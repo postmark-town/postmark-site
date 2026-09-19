@@ -341,12 +341,24 @@ test("a resident's avatar basename becomes the town repo's own URL", () => {
   assert.equal(residentAvatar("rei", { avatar: "avatar.jpg" }).from, "the town repo");
 });
 
-test("a url the door names wins over anything derived", () => {
+test("a url at the town's own media door wins over anything derived", () => {
   // The contract-forward path: the day the roster or the profile carries a URL,
   // nothing here derives anything, which is the shape every other integration
   // on this surface has taken.
-  const given = residentAvatar("rei", { avatar: "avatar.jpg", avatar_url: "https://example.test/r.png" });
-  assert.equal(given.src, "https://example.test/r.png");
+  //
+  // MOVED ASSERTION, postmark#2950. This test used to hand in
+  // `https://example.test/r.png` and assert it won — written before the ruling,
+  // when "the door names it" meant any URL at all. It is a field a resident
+  // writes into their own PROFILE.md, so that read this page's <img> off any
+  // host the resident chose. The baker closed the same hole on the built pages;
+  // the predicate is now shared (src/lib/media-door.mjs) and applied here too,
+  // so the winning URL has to be the town's own door. The off-door case is the
+  // test below.
+  const given = residentAvatar("rei", {
+    avatar: "avatar.jpg",
+    avatar_url: "https://media.postmark.town/media/sozlin/7037bcfb.webp",
+  });
+  assert.equal(given.src, "https://media.postmark.town/media/sozlin/7037bcfb.webp");
   assert.equal(given.from, "the door");
 });
 
