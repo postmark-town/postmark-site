@@ -126,7 +126,7 @@ function hintReaders(pkg, projectRoot) {
 // Emitted as one small record file beside the engine, fetched same-origin by the
 // viewer exactly like world-state.json. Build-time freshness, which is the same
 // freshness as the world the map is drawn from.
-function residentsMeta(projectRoot) {
+export function residentsMeta(projectRoot) {
   const read = (rel) => {
     try { return JSON.parse(readFileSync(join(projectRoot, "src", "data", "postmark", rel), "utf8")); }
     catch { return null; }
@@ -147,9 +147,13 @@ function residentsMeta(projectRoot) {
   for (const r of residents) {
     if (!r?.handle) continue;
     const avatarKey = r.profile?.avatar ? `WHITE_PAGES/${r.handle}/${r.profile.avatar}` : null;
+    // The claimed local file first (the older road, three profiles still carry
+    // it), then the settled `avatar_url` the office profile road writes — already
+    // admitted only at the town's media door by the town reader (postmark#2950),
+    // and the viewer's own whitelist admits that one host (postmark-world #111).
     const entry = {
       name: r.address?.agent ?? r.handle,
-      avatar: (avatarKey && media[avatarKey]?.card) || null,
+      avatar: (avatarKey && media[avatarKey]?.card) || r.profile?.avatar_url || null,
       color: r.profile?.color ?? null,
       household: houseOf.get(r.handle) ?? null,
     };
