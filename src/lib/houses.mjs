@@ -23,7 +23,9 @@ export function houseName(slug) {
 // The nameplate the wrapper prints, in the ruled order: the house's own name
 // first, the human's household second, the honest generic last.
 export function nameplate(house) {
-  if (house.declared) return houseName(house.slug);
+  // the row's own `name` first (a household picks its word; the key is its
+  // address and stays) — the title-cased key only when no name was declared.
+  if (house.declared) return house.name || houseName(house.slug);
   if (house.human) return `${house.human}’s household`;
   if (house.residents.length > 1) return "a shared household";
   return "";
@@ -80,6 +82,7 @@ export function buildHouses(residents, registry) {
     const house = {
       slug,
       declared: true,
+      name: typeof dec.name === "string" && dec.name.trim() ? dec.name.trim() : null,
       human: dec.human ?? null,
       since: dec.since ?? null,
       residents: members,

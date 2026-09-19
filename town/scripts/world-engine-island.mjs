@@ -141,7 +141,7 @@ function residentsMeta(projectRoot) {
   // "the-rookery" reads as The Rookery here exactly as it does on every page.
   const houseOf = new Map();
   for (const [slug, dec] of Object.entries(registry.households ?? {}))
-    for (const h of dec.residents ?? []) houseOf.set(h, houseName(slug));
+    for (const h of dec.residents ?? []) houseOf.set(h, (typeof dec.name === "string" && dec.name.trim()) || houseName(slug));
 
   const out = {};
   for (const r of residents) {

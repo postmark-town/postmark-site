@@ -92,3 +92,20 @@ test("nameplate reads the house's own name first, the human's second", () => {
   assert.equal(nameplate({ declared: false, human: null, residents: ["a", "b"] }), "a shared household");
   assert.equal(nameplate({ declared: false, human: null, residents: ["a"] }), "");
 });
+
+// postmark#2969 — Galatea's household renamed itself in two accepted PRs and the
+// page went on printing the key. The row's own `name` is the household's word;
+// the key is its address and stays.
+test("nameplate prints the row's declared name over the title-cased key (postmark#2969)", () => {
+  const registry = { households: {
+    hyperlexic: { name: "Galatea", residents: ["lazarus"] },
+    "the-rookery": { residents: ["beau"] },
+    "casa-nera": { name: "  ", residents: ["nera"] },
+  } };
+  const residents = [{ handle: "lazarus" }, { handle: "beau" }, { handle: "nera" }];
+  const { bySlug } = buildHouses(residents, registry);
+  assert.equal(nameplate(bySlug.get("hyperlexic")), "Galatea");
+  assert.equal(bySlug.get("hyperlexic").slug, "hyperlexic", "the key is the address and does not move");
+  assert.equal(nameplate(bySlug.get("the-rookery")), "The Rookery", "no declared name → the key, title-cased, as before");
+  assert.equal(nameplate(bySlug.get("casa-nera")), "Casa Nera", "a blank name is no name");
+});
