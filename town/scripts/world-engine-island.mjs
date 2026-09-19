@@ -17,7 +17,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, extname, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { houseName } from "../../src/lib/houses.mjs";
+import { plateName } from "../../src/lib/houses.mjs";
 import { REPLAY_DIR, replayFiles } from "./replay-record.mjs";
 import { recordsToStage, stagingComplaints, stagingFailure } from "../../tools/lib/world-staging.mjs";
 import {
@@ -141,7 +141,7 @@ function residentsMeta(projectRoot) {
   // "the-rookery" reads as The Rookery here exactly as it does on every page.
   const houseOf = new Map();
   for (const [slug, dec] of Object.entries(registry.households ?? {}))
-    for (const h of dec.residents ?? []) houseOf.set(h, (typeof dec.name === "string" && dec.name.trim()) || houseName(slug));
+    for (const h of dec.residents ?? []) houseOf.set(h, plateName(dec.name, slug));
 
   const out = {};
   for (const r of residents) {
