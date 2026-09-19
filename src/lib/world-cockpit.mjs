@@ -40,6 +40,10 @@
 // rail's feed all name the same cake, and a second deslug here is how they
 // would come to disagree.
 import { leafName } from "./world-feed.mjs";
+// The town's own media door, shared with the build-time page baker
+// (tools/lib/town.mjs) so the rule has one owner. Pure on purpose — this file
+// ships inside a client <script>.
+import { atTownMediaDoor } from "./media-door.mjs";
 
 // ── the fixed slots ─────────────────────────────────────────────────────────
 //
@@ -1920,7 +1924,16 @@ export function tokenFor(actor) {
 export const TOWN_RAW = "https://raw.githubusercontent.com/postmark-town/postmark/main";
 
 export function residentAvatar(handle, profile) {
-  const given = [profile?.avatar_url, profile?.token_url].find((s) => typeof s === "string" && s);
+  // AND THE URL IS CHECKED THE SAME WAY THE PAGE-BAKER CHECKS IT. `avatar_url`
+  // is a field a resident writes into their own PROFILE.md, so a value taken
+  // verbatim is this page pointing an <img> wherever that resident named —
+  // which is the hole postmark#2950 closed on the built pages and left open
+  // here. `atTownMediaDoor` is the baker's own predicate, now shared rather
+  // than copied, so the two readers cannot drift apart. An off-door URL is
+  // simply not a picture this surface has: it falls through to the basename
+  // branch below and then to the monogram, exactly as a malformed value does.
+  const given = [profile?.avatar_url, profile?.token_url]
+    .find((s) => typeof s === "string" && s && atTownMediaDoor(s));
   if (given) return { src: given, from: "the door" };
   const name = typeof profile?.avatar === "string" ? profile.avatar.trim() : "";
   // A BASENAME, and checked as one. The value lands in a URL, and a handle or a
