@@ -24,8 +24,11 @@ import {
   importClosure, moduleEntryPaths, noEntryFailure, preloadTags,
   sameOriginDemands, unstagedModuleFailure,
 } from "../../tools/lib/world-preload.mjs";
+import { settlementStamp, stampedExportText, STAMPED_RECORD } from "../../tools/lib/world-stamp.mjs";
+import { worldPin } from "../../tools/lib/world-pin-publish.mjs";
 
 const META_PATH = "/world-engine/residents-meta.json";
+const STAMPED_PATH = `/${STAMPED_RECORD}`;
 
 // ── THE DISPLAY PIN (founder, 2026-09-10 21:0x EDT: "revert the DISPLAY to
 // include the old atlas html again while keeping the DATA at the most recent
@@ -169,6 +172,32 @@ function pkgRoot(projectRoot) {
   return existsSync(p) ? p : null;
 }
 
+// ── THE EXPORT SAYS WHICH SETTLEMENT IT IS (postmark#2923) ──────────────────
+//
+// `postmark.town/WORLD/world-state.json` is the pinned fold, and until now a
+// reader who downloaded it could not tell which settlement it reflected. The
+// fold cannot stamp itself — it is computed before the blessing, and the number
+// is read from a tag the keeper pushes about twenty minutes after the fold's
+// own commit — so the world half of #2923 was stopped on 2026-09-18 and
+// re-homed here. THIS is the step that knows: the copy is made here, and the
+// site is the only place holding both the commit it installed and the record
+// that says what that commit was blessed as.
+//
+// The decision (and its two sources, and what an unknown looks like) is
+// `tools/lib/world-stamp.mjs`; this function is only the three reads.
+export function exportStamp(projectRoot, env = process.env) {
+  let record = null;
+  try {
+    record = JSON.parse(readFileSync(join(projectRoot, "src", "data", "postmark", "settlements.json"), "utf8"));
+  } catch { /* an absent record is a real state, and the stamp says so in its own words */ }
+  // the sha the build actually COMPILED against, read off the lockfile by the
+  // function that already owns that law rather than spelled a second time
+  let installedSha = null;
+  try { installedSha = worldPin({ root: projectRoot, env }).world_installed; }
+  catch { /* likewise: unreadable is reported by the stamp, never guessed at */ }
+  return settlementStamp({ record, installedSha, envSettlement: env.PUBLIC_WORLD_SETTLEMENT ?? null });
+}
+
 /** does the pinned package carry this file? the one seam the checks touch */
 const packageHas = (pkg) => (rel) => existsSync(join(pkg, ...rel.split("/")));
 
@@ -216,12 +245,24 @@ function stagingWalk(pkg, projectRoot) {
   return files;
 }
 
-function stage(pkg, dest, projectRoot) {
+export function stage(pkg, dest, projectRoot, env = process.env) {
   const files = stagingWalk(pkg, projectRoot);
+  const stamp = exportStamp(projectRoot, env);
   for (const file of files) {
     const output = join(dest, ...file.publicPath.slice(1).split("/"));
     mkdirSync(dirname(output), { recursive: true });
-    cpSync(file.source, output);
+    // Every record is copied byte for byte except the one that must say which
+    // settlement it is, and that one is SPLICED rather than re-serialised: the
+    // published export is today byte-identical to the world repo's own file and
+    // readers diff it against that, so a whitespace-only rewrite of 0.93 MB
+    // would be a false positive somebody has to chase.
+    if (file.publicPath === STAMPED_PATH) {
+      writeFileSync(output, stampedExportText(readFileSync(file.source, "utf8"), stamp));
+      console.log(`[world-engine-island] the export is stamped ${stamp.settlement ?? "(unnamed)"}${stamp.from ? ` from the ${stamp.from}` : ""}.`);
+      for (const note of stamp.notes) console.warn(`[world-engine-island] world-state stamp: ${note}`);
+    } else {
+      cpSync(file.source, output);
+    }
   }
   // the faces: derived, not copied, so it is written rather than staged. Absent
   // data means no file, and the viewer's own fallback (monograms) is already the
@@ -372,6 +413,14 @@ export default function worldEngineIsland() {
           }
           const file = stagingWalk(pkg, projectRoot).find((entry) => entry.publicPath === pathname);
           if (!file) return next();
+          // the stamped export is stamped in BOTH habitats — this file's whole
+          // premise is that dev serves the same surface a build emits, and an
+          // export that says which settlement it is only in prod is the kind of
+          // difference that gets found in prod
+          if (pathname === STAMPED_PATH) {
+            res.setHeader("content-type", MIME[".json"]);
+            return res.end(stampedExportText(readFileSync(file.source, "utf8"), exportStamp(projectRoot)));
+          }
           res.setHeader("content-type", MIME[extname(file.source)] ?? "application/octet-stream");
           res.end(readFileSync(file.source));
         });
