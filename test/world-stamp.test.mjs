@@ -209,3 +209,111 @@ test("something that is not a JSON object is REFUSED rather than stamped into no
   const stamp = settlementStamp({ record: RECORD, installedSha: S73_FULL, envSettlement: "73" });
   assert.throws(() => stampedExportText("not json at all", stamp), /refusing to stamp/);
 });
+
+// ── the wiring ──────────────────────────────────────────────────────────────
+//
+// Everything above proves the stamp's LAW from fixtures, and a law nothing calls
+// is a law nobody obeys: `stage()` could copy the export byte for byte and every
+// test above would still be green. These run the real `stage()` over a fixture
+// package and read the file it emitted, which is the thing the reader actually
+// receives.
+
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { exportStamp, stage } from "../town/scripts/world-engine-island.mjs";
+
+const FIXTURE_SHA = "b7c912dda0000000000000000000000000000000"; // S72's commit
+const FOLD = '{\n  "tick": 0,\n  "marks": [],\n  "parcels": []\n}\n';
+const SKELETON = '{\n  "light": 1\n}\n';
+
+/** a package and a project root with exactly the parts `stage()` reads */
+function fixture() {
+  const root = mkdtempSync(join(tmpdir(), "world-stamp-"));
+  const pkg = join(root, "node_modules", "postmark-world");
+  const put = (base, rel, text) => {
+    const path = join(base, ...rel);
+    mkdirSync(join(path, ".."), { recursive: true });
+    writeFileSync(path, text);
+    return path;
+  };
+  // the package: a viewer that ASKS this origin for the record (which is what
+  // causes it to be staged at all), one engine module, and two records
+  // the staged set is DERIVED from demand, so the second record has to be asked
+  // for too — it is here as the control that proves only the export is rewritten
+  put(pkg, ["spectator", "viewer.mjs"], 'fetch("/WORLD/world-state.json");\nfetch("/WORLD/skeleton.json");\n');
+  put(pkg, ["tools", "engine.mjs"], "export const x = 1;\n");
+  put(pkg, ["WORLD", "world-state.json"], FOLD);
+  put(pkg, ["WORLD", "skeleton.json"], SKELETON);
+  // the site: the pin the build compiled against, and the town's record
+  put(root, ["package.json"], JSON.stringify({ dependencies: { "postmark-world": `github:postmark-town/postmark-world#${FIXTURE_SHA}` } }));
+  put(root, ["package-lock.json"], JSON.stringify({
+    packages: { "node_modules/postmark-world": { resolved: `git+ssh://git@github.com/postmark-town/postmark-world.git#${FIXTURE_SHA}` } },
+  }));
+  put(root, ["src", "data", "postmark", "settlements.json"], JSON.stringify(RECORD));
+  put(root, ["town", "page.mjs"], 'fetch("/WORLD/world-state.json");\n');
+  return { root, pkg, dest: mkdtempSync(join(tmpdir(), "world-stamp-dest-")) };
+}
+
+const stagedExport = (dest) => readFileSync(join(dest, "WORLD", "world-state.json"), "utf8");
+
+test("THE ASK, WIRED: the export `stage()` emits carries the settlement the pin resolves to", () => {
+  const { root, pkg, dest } = fixture();
+  try {
+    stage(pkg, dest, root, { PUBLIC_WORLD_SETTLEMENT: "73" });
+    const staged = JSON.parse(stagedExport(dest));
+    assert.equal(staged.settlement, "S73");
+    assert.equal(staged.as_of.sha, "54a437a72");
+    assert.deepEqual(staged.as_of, RECORD.current);
+    // and it is still the fold it was
+    assert.deepEqual(staged.marks, []);
+    assert.equal(staged.tick, 0);
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(dest, { recursive: true, force: true }); }
+});
+
+test("with no resolver in the build, the staged export names the settlement the INSTALLED commit was blessed as", () => {
+  const { root, pkg, dest } = fixture();
+  try {
+    stage(pkg, dest, root, {});
+    const staged = JSON.parse(stagedExport(dest));
+    assert.equal(staged.settlement, "S72");           // the fixture pin is S72's commit
+    assert.equal(staged.as_of.sha, "b7c912dda");
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(dest, { recursive: true, force: true }); }
+});
+
+test("EVERY OTHER RECORD IS STILL A COPY — only the export is rewritten", () => {
+  const { root, pkg, dest } = fixture();
+  try {
+    stage(pkg, dest, root, { PUBLIC_WORLD_SETTLEMENT: "73" });
+    assert.equal(readFileSync(join(dest, "WORLD", "skeleton.json"), "utf8"), SKELETON,
+      "a record that is not the export must reach the output byte for byte");
+    // the export's own bytes after the opening brace survive the splice
+    assert.ok(stagedExport(dest).endsWith(FOLD.slice(FOLD.indexOf("{") + 1)),
+      "the fold's own text must be untouched below the stamp");
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(dest, { recursive: true, force: true }); }
+});
+
+test("a build with no settlements record still stages the export, stamped null with its reason", () => {
+  const { root, pkg, dest } = fixture();
+  try {
+    rmSync(join(root, "src", "data", "postmark", "settlements.json"));
+    stage(pkg, dest, root, {});
+    const staged = JSON.parse(stagedExport(dest));
+    assert.equal(staged.settlement, null);
+    assert.ok(staged.settlement_note.includes("fetch-town.mjs"));
+    assert.deepEqual(staged.marks, [], "the record is still served — an unnameable settlement is not a broken build");
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(dest, { recursive: true, force: true }); }
+});
+
+test("exportStamp reads the lockfile, not the spec — that is the sha the build COMPILED against", () => {
+  const { root } = fixture();
+  try {
+    // the spec asks for something else; the lockfile is what `npm ci` installs
+    writeFileSync(join(root, "package.json"),
+      JSON.stringify({ dependencies: { "postmark-world": "github:postmark-town/postmark-world#1984062fa00000000000000000000000000000000".slice(0, 55) } }));
+    const stamp = exportStamp(root, {});
+    assert.equal(stamp.settlement, "S72", "the lockfile's sha decides, because it is what was installed");
+    assert.equal(stamp.from, "installed-sha");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
