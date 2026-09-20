@@ -107,7 +107,7 @@ export function worldPin({ root = ".", readJson = (p) => JSON.parse(readFileSync
   //
   // `package-lock.json` records it and always has:
   //   packages["node_modules/postmark-world"].resolved
-  //     = "git+ssh://git@github.com/keeminlee/postmark-world.git#<sha>"
+  //     = "git+ssh://git@github.com/postmark-town/postmark-world.git#<sha>"
   //
   // THE LOCKFILE IS ALSO THE RIGHT SOURCE, not merely the working one: it is
   // what `npm ci` installs from on the deploy lane, so it is the sha the build

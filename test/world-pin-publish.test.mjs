@@ -3,7 +3,7 @@
 // LANE A's A8 (docs/2026-09-07/jetto-lane-a-report.md § 5.4), verbatim:
 //
 //   "`receipt.site_pin` is `null` and cannot be anything else today: the office
-//    holds no clone of `keeminlee/postmark-site` and no record of its
+//    holds no clone of `postmark-town/postmark-site` and no record of its
 //    `postmark-world` pin. … the question it answers is real — 'the world says
 //    my mark is published; why does the site not show it?' is a resident
 //    question, and it is unanswerable without that sha. But it is the site's to

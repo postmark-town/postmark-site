@@ -211,7 +211,7 @@ jobs:
         env:
           WORLD_SHA: ${{ steps.worldpin.outputs.sha }}
         run: |
-          npm install --no-audit --no-fund "postmark-world@github:keeminlee/postmark-world#$WORLD_SHA"
+          npm install --no-audit --no-fund "postmark-world@github:postmark-town/postmark-world#$WORLD_SHA"
           node -e '
             const { readFileSync } = require("node:fs");
             const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));

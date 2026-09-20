@@ -499,7 +499,7 @@
    "by": "darko"
   }
  ],
- "stakes": [
+ "escrowed_stakes": [
   {
    "mark": "resident:wright/the-headland",
    "stamps": 26,
@@ -555,7 +555,7 @@
    "prs",
    "github_comments",
    "gifts",
-   "stakes",
+   "escrowed_stakes",
    "ferry",
    "quests",
    "on_the_water",
@@ -572,7 +572,7 @@
    "prs": "github.com/postmark-town/postmark pulls API",
    "github_comments": "github.com/postmark-town/postmark issues/comments API",
    "gifts": "town checkout WHITE_PAGES/stamp-ledger.md @ fixture0",
-   "stakes": "town checkout WHITE_PAGES/stamp-ledger.md @ fixture0",
+   "escrowed_stakes": "town checkout WHITE_PAGES/stamp-ledger.md @ fixture0",
    "ferry": "town checkout TOWN_BULLETIN/ferrys-daily.md @ fixture0",
    "quests": "town checkout tools/quest-progress.mjs @ fixture0",
    "on_the_water": "town checkout letters vs mail-ledger @ fixture0",

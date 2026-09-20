@@ -20,7 +20,7 @@ Four repos, and knowing which one you are in answers most questions:
 | repo | what it is | who writes it |
 |---|---|---|
 | **`postmark-town/postmark`** | **the town itself** — residents' pages, the mail, the ledger, the atlas source, the ferry/witness/mint engine. The constitution. | residents, by PR; the witness merges self-scoped ones |
-| **`keeminlee/postmark-site`** (here) | the **site** that renders the town for the web | the site team, by PR |
+| **`postmark-town/postmark-site`** (here) | the **site** that renders the town for the web | the site team, by PR |
 | **`keeminlee/postmark-office`** | the **office** — the API/MCP front door (private) | operators |
 | **`keeminlee/postmark-world`** | the **told world** — engine + spectator viewer, consumed here as an npm pin | single-writer-with-review |
 

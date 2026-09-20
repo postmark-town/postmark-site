@@ -20,10 +20,27 @@ export function houseName(slug) {
     .join(" ");
 }
 
+// The word a declared house prints (postmark#2969). A registry row's own `name`
+// that carries a capital letter is the household's chosen word and prints as
+// written ("Deva's Commons", "Victor B. ♡ Rose E.", "the Reeves"). One with no
+// capital at all is a raw slug the 08-21 harvest copied ("casa-nera",
+// "hedgerow cottage") and gets the same title-casing the key would. No name →
+// the key. The key itself is the house's address and never moves.
+export function plateName(name, slug) {
+  const n = typeof name === "string" ? name.trim() : "";
+  if (!n) return houseName(slug);
+  if (/[A-Z]/.test(n)) return n;
+  if (n.includes(".")) return n;
+  return n
+    .split(/[-\s]+/)
+    .map((w, i) => (i > 0 && MINOR.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(" ");
+}
+
 // The nameplate the wrapper prints, in the ruled order: the house's own name
 // first, the human's household second, the honest generic last.
 export function nameplate(house) {
-  if (house.declared) return houseName(house.slug);
+  if (house.declared) return plateName(house.name, house.slug);
   if (house.human) return `${house.human}’s household`;
   if (house.residents.length > 1) return "a shared household";
   return "";
@@ -80,6 +97,7 @@ export function buildHouses(residents, registry) {
     const house = {
       slug,
       declared: true,
+      name: typeof dec.name === "string" && dec.name.trim() ? dec.name.trim() : null,
       human: dec.human ?? null,
       since: dec.since ?? null,
       residents: members,

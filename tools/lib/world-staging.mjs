@@ -71,17 +71,58 @@ const RECORD_LITERAL = new RegExp(`["'](/(?:${RECORD_ROOTS.join("|")})/[A-Za-z0-
  * Source text with its comments removed, so prose about a path is not mistaken
  * for a demand for it.
  *
- * Conservative on purpose. A `//` that follows `:` is a URL scheme, not a
- * comment — that one case is worth handling because half the comments in this
- * codebase discuss URLs. Everything else a real parser would catch and this
- * does not (a `//` inside a string literal) fails in the LOUD direction: the
- * demand survives, the build asks for a file, and if the package has it nothing
- * happens at all.
+ * ── ONE PASS, IN SOURCE ORDER, AND THAT IS THE WHOLE POINT ─────────────────
+ *
+ * This used to be two passes: every block comment removed first, then every
+ * line comment. Two passes cannot express "whichever opener comes first wins",
+ * and a comment stripper that reads out of source order is not conservative,
+ * it is wrong in the QUIET direction — it deletes code.
+ *
+ * The instance, measured on the pinned viewer (postmark-town/postmark#2867).
+ * The world viewer's header draws the habitat table in line comments:
+ *
+ *     //   • LOCAL (spectator/server.mjs)  — /WORLD/* off disk, /api/walks live,
+ *
+ * The `/*` inside `/WORLD/*` is dead text to any real parser — it sits in a
+ * line comment. To a block-comments-first pass it is an OPENER, and the fake
+ * comment it opens runs to the next real `* /` fifty-five lines below, taking
+ * every one of the viewer's 11 `import` lines with it. Four such windows in
+ * that file, five more readers in this repo with the same header habit; the
+ * demand scan saw 0 of the viewer's 11 imports and 6,430 bytes of its text
+ * were gone before `recordDemands` ever looked.
+ *
+ * No record demand actually lived inside those windows on the pin this was
+ * measured against, so nothing was mis-staged — which is exactly the shape of
+ * a bug worth fixing before it costs something. A record read that moved into
+ * one of those windows would have vanished silently, the page would have
+ * 404'd in prod, and the viewer answers a 404 by reading the world's main tip.
+ * That is the failure this whole module exists to make impossible, arriving
+ * through the stripper instead of through a hand-kept list.
+ *
+ * SWAPPING THE TWO PASSES IS NOT THE FIX, and it is the repair a reader will
+ * reach for first. Line-comments-first is wrong in the mirror direction: given
+ * `/* a note // with an opener * / fetch("/WORLD/real.json")`, the line pass
+ * runs to end of line, eats the block's own close AND the demand behind it, and
+ * the record vanishes exactly as before — same silent 404, opposite cause.
+ * Neither order is right at every position, which is the point.
+ *
+ * So: one alternation, applied together, left to right. At each position a
+ * line comment or a block comment, whichever starts there — and whichever one
+ * matches consumes its text, so an opener inside the other's body is never
+ * seen. `//` and `/*` are peers, not stages.
+ *
+ * Conservative on purpose, otherwise unchanged. A `//` that follows `:` is a
+ * URL scheme, not a comment — that one case is worth handling because half the
+ * comments in this codebase discuss URLs. Everything else a real parser would
+ * catch and this does not (a `//` inside a string literal) fails in the LOUD
+ * direction: the demand survives, the build asks for a file, and if the package
+ * has it nothing happens at all.
  */
 export function stripComments(source) {
-  return String(source ?? "")
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  return String(source ?? "").replace(
+    /(^|[^:])\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+    (_match, beforeLineComment) => (beforeLineComment === undefined ? " " : beforeLineComment),
+  );
 }
 
 /**

@@ -16,6 +16,10 @@
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { FAILSAFE_SCHEMA, load as parseYaml } from "js-yaml";
+// The media-door rule is shared with the browser-bundled world cockpit, so it
+// lives in a pure module both can import (src/lib/media-door.mjs). This reader
+// applies it at build time; the cockpit applies it at runtime.
+import { atTownMediaDoor } from "../../src/lib/media-door.mjs";
 
 const IMAGE_RE = /\.(png|jpe?g|webp|gif)$/i;
 
@@ -59,8 +63,11 @@ function rel(townRoot, abs) {
 // PROFILE.md is resident-authored expression, not a join contract. Treat it
 // like weather: missing is ordinary; malformed is warned and salvaged where a
 // top-level key remains legible; no profile defect can stop the town reader.
-const PROFILE_STRING_FIELDS = ["avatar", "color", "color_name", "bio", "runtime"];
+const PROFILE_STRING_FIELDS = ["avatar", "avatar_url", "color", "color_name", "bio", "runtime"];
 
+// The town's own media door. `avatar_url` is the only profile field that lands
+// on the page as a URL the site never processed, so the one thing that makes it
+// safe is that it can name nowhere else.
 function profileFrontmatter(text) {
   const source = String(text).replace(/^\uFEFF/, "");
   const match = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(source);
@@ -133,6 +140,18 @@ function normalizeProfile(raw, profilePath, problems) {
   if (profile.avatar && (profile.avatar === "." || profile.avatar === ".." || /[\\/]/.test(profile.avatar))) {
     delete profile.avatar;
     problems.push(`invalid resident profile avatar filename: ${profilePath}`);
+  }
+
+  // `avatar_url` is what the settled office profile road writes: a complete URL
+  // at the town's media door, never a file beside PROFILE.md. It is not claimed
+  // and never becomes a claimed asset — the page prints it verbatim — so it is
+  // admitted only when it names the town's own door, and dropped the same way a
+  // traversing filename is when it names anything else.
+  if (profile.avatar_url && !atTownMediaDoor(profile.avatar_url)) {
+    delete profile.avatar_url;
+    problems.push(`invalid resident profile avatar_url (not the town media door): ${profilePath}`);
+  } else if (profile.avatar_url === "") {
+    delete profile.avatar_url;
   }
   return profile;
 }

@@ -111,41 +111,63 @@ function pageFileFor(path) {
 // from source with its prose blanked out.
 //
 // Three forms, each blanked to spaces rather than deleted so that line
-// structure survives for the pass after it:
+// structure survives:
 //   · HTML          <!-- … -->
 //   · JSX / Astro   a brace-wrapped block comment, and any bare block comment,
 //                   which also covers the frontmatter and the <style> block
 //   · line          `// …` to end of line, OUTSIDE quotes only
 //
-// The line pass is the one with teeth, because `https://` is not a comment. It
-// walks the line tracking `"`, `'` and backtick, ignores a `//` inside any of
-// them, and additionally declines a `//` preceded by `:` or `(` — the protocol
-// and `url(//…)` cases. A `//` that survives all of that is prose.
+// ONE PASS, IN SOURCE ORDER (#2877, the sibling of #2867). The first cut ran
+// the block shapes as regex passes FIRST and the line pass second, so a `/*`
+// mentioned inside a `// …` line opened a fake block that swallowed real
+// markup up to the next `*/` — two real hrefs on the 09-16 pages vanished
+// before the walk saw them, and a dead link behind such a window passed. Now
+// every opener is recognised at the position it opens, left to right, and
+// whichever opens first consumes its body: a `/*` inside a line comment opens
+// nothing, a `//` inside a block ends nothing.
+//
+// The line shape is the one with teeth, because `https://` is not a comment.
+// Quotes — `"`, `'` and backtick — are tracked per line, a `//` inside any of
+// them is prose, and a `//` preceded by `:` or `(` is a protocol or `url(//…)`.
+// The block shapes are recognised regardless of quotes, as before: an id quoted
+// inside a comment must not count, whatever the comment is standing in.
 export function stripComments(src) {
-  const blank = (m) => m.replace(/[^\n]/g, " ");
-  let s = src
-    .replace(/<!--[\s\S]*?-->/g, blank)
-    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, blank)
-    .replace(/\/\*[\s\S]*?\*\//g, blank);
-
-  return s.split("\n").map((line) => {
-    let quote = null;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (quote) {
-        if (c === "\\") i++;
-        else if (c === quote) quote = null;
-        continue;
-      }
-      if (c === '"' || c === "'" || c === "`") { quote = c; continue; }
-      if (c === "/" && line[i + 1] === "/") {
-        const before = line[i - 1];
-        if (before === ":" || before === "(") continue; // https://… and url(//…)
-        return line.slice(0, i);
-      }
+  const s = String(src);
+  let out = "";
+  let i = 0;
+  let quote = null;
+  const blankTo = (end) => { out += s.slice(i, end).replace(/[^\n]/g, " "); i = end; };
+  const closeOf = (openLen, close) => { const e = s.indexOf(close, i + openLen); return e < 0 ? s.length : e + close.length; };
+  while (i < s.length) {
+    const c = s[i];
+    if (c === "\n") { out += c; i++; quote = null; continue; }
+    if (s.startsWith("<!--", i)) { blankTo(closeOf(4, "-->")); continue; }
+    const jsx = /^\{\s*\/\*/.exec(s.slice(i, i + 16));
+    if (jsx) {
+      const open = i + jsx[0].length - 2;            // the `/*` inside the brace
+      const e = s.indexOf("*/", open + 2);
+      const end = e < 0 ? s.length : e + 2;
+      const brace = e < 0 ? null : /^\s*\}/.exec(s.slice(end, end + 16));
+      if (brace) { blankTo(end + brace[0].length); continue; }   // `{ /* … */ }` whole
+      out += s.slice(i, open); i = open; blankTo(end); continue; // a bare block after a brace
     }
-    return line;
-  }).join("\n");
+    if (s.startsWith("/*", i)) { blankTo(closeOf(2, "*/")); continue; }
+    if (quote) {
+      if (c === "\\") { out += s.slice(i, i + 2); i += 2; continue; }
+      if (c === quote) quote = null;
+      out += c; i++; continue;
+    }
+    if (c === '"' || c === "'" || c === "`") { quote = c; out += c; i++; continue; }
+    if (c === "/" && s[i + 1] === "/") {
+      const before = s[i - 1];
+      if (before === ":" || before === "(") { out += c; i++; continue; } // https://… and url(//…)
+      const eol = s.indexOf("\n", i);
+      blankTo(eol < 0 ? s.length : eol);                                  // the newline itself stays
+      continue;
+    }
+    out += c; i++;
+  }
+  return out;
 }
 
 /** A page's source as the reader sees it: prose blanked, markup left alone. */
@@ -323,4 +345,27 @@ test("every real page still parses to at least one id — stripping has not blan
     assert.ok(idsIn(sourceOf(join(PAGES, "town", "index.astro"))).has(anchor),
       `the hub's \`${anchor}\` anchor did not survive stripping`);
   }
+});
+
+// ── ONE PASS, IN SOURCE ORDER (#2877, sibling of #2867) ──────────────────────
+// Block comments stripped first and line comments second let a `/*` mentioned
+// inside a `// …` line open a fake block that swallowed real markup up to the
+// next `*/`. Two real hrefs vanished that way before the walk saw them, and a
+// dead link behind such a window would have passed.
+test("a `/*` inside a line comment opens no block, and a `//` inside a block ends nothing", () => {
+  const src = [
+    "// the old reader used /* to open a block here",
+    '<a href="#after">after the window</a>',
+    '<section id="after"></section>',
+    "/* a real block that mentions // a line comment",
+    '   and ends here */ <span id="tail"></span>',
+  ].join("\n");
+  assert.deepEqual([...idsIn(stripComments(src))].sort(), ["after", "tail"],
+    "the `/*` in the line comment swallowed the markup up to the real block's `*/`");
+  assert.equal(linkIsDead(src, "after"), false, "the link to #after reads dead because its anchor was blanked");
+
+  // AND THE FIXTURE BITES: the 09-16 order (blocks first) on the same text loses
+  // the anchor — otherwise the assertion above proves nothing about the order.
+  const blocksFirst = src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
+  assert.equal(idsIn(blocksFirst).has("after"), false, "this fixture does not exercise the two-pass order");
 });

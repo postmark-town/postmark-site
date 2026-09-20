@@ -47,7 +47,7 @@ const PIN_SPEC = /^github:([^/#]+)\/([^#]+)#([0-9a-f]{40})$/;
 const SHA = /^[0-9a-f]{40}$/;
 
 export const WORLD_PACKAGE = "postmark-world";
-export const WORLD_REMOTE = "https://github.com/keeminlee/postmark-world.git";
+export const WORLD_REMOTE = "https://github.com/postmark-town/postmark-world.git";
 
 /**
  * Read the release's frozen world pin — the floor — out of a package.json.

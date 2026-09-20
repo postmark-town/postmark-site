@@ -155,7 +155,13 @@ function view(r) {
     profileBio: excerpt(profile.bio, 400),
     profileRuntime: excerpt(profile.runtime, 72),
     profileColorName: excerpt(profile.color_name, 56),
-    avatarUrl: avatarKey && media[avatarKey] ? media[avatarKey].card : null,
+    // Local first, then the field the office profile road actually writes. The
+    // claimed local file is the older road and three profiles still carry both,
+    // so keeping it first means those pages render exactly as they did today.
+    // `avatar_url` is a complete town-media URL — normalizeProfile has already
+    // refused any host but the town's own media door — and it is used verbatim
+    // because it is not a claimed asset and has no entry in the media map.
+    avatarUrl: (avatarKey && media[avatarKey] ? media[avatarKey].card : null) ?? profile.avatar_url ?? null,
     monogram: Array.from(String(name).trim())[0]?.toLocaleUpperCase() ?? "?",
     continuityStart,
     continuity: continuityDays(continuityStart),

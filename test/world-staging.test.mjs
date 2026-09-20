@@ -170,6 +170,128 @@ test('a URL scheme is not a comment, so stripping does not eat the line it sits 
   assert.deepEqual(recordDemands([{ name: "s", text: source }]).map((d) => d.record), ["WORLD/real.json"]);
 });
 
+// ---------------------------------------------------------------------------
+// THE TWO OPENERS ARE PEERS, NOT STAGES (postmark-town/postmark#2867)
+// ---------------------------------------------------------------------------
+//
+// The stripper used to remove every block comment first and every line comment
+// second. Two passes cannot ask "which opener came first", so a `/*` written
+// inside a LINE comment — which is dead text to any real parser — opened a fake
+// block that ran to the next real close and deleted the code in between.
+//
+// Measured on the world pin this train builds against: the viewer's own habitat
+// table says `/WORLD/* off disk` in a line comment, and the window that opened
+// there swallowed 6,430 bytes and ALL ELEVEN of the viewer's `import` lines
+// before `recordDemands` looked at it. Five more readers in this repo carry the
+// same header habit. No record literal happened to live inside those windows, so
+// nothing was mis-staged — which is the only reason this is a fix and not an
+// outage. A read that moved into one would have vanished silently, the page
+// would have 404'd, and the viewer answers a 404 by reading the world's main tip.
+//
+// Every case below is written with LITERAL expectations rather than quantities
+// the stripper also produces, because a probe whose two numbers move together is
+// not a probe.
+
+test('the two openers are peers: a /* inside a line comment is dead text, and the imports below it survive', () => {
+  // THE VIEWER'S REAL SHAPE — and the closing `*/` below the imports is the part
+  // that makes this a probe rather than a sentence. A fake block only forms when
+  // some LATER `*/` closes it; with no closer the lazy block pattern matches
+  // nothing and even the broken order returns the source untouched. The first
+  // cut of this test had no closer and stayed green under its own flip.
+  const source = [
+    `// ── HABITATS ────────────────────────────────────────────────`,
+    `//   • LOCAL (spectator/server.mjs)  — /WORLD/* off disk, /api/walks live,`,
+    `//   • ISLAND (postmark.town/world)  — /WORLD/* staged beside the page at build`,
+    `import { drawGround } from "../tools/ground.mjs";`,
+    `import { marks } from "../tools/mark-class.mjs";`,
+    `const state = recordSources("/WORLD/world-state.json");`,
+    `/* an ordinary block comment further down the file */`,
+    `const skeleton = recordSources("/WORLD/skeleton.json");`,
+  ].join("\n");
+
+  const stripped = stripComments(source);
+  assert.match(stripped, /import \{ drawGround \}/, "the first import was eaten by a fake block comment");
+  assert.match(stripped, /import \{ marks \}/, "the second import was eaten by a fake block comment");
+  assert.match(stripped, /recordSources\("\/WORLD\/world-state\.json"\)/, "the demand itself was eaten");
+  assert.doesNotMatch(stripped, /an ordinary block comment/, "the real block comment survived");
+  assert.deepEqual(
+    recordDemands([{ name: "viewer", text: source }]).map((d) => d.record),
+    ["WORLD/skeleton.json", "WORLD/world-state.json"],
+    "a record read below a `/WORLD/*` line comment must still be a demand",
+  );
+});
+
+test('the two openers are peers: a real block comment still goes, so the fix did not simply stop stripping', () => {
+  // THE PAIRED CASE. Without it, a stripper that returned its input unchanged
+  // would pass the test above.
+  const source = `/* we used to fetch "/WORLD/gone.json" here */ fetch("/WORLD/real.json");`;
+  assert.doesNotMatch(stripComments(source), /gone\.json/, "a real block comment survived the strip");
+  assert.deepEqual(recordDemands([{ name: "s", text: source }]).map((d) => d.record), ["WORLD/real.json"]);
+});
+
+test('the two openers are peers: a // inside a block comment still goes with the block', () => {
+  const source = [
+    `/*`,
+    `  // we used to fetch "/WORLD/gone.json" here`,
+    `  and "/WORLD/also-gone.json" before that`,
+    `*/`,
+    `fetch("/WORLD/real.json");`,
+  ].join("\n");
+  const stripped = stripComments(source);
+  assert.doesNotMatch(stripped, /gone\.json/, "the block's body survived past a `//` inside it");
+  assert.doesNotMatch(stripped, /also-gone\.json/, "the block ended early at a `//` and left its tail as code");
+  assert.deepEqual(recordDemands([{ name: "s", text: source }]).map((d) => d.record), ["WORLD/real.json"]);
+});
+
+test('the two openers are peers: THE MIRROR — a // inside a one-line block may not eat the code after the close', () => {
+  // THE CASE THAT REFUSES THE OTHER WRONG ANSWER. "Strip line comments first,
+  // then block comments" is the obvious repair and it is wrong in this
+  // direction: the line pass sees the `//` inside the block's body, runs to end
+  // of line, and swallows the block's own `*/` along with the real code behind
+  // it. The demand disappears exactly as it did under the old order — same
+  // silent 404, opposite cause. Neither pass order is correct at any position;
+  // only reading the two openers as peers is.
+  const source = `/* a note // with a line opener */ fetch("/WORLD/real.json");`;
+  const stripped = stripComments(source);
+  assert.doesNotMatch(stripped, /a note/, "the block comment survived");
+  assert.match(stripped, /\/WORLD\/real\.json/, "the code after the block's close was eaten by a `//` inside it");
+  assert.deepEqual(recordDemands([{ name: "s", text: source }]).map((d) => d.record), ["WORLD/real.json"]);
+});
+
+test('the two openers are peers: both hazards in one file, each resolved by whichever opened first', () => {
+  const source = [
+    `// the ISLAND serves /WORLD/* beside the page`,
+    `import { real } from "./real.mjs";`,
+    `/* a stale note about "/WORLD/gone.json"`,
+    `   // with a line opener inside it`,
+    `   and more prose */`,
+    `fetch("/WORLD/real.json");`,
+  ].join("\n");
+  const stripped = stripComments(source);
+  assert.match(stripped, /import \{ real \}/, "the line comment's `/*` opened a fake block over the import");
+  assert.doesNotMatch(stripped, /gone\.json/, "the real block comment was not removed");
+  assert.doesNotMatch(stripped, /more prose/, "the real block comment ended early");
+  assert.deepEqual(recordDemands([{ name: "s", text: source }]).map((d) => d.record), ["WORLD/real.json"]);
+});
+
+test('the two openers are peers: the staged set is what changes, and a demand inside a fake window is the cost', () => {
+  // The consumer named on the issue: `recordDemands`, and the staging manifest
+  // `recordsToStage` feeds the build. This is the failure the pinned viewer
+  // came within one line of, spelled out so the cost is legible without a pin.
+  const source = [
+    `//   • LOCAL (spectator/server.mjs) — /WORLD/* off disk`,
+    `const ledger = recordSources("/WORLD/walk-ledger.md");`,
+    `/* a real comment, closing the fake window the line above used to open */`,
+    `const state = recordSources("/WORLD/world-state.json");`,
+  ].join("\n");
+  const staged = recordsToStage([{ name: "viewer", text: source }]).map((entry) => entry.record);
+  assert.deepEqual(staged, [
+    "WORLD/settlement-publications.json",   // the published floor
+    "WORLD/walk-ledger.md",                 // ← this one used to vanish
+    "WORLD/world-state.json",
+  ]);
+});
+
 test('one record wanted by several readers is staged once and names all of them', () => {
   const many = [
     { name: "viewer", text: 'recordSources("/WORLD/world-state.json")' },

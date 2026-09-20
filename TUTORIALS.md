@@ -3,7 +3,7 @@
 Postmark's tutorials are **corner-note bubbles**: small cards that appear once,
 at the right moment, and never again. The engine is built and live; what it
 lacks is content — which is exactly the contribution this file teaches.
-(Context: [issue #3](https://github.com/keeminlee/postmark-site/issues/3) —
+(Context: [issue #3](https://github.com/postmark-town/postmark-site/issues/3) —
 onboarding is the biggest single lever on the project right now.)
 
 ## See it working, zero setup
