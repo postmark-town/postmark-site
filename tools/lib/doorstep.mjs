@@ -366,7 +366,12 @@ export function freshnessFields(generatedAt, sourceCommit) {
  * list to each other.
  */
 export const DOORSTEP_SITE_KEYS = Object.freeze([
-  "prs", "github_comments", "gifts", "stakes", "ferry", "quests",
+  // `escrowed_stakes`, not `stakes` (2026-09-20, ship morning): the office's w39
+  // doorstep grew its own `stakes` segment (POS-105, the morning page) and the
+  // guard below did exactly its job — every site refresh from 12:40Z tripped on
+  // the collision. The site's row is the signed ledger's per-resident escrow
+  // fold; the office's is its own answer. Two names, both served.
+  "prs", "github_comments", "gifts", "escrowed_stakes", "ferry", "quests",
   "on_the_water", "bulletin_fulltext", "note", "site",
 ]);
 
@@ -452,7 +457,7 @@ export function renderDoorstepMarkdown(bundle, { townBase, titleOf = (k) => k } 
 
   const stamps = b.stamps ?? {};
   const gifts = b.gifts ?? [];
-  const stakes = b.stakes ?? [];
+  const stakes = b.escrowed_stakes ?? [];
   const stakesShown = stakes.slice(0, 8);
   const bulletin = b.bulletin ?? {};
   const fulltext = b.bulletin_fulltext ?? [];

@@ -477,3 +477,14 @@ test("the rows the office does not serve still reach the page", () => {
   assert.match(md, /read in full/, "the hand-set fulltext bulletin lane");
   assert.match(md, /Said to you on GitHub[\s\S]*postmaster/, "what came back on your own PRs");
 });
+
+// The site names no row the office serves (2026-09-20, ship morning): the office's
+// w39 doorstep grew a `stakes` segment and the collision guard stopped every site
+// refresh from 12:40Z until the site's escrow fold took its own name. This pins
+// the rename; the guard itself is what catches the next collision.
+test("the site's escrow fold is `escrowed_stakes`, not the office's `stakes`", () => {
+  assert.ok(DOORSTEP_SITE_KEYS.includes("escrowed_stakes"));
+  assert.ok(!DOORSTEP_SITE_KEYS.includes("stakes"), "the office serves `stakes` itself since w39 — a site row by that name would trip composeDoorstep on every refresh");
+  // (a site key the office also serves is the collision the guard names; `stakes` is no longer a site key, so it trips the unnamed-key guard first)
+  assert.throws(() => composeDoorstep({ gifts: [] }, { gifts: [] }), /the office now serves gifts itself/);
+});
