@@ -73,10 +73,7 @@ import { createHomeColumn } from "./home-column.mjs";
 import { recordSources } from "../tools/record-sources.mjs";
 
 async function loadGround() {
-  const [sk, mf] = await Promise.all([
-    fetchJson(recordSources("/WORLD/skeleton.json", { office: officeUrl("/world/skeleton") }).map((s) => s.url)),
-    fetchJson(recordSources("/seeding/manifest.json").map((s) => s.url)).catch(() => null),
-  ]);
+  const sk = await fetchJson(recordSources("/WORLD/skeleton.json", { office: officeUrl("/world/skeleton") }).map((s) => s.url));
 }
 async function loadFold() {
   await fetchWorldState(recordSources("/WORLD/world-state.json", { office: officeUrl("/world/state") }).map((s) => s.url));
@@ -119,7 +116,6 @@ const sources = () => [
 /** A staging walk in the shape `stage()` returns, in the order it returns it. */
 const files = () => [
   ...Object.keys(MODULES).map((publicPath) => ({ publicPath })),
-  { publicPath: "/seeding/manifest.json" },
   { publicPath: "/WORLD/settlement-publications.json" },
   { publicPath: "/WORLD/skeleton.json" },
   { publicPath: "/WORLD/world-state.json" },
@@ -152,7 +148,6 @@ test("the hint chain is the closure and the boot records, and nothing else", () 
     '<link rel="modulepreload" href="/world-engine/tools/world-engine.mjs">',
     '<link rel="modulepreload" href="/world-engine/tools/geometry.mjs">',
     '<link rel="modulepreload" href="/world-engine/tools/record-sources.mjs">',
-    '<link rel="preload" as="fetch" href="/seeding/manifest.json" crossorigin>',
     '<link rel="preload" as="fetch" href="/WORLD/walk-ledger.md" crossorigin>',
     '<link rel="preload" as="fetch" href="/world-engine/residents-meta.json" crossorigin>',
   ]);
@@ -244,7 +239,11 @@ test("a staged record no reader asks for is never hinted", () => {
 test("the records the boot reads from this origin ARE hinted, by name", () => {
   // The direction that makes this a removal rather than a breakage.
   const hrefs = hrefsOf(hintsFor());
-  assert.ok(hrefs.includes("/seeding/manifest.json"), "the seeding manifest keeps its preload");
+  // `/seeding/manifest.json` was named here until 2026-09-20. The viewer
+  // fetched the seeding manifest at boot to decide green, so it earned a
+  // preload; the manifest is deleted (postmark#3025), the viewer's `loadGround`
+  // above no longer asks for it, and a hint for a file nobody reads is exactly
+  // what the rule below refuses.
   assert.ok(hrefs.includes("/world-engine/residents-meta.json"), "the faces keep their preload");
   assert.ok(hrefs.includes("/WORLD/walk-ledger.md"),
     "the walk ledger is read same-origin at boot on every path and is hinted — POS-85's descope line");
