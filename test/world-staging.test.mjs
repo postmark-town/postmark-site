@@ -34,11 +34,18 @@ import {
   stripComments,
 } from "../tools/lib/world-staging.mjs";
 
-/** the same-origin reads the real viewer makes, spelled as it spells them */
+/** the same-origin reads the real viewer makes, spelled as it spells them.
+ *
+ *  `/seeding/manifest.json` was one of them until 2026-09-20: the viewer
+ *  fetched the seeding manifest in `loadGround` to decide which marks drew
+ *  green, so the build had to stage it. The manifest is deleted in the world
+ *  repo (postmark#3025) and green comes off the fold now, so the viewer stops
+ *  asking and this fixture stops spelling it. Nothing in the gate changed — it
+ *  reads the demand off the viewer's text, which is exactly why a viewer that
+ *  stops asking is all it takes. */
 const VIEWER = `
   const worldStatePaths = () => recordSources("/WORLD/world-state.json", { office: officeUrl("/world/state") });
   fetchJson(recordSources("/WORLD/skeleton.json", { office: officeUrl("/world/skeleton") }));
-  fetchJson(recordSources("/seeding/manifest.json"));
   for (const { url } of recordSources("/WORLD/walk-ledger.md")) {}
   const thresholdLedgerSources = () => recordSources("/WORLD/threshold-ledger.md", { office: officeUrl("/world/threshold-ledger") });
 `;
@@ -56,7 +63,6 @@ const packageWithout = (...missing) => (rel) => !missing.includes(rel);
 test('tags only, never main tip: every same-origin record the viewer reads is staged, so no read can fall through to another source', () => {
   const staged = recordsToStage(viewerSource()).map((entry) => entry.record);
   assert.deepEqual(staged, [
-    "seeding/manifest.json",
     "WORLD/settlement-publications.json",   // the published floor, not a demand
     "WORLD/skeleton.json",
     "WORLD/threshold-ledger.md",
