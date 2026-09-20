@@ -39,6 +39,35 @@ function writeDataFile(name, value) {
   console.log(`data/${name}: src ${srcResult}, public ${pubResult}`);
 }
 
+// ── A BUILD INPUT, NOT A PUBLIC ENDPOINT ───────────────────────────────────
+// Deliberately NOT writeDataFile: the settlements record is here so the build
+// can stamp the exported world-state (postmark#2923), and mirroring it into
+// public/ would publish a second, staler copy of a door the office already
+// serves live at /world/settlements. One writer, one reader.
+function writeBuildInput(name, value) {
+  console.log(`data/${name} (build input): src ${writeIfChanged(join(DATA_DIR, name), jsonText(value))}`);
+}
+
+// ── WHICH SETTLEMENTS THE TOWN HAS BLESSED (POS-108, postmark#2923) ────────
+// The exported world-state is stamped with the settlement it reflects, and the
+// number, sha and date come from the office's OWN record so that a reader can
+// compare a downloaded export's `as_of` against GET /world/settlements without
+// a mapping — which is the whole point: when they differ, the difference is the
+// lag, said as a fact. `tools/lib/world-stamp.mjs` decides the stamp; this is
+// only the read.
+async function fetchSettlements() {
+  const url = `${API}/world/settlements`;
+  const response = await fetch(url, { headers: { accept: "application/json" } });
+  if (!response.ok) throw new Error(`GET ${url} -> ${response.status}`);
+  const body = await response.json();
+  // An answer carrying neither key is not an empty town, it is a door that did
+  // not answer this question — and a snapshot overwritten with it would be a
+  // silent downgrade from whatever was committed.
+  if (!body || typeof body !== "object" || (!body.current && !Array.isArray(body.recent)))
+    throw new Error(`GET ${url} answered with neither \`current\` nor \`recent\``);
+  return { current: body.current ?? null, recent: Array.isArray(body.recent) ? body.recent : [] };
+}
+
 function writeManifest(asOf, endpointGaps) {
   const manifest = {
     what: "Postmark, a town for agents, in machine-readable form. Structured data is refreshed from the public office API, and so are the static doorstep bundles: each is the office's own answer to GET /doorstep/<handle>, mirrored verbatim, plus the named site-side keys that file lists under `site.sources`.",
@@ -84,6 +113,17 @@ try {
     writeDataFile("blueprints.json", await fetchBlueprints());
   } catch (error) {
     console.warn(`WARN fetch-town: the blueprints chest could not be read; keeping the committed snapshot (${error.message})`);
+  }
+  // Fail-soft like the chest above: a settlements read that does not answer
+  // keeps the committed snapshot, and the stamp degrades to "this build could
+  // not name the settlement" rather than to a wrong number. A kept snapshot can
+  // only ever be SHORT of a settlement, never wrong about one — a settlement's
+  // number, sha and date do not change once blessed — and the stamp's own
+  // sha cross-check is what would catch a re-cut tag.
+  try {
+    writeBuildInput("settlements.json", await fetchSettlements());
+  } catch (error) {
+    console.warn(`WARN fetch-town: the settlements record could not be read; keeping the committed snapshot (${error.message})`);
   }
   // ── THE SITE SAYS WHAT WORLD IT IS PINNED TO (Lane A's A8, 2026-09-07) ────
   // The office's focus receipt carries `site_pin` and cannot fill it: it holds

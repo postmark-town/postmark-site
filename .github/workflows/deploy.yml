@@ -242,11 +242,25 @@ jobs:
           PUBLIC_CHANNEL: ${{ steps.lane.outputs.channel }}
         run: node tools/fetch-town.mjs
 
+      # THE SETTLEMENT NUMBER ONLY EXISTS UP HERE (postmark#2923). The staged
+      # world-state export is stamped with the settlement it reflects, and the
+      # step that makes the copy — world-engine-island's `stage()` — runs inside
+      # `npm run build`, where the resolver's answer was simply not in the
+      # process. This is that one line of plumbing.
+      #
+      # It is the STRONG source on purpose: `settlement` is correct in both of
+      # the resolver's branches by construction — on an advance it is the tag
+      # that was installed, and on a hold it is `floorSettlement`, an ancestry
+      # walk, which is the only thing that answers correctly when the floor is
+      # pinned to a commit downstream of its own tag. Empty on the snapshot lane
+      # (which resolves no tag at all) and on a skipped run, and empty is a
+      # state the stamp handles by name rather than by guessing.
       - name: Build (${{ steps.lane.outputs.channel }})
         if: steps.pin.outputs.skip != 'true'
         env:
           PUBLIC_CHANNEL: ${{ steps.lane.outputs.channel }}
           PUBLIC_BUILD_SHA: ${{ github.sha }}
+          PUBLIC_WORLD_SETTLEMENT: ${{ steps.worldpin.outputs.settlement }}
         run: npm run build            # town -> dist-town/
 
       # The deployed site says what it was built from, so a watcher can ask
