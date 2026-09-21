@@ -9,6 +9,7 @@
     "dev": "astro dev --config astro.config.town.mjs",
     "fetch:postmark": "node tools/fetch-town.mjs",
     "build": "astro build --config astro.config.town.mjs",
+    "clean": "node tools/clean-dist.mjs",
     "test": "node --test",
     "preview": "astro preview --config astro.config.town.mjs",
     "astro": "astro"
