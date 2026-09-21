@@ -775,7 +775,60 @@ test("the holo expansion has one home, and every surface imports it rather than 
 // pot's close shape, and on a household page it moves with whether the house
 // has a shared dashboard — both of which only resolve at render.
 const DIST = new URL("../dist-town/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
-const built = existsSync(DIST);
+
+// ── THE GUARD READS THE PAGES, NOT THE DIRECTORY (POS-177, 2026-09-21) ───────
+//
+// This used to be `const built = existsSync(DIST)` — a question about the
+// DIRECTORY, never about the pages. It is wrong in the one state that actually
+// occurs, and the state is not exotic: it is what a Windows lane's own cleanup
+// leaves behind.
+//
+// The town has a household whose slug ends in a dot — `victor-b.-rose-e.`, live
+// in households.json and live on prod at /households/victor-b.-rose-e./. Astro
+// builds it to a directory ending in a dot, and the Win32 path layer STRIPS a
+// trailing dot, so the path no longer resolves and nothing can open or remove
+// the directory. `git clean -fdx` says so and gives up on it:
+//
+//   warning: could not open directory 'dist-town/households/victor-b.-rose-e./'
+//   warning: failed to remove dist-town/households/victor-b.-rose-e.
+//
+// What is left is a HUSK: `dist-town/` still standing, holding exactly one
+// page. `existsSync(DIST)` reads that husk as `true`, the arms below run
+// against a site of one page, and nine of them red on pages that were never
+// built — a failed cleanup wearing the costume of a content regression. The
+// tenth ("no built page teaches the expansion twice") went GREEN on it, which
+// is worse: it swept one page and reported the site clean.
+//
+// So `built` is retired and each arm guards on THE ARTIFACT IT READS. The
+// contract, and both halves matter:
+//
+//   · a page that was never built  → SKIP  (there is nothing to judge)
+//   · a page that is built and wrong → RED (that is what these exist for)
+//
+// A guard that cannot tell those apart buys its green by skipping everything,
+// so none of the content assertions below were loosened — only the question of
+// whether to ask them at all.
+//
+// WHY THE FRONT DOOR IS THE SWEEPS' GUARD. The two arms that walk every built
+// page have no single named artifact; what they need is "a build happened
+// here". `dist-town/index.html` is that: every finished build emits it, `git
+// clean` removes it first (a top-level file, nothing exotic in its path), and
+// the husk never contains it. A build KILLED midway can leave the front door
+// with pages missing behind it — that state stays RED, deliberately, and the
+// `pages.length > 100` assertion below is what says so. Built-and-truncated is
+// broken; it is not "not built".
+//
+// The husk itself is not this file's to repair — see `npm run clean`, and the
+// note in README, for the cleanup that actually removes a trailing-dot
+// directory on Windows (the `\\?\` prefix is the one that works). The slug
+// cannot simply stop ending in a dot without moving a URL prod serves today.
+const page = (...segs) => join(DIST, ...segs, "index.html");
+/** A built page, by its route segments: builtPage() is the front door, builtPage("stamps") is /stamps/. */
+const builtPage = (...segs) => existsSync(page(...segs));
+/** A built route FAMILY — the directory /fund/, /residents/, /households/ build their pages into. */
+const builtFamily = (...segs) => existsSync(join(DIST, ...segs));
+/** A build ran to completion in this tree — see WHY THE FRONT DOOR above. */
+const builtSite = builtPage();
 
 // Astro escapes the apostrophe in "the collector's shiny kind" to &#39;, so a
 // raw includes() of the constant finds NOTHING in built HTML. The first cut of
@@ -821,7 +874,7 @@ const insideGlossary = (html) => {
   return end < 0 ? "" : html.slice(open.index, end);
 };
 
-test("no built page teaches the expansion twice in flowing prose", { skip: !built }, () => {
+test("no built page teaches the expansion twice in flowing prose", { skip: !builtSite }, () => {
   // THE PLACEMENT RULE, and the whole of it: the FIRST holo mention on a page
   // carries the expansion; every later mention stays bare "✧ holo". A page that
   // said it twice would be the prose budget going, which is the thing the rule
@@ -880,7 +933,7 @@ const REPEALED = [
   "a vote, or a say",           // the seam section's opening paragraph
 ];
 
-test("NOT ONE built page still teaches the repealed law", { skip: !built }, () => {
+test("NOT ONE built page still teaches the repealed law", { skip: !builtSite }, () => {
   // THE FOUNDER, 2026-09-17, verbatim: "non-spendable is repealed; the stamps
   // are like any other, but are holo to signify the special source."
   const pages = everyBuiltPage();
@@ -893,7 +946,7 @@ test("NOT ONE built page still teaches the repealed law", { skip: !built }, () =
   assert.deepEqual(offenders, [], `the repealed law is still rendered:\n  ${offenders.join("\n  ")}`);
 });
 
-test("and the ruling's own rule IS on the pages that teach the word", { skip: !built }, () => {
+test("and the ruling's own rule IS on the pages that teach the word", { skip: !(builtPage("stamps") && builtPage("numbers")) }, () => {
   // The other half, so "swept clean" cannot be satisfied by saying nothing at
   // all. The one-line rule, from the sweep brief: "holo is fresh mint to a
   // giver, liquid like any stamp; the word names its source and its ink."
@@ -904,7 +957,7 @@ test("and the ruling's own rule IS on the pages that teach the word", { skip: !b
   }
 });
 
-test("and the VOICE half is on the pages too, not merely absent", { skip: !built }, () => {
+test("and the VOICE half is on the pages too, not merely absent", { skip: !(builtFamily("fund") && builtPage("stamps")) }, () => {
   // The same discipline for the second ruling of 2026-09-17 ("holo does anything
   // a normal stamp can; staking vs voting is a nondistiction"). Deleting the
   // repealed sentences satisfies the sweep above by saying NOTHING, which is the
@@ -928,7 +981,7 @@ test("and the VOICE half is on the pages too, not merely absent", { skip: !built
   assert.match(stamps, /cap on money/, "the Rules name what bounds money, now that no verb does");
 });
 
-test("the glossary's holo entry says what the name is short for", { skip: !built }, () => {
+test("the glossary's holo entry says what the name is short for", { skip: !builtPage("stamps") }, () => {
   // The exemption, asserted from the other side: the once-per-page tests cut
   // the glossary out, so without this the entry could quietly lose the
   // expansion and every other probe would stay green.
@@ -941,7 +994,7 @@ test("the glossary's holo entry says what the name is short for", { skip: !built
     "the glossary's holo entry must carry the expansion, once — it is where a reader looks the word up");
 });
 
-test("each money surface teaches it exactly once outside the glossary, in both of the household's shapes", { skip: !built }, () => {
+test("each money surface teaches it exactly once outside the glossary, in both of the household's shapes", { skip: !(builtPage("stamps") && builtPage("numbers") && builtFamily("fund") && builtFamily("households")) }, () => {
   // Named surfaces first. Every fund page counts, not a sampled one, because
   // the expansion moves between the fine print and the footer with the pot's
   // close shape — a pot whose bullets never name holo would otherwise ship a
@@ -981,7 +1034,7 @@ test("each money surface teaches it exactly once outside the glossary, in both o
   }
 });
 
-test("the built hub teaches the expansion ZERO times, and still points at where it lives", { skip: !built }, () => {
+test("the built hub teaches the expansion ZERO times, and still points at where it lives", { skip: !builtPage("town") }, () => {
   // THE FOUNDER'S RULING, 2026-08-31: the holo explanation belongs on /stamps/,
   // "its one home" — the hub leaves "a one-line pointer at most, or nothing."
   //
@@ -1075,7 +1128,7 @@ test("an UNCAPPED pot publishes what arrived — no posted need was never a reas
   assert.match(uncappedArm, /usd\(received\)/, "the uncapped arm prints the total it received");
 });
 
-test("the BUILT fund page carries the outside gift as its own line", { skip: !built }, () => {
+test("the BUILT fund page carries the outside gift as its own line", { skip: !builtFamily("fund") }, () => {
   // The render is the claim here, not the source: `roll` resolves from the
   // synced seam at build time, so only the built page can say whether a real
   // recorded gift reached a reader's eyes.

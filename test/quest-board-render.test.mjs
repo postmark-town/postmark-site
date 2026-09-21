@@ -727,9 +727,23 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const DIST = new URL("../dist-town/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
-const built = existsSync(DIST);
 
-test("no built resident page contains the string [object Object]", { skip: !built }, () => {
+// ── THE GUARD READS THE PAGES, NOT THE DIRECTORY (POS-177, 2026-09-21) ───────
+//
+// Was `existsSync(DIST)`. The whole argument is written once, in
+// test/funding.test.mjs beside its twin — in short: the town has a household
+// slug ending in a dot, Windows cannot delete the directory Astro builds it to,
+// so `git clean -fdx` leaves `dist-town/` standing with ONE page in it. A guard
+// that asks whether the directory exists calls that husk a build, and these two
+// arms then red on resident pages that were never built.
+//
+// Both arms here read the /residents/ family, so that is what they guard on:
+// no residents directory → SKIP, and a residents directory that is empty or
+// missing wright's page stays RED, because a build that ran and did not emit
+// them is broken, not absent.
+const builtFamily = (...segs) => existsSync(join(DIST, ...segs));
+
+test("no built resident page contains the string [object Object]", { skip: !builtFamily("residents") }, () => {
   const dir = join(DIST, "residents");
   const handles = existsSync(dir) ? readdirSync(dir).slice(0, 40) : [];
   assert.ok(handles.length > 0, "no built resident pages to read — the build did not produce them");
@@ -755,7 +769,7 @@ test("the scan reads page text, not script bytes — a script literal is not the
   assert.equal(pageText(inText).includes("[object Object]"), true, "a literal in the page's text is the bug");
 });
 
-test("the built page carries the day rule's fix and the arrived line's delivery", { skip: !built }, () => {
+test("the built page carries the day rule's fix and the arrived line's delivery", { skip: !builtFamily("residents") }, () => {
   const p = join(DIST, "residents", "wright", "index.html");
   assert.ok(existsSync(p), "wright's page was not built");
   const html = readFileSync(p, "utf8");
