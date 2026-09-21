@@ -1078,3 +1078,45 @@ test("an ordinary pass records NO problems — the drop is exceptional, not the 
   assert.deepEqual(r.problems, [], "a healthy office must not manufacture a problems line");
   assert.deepEqual(r.files["residents.json"].map((x) => x.handle), ["rei", "wright"]);
 });
+
+test("writeManifest SERVES the problems list — a source pin, labelled as one", () => {
+  // The link in the chain that has no unit: writeManifest is a local function
+  // in a top-level-await script whose only output paths are this repo's real
+  // src/data and public/ trees, so exercising it for real would mutate the
+  // working tree. This is deliberately a text-reader, in the same shape and for
+  // the same reason as the shortFetchPlan pin above.
+  //
+  // What it holds is the whole point of POS-180: before this, `problems` was
+  // assembled and console.warn'd and the manifest published `endpoint_gaps`
+  // alone, so the office's sentinel — which can only compare SERVED values —
+  // had nothing to read and POS-166's drop was invisible.
+  const src = readFileSync(new URL("../tools/fetch-town.mjs", import.meta.url), "utf8");
+  assert.match(src, /function writeManifest\(asOf, endpointGaps, problems\)/, "the manifest writer must be handed the list");
+  assert.match(src, /^\s+problems,$/m, "…and must put it on the manifest object it publishes");
+  assert.match(src, /writeManifest\(result\.asOf, result\.endpointGaps, result\.problems\)/, "…from the build's own result, not a recomputation");
+  // endpoint_gaps is NOT replaced: a gap is a standing fact about the
+  // deployment and a problem is news from this pass, and folding them together
+  // would let the standing facts drown the news.
+  assert.match(src, /endpoint_gaps: endpointGaps,/, "the gaps key survives beside it");
+  // and the warn loop stays — the build log keeps saying it too
+  assert.match(src, /for \(const problem of result\.problems\) console\.warn/);
+});
+
+test("THE POS-166 CASE, NOW SERVED: a dropped bulletin entry still drops AND its line is publishable", async () => {
+  // POS-166 proved the drop. What it could not prove — because nothing
+  // published the list — is that anyone downstream can SEE it. The drop is
+  // re-asserted here against the same ghost fixture, and the line is asserted
+  // to be a plain string in `problems`, which is the value writeManifest now
+  // serves and build-stamp.mjs carries to the sentinel.
+  const { data, town } = fixtureSnapshot();
+  const r = await buildOfficeData({
+    apiBase: "https://example.test", dataDir: data, townRoot: town,
+    fetchImpl: ghostList(), retries: 1,
+  });
+  assert.deepEqual(r.files["bulletin.json"].map((b) => b.slug), ["settling-in"], "the shed entry still leaves the board");
+  const line = r.problems.find((p) => /darkos-birthday-at-lanternstep/.test(p));
+  assert.ok(line, "and its line is in problems");
+  assert.equal(typeof line, "string", "a served value must be a plain string, not an Error or a Symbol");
+  assert.equal(JSON.parse(JSON.stringify(r.problems)).includes(line), true,
+    "…and must survive the JSON round trip the manifest and /build.json both put it through");
+});
