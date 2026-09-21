@@ -1246,22 +1246,55 @@ Then hand it back to your human to carry in.
       window.location.href = d.path;
     });
 
-    // ── the house's day: ONE board, drawn once ────────────────────────────
+    // ── the day's board: THE SEAT'S, redrawn when the rail moves ──────────
     //
-    // The quests are the HOUSE's (the cap counts the household), so the board
-    // is chrome above every profile and is built exactly once — moving between
-    // residents never redraws it (ruling 2026-08-07). The house total, the bar,
-    // and the ceiling footnote are identical for every member, so the first
-    // member's answer supplies them all.
+    // ⚑ THE BOARD WAS THE FIRST HOUSEMATE'S ON EVERYBODY'S PAGE (POS-179).
+    // Keemin, on his own resident page 2026-09-21: "your resident page still
+    // has TO DO items that have already been done."
     //
-    // What IS the member's own — their hand today, and who they have already
-    // reached — is a line inside each card that is rewritten in place when the
-    // rail moves. On the household seat the hand goes quiet (the house has no
-    // hand of its own) but the counted lines show the WHOLE house's day: every
-    // member's units merged, each attributed to the hand that earned it
-    // (Keemin, 2026-08-07).
-    var questBoard = null;                  // id -> { hand, counted } once drawn
+    // It was drawn once, from `memberHandles[0]`, on the reading that the
+    // quests are the HOUSE's because the cap counts the household (ruling
+    // 2026-08-07). That is true of the CEILING and of nothing else on the
+    // board. `complete` is each resident's own, and `complete` is the only
+    // field the partition reads — so on /residents/wright/ the Still-to-do
+    // block held the ARCHITECT's six unfinished rows while Wright's own board
+    // had one. Both boards carry the same eleven ids in the same order; only
+    // the answers differ, which is exactly why nothing looked broken. 28 of
+    // 118 households hold more than one resident and 98 residents live in
+    // them; the 28 who happen to be their house's first member were right by
+    // coincidence.
+    //
+    // So the board is the OPEN SEAT's and a seat change REDRAWS it — cards,
+    // Still to do, Not read here, and the arrived line — rather than rewriting
+    // two lines inside cards built from somebody else's answers. The fetch
+    // cache is per handle, so a switch costs at most one new fetch and a
+    // switch back costs none.
+    //
+    // What is still the member's own within a drawn board — their hand today,
+    // and who they have already reached — stays a line inside each card that
+    // `setQuestHand` writes. On the household seat the hand goes quiet (the
+    // house has no hand of its own) but the counted lines show the WHOLE
+    // house's day: every member's units merged, each attributed to the hand
+    // that earned it (Keemin, 2026-08-07).
+    // ── QUEST-BOARD DRIVER ─── extracted verbatim by test/quest-board-render.test.mjs
+    //
+    // The law region below is PURE and has been testable since 2026-09-05. The
+    // question POS-179 is about is not in it: WHICH board the page asks for,
+    // and what a seat change does to the one it drew. That lives out here, in
+    // the fetch cache and the three functions under it, and all 22 of the law
+    // tests passed while the answer was wrong. So this region is sliced and run
+    // too — against a stub `house`, a stub `fetch` and a settable
+    // `currentHandle`. It reaches OUT for exactly those three, plus `API`,
+    // `memberHandles` and `HOUSE_TAB`; keep it that way and the slice keeps
+    // working.
+    var questBoard = null;                  // id -> { hand, counted } for the drawn seat
+    var questBoardSeat;                     // the seat it was drawn for (undefined = never)
     var questSeen = Object.create(null);    // handle -> promise of their quests
+
+    // The seat the rail is showing, in the board's own vocabulary: a member
+    // handle, or null for the household seat. `undefined` is not one of its
+    // values, which is what lets `questBoardSeat` start out meaning "no board".
+    function liveSeat() { return currentHandle === HOUSE_TAB ? null : currentHandle; }
 
     function questsFor(handle) {
       if (!questSeen[handle]) {
@@ -1630,7 +1663,20 @@ Then hand it back to your human to carry in.
     }
     // ── END QUEST-BOARD LAW ──────────────────────────────────────────────────
 
-    function drawQuestBoard() {
+    // `seat` is a member handle, or null for the household seat.
+    //
+    // THE HOUSEHOLD SEAT IS A STOPGAP AND IS MARKED AS ONE (POS-179). What a
+    // merged board's `complete` means across nine residents — all-met, any-met,
+    // or a row per member — is a SHAPE QUESTION held for Keemin, and this lane
+    // does not answer it. Until it is answered the house seat keeps the cards
+    // and the merged counted lines it has shown since 2026-08-07 (drawn, as
+    // they always were, from the first member's board, because the ceiling and
+    // the house total are the same for everyone) and simply says NOTHING about
+    // what is still to do or what has arrived: those two blocks are claims
+    // about one resident, and the house seat has no resident to make them
+    // about. An absent block is the honest shape — the same rule the uncounted
+    // block already keeps for itself.
+    function drawQuestBoard(seat) {
       var sec = house.querySelector("[data-quests]");
       var wrap = house.querySelector("[data-quest-cards]");
       var unWrap = house.querySelector("[data-quest-uncounted]");
@@ -1639,14 +1685,28 @@ Then hand it back to your human to carry in.
       var nrList = house.querySelector("[data-quest-notread-list]");
       var dayEl = house.querySelector("[data-quests-day]");
       var arrivedEl = house.querySelector("[data-quest-arrived]");
-      if (!sec || !wrap || questBoard) return Promise.resolve();
-      return questsFor(memberHandles[0]).then(function (b) {
-        if (!b || !Array.isArray(b.quests) || !b.quests.length) { sec.hidden = true; return; }
+      if (!sec || !wrap) return Promise.resolve();
+      // already standing for this seat — a switch back is free, and the
+      // per-handle fetch cache means it was free the second time too.
+      if (questBoard && questBoardSeat === seat) return Promise.resolve();
+      var onHouse = seat === null;
+      return questsFor(onHouse ? memberHandles[0] : seat).then(function (b) {
+        // a late answer for a seat the reader has already left must not paint
+        // over the live one — the seat that IS live has its own draw in flight
+        if (liveSeat() !== seat) return;
+        // a seat whose door answers nothing takes the section down with it —
+        // and takes the drawn board too, so that stepping back to a seat that
+        // HAS one redraws it rather than reading the early return above and
+        // leaving the section hidden over somebody else's cards.
+        if (!b || !Array.isArray(b.quests) || !b.quests.length) {
+          sec.hidden = true; questBoard = null; questBoardSeat = undefined; return;
+        }
         applyDay(dayEl, b.today);
         wrap.textContent = "";
         if (unList) unList.textContent = "";
         if (nrList) nrList.textContent = "";
         questBoard = Object.create(null);
+        questBoardSeat = seat;
         var uncounted = 0;
         var notRead = 0;
         var done = [];
@@ -1669,7 +1729,9 @@ Then hand it back to your human to carry in.
             return;
           }
           if (shape === "row") {
-            if (unList) { unList.appendChild(buildUncountedRow(q)); uncounted++; }
+            // The house seat says nothing about what is still to do — the rows
+            // are not hidden, they are never built (POS-179, above).
+            if (unList && !onHouse) { unList.appendChild(buildUncountedRow(q)); uncounted++; }
             return;
           }
           var built = buildQuestCard(q);
@@ -1680,7 +1742,9 @@ Then hand it back to your human to carry in.
         // heading over nothing is a fifth thing for the eye to skip.
         if (unWrap) unWrap.hidden = uncounted === 0;
         if (nrWrap) nrWrap.hidden = notRead === 0;
-        applyArrived(arrivedEl, done, keptTotal);
+        // and nothing about what has arrived: an empty fold is already an
+        // absent line here, so the house seat is handed one (POS-179).
+        applyArrived(arrivedEl, onHouse ? [] : done, keptTotal);
         sec.hidden = false;
       });
     }
@@ -1691,9 +1755,10 @@ Then hand it back to your human to carry in.
     // EVERY member's board has answered: a half-merged list shown as the
     // house's would be a quieter lie than none (the stamps-sum rule).
     function drawHouseCounted() {
-      Promise.all(memberHandles.map(questsFor)).then(function (boards) {
-        // a late answer for a seat the reader has already left must not paint
-        if (currentHandle !== HOUSE_TAB || !questBoard) return;
+      return Promise.all(memberHandles.map(questsFor)).then(function (boards) {
+        // a late answer for a seat the reader has already left must not paint,
+        // and neither must one for a board that has since been redrawn
+        if (currentHandle !== HOUSE_TAB || !questBoard || questBoardSeat !== null) return;
         if (boards.some(function (b) { return !b || !Array.isArray(b.quests); })) return;
         Object.keys(questBoard).forEach(function (id) {
           var slot = questBoard[id];
@@ -1737,18 +1802,22 @@ Then hand it back to your human to carry in.
     // Rewrite the member-owned lines for the seat now showing. `handle` null =
     // the household seat: the hand goes quiet, the counted lines turn to the
     // house's own day.
+    // Returns the promise it runs on, so a test can watch the end of a seat
+    // move rather than the start of one — the same reason `applyArrived`
+    // returns the element it wrote.
     function setQuestHand(handle) {
-      drawQuestBoard().then(function () {
-        if (!questBoard) return;
+      return drawQuestBoard(handle).then(function () {
+        // the board standing is somebody else's seat: their own call is in
+        // flight and will draw and dress it
+        if (!questBoard || questBoardSeat !== handle || liveSeat() !== handle) return;
         if (handle === null) {
           Object.keys(questBoard).forEach(function (id) {
             questBoard[id].hand.hidden = true;
             questBoard[id].counted.hidden = true;
           });
-          drawHouseCounted();
-          return;
+          return drawHouseCounted();
         }
-        questsFor(handle).then(function (b) {
+        return questsFor(handle).then(function (b) {
           // a late answer for a seat the reader has already left must not paint
           // over the live one
           if (currentHandle !== handle || !questBoard) return;
@@ -1792,6 +1861,7 @@ Then hand it back to your human to carry in.
         });
       });
     }
+    // ── END QUEST-BOARD DRIVER ───────────────────────────────────────────────
 
     // ── the household seat: what the house holds, summed across its members ──
     // The API is per-handle, so the house total is a sum the page does itself.
@@ -1879,8 +1949,8 @@ Then hand it back to your human to carry in.
       if (egg) { egg.hidden = isSeat; if (!isSeat) egg.dataset.handle = handle; }
       if (isSeat) { drawHouseStamps(); }
       else { initPanel(handle); }
-      // The quest board is the HOUSE's and is drawn once; only the member's own
-      // hand changes with the seat, so the tab move updates that line in place.
+      // The quest board belongs to the seat: the tab move redraws it from that
+      // resident's own answers, then writes their hand into it (POS-179).
       setQuestHand(isSeat ? null : handle);
       document.dispatchEvent(new CustomEvent("pm:tab", { detail: { handle: handle } }));
       var path = pathFor(handle);

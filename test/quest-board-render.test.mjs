@@ -71,7 +71,11 @@ function makeDocument() {
     };
     return el;
   };
-  return { createElement: node };
+  return {
+    createElement: node,
+    // the driver's merged counted line separates names with a text node
+    createTextNode(t) { const n = node("#text"); n.textContent = String(t); return n; },
+  };
 }
 
 function runLaw() {
@@ -283,16 +287,20 @@ test("the page actually calls the law: the partition, the block, and the hand li
   for (const [what, re] of [
     ["the shape decides where a row goes", /var shape = questShape\(q\);/],
     ["a settled row leaves the board rather than being drawn", /if \(shape === "done"\) \{ done\.push\(q\); return; \}/],
-    ["an open checklist row still becomes a row", /if \(shape === "row"\) \{[\s\S]{0,140}buildUncountedRow\(q\)/],
+    ["an open checklist row still becomes a row, and never on the house seat", /if \(shape === "row"\) \{[\s\S]{0,260}if \(unList && !onHouse\) \{ unList\.appendChild\(buildUncountedRow\(q\)\)/],
     ["a counted row still becomes a card", /var built = buildQuestCard\(q\);/],
     ["the block hides itself when nothing is left to do", /unWrap\.hidden = uncounted === 0;/],
     // The arrived line's DELIVERY is asserted on the element in its own test
     // above (repair 3), which is the check a discarded answer cannot survive.
     // This regex only has to find the call; the behaviour is watched elsewhere.
-    ["the arrived line is applied to the page", /applyArrived\(arrivedEl, done, keptTotal\);/],
+    ["the arrived line is applied to the page, with nothing arrived on the house seat", /applyArrived\(arrivedEl, onHouse \? \[\] : done, keptTotal\);/],
     ["the arrived denominator counts only rows that are KEPT", /var keptTotal = b\.quests\.filter\(function \(q\) \{ return !questResets\(q\); \}\)\.length;/],
     ["the card asks the row for its cadence rather than assuming today", /questCountText\(sharedQ, lead, target, q\.cadence\)/],
     ["the seat switch writes the hand through the guard", /slot\.hand\.textContent = handText;/],
+    // POS-179. The driver tests below watch this behave; this finds the line,
+    // so a rewrite that reaches for the first housemate again is named here too.
+    ["the board is asked for the open seat, never the first housemate", /return questsFor\(onHouse \? memberHandles\[0\] : seat\)\.then/],
+    ["a seat change redraws rather than returning early", /if \(questBoard && questBoardSeat === seat\) return Promise\.resolve\(\);/],
   ]) {
     assert.match(SOURCE, re, `${what} — the law is defined but not called`);
   }
@@ -699,6 +707,206 @@ test("no rendered row anywhere on the new board prints a null, an undefined or a
   }
 });
 
+// ── the driver: WHICH board the page asked for (POS-179) ─────────────────────
+//
+// Every test above this line hands a board straight to the partition, so every
+// one of them passed while the page was drawing the FIRST HOUSEMATE's board on
+// all 98 residents who share a roof. The law was right; the question was never
+// asked of the right resident. Which board is fetched, and what a seat change
+// does to the one already drawn, lives outside the law region — so the driver
+// region is sliced and run too, against a stub `house`, a stub `fetch` and a
+// `currentHandle` the test moves the way the rail does.
+//
+// These run the component's own source for the same reason the law tests do: a
+// copy of `drawQuestBoard` would have agreed with itself about `memberHandles[0]`.
+
+const DRIVER_OPEN = "// ── QUEST-BOARD DRIVER ───";
+const DRIVER_CLOSE = "// ── END QUEST-BOARD DRIVER ──";
+
+function driverSource() {
+  const a = SOURCE.indexOf(DRIVER_OPEN);
+  const b = SOURCE.indexOf(DRIVER_CLOSE);
+  assert.ok(a >= 0, `the driver region's opening sentinel is gone from Household.astro: ${DRIVER_OPEN}`);
+  assert.ok(b > a, `the driver region's closing sentinel is gone from Household.astro: ${DRIVER_CLOSE}`);
+  return SOURCE.slice(a, b);
+}
+
+const SLOTS = [
+  "[data-quests]", "[data-quest-cards]",
+  "[data-quest-uncounted]", "[data-quest-uncounted-list]",
+  "[data-quest-notread]", "[data-quest-notread-list]",
+  "[data-quests-day]", "[data-quest-arrived]",
+];
+
+/** The page's quest-board markup, as the shipped component declares it: hidden. */
+function makeHouse(document) {
+  const map = Object.create(null);
+  for (const sel of SLOTS) {
+    map[sel] = document.createElement("div");
+    map[sel].hidden = sel !== "[data-quest-cards]" && sel !== "[data-quest-uncounted-list]" && sel !== "[data-quest-notread-list]" && sel !== "[data-quests-day]";
+  }
+  return { querySelector: (sel) => map[sel] ?? null, at: map };
+}
+
+/**
+ * Run the driver against a set of per-handle boards.
+ * `boards` is handle -> the door's answer (or null for a door that says no).
+ */
+function runDriver({ boards, members, seat }) {
+  const document = makeDocument();
+  const house = makeHouse(document);
+  const fetched = [];
+  const fetchStub = (url) => {
+    const handle = decodeURIComponent(String(url).split("/api/quests/")[1]);
+    fetched.push(handle);
+    const body = boards[handle] ?? null;
+    return Promise.resolve({ ok: body !== null, json: () => Promise.resolve(body) });
+  };
+  const ctx = vm.createContext({
+    document, house, fetch: fetchStub, encodeURIComponent,
+    Math, String, Object, Array, Boolean, Promise,
+    API: "/api",
+    memberHandles: members,
+    HOUSE_TAB: "__house",
+    currentHandle: seat === null ? "__house" : seat,
+  });
+  vm.runInContext(driverSource(), ctx, { filename: "Household.astro#quest-board-driver" });
+  return { ctx, house, fetched, at: house.at };
+}
+
+/** Move the rail: set the live seat, then let the page respond to it. */
+function goTo(run, seat) {
+  run.ctx.currentHandle = seat === null ? "__house" : seat;
+  return run.ctx.setQuestHand(seat);
+}
+
+// ── the fixture house: two residents, same eleven rows, different answers ────
+// Which is the live shape (confirmed at the door 2026-09-21): /api/quests/wright
+// and /api/quests/architect carry the same ids in the same order and differ only
+// in `complete` — one row open against six. So the fixture differs only there,
+// and in the daily count, which is the other thing the first housemate's board
+// was speaking for.
+
+const dailyCard = (progress, counted) => ({
+  id: "correspond-send", title: "Send a letter", cadence: "daily",
+  target: 5, progress, complete: progress >= 5, counted, reward: "1 stamp each",
+});
+const keptRow = (id, complete) => ({
+  id, title: id, cadence: "once", target: 1, progress: null, complete, counted: [],
+});
+const TWO_MEMBER_HOUSE = {
+  // alice: three rows still to do, one arrived
+  alice: {
+    today: { day: "2026-09-21" },
+    quests: [
+      dailyCard(2, ["rei"]),
+      keptRow("tend-your-home", false),
+      keptRow("hang-your-window", false),
+      keptRow("walk-the-world", false),
+      keptRow("welcome-to-postmark", true),
+    ],
+  },
+  // bob: nothing still to do — everything kept is arrived
+  bob: {
+    today: { day: "2026-09-21" },
+    quests: [
+      dailyCard(4, ["lupi"]),
+      keptRow("tend-your-home", true),
+      keptRow("hang-your-window", true),
+      keptRow("walk-the-world", true),
+      keptRow("welcome-to-postmark", true),
+    ],
+  },
+};
+const MEMBERS = ["alice", "bob"];
+const rows = (run) => run.at["[data-quest-uncounted-list]"].children.map((li) => text(li));
+const cards = (run) => cls(run.at["[data-quest-cards]"], "quest-card");
+
+test("the board is the OPEN SEAT's, never the first housemate's", async () => {
+  // bob's own page. On the base this fetched alice and drew her three open rows
+  // under Still to do — the founder's report, exactly: things already done.
+  const run = runDriver({ boards: TWO_MEMBER_HOUSE, members: MEMBERS, seat: "bob" });
+  await goTo(run, "bob");
+  assert.deepEqual(run.fetched, ["bob"], "the page asked a resident other than the one whose seat is open");
+  assert.deepEqual(rows(run), [], "bob's page is listing somebody else's unfinished rows");
+  assert.equal(run.at["[data-quest-uncounted]"].hidden, true, "Still to do stands over nothing");
+  assert.equal(text(run.at["[data-quest-arrived]"]), "Arrived · 4 of 4 done");
+});
+
+test("a member's CARDS are their own count, not the first housemate's", async () => {
+  const onA = runDriver({ boards: TWO_MEMBER_HOUSE, members: MEMBERS, seat: "alice" });
+  await goTo(onA, "alice");
+  const onB = runDriver({ boards: TWO_MEMBER_HOUSE, members: MEMBERS, seat: "bob" });
+  await goTo(onB, "bob");
+  assert.match(text(cards(onA)[0]), /2 \/ 5 today/, "alice's card is not alice's day");
+  assert.match(text(cards(onB)[0]), /4 \/ 5 today/, "bob's card is showing alice's day");
+});
+
+test("a seat switch RE-PARTITIONS the board, not just the hand lines", async () => {
+  const run = runDriver({ boards: TWO_MEMBER_HOUSE, members: MEMBERS, seat: "alice" });
+  await goTo(run, "alice");
+  assert.deepEqual(rows(run), ["tend-your-home", "hang-your-window", "walk-the-world"].map((id) => `○${id}oncenot yet`),
+    "alice's own page does not show alice's three open rows");
+  assert.equal(run.at["[data-quest-uncounted]"].hidden, false);
+  assert.equal(text(run.at["[data-quest-arrived]"]), "Arrived · 1 of 4 done");
+
+  await goTo(run, "bob");
+  assert.deepEqual(rows(run), [], "alice's three rows are still on the page under bob's name");
+  assert.equal(run.at["[data-quest-uncounted]"].hidden, true, "the block did not go with its rows");
+  assert.equal(text(run.at["[data-quest-arrived]"]), "Arrived · 4 of 4 done", "the arrived line is still alice's");
+  assert.equal(run.at["[data-quest-arrived]"].hidden, false);
+});
+
+test("the household seat draws NO Still-to-do block and NO arrived line", async () => {
+  // A STOPGAP, held deliberately: what `complete` means merged across a house
+  // is a shape question for Keemin (POS-179). The seat keeps its cards and its
+  // merged counted lines and says nothing it cannot say about one resident.
+  const run = runDriver({ boards: TWO_MEMBER_HOUSE, members: MEMBERS, seat: null });
+  await goTo(run, null);
+  assert.deepEqual(rows(run), [], "the house seat is telling a household what one resident still has to do");
+  assert.equal(run.at["[data-quest-uncounted]"].hidden, true);
+  assert.equal(text(run.at["[data-quest-arrived]"]), "", "the house seat claims an arrival it cannot attribute");
+  assert.equal(run.at["[data-quest-arrived]"].hidden, true);
+  // and what it DOES keep, unchanged: the cards, and the merged day
+  assert.equal(cards(run).length, 1, "the house seat lost its cards");
+  const counted = text(cls(run.at["[data-quest-cards]"], "quest-counted")[0]);
+  assert.match(counted, /rei \(alice\)/, "the merged counted line did not survive the redraw");
+  assert.match(counted, /lupi \(bob\)/, "the merged counted line did not survive the redraw");
+});
+
+test("the fetch cache is per handle: a switch costs one fetch, a switch back costs none", async () => {
+  const run = runDriver({ boards: TWO_MEMBER_HOUSE, members: MEMBERS, seat: "alice" });
+  await goTo(run, "alice");
+  await goTo(run, "bob");
+  await goTo(run, "alice");
+  assert.deepEqual(run.fetched, ["alice", "bob"], "a redraw refetched a board the page already held");
+});
+
+test("the same seat twice does not rebuild the board", async () => {
+  const run = runDriver({ boards: TWO_MEMBER_HOUSE, members: MEMBERS, seat: "alice" });
+  await goTo(run, "alice");
+  const first = cards(run)[0];
+  await goTo(run, "alice");
+  assert.equal(cards(run)[0], first, "an idle seat move rebuilt the cards");
+});
+
+test("a door that answers nothing hides the section rather than drawing an empty one", async () => {
+  const run = runDriver({ boards: { alice: TWO_MEMBER_HOUSE.alice, bob: null }, members: MEMBERS, seat: "bob" });
+  await goTo(run, "bob");
+  assert.equal(run.at["[data-quests]"].hidden, true, "a seat with no answer drew a board anyway");
+});
+
+test("and stepping back off that seat brings the board back", async () => {
+  // the redraw's own hazard: a seat that hides the section must not leave the
+  // drawn-board bookkeeping standing, or the early return keeps it hidden.
+  const run = runDriver({ boards: { alice: TWO_MEMBER_HOUSE.alice, bob: null }, members: MEMBERS, seat: "alice" });
+  await goTo(run, "alice");
+  await goTo(run, "bob");
+  await goTo(run, "alice");
+  assert.equal(run.at["[data-quests]"].hidden, false, "alice's board never came back");
+  assert.deepEqual(rows(run), ["tend-your-home", "hang-your-window", "walk-the-world"].map((id) => `○${id}oncenot yet`));
+});
+
 // ── the built page ───────────────────────────────────────────────────────────
 //
 // The vm above proves the writers are right and the regexes prove they are
@@ -763,7 +971,8 @@ test("the built page carries the day rule's fix and the arrived line's delivery"
     ["the day writer", "function applyDay(el, today)"],
     ["the day rule's call", "applyDay(dayEl, b.today);"],
     ["the arrived writer", "function applyArrived(el, done, keptTotal)"],
-    ["the arrived call", "applyArrived(arrivedEl, done, keptTotal);"],
+    ["the arrived call", "applyArrived(arrivedEl, onHouse ? [] : done, keptTotal);"],
+    ["the board asks for the open seat", "return questsFor(onHouse ? memberHandles[0] : seat).then(function (b) {"],
     ["the kept denominator", "return !questResets(q);"],
     ["the finished-daily rule", "q.complete === true && !questResets(q)"],
     ["the block heading", "Still to do"],
