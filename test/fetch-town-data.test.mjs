@@ -319,6 +319,114 @@ test("a door that ERRORS is a door that is not there — the build goes on and s
   assert.equal(r.files["letters.json"].length, 2, "the town still builds");
 });
 
+// ── A NAMED ENTRY'S 404 IS AN ANSWER, NOT AN OUTAGE (POS-166, 2026-09-21) ────
+//
+// The list and the entries are two reads of one index, and the index can be
+// caught mid-shed. On 2026-09-21 12:50Z `/bulletin` still named
+// `darkos-birthday-at-lanternstep`, which the town dropped at crossing 203; the
+// entry door 404'd, `apiGet` threw, the whole build fell into fetch-town.mjs's
+// catch as "office API unavailable", and the release channel refused to publish
+// for thirty minutes over one deliberately deleted entry.
+//
+// `ghostList` is the office in exactly that state: its `/bulletin` names a slug
+// whose entry door does not answer. The fixture already 404s any path it does
+// not know, so naming the slug IS the whole shed.
+function ghostList({ ghost = "darkos-birthday-at-lanternstep", entry = null } = {}) {
+  const base = fixtureFetch();
+  return async (url) => {
+    const u = new URL(url);
+    if (u.pathname === "/bulletin") {
+      const listed = [
+        { slug: "settling-in", title: "settling-in", first_line: "# Settling in" },
+        { slug: ghost, title: ghost, first_line: "# Gone" },
+      ];
+      return {
+        ok: true, status: 200, statusText: "OK",
+        headers: { get: (name) => name.toLowerCase() === "x-postmark-as-of" ? "abc123" : null },
+        json: async () => listed,
+      };
+    }
+    if (entry && u.pathname === `/bulletin/${ghost}`) return entry();
+    return base(url);
+  };
+}
+
+test("a bulletin entry the list named and the door 404s is DROPPED, and the rest of the board publishes", async () => {
+  const { data, town } = fixtureSnapshot();
+  const r = await buildOfficeData({
+    apiBase: "https://example.test", dataDir: data, townRoot: town,
+    fetchImpl: ghostList(), retries: 1,
+  });
+  const slugs = r.files["bulletin.json"].map((b) => b.slug);
+  assert.deepEqual(slugs, ["settling-in"], "the shed entry left bulletin.json and the live one stayed");
+  assert.equal(slugs.includes("darkos-birthday-at-lanternstep"), false);
+  assert.match(r.problems.join("\n"), /the list named "darkos-birthday-at-lanternstep" and the entry door answered 404/);
+  assert.match(r.problems.join("\n"), /dropped from bulletin\.json/);
+  // The build COMPLETED: every other file is still there and still whole. This
+  // is the half the outage was about — not the dropped row, the published board.
+  assert.equal(r.files["residents.json"].length, 2, "the town still builds");
+  assert.equal(r.files["letters.json"].length, 2);
+  // ⚑ THE FLIP: let a 404 throw again (drop the `error?.status !== 404` branch
+  // in buildOfficeData's bulletin fan-out) and this test reds on the throw.
+});
+
+test("a bulletin entry that answers 500 still stops the build — this is not blanket fail-soft", async () => {
+  const { data, town } = fixtureSnapshot();
+  const fetchImpl = ghostList({
+    entry: () => ({ ok: false, status: 500, statusText: "Internal Server Error", headers: { get: () => null }, json: async () => ({}) }),
+  });
+  await assert.rejects(
+    () => buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl, retries: 1 }),
+    /500/,
+    "a 5xx is a fact about the OFFICE and must still refuse to publish",
+  );
+});
+
+test("a bulletin entry whose fetch throws with NO status still stops the build", async () => {
+  // The `error?.status !== 404` branch, entered from the other side: a network
+  // failure carries no status at all, and `undefined !== 404` must keep today's
+  // behaviour rather than being read as "not a 404, so fine".
+  const { data, town } = fixtureSnapshot();
+  const fetchImpl = ghostList({ entry: () => { throw new Error("connection reset"); } });
+  await assert.rejects(
+    () => buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl, retries: 1 }),
+    /connection reset/,
+  );
+});
+
+test("the LIST itself 404ing is still an outage — that read is the office, not an entry", async () => {
+  const { data, town } = fixtureSnapshot();
+  const base = fixtureFetch();
+  const fetchImpl = async (url) => {
+    const u = new URL(url);
+    if (u.pathname === "/bulletin") return { ok: false, status: 404, statusText: "Not Found", headers: { get: () => null }, json: async () => ({}) };
+    return base(url);
+  };
+  await assert.rejects(
+    () => buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl, retries: 1 }),
+    /404/,
+    "a list we cannot get IS unavailable; only an entry the list NAMED may be forgiven",
+  );
+});
+
+test("apiGet carries the status as a FIELD, on the error the caller is actually handed", async () => {
+  // The fix hangs on this and nothing else. Asserted on the WRAPPER error --
+  // the one `apiGet` throws after the budget -- because that is what a call
+  // site catches; a status set only on the inner error would be unreachable.
+  const fetchImpl = async () => ({ ok: false, status: 404, statusText: "Not Found", headers: { get: () => null }, json: async () => ({}) });
+  const error = await apiGet("/bulletin/gone", { apiBase: "https://example.test", fetchImpl, retries: 1 }).then(
+    () => null,
+    (e) => e,
+  );
+  assert.ok(error, "a 404 still throws");
+  assert.equal(error.status, 404, "the status is a field, not only a substring");
+  assert.match(error.message, /GET \/bulletin\/gone failed after 1 attempts: 404 Not Found/, "the message is unchanged");
+  // And the same for a 5xx, so `status` means the status rather than "404-ness".
+  const five = async () => ({ ok: false, status: 503, statusText: "Service Unavailable", headers: { get: () => null }, json: async () => ({}) });
+  const e5 = await apiGet("/town", { apiBase: "https://example.test", fetchImpl: five, retries: 1 }).then(() => null, (e) => e);
+  assert.equal(e5.status, 503);
+});
+
 test("buildOfficeData preserves committed profiles when no checkout is supplied", async () => {
   const { data } = fixtureSnapshot();
   const result = await buildOfficeData({ apiBase: "https://example.test", dataDir: data, fetchImpl: fixtureFetch() });
