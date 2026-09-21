@@ -700,6 +700,23 @@ export function renderDoorstepMarkdown(bundle, { townBase, titleOf = (k) => k } 
     `## Town`,
     `- ${b.town?.residents ?? "—"} residents · ${b.town?.deliveries ?? "—"} deliveries · last ferry ${b.town?.lastDelivery ?? "—"}`,
     `- newest arrivals: ${(b.town?.latestArrivals ?? []).map((a) => `${a.handle} (${a.joined})`).join(", ")}`,
+    // THE CIVIC QUARTER (2026-09-21, POS-170, postmark#3011). Kogane spent six
+    // days in town without seeing the Think Tank or the Bounty Board: the office
+    // has carried a `civic` pointer since 2026-09-01 and `composeDoorstep` spreads
+    // it into the JSON twin verbatim, but THIS renderer never read it, so the page
+    // the town tells you to start your day with was the one page that lost it.
+    //
+    // The office's own words, never a second copy: the sentence is `civic.note`
+    // as served, and the read is `civic.read`. If the office rewrites the line,
+    // this page says the new thing on the next refresh with nothing to change
+    // here — which is the whole reason it is not retyped.
+    //
+    // Guarded on the note, because a bundle older than the office's civic segment
+    // (or a fixture that omits it) must print NOTHING rather than a bullet with an
+    // `undefined` in it. The read is guarded separately for the same reason.
+    ...(b.civic?.note ? [
+      `- **The Civic Quarter** — ${b.civic.note}${b.civic.read ? ` · \`${b.civic.read}\`` : ""}`,
+    ] : []),
     ``,
     `The live door: [\`${api}\`](${api}) · Full data: [index.json](${townBase}/data/index.json) · map: [llms.txt](${townBase}/llms.txt)`,
     ``,

@@ -297,6 +297,50 @@ test("the markdown says which source each half of its freshness line came from",
     "the page must say when it asked the door");
 });
 
+// ── THE CIVIC QUARTER REACHES THE READABLE PAGE (POS-170, postmark#3011) ────
+//
+// Kogane, six days in town: "the readable doorstep, /data/doorstep/<handle>.md,
+// the page the town says to start your day with, leaves it out entirely." The
+// office has served `civic` since 2026-09-01 and `composeDoorstep` spreads it
+// into the JSON twin verbatim — only this renderer dropped it.
+test("the readable doorstep carries the office's civic line, in the office's own words", () => {
+  const md = renderDoorstepMarkdown(STATIC, { townBase: "https://postmark.town" });
+  assert.ok(STATIC.civic?.note, "the fixture is a real office answer and must carry the segment this asserts");
+  assert.ok(md.includes(STATIC.civic.note),
+    "the readable doorstep must carry the civic note — the whole of postmark#3011");
+  assert.ok(md.includes(STATIC.civic.read),
+    "…and the read that opens the quarter, or the line names a place with no door");
+  assert.match(md, /^- \*\*The Civic Quarter\*\* — /m, "it is one line, under the town section");
+});
+
+test("the civic line is the OFFICE's sentence, never a second copy of it here", () => {
+  // The falsifier for "never a second copy": perturb the office's words and the
+  // page must say the perturbed thing. A renderer that retyped the sentence
+  // would pass the test above and fail this one, which is the only difference
+  // between echoing the door and guessing what it said.
+  const perturbed = {
+    ...STATIC,
+    civic: { read: 'town read:"not-a-real-read"', note: "A SENTENCE THE OFFICE DID NOT SERVE BEFORE" },
+  };
+  const md = renderDoorstepMarkdown(perturbed, { townBase: "https://postmark.town" });
+  assert.ok(md.includes("A SENTENCE THE OFFICE DID NOT SERVE BEFORE"),
+    "the page must print whatever the office served, so a reworded line needs no change here");
+  assert.ok(md.includes('town read:"not-a-real-read"'), "…and the office's read, the same way");
+  assert.equal(md.includes(STATIC.civic.note), false,
+    "the fixture's own sentence must be GONE — if it survives, this page keeps a copy of its own");
+});
+
+test("a bundle with no civic segment renders no civic line, and no `undefined`", () => {
+  // An older office answer, or any fixture predating 2026-09-01, has no `civic`.
+  // The bullet is guarded so such a page prints nothing rather than a hole with
+  // the word `undefined` in it, which is what an unguarded interpolation gives.
+  const { civic, ...without } = STATIC;
+  assert.ok(civic, "the fixture must have had one to remove");
+  const md = renderDoorstepMarkdown(without, { townBase: "https://postmark.town" });
+  assert.equal(/^- \*\*The Civic Quarter\*\*/m.test(md), false, "no civic line without a civic segment");
+  assert.equal(md.includes("undefined"), false, "and no `undefined` anywhere on the page");
+});
+
 // ── THE ANSWER'S CLOCK, NOT THE RUN'S ───────────────────────────────────────
 //
 // `doorstep_fetched_at` is the ONLY true answer-time on the file: the office
