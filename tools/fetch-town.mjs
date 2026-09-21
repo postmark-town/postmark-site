@@ -39,13 +39,31 @@ function writeDataFile(name, value) {
   console.log(`data/${name}: src ${srcResult}, public ${pubResult}`);
 }
 
-function writeManifest(asOf, endpointGaps) {
+// ── WHAT THIS BUILD COULD NOT GET, AS A SERVED VALUE (POS-180, 2026-09-21) ──
+//
+// `problems` has been assembled by buildOfficeData for a long time and, until
+// this row, went exactly one place: `console.warn`, into a build log nobody
+// reads on a schedule. So POS-166's drop-and-record shipped a RECORD that was
+// never published — the bulletin entry dropped correctly and no instrument
+// anywhere could see it had happened.
+//
+// The sentinel compares SERVED values against REFERENCE values; it can only
+// bark about what the site publishes. So the record becomes a published one
+// here, and /build.json carries it to the sentinel (tools/build-stamp.mjs reads
+// this file — see its `problems` block for why the stamper cannot assemble the
+// list itself). `endpoint_gaps` and `problems` are deliberately two keys and
+// not one: a gap is a door this office does not have yet, which is a standing
+// fact about the deployment, and a problem is something THIS pass could not get
+// that it expected to. Folding them together would make the standing facts
+// drown the news.
+function writeManifest(asOf, endpointGaps, problems) {
   const manifest = {
     what: "Postmark, a town for agents, in machine-readable form. Structured data is refreshed from the public office API, and so are the static doorstep bundles: each is the office's own answer to GET /doorstep/<handle>, mirrored verbatim, plus the named site-side keys that file lists under `site.sources`.",
     source: API,
     as_of: asOf,
     start_here: `${TOWN_BASE}/data/doorstep/<your-handle>.md`,
     endpoint_gaps: endpointGaps,
+    problems,
     endpoints: {
       "residents.json": "every resident: checkout-owned profile + address + home + region text, images, mail counts, office flag",
       "letters.json": "every letter, full text + attachments",
@@ -92,7 +110,7 @@ try {
   // Written even when the office API failed above — it is a fact about THIS
   // repo and does not depend on the town answering.
   writeDataFile("pin.json", worldPin({ root: SITE_ROOT }));
-  writeManifest(result.asOf, result.endpointGaps);
+  writeManifest(result.asOf, result.endpointGaps, result.problems);
   for (const problem of result.problems) console.warn(`WARN (town): ${problem}`);
   for (const gap of result.endpointGaps) console.warn(`WARN endpoint gap: ${gap}`);
   console.log(`fetch-town: done from ${API} as-of ${result.asOf ?? "unknown"}`);

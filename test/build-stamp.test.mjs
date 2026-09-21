@@ -9,6 +9,20 @@ import { composeStamp, gather, main, readWorldSha, SCHEMA } from "../tools/build
 const AT = "2026-08-25T23:00:00.000Z";
 // A complete build names its world. Fixtures that assert "no notes" carry this.
 const WORLD = { sha: "256db2fe02b4c786f4f6182629d896c38cd2b442", from: "package-lock.json", note: null };
+// …and, since POS-180, a complete build can also say what its fetch could not
+// get. `[]` is "asked for everything and got it"; the absence of the list is a
+// note, because a stamp that says nothing went wrong BECAUSE it failed to look
+// is the false all-clear this file exists to refuse. Fixtures that assert "no
+// notes" carry this for the same reason they carry WORLD.
+const NO_PROBLEMS = [];
+
+/** The served manifest, where a `gather()` fixture's problems list comes from. */
+function writeManifestAt(root, problems = []) {
+  const dir = join(root, "public", "atelier", "postmark", "data");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "index.json"), JSON.stringify({ as_of: "abc123", endpoint_gaps: [], problems }));
+  return root;
+}
 
 test("the release lane stamps two shas on two different clocks", () => {
   // Prod builds CODE from the newest release/* tag and overlays town DATA from
@@ -23,6 +37,7 @@ test("the release lane stamps two shas on two different clocks", () => {
     crossing: 149,
     builtAt: AT,
     world: WORLD,
+    problems: NO_PROBLEMS,
   });
   assert.equal(s.schema, SCHEMA);
   assert.equal(s.channel, "release");
@@ -36,7 +51,7 @@ test("the release lane stamps two shas on two different clocks", () => {
 test("the snapshot lane says the two shas share one commit rather than leaving a reader to guess", () => {
   // Dev has no tag pin and no overlay, so code and data genuinely are the same
   // commit. Equal fields must not be readable as "verified in sync".
-  const s = composeStamp({ channel: "snapshot", codeSha: "cccccccc", codeRef: "main", townDataSha: null, builtAt: AT, world: WORLD });
+  const s = composeStamp({ channel: "snapshot", codeSha: "cccccccc", codeRef: "main", townDataSha: null, builtAt: AT, world: WORLD, problems: NO_PROBLEMS });
   assert.equal(s.town_data_sha, "cccccccc");
   assert.match(s.town_data_from, /the checkout itself/);
   assert.deepEqual(s.notes, [], "a snapshot build with no overlay is complete, not degraded");
@@ -105,7 +120,7 @@ test("gather reads HEAD, not github.sha, and survives a git that will not answer
 test("the stamp names the TOWN record it read and the crossing it reflects", () => {
   const s = composeStamp({
     channel: "release", codeSha: "a".repeat(40), codeRef: "release/2026-w35.1",
-    townDataSha: "b".repeat(40), townSha: "c".repeat(40), crossing: 149, builtAt: AT, world: WORLD,
+    townDataSha: "b".repeat(40), townSha: "c".repeat(40), crossing: 149, builtAt: AT, world: WORLD, problems: NO_PROBLEMS,
   });
   assert.equal(s.town_sha, "c".repeat(40));
   assert.equal(s.crossing, 149);
@@ -198,6 +213,7 @@ test("world_sha is read from the tree the stamper runs in — the BUILD tree, ne
   const build = mkdtempSync(join(tmpdir(), "build-stamp-build-")); // the build tree, advanced by the resolver
   writeFileSync(join(main, "package-lock.json"), LOCK("ecc63613a063ca2e3da262c6306c34b72ae3b9f8"));
   writeFileSync(join(build, "package-lock.json"), LOCK(S63));
+  writeManifestAt(build);   // a complete build also knows its fetch got everything (POS-180)
   const env = { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "release/2026-w37.6", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "178" };
   const s = gather({ env, exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root: build });
   assert.equal(s.world_sha, S63);
@@ -240,7 +256,7 @@ test("readWorldSha falls back to the installed package only when the lockfile ca
 });
 
 test("world_ref is the lane's name for the world, or null — never derived from the sha", () => {
-  const base = { channel: "release", codeSha: "a", codeRef: "r", townDataSha: "b", townSha: "c".repeat(40), crossing: 1, builtAt: AT, world: WORLD };
+  const base = { channel: "release", codeSha: "a", codeRef: "r", townDataSha: "b", townSha: "c".repeat(40), crossing: 1, builtAt: AT, world: WORLD, problems: NO_PROBLEMS };
   assert.equal(composeStamp({ ...base, worldRef: "settlement/S63" }).world_ref, "settlement/S63");
   for (const empty of ["", "   ", null, undefined]) assert.equal(composeStamp({ ...base, worldRef: empty }).world_ref, null, `BUILD_WORLD_REF=${JSON.stringify(empty)} is "the lane did not say"`);
   // and a hold on the floor (the box script passes an empty ref) leaves the sha standing on its own
@@ -252,6 +268,7 @@ test("world_ref is the lane's name for the world, or null — never derived from
 test("main writes world_sha and world_ref into the JSON the sentinel reads", () => {
   const root = mkdtempSync(join(tmpdir(), "build-stamp-world-main-"));
   writeFileSync(join(root, "package-lock.json"), LOCK(S63));
+  writeManifestAt(root);
   const out = join(root, "dist-town", "build.json");
   const realLog = console.log; const logged = [];
   console.log = (m) => logged.push(String(m));
@@ -267,4 +284,107 @@ test("main writes world_sha and world_ref into the JSON the sentinel reads", () 
   assert.equal(parsed.world_ref, "settlement/S63");
   assert.deepEqual(parsed.notes, []);
   assert.ok(logged.some((l) => /world 256db2fe \(settlement\/S63\)/.test(l)), "the console line names the world too, so a box journal answers the question without curl");
+});
+
+// ── WHAT THIS BUILD COULD NOT GET, AS A SERVED VALUE (POS-180, 2026-09-21) ──
+//
+// POS-166 shipped the drop-and-record pattern and the RECORD went nowhere:
+// `problems` was assembled by buildOfficeData and console.warn'd into a build
+// log, while writeManifest published `endpoint_gaps` and not `problems`. The
+// office's site-sentinel compares SERVED values against REFERENCE values, so it
+// could not see that a drop had happened at all. These are the tests for the
+// carry: fetch-town.mjs writes the list onto the served manifest, the box's
+// overlay rsyncs public/atelier/postmark into the build tree, and the stamper
+// reads it back onto /build.json where the sentinel already looks every pass.
+
+test("the problems list travels from the served manifest onto the stamp", () => {
+  const root = mkdtempSync(join(tmpdir(), "build-stamp-problems-"));
+  writeFileSync(join(root, "package-lock.json"), LOCK(S63));
+  writeManifestAt(root, ['residents: the roll named "wright" and the card door answered 404 — HELD OVER']);
+  const s = gather({
+    env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "203" },
+    exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root,
+  });
+  assert.equal(s.problems.length, 1);
+  assert.match(s.problems[0], /the roll named "wright"/,
+    "the bark must name the entity and the door — a count alone tells a reader nothing to act on");
+  // A build that published WITH problems is still a complete build: the site is
+  // fresh, something in it is held over. That is a finding, not a degradation
+  // of the stamp, so it must not also fill `notes`.
+  assert.deepEqual(s.notes, [], "problems and notes are different questions");
+});
+
+test("an UNREADABLE manifest is null plus a note — never [], which would be a false all-clear", () => {
+  // THE FALSIFIER FOR THE WHOLE FIELD. `problems: []` means "asked for
+  // everything and got it". A stamper that defaulted to [] when it could not
+  // find the manifest would tell the sentinel every build was clean precisely
+  // when it had stopped being able to look — the exact shape of lie this file
+  // was written to refuse.
+  const root = mkdtempSync(join(tmpdir(), "build-stamp-noman-"));
+  writeFileSync(join(root, "package-lock.json"), LOCK(S63));
+  const s = gather({
+    env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "203" },
+    exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root,
+  });
+  assert.equal(s.problems, null, "unread is not clean");
+  assert.notDeepEqual(s.problems, []);
+  assert.ok(s.notes.some((n) => /could not read the town manifest/.test(n)),
+    "and it says so, so a reader knows the field was unread rather than empty");
+
+  // A manifest that exists but carries no `problems` key is the same answer:
+  // an older fetch-town.mjs still writing the pre-POS-180 shape.
+  mkdirSync(join(root, "public", "atelier", "postmark", "data"), { recursive: true });
+  writeFileSync(join(root, "public", "atelier", "postmark", "data", "index.json"), JSON.stringify({ as_of: "abc", endpoint_gaps: [] }));
+  const old = gather({
+    env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "203" },
+    exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root,
+  });
+  assert.equal(old.problems, null);
+});
+
+test("an EMPTY problems list leaves the stamp byte-compatible with today's readers", () => {
+  // The additive check. Every field /build.json carried before POS-180 must
+  // still be there, unchanged, in the ordinary case — the sentinel, the page's
+  // own freshness line and world-pin-publish.mjs all read this file, and none
+  // of them knows the new key.
+  const before = composeStamp({
+    channel: "release", codeSha: "a".repeat(40), codeRef: "release/2026-w40.1",
+    townDataSha: "b".repeat(40), townSha: "c".repeat(40), crossing: 203, builtAt: AT, world: WORLD,
+    worldRef: "settlement/S63", problems: [],
+  });
+  for (const key of ["schema", "channel", "built_at", "code_sha", "code_ref", "town_data_sha",
+    "town_data_from", "town_sha", "crossing", "world_sha", "world_from", "world_ref", "why_two", "notes"]) {
+    assert.ok(key in before, `${key} must survive — an added field may not cost an existing reader its own`);
+  }
+  assert.deepEqual(before.problems, []);
+  assert.deepEqual(before.notes, [], "a clean build with an empty list is complete, not degraded");
+  // …and the new key is the ONLY thing that changed shape.
+  const legacyKeys = Object.keys(before).filter((k) => k !== "problems");
+  const legacy = composeStamp({
+    channel: "release", codeSha: "a".repeat(40), codeRef: "release/2026-w40.1",
+    townDataSha: "b".repeat(40), townSha: "c".repeat(40), crossing: 203, builtAt: AT, world: WORLD,
+    worldRef: "settlement/S63", problems: [],
+  });
+  for (const k of legacyKeys) assert.deepEqual(legacy[k], before[k]);
+});
+
+test("main writes problems into the JSON the sentinel reads, and names the count in the box journal", () => {
+  const root = mkdtempSync(join(tmpdir(), "build-stamp-problems-main-"));
+  writeFileSync(join(root, "package-lock.json"), LOCK(S63));
+  writeManifestAt(root, ["bulletin: the list named \"darkos-birthday-at-lanternstep\" and the entry door answered 404"]);
+  const out = join(root, "dist-town", "build.json");
+  const realLog = console.log; const logged = [];
+  console.log = (m) => logged.push(String(m));
+  try {
+    main(["node", "build-stamp.mjs", "--out", out], {
+      env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "release/2026-w40.1", BUILD_TOWN_DATA_SHA: "b".repeat(40), BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "203" },
+      exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root,
+    });
+  } finally { console.log = realLog; }
+  const parsed = JSON.parse(readFileSync(out, "utf8"));
+  assert.equal(parsed.problems.length, 1);
+  assert.match(parsed.problems[0], /darkos-birthday-at-lanternstep/);
+  assert.ok(logged.some((l) => /problems 1/.test(l)),
+    "the box journal answers the question without curl — the same courtesy the world line already pays");
+  assert.ok(logged.some((l) => /problem: bulletin:/.test(l)), "and it prints the line itself, not only the count");
 });
