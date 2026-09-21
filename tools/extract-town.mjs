@@ -43,7 +43,7 @@ import {
 } from "./lib/doorstep.mjs";
 import {
   QUOTED_IMAGE_REF_RE, ATTR_REF_RE, githubUrl, byteMirror,
-  findLeftoverImageRef, findRelativeRef, writeIfChanged,
+  findLeftoverImageRef, findRelativeRef, writeIfChanged, injectBaseTarget,
 } from "./lib/mirror.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -881,6 +881,9 @@ await emitSeam(TOWN);
     office = office.replace(ATTR_REF_RE, (whole, attr, ref) =>
       rewrites.has(ref) ? `${attr}="${rewrites.get(ref)}"` : whole
     );
+    // The site frames this document on /daily/, and the refs just rewritten
+    // point at GitHub, which refuses to be framed. Links leave the frame.
+    office = injectBaseTarget(office);
     console.log(`daily: ferrys-daily.html ${writeIfChanged(join(DAILY_DIR, "ferrys-daily.html"), office)} — ${rewrites.size} refs, ${wrote} written, ${kept} unchanged`);
   }
 }
