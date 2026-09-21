@@ -187,6 +187,31 @@ export function createRateGate({
   };
 }
 
+// ── THE STATUS IS A FIELD, NOT A SUBSTRING (POS-166, 2026-09-21) ────────────
+//
+// A 404 on ONE entry a list named is a fact about that entry; a 500 is a fact
+// about the office, and only one of the two should stop a build. The caller
+// could not tell them apart: the status survived only inside the message
+// `GET /bulletin/<slug> failed after 3 attempts: 404 Not Found`, which
+// interpolates the failing PATH into the same string — so a slug ending in
+// `-404` would have made a 500 read as a 404 under any match loose enough to
+// be written. This adds a field to an object every caller already receives.
+// The message text, the return shape, the `retries` budget, the nap schedule
+// and the 429 refusal path are all unchanged.
+function httpError(status, statusText) {
+  // The expression is the original one, character for character, so the message
+  // is byte-identical for every status -- including the degenerate case where a
+  // response carries no statusText at all.
+  const error = new Error(`${status} ${statusText}`.trim());
+  error.status = status;
+  return error;
+}
+
+function carryStatus(error, from) {
+  if (from?.status !== undefined) error.status = from.status;
+  return error;
+}
+
 export async function apiGet(path, { apiBase, fetchImpl = fetch, retries = 3, timeoutMs = 15000, maxRetryAfterMs = 60_000, gate = null } = {}) {
   const base = normApiBase(apiBase);
   const nap = (ms) => (gate ? gate.sleep(ms) : new Promise((resolve) => setTimeout(resolve, ms)));
@@ -215,9 +240,9 @@ export async function apiGet(path, { apiBase, fetchImpl = fetch, retries = 3, ti
         const ra = Number(res.headers?.get?.("retry-after"));
         waitMs = Number.isFinite(ra) && ra > 0 ? Math.min(ra * 1000, maxRetryAfterMs) : Math.max(waitMs, 1000);
         if (gate) gate.park(ra);
-        throw new Error(`${res.status} ${res.statusText}`.trim());
+        throw httpError(res.status, res.statusText);
       }
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`.trim());
+      if (!res.ok) throw httpError(res.status, res.statusText);
       const out = {
         body: await res.json(),
         asOf: res.headers?.get?.("x-postmark-as-of") ?? null,
@@ -232,14 +257,16 @@ export async function apiGet(path, { apiBase, fetchImpl = fetch, retries = 3, ti
         // the RUN's budget is spent; a count cannot outlast a queue.
         if (!gate.expired()) continue;
         const { refusals } = gate.stats();
-        throw new Error(`GET ${path} refused: the run's ${gate.budgetMs} ms fetch budget is spent after ${refusals} refusal(s) (${lastError?.message ?? lastError})`);
+        throw carryStatus(new Error(`GET ${path} refused: the run's ${gate.budgetMs} ms fetch budget is spent after ${refusals} refusal(s) (${lastError?.message ?? lastError})`), lastError);
       }
       hardAttempts += 1;
       if (hardAttempts >= retries) break;
       await nap(waitMs);
     }
   }
-  throw new Error(`GET ${path} failed after ${retries} attempts: ${lastError?.message ?? lastError}`);
+  // The WRAPPER is what a caller actually catches, so it carries the status
+  // too. A field that exists on an error nobody is handed is not a field.
+  throw carryStatus(new Error(`GET ${path} failed after ${retries} attempts: ${lastError?.message ?? lastError}`), lastError);
 }
 
 /** map, at most `limit` in flight at once, order preserved. The office's keyless
@@ -652,9 +679,40 @@ export async function buildOfficeData({
     .map((r) => mapResident(r, letters, ledger, profileByHandle.get(r.handle) ?? r.profile ?? {}))
     .sort((a, b) => a.handle.localeCompare(b.handle));
 
-  const bulletin = await Promise.all(ensureArray(bulletinListRes.body, "/bulletin").map(async (b) =>
-    (await apiGet(`/bulletin/${encodeURIComponent(b.slug)}`, { apiBase, fetchImpl, retries, gate })).body
-  ));
+  // ── A NAMED ENTRY'S 404 IS AN ANSWER, NOT AN OUTAGE (POS-166, 2026-09-21) ──
+  //
+  // The list and the entries are two reads of one index, and the index can be
+  // caught mid-shed: on 2026-09-21 12:50Z `/bulletin` still named
+  // `darkos-birthday-at-lanternstep`, an entry the town dropped at crossing
+  // 203, and the entry door answered 404. `apiGet` threw, the throw escaped
+  // this `Promise.all`, the whole build fell into fetch-town.mjs's catch as
+  // "office API unavailable", and on the release channel the #2884 rule did
+  // exactly what it is for and REFUSED to publish. The site stayed on the last
+  // good build for thirty minutes and the sentinel went down — over one entry
+  // that had been deleted on purpose.
+  //
+  // So a 404 on a slug the list named is now read as the answer it is: that
+  // entry is gone, it leaves `bulletin.json`, `problems` says which one, and
+  // the other entries still publish. Everything else is unchanged and still
+  // stops the build — a 5xx, a timeout, a network failure, a refusal whose
+  // budget ran out, and `/bulletin` itself failing (that read is above, and a
+  // list we cannot get IS "unavailable"). This is deliberately narrower than
+  // fail-soft: it forgives one named thing being absent, never the office
+  // being unreachable.
+  const DROPPED = Symbol("bulletin entry the list named and the door 404'd");
+  const bulletinEntries = await Promise.all(ensureArray(bulletinListRes.body, "/bulletin").map(async (b) => {
+    try {
+      return (await apiGet(`/bulletin/${encodeURIComponent(b.slug)}`, { apiBase, fetchImpl, retries, gate })).body;
+    } catch (error) {
+      if (error?.status !== 404) throw error;
+      problems.push(`bulletin: the list named "${b.slug}" and the entry door answered 404 — the office's index still carries an entry the town has shed; dropped from bulletin.json and the rest of the board published`);
+      return DROPPED;
+    }
+  }));
+  // A SENTINEL, not a null check: `null` is a body the office could one day
+  // send, and dropping it silently would be this same defect wearing the fix's
+  // clothes.
+  const bulletin = bulletinEntries.filter((entry) => entry !== DROPPED);
   bulletin.sort((a, b) => a.slug.localeCompare(b.slug));
 
   const threads = buildThreads(letters);
