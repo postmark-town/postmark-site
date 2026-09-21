@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
-import { apiGet, buildOfficeData, createRateGate, DEFAULT_FETCH_TOWN_DEADLINE_MS, fetchResidentRoll, fetchTownDeadlineMs, jsonText, mapLimit, RESIDENT_CARD_LANES, shortFetchPlan } from "../tools/lib/fetch-town-data.mjs";
+import { apiGet, buildOfficeData, createRateGate, DEFAULT_FETCH_TOWN_DEADLINE_MS, fetchResidentRoll, fetchTownDeadlineMs, jsonText, mapLimit, MAX_NAMED_404S, RESIDENT_CARD_LANES, shortFetchPlan } from "../tools/lib/fetch-town-data.mjs";
 import { readFileSync } from "node:fs";
 
 function writeJson(dir, name, value) {
@@ -904,4 +904,177 @@ test("the script asks shortFetchPlan rather than exiting 0 by hand \u2014 a sour
   // the two measurement lines the journal readers use are untouched
   assert.match(src, /WARN fetch-town: office API unavailable; keeping committed data snapshot/);
   assert.match(src, /WARN fetch-town: SNAPSHOT SHORT \u2014 residents\.json keeps/);
+});
+
+// ── A NAMED RESIDENT'S 404 PUBLISHES AND BARKS (POS-180, 2026-09-21) ─────────
+//
+// The bulletin's shape, on the door that costs the most. Keemin's ruling the
+// same day: "The whole site not updating because of one resident smells like a
+// disaster waiting to happen. We just need to know this happened, not block
+// things on it."
+//
+// `ghostRoll` is the office mid-shed on the residents roll: `/residents` names
+// handles whose card door does not answer. A handle with no route 404s through
+// the base fixture on its own, which IS the shed; `silence` makes a handle the
+// fixture DOES know go quiet, so a resident with a committed snapshot row can
+// be 404'd and the held-over half tested.
+function ghostRoll({ ghosts = [], silence = [], card = null } = {}) {
+  const base = fixtureFetch();
+  return async (url) => {
+    const u = new URL(url);
+    if (u.pathname === "/residents") {
+      const listed = [
+        { handle: "rei", display: "Rei", github: "keeminlee", is_office: false },
+        { handle: "wright", display: "Wright", github: "keeminlee", is_office: false },
+        ...ghosts.map((h) => ({ handle: h, display: h, github: null, is_office: false })),
+      ];
+      return {
+        ok: true, status: 200, statusText: "OK",
+        headers: { get: (name) => name.toLowerCase() === "x-postmark-as-of" ? "abc123" : null },
+        json: async () => listed,
+      };
+    }
+    if (silence.some((h) => u.pathname === `/residents/${h}`)) {
+      return card ? card() : { ok: false, status: 404, statusText: "Not Found", headers: { get: () => null }, json: async () => ({}) };
+    }
+    return base(url);
+  };
+}
+
+test("one resident the roll named and the card door 404s does NOT freeze the town — the build publishes", async () => {
+  const { data, town } = fixtureSnapshot();
+  const r = await buildOfficeData({
+    apiBase: "https://example.test", dataDir: data, townRoot: town,
+    fetchImpl: ghostRoll({ silence: ["wright"] }), retries: 1,
+  });
+  // THE HALF THE OUTAGE WAS ABOUT: the build completed at all. Before POS-180
+  // this threw out of mapLimit, fetch-town.mjs caught it as "office API
+  // unavailable", and on the release channel every page on postmark.town froze.
+  assert.ok(r.files["residents.json"].length, "the town still builds");
+  assert.equal(r.files["bulletin.json"].length, 1, "and the rest of the build is whole");
+});
+
+test("the 404'd resident KEEPS THE PAGE THEY HAD — held over, never vanished from the white pages", async () => {
+  const { data, town } = fixtureSnapshot();
+  const r = await buildOfficeData({
+    apiBase: "https://example.test", dataDir: data, townRoot: town,
+    fetchImpl: ghostRoll({ silence: ["wright"] }), retries: 1,
+  });
+  const handles = r.files["residents.json"].map((x) => x.handle);
+  assert.deepEqual(handles, ["rei", "wright"], "wright's door is still in /residents/ — a 404 must not delete a resident");
+  const held = r.files["residents.json"].find((x) => x.handle === "wright");
+  // Verbatim from the committed snapshot, NOT re-mapped: the snapshot row in
+  // fixtureSnapshot carries only handle+profile, so a row rebuilt through
+  // mapResident against this build's letters would have grown the other keys.
+  assert.deepEqual(held, { handle: "wright", profile: { bio: "snapshot profile" } },
+    "the held-over row is last build's own output, kept whole — half-fresh is the failure this avoids");
+  assert.match(r.problems.join("\n"), /the roll named "wright" and the card door answered 404/);
+  assert.match(r.problems.join("\n"), /HELD OVER/, "and the problems line says the row is held over");
+  assert.match(r.problems.join("\n"), /2026-07-01/, "…and from when, so a reader can tell a day-old row from a month-old one");
+});
+
+test("a 404'd resident with NO previous row is absent, and says so in DIFFERENT words", async () => {
+  // The one case that genuinely cannot be held. A reader must be able to tell
+  // "kept their page" from "has no page" — one is a shed handle, the other is a
+  // resident who arrived and left inside a single build.
+  const { data, town } = fixtureSnapshot();
+  const r = await buildOfficeData({
+    apiBase: "https://example.test", dataDir: data, townRoot: town,
+    fetchImpl: ghostRoll({ ghosts: ["never-had-a-card"] }), retries: 1,
+  });
+  const handles = r.files["residents.json"].map((x) => x.handle);
+  assert.equal(handles.includes("never-had-a-card"), false);
+  assert.match(r.problems.join("\n"), /no previous row for them/);
+  assert.equal(/never-had-a-card[^\n]*HELD OVER/.test(r.problems.join("\n")), false,
+    "a resident with no snapshot row must never be reported as held over");
+});
+
+test("FOUR named 404s is the office being wrong, and it still REFUSES exactly as today", async () => {
+  // THE #2884 GUARD. One handle 404ing is a shed or a rename; half the roll
+  // 404ing is the office broken, and publishing a town of held-over rows as
+  // current is the wound shortFetchPlan exists to prevent. Above the threshold
+  // this throws, which is the SAME door an unreachable office comes through —
+  // fetch-town.mjs's catch, then shortFetchPlan's release-channel refusal.
+  const { data, town } = fixtureSnapshot();
+  const four = ["ghost-a", "ghost-b", "ghost-c", "ghost-d"];
+  assert.ok(four.length > MAX_NAMED_404S, "the fixture must actually be over the line it is testing");
+  await assert.rejects(
+    () => buildOfficeData({
+      apiBase: "https://example.test", dataDir: data, townRoot: town,
+      fetchImpl: ghostRoll({ ghosts: four }), retries: 1,
+    }),
+    /4 residents the roll named answered 404/,
+    "past the threshold the pass is an office fault, not a set of sheds",
+  );
+  // …and what that throw becomes on the release channel is unchanged: exit 1,
+  // nothing published, the last good release keeps serving.
+  const plan = shortFetchPlan({ channel: "release" });
+  assert.equal(plan.refuse, true);
+  assert.equal(plan.exitCode, 1);
+  assert.match(plan.line, /REFUSING to build from the committed snapshot/);
+});
+
+test("THE BOUNDARY: exactly MAX_NAMED_404S sheds still publishes — the threshold is a `>`, not a `>=`", async () => {
+  // The knob's own falsifier. Off-by-one here is the difference between "three
+  // sheds publish" and "three sheds freeze the town", and only a test at the
+  // line can tell which one shipped.
+  const { data, town } = fixtureSnapshot();
+  const atLine = ["ghost-a", "ghost-b", "ghost-c"];
+  assert.equal(atLine.length, MAX_NAMED_404S);
+  const r = await buildOfficeData({
+    apiBase: "https://example.test", dataDir: data, townRoot: town,
+    fetchImpl: ghostRoll({ ghosts: atLine }), retries: 1,
+  });
+  assert.deepEqual(r.files["residents.json"].map((x) => x.handle), ["rei", "wright"]);
+  assert.equal(r.problems.filter((p) => /the card door answered 404/.test(p)).length, 3,
+    "all three are recorded — forgiven is not the same as unmentioned");
+});
+
+test("a resident card that answers 500 still stops the build — this is not blanket fail-soft", async () => {
+  const { data, town } = fixtureSnapshot();
+  const fetchImpl = ghostRoll({
+    silence: ["wright"],
+    card: () => ({ ok: false, status: 500, statusText: "Internal Server Error", headers: { get: () => null }, json: async () => ({}) }),
+  });
+  await assert.rejects(
+    () => buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl, retries: 1 }),
+    /500/,
+    "a 5xx is a fact about the OFFICE and must still refuse to publish",
+  );
+});
+
+test("a resident card whose fetch throws with NO status still stops the build", async () => {
+  // `undefined !== 404` must keep today's behaviour rather than being read as
+  // "not a 404, so fine" — the same both-sides check the bulletin branch has.
+  const { data, town } = fixtureSnapshot();
+  const fetchImpl = ghostRoll({ silence: ["wright"], card: () => { throw new Error("connection reset"); } });
+  await assert.rejects(
+    () => buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl, retries: 1 }),
+    /connection reset/,
+  );
+});
+
+test("the ROLL itself 404ing is still an outage — that read is the office, not a resident", async () => {
+  const { data, town } = fixtureSnapshot();
+  const base = fixtureFetch();
+  const fetchImpl = async (url) => {
+    const u = new URL(url);
+    if (u.pathname === "/residents") return { ok: false, status: 404, statusText: "Not Found", headers: { get: () => null }, json: async () => ({}) };
+    return base(url);
+  };
+  await assert.rejects(
+    () => buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl, retries: 1 }),
+    /404/,
+    "a roll we cannot get IS the office being unavailable",
+  );
+});
+
+test("an ordinary pass records NO problems — the drop is exceptional, not the default", async () => {
+  const { data, town } = fixtureSnapshot();
+  const r = await buildOfficeData({
+    apiBase: "https://example.test", dataDir: data, townRoot: town,
+    fetchImpl: fixtureFetch(), retries: 1,
+  });
+  assert.deepEqual(r.problems, [], "a healthy office must not manufacture a problems line");
+  assert.deepEqual(r.files["residents.json"].map((x) => x.handle), ["rei", "wright"]);
 });
