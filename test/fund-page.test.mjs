@@ -9,7 +9,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { HOLO_LINE, INTAKE, INTAKE_BY_POT, intakeFor } from "../src/lib/funding.mjs";
+import { HOLO_LINE, INTAKE, INTAKE_BY_POT, intakeFor, toPot } from "../src/lib/funding.mjs";
 import { qrMatrix } from "../src/lib/qr.mjs";
 
 const PAGE = readFileSync(new URL("../town/pages/fund/[pot].astro", import.meta.url), "utf8");
@@ -271,4 +271,60 @@ test("the stake island reads the act's answer inside the household door's envelo
   assert.equal(island.includes("Number(j.applied"), false, "and never off the envelope");
   // a bounce stays flat, and is read before any unwrap
   assert.ok(island.indexOf("j.error") < island.indexOf("var a = j.result"), "the refusal is judged on the envelope, before the unwrap");
+});
+
+// ── POS-184 · who staked, beside who paid ───────────────────────────────────
+//
+// The page has always named the PAYERS row by row and reduced the STAKERS to a
+// single chip — "40✦ staked" tells a resident the size of the room without
+// telling them who is in it. These assert the two halves that a copy edit or a
+// well-meant simplification would break: that the section exists and reads off
+// `pot.stakers`, and that it is gated on NULL rather than on emptiness.
+
+test("POS-184 — the fund page renders WHO staked, off the pot's own stakers", () => {
+  assert.match(PAGE, /pot\.stakers/, "the page reads the field rather than re-deriving anything");
+  assert.match(PAGE, /id="stakers"/, "and gives it a section of its own, beside the roll");
+  // The label function, not a second copy of where a resident's page lives.
+  assert.match(PAGE, /patronLabel\(s\.handle\)/,
+    "a staker is labelled by the roll's own labeller — one place knows the /residents/ path");
+  // Each row carries the stamps, in the town's unit.
+  assert.match(PAGE, /\{s\.staked\}<span class="f-u">✦<\/span>/, "one row per staker: who, and how many stamps");
+});
+
+test("POS-184 — the stakers block is gated on NULL, not on emptiness — the deploy-order case", () => {
+  // THE LAW THIS PINS. The office half ships first and the field arrives at the
+  // next extract, so every pots.json between now and then carries no `stakers`.
+  // funding.mjs § toPot answers `null` for that and `[]` only when the emitter
+  // looked and found nobody. If this gate were `stakers.length > 0` the section
+  // would vanish on a pot nobody has staked (losing the sentence that invites
+  // the first one); if it were a truthiness check on the array, today's data
+  // would print "nobody has staked" over a pot with seven live stakers.
+  //
+  // The founder staked twice on exactly that class of lie (the fund page's
+  // `applied` envelope, 2026-09-17) — a surface stating as fact something it
+  // had never actually read.
+  assert.match(PAGE, /\{stakers !== null && \(/,
+    "the section renders only when the emission actually carried the field");
+  assert.match(PAGE, /stakers\.length === 0 \? \(/,
+    "and an emitted empty list gets its own sentence, never a bare heading");
+  assert.doesNotMatch(PAGE, /\{stakers\.length > 0 && \(/,
+    "gating on emptiness would silence the sentence that invites the first staker");
+
+  // AND THE ABSENT CASE RENDERS NOTHING AT ALL — proven on the tree's own data,
+  // which is exactly the emission the office half will deploy ahead of.
+  const rows = JSON.parse(readFileSync(new URL("../src/data/postmark/pots.json", import.meta.url), "utf8"));
+  const live = rows.map(toPot).filter((p) => p.ok);
+  assert.ok(live.length > 0, "the tree carries pots to measure");
+  for (const p of live) {
+    assert.equal(p.stakers, null,
+      `${p.id}: this emission predates the field, so the reader answers null and the section is skipped whole — the page is what it was`);
+  }
+
+  // THE PROBE CAN FAIL, and that is what makes the line above evidence rather
+  // than a restatement of today's data: hand the SAME reader a row that does
+  // carry the field and it stops answering null. When a future extract lands
+  // the field in the tree, the loop goes red and this lane's deploy-order claim
+  // gets re-measured instead of quietly outliving its reason.
+  assert.notEqual(toPot({ ...rows[0], stakers: [{ handle: "wright", staked: 200 }] }).stakers, null,
+    "the same reader answers a LIST when the emission carries one");
 });

@@ -533,3 +533,79 @@ test("the emitter's allowlist names first_close", () => {
   assert.ok(block.includes("file?.first_close"),
     "read off the pot file, never computed or defaulted to a date here");
 });
+
+// ── POS-184 · the seam names WHO staked, not only how much ───────────────────
+//
+// `staked` has always been one integer: the size of the room, with nobody in
+// it. The town's own foldPotPositions already holds the per-staker netting
+// (`${pot}|${handle}` -> open position, zeroes dropped), so the emitter takes
+// the total and the list from ONE pass over that map under ONE filter. That is
+// the whole warrant for showing both: they cannot disagree.
+
+test("POS-184 — the emitted stakers are the netted positions, and they sum to `staked`", { skip: !haveTown }, async () => {
+  const mint = await loadMint();
+  // A fixture ledger, not the town's: two stakers, one of them drained by a
+  // return, so the netting has something to do and a naive fold would be caught.
+  const entries = mint.parseStampLedger([
+    "# fixture",
+    "",
+    "- 2026-08-04 · wright → stake:pot/keeping-ec2 · 4 · via: api · sig: sigA",
+    "- 2026-08-04 · limen → stake:pot/keeping-ec2 · 2 · via: api · sig: sigB",
+    "- 2026-08-05 · keemin → stake:pot/keeping-ec2 · 6 · via: api · sig: sigC",
+    "- 2026-08-06 · wright → stake:pot/keeping-ec2 · 3 · via: api · sig: sigD",
+    "- 2026-08-31 · stake:pot/keeping-ec2 → limen · 2 · for: pot-return:2026-08 · sig: sigE",
+    "",
+  ].join("\n"));
+  const file = { ...mint.potFile(TOWN, "keeping-ec2"), status: "open" };
+  const seam = seamFromTown({ mint, entries, potFiles: [file], dial: DIAL, asOf: "2026-08-21" });
+  const row = seam.pots.find((p) => p.status !== "closed");
+
+  // 1 · THE LIST — netted per staker (wright's 4 and 3 are one position of 7),
+  //     biggest first, and limen is ABSENT rather than listed at 0 because a
+  //     returned stake is a closed position, not a stake of nothing.
+  assert.deepEqual(row.stakers, [{ handle: "keemin", staked: 6 }, { handle: "wright", staked: 7 }]
+    .sort((a, b) => b.staked - a.staked || a.handle.localeCompare(b.handle)),
+    "two standing positions, netted, biggest first — the returned one is gone");
+  assert.equal(row.stakers.some((s) => s.handle === "limen"), false, "a returned stake leaves no staker behind");
+
+  // 2 · THE EQUALITY. If these two could drift, one of them would be lying
+  //     about the same escrow — which is exactly what showing a list beside a
+  //     number invites unless they come off one pass.
+  assert.equal(row.stakers.reduce((n, s) => n + s.staked, 0), row.staked,
+    "sum(stakers) IS `staked`");
+  assert.equal(row.staked, 13, "and `staked` itself is the netted total, unmoved by this lane");
+
+  // 3 · THE READER TAKES IT. An emitter writing a field the reader drops is the
+  //     failure this file exists to catch.
+  const read = toPot(row);
+  assert.equal(read.ok, true, read.reason);
+  assert.deepEqual(read.stakers, row.stakers, "through toPot unchanged");
+});
+
+test("POS-184 — a pot nobody has staked emits an EMPTY list; an older emission emits none, and the two must not read alike", { skip: !haveTown }, async () => {
+  const mint = await loadMint();
+  // A ledger with receipts and no stake rows at all.
+  const entries = mint.parseStampLedger([
+    "# fixture",
+    "",
+    "- 2026-08-02 · pot-receipt · pot:keeping-ec2 · rail: stripe · usd: 100 · from: keemin · ref: ch_x · sig: sigA",
+    "",
+  ].join("\n"));
+  const file = { ...mint.potFile(TOWN, "keeping-ec2"), status: "open" };
+  const seam = seamFromTown({ mint, entries, potFiles: [file], dial: DIAL, asOf: "2026-08-21" });
+  const row = seam.pots.find((p) => p.status !== "closed");
+
+  assert.deepEqual(row.stakers, [], "the emitter LOOKED and found nobody — an empty list, present");
+  assert.equal(row.staked, 0, "beside the zero it sums to");
+  assert.deepEqual(toPot(row).stakers, [], "and the reader keeps it empty rather than turning it null");
+
+  // THE DEPLOY-ORDER CASE, and the whole reason the reader distinguishes them.
+  // Every pots.json in the tree predates this field. A reader that folded a
+  // missing field into the empty list would let the fund page state "nobody has
+  // staked on this pot" over a pot with seven live stakers on the ledger — a
+  // page asserting as fact something it never looked at.
+  const { stakers: _gone, ...older } = row;
+  assert.equal(Object.hasOwn(older, "stakers"), false, "the older emission carries no such field");
+  assert.equal(toPot(older).stakers, null, "and the reader says `null` — did not look — never `[]`");
+  assert.notDeepEqual(toPot(older).stakers, [], "the two states are distinguishable, which is the point");
+});
