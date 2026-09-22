@@ -185,6 +185,27 @@ const rollTotal = roll.reduce((n, r) => n + r.usd, 0);
 const anyOutside = roll.some((r) => !r.attached);
 const staked = Number(pot.staked ?? 0);
 
+// WHO STAKED — the roll's counterpart, and the other half of the question this
+// page exists to answer. The chip above has always said how many stamps stand
+// behind this pot; it could not say whose, so a reader deciding whether to add
+// their own could see the size of the room and not who was in it.
+//
+// NULL IS NOT THE EMPTY LIST. `pot.stakers` is null on an emission that predates
+// the field (funding.mjs § toPot says why) — this page then renders exactly what
+// it rendered before the field existed, which is what lets the two halves of
+// this lane deploy in either order. It is `[]` only when the emitter looked and
+// found nobody, and that gets a sentence.
+//
+// patronLabel is the roll's own labeller and it is the right one here: a staker
+// is ALWAYS a resident handle — the ledger's stake grammar captures one and the
+// office refuses a row without it — so every staker takes its `attached` branch
+// and gets the same /residents/ link a patron gets. Its "an outside gift" branch
+// is unreachable from here, and reusing the function is still better than a
+// second copy of where a resident's page lives.
+const stakers = pot.stakers === null ? null
+  : pot.stakers.map((s) => ({ ...patronLabel(s.handle), staked: s.staked }));
+const stakersTotal = (stakers ?? []).reduce((n, s) => n + s.staked, 0);
+
 // THE MONEY BAR — the Guild card's own three shapes (PotCards.astro), full
 // size. An elastic pot measures the roll against its CLOSE FLOOR: the floor
 // gates the ceremony, never the door. A targetless, floorless pot gets no bar
@@ -540,7 +561,55 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           )}
         </div>
       </details>
-    </section>
+    </section>{/* WHO HAS STAKED — the roll's counterpart, same fold, same shape.
+        The dollars have always been named here; the stamps were a single number,
+        and "340✦ staked" tells a resident the size of the room without telling
+        them who is in it. Rendered only when the emission actually carried the
+        field: `null` means this pots.json predates it, and a page that printed
+        "nobody has staked" over seven live stakers would be worse than silent.
+        The founder staked twice on exactly that class of lie.
+
+        GLUED TO THE TAG ABOVE ON PURPOSE, and it must stay glued. A newline on
+        either side of an expression that renders nothing survives the build as
+        two bytes of whitespace in every fund page — which is the whole of what
+        this lane's deploy-order proof measures. Pretty-printing this apart is a
+        one-character change that makes the before/after comparison stop being
+        byte-for-byte. */}{stakers !== null && (
+      <section class="f-roll" id="stakers" aria-label="Who has staked on this pot">
+        <details class="f-fold" open={stakers.length === 0}>
+          <summary>
+            <span class="f-fold-sum">Who has staked</span>
+            <span class="f-fold-meta">{stakers.length === 0 ? "nobody yet" : `${stakers.length === 1 ? "one staker" : `${stakers.length} stakers`} · ${stakersTotal}✦`}</span>
+          </summary>
+          <div class="f-fold-body">
+            {stakers.length === 0 ? (
+              <p class="f-roll-empty f-dim">
+                Nobody has staked stamps on this pot yet. A stake is not a payment — it says the
+                need matters to you, it comes home whole at the close, and it is what sizes the
+                reward the givers share. Being first is allowed.
+              </p>
+            ) : (
+              <>
+                <ul class="f-roll-list">
+                  {stakers.map((s) => (
+                    <li class="f-roll-row">
+                      <span class="f-roll-who">
+                        {s.href ? <a href={s.href}>{s.label}</a> : s.label}
+                      </span>
+                      <span class="f-roll-usd">{s.staked}<span class="f-u">✦</span></span>
+                    </li>
+                  ))}
+                </ul>
+                <p class="f-roll-sum">
+                  <span>{stakers.length === 1 ? "one staker" : `${stakers.length} stakers`}</span>
+                  <span class="f-roll-usd">{stakersTotal}<span class="f-u">✦</span></span>
+                </p>
+              </>
+            )}
+          </div>
+        </details>
+      </section>
+    )}
 
     {/* THE FINE PRINT — everything the old disclosure wall said, kept whole
         and moved BELOW the money moment behind one click (founder's page law,

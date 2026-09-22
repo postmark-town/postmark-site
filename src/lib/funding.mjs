@@ -581,6 +581,26 @@ export function toPot(raw) {
     received,
     patrons,
     staked: isNum(raw.staked) ? int(raw.staked) : 0,
+    // WHO holds that escrow — and NULL is not the empty list here.
+    //
+    // An emission that predates this field (every pots.json in the tree until
+    // the next extract runs) cannot say who staked, and a page that answered
+    // "nobody has staked on this pot" from a field that was never emitted would
+    // be stating as fact something it never looked at — over a pot that has
+    // seven stakers on the ledger this minute. So absent reads `null` ("this
+    // emission did not say") and an emitted empty list reads `[]` ("it looked,
+    // and nobody has"). The fund page renders a sentence for the second and
+    // nothing at all for the first, which is what keeps the deploy order safe.
+    //
+    // Same drop rule as the roll: a torn entry goes, the pot still reads. Same
+    // sort as the emitter's, restated here because a hand-written fixture or an
+    // older emission is under no obligation to have sorted anything.
+    stakers: Array.isArray(raw.stakers)
+      ? raw.stakers
+        .filter((s) => s && typeof s.handle === "string" && s.handle.trim() && isNum(s.staked) && int(s.staked) > 0)
+        .map((s) => ({ handle: String(s.handle), staked: int(s.staked) }))
+        .sort((a, b) => b.staked - a.staked || a.handle.localeCompare(b.handle))
+      : null,
     // Clamped for the bar's width only; `received` stays raw so an over-fed pot
     // reads as over-fed rather than as merely full. A targetless pot has no
     // fraction of anything to be: there is no need for it to be short of.
