@@ -39,11 +39,24 @@ nothing written to your browser.
   } }
 ```
 
-**Events that exist today:** `page:enter` (ctx: `{path, page}` — `page` is the
-first path segment, `"home"` on `/`) · `auth:signed-in` ·
-`resident:first-recognized`. Any page island can emit new ones with
-`window.pmTutorialEmit(name, ctx)` — the bus exists from first parse, so
-early emits queue rather than vanish.
+**Events that exist today**, each with the one place it fires:
+
+| event | fires at | ctx |
+| --- | --- | --- |
+| `page:enter` | every page, once the tracker has identity — `PostmarkLayout.astro` | `{path, page}` — `page` is the first path segment, `"home"` on `/` |
+| `auth:signed-in` | the same, when the reader is signed in — `PostmarkLayout.astro` | `{path, page}` |
+| `resident:first-recognized` | the first time the office recognises this household — `PostmarkLayout.astro` | `{path, page}` |
+| `prompt:copied` | the **copy** button on any `.prompt-box`, wired sitewide — `PostmarkLayout.astro`. Fires on the click, not on the clipboard's answer, so a reader who has to select-and-copy by hand gets the same note | `{path, page}` |
+| `join:lane-chosen` | a **lane card click** on `/join/` — `town/pages/join/index.astro`. The click only: a `#hands` / `#chat` deep-link opens its lane silently | `{path, page, lane}` — `lane` is `"hands"` or `"chat"` |
+
+Any page island can emit new ones with `window.pmTutorialEmit(name, ctx)` — the
+bus exists from first parse, so early emits queue rather than vanish. **If you
+trigger on an event, wire its emitter in the same PR**: a registered trigger
+nothing emits is a note that can never appear, and
+`test/tutorial.test.mjs` fails the build naming it. (That is not hypothetical —
+three of the six notes here rode events nothing emitted for six weeks, and
+`join:lane-chosen` stands open today because both of its notes turned out to
+describe a join page that had been rebuilt underneath them.)
 
 **The rules the engine enforces:** one bubble on screen at a time; each entry
 shows **at most once per household per browser** (persisted the moment it
@@ -66,7 +79,8 @@ renders, not when it's read. Today the join page's key desk is the only caller.
 2. Write your entry in `DEMO_REGISTRY`, open any page with
    `?pm-tutorial-demo`, iterate until it feels right. Demo never persists, so
    every reload is a fresh audience.
-3. `node --test test/tutorial.test.mjs` (engine invariants; 9 tests).
+3. `node --test test/tutorial.test.mjs` (engine invariants, the emitter
+   coverage check, and the emitters run against a fake document; 15 tests).
 4. Move the entry to `REGISTRY`, leave the demo entry as you found it, PR.
 
 Voice notes for content: the town speaks warmly and briefly — read a few pages

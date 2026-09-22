@@ -212,13 +212,15 @@ test("every road that names moving in opens /join/move-in/", () => {
   assert.ok(!/data-house-add href="\/join\/"/.test(HOUSE),
     "a `+ add a resident` link still lands on /join/, whose own header comment says the add-resident panel was removed");
 
-  // BOTH tutorial notes that offer the move-in form, not just the one the
-  // build lane was scoped to. `join-no-git-needed` said "Open the move-in form"
-  // and pointed at the writing desk, where the form no longer is; it is dormant
-  // today (nothing in the site emits `join:lane-chosen`, so neither of that
-  // trigger's notes can fire) and a dormant note with a wrong href is a defect
-  // that ships silently on the day the emitter lands.
-  for (const id of ["signed-in-move-them-in", "join-no-git-needed"]) {
+  // ONE NOTE NOW OFFERS THE MOVE-IN FORM. This loop held two: `join-no-git-needed`
+  // rode `join:lane-chosen`, which nothing emitted, so it had never once appeared
+  // — the reason it was kept here was that "a dormant note with a wrong href is a
+  // defect that ships silently on the day the emitter lands". The emitter landed
+  // (2026-09-21, postmark#1792) and the note did not survive it: its sentence
+  // ("only one asks you to know git") answers a question today's two lane cards
+  // no longer ask. It is deleted from the registry, so it is deleted from here;
+  // the stray check below is what keeps the next one honest.
+  for (const id of ["signed-in-move-them-in"]) {
     const note = REGISTRY.find((e) => e.id === id);
     assert.ok(note, `the ${id} tutorial note is gone`);
     assert.equal(note.content.cta.href, "/join/move-in/",
