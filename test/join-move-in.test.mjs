@@ -710,6 +710,23 @@ test("the page marks the door's required fields and shares ONE error slot", () =
   assert.match(PAGE, /data-form-error role="alert"/,
     "the shared error slot no longer announces itself, so a reader stopped on a press is not told");
 
+  // AND THE ORDER THAT MAKES THAT ATTRIBUTE DO ANYTHING. A live region announces
+  // a mutation INSIDE ITSELF, and an element that is `hidden` is out of the
+  // accessibility tree — so a slot that is filled and THEN revealed can announce
+  // nothing at all, and the `role="alert"` above would be decoration. CAN FAIL:
+  // move the unhide back to the end of showError and this reds. (Plain string
+  // work rather than a regex, so the assertion says what it means.)
+  const fnAt = PAGE.indexOf("function showError(defect, hint) {");
+  assert.ok(fnAt >= 0, "showError is gone, or no longer named the way this assertion reads it");
+  const fnEnd = PAGE.indexOf("\n    }", fnAt);
+  const showErrorBody = PAGE.slice(fnAt, fnEnd);
+  const unhideAt = showErrorBody.indexOf("formError.hidden = false");
+  const fillAt = showErrorBody.indexOf("formError.appendChild");
+  assert.ok(unhideAt >= 0 && fillAt >= 0, "showError no longer both reveals and fills the one slot");
+  assert.ok(unhideAt < fillAt,
+    "showError fills the alert slot BEFORE revealing it — the write then happens outside the " +
+    "accessibility tree, and a reader stopped on a press may be told nothing at all");
+
   // and the page still owns no words of its own about a refusal
   assert.ok(!PAGE.includes("name your household"),
     "the page has pasted a refusal sentence inline — it belongs in src/lib/ceremony-refusals.mjs with its sha");

@@ -367,6 +367,14 @@ import "@/styles/join-move-in-form.css";
     }
 
     function showError(defect, hint) {
+      // UNHIDDEN FIRST, THEN FILLED, and the order is the whole reason the slot
+      // carries `role="alert"` at all. An assertive live region announces a
+      // MUTATION INSIDE ITSELF, and an element that is `hidden` is out of the
+      // accessibility tree entirely — so filling it while hidden and revealing it
+      // afterwards can land as no announcement at all. Revealing the empty region
+      // first makes the write the mutation. Both happen in one task, so nothing
+      // paints in between and no reader sees an empty box.
+      formError.hidden = false;
       while (formError.firstChild) formError.removeChild(formError.firstChild);
       const b = document.createElement("b"); b.textContent = defect; formError.appendChild(b);
       if (hint) { const s = document.createElement("span"); s.textContent = " — " + hint; formError.appendChild(s); }
