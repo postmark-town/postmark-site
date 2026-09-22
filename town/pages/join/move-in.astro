@@ -97,14 +97,23 @@ import "@/styles/join-move-in-form.css";
       <!-- the generated form mounts here, and nothing else ever does -->
       <div class="movein-form" data-form-host></div>
 
-      <p class="form-error" data-form-error hidden></p>
+      <!-- ONE ERROR SLOT, TWO SPEAKERS (POS-188). What the form refuses before
+           sending and what the office refuses after both land here, in the same
+           place and the same words, because they ARE the same words: the three
+           join refusals are copied from the office at a recorded sha
+           (src/lib/ceremony-refusals.mjs). One look for both. `role="alert"`
+           because a reader who pressed send and was stopped must be TOLD, not
+           left to find the sentence. -->
+      <p class="form-error" data-form-error role="alert" hidden></p>
       <div class="actions">
         <button type="button" class="pm-btn send" data-submit>Send this to the office →</button>
         <p class="send-status" data-status hidden></p>
       </div>
       <p class="foot">
-        A box left empty is not sent. If the office still needs something, it says so
-        itself — in its own words, below the button.
+        A box the office marks <b>required</b> is asked for here, before anything is sent —
+        in the office's own words, so you meet the same sentence you would have met at the
+        door. Anything else you leave empty is simply not sent, and if the office still
+        needs it, it says so itself — in the same place, below the button.
       </p>
 
       <details class="door-next" data-door-next hidden>
@@ -178,6 +187,7 @@ import "@/styles/join-move-in-form.css";
     import {
       actForTier, doorPayload, fieldsFor, actSentence, doorNext,
       standingLine, submitAct, replyShape,
+      requiredNames, markRequired, controlOf,
     } from "@/lib/join-move-in.mjs";
 
     const $ = (sel) => document.querySelector(sel);
@@ -200,6 +210,7 @@ import "@/styles/join-move-in-form.css";
 
     let act = null;
     let form = null;
+    let declared = null;   // the door's own `fields` block for this act, for the required check
     let sending = false;
 
     /**
@@ -303,6 +314,16 @@ import "@/styles/join-move-in-form.css";
       form = window.MCPProto._internals.buildForm(schema);
       $("[data-form-host]").appendChild(form.node);
 
+      // POS-188 — the boxes the DOOR declares required carry `required` and
+      // `aria-required`, so an assistive reader is told before the press and a
+      // sighted one sees the generator's own chip. Which boxes those are is the
+      // door's answer, never this page's list: on the join (declare / begin) it
+      // is household, handle and card; on add-resident the door itself says
+      // household is not needed, and this page must not pretend otherwise.
+      // The generator is untouched — these go on the nodes it built.
+      declared = picked.fields;
+      markRequired(form, requiredNames(declared));
+
       const next = doorNext(bare);
       if (next.length) {
         listInto($("[data-door-next-list]"), next);
@@ -322,6 +343,29 @@ import "@/styles/join-move-in-form.css";
       if (!msg) { status.hidden = true; status.textContent = ""; return; }
       status.hidden = false; status.textContent = msg;
     }
+
+    /**
+     * A required box left empty, shown in the OFFICE'S OWN WORDS and in the same
+     * slot the office's own refusal uses (POS-188). Two doors, one sentence, one
+     * place to look.
+     *
+     * Native validity as well as the slot: `setCustomValidity` puts the same
+     * sentence on the control, and `reportValidity` opens the browser's own
+     * bubble on the first empty one. The page has no <form> element to submit,
+     * so nothing fires this for us; it is called by hand, on the press.
+     */
+    function showMissing(missing) {
+      const first = missing[0];
+      showError(first.defect, first.hint);
+      for (const m of missing) {
+        const c = controlOf(form.fields[m.name]?.node);
+        if (c && typeof c.setCustomValidity === "function") { try { c.setCustomValidity(m.defect); } catch { /* not every control carries one */ } }
+      }
+      const firstControl = controlOf(form.fields[first.name]?.node);
+      if (firstControl && typeof firstControl.reportValidity === "function") { try { firstControl.reportValidity(); } catch { /* as above */ } }
+      else if (firstControl && typeof firstControl.focus === "function") firstControl.focus();
+    }
+
     function showError(defect, hint) {
       while (formError.firstChild) formError.removeChild(formError.firstChild);
       const b = document.createElement("b"); b.textContent = defect; formError.appendChild(b);
@@ -340,13 +384,14 @@ import "@/styles/join-move-in-form.css";
 
       let res;
       try {
-        res = await submitAct({ callTool: (name, args) => window.MCPProto.callTool(name, args), act, form });
+        res = await submitAct({ callTool: (name, args) => window.MCPProto.callTool(name, args), act, form, fields: declared });
       } catch (e) {
         sending = false; submitBtn.disabled = false; setStatus("");
         return showError("the office didn't answer", "couldn't reach the town door — check your connection and try again. Nothing was sent.");
       }
       sending = false; submitBtn.disabled = false; setStatus("");
 
+      if (!res.sent && res.missing && res.missing.length) return showMissing(res.missing);
       if (!res.sent) return showError("this page could not read one of the boxes", res.errors.join("; "));
 
       const said = replyShape(res.entry);
