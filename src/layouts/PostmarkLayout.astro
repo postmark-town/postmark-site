@@ -313,6 +313,13 @@ const row = rowFor(active, { ownChips });
         if (!btn || !pre) return;
         var label = btn.querySelector("span") || btn;
         btn.addEventListener("click", function () {
+          // THE MOMENT, not the outcome (2026-09-21, postmark#1792). The reader
+          // has decided to hand the text over; whether the clipboard took it or
+          // they have to select it by hand is the same moment to a corner note,
+          // and firing only on the happy path would hide the note from exactly
+          // the reader having the worse time. Fired before the async branch so
+          // it does not depend on a promise settling at all.
+          if (window.pmTutorialEmit) window.pmTutorialEmit("prompt:copied");
           navigator.clipboard.writeText(pre.textContent.trim()).then(function () {
             btn.classList.add("copied");
             label.textContent = "copied ✓";
