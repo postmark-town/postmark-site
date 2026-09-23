@@ -310,21 +310,34 @@ test("POS-184 — the stakers block is gated on NULL, not on emptiness — the d
   assert.doesNotMatch(PAGE, /\{stakers\.length > 0 && \(/,
     "gating on emptiness would silence the sentence that invites the first staker");
 
-  // AND THE ABSENT CASE RENDERS NOTHING AT ALL — proven on the tree's own data,
-  // which is exactly the emission the office half will deploy ahead of.
+  // THE ABSENT CASE RENDERS NOTHING AT ALL — proven on the tree's own rows with
+  // the field STRUCK, which is exactly the emission the office half deployed
+  // ahead of. (Until 2026-09-23 this loop read the tree's data as that case and
+  // said it would go red the day an extract landed the field; it did, at the
+  // by-hand re-extract that carried `stakers` — the re-measurement it asked for.
+  // A live record pinned as a fixture decays with the next crossing; the struck
+  // copy does not.)
   const rows = JSON.parse(readFileSync(new URL("../src/data/postmark/pots.json", import.meta.url), "utf8"));
-  const live = rows.map(toPot).filter((p) => p.ok);
-  assert.ok(live.length > 0, "the tree carries pots to measure");
-  for (const p of live) {
+  const before = rows.map(({ stakers, ...rest }) => rest);
+  const absent = before.map(toPot).filter((p) => p.ok);
+  assert.ok(absent.length > 0, "the tree carries pots to measure");
+  for (const p of absent) {
     assert.equal(p.stakers, null,
-      `${p.id}: this emission predates the field, so the reader answers null and the section is skipped whole — the page is what it was`);
+      `${p.id}: an emission without the field — the reader answers null and the section is skipped whole`);
   }
 
-  // THE PROBE CAN FAIL, and that is what makes the line above evidence rather
-  // than a restatement of today's data: hand the SAME reader a row that does
-  // carry the field and it stops answering null. When a future extract lands
-  // the field in the tree, the loop goes red and this lane's deploy-order claim
-  // gets re-measured instead of quietly outliving its reason.
-  assert.notEqual(toPot({ ...rows[0], stakers: [{ handle: "wright", staked: 200 }] }).stakers, null,
+  // AND THE TREE'S OWN ROWS NOW CARRY IT: the reader answers a LIST (empty or
+  // not) for every pot the by-hand extract wrote, never null — the two cases
+  // are told apart by the emission, not by the count.
+  const live = rows.map(toPot).filter((p) => p.ok);
+  for (const p of live) {
+    assert.ok(Array.isArray(p.stakers), `${p.id}: the tree's emission carries stakers, so the reader answers a list`);
+  }
+  assert.ok(live.some((p) => p.stakers.length > 0), "and at least one pot has a staker to name");
+
+  // THE PROBE CAN FAIL: strike the field from a row that has it and the same
+  // reader goes back to null; hand a struck row the field and it answers a list.
+  assert.equal(toPot(before[0]).stakers, null);
+  assert.notEqual(toPot({ ...before[0], stakers: [{ handle: "wright", staked: 200 }] }).stakers, null,
     "the same reader answers a LIST when the emission carries one");
 });
