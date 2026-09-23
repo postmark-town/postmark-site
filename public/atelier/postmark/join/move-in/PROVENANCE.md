@@ -7,10 +7,10 @@ Two files sit here and they are not the same kind of thing.
 | | |
 |---|---|
 | source | `postmark-office`, `ops/mcp-prototype/mcp-proto.js` |
-| office commit read | `2fb0bc0efb6897e24424b11bfdb3b1ef489142f8` (2026-09-11) |
-| last commit to touch it | `4672a03a6aaf67ba5927fa87e47f50b5f3e2f1c2` (2026-08-30) |
-| git blob sha1 | `b09f7763d69981384198c3fc46568c1455ebbd5e` |
-| sha256, LF-normalized | `bdb6446ff4b8c05c8431df3d9f703c57ca2c6856801fa8d67929b52b40df4e67` |
+| office commit read | `afe68b79681888cb29f274c6b74ac756ef72f539` (2026-09-23) |
+| last commit to touch it | `afe68b79681888cb29f274c6b74ac756ef72f539` (2026-09-23) |
+| git blob sha1 | `b4f3a2b4d9eb04f6e8ec3705ba12c132921c423e` |
+| sha256, LF-normalized | `74b75860f4f5abf8325e2c8c6fedaa894bf700eef7f82d2ca3f048f23230b0dc` |
 
 Everything after this file's 27-line provenance header is byte-for-byte the
 office's file. To check:
