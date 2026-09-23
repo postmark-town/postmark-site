@@ -227,8 +227,12 @@ export function seamFromTown({ mint, entries, potFiles, dial, asOf }) {
         received_usd: received,
         // A closed epoch holds no escrow: every stake either burned or
         // returned at the close. The number is 0 because the close made it 0,
-        // not because nothing was staked.
+        // not because nothing was staked. The list says the same thing the same
+        // way — EMPTY, not absent: nobody is standing behind a closed epoch,
+        // and that is an answer, where a missing field would only mean this
+        // emission never looked.
         staked: 0,
+        stakers: [],
         patrons: [...roll.values()].sort((a, b) => b.usd - a.usd || a.patron.localeCompare(b.patron)),
       });
     }
@@ -269,17 +273,30 @@ export function seamFromTown({ mint, entries, potFiles, dial, asOf }) {
       roll.set(r.from, held);
     }
 
+    // THE ESCROW, AND WHOSE IT IS. `positions` is the town's own
+    // foldPotPositions — `${pot}|${handle}` -> the netted open position, every
+    // zero already dropped (a closed position is not a stake). The total and
+    // the list are taken in ONE pass over it under ONE filter, so the sum of
+    // `stakers` IS `staked` by construction and no second netting rule is
+    // written down here to drift from the town's. `n > 0` guards a malformed
+    // ledger that returned more than it staked, where a negative position would
+    // otherwise pull the total below the list it is supposed to be the sum of.
     let staked = 0;
+    const stakers = [];
     for (const [k, n] of positions) {
-      const [p] = String(k).split("|");
-      if (p === pot && n > 0) staked += n;
+      const [p, handle] = String(k).split("|");
+      if (p !== pot || !(n > 0)) continue;
+      staked += n;
+      stakers.push({ handle, staked: n });
     }
+    stakers.sort((a, b) => b.staked - a.staked || a.handle.localeCompare(b.handle));
 
     potRows.push({
       ...base,
       epoch,
       received_usd: received,
       staked,
+      stakers,
       patrons: [...roll.values()].sort((a, b) => b.usd - a.usd || a.patron.localeCompare(b.patron)),
     });
   }

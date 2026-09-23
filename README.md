@@ -54,7 +54,27 @@ To change what appears in them, change the town or the office — not this repo.
 ```
 npm ci
 npm run build          # -> dist-town/
+npm run clean          # removes dist-town/ — use this, not `git clean`, on Windows
 ```
+
+**On Windows, `git clean -fdx` cannot empty `dist-town/`.** The town has a
+household slug ending in a dot (`victor-b.-rose-e.`, live on prod at
+`/households/victor-b.-rose-e./`), Astro builds it to a directory ending in a
+dot, and the Win32 path layer strips a trailing dot — so the directory is real
+but its name is unreachable. `git clean` warns, **exits 1**, and leaves
+`dist-town/` standing with one page in it; `rm -rf` abandons the whole
+`households/` directory and leaves fifty. Either way what survives is a **husk**
+that the next reader mistakes for a build.
+
+`npm run clean` is the one that works, and the reason is the runtime rather than
+a flag: Node's `fs.rmSync` opens paths through the verbatim `\\?\` form that
+skips Win32 normalisation, so the trailing dot survives and the directory goes —
+where `git clean`, `rm -rf` and PowerShell's own `Remove-Item` all give up. It
+also **reads the removal back** and exits 1 rather than reporting a success it
+did not achieve. Run it before `git clean` in a pool tree. On Linux and macOS it
+is an ordinary recursive remove. See `tools/clean-dist.mjs` for every remover
+measured, and the guard header in `test/funding.test.mjs` for what a husk does
+to the built-page tests (POS-177).
 
 `astro.config.town.mjs` is the config (`srcDir: town`, `publicDir:
 public/atelier/postmark`, `outDir: dist-town`, `@` → `./src`).

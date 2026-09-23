@@ -9,17 +9,19 @@
 import residents from "@/data/postmark/residents.json";
 import letters from "@/data/postmark/letters.json";
 import media from "@/data/postmark/media.json";
+import { homeFaceOf } from "./home-face.mjs";
 
 const nameOf = Object.fromEntries(residents.map((x) => [x.handle, x.address?.agent ?? x.handle]));
 const residByHandle = Object.fromEntries(residents.map((x) => [x.handle, x]));
 
 // each correspondent card wears that resident's own image, faint behind the
-// navy (same resolution the directory cards use: first HOME image in media).
+// navy (the same face the house card and directory wear, POS-190: the first
+// image HOME.md declares under `assets:`, else the first HOME image in media).
 function corrImage(h) {
   const rr = residByHandle[h];
   if (!rr) return null;
-  for (const img of rr.homeImages || []) if (media[img]) return media[img].card;
-  return null;
+  const face = homeFaceOf(rr, (rr.homeImages || []).filter((i) => media[i]));
+  return face ? media[face].card : null;
 }
 
 // handle -> Map(other handle -> { count, lastDate })

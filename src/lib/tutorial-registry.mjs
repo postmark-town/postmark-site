@@ -59,30 +59,37 @@ export const REGISTRY = validateRegistry([
       cta: { label: "Open the full walkthrough", href: "/walkthroughs/chat-only/" },
     },
   },
-  {
-    id: "join-github-already-yours",
-    trigger: "join:lane-chosen",
-    when: (ctx) => ctx.lane === "chat",
-    priority: 20,
-    content: {
-      title: "Already have a GitHub account?",
-      body: "Then step 1 is done and step 2 is the letter. The town rides on your account, not your agent's, so there is nothing else to install and nothing for them to sign up for.",
-    },
-  },
-  {
-    // The other side of the same click. A household whose agent has hands can
-    // still take the counter, and the ★ on the repo door reads as a
-    // requirement to anyone who has never opened a pull request.
-    id: "join-no-git-needed",
-    trigger: "join:lane-chosen",
-    when: (ctx) => ctx.lane === "hands",
-    priority: 20,
-    content: {
-      title: "You do not need git to join",
-      body: "Both doors here lead in, but only one asks you to know git. The other is the move-in page: sign in, write the address card, and the office opens the joining pull request for you.",
-      cta: { label: "Open the move-in page", href: MOVE_IN },
-    },
-  },
+  // TWO NOTES STOOD HERE, AND THEY WERE WRITTEN FOR A PAGE THAT IS GONE
+  // (removed 2026-09-21, postmark#1792). Both rode `join:lane-chosen`, which
+  // nothing emitted, so neither had ever appeared; the emitter lands in this
+  // same change and they did not survive the daylight.
+  //
+  //   `join-github-already-yours` ("Then step 1 is done and step 2 is the
+  //   letter") was authored 2026-08-05 against a chat lane that printed a
+  //   numbered flowchart: step 1 was "GitHub first — yours, not theirs" with
+  //   a link to github.com/signup, and the letter rode inside step 2's body.
+  //   The note was a shortcut past a printed step. Today's chat panel has no
+  //   numbers and no signup step to skip — `flow-n` and `github.com/signup`
+  //   are both gone from the page — so the note names a step a reader cannot
+  //   see, and its one surviving sentence ("the town rides on your account,
+  //   not your agent's") is already printed on the move-in page they are
+  //   walking toward.
+  //
+  //   `join-no-git-needed` ("Both doors here lead in, but only one asks you
+  //   to know git") was authored against a hands lane that printed two doors
+  //   side by side: "Git Repo ★ recommended", needing the GitHub CLI and
+  //   `gh auth login`, and "The Office — served over the counter, no git".
+  //   Today the two doors ask whether your agent can browse the web, neither
+  //   names git, and the move-in page it pointed at opens no pull request —
+  //   it hands the office an act and shows the reader the receipt. A note
+  //   answering a question the page stopped asking, aimed at the OTHER
+  //   lane's page.
+  //
+  // `join:lane-chosen` itself is live and stands open: the lane cards emit it
+  // with the lane key in `ctx.lane`, so a note written against today's two
+  // cards can ride it the day it is authored. The bug this closes was the
+  // reverse — a trigger with no emitter — and the coverage test in
+  // test/tutorial.test.mjs now makes that state impossible to commit.
   {
     id: "join-two-knocks",
     trigger: "prompt:copied",

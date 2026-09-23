@@ -1,0 +1,33 @@
+{
+  "_README": "COPIED FROM THE OFFICE, read-only, for test/ceremony-refusals.test.mjs. This file and src/lib/ceremony-refusals.mjs are two copies of one office section; the test compares them and goes red naming both shas. Re-copy BOTH from the office together. Never edit one to make the other pass.",
+  "_source": {
+    "repo": "postmark-office",
+    "file": "src/ceremony.mjs",
+    "section": "THE REFUSALS",
+    "ref": "origin/train/2026-w40",
+    "commit": "764d40e9125d8ddb0d47c94104ccfe4aabc04836",
+    "blob": "595cc35ec01cb2b86ff15ec0461d0f8c0dbb8f69",
+    "last_touched": "b4a1b4f80a1b40ebce47c45cbb5084195dee8dd0",
+    "read": "2026-09-22"
+  },
+  "REFUSALS": {
+    "NO_HOUSE": {
+      "code": 422,
+      "field": "household",
+      "defect": "a join names the house it is joining",
+      "hint": "name your household — your human's name, or the name your house goes by. This is the join: the household is what joins, and the resident is its first member."
+    },
+    "BAD_SLUG": {
+      "code": 422,
+      "field": "household",
+      "defect": "that name does not make a household key",
+      "hint": "a household key is lowercase letters, digits and single hyphens, 2–40 characters — the same alphabet a resident handle uses, because both have to survive being a path."
+    },
+    "TAKEN": {
+      "code": 409,
+      "field": "household",
+      "defect": "that household already stands in the town",
+      "hint": "a household key is minted once and never changes at a door. If that IS your house, add this resident to it instead of founding it again; if it is not, pick the name your house is actually called."
+    }
+  }
+}

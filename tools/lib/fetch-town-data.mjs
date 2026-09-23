@@ -7,6 +7,30 @@ import { buildThreads, parseFrontmatter, readResidentProfiles } from "./town.mjs
 
 export const RESIDENT_CARD_LANES = 6;
 
+// ── HOW MANY NAMED 404s ARE A SHED, AND HOW MANY ARE AN OUTAGE (POS-180) ────
+//
+// POS-166 taught the bulletin fan-out that a 404 on a slug the list named is an
+// answer, not an outage, and POS-180 extends that to the residents roll. But
+// the two fan-outs are not the same size, and the residents one needs a ceiling
+// the bulletin one does not.
+//
+// The reason is #2884. `shortFetchPlan` exists because on 2026-09-17 a refused
+// pass published a three-week-old 134-row snapshot as the current town. Holding
+// ONE resident's row over from the last build is a shed handle or a rename —
+// the town moved and the roll has not caught up. Holding HALF the roll over is
+// that same #2884 wound wearing this fix's clothes: a town of held-over rows,
+// published as current, with nothing refusing. The difference between the two
+// is a count, so a count is where the line goes.
+//
+// THREE IS NOT MEASURED, AND SAYING SO IS THE POINT. Nothing records how often
+// a named-entity 404 fires, because until this row ships nothing published the
+// record — `problems` was assembled and console.warn'd and never served. So
+// this is a first knob, set where a hand-sized number of simultaneous sheds
+// still publishes and a systematic one does not, and it is deliberately a named
+// constant rather than a literal so the founder can re-rule it against the
+// `problems` counts this row finally makes visible.
+export const MAX_NAMED_404S = 3;
+
 export const DATA_FILES = [
   "letters.json",
   "residents.json",
@@ -187,6 +211,31 @@ export function createRateGate({
   };
 }
 
+// ── THE STATUS IS A FIELD, NOT A SUBSTRING (POS-166, 2026-09-21) ────────────
+//
+// A 404 on ONE entry a list named is a fact about that entry; a 500 is a fact
+// about the office, and only one of the two should stop a build. The caller
+// could not tell them apart: the status survived only inside the message
+// `GET /bulletin/<slug> failed after 3 attempts: 404 Not Found`, which
+// interpolates the failing PATH into the same string — so a slug ending in
+// `-404` would have made a 500 read as a 404 under any match loose enough to
+// be written. This adds a field to an object every caller already receives.
+// The message text, the return shape, the `retries` budget, the nap schedule
+// and the 429 refusal path are all unchanged.
+function httpError(status, statusText) {
+  // The expression is the original one, character for character, so the message
+  // is byte-identical for every status -- including the degenerate case where a
+  // response carries no statusText at all.
+  const error = new Error(`${status} ${statusText}`.trim());
+  error.status = status;
+  return error;
+}
+
+function carryStatus(error, from) {
+  if (from?.status !== undefined) error.status = from.status;
+  return error;
+}
+
 export async function apiGet(path, { apiBase, fetchImpl = fetch, retries = 3, timeoutMs = 15000, maxRetryAfterMs = 60_000, gate = null } = {}) {
   const base = normApiBase(apiBase);
   const nap = (ms) => (gate ? gate.sleep(ms) : new Promise((resolve) => setTimeout(resolve, ms)));
@@ -215,9 +264,9 @@ export async function apiGet(path, { apiBase, fetchImpl = fetch, retries = 3, ti
         const ra = Number(res.headers?.get?.("retry-after"));
         waitMs = Number.isFinite(ra) && ra > 0 ? Math.min(ra * 1000, maxRetryAfterMs) : Math.max(waitMs, 1000);
         if (gate) gate.park(ra);
-        throw new Error(`${res.status} ${res.statusText}`.trim());
+        throw httpError(res.status, res.statusText);
       }
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`.trim());
+      if (!res.ok) throw httpError(res.status, res.statusText);
       const out = {
         body: await res.json(),
         asOf: res.headers?.get?.("x-postmark-as-of") ?? null,
@@ -232,14 +281,16 @@ export async function apiGet(path, { apiBase, fetchImpl = fetch, retries = 3, ti
         // the RUN's budget is spent; a count cannot outlast a queue.
         if (!gate.expired()) continue;
         const { refusals } = gate.stats();
-        throw new Error(`GET ${path} refused: the run's ${gate.budgetMs} ms fetch budget is spent after ${refusals} refusal(s) (${lastError?.message ?? lastError})`);
+        throw carryStatus(new Error(`GET ${path} refused: the run's ${gate.budgetMs} ms fetch budget is spent after ${refusals} refusal(s) (${lastError?.message ?? lastError})`), lastError);
       }
       hardAttempts += 1;
       if (hardAttempts >= retries) break;
       await nap(waitMs);
     }
   }
-  throw new Error(`GET ${path} failed after ${retries} attempts: ${lastError?.message ?? lastError}`);
+  // The WRAPPER is what a caller actually catches, so it carries the status
+  // too. A field that exists on an error nobody is handed is not a field.
+  throw carryStatus(new Error(`GET ${path} failed after ${retries} attempts: ${lastError?.message ?? lastError}`), lastError);
 }
 
 /** map, at most `limit` in flight at once, order preserved. The office's keyless
@@ -555,9 +606,45 @@ export async function buildOfficeData({
   // over the whole roll asked the office for every card in the same instant;
   // past ~240 the keyless bucket refused the rest, the build kept the committed
   // snapshot, and the /residents/ directory froze at 134 while the town grew.
-  const fullResidents = await mapLimit(residentHandles, RESIDENT_CARD_LANES, async (handle) =>
-    (await apiGet(`/residents/${encodeURIComponent(handle)}`, { apiBase, fetchImpl, retries, gate })).body
-  );
+  // ── A NAMED RESIDENT'S 404 IS AN ANSWER TOO (POS-180, 2026-09-21) ─────────
+  //
+  // The same two-reads-of-one-index shape as the bulletin fan-out below, on the
+  // door that costs the most: `/residents` names the roll, `/residents/<handle>`
+  // answers the card, and a handle caught mid-shed or mid-rename 404s. Before
+  // this the throw escaped `mapLimit`, the build fell into fetch-town.mjs's
+  // catch as "office API unavailable", and on the release channel the whole
+  // site froze at the last good build over one resident. That is the 12:50Z
+  // shape, one door over from the bulletin's.
+  //
+  // WHY A HOLE AND NOT THE BULLETIN'S ONE-LINE FILTER. `mapLimit` returns
+  // POSITIONALLY — `out[i] = await fn(items[i], i)` — so the result is index-
+  // aligned with `residentHandles`, and a dropped card must leave a hole that
+  // is compacted with its handle still known. The bulletin's `Promise.all` maps
+  // entries whose slug travels in the body, so a bare `.filter` suffices there
+  // and would lose the handle here.
+  // Named apart from the bulletin fan-out's own sentinel below: two Symbols in
+  // one function scope, and the second `const DROPPED` is a SyntaxError rather
+  // than a shadow.
+  const DROPPED_CARD = Symbol("resident the roll named and the card door 404'd");
+  const dropped404 = [];
+  const cards = await mapLimit(residentHandles, RESIDENT_CARD_LANES, async (handle) => {
+    try {
+      return (await apiGet(`/residents/${encodeURIComponent(handle)}`, { apiBase, fetchImpl, retries, gate })).body;
+    } catch (error) {
+      if (error?.status !== 404) throw error;
+      dropped404.push(handle);
+      return DROPPED_CARD;
+    }
+  });
+  // THE CEILING, AND IT REFUSES THROUGH THE EXISTING DOOR. Above the threshold
+  // this throws, which lands in fetch-town.mjs's catch exactly as an unreachable
+  // office does — the committed snapshot is kept, the two short-fetch
+  // measurement lines print, and `shortFetchPlan` makes the release-channel
+  // call. One refusal path, not a second one that could drift from it.
+  if (dropped404.length > MAX_NAMED_404S) {
+    throw new Error(`${dropped404.length} residents the roll named answered 404 at their card door (${dropped404.slice().sort().join(", ")}) — past the ${MAX_NAMED_404S} this build will forgive as sheds, a roll and a card door that disagree this widely is the office being wrong, not the town having moved`);
+  }
+  const fullResidents = cards.filter((card) => card !== DROPPED_CARD);
 
   // ── THE LETTER CORPUS: the bulk door first, the resident cards as fallback ──
   //
@@ -633,10 +720,13 @@ export async function buildOfficeData({
   // Resident profiles are checkout-owned until the Office grows a profile read
   // endpoint. A checkout refresh wins; without one (ordinary deploy), retain
   // the committed last-good overlay so fetching API rows cannot erase it.
-  const profileByHandle = new Map(
-    ensureArray(readSnapshot("residents.json", []), "snapshot residents.json")
-      .map((r) => [r.handle, r.profile ?? {}])
-  );
+  // The committed snapshot is read ONCE and kept whole. Until POS-180 only the
+  // `profile` half was taken; the held-over row below needs the row itself, and
+  // reading the same file twice for two halves of it is how the two halves
+  // start disagreeing.
+  const snapshotResidents = ensureArray(readSnapshot("residents.json", []), "snapshot residents.json");
+  const snapshotRowByHandle = new Map(snapshotResidents.map((r) => [r.handle, r]));
+  const profileByHandle = new Map(snapshotResidents.map((r) => [r.handle, r.profile ?? {}]));
   if (townRoot) {
     const checkoutProblems = [];
     for (const [handle, profile] of Object.entries(readResidentProfiles(townRoot, checkoutProblems))) {
@@ -648,13 +738,75 @@ export async function buildOfficeData({
     endpointGaps.push("resident profiles preserved from committed snapshot: office has no profile endpoint yet");
   }
 
+  // ── THE DROPPED RESIDENT KEEPS THE PAGE THEY HAD (POS-180) ───────────────
+  //
+  // A 404'd card must not delete a resident from the white pages. The roll
+  // still names them, so the town still has them; what is missing is one read.
+  // Their previous row is already on disk — it is the last build's OWN OUTPUT,
+  // committed as src/data/postmark/residents.json — so it is taken verbatim and
+  // NOT passed back through `mapResident`: it is already in output shape, and
+  // re-mapping an output row against this build's letters and ledger would
+  // quietly rebuild half of it from today's corpus while the rest stayed
+  // yesterday's. Held over means held over.
+  //
+  // A resident with no snapshot row is the one case that genuinely cannot be
+  // held: they arrived and shed inside one build, and there is no page to keep.
+  // They leave the file, and `problems` says so in different words, because a
+  // reader must be able to tell "kept their page" from "has no page".
+  const snapshotStats = readSnapshot("stats.json", {});
+  const heldFrom = snapshotStats?.latestDate
+    ? `the last good build, whose newest recorded delivery is ${snapshotStats.latestDate}`
+    : "the last good build, which this build cannot date (the committed stats.json names no latest delivery)";
+  const heldOver = [];
+  for (const handle of dropped404.slice().sort()) {
+    const row = snapshotRowByHandle.get(handle);
+    if (row) {
+      heldOver.push(row);
+      problems.push(`residents: the roll named "${handle}" and the card door answered 404 — the office's roll still carries a resident whose card is gone; the row is HELD OVER from ${heldFrom}, so their page stands rather than vanishing from /residents/`);
+    } else {
+      problems.push(`residents: the roll named "${handle}" and the card door answered 404, and the committed snapshot has no previous row for them — this resident is absent from this build's /residents/ entirely, because there is no page to hold over`);
+    }
+  }
+
   const residents = fullResidents
     .map((r) => mapResident(r, letters, ledger, profileByHandle.get(r.handle) ?? r.profile ?? {}))
+    .concat(heldOver)
     .sort((a, b) => a.handle.localeCompare(b.handle));
 
-  const bulletin = await Promise.all(ensureArray(bulletinListRes.body, "/bulletin").map(async (b) =>
-    (await apiGet(`/bulletin/${encodeURIComponent(b.slug)}`, { apiBase, fetchImpl, retries, gate })).body
-  ));
+  // ── A NAMED ENTRY'S 404 IS AN ANSWER, NOT AN OUTAGE (POS-166, 2026-09-21) ──
+  //
+  // The list and the entries are two reads of one index, and the index can be
+  // caught mid-shed: on 2026-09-21 12:50Z `/bulletin` still named
+  // `darkos-birthday-at-lanternstep`, an entry the town dropped at crossing
+  // 203, and the entry door answered 404. `apiGet` threw, the throw escaped
+  // this `Promise.all`, the whole build fell into fetch-town.mjs's catch as
+  // "office API unavailable", and on the release channel the #2884 rule did
+  // exactly what it is for and REFUSED to publish. The site stayed on the last
+  // good build for thirty minutes and the sentinel went down — over one entry
+  // that had been deleted on purpose.
+  //
+  // So a 404 on a slug the list named is now read as the answer it is: that
+  // entry is gone, it leaves `bulletin.json`, `problems` says which one, and
+  // the other entries still publish. Everything else is unchanged and still
+  // stops the build — a 5xx, a timeout, a network failure, a refusal whose
+  // budget ran out, and `/bulletin` itself failing (that read is above, and a
+  // list we cannot get IS "unavailable"). This is deliberately narrower than
+  // fail-soft: it forgives one named thing being absent, never the office
+  // being unreachable.
+  const DROPPED = Symbol("bulletin entry the list named and the door 404'd");
+  const bulletinEntries = await Promise.all(ensureArray(bulletinListRes.body, "/bulletin").map(async (b) => {
+    try {
+      return (await apiGet(`/bulletin/${encodeURIComponent(b.slug)}`, { apiBase, fetchImpl, retries, gate })).body;
+    } catch (error) {
+      if (error?.status !== 404) throw error;
+      problems.push(`bulletin: the list named "${b.slug}" and the entry door answered 404 — the office's index still carries an entry the town has shed; dropped from bulletin.json and the rest of the board published`);
+      return DROPPED;
+    }
+  }));
+  // A SENTINEL, not a null check: `null` is a body the office could one day
+  // send, and dropping it silently would be this same defect wearing the fix's
+  // clothes.
+  const bulletin = bulletinEntries.filter((entry) => entry !== DROPPED);
   bulletin.sort((a, b) => a.slug.localeCompare(b.slug));
 
   const threads = buildThreads(letters);
@@ -682,7 +834,7 @@ export async function buildOfficeData({
       "meeps.json": meeps,
       "bulletin.json": bulletin,
       "docs.json": docs,
-      "stats.json": buildStats({ town, metrics, residents, letters, ledger, snapshotStats: readSnapshot("stats.json", {}) }),
+      "stats.json": buildStats({ town, metrics, residents, letters, ledger, snapshotStats }),
     },
   };
 }

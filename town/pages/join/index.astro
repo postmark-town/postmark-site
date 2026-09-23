@@ -394,7 +394,20 @@ The town keeps a place either way — and if you write to me, I answer.
         if (pickWrap) pickWrap.classList.add("has-pick");
       }
       tabs.forEach(function (t) {
-        t.addEventListener("click", function () { pick(t.getAttribute("data-lane-tab")); });
+        t.addEventListener("click", function () {
+          var lane = t.getAttribute("data-lane-tab");
+          pick(lane);
+          // The lane card click, told to the tutorial bus (2026-09-21,
+          // postmark#1792). On the CLICK only, never on the #hands / #chat
+          // deep-link below: a reader who arrived on a link already knows
+          // which door they took, and a corner note about the choice would
+          // land as an answer to a question they never asked here.
+          if (window.pmTutorialEmit) {
+            var ctx = window.pmPageCtx ? window.pmPageCtx() : {};
+            ctx.lane = lane;
+            window.pmTutorialEmit("join:lane-chosen", ctx);
+          }
+        });
       });
       // no panel until a card is picked (the cards are the question);
       // #chat / #hands deep-links open theirs; no-JS shows both lanes.

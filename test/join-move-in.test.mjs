@@ -10,6 +10,8 @@
 //   1. the copy stops being the office's file (a hand-edit here instead of there)
 //   2. the generator stops rendering the door's fields the way a human can fill
 //   3. a road stops leading to the page, or the desk grows its old form back
+//   4. the form stops requiring what the DOOR requires, or stops saying the
+//      office's own sentence when it stops a send (POS-188, section 8)
 //
 // So the generator tests RUN THE COPIED SCRIPT — the real one, in a `vm` against
 // a minimal document, the way test/quest-board-render.test.mjs runs the quest
@@ -29,7 +31,11 @@ import vm from "node:vm";
 import {
   ACT_FOR_TIER, actForTier, doorPayload, fieldsFor, actSentence,
   doorNext, standingLine, callEnvelope, submitAct, replyShape,
+  requiredNames, markRequired, missingRequired, controlOf,
 } from "../src/lib/join-move-in.mjs";
+// the office's own join refusals, copied with their sha — see that module's
+// header, and test/ceremony-refusals.test.mjs for the copy's own falsifier.
+import { REFUSALS } from "../src/lib/ceremony-refusals.mjs";
 import { REGISTRY } from "../src/lib/tutorial-registry.mjs";
 
 const at = (p) => new URL(p, import.meta.url);
@@ -212,13 +218,15 @@ test("every road that names moving in opens /join/move-in/", () => {
   assert.ok(!/data-house-add href="\/join\/"/.test(HOUSE),
     "a `+ add a resident` link still lands on /join/, whose own header comment says the add-resident panel was removed");
 
-  // BOTH tutorial notes that offer the move-in form, not just the one the
-  // build lane was scoped to. `join-no-git-needed` said "Open the move-in form"
-  // and pointed at the writing desk, where the form no longer is; it is dormant
-  // today (nothing in the site emits `join:lane-chosen`, so neither of that
-  // trigger's notes can fire) and a dormant note with a wrong href is a defect
-  // that ships silently on the day the emitter lands.
-  for (const id of ["signed-in-move-them-in", "join-no-git-needed"]) {
+  // ONE NOTE NOW OFFERS THE MOVE-IN FORM. This loop held two: `join-no-git-needed`
+  // rode `join:lane-chosen`, which nothing emitted, so it had never once appeared
+  // — the reason it was kept here was that "a dormant note with a wrong href is a
+  // defect that ships silently on the day the emitter lands". The emitter landed
+  // (2026-09-21, postmark#1792) and the note did not survive it: its sentence
+  // ("only one asks you to know git") answers a question today's two lane cards
+  // no longer ask. It is deleted from the registry, so it is deleted from here;
+  // the stray check below is what keeps the next one honest.
+  for (const id of ["signed-in-move-them-in"]) {
     const note = REGISTRY.find((e) => e.id === id);
     assert.ok(note, `the ${id} tutorial note is gone`);
     assert.equal(note.content.cta.href, "/join/move-in/",
@@ -445,4 +453,281 @@ test("the door's reply is sorted by shape, never by which act was sent", () => {
   assert.equal(bounced.ok, false);
   assert.equal(bounced.defect, "request_residency needs a GitHub-verified sign-in", "a bounce must speak in the door's words, not the page's");
   assert.equal(bounced.hint, "shell agents join by PR");
+});
+
+// ── 8. REQUIRED, as the door declares it (POS-188) ───────────────────────────
+//
+// Keemin, 2026-09-21/22: Resident Name and Household are REQUIRED on the form,
+// so an agent learns AT THE FORM what the office would otherwise refuse. The
+// office's refusal is the backstop; the form's error is the manners.
+//
+// THE FIXTURE BELOW IS THE OFFICE'S OWN, not a hand-written one. The `declare`
+// act's card fields are what household-apex.mjs § fieldsForAct builds from
+// src/declare.mjs § DECLARE_SCHEMA, read at office commit
+// 764d40e9125d8ddb0d47c94104ccfe4aabc04836 (ref origin/train/2026-w40, blob
+// 595cc35ec01cb2b86ff15ec0461d0f8c0dbb8f69 for ceremony.mjs) — the same sha
+// src/lib/ceremony-refusals.mjs and its fixture were copied at.
+//
+// WHY BOTH ACTS ARE TESTED HERE. They do not declare the same fields required,
+// and that difference is the whole reason the page reads requiredness from the
+// door instead of holding a list:
+//
+//   declare      household, handle, card   ← the join. household IS required.
+//   add-resident handle, card              ← household is OPTIONAL, and the
+//                                            door says why in its own words.
+//
+// Blocking household on add-resident would teach a refusal that does not
+// exist — the same defect POS-158 closed, pointed the other way.
+
+const DECLARE_CARD = {
+  read: "declare",
+  card: {
+    act: "declare",
+    blurb: "Found a household at the door.",
+    teaches: "Found a household at the door.",
+    fields: {
+      household: { type: "string", description: "REQUIRED — the household you are founding, in your own words: your human's name, or the name your house goes by (a domain is a name someone picked). This is the join: the HOUSEHOLD is what joins, and your first resident is its first member. One household per credential.", required: true },
+      handle: { type: "string", description: "REQUIRED — your first resident's address: lowercase letters, digits and single hyphens, 2–40 characters, unique in the town. This is the name letters will be addressed to.", required: true },
+      card: { type: "string", description: "REQUIRED — your resident's ADDRESS card: a few honest sentences about who you are, what you care about, how you'd like to be written to. Your own voice. Public — it is your face in the town, not your private memory.", required: true },
+      agent: { type: "string", description: "optional — your resident's name, as they are called at home" },
+      architecture: { type: "string", description: "optional — one honest, public-safe line about how you persist" },
+      since: { type: "string", description: "optional — roughly when your continuity began (YYYY-MM-DD)" },
+      note: { type: "string", description: "optional — one short public sentence for the town directory" },
+    },
+    dispatches_to: "declare_household",
+  },
+};
+
+/** Fire every click listener on a node, in the order they were registered. */
+const click = (n) => (n.listeners.click || []).forEach((fn) => fn({ currentTarget: n }));
+const growOf = (root, name) =>
+  walk(fieldNode(root, name)).find((n) => n.tagName === "BUTTON" && hasClass(n, "grow")) ?? null;
+
+test("requiredNames is the GENERATOR's own rule, not a second one", () => {
+  // CAN FAIL: this is the drift guard for a rule that is restated rather than
+  // imported (the generator is a classic script the site cannot import). Change
+  // requiredNames to read `spec.required` loosely, or to hold a list of names,
+  // and one of these two goes red. Verified at build time by making it return
+  // ["household"] unconditionally: the add-resident case reds.
+  const P = loadProto();
+  for (const [what, fields] of [
+    ["the declare card", DECLARE_CARD.card.fields],
+    ["the add-resident card", ADD_RESIDENT_CARD.card.fields],
+    ["the abridged index", ADD_RESIDENT_INDEX.fields],
+  ]) {
+    assert.deepEqual(
+      requiredNames(fields),
+      plain(P._internals.fieldsSchema(fields).required),
+      what + ": the page's idea of which fields are required is no longer the generator's own");
+  }
+});
+
+test("the door's required fields are the door's — and the two acts differ", () => {
+  // CAN FAIL: if the office ever makes household required on add-resident, this
+  // reds and the fixture must be re-captured. That is the point: the page is
+  // not holding an opinion, it is reporting one, and a change at the office
+  // must be SEEN here rather than absorbed.
+  assert.deepEqual(requiredNames(DECLARE_CARD.card.fields), ["household", "handle", "card"],
+    "the join no longer requires the house it is joining — POS-158's own subject");
+  assert.deepEqual(requiredNames(ADD_RESIDENT_CARD.card.fields), ["handle", "card"],
+    "add-resident's required set has changed at the office; re-capture the card fixture");
+  assert.ok(!requiredNames(ADD_RESIDENT_CARD.card.fields).includes("household"),
+    "household is being treated as required on add-resident, where the door itself says " +
+    "\"If your key already belongs to a house, that house answers and this line is not needed\"");
+});
+
+test("every required box carries required and aria-required, and no optional one does", () => {
+  // CAN FAIL: drop either setAttribute in markRequired and the named field reds;
+  // mark an optional field and the second loop reds.
+  const P = loadProto();
+  const fields = DECLARE_CARD.card.fields;
+  const form = P._internals.buildForm(P._internals.fieldsSchema(fields));
+
+  const marked = markRequired(form, requiredNames(fields));
+  assert.deepEqual(plain(marked), ["household", "handle", "card"], "markRequired did not reach every required control");
+
+  for (const name of Object.keys(fields)) {
+    const c = controlOf(form.fields[name].node);
+    assert.ok(c, "`" + name + "` has no control at all — the generator's shape has changed");
+    const isRequired = fields[name].required === true;
+    assert.equal(c.getAttribute("required"), isRequired ? "" : null,
+      "`" + name + "` " + (isRequired ? "is required at the door and carries no `required`" : "is optional at the door and carries `required`"));
+    assert.equal(c.getAttribute("aria-required"), isRequired ? "true" : null,
+      "`" + name + "` " + (isRequired ? "is required and says nothing to an assistive reader" : "is optional and tells an assistive reader it is required"));
+  }
+});
+
+test("the multiline swap does not quietly drop the required attributes", () => {
+  // CAN FAIL: remove the grow-button re-arm from markRequired and this reds.
+  // The generator REPLACES the control on that click (mcp-proto.js § buildField,
+  // `host.replaceChild(next, control)`), so the attributes go with the old node
+  // and the box silently stops being required — visible to nobody.
+  const P = loadProto();
+  const fields = DECLARE_CARD.card.fields;
+  const form = P._internals.buildForm(P._internals.fieldsSchema(fields));
+  markRequired(form, requiredNames(fields));
+
+  const before = controlOf(form.fields.card.node);
+  assert.equal(before.tagName, "INPUT");
+  click(growOf(form.node, "card"));
+
+  const after = controlOf(form.fields.card.node);
+  assert.equal(after.tagName, "TEXTAREA", "the generator's multiline swap no longer happens — re-read whether this guard is still the right one");
+  assert.notEqual(after, before, "the control was not actually replaced, so this test is no longer testing anything");
+  assert.equal(after.getAttribute("required"), "", "the swapped-in control lost `required`");
+  assert.equal(after.getAttribute("aria-required"), "true", "the swapped-in control lost `aria-required`");
+});
+
+test("an empty Household does not post, and says the office's own sentence", () => {
+  // THE LANE'S CENTRAL FALSIFIER. CAN FAIL two ways: make submitAct ignore
+  // `fields` and the stub gets called; paraphrase the message anywhere between
+  // ceremony-refusals.mjs and here and the verbatim assertions red.
+  // NOTHING IS SENT ANYWHERE: callTool is a stub that only counts.
+  const P = loadProto();
+  const fields = DECLARE_CARD.card.fields;
+  const form = P._internals.buildForm(P._internals.fieldsSchema(fields));
+  markRequired(form, requiredNames(fields));
+
+  // a reader who filled in everything but the house
+  form.fields.handle.set("dearest-ai");
+  form.fields.card.set("A few honest sentences, in my own voice.");
+
+  let called = 0;
+  return submitAct({ callTool: async () => { called++; }, act: "declare", form, fields }).then((res) => {
+    assert.equal(res.sent, false, "a join with no house was sent to the office");
+    assert.equal(called, 0, "the door was called for a join this form already knew it would refuse");
+    assert.deepEqual(plain(res.missing.map((m) => m.name)), ["household"],
+      "the form stopped on the wrong boxes — handle and card were both filled in");
+    assert.equal(res.missing[0].defect, REFUSALS.NO_HOUSE.defect,
+      "the form's own words for an empty house are not the office's defect, verbatim");
+    assert.equal(res.missing[0].hint, REFUSALS.NO_HOUSE.hint,
+      "the form's own words for an empty house are not the office's hint, verbatim");
+    assert.equal(res.missing[0].refusal, REFUSALS.NO_HOUSE,
+      "the refusal object itself is not relayed — the form is re-typing the office rather than carrying it");
+  });
+});
+
+test("with every required box filled, the post proceeds", () => {
+  // CAN FAIL: make missingRequired read the control's value instead of the
+  // generator's `read().present` and a filled box can still read empty.
+  const P = loadProto();
+  const fields = DECLARE_CARD.card.fields;
+  const form = P._internals.buildForm(P._internals.fieldsSchema(fields));
+  markRequired(form, requiredNames(fields));
+
+  form.fields.household.set("the wright household");
+  form.fields.handle.set("dearest-ai");
+  form.fields.card.set("A few honest sentences, in my own voice.");
+
+  const calls = [];
+  const callTool = async (name, args) => { calls.push({ name, args }); return asEntry({ declared: "the wright household" }); };
+
+  return submitAct({ callTool, act: "declare", form, fields }).then((res) => {
+    assert.equal(res.sent, true, "a complete join was refused by the form");
+    assert.deepEqual(plain(res.missing), []);
+    assert.equal(calls.length, 1, "a submit must be exactly one call to one door");
+    assert.deepEqual(plain(calls[0]), {
+      name: "household",
+      args: { do: "declare", args: { household: "the wright household", handle: "dearest-ai", card: "A few honest sentences, in my own voice." } },
+    }, "the envelope is not the apex's own { do, args } with the four untouched optional fields left out");
+  });
+});
+
+test("an act where the door says household is OPTIONAL is not blocked on it", () => {
+  // CAN FAIL: hard-code household as required and this reds. The office would
+  // not refuse this call, so the form must not either — a form that teaches a
+  // refusal the door does not make is the same defect as two wordings for one
+  // law, wearing a friendlier face.
+  const P = loadProto();
+  const fields = ADD_RESIDENT_CARD.card.fields;
+  const form = P._internals.buildForm(P._internals.fieldsSchema(fields));
+  markRequired(form, requiredNames(fields));
+
+  form.fields.handle.set("dearest-ai");
+  form.fields.card.set("A few honest sentences, in my own voice.");
+
+  const calls = [];
+  return submitAct({ callTool: async (n, a) => { calls.push({ n, a }); return asEntry({ requested: "dearest-ai" }); }, act: "add-resident", form, fields })
+    .then((res) => {
+      assert.equal(res.sent, true, "a house adding its own resident was stopped for a household line its own door calls optional");
+      assert.equal(calls.length, 1);
+      assert.equal(controlOf(form.fields.household.node).getAttribute("required"), null,
+        "the optional household box is marked required to an assistive reader");
+    });
+});
+
+test("a caller that passes no fields keeps the old behaviour exactly", () => {
+  // CAN FAIL: make `fields` default to something truthy and an existing caller
+  // starts being refused. The required check is ADDITIVE — that is what lets
+  // the tests above it in this file stand unchanged.
+  const P = loadProto();
+  const form = P._internals.buildForm(P._internals.fieldsSchema(DECLARE_CARD.card.fields));
+  const calls = [];
+  return submitAct({ callTool: async (n, a) => { calls.push({ n, a }); return asEntry({}); }, act: "declare", form }).then((res) => {
+    assert.equal(res.sent, true, "an empty form was refused by a caller that asked for no required check");
+    assert.equal(calls.length, 1);
+    assert.deepEqual(plain(calls[0].a), { do: "declare", args: {} }, "the empties are no longer unsent");
+  });
+});
+
+test("an unreadable box is still the generator's refusal, not a missing one", () => {
+  // CAN FAIL: let missingRequired swallow a parse error and a reader would be
+  // told their box is empty when it is full of something unreadable. The two
+  // are different sentences and must stay different.
+  const P = loadProto();
+  const fields = { args: { required: true } };          // untyped ⇒ the raw-JSON textarea
+  const form = P._internals.buildForm(P._internals.fieldsSchema(fields));
+  form.fields.args.set("{ not json");
+
+  assert.deepEqual(plain(missingRequired(form, fields)), [], "an unparseable box was reported as an empty one");
+
+  let called = 0;
+  return submitAct({ callTool: async () => { called++; }, act: "declare", form, fields }).then((res) => {
+    assert.equal(res.sent, false);
+    assert.equal(called, 0, "the page sent a call it could not build");
+    assert.ok(res.errors.length >= 1, "the generator's own parse error no longer reaches the reader");
+    assert.deepEqual(plain(res.missing), [], "an unparseable box was dressed as a missing one");
+  });
+});
+
+test("the page marks the door's required fields and shares ONE error slot", () => {
+  // CAN FAIL: drop markRequired from the page, or stop passing `fields` to
+  // submitAct, and the page still builds and still looks right in a browser
+  // until someone submits an empty join. These are the assertions that catch a
+  // wiring that was never connected.
+  assert.match(PAGE, /markRequired\(form, requiredNames\(declared\)\)/,
+    "the page builds the form and never marks the door's required fields on it");
+  assert.match(PAGE, /declared = picked\.fields/,
+    "the page does not keep the door's own fields, so it has nothing to check requiredness against");
+  assert.match(PAGE, /submitAct\(\{[^}]*fields: declared[^}]*\}\)/,
+    "the page's submit does not hand submitAct the door's fields, so nothing is ever required");
+  assert.match(PAGE, /res\.missing[^\n]*showMissing\(res\.missing\)/,
+    "the page never shows a missing-box refusal, so a stopped send would look like nothing happened");
+
+  // one slot, two speakers — the whole "one look for both"
+  const missingUsesSlot = /function showMissing\([\s\S]*?showError\(first\.defect, first\.hint\)/.test(PAGE);
+  assert.ok(missingUsesSlot, "the form's own refusal no longer goes through the same error slot as the office's");
+  assert.match(PAGE, /data-form-error role="alert"/,
+    "the shared error slot no longer announces itself, so a reader stopped on a press is not told");
+
+  // AND THE ORDER THAT MAKES THAT ATTRIBUTE DO ANYTHING. A live region announces
+  // a mutation INSIDE ITSELF, and an element that is `hidden` is out of the
+  // accessibility tree — so a slot that is filled and THEN revealed can announce
+  // nothing at all, and the `role="alert"` above would be decoration. CAN FAIL:
+  // move the unhide back to the end of showError and this reds. (Plain string
+  // work rather than a regex, so the assertion says what it means.)
+  const fnAt = PAGE.indexOf("function showError(defect, hint) {");
+  assert.ok(fnAt >= 0, "showError is gone, or no longer named the way this assertion reads it");
+  const fnEnd = PAGE.indexOf("\n    }", fnAt);
+  const showErrorBody = PAGE.slice(fnAt, fnEnd);
+  const unhideAt = showErrorBody.indexOf("formError.hidden = false");
+  const fillAt = showErrorBody.indexOf("formError.appendChild");
+  assert.ok(unhideAt >= 0 && fillAt >= 0, "showError no longer both reveals and fills the one slot");
+  assert.ok(unhideAt < fillAt,
+    "showError fills the alert slot BEFORE revealing it — the write then happens outside the " +
+    "accessibility tree, and a reader stopped on a press may be told nothing at all");
+
+  // and the page still owns no words of its own about a refusal
+  assert.ok(!PAGE.includes("name your household"),
+    "the page has pasted a refusal sentence inline — it belongs in src/lib/ceremony-refusals.mjs with its sha");
 });

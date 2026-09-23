@@ -102,7 +102,7 @@ export const SCHEMA = 1;
  * wrong is worse than one that admits it cannot say, because the watcher
  * downstream believes it.
  */
-export function composeStamp({ channel, codeSha, codeRef, townDataSha, townSha, crossing, builtAt, world = null, worldRef = null }) {
+export function composeStamp({ channel, codeSha, codeRef, townDataSha, townSha, crossing, builtAt, world = null, worldRef = null, problems = null }) {
   const notes = [];
   const lane = channel === "release" || channel === "snapshot" ? channel : null;
   if (!lane) notes.push("PUBLIC_CHANNEL was not release or snapshot, so the lane is unknown");
@@ -167,6 +167,7 @@ export function composeStamp({ channel, codeSha, codeRef, townDataSha, townSha, 
   const worldFrom = worldSha ? (world?.from ?? null) : null;
   if (!worldSha) notes.push(`this build did not report which postmark-world it compiled${world?.note ? ` (${world.note})` : ""} — the world served at /world/ cannot be told from another world's by this stamp`);
   const ref = String(worldRef ?? "").trim();
+  if (!Array.isArray(problems)) notes.push("this build could not read the town manifest's `problems` list (public/atelier/postmark/data/index.json), so the stamp cannot say what the fetch failed to get — a reader must treat that as unread, never as clean");
 
   return {
     schema: SCHEMA,
@@ -188,6 +189,24 @@ export function composeStamp({ channel, codeSha, codeRef, townDataSha, townSha, 
     // file exists is that one number could not hold both tenses, and a reader
     // meeting the stamp for the first time should meet that fact here.
     why_two: "prod builds CODE from the newest release/* tag and overlays town DATA from main, so the two move on different clocks and each must be compared against its own source.",
+    // ── WHAT THIS BUILD COULD NOT GET (POS-180, 2026-09-21) ─────────────────
+    //
+    // The one field on this stamp the stamper does not know first-hand. Every
+    // other value here is read from the build's own receipts — git, the
+    // lockfile, the environment — but this one is the FETCH's knowledge, and
+    // the fetch ran in a different process and, on the box, a different tree.
+    // So it travels the way the town data travels: fetch-town.mjs writes it
+    // onto the served manifest, site-refresh.sh's overlay rsyncs
+    // public/atelier/postmark into the build tree, and it is read back here.
+    //
+    // Three states, and they are three different sentences:
+    //   []      this build got everything it asked the office for.
+    //   [...]   it published anyway, and these are the things it could not get.
+    //   null    the manifest could not be read, so this build cannot say.
+    // `null` is NOT `[]`, for the same reason every other unknown on this stamp
+    // is a null with a note: a stamp that says "no problems" because it failed
+    // to look is the false all-clear this whole file exists to refuse.
+    problems: Array.isArray(problems) ? problems : null,
     notes,
   };
 }
@@ -220,6 +239,21 @@ export function readWorldSha({ root = process.cwd(), read = (p) => readFileSync(
   } catch { return { sha: null, from: null, note: `${lockNote}, and the installed package could not be read` }; }
 }
 
+/**
+ * The `problems` list this build's fetch recorded, from the served manifest.
+ *
+ * Read from the build tree's own public/ — the copy that is about to be served
+ * — rather than from src/data/, because the served file is the one a reader of
+ * /data/index.json will see and the stamp must not be able to disagree with it.
+ * Every failure is a null, never an empty list: see composeStamp's `problems`.
+ */
+export function readProblems({ root = process.cwd(), read = (p) => readFileSync(p, "utf8") } = {}) {
+  try {
+    const manifest = JSON.parse(read(join(root, "public", "atelier", "postmark", "data", "index.json")));
+    return Array.isArray(manifest?.problems) ? manifest.problems : null;
+  } catch { return null; }
+}
+
 /** Read what the build knows, tolerating every failure as a null-plus-note. */
 export function gather({ env = process.env, exec = execFileSync, now = () => new Date(), root = process.cwd(), read } = {}) {
   let codeSha = null;
@@ -241,6 +275,7 @@ export function gather({ env = process.env, exec = execFileSync, now = () => new
     builtAt: now().toISOString(),
     world: readWorldSha(read ? { root, read } : { root }),
     worldRef: env.BUILD_WORLD_REF ?? null,
+    problems: readProblems(read ? { root, read } : { root }),
   });
 }
 
@@ -250,7 +285,8 @@ export function main(argv = process.argv, deps = {}) {
   const stamp = gather(deps);
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(stamp, null, 2) + "\n");
-  console.log(`build-stamp: ${out} — ${stamp.channel ?? "unknown lane"}, code ${String(stamp.code_sha).slice(0, 8)} (${stamp.code_ref ?? "?"}), town data ${String(stamp.town_data_sha).slice(0, 8)}, world ${String(stamp.world_sha).slice(0, 8)} (${stamp.world_ref ?? "no tag named"})`);
+  console.log(`build-stamp: ${out} — ${stamp.channel ?? "unknown lane"}, code ${String(stamp.code_sha).slice(0, 8)} (${stamp.code_ref ?? "?"}), town data ${String(stamp.town_data_sha).slice(0, 8)}, world ${String(stamp.world_sha).slice(0, 8)} (${stamp.world_ref ?? "no tag named"}), problems ${stamp.problems === null ? "unread" : stamp.problems.length}`);
+  for (const p of stamp.problems ?? []) console.log(`  problem: ${p}`);
   for (const n of stamp.notes) console.log(`  note: ${n}`);
   return stamp;
 }
