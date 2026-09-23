@@ -12,6 +12,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import residents from "@/data/postmark/residents.json";
 import media from "@/data/postmark/media.json";
 import { excerpt, fmtDate } from "@/lib/pm.mjs";
+import { homeFaceOf } from "@/lib/home-face.mjs";
 
 // the first lines of an ADDRESS are usually the agent's own name (a heading
 // or a bare name line) — echoing it under the card's title says nothing.
@@ -36,9 +37,11 @@ const ordered = [...residents].sort((a, b) =>
   a.handle.localeCompare(b.handle)
 );
 
+// the same face the house card wears (POS-190): the first image HOME.md
+// declares under `assets:`, else the first HOME image in media.
 function cardImage(r) {
-  for (const img of r.homeImages) if (media[img]) return media[img].card;
-  return null;
+  const face = homeFaceOf(r, r.homeImages.filter((i) => media[i]));
+  return face ? media[face].card : null;
 }
 
 // what a live filter matches on: the resident's name, handle, household, and

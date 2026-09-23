@@ -88,3 +88,59 @@ test("5. a declared asset the Region card claimed is not the house's face", () =
   assert.equal(t.homeThumb, "/media/a-card.png");
   assert.deepEqual(t.images, [key("a.png")]);
 });
+
+// ── the three other readers wear the same face (POS-190, Wright's review) ──
+//
+// The residents directory, the correspondent cards and the rendition view each
+// picked "the first HOME image in media" on their own. Each now asks the same
+// helper, over the same list it read before. Their own lines are lifted and
+// run here, like the house card's above, on the same three fixtures.
+
+const lift = (url, re, what) => {
+  const src = readFileSync(new URL(url, import.meta.url), "utf8");
+  const m = re.exec(src);
+  assert.ok(m, `${what} is still where this suite reads it`);
+  return m;
+};
+
+// residents directory: `function cardImage(r) { … }`
+const DIR = lift("../town/pages/residents/index.astro", /^function cardImage\(r\) \{[\s\S]*?^\}/m, "the directory's cardImage");
+// eslint-disable-next-line no-new-func -- runs the page's own function
+const cardImage = new Function("media", "homeFaceOf", `${DIR[0]}\nreturn cardImage;`)(MEDIA, homeFaceOf);
+
+// correspondent cards: `function corrImage(h) { … }` in src/lib/correspondents.mjs
+const CORR = lift("../src/lib/correspondents.mjs", /^function corrImage\(h\) \{[\s\S]*?^\}/m, "the correspondents' corrImage");
+const corrImageFor = (resident) =>
+  // eslint-disable-next-line no-new-func -- runs the module's own function
+  new Function("media", "homeFaceOf", "residByHandle", `${CORR[0]}\nreturn corrImage;`)(MEDIA, homeFaceOf, { [HANDLE]: resident })(HANDLE);
+
+// rendition view: the `const homeFace` line, the `homeImgs` gallery line, and
+// the payload's `image:` expression.
+const REND_URL = "../town/pages/residents/[handle]/view/[rendition].astro";
+const REND_FACE = lift(REND_URL, /^(const homeFace = [^\n]+;)\s*$/m, "the rendition view's homeFace line");
+const REND_GALLERY = lift(REND_URL, /^(const regionAssets = [\s\S]*?^const homeImgs = [^\n]+;)\s*$/m, "the rendition view's gallery block");
+const REND_IMAGE = lift(REND_URL, /^\s*image:\s*(.+),\s*$/m, "the rendition view's image line");
+// eslint-disable-next-line no-new-func -- runs the page's own lines
+const rendition = new Function("r", "handle", "media", "homeFaceOf",
+  `${REND_FACE[1]}\n${REND_GALLERY[1]}\nreturn { image: (${REND_IMAGE[1]}), homeImgs };`);
+
+const CASES = [
+  ["declared b.png", { assets: ["b.png"], body: "# the house" }, "/media/b-card.png"],
+  ["no assets", { body: "# the house" }, "/media/a-card.png"],
+  ["declared missing.png", { assets: ["missing.png"], body: "# the house" }, "/media/a-card.png"],
+];
+const resident = (home) => ({ handle: HANDLE, home, region: null, homeImages: HOME_IMAGES });
+
+for (const [label, home, want] of CASES) {
+  test(`6. residents directory, ${label} → ${want}`, () => {
+    assert.equal(cardImage(resident(home)), want);
+  });
+  test(`7. correspondent card, ${label} → ${want}`, () => {
+    assert.equal(corrImageFor(resident(home)), want);
+  });
+  test(`8. rendition view, ${label} → ${want}, gallery in filename order`, () => {
+    const t = rendition(resident(home), HANDLE, MEDIA, homeFaceOf);
+    assert.equal(t.image, want);
+    assert.deepEqual(t.homeImgs, ["/media/a-card.png", "/media/b-card.png"], "the gallery order is unchanged");
+  });
+}
