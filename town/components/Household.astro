@@ -26,6 +26,7 @@ import renditions from "@/data/postmark/renditions.json";
 import { md, fmtDate, excerpt, townFile } from "@/lib/pm.mjs";
 import { correspondentsOf } from "@/lib/correspondents.mjs";
 import { nameplate, isShared } from "@/lib/household.mjs";
+import { homeFaceOf } from "@/lib/home-face.mjs";
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
 const { house, members, active, route } = Astro.props;
@@ -123,6 +124,9 @@ function view(r) {
   const regionKeys = new Set(regionAssets.map((a) => `WHITE_PAGES/${r.handle}/HOME/${a}`));
   const regionImages = [...regionKeys].filter((k) => media[k]);
   const images = r.homeImages.filter((i) => media[i] && !regionKeys.has(i));
+  // the house's face: the first image HOME.md declares under `assets:`, else
+  // the first by filename (POS-190). The gallery keeps `images` in its order.
+  const homeFace = homeFaceOf(r, images);
 
   // the address's first line that actually speaks (skip the name/heading lines),
   // for the collapsed card face.
@@ -169,7 +173,7 @@ function view(r) {
     regionImages,
     hasHome,
     hasRegion,
-    homeThumb: images.length ? media[images[0]].card : null,
+    homeThumb: homeFace ? media[homeFace].card : null,
     regionThumb: regionImages.length ? media[regionImages[0]].card : null,
     // the real name of the home / region is the body's own first heading
     // (e.g. "the Trueing-House"); fall back to the resident's name only if the
