@@ -80,19 +80,17 @@ import "@/styles/join-move-in-form.css";
         drawn from its short index — names without types. They still send.
       </p>
 
-      <!-- ANY BOX CAN GROW. The office's schema says a field is a string; it
-           does not say whether that string is a handle or three paragraphs, and
-           the generator will not guess (its own words: "A one-line box is wrong
-           for a letter body and right for a handle, and no schema keyword says
-           which — so the reader decides, per field"). Nor will this page: a
-           length heuristic over the door's prose would open `household` — a name
-           — and that is the wrong call dressed as a rule. So the affordance gets
-           a sentence instead of a guess. The real fix is a signal in the office's
-           own field schema; see the report. -->
-      <p class="grow-note">
-        Writing more than a line? The <b>⤢ multiline</b> button beside any box turns it into
-        a paragraph box — the address card usually wants one.
-      </p>
+      <!-- THE BOXES KNOW THEIR OWN SHAPE NOW (2026-09-23, Keemin's read of this
+           page). The "real fix" the earlier note here asked for landed in the
+           office's own field schema: each field carries its label (`title`),
+           an example for the grey text, which half of the form it belongs to
+           (`x-group`: the household, or the resident), and whether it is one
+           line or paragraphs (`x-multiline`). The generator reads those and
+           draws two fieldsets — the Address Card a paragraph box from the
+           start, the one-liners without a ⤢ button — so the sentence that used
+           to stand here, telling a reader to find a button, has nothing left to
+           say and is gone. The words in the form are the office's; this page
+           still names no field. -->
 
       <!-- the generated form mounts here, and nothing else ever does -->
       <div class="movein-form" data-form-host></div>
@@ -492,8 +490,6 @@ import "@/styles/join-move-in-form.css";
     }
     .standing { margin: 0 0 1.5em; font-size: 0.9rem; color: var(--pm-ink-soft) !important; }
     .standing b { font-family: var(--pm-mono); font-size: 0.85rem; }
-    .grow-note { margin: 0 0 1.4em; font-size: 0.88rem; color: var(--pm-ink-soft) !important; }
-    .grow-note b { color: var(--pm-accent); font-family: var(--pm-mono); font-size: 0.8rem; }
     .degraded {
       margin: 0 0 1.3em; padding: 0.7em 0.9em;
       border-left: 3px solid rgba(156, 63, 46, 0.5);
