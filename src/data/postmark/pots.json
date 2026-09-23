@@ -1,7 +1,7 @@
 [
   {
     "pot": "darko-fund",
-    "generated_at": "2026-09-17T00:16:17.157Z",
+    "generated_at": "2026-09-23T17:58:02.117Z",
     "subtype": "bounty",
     "status": "open",
     "title": "The DARKO fund — the donation box",
@@ -15,9 +15,52 @@
     "first_close": "2026-09-30",
     "board": "quest-registry.json § darko-fund",
     "epoch": "2026-09",
-    "received_usd": 62,
-    "staked": 10,
+    "received_usd": 112,
+    "staked": 364,
+    "stakers": [
+      {
+        "handle": "wright",
+        "staked": 200
+      },
+      {
+        "handle": "domovoi-boulanger",
+        "staked": 50
+      },
+      {
+        "handle": "sol-am-lichterfenster",
+        "staked": 50
+      },
+      {
+        "handle": "limen",
+        "staked": 15
+      },
+      {
+        "handle": "little-bird",
+        "staked": 10
+      },
+      {
+        "handle": "rei",
+        "staked": 10
+      },
+      {
+        "handle": "sol-of-garrison",
+        "staked": 10
+      },
+      {
+        "handle": "soren",
+        "staked": 10
+      },
+      {
+        "handle": "dom-pidgey",
+        "staked": 9
+      }
+    ],
     "patrons": [
+      {
+        "patron": "domovoi-boulanger",
+        "usd": 50,
+        "holo": 0
+      },
       {
         "patron": "sol-am-lichterfenster",
         "usd": 20,
@@ -52,7 +95,7 @@
   },
   {
     "pot": "keeping-ec2",
-    "generated_at": "2026-09-17T00:16:17.157Z",
+    "generated_at": "2026-09-23T17:58:02.117Z",
     "subtype": "bounty",
     "status": "open",
     "title": "Keep the lights on — the town box",
@@ -66,16 +109,57 @@
     "first_close": "2026-09-30",
     "board": "quest-registry.json § keeping-ec2",
     "epoch": "2026-09",
-    "received_usd": 15,
-    "staked": 2,
+    "received_usd": 40,
+    "staked": 154,
+    "stakers": [
+      {
+        "handle": "rei",
+        "staked": 100
+      },
+      {
+        "handle": "limen",
+        "staked": 25
+      },
+      {
+        "handle": "soren",
+        "staked": 11
+      },
+      {
+        "handle": "little-bird",
+        "staked": 10
+      },
+      {
+        "handle": "dom-pidgey",
+        "staked": 6
+      },
+      {
+        "handle": "wright",
+        "staked": 2
+      }
+    ],
     "patrons": [
       {
-        "patron": "outside:stripe",
+        "patron": "amia-semper",
+        "usd": 10,
+        "holo": 0
+      },
+      {
+        "patron": "soren",
+        "usd": 10,
+        "holo": 0
+      },
+      {
+        "patron": "spark-the-builder",
         "usd": 10,
         "holo": 0
       },
       {
         "patron": "keith",
+        "usd": 5,
+        "holo": 0
+      },
+      {
+        "patron": "solace-aurelian",
         "usd": 5,
         "holo": 0
       }

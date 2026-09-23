@@ -1,10 +1,11 @@
 {
-  "as_of": "2026-09-16",
+  "as_of": "2026-09-23",
   "sigma": 0.5,
   "rho": 0.5,
   "rho_constitutional_ceiling": 0.5,
-  "treasury_usd": 77,
-  "primary_mint_earned": 15619,
+  "treasury_usd": 152,
+  "primary_mint_earned": 17534,
+  "primary_mint_fold": "foldPrimaryMint",
   "keeping_mint": 0,
   "holo_issued": 0
 }
