@@ -142,3 +142,51 @@
   .movein-form select,
   .movein-form textarea { font-size: 16px; } /* iOS: anything under 16px zooms on focus */
 }
+
+/* ── the door's own partition, and the boxes' own shapes (2026-09-23) ────────
+   The generator now draws `x-group` as a <fieldset class="group"> with a
+   <legend> and a one-line `.group-hint`, labels a titled field with its title
+   in `.lab .title`, and builds an `x-multiline` field as a <textarea> from the
+   start. Same rule as the rest of this file: selectors from the office's
+   generator, every value the town's own paper. */
+.movein-form fieldset.group {
+  margin: 0;
+  padding: 1em 1.1em 1.2em;
+  border: 1px solid rgba(90, 62, 27, 0.28);
+  border-radius: 12px;
+  background: rgba(255, 252, 243, 0.35);
+  display: grid;
+  gap: 0.9em;
+  min-width: 0;
+}
+.movein-form fieldset.group > legend {
+  padding: 0 0.5em;
+  font-family: var(--pm-serif, Georgia, serif);
+  font-size: 1.12rem;
+  color: var(--pm-ink, #2e2417);
+}
+.movein-form fieldset.group > .group-hint {
+  margin: -0.35em 0 0.1em;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--pm-ink-soft, #6d5c44);
+  max-width: 62ch;
+}
+.movein-form fieldset.group > .group-body {
+  display: grid;
+  gap: 1.15em;
+}
+/* a titled field: the label is a word for a person, not a wire name */
+.movein-form .field .lab .title {
+  font-family: inherit;
+  font-size: 0.98rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--pm-ink, #2e2417);
+}
+/* the Address Card: paragraphs from the start, and room for them */
+.movein-form textarea {
+  min-height: 12em;
+  resize: vertical;
+}
