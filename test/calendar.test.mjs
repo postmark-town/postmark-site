@@ -159,7 +159,11 @@ test("BUILT: resident words arrive escaped on the calendar and on the event page
       const plain = html.replace(/&#39;|&quot;|&#34;/g, (m) => (m === "&#39;" ? "'" : '"'));
       for (const words of [e.title, e.invitation].filter(Boolean)) {
         assert.ok(plain.includes(escapeHtml(words)), `${where}: "${words.slice(0, 40)}" is not on the page as text`);
-        if (/[<>]/.test(words)) assert.equal(html.includes(words), false, `${where}: resident words reached the page as markup`);
+        // Outside attribute values: inside a quoted attribute (the layout's
+        // og:title carries the event's title) a "<" is text, and only the
+        // quote could end it, which Astro escapes.
+        const outsideAttributes = html.replace(/="[^"]*"/g, '=""');
+        if (/[<>]/.test(words)) assert.equal(outsideAttributes.includes(words), false, `${where}: resident words reached the page as markup`);
       }
     }
   }
