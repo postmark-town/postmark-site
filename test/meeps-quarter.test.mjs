@@ -181,11 +181,12 @@ const builtMeeps = join(DIST, "meeps", "index.html");
 test("the built Meeps page: exactly five buildings, five cards, and the bench from the manifest",
   { skip: !existsSync(builtMeeps) }, () => {
   const page = readFileSync(builtMeeps, "utf8");
-  const buildings = [...page.matchAll(/data-meep="([^"]+)"/g)].map((m) => m[1]);
-  const panels = [...page.matchAll(/data-panel="([^"]+)"/g)].map((m) => m[1]);
+  // Read off the ELEMENTS — the page's own switching CSS names every key too.
+  const buildings = [...page.matchAll(/<a\b[^>]*\bdata-meep="([^"]+)"/g)].map((m) => m[1]);
+  const panels = [...page.matchAll(/<section\b[^>]*\bdata-panel="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(buildings, MEEPS.map((m) => m.key));
   assert.deepEqual(panels, MEEPS.map((m) => m.key));
-  const units = [...page.matchAll(/data-unit="([^"]+)"/g)].map((m) => m[1]);
+  const units = [...page.matchAll(/<li\b[^>]*\bdata-unit="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(units, DATA("rollcall.json").units.map((u) => u.unit));
   assert.ok(page.includes(DATA("rollcall.json").tag), "the bench does not say which release it was read at");
 });
@@ -193,11 +194,13 @@ test("the built Meeps page: exactly five buildings, five cards, and the bench fr
 test("the built Post Office card carries the Daily as its window, and the Daily page still stands",
   { skip: !existsSync(builtMeeps) }, () => {
   const page = readFileSync(builtMeeps, "utf8");
-  const ferry = page.slice(page.indexOf('data-panel="postmaster"'), page.indexOf('data-panel="illuminator"'));
+  const ferry = page.slice(page.indexOf('<section class="mq-panel" id="postmaster"'), page.indexOf('<section class="mq-panel" id="illuminator"'));
+  assert.ok(ferry.length > 0, "Ferry's panel was not found in the built page");
   assert.match(ferry, /data-daily-window/);
   assert.match(ferry, /href="\/daily\/"[^>]*>read the whole Daily →/);
   const w = dailyWindow(readFileSync(join(ROOT, "public", "atelier", "postmark", "daily", "ferrys-daily.html"), "utf8"));
-  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Astro's own text escaping: & < > " and the apostrophe as &#39;
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   assert.ok(ferry.includes(esc(w.headline)), "the Daily's headline is not in Ferry's card");
   assert.ok(existsSync(join(DIST, "daily", "index.html")), "/daily/ stopped building");
 });
