@@ -391,3 +391,17 @@ test("every old path still builds", { skip: !existsSync(builtPage("/")) }, () =>
     assert.ok(existsSync(builtPage(href)), `${href} did not build`);
   }
 });
+
+test("the routes that came back from a fold are real pages, not stubs", () => {
+  // /bulletin/, /window/ and /meeps/ were all redirect stubs pointing INTO a
+  // scroller before the 2026-08-25 chip wave gave them their content back. A
+  // stub still passes rule 1 (the file exists); this names them, because a
+  // silent re-fold is exactly what took a year to find last time. /daily/
+  // joins them now that it has left the rail (part 6).
+  for (const [key, href] of [["bulletin", "/bulletin/"], ["residents", "/window/"], ["meeps", "/meeps/"], ["meeps", "/daily/"]]) {
+    const file = pageFileFor(href);
+    assert.ok(file, `${href} has no page`);
+    assert.equal(activeKeyOf(file), key, `${href} does not claim "${key}" — it has folded into a stub`);
+    assert.equal(/http-equiv="refresh"/.test(readFileSync(file, "utf8")), false, `${href} is a redirect again`);
+  }
+});
