@@ -155,7 +155,13 @@ test("the built crossings page lists S81 with its counts", { skip: !built("recor
 test("the built Record landing: six cards, each linking its page; the repos page: five", { skip: !built("records") || !built("records", "repos") }, () => {
   const landing = html("records");
   assert.deepEqual([...landing.matchAll(/<article\b[^>]*\bdata-record-card="([^"]+)"/g)].map((m) => m[1]), RECORD_CARDS.map((c) => c.key));
-  for (const c of RECORD_CARDS) assert.ok(landing.includes(`href="${c.href}"`), `${c.key}'s card does not link ${c.href}`);
+  // read each CARD's own link — the chip row above links the same pages, so a
+  // page-wide search would pass with every card's link gone
+  for (const c of RECORD_CARDS) {
+    const start = landing.indexOf(`data-record-card="${c.key}"`);
+    const card = landing.slice(start, landing.indexOf("</article>", start));
+    assert.ok(card.includes(`href="${c.href}"`), `${c.key}'s card does not link ${c.href}`);
+  }
   const repos = html("records", "repos");
   assert.deepEqual([...repos.matchAll(/<a\b[^>]*\bdata-repo="([^"]+)"/g)].map((m) => m[1]), REPOS.map((r) => r.key));
 });
