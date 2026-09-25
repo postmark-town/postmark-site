@@ -363,3 +363,31 @@ test("a flag is an escape for a page NOT HERE YET, never for one that is", () =>
     assert.equal(navFlags({})[e.flag], false, `${e.key}'s flag is on by default`);
   }
 });
+
+// ── THE BUILT SITE (skipped until built, as POS-177 rules) ───────────────────
+
+const DIST = join(ROOT, "dist-town");
+const builtPage = (href) => join(DIST, ...href.split("/").filter(Boolean), "index.html");
+
+test("the built rail is the six seats, on every page that wears the layout", { skip: !existsSync(builtPage("/")) }, () => {
+  const seats = (href) => {
+    const s = readFileSync(builtPage(href), "utf8");
+    const i = s.indexOf('class="pm-townnav-links"');
+    const nav = s.slice(i, s.indexOf("</nav>", i));
+    return [...nav.matchAll(/<a\b[^>]*>([^<]*)/g)].map((m) => m[1].trim());
+  };
+  for (const href of ["/", "/town/", "/meeps/", "/households/", "/residents/", "/records/", "/mail/", "/daily/"]) {
+    assert.deepEqual(seats(href), ["Postmark", "The Town", "The World", "The Households", "The Record", "Join"], `${href}'s built rail`);
+  }
+});
+
+test("every old path still builds", { skip: !existsSync(builtPage("/")) }, () => {
+  for (const href of [
+    "/town/", "/daily/", "/bulletin/", "/works/", "/meeps/", "/numbers/", "/votes/",
+    "/replay/", "/conversations/", "/atlas/",
+    "/mail/", "/mail/returned/", "/mail/compose/", "/residents/", "/window/", "/stamps/", "/join/",
+    "/households/", "/records/", "/records/crossings/", "/records/repos/",
+  ]) {
+    assert.ok(existsSync(builtPage(href)), `${href} did not build`);
+  }
+});
