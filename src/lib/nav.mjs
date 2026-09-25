@@ -210,6 +210,10 @@ export const RAIL = [
     members: [
       { key: "town", label: "the civic quarter", href: "/town/", icon: "⌂" },
       { key: "meeps", label: "the meeps", href: "/meeps/", icon: "⁂" },
+      // FERRY’S DAILY IS BACK (Keemin, 2026-09-25: "add Ferry’s Daily back to the top
+      // rail (redundant). I think it’s enough of a staple that it’s worth it") —
+      // redundant with the Post Office card on /meeps/, and kept on purpose.
+      { key: "daily", label: "ferry’s daily", href: "/daily/", icon: "▤" },
       // WHAT'S ON (part 2): the calendar is built on feature/calendar and has not
       // landed here, so the chip waits behind a nav flag, default off. Same key,
       // href, icon as feature/calendar's own chip, so the two lines meet.

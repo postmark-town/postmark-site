@@ -108,7 +108,7 @@ test("SIX SEATS, the door's nouns, in the design's order", () => {
 
 test("each seat's row, in the design's words and order", () => {
   const row = (k) => chipsFor(k).chips.map((c) => c.label);
-  assert.deepEqual(row("town"), ["the civic quarter", "the meeps", "the bulletin"],
+  assert.deepEqual(row("town"), ["the civic quarter", "the meeps", "ferry’s daily", "the bulletin"],
     "The Town's row (what's on waits behind its flag)");
   assert.deepEqual(row("world"), ["the living map", "conversations", "replay", "the atlas", "the harbor · beyond the water"]);
   assert.deepEqual(row("households"), ["the houses", "every resident"]);
@@ -117,7 +117,7 @@ test("each seat's row, in the design's words and order", () => {
   assert.equal(chipsFor("join"), null, "the Join door grew a row");
   // with the flag on, what's on stands between the meeps and the bulletin
   assert.deepEqual(chipsFor("town", { flags: navFlags({ PUBLIC_NAV_WHATS_ON: "1" }) }).chips.map((c) => c.key),
-    ["town", "meeps", "calendar", "bulletin"]);
+    ["town", "meeps", "daily", "calendar", "bulletin"]);
 });
 
 // ── rule 1: a read per page ──────────────────────────────────────────────────
@@ -228,7 +228,7 @@ test("LITTLE ICONS FOR THE TOWN'S CHIPS — decoration, never the name", () => {
 test("a page anywhere in a family finds its section, so the seat lights up", () => {
   const cases = {
     postmark: "postmark",
-    town: "town", meeps: "town", bulletin: "town", votes: "town", calendar: "town",
+    town: "town", meeps: "town", daily: "town", bulletin: "town", votes: "town", calendar: "town",
     world: "world", conversations: "world", replay: "world", atlas: "world", harbor: "world", birthday: "world",
     households: "households", household: "households", residents: "households",
     record: "record", mail: "record", crossings: "record", works: "record", stamps: "record", numbers: "record", repos: "record",
@@ -253,14 +253,16 @@ test("EVERY PAGE THAT CLAIMS A KEY LIGHTS A SEAT — no page is left with the ra
 
 // ── the moves this rail made, each with its old URL still answering ──────────
 
-test("THE DAILY LEFT THE RAIL — /daily/ stays a page and lights the meeps, whose Post Office it is the window of", () => {
-  assert.equal(allEntries().some((e) => e.href === "/daily/" || e.key === "daily"), false, "the Daily is back in the rail");
+test("FERRY’S DAILY IS BACK IN THE RAIL (Keemin 2026-09-25: a staple, kept redundant with the Post Office card)", () => {
+  const chip = chipsFor("town").chips.find((c) => c.key === "daily");
+  assert.ok(chip, "the Daily’s chip is missing from the Town’s row");
+  assert.equal(chip.href, "/daily/");
   const file = pageFileFor("/daily/");
-  assert.ok(file, "/daily/ was deleted — it moves seats, it does not leave the site");
-  assert.equal(activeKeyOf(file), "meeps");
-  assert.equal(rowFor("meeps").of.key, "town");
+  assert.ok(file, "/daily/ was deleted");
+  assert.equal(activeKeyOf(file), "daily", "the Daily lights its own chip now");
+  assert.equal(rowFor("daily").of.key, "town");
   const meeps = readFileSync(pageFileFor("/meeps/"), "utf8");
-  assert.match(meeps, /href="\/daily\/"/, "nothing on /meeps/ opens the Daily — the chip went and took the only door with it");
+  assert.match(meeps, /href="\/daily\/"/, "the Post Office card still opens the Daily — the redundancy is the point");
 });
 
 test("THE HARBOR IS THE WORLD'S FAR SHORE — a chip, on its own flag at its own domain", () => {
@@ -398,7 +400,7 @@ test("the routes that came back from a fold are real pages, not stubs", () => {
   // stub still passes rule 1 (the file exists); this names them, because a
   // silent re-fold is exactly what took a year to find last time. /daily/
   // joins them now that it has left the rail (part 6).
-  for (const [key, href] of [["bulletin", "/bulletin/"], ["residents", "/window/"], ["meeps", "/meeps/"], ["meeps", "/daily/"]]) {
+  for (const [key, href] of [["bulletin", "/bulletin/"], ["residents", "/window/"], ["meeps", "/meeps/"], ["daily", "/daily/"]]) {
     const file = pageFileFor(href);
     assert.ok(file, `${href} has no page`);
     assert.equal(activeKeyOf(file), key, `${href} does not claim "${key}" — it has folded into a stub`);
