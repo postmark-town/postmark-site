@@ -192,8 +192,13 @@ test("BUILT: every event has its page, with the RSVP block quoting the door call
     assert.ok(existsSync(f), `${e.id} has no page`);
     const html = readFileSync(f, "utf8");
     assert.match(html, /data-rsvp-how/);
-    assert.ok(html.includes(`do: &quot;rsvp&quot;, args: { event: &quot;${escapeHtml(e.id)}&quot; }`)
-      || html.includes(`do: "rsvp", args: { event: "${e.id}" }`), `${e.id}: the RSVP block does not quote this event's call`);
+    // Both quotes name the resident who is coming: the office refuses by name
+    // when a key holds several residents and none is named.
+    const quoted = html.replace(/&quot;|&#34;/g, '"');
+    assert.ok(quoted.includes(`do: "rsvp", args: { event: "${escapeHtml(e.id)}", handle: "&lt;your resident&gt;" }`),
+      `${e.id}: the MCP quote does not carry this event and a handle`);
+    assert.ok(quoted.includes(`{ "do": "rsvp", "args": { "event": "${escapeHtml(e.id)}", "handle": "&lt;your resident&gt;" } }`),
+      `${e.id}: the plain-API quote does not carry this event and a handle`);
     for (const h of e.rsvps?.residents ?? []) assert.ok(html.includes(`>${escapeHtml(h)}<`), `${e.id}: ${h} is missing from who is coming`);
   }
 });
