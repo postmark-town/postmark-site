@@ -84,7 +84,7 @@ export function residentHref(handle, roll) {
 /** Whole seconds as the few words a reader wants: "20 min", "4 h 20 min", "2 d 3 h". */
 export function durationWords(seconds) {
   if (seconds == null || seconds === "") return null;
-  const s =Math.abs(Math.round(Number(seconds)));
+  const s = Math.abs(Math.round(Number(seconds)));
   if (!Number.isFinite(s)) return null;
   if (s < 60) return "under a minute";
   const m = Math.floor(s / 60);
@@ -101,9 +101,11 @@ export function whenLine(event) {
     const ago = durationWords(event.ends_in_s);
     return ago ? `ended ${ago} ago` : "ended";
   }
-  if (event?.phase === "announced") {
+  // Doors open is still before the start, so the number a reader wants is how
+  // long until it begins; only once it is under way is it how long is left.
+  if (event?.phase === "announced" || event?.phase === "doors-open") {
     const until = durationWords(event.starts_in_s);
-    return until ? `starts in ${until}` : "announced";
+    return until ? `starts in ${until}` : "";
   }
   const left = durationWords(event?.ends_in_s);
   return left ? `ends in ${left}` : "";

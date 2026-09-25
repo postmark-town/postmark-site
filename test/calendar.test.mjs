@@ -9,7 +9,10 @@
 // branch pos-207/the-calendar with the Snug Harbour moved to its true point).
 // The built-page arms then read dist-town/ when a build is there and SKIP when
 // it is not: they are judged against the committed calendar.json, whatever it
-// holds, so they stay true after the office's door replaces the sample.
+// holds. That is the EMPTY calendar until the office's door lands, because a
+// committed sample would be published (the invented Grand Opening, with its
+// RSVPs, on the live site); the sample lives only in test/fixtures, and the
+// fixture's rendered proof is the lane's variant build.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -67,7 +70,8 @@ test("a mark links to the World at the mark's point; a bare point reads (x, y) a
   assert.equal(placeOf({ mark: null, name: null }).href, null, "no point, no link into the World");
 });
 
-test("the Snug Harbour stands at its true point in both copies, not the sample's (412, -188)", () => {
+test("the Snug Harbour stands at its true point wherever it is carried, not the sample's (412, -188)", () => {
+  assert.ok(JSON.stringify(SAMPLE).includes("the-snug-harbour"), "the fixture stopped carrying the harbour, so this checks nothing");
   for (const [name, cal] of [["the test fixture", SAMPLE], ["src/data/postmark/calendar.json", COMMITTED]]) {
     const text = JSON.stringify(cal);
     if (!text.includes("the-snug-harbour")) continue;
@@ -75,6 +79,14 @@ test("the Snug Harbour stands at its true point in both copies, not the sample's
     const e = eventsOf(cal).find((x) => x.place?.mark === "current-the-reader/the-snug-harbour");
     assert.deepEqual([e.place.x, e.place.y], [-350, 4978], name);
   }
+});
+
+test("the committed calendar never carries the sample's invented events: they would be published", () => {
+  const invented = new Set(eventsOf(SAMPLE).map((e) => e.id));
+  const leaked = eventsOf(COMMITTED).filter((e) => invented.has(e.id)).map((e) => e.id);
+  assert.deepEqual(leaked, [], "src/data/postmark/calendar.json carries the office's sample, which the next release would publish");
+  const pub = JSON.parse(read("public", "atelier", "postmark", "data", "calendar.json"));
+  assert.deepEqual(eventsOf(pub).filter((e) => invented.has(e.id)).map((e) => e.id), [], "and so does the public copy");
 });
 
 test("every event has a page address, and an id that is not <host>/<slug> has none", () => {
@@ -91,8 +103,10 @@ test("a handle links to its resident page only when the roll has one", () => {
   assert.equal(residentHref("errant", roll), null, "a handle with no page would be a link to a 404");
 });
 
-test("the when-line: Now says how long is left, Coming how long until, Lately how long ago", () => {
-  assert.equal(whenLine(SAMPLE.now[0]), "ends in 4 h 20 min");
+test("the when-line: until the start while announced or doors-open, how long is left once under way, how long ago once ended", () => {
+  assert.equal(SAMPLE.now[0].phase, "doors-open", "the sample's Now event is the doors-open case this line judges");
+  assert.equal(whenLine(SAMPLE.now[0]), "starts in 20 min");
+  assert.equal(whenLine({ ...SAMPLE.now[0], phase: "underway", starts_in_s: -600, ends_in_s: 13800 }), "ends in 3 h 50 min");
   assert.equal(whenLine(SAMPLE.coming[0]), "starts in 1 d 2 h");
   assert.equal(whenLine({ phase: "ended", ends_in_s: -7200 }), "ended 2 h ago");
   assert.equal(durationWords(null), null, "a missing count is no words, not 'under a minute'");
