@@ -304,8 +304,12 @@ test("THE TOP RAIL IS FOR HUMANS — Residents, the Mail and Stamps are lifted b
   // MEMBERSHIP is this test's claim; ORDER is ruled separately and asserted in
   // its own test below, so a re-order cannot pass by agreeing with only half of
   // either ruling.
+  // AMENDED 2026-09-25 (the site, reprojected — part 5): The Mail and Stamps went into The Record,
+  // the seat that gathers what lasts; Residents keeps its seat. The founder's
+  // reader's-argument survives the move: both are one click from the top rail,
+  // under a seat whose name says what they are.
   assert.deepEqual([...RAIL.map((s) => s.key)].sort(),
-    ["harbor", "join", "mail", "postmark", "residents", "stamps", "town", "world"],
+    ["harbor", "join", "postmark", "record", "residents", "town", "world"],
     `the rail reads: ${RAIL.map((s) => s.label).join(" · ")}`);
 
   // the three by name, each a SEAT and no longer a chip of The Town.
@@ -315,24 +319,21 @@ test("THE TOP RAIL IS FOR HUMANS — Residents, the Mail and Stamps are lifted b
   // instead of a page that is now a forwarder. What this test claims — that the
   // three are SEATS, with these names, each lighting its own key — is untouched.
   const town = RAIL.find((s) => s.key === "town");
-  for (const [key, label, href] of [
-    ["residents", "Residents", "/residents/"],
-    ["mail", "The Mail", "/mail/"],
-    ["stamps", "Stamps", "/stamps/"],
-  ]) {
-    const seat = RAIL.find((s) => s.key === key);
-    assert.ok(seat, `"${label}" is not on the top rail`);
-    assert.equal(seat.label, label);
-    assert.equal(seat.href, href);
-    assert.equal(town.members.some((m) => m.key === key), false,
-      `"${label}" is on the top rail AND still a chip of The Town`);
-    assert.equal(sectionOf(key).key, key, `a page in ${label} still lights another seat`);
+  const residents = RAIL.find((s) => s.key === "residents");
+  assert.ok(residents, "Residents is not on the top rail");
+  assert.equal(residents.href, "/residents/");
+  assert.equal(sectionOf("residents").key, "residents");
+  // the mail and stamps: chips of The Record, never of The Town, at their URLs
+  const record = RAIL.find((s) => s.key === "record");
+  for (const [key, href] of [["mail", "/mail/"], ["stamps", "/stamps/"]]) {
+    assert.equal(RAIL.some((s) => s.key === key), false, `${key} is still a top-rail seat`);
+    assert.equal(record.members.find((m) => m.key === key)?.href, href, `${key} is not a chip of The Record`);
+    assert.equal(town.members.some((m) => m.key === key), false, `${key} is a chip of The Town`);
+    assert.equal(sectionOf(key).key, "record", `a page in ${key} lights another seat`);
   }
-
-  // Stamps keeps the honesty marker it wore as a chip. A promotion is exactly
-  // when a beta flag goes missing without anyone deciding to drop it.
-  assert.equal(RAIL.find((s) => s.key === "stamps").beta, true,
-    "Stamps lost its beta chip on the way up to the top rail");
+  // THE BETA MARKER IS A DECIDED LOSS, not a dropped one: a chip row carries
+  // no beta mark, and the stamps page's own head says what is still cooking.
+  assert.equal(record.members.find((m) => m.key === "stamps").beta, undefined);
 
   // and the rest genuinely IS carried below — seats naming nothing else would
   // pass the list and fail the reader
@@ -356,8 +357,10 @@ test("THE ORDER IS THE OLD ORDER, with Ferry's Daily replaced by The Town", () =
   // written here because the ORDER of a rail is the one property with no
   // internal logic to re-derive it from — get it wrong and everything still
   // resolves, every seat still lights, and only the founder can tell.
+  // AMENDED 2026-09-25 (the site, reprojected — part 5): The Record stands where The Mail
+  // stood; Stamps left the rail into it. The full six-seat order is part 6's.
   assert.deepEqual(RAIL.map((s) => s.key),
-    ["postmark", "town", "world", "mail", "harbor", "residents", "stamps", "join"],
+    ["postmark", "town", "world", "record", "harbor", "residents", "join"],
     `the rail reads: ${RAIL.map((s) => s.label).join(" · ")}`);
 
   // THE SUBSTITUTION, stated as itself: whatever stands second is The Town.
@@ -373,15 +376,17 @@ test("THE ORDER IS THE OLD ORDER, with Ferry's Daily replaced by The Town", () =
   // and The Works is not a seat, because it is a chip (his own earlier ruling,
   // and the reason the old rail's ninth entry has no successor here)
   assert.equal(RAIL.some((s) => s.key === "works"), false,
-    "The Works came back to the top rail; it lives in The Town's row");
+    "The Works came back to the top rail; it lives in a chip row");
 
   // THE HARBOR IS BESIDE THE MAIL AGAIN. The old rail put them adjacent with the
   // reason written next to them — "the Harbor sits next to the Mail because it
   // IS the mail's outward half" — and the re-org separated them without ever
   // deciding to. Asserted so a future re-sort has to break it on purpose.
+  // (AMENDED 2026-09-25 (the site, reprojected — part 5): the Harbor stays beside the seat that
+  // now holds the mail.)
   const keys = RAIL.map((s) => s.key);
-  assert.equal(keys.indexOf("harbor") - keys.indexOf("mail"), 1,
-    "the Harbor left the Mail's side; the old rail had them adjacent for a stated reason");
+  assert.equal(keys.indexOf("harbor") - keys.indexOf("record"), 1,
+    "the Harbor left the mail's side; the old rail had them adjacent for a stated reason");
 });
 
 test("THE TOWN KEEPS THE FOUNDER'S OWN LIST, and the meeps is back in it", () => {
@@ -406,11 +411,14 @@ test("THE TOWN KEEPS THE FOUNDER'S OWN LIST, and the meeps is back in it", () =>
   //     card-grid mistake in miniature.
   // His 2026-08-25 list is still underneath: ferry's daily, the bulletin, the
   // works, and the meeps he appended. What changed is what wraps it.
+  // AMENDED 2026-09-25 (the site, reprojected — part 5): the works and the numbers moved to The
+  // Record — the record's instruments, not places in the town.
   assert.deepEqual(chipsFor("town").chips.map((c) => c.key),
-    ["town", "daily", "bulletin", "works", "meeps", "numbers"],
+    ["town", "daily", "bulletin", "meeps"],
     `The Town's row reads: ${chipsFor("town").chips.map((c) => c.label).join(" · ")}`);
-  assert.equal(town.members.some((m) => m.key === "numbers" && !m.held), true,
-    "the S4 hold is over — the numbers chip hangs, unheld, at the end of the founder's list");
+  const record = RAIL.find((s) => s.key === "record");
+  assert.equal(record.members.some((m) => m.key === "numbers" && !m.held), true,
+    "the numbers chip does not hang in The Record");
 
   // THE MEEPS RETURNED, and its page answers to its own name again. It had been
   // struck from the residents row hours earlier and borrowed `residents` while
@@ -424,11 +432,12 @@ test("THE TOWN KEEPS THE FOUNDER'S OWN LIST, and the meeps is back in it", () =>
   assert.equal(sectionOf("meeps").key, "town");
 });
 
-test("The Works is inside The Town, not beside it", () => {
+test("The Works is a chip, not a seat — in The Record since part 5", () => {
   // Demoted 2026-08-25: "weird having that old surface be first-class". The
-  // page is untouched; only its seat moved.
+  // page is untouched; only its seat moved. AMENDED 2026-09-25 (the site, reprojected — part 5): 
+  // from The Town's row to The Record's.
   assert.equal(RAIL.some((s) => s.key === "works"), false, "The Works climbed back onto the top rail");
-  assert.equal(sectionOf("works")?.key, "town");
+  assert.equal(sectionOf("works")?.key, "record");
   assert.ok(pageFileFor("/works/"), "The Works was demoted into a 404");
 });
 
@@ -503,15 +512,18 @@ test("no key is used twice — a duplicate silently steals the other's highlight
 // ── the lookups the layout renders from ──────────────────────────────────────
 
 test("a page anywhere in a family finds its section, so the seat lights up", () => {
-  assert.equal(sectionOf("mail").key, "mail");         // its own seat since the lift
+  assert.equal(sectionOf("mail").key, "record");       // a chip of The Record (part 5)
   assert.equal(sectionOf("residents").key, "residents");
-  assert.equal(sectionOf("stamps").key, "stamps");
+  assert.equal(sectionOf("stamps").key, "record");
+  assert.equal(sectionOf("crossings").key, "record");
+  assert.equal(sectionOf("repos").key, "record");
+  assert.equal(sectionOf("numbers").key, "record");
   assert.equal(sectionOf("town").key, "town");         // /town/, hidden from the row but still in the family
   assert.equal(sectionOf("meeps").key, "town");        // back in The Town this wave
   assert.equal(sectionOf("bulletin").key, "town");
   assert.equal(sectionOf("atlas").key, "world");       // a lens on The World
   assert.equal(sectionOf("votes").key, "town");
-  assert.equal(sectionOf("works").key, "town");
+  assert.equal(sectionOf("works").key, "record");
   assert.equal(sectionOf("postmark").key, "postmark"); // the front door, its own seat
   assert.equal(sectionOf("harbor").key, "harbor");
   // an orphan page (the darkroom, the ops desk) is deliberately in no section
@@ -549,10 +561,12 @@ test("the section row a page draws never shows a held chip, and never appears wh
   // that ruling is recorded, not here; what this test is about is that a row
   // renders its family and hides what is held
   assert.ok(town.chips.some((m) => m.key === "town"), "the quarter is missing from its own row");
-  assert.ok(town.chips.some((m) => m.key === "works"), "The Works is missing from the row it was demoted into");
-  assert.equal(town.chips.some((m) => m.key === "numbers"), true, "the numbers chip fell off the row after its hold was lifted (2026-09-03)");
+  // AMENDED 2026-09-25 (the site, reprojected — part 5): the works and the numbers are The Record's.
+  const record = chipsFor("record");
+  assert.ok(record.chips.some((m) => m.key === "works"), "The Works is missing from The Record's row");
+  assert.equal(record.chips.some((m) => m.key === "numbers"), true, "the numbers chip fell off The Record's row");
   // a page that WAS held still draws its section's row when a reader lands on it
-  assert.equal(chipsFor("numbers").of.key, "town");
+  assert.equal(chipsFor("numbers").of.key, "record");
   // and so does the hidden one — /town/ is out of the row, not out of the town
   assert.equal(chipsFor("town").of.key, "town");
   // and a seat with no members draws nothing at all — Harbor never had one, and
@@ -560,8 +574,9 @@ test("the section row a page draws never shows a held chip, and never appears wh
   // founder's own earlier strikes, not because a row was withheld from them
   assert.equal(chipsFor("harbor"), null);
   assert.equal(chipsFor("residents"), null);
-  assert.equal(chipsFor("mail"), null);
-  assert.equal(chipsFor("stamps"), null);
+  // the mail and stamps are chips of a section with a row now (part 5)
+  assert.equal(chipsFor("mail").of.key, "record");
+  assert.equal(chipsFor("stamps").of.key, "record");
   assert.equal(chipsFor(""), null);
 });
 
@@ -606,6 +621,10 @@ test("THE THREE STILL-STRUCK CHIPS — the pages stay, at the URLs they had", ()
     ["/mail/returned/", "mail", "returned to sender"],
     ["/mail/compose/", "mail", "write a letter"],
   ];
+  // AMENDED 2026-09-25 (the site, reprojected — part 5): the mail's rooms answer to `mail`, which is a
+  // chip of The Record now — so the seat above them is The Record and the row
+  // under it is The Record's, with the mail chip lit. /window/ is unchanged.
+  const litSeat = { residents: "residents", mail: "record" };
   for (const [href, room, label] of struck) {
     assert.equal(allEntries().some((e) => e.href === href), false,
       `"${label}" is back in a chip row`);
@@ -622,8 +641,9 @@ test("THE THREE STILL-STRUCK CHIPS — the pages stay, at the URLs they had", ()
     // rail rather than being dropped when its old shape stopped applying.
     const lit = sectionOf(key);
     assert.ok(lit, `${href} lights no seat at all — the rail goes dark where the reader is deepest`);
-    assert.equal(lit.key, room, `${href} lights "${lit.label}" instead of its own room`);
-    assert.equal(rowFor(key), null, `${href} draws a chip row; neither of these rooms has one`);
+    assert.equal(lit.key, litSeat[room], `${href} lights "${lit.label}" instead of its own room's seat`);
+    if (room === "mail") assert.equal(rowFor(key).of.key, "record", `${href} draws the wrong row`);
+    else assert.equal(rowFor(key), null, `${href} draws a chip row; the residents' room has none`);
   }
 });
 
@@ -707,8 +727,9 @@ test("ONE CHIP ROW PER PAGE — never the section's AND the room's", () => {
   assert.equal(rowFor("atlas").place, "section");
   // and a lifted seat draws none at all, because its family is one read
   assert.equal(rowFor("residents"), null);
-  assert.equal(rowFor("mail"), null);
-  assert.equal(rowFor("stamps"), null);
+  // AMENDED 2026-09-25 (the site, reprojected — part 5): the mail and stamps draw The Record's row
+  assert.equal(rowFor("mail").of.key, "record");
+  assert.equal(rowFor("stamps").of.key, "record");
   // the household page takes none, by the founder's word, and that survived the
   // retirement of the seat that used to carry the rule; nor does an orphan page
   assert.equal(rowFor("household"), null, "a section row appeared over the household's own");
@@ -869,8 +890,10 @@ test("LITTLE ICONS FOR THE TOWN'S CHIPS — decoration, never the name", () => {
   // and the ballot and the bounty board left for the quarter that now draws
   // them. The claim is unchanged — every chip keeps its WORDS, and the icon is
   // decoration beside the label rather than a replacement for it.
+  // AMENDED 2026-09-25 (the site, reprojected — part 5): the works and the
+  // numbers moved to The Record's row, with their icons.
   assert.deepEqual(row.map((c) => c.label),
-    ["the civic quarter", "ferry’s daily", "the bulletin", "the works", "the meeps", "the numbers"]);
+    ["the civic quarter", "ferry’s daily", "the bulletin", "the meeps"]);
 
   // AND THEY ARE HIDDEN FROM A SCREEN READER, because a decorative glyph read
   // aloud beside its own label says the chip twice in two vocabularies.
@@ -911,7 +934,7 @@ test("WHAT'S ON WAITS FOR ITS PAGE — the chip is flagged, off by default, and 
   // ON: it hangs beside the bulletin, where feature/calendar seats its own chip.
   const on = navFlags({ PUBLIC_NAV_WHATS_ON: "1" });
   assert.deepEqual(rowFor("bulletin", { flags: on }).chips.map((c) => c.key),
-    ["town", "daily", "bulletin", "calendar", "works", "meeps", "numbers"]);
+    ["town", "daily", "bulletin", "calendar", "meeps"]);
 
   // and the layout reads the flag from the build — the one place it may come from.
   const shell = readFileSync(join(ROOT, "src", "layouts", "PostmarkLayout.astro"), "utf8");
@@ -925,4 +948,26 @@ test("a flag is an escape for a page NOT HERE YET, never for one that is", () =>
     assert.ok((e.waits ?? "").trim().length >= 20, `${e.key} is flagged with no reason on file`);
     assert.equal(navFlags({})[e.flag], false, `${e.key}'s flag is on by default`);
   }
+});
+
+// ── THE RECORD (the site, reprojected — part 5) ─────────────────────────────
+
+test("THE RECORD gathers what lasts: its own landing first, then the mail, the crossings, the works, stamps, the numbers, the repos", () => {
+  //   "One seat that makes 'the record is public' a place to point at."
+  //                              — the design note, the-site-reprojected.md
+  const record = RAIL.find((s) => s.key === "record");
+  assert.ok(record, "there is no Record seat");
+  assert.equal(record.label, "The Record");
+  assert.equal(record.href, "/records/");
+  assert.deepEqual(record.members.map((m) => m.key), ["record", "mail", "crossings", "works", "stamps", "numbers", "repos"]);
+  // every old URL still answers, and each page claims its own chip's key
+  for (const [href, key] of [["/records/", "record"], ["/mail/", "mail"], ["/records/crossings/", "crossings"], ["/works/", "works"], ["/stamps/", "stamps"], ["/numbers/", "numbers"], ["/records/repos/", "repos"]]) {
+    const file = pageFileFor(href);
+    assert.ok(file, `${href} has no page`);
+    assert.equal(activeKeyOf(file), key, `${href} does not claim "${key}"`);
+  }
+  // the chips wear icons, one each, all different — the Town's rule, kept
+  const icons = record.members.map((m) => m.icon);
+  assert.equal(icons.every(Boolean), true, "a Record chip has no icon");
+  assert.equal(new Set(icons).size, icons.length, "two Record chips share a glyph");
 });

@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildOfficeData, fetchBlueprints, fetchRollcall, jsonText, shortFetchPlan } from "./lib/fetch-town-data.mjs";
+import { buildOfficeData, fetchBlueprints, fetchRollcall, fetchCrossings, jsonText, shortFetchPlan } from "./lib/fetch-town-data.mjs";
 import { worldPin } from "./lib/world-pin-publish.mjs";
 import { writeIfChanged } from "./lib/mirror.mjs";
 
@@ -73,6 +73,7 @@ function writeManifest(asOf, endpointGaps, problems) {
       "meeps.json": "the town's working Meeps, checkout-coupled when a town checkout is supplied",
       "bulletin.json": "the town bulletin, full text",
       "docs.json": "last committed docs snapshot until the office exposes town docs",
+      "crossings.json": "every settlement the Worldkeeper has blessed: the world repo's settlement/S<n> tags (number, sha, blessed_at = the tagged commit's date, the receipt = the tag's message verbatim) and the published count from WORLD/settlement-publications.json at each tag",
       "rollcall.json": "the meeplings' bench: the office's deploy/box-rollcall-manifest.json read at the release the office serves (GET /release -> tag), trimmed to each unit's name, label, stage, cadence and heartbeat allowance",
       "blueprints.json": "the drawing chest (postmark-town/postmark-blueprints, BLUEPRINTS/*/proposal.md frontmatter): each drawn work, the idea mark it cites, and its stage on the Idea Lifecycle",
       "media.json": "town image paths -> processed site copies, owned by extract-town.mjs",
@@ -111,6 +112,17 @@ try {
     writeDataFile("rollcall.json", await fetchRollcall({ apiBase: API }));
   } catch (error) {
     console.warn(`WARN fetch-town: the box roll-call could not be read; keeping the committed snapshot (${error.message})`);
+  }
+  // ── THE CROSSINGS (the site, reprojected — part 5) ─────────────────────────
+  // Every settlement, from the world repo's own tags. Fail-soft like the chest:
+  // a world that cannot be read keeps the committed crossings.json. The last
+  // snapshot is handed in so only a new settlement's count is fetched.
+  try {
+    let previous = null;
+    try { previous = JSON.parse(readFileSync(join(DATA_DIR, "crossings.json"), "utf8")); } catch { /* first build */ }
+    writeDataFile("crossings.json", await fetchCrossings({ previous }));
+  } catch (error) {
+    console.warn(`WARN fetch-town: the settlement tags could not be read; keeping the committed snapshot (${error.message})`);
   }
   // ── THE SITE SAYS WHAT WORLD IT IS PINNED TO (Lane A's A8, 2026-09-07) ────
   // The office's focus receipt carries `site_pin` and cannot fill it: it holds

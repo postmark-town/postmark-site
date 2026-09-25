@@ -1,0 +1,75 @@
+---
+// THE REPOS — the five public repositories the town is made of (the site,
+// reprojected — part 5, from rev. 2 of the design: "Beyond the door, as links …
+// the five public repos as a chip under The Record").
+//
+// One card each: the repository's name, what it holds in the site's words,
+// and its OWN description as its maintainers wrote it on GitHub, quoted
+// (postmark-site has none, and its card says only the site's own line). The
+// cards live in src/lib/record.mjs.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import { REPOS } from "@/lib/record.mjs";
+---
+<PostmarkLayout
+  door={null}
+  title="The repos — Postmark"
+  description="The five public repositories Postmark is made of: the town, the office, this site, the told world, and the drawing chest. Clone any of them and check."
+  active="repos"
+>
+  <div class="recdir">
+    <header class="dir-head">
+      <h1>The repos</h1>
+      <p class="tag">the town's own source, all of it public</p>
+      <p class="how">
+        Postmark is five repositories. The doors answer what the town holds; these are where it is
+        kept. Clone any of them and recompute what the site shows you.
+      </p>
+    </header>
+
+    <div class="repo-grid">
+      {REPOS.map((r) => (
+        <a class="repo-card" href={r.href} target="_blank" rel="noopener" data-repo={r.key}>
+          <span class="repo-name"><code>postmark-town/{r.name}</code> ↗</span>
+          <span class="repo-short">{r.short}</span>
+          <span class="repo-holds">{r.holds}</span>
+          {r.said && <span class="repo-said">“{r.said}”</span>}
+        </a>
+      ))}
+    </div>
+  </div>
+
+  <style>
+    .recdir { max-width: 1020px; margin: 0 auto; padding: 0 0.4em 2em; }
+    .dir-head { text-align: center; margin: 0 0 1.7em; }
+    .dir-head h1 {
+      margin: 0;
+      font-size: clamp(1.9rem, 4.6vw, 2.6rem);
+      color: var(--pm-gold-bright);
+      text-shadow: 0 0 34px rgba(232, 196, 139, 0.35);
+    }
+    .dir-head .tag {
+      margin: 0.4em 0 1em;
+      font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.12em;
+      color: rgba(232, 196, 139, 0.8);
+    }
+    .dir-head .how { max-width: 62ch; margin: 0 auto; color: #cdc2ab; font-size: 0.95rem; line-height: 1.6; }
+
+    .repo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1em; }
+    @media (max-width: 700px) { .repo-grid { grid-template-columns: 1fr; } }
+    .repo-card {
+      display: flex; flex-direction: column; gap: 0.4em;
+      padding: 1em 1.2em 1.1em;
+      background: rgba(13, 20, 38, 0.72);
+      border: 1px solid rgba(232, 196, 139, 0.18);
+      border-radius: 12px;
+      text-decoration: none;
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+    .repo-card:hover { border-color: rgba(232, 196, 139, 0.55); transform: translateY(-2px); }
+    .repo-name { font-family: var(--pm-mono); font-size: 0.78rem; color: var(--pm-gold-bright); overflow-wrap: anywhere; }
+    .repo-name code { font-family: inherit; }
+    .repo-short { font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(232, 196, 139, 0.65); }
+    .repo-holds { color: #cdc2ab; font-size: 0.92rem; line-height: 1.55; }
+    .repo-said { color: rgba(205, 194, 171, 0.7); font-size: 0.84rem; line-height: 1.55; font-style: italic; }
+  </style>
+</PostmarkLayout>

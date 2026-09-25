@@ -927,3 +927,82 @@ export async function fetchRollcall({ fetchImpl = fetch, apiBase = "https://post
     units,
   };
 }
+
+// ── THE CROSSINGS (the site, reprojected — part 5) ───────────────────────────
+// Every settlement the Worldkeeper has blessed, for The Record's crossings
+// page. The office's GET /world/settlements answers the newest twenty, number,
+// sha and date only (its RECENT_MAX); the page wants EVERY one, with the
+// Worldkeeper's own receipt. Both live in the world repo's annotated tags,
+// `settlement/S<n>`, which is exactly where the office reads its own list from
+// ("The truth is the world repo's own git TAGS … The tag's commit date is when
+// it was blessed." — postmark-office src/settlements.mjs).
+//
+// So the tags are fetched here, keyless, the cheap way: a bare repository in a
+// temp directory, one shallow fetch of `refs/tags/settlement/*` with no trees
+// (0.8 s and ~240 KB for 81 tags, measured 2026-09-25), then for-each-ref.
+// `blessed_at` is the tagged commit's date — the same instant the office's
+// door serves — and `receipt` is the tag's message, verbatim.
+//
+// The published count is the one structured number the world keeps per
+// settlement: WORLD/settlement-publications.json at the tag, read raw. It is
+// fetched only for a tag the previous snapshot does not already hold at the
+// same sha, so a build reads one or two files, not eighty. A tag whose file is
+// absent (the earliest settlements predate it) carries null, never a guess.
+//
+// Any failure throws, and the caller keeps the committed snapshot.
+export const WORLD_REPO_SLUG = "postmark-town/postmark-world";
+export async function fetchCrossings({ fetchImpl = fetch, repo = WORLD_REPO_SLUG, previous = null, timeoutMs = 15000, git = null } = {}) {
+  const { execFileSync } = await import("node:child_process");
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: pjoin } = await import("node:path");
+  const run = git ?? ((args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 120000 }));
+
+  const dir = mkdtempSync(pjoin(tmpdir(), "pm-crossings-"));
+  let rows;
+  try {
+    run(["init", "-q", "--bare", "."], dir);
+    run(["fetch", "-q", "--depth=1", "--filter=tree:0", `https://github.com/${repo}.git`, "refs/tags/settlement/*:refs/tags/settlement/*"], dir);
+    const SEP = "\u001f", END = "\u001e";
+    const out = run(["for-each-ref", `--format=%(refname:short)${SEP}%(*objectname)${SEP}%(*committerdate:iso-strict)${SEP}%(creatordate:iso-strict)${SEP}%(contents)${END}`, "refs/tags/settlement"], dir);
+    rows = out.split(END).map((r) => r.replace(/^\s+/, "")).filter(Boolean).map((r) => {
+      const [tag, sha, blessed, tagged, ...rest] = r.split(SEP);
+      return { tag, sha, blessed, tagged, message: rest.join(SEP) };
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  const prev = new Map((previous?.crossings ?? []).map((c) => [c.n, c]));
+  const crossings = [];
+  for (const row of rows) {
+    const m = /^settlement\/S(\d+)$/.exec(row.tag ?? "");
+    if (!m) continue;
+    const n = Number(m[1]);
+    const sha = row.sha || null;
+    const kept = prev.get(n);
+    let published = kept && kept.sha === sha && "published_total" in kept ? kept.published_total : undefined;
+    if (published === undefined) {
+      published = null;
+      try {
+        const res = await fetchImpl(`https://raw.githubusercontent.com/${repo}/${row.tag}/WORLD/settlement-publications.json`, { signal: AbortSignal.timeout(timeoutMs) });
+        if (res.ok) {
+          const body = await res.json();
+          if (body && typeof body.published === "object" && body.published) published = Object.keys(body.published).length;
+        }
+      } catch { /* the count stays null; the receipt still stands */ }
+    }
+    crossings.push({
+      n,
+      tag: row.tag,
+      sha,
+      blessed_at: row.blessed || null,
+      tagged_at: row.tagged || null,
+      receipt: String(row.message ?? "").trim(),
+      published_total: published,
+    });
+  }
+  crossings.sort((a, b) => b.n - a.n);
+  if (!crossings.length) throw new Error("the world repo answered no settlement tags");
+  return { fetched_at: new Date().toISOString(), repo, crossings };
+}

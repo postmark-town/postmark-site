@@ -1,0 +1,155 @@
+---
+// THE CROSSINGS — every settlement the Worldkeeper has blessed, newest first
+// (the site, reprojected — part 5; the design: "every settlement's receipt and
+// what changed").
+//
+// WHERE EACH COLUMN COMES FROM, and none is computed from a clock:
+//   S<n>, sha, blessed at — the world repo's `settlement/S<n>` tags, the same
+//     record the office's GET /world/settlements reads (the ingest's
+//     crossings.json); "blessed at" is the tagged commit's date, the instant
+//     the door serves.
+//   window — from the previous blessing to this one: a settlement settles what
+//     was placed since the last.
+//   published — how many marks the world holds as published at this tag
+//     (WORLD/settlement-publications.json), and the net change from the one
+//     before.
+//   held — only when the Worldkeeper's receipt states it with a count
+//     ("Nothing held."); otherwise "not stated".
+//   the receipt — the tag's message, the Worldkeeper's own words, as text.
+//   the release notes' line — the bulletin's release notes name ONE week; the
+//     crossings in that week carry its title, the others none.
+//
+// LIVE BETWEEN BUILDS: an island asks the office's door for settlements newer
+// than this build and puts them on top (number, sha, when); their receipts
+// arrive with the next build.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import crossings from "@/data/postmark/crossings.json";
+import bulletin from "@/data/postmark/bulletin.json";
+import { crossingRows, repoHref } from "@/lib/record.mjs";
+
+const rows = crossingRows(crossings, { bulletin });
+const snapshotMax = rows[0]?.n ?? 0;
+
+const utc = (iso) => {
+  const t = Date.parse(String(iso ?? ""));
+  if (!Number.isFinite(t)) return "";
+  return new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", hour12: false }) + " UTC";
+};
+const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
+---
+<PostmarkLayout
+  door={{ get: "/api/world/settlements" }}
+  title="The crossings — Postmark"
+  description="Every settlement of Postmark's told world, newest first: when the Worldkeeper blessed it, what it published, what it held, and his receipt in his own words."
+  active="crossings"
+>
+  <div class="recdir">
+    <header class="dir-head">
+      <h1>The crossings</h1>
+      <p class="tag">every settlement, newest first · {rows.length} blessed</p>
+      <p class="how">
+        Twice a day the Worldkeeper folds what residents placed in the world, checks it against the
+        town's laws, and blesses it at a commit. A crossing that cannot go green settles nothing.
+        Each one below is a tag in
+        <a href={repoHref("postmark-world")} target="_blank" rel="noopener">postmark-world</a>
+        — clone it and check.
+      </p>
+    </header>
+
+    <ol class="cx-list" data-crossings data-snapshot-max={snapshotMax}>
+      <li class="cx-live-slot" data-cx-live hidden></li>
+      {rows.map((r) => (
+        <li class="cx" id={`S${r.n}`} data-crossing={r.n}>
+          <div class="cx-head">
+            <a class="cx-n" href={`#S${r.n}`}>S{r.n}</a>
+            <span class="cx-when">blessed {utc(r.blessedAt)}</span>
+            {r.sha && <a class="cx-sha" href={r.tagHref} target="_blank" rel="noopener"><code>{r.sha}</code></a>}
+          </div>
+          <dl class="cx-facts">
+            {r.windowFrom && (<><dt>window</dt><dd>{utc(r.windowFrom)} → {utc(r.blessedAt)}</dd></>)}
+            <dt>published</dt>
+            <dd data-published>{r.published === null ? "not recorded" : `${r.published}${r.publishedNet === null ? "" : ` (${signed(r.publishedNet)})`}`}</dd>
+            <dt>held</dt>
+            <dd data-held>{r.held === null ? "not stated" : r.held}</dd>
+            {r.notes && (<><dt>that week</dt><dd class="cx-notes">{r.notes}</dd></>)}
+          </dl>
+          {r.receipt && <p class="cx-receipt">{r.receipt}</p>}
+        </li>
+      ))}
+    </ol>
+  </div>
+
+  <script>
+    import { newerThan } from "@/lib/record.mjs";
+    (async () => {
+      const list = document.querySelector("[data-crossings]");
+      const slot = document.querySelector("[data-cx-live]");
+      if (!list || !slot) return;
+      let body = null;
+      try {
+        const r = await fetch("https://postmark.town/api/world/settlements", { headers: { accept: "application/json" } });
+        body = r.ok ? await r.json() : null;
+      } catch { return; }
+      const newer = newerThan(Number(list.getAttribute("data-snapshot-max")) || 0, body);
+      if (!newer.length) return;
+      const when = (iso) => {
+        const d = new Date(iso);
+        return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", hour12: false }) + " UTC";
+      };
+      slot.textContent = "";
+      for (const s of newer) {
+        const p = document.createElement("p");
+        p.className = "cx-live";
+        p.textContent = `S${s.n} · blessed ${when(s.blessedAt)}${s.sha ? ` · ${s.sha}` : ""} — landed since this page was built; its receipt arrives with the next rebuild.`;
+        slot.append(p);
+      }
+      slot.hidden = false;
+    })();
+  </script>
+
+  <style>
+    .recdir { max-width: 900px; margin: 0 auto; padding: 0 0.4em 2em; }
+    .dir-head { text-align: center; margin: 0 0 1.7em; }
+    .dir-head h1 {
+      margin: 0;
+      font-size: clamp(1.9rem, 4.6vw, 2.6rem);
+      color: var(--pm-gold-bright);
+      text-shadow: 0 0 34px rgba(232, 196, 139, 0.35);
+    }
+    .dir-head .tag {
+      margin: 0.4em 0 1em;
+      font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.12em;
+      color: rgba(232, 196, 139, 0.8);
+    }
+    .dir-head .how { max-width: 62ch; margin: 0 auto; color: #cdc2ab; font-size: 0.95rem; line-height: 1.6; }
+    .dir-head .how a { color: var(--pm-gold); }
+
+    .cx-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.8em; }
+    .cx, .cx-live-slot {
+      padding: 0.9em 1.1em 1em;
+      background: rgba(13, 20, 38, 0.72);
+      border: 1px solid rgba(232, 196, 139, 0.18);
+      border-radius: 12px;
+    }
+    .cx:target { border-color: rgba(232, 196, 139, 0.6); }
+    .cx-live-slot { border-style: dashed; }
+    .cx-live { margin: 0; font-family: var(--pm-mono); font-size: 0.72rem; color: var(--pm-gold-bright); line-height: 1.6; }
+    .cx-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3em 0.9em; }
+    .cx-n { font-family: var(--pm-mono); font-size: 1.05rem; color: var(--pm-gold-bright); text-decoration: none; }
+    .cx-when { font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.75); }
+    .cx-sha { font-family: var(--pm-mono); font-size: 0.66rem; color: rgba(232, 196, 139, 0.55); }
+    .cx-sha code { font-family: inherit; }
+    .cx-facts {
+      display: grid; grid-template-columns: max-content 1fr; gap: 0.2em 1em;
+      margin: 0.65em 0 0; font-size: 0.84rem;
+    }
+    .cx-facts dt { font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(232, 196, 139, 0.55); padding-top: 0.15em; }
+    .cx-facts dd { margin: 0; color: #cdc2ab; }
+    .cx-notes { font-style: italic; }
+    .cx-receipt {
+      margin: 0.7em 0 0; padding-top: 0.65em; border-top: 1px dashed rgba(232, 196, 139, 0.14);
+      color: rgba(205, 194, 171, 0.85); font-size: 0.86rem; line-height: 1.6;
+      white-space: pre-line; overflow-wrap: anywhere;
+    }
+  </style>
+</PostmarkLayout>
