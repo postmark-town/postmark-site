@@ -15,7 +15,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { bulletinCards, isHappening, HAPPENING, ORDER } from "../src/lib/bulletin-cards.mjs";
+import { bulletinCards, bulletinPostings, isHappening, HAPPENING, ORDER } from "../src/lib/bulletin-cards.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const BULLETIN = JSON.parse(readFileSync(join(ROOT, "src", "data", "postmark", "bulletin.json"), "utf8"));
@@ -98,4 +98,22 @@ test("the built bulletin pins no happening card, pins every other card, and has 
   // the chip are both absent until the calendar lands.
   assert.equal(/data-whats-on/.test(page), false, "the bulletin links a calendar page that is not on this branch");
   assert.equal(/href="\/calendar\/"/.test(page), false, "something on the bulletin links /calendar/ with the flag off");
+});
+
+test("an unpinned happening still OPENS from its deep link — the store keeps every posting the wall used to",
+  { skip: !existsSync(builtBulletin) }, () => {
+  const page = readFileSync(builtBulletin, "utf8");
+  const openable = new Set([...page.matchAll(/data-post="([^"]+)"/g)].map((m) => m[1]));
+  for (const p of bulletinPostings(BULLETIN)) {
+    assert.equal(openable.has(p.slug), true, `/bulletin/#${p.slug} opens nothing on the built page`);
+  }
+  assert.ok(BULLETIN.filter(isHappening).every((p) => openable.has(p.slug)));
+});
+
+test("bulletinPostings is the cards plus the happenings, never the Daily", () => {
+  const all = bulletinPostings(BULLETIN).map((p) => p.slug);
+  assert.equal(all.includes("ferrys-daily"), false);
+  assert.deepEqual(all.filter((s) => bulletinCards(BULLETIN).some((c) => c.slug === s)), bulletinCards(BULLETIN).map((p) => p.slug));
+  assert.deepEqual(all.filter((s) => !bulletinCards(BULLETIN).some((c) => c.slug === s)).sort(),
+    BULLETIN.filter(isHappening).map((p) => p.slug).sort());
 });

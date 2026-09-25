@@ -34,17 +34,31 @@ export function isHappening(posting) {
   return String(posting?.data?.kind ?? "").trim().toLowerCase() === HAPPENING;
 }
 
+const rank = (slug) => {
+  const i = ORDER.indexOf(slug);
+  return i < 0 ? ORDER.length + 99 : i;
+};
+
 /**
- * The cards the bulletin page pins.
+ * Every posting the page can OPEN — its deep links, /bulletin/#<slug>. A
+ * happening is unpinned but still opens: the home page's signed-in card band
+ * links the newest postings by slug, doorsteps and letters carry these links,
+ * and an old link that opens nothing is a broken link. Unpinning is the wall's
+ * business; the address keeps answering.
+ * @param {Array<{slug: string, data?: object}>} bulletin  bulletin.json
+ */
+export function bulletinPostings(bulletin) {
+  return [...(bulletin ?? [])]
+    .filter((p) => !NOT_A_CARD.has(p.slug))
+    .sort((a, b) => rank(a.slug) - rank(b.slug));
+}
+
+/**
+ * The cards the bulletin page PINS: every posting it can open, less the
+ * happenings.
  * @param {Array<{slug: string, data?: object}>} bulletin  bulletin.json
  */
 export function bulletinCards(bulletin) {
-  const rank = (slug) => {
-    const i = ORDER.indexOf(slug);
-    return i < 0 ? ORDER.length + 99 : i;
-  };
-  return [...(bulletin ?? [])]
-    .filter((p) => !NOT_A_CARD.has(p.slug))
-    .filter((p) => !isHappening(p))
-    .sort((a, b) => rank(a.slug) - rank(b.slug));
+  return bulletinPostings(bulletin)
+    .filter((p) => !isHappening(p));
 }

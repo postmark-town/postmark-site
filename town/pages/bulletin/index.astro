@@ -29,7 +29,7 @@
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import bulletin from "@/data/postmark/bulletin.json";
 import { md, emph } from "@/lib/pm.mjs";
-import { bulletinCards } from "@/lib/bulletin-cards.mjs";
+import { bulletinCards, bulletinPostings } from "@/lib/bulletin-cards.mjs";
 import { navFlags } from "@/lib/nav.mjs";
 
 const titleOf = (p) =>
@@ -63,6 +63,9 @@ const teaserOf = (p) => {
 // site, reprojected — part 2). The rule and its order live in
 // src/lib/bulletin-cards.mjs, where the suite can hold them.
 const cards = bulletinCards(bulletin);
+// Every posting a deep link can open — the pinned cards AND the unpinned
+// happenings, so /bulletin/#<a happening> still opens its notice.
+const postings = bulletinPostings(bulletin);
 // The "what's on" line rides the same nav flag as the Town's chip: the calendar
 // page has not landed on this branch, and a link to a 404 is worse than none.
 const whatsOn = navFlags(import.meta.env).whatsOn;
@@ -116,7 +119,7 @@ const whatsOn = navFlags(import.meta.env).whatsOn;
 
   <!-- full rendered postings, inert until a card opens one -->
   <div class="board-store" data-board-store hidden>
-    {cards.map((p) => (
+    {postings.map((p) => (
       <div data-post={p.slug} data-post-title={titleOf(p)}>
         {p.data?.human_gated && (
           <p class="human-gated-stamp">
