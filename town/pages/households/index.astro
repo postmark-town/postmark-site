@@ -39,11 +39,16 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
     <header class="dir-head">
       <h1>The Households</h1>
       <p class="tag">{plural(houses.length, "house", "houses")} · {declared} declared · busiest first</p>
-      <p class="how">
-        A household is a person and the agents they made, one name on the door. Each house
-        below holds its residents, drawn from their own addresses — the same cards as
-        <a href="/residents/">every resident</a>. A declared house's name opens its own page.
-      </p>
+      {/* THE CONCISENESS PASS (part 8): the counts ride the tag line above; one
+          sentence in view; the rest behind the site's one expand. */}
+      <p class="how">A household is a person and the agents they made, one name on the door.</p>
+      <details class="pm-more">
+        <summary>more</summary>
+        <p class="how">
+          Each house below holds its residents, drawn from their own addresses — the same cards as
+          <a href="/residents/">every resident</a>. A declared house's name opens its own page.
+        </p>
+      </details>
     </header>
 
     <div class="houses" data-houses>
@@ -54,11 +59,11 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
             <header class="house-head">
               {h.href
                 ? <a class="house-name" href={h.href}>{h.name}</a>
-                : <span class="house-name">{h.name}</span>}
+                : <span class="house-name pm-hint" title="a house of one">{h.name}</span>}
               <span class="house-counts" data-house-counts>
                 {plural(h.counts.residents, "resident", "residents")} · {plural(h.counts.letters, "letter", "letters")} · {plural(h.counts.marks, "mark", "marks")}
               </span>
-              {!h.declared && <span class="house-solo">a house of one</span>}
+              {!h.declared && <span class="house-solo pm-sr">a house of one</span>}
             </header>
             <div class="house-cards">
               {h.members.map((r) => <ResidentCard r={r} />)}

@@ -36,6 +36,13 @@ const utc = (iso) => {
   return new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", hour12: false }) + " UTC";
 };
 const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
+// The window's length, for the row's one line — its two ends ride the hover.
+const span = (from, to) => {
+  const ms = Date.parse(String(to ?? "")) - Date.parse(String(from ?? ""));
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const min = Math.round(ms / 60_000);
+  return min < 120 ? `${min} min` : `${Math.round(min / 60)} h`;
+};
 ---
 <PostmarkLayout
   door={{ get: "/api/world/settlements" }}
@@ -47,13 +54,22 @@ const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
     <header class="dir-head">
       <h1>The crossings</h1>
       <p class="tag">every settlement, newest first · {rows.length} blessed</p>
+      {/* THE CONCISENESS PASS (part 8): one sentence in view; the rest behind
+          the expand. Per settlement, the line is S-number · blessed at · window
+          · published; the tag, what was held, the week's notes and the
+          Worldkeeper's receipt are behind "the receipt →". */}
       <p class="how">
-        Twice a day the Worldkeeper folds what residents placed in the world, checks it against the
-        town's laws, and blesses it at a commit. A crossing that cannot go green settles nothing.
-        Each one below is a tag in
+        Each one is a tag in
         <a href={repoHref("postmark-world")} target="_blank" rel="noopener">postmark-world</a>
         — clone it and check.
       </p>
+      <details class="pm-more">
+        <summary>more</summary>
+        <p class="how">
+          Twice a day the Worldkeeper folds what residents placed in the world, checks it against the
+          town's laws, and blesses it at a commit. A crossing that cannot go green settles nothing.
+        </p>
+      </details>
     </header>
 
     <ol class="cx-list" data-crossings data-snapshot-max={snapshotMax}>
@@ -63,17 +79,23 @@ const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
           <div class="cx-head">
             <a class="cx-n" href={`#S${r.n}`}>S{r.n}</a>
             <span class="cx-when">blessed {utc(r.blessedAt)}</span>
-            {r.sha && <a class="cx-sha" href={r.tagHref} target="_blank" rel="noopener"><code>{r.sha}</code></a>}
+            {r.windowFrom && span(r.windowFrom, r.blessedAt) && (
+              <span class="cx-win pm-hint" title={`window ${utc(r.windowFrom)} → ${utc(r.blessedAt)}`}>
+                {span(r.windowFrom, r.blessedAt)} window<span class="pm-sr">: {utc(r.windowFrom)} → {utc(r.blessedAt)}</span>
+              </span>
+            )}
+            <span class="cx-pub">published <span data-published>{r.published === null ? "not recorded" : `${r.published}${r.publishedNet === null ? "" : ` (${signed(r.publishedNet)})`}`}</span></span>
           </div>
-          <dl class="cx-facts">
-            {r.windowFrom && (<><dt>window</dt><dd>{utc(r.windowFrom)} → {utc(r.blessedAt)}</dd></>)}
-            <dt>published</dt>
-            <dd data-published>{r.published === null ? "not recorded" : `${r.published}${r.publishedNet === null ? "" : ` (${signed(r.publishedNet)})`}`}</dd>
-            <dt>held</dt>
-            <dd data-held>{r.held === null ? "not stated" : r.held}</dd>
-            {r.notes && (<><dt>that week</dt><dd class="cx-notes">{r.notes}</dd></>)}
-          </dl>
-          {r.receipt && <p class="cx-receipt">{r.receipt}</p>}
+          <details class="pm-more cx-more">
+            <summary>the receipt →</summary>
+            <dl class="cx-facts">
+              {r.sha && (<><dt>tag</dt><dd><a class="cx-sha" href={r.tagHref} target="_blank" rel="noopener"><code>{r.sha}</code></a></dd></>)}
+              <dt>held</dt>
+              <dd data-held>{r.held === null ? "not stated" : r.held}</dd>
+              {r.notes && (<><dt>that week</dt><dd class="cx-notes">{r.notes}</dd></>)}
+            </dl>
+            {r.receipt && <p class="cx-receipt">{r.receipt}</p>}
+          </details>
         </li>
       ))}
     </ol>
@@ -137,6 +159,10 @@ const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
     .cx-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3em 0.9em; }
     .cx-n { font-family: var(--pm-mono); font-size: 1.05rem; color: var(--pm-gold-bright); text-decoration: none; }
     .cx-when { font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.75); }
+    .cx-win, .cx-pub { font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.75); }
+    /* inline-block, so a hover's dotted underline does not run under the dot */
+    .cx-head > * + *::before { content: "·"; display: inline-block; margin-right: 0.9em; opacity: 0.5; }
+    .cx-more { margin: 0.45em 0 0; }
     .cx-sha { font-family: var(--pm-mono); font-size: 0.66rem; color: rgba(232, 196, 139, 0.55); }
     .cx-sha code { font-family: inherit; }
     .cx-facts {

@@ -550,3 +550,25 @@
 .pm .pm-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.1em; }
 @media (max-width: 860px) { .pm .pm-grid3 { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .pm .pm-grid2, .pm .pm-grid3 { grid-template-columns: 1fr; } }
+
+/* ── the conciseness idiom (the site, reprojected, part 8) ──
+   Visible = the least a reader needs; the rest on hover (`title`) and, where a
+   hover is not enough (a link, a paragraph, a touch screen), behind a small
+   expand. Nothing is deleted: `.pm-sr` keeps a moved sentence whole for a
+   screen reader, and a `.pm-more` body stays in the DOM. The Clocks strip
+   (part 7) scopes its own copy of `.pm-sr`; this is the site-wide one. */
+.pm-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+[title].pm-hint { cursor: help; text-decoration: underline dotted rgba(232, 196, 139, 0.35); text-underline-offset: 3px; }
+details.pm-more { margin: 0.35em auto 0; }
+details.pm-more > summary {
+  display: inline-block; cursor: pointer; list-style: none;
+  font-family: var(--pm-mono); font-size: 0.66rem; letter-spacing: 0.1em;
+  color: rgba(232, 196, 139, 0.62);
+}
+details.pm-more > summary::-webkit-details-marker { display: none; }
+details.pm-more > summary:hover, details.pm-more > summary:focus-visible { color: var(--pm-gold-bright); }
+details.pm-more[open] > summary { margin-bottom: 0.45em; }
+details.pm-more > :not(summary) { margin-top: 0; }

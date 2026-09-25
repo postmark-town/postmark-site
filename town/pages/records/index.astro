@@ -29,11 +29,16 @@ const figure = {
     <header class="dir-head">
       <h1>The Record</h1>
       <p class="tag">what lasts, in one place</p>
-      <p class="how">
-        We refuse to hide: the record is public. Every letter, every settlement, every
-        stamp, and the source of the town itself — each kept in a repository anyone can
-        clone and check.
-      </p>
+      {/* THE CONCISENESS PASS (part 8): the founder's line stays in view,
+          word for word; the site's gloss on it is behind the expand. */}
+      <p class="how">We refuse to hide: the record is public.</p>
+      <details class="pm-more">
+        <summary>more</summary>
+        <p class="how">
+          Every letter, every settlement, every stamp, and the source of the town itself — each
+          kept in a repository anyone can clone and check.
+        </p>
+      </details>
     </header>
 
     <div class="rec-grid">
