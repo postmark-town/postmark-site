@@ -158,7 +158,8 @@ const apiCall = `POST /household\n{ "do": "rsvp", "args": { "event": "${event.id
         if (r.kind !== "recorded") { if (r.body) receipt.append(line("cal-rsvp-out-body", r.body)); return; }
         if (r.receipt) receipt.append(line("cal-rsvp-out-body", r.receipt));
         if (r.fellBack) receipt.append(line("cal-rsvp-out-body", "Fell back to mail: " + r.fellBack + "."));
-        if (r.budget !== null) receipt.append(line("cal-rsvp-out-body", "Wake budget: " + r.budget + (r.budgetNote ? " (" + r.budgetNote + ")." : ".")));
+        if (r.budget !== null) receipt.append(line("cal-rsvp-out-body", "Wake budget: " + r.budget + "."));
+        if (r.budgetNote) receipt.append(line("cal-rsvp-out-note", r.budgetNote));
         if (r.secret) {
           const wrap = document.createElement("div");
           wrap.className = "cal-rsvp-secret";
@@ -256,7 +257,9 @@ const apiCall = `POST /household\n{ "do": "rsvp", "args": { "event": "${event.id
       background: var(--pm-accent); color: var(--pm-paper);
     }
     .cal-rsvp-btn:hover { filter: brightness(1.08); }
-    .cal-rsvp-form { display: grid; gap: 0.9em; margin: 0.3em 0 0; }
+    /* light paper, so light controls: under the site's dark scheme an unchecked
+       radio paints as a dark filled dot and reads as the chosen one */
+    .cal-rsvp-form { display: grid; gap: 0.9em; margin: 0.3em 0 0; color-scheme: light; accent-color: var(--pm-accent); }
     .cal-rsvp-form[hidden], .cal-rsvp-form [hidden], .cal-rsvp [hidden] { display: none; }
     .cal-rsvp-form label { display: grid; gap: 0.3em; }
     .cal-rsvp-form fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 0.45em; min-width: 0; }
@@ -268,6 +271,7 @@ const apiCall = `POST /household\n{ "do": "rsvp", "args": { "event": "${event.id
       border: 1px solid var(--pm-line); background: #fffaf0; color: var(--pm-ink); max-width: 100%; min-width: 0; box-sizing: border-box;
     }
     .cal-rsvp-form input[type=number] { width: 6em; }
+    .cal-rsvp-form input[readonly], .cal-rsvp-form select { width: 100%; max-width: 20em; }
     .cal-rsvp-form input[readonly] { background: var(--pm-paper-deep); }
     .cal-rsvp-form input[data-rsvp-for] { margin-left: 1.7em; width: calc(100% - 1.7em); }
     .cal-rsvp-form button { justify-self: start; }
@@ -278,6 +282,7 @@ const apiCall = `POST /household\n{ "do": "rsvp", "args": { "event": "${event.id
        attribute: :global() is how a scoped sheet reaches them */
     .cal-rsvp-out :global(.cal-rsvp-out-title) { margin: 0 0 0.3em; font-family: var(--pm-mono); font-size: 0.84rem; letter-spacing: 0.04em; font-weight: 600; }
     .cal-rsvp-out :global(.cal-rsvp-out-body) { margin: 0.2em 0; font-size: 0.92rem; line-height: 1.55; overflow-wrap: anywhere; }
+    .cal-rsvp-out :global(.cal-rsvp-out-note) { margin: 0.1em 0 0.3em; font-size: 0.84rem; line-height: 1.5; color: var(--pm-ink-soft); }
     .cal-rsvp-out :global(.cal-rsvp-out-coda) { margin: 0.6em 0 0; font-size: 0.84rem; line-height: 1.5; color: var(--pm-ink-soft); font-style: italic; }
     .cal-rsvp-out :global(.cal-rsvp-secret) { margin: 0.7em 0 0.2em; padding: 0.7em 0.8em; border-radius: 8px; border: 1px dashed var(--pm-accent); background: #fffaf0; }
     .cal-rsvp-out :global(.cal-rsvp-secret-head) { margin: 0 0 0.35em; font-family: var(--pm-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pm-ink-soft); }
