@@ -97,9 +97,9 @@ for (const f of everyPageFile()) {
 
 test("SIX SEATS, the door's nouns, in the design's order", () => {
   assert.deepEqual(RAIL.map((s) => s.label),
-    ["Postmark", "The Town", "The World", "The Households", "The Record", "Join"],
+    ["Postmark", "The Town", "Ferry’s Daily", "The World", "The Households", "The Record", "Join"],
     `the rail reads: ${RAIL.map((s) => s.label).join(" · ")}`);
-  assert.deepEqual(RAIL.map((s) => s.href), ["/", "/town/", "/world/", "/households/", "/records/", "/join/"]);
+  assert.deepEqual(RAIL.map((s) => s.href), ["/", "/town/", "/daily/", "/world/", "/households/", "/records/", "/join/"]);
   // Join keeps its lantern (Keemin, 2026-07-31: a newcomer must find Join
   // without hunting), and no seat is external — the harbor is a chip now.
   assert.equal(RAIL.find((s) => s.key === "join").lantern, true, "Join lost its lantern");
@@ -108,7 +108,7 @@ test("SIX SEATS, the door's nouns, in the design's order", () => {
 
 test("each seat's row, in the design's words and order", () => {
   const row = (k) => chipsFor(k).chips.map((c) => c.label);
-  assert.deepEqual(row("town"), ["the civic quarter", "the meeps", "ferry’s daily", "the bulletin"],
+  assert.deepEqual(row("town"), ["the civic quarter", "the meeps", "the bulletin"],
     "The Town's row (what's on waits behind its flag)");
   assert.deepEqual(row("world"), ["the living map", "conversations", "replay", "the atlas", "the harbor · beyond the water"]);
   assert.deepEqual(row("households"), ["the houses", "every resident"]);
@@ -117,7 +117,7 @@ test("each seat's row, in the design's words and order", () => {
   assert.equal(chipsFor("join"), null, "the Join door grew a row");
   // with the flag on, what's on stands between the meeps and the bulletin
   assert.deepEqual(chipsFor("town", { flags: navFlags({ PUBLIC_NAV_WHATS_ON: "1" }) }).chips.map((c) => c.key),
-    ["town", "meeps", "daily", "calendar", "bulletin"]);
+    ["town", "meeps", "calendar", "bulletin"]);
 });
 
 // ── rule 1: a read per page ──────────────────────────────────────────────────
@@ -228,7 +228,8 @@ test("LITTLE ICONS FOR THE TOWN'S CHIPS — decoration, never the name", () => {
 test("a page anywhere in a family finds its section, so the seat lights up", () => {
   const cases = {
     postmark: "postmark",
-    town: "town", meeps: "town", daily: "town", bulletin: "town", votes: "town", calendar: "town",
+    town: "town", meeps: "town", bulletin: "town", votes: "town", calendar: "town",
+    daily: "daily",
     world: "world", conversations: "world", replay: "world", atlas: "world", harbor: "world", birthday: "world",
     households: "households", household: "households", residents: "households",
     record: "record", mail: "record", crossings: "record", works: "record", stamps: "record", numbers: "record", repos: "record",
@@ -253,14 +254,16 @@ test("EVERY PAGE THAT CLAIMS A KEY LIGHTS A SEAT — no page is left with the ra
 
 // ── the moves this rail made, each with its old URL still answering ──────────
 
-test("FERRY’S DAILY IS BACK IN THE RAIL (Keemin 2026-09-25: a staple, kept redundant with the Post Office card)", () => {
-  const chip = chipsFor("town").chips.find((c) => c.key === "daily");
-  assert.ok(chip, "the Daily’s chip is missing from the Town’s row");
-  assert.equal(chip.href, "/daily/");
+test("FERRY’S DAILY IS A SEAT OF ITS OWN (Keemin 2026-09-25: a staple; \"return Ferry's daily to the top rail\")", () => {
+  const seat = RAIL.find((e) => e.key === "daily");
+  assert.ok(seat, "the Daily has no seat on the top rail");
+  assert.equal(seat.href, "/daily/");
+  assert.equal(seat.members, undefined, "the Daily's seat grew a row — the page is the whole seat");
+  assert.equal(chipsFor("town").chips.some((c) => c.key === "daily"), false, "the Daily is still a chip on the Town's row as well");
   const file = pageFileFor("/daily/");
   assert.ok(file, "/daily/ was deleted");
-  assert.equal(activeKeyOf(file), "daily", "the Daily lights its own chip now");
-  assert.equal(rowFor("daily").of.key, "town");
+  assert.equal(activeKeyOf(file), "daily", "the Daily lights its own seat");
+  assert.equal(sectionOf("daily")?.key, "daily");
   const meeps = readFileSync(pageFileFor("/meeps/"), "utf8");
   assert.match(meeps, /href="\/daily\/"/, "the Post Office card still opens the Daily — the redundancy is the point");
 });
@@ -379,7 +382,7 @@ test("the built rail is the six seats, on every page that wears the layout", { s
     return [...nav.matchAll(/<a\b[^>]*>([^<]*)/g)].map((m) => m[1].trim());
   };
   for (const href of ["/", "/town/", "/meeps/", "/households/", "/residents/", "/records/", "/mail/", "/daily/"]) {
-    assert.deepEqual(seats(href), ["Postmark", "The Town", "The World", "The Households", "The Record", "Join"], `${href}'s built rail`);
+    assert.deepEqual(seats(href), ["Postmark", "The Town", "Ferry’s Daily", "The World", "The Households", "The Record", "Join"], `${href}'s built rail`);
   }
 });
 

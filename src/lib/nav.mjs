@@ -210,10 +210,6 @@ export const RAIL = [
     members: [
       { key: "town", label: "the civic quarter", href: "/town/", icon: "⌂" },
       { key: "meeps", label: "the meeps", href: "/meeps/", icon: "⁂" },
-      // FERRY’S DAILY IS BACK (Keemin, 2026-09-25: "add Ferry’s Daily back to the top
-      // rail (redundant). I think it’s enough of a staple that it’s worth it") —
-      // redundant with the Post Office card on /meeps/, and kept on purpose.
-      { key: "daily", label: "ferry’s daily", href: "/daily/", icon: "▤" },
       // WHAT'S ON (part 2): the calendar is built on feature/calendar and has not
       // landed here, so the chip waits behind a nav flag, default off. Same key,
       // href, icon as feature/calendar's own chip, so the two lines meet.
@@ -223,6 +219,13 @@ export const RAIL = [
       { key: "bulletin", label: "the bulletin", href: "/bulletin/", icon: "⚑" },
     ],
   },
+
+  // FERRY’S DAILY — a seat of its own on the top rail (Keemin, 2026-09-25: "add
+  // Ferry’s Daily back to the top rail (redundant). I think it’s enough of a
+  // staple that it’s worth it", and then "I also meant let’s return Ferry’s daily
+  // to the top rail"). Redundant with the Post Office card on /meeps/, kept on
+  // purpose. No row: the page is the whole seat.
+  { key: "daily", label: "Ferry’s Daily", href: "/daily/" },
 
   // THE WORLD — the living map, conversations, replay, the atlas, and the
   // harbor: the town's far shore, "beyond the water". The harbor is served at
