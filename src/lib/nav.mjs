@@ -292,7 +292,9 @@ export const RAIL = [
       // this is PROJECTS, the resident collaborative builds, NOT the Keeping
       // Works). Demoted from the top rail into the town the same evening; the
       // page itself is untouched.
-      { key: "works", label: "the works", href: "/works/", icon: "⚒" },
+      // THE WORKS AND THE NUMBERS LEFT THIS ROW for The Record (the site,
+      // reprojected — part 5): both are the record's instruments, not places
+      // in the town. Their pages did not move.
       // THE MEEPS, RETURNED. Struck from the residents row hours earlier the
       // same evening ("remove 'the windows' and 'the meeps' from residents/"),
       // and put back by the founder's own hand once residents left the town:
@@ -301,14 +303,6 @@ export const RAIL = [
       // borrowing `residents`, which it had to do only while it was a room of
       // a section that has now gone up a level.
       { key: "meeps", label: "the meeps", href: "/meeps/", icon: "⁂" },
-      // The Numbers was HELD out of every surface from 2026-08-21 (Keemin: "it's
-      // sitting there empty and misleading") until the S4 emission gave it real
-      // data. The page reads the dials, the backing gauge and the holo cap from
-      // the ledger's derived record now (read live 2026-09-03), so the hold's
-      // own condition is met and the chip hangs. The hold is kept in history,
-      // not in the code: a hold whose condition has passed is the staleness
-      // class the 09-02 sweep named.
-      { key: "numbers", label: "the numbers", href: "/numbers/", icon: "▦" },
     ],
   },
 
@@ -382,7 +376,32 @@ export const RAIL = [
   // /mail/<thread>/, /mail/with/<pair>/ and the two rooms the founder struck
   // from its row by name (returned to sender, write a letter). All four claim
   // `mail`, so they light this seat; none is a chip, by his ruling.
-  { key: "mail", label: "The Mail", href: "/mail/" },
+  //
+  // THE RECORD (the site, reprojected — part 5) takes the Mail's seat and gathers
+  // what lasts into one place: "We refuse to hide. The record is public." The
+  // mail, the crossings (every settlement, new), the works, stamps, the numbers
+  // and the repos. Its own landing, /records/, is the aggregate every row leads
+  // with; the mail's family (/mail/<thread>/, /mail/with/<pair>/, the two rooms)
+  // still claims `mail`, which is a chip here now, so a reader deep in the mail
+  // sees The Record lit and the mail chip lit under it. The Mail and Stamps
+  // seats are gone from the top rail; every page keeps its URL.
+  {
+    key: "record",
+    label: "The Record",
+    href: "/records/",
+    members: [
+      { key: "record", label: "the record", href: "/records/", icon: "❡" },
+      { key: "mail", label: "the mail", href: "/mail/", icon: "✉" },
+      { key: "crossings", label: "the crossings", href: "/records/crossings/", icon: "⛴" },
+      { key: "works", label: "the works", href: "/works/", icon: "⚒" },
+      // Stamps keeps the beta mark it wore as a seat — ONE door, wearing the
+      // beta chip, is the law test/civic-hub.test.mjs holds (ChipRow renders a
+      // chip's `beta` the way the rail renders a seat's).
+      { key: "stamps", label: "stamps", href: "/stamps/", icon: "✦", beta: true },
+      { key: "numbers", label: "the numbers", href: "/numbers/", icon: "▦" },
+      { key: "repos", label: "the repos", href: "/records/repos/", icon: "⌥" },
+    ],
+  },
 
   // The Harbor is the mail's outward half — the towns Postmark connects, and
   // what crosses between them. It stays top-level as a future apex of its own.
@@ -434,7 +453,8 @@ export const RAIL = [
   // again — the teaching, leading with the questions — so the seat has its own
   // room to open and lights normally. The `noActive` escape it wore for one
   // afternoon is gone with the reason for it.
-  { key: "stamps", label: "Stamps", href: "/stamps/", beta: true },
+  // (THE STAMPS SEAT moved into The Record as its `stamps` chip — the site,
+  // reprojected, part 5. /stamps/ is the same page at the same URL.)
 
   // JOIN — the lantern-lit door, and ONE face now.
   //
