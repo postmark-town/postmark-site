@@ -3,35 +3,44 @@
 // the next ferry and the next settlement, in the reader's own time zone, with
 // the open window's number.
 //
+// SMALL ON THE PAGE, WHOLE ON HOVER (Keemin, 2026-09-25: "shrink the clocks
+// down to icons and remaining time in hours and minutes and just give any
+// extra info on hover"). What is visible is the glyph and "in 6 h 36 min". The
+// clock's name, the wall-clock time in the reader's zone, the UTC marks and the
+// window number ride the element's `title` (a hover) and stay in the DOM for a
+// screen reader, visually hidden.
+//
 // STATIC FLOOR, LIVE ISLAND — the freshness architecture's own shape. Baked,
-// the strip says the marks in UTC, which is true whether or not anything is
-// reachable. The island then reads the marks off the record (the office's
-// crossing derivation; the settlements' own dates), counts down to the next of
-// each in the reader's zone, and adds the office's window count. Every failed
-// read leaves the floor standing. The reasoning is src/lib/clocks.mjs's.
+// the strip says the marks in UTC (in the title), which is true whether or not
+// anything is reachable. The island then reads the marks off the record (the
+// office's crossing derivation; the settlements' own dates), counts down to the
+// next of each in the reader's zone, and adds the office's window count. Every
+// failed read leaves the floor standing. The reasoning is src/lib/clocks.mjs's.
 import { FERRY_MARKS, SETTLEMENT_MARKS, marksPhrase } from "@/lib/clocks.mjs";
+const ferryTitle = `next ferry · ${marksPhrase(FERRY_MARKS)}`;
+const settlementTitle = `next settlement · ${marksPhrase(SETTLEMENT_MARKS)}`;
 ---
 <div class="pm-clocks" data-clocks aria-label="The town's clocks">
-  <span class="pm-clock" data-clock="ferry">
+  <span class="pm-clock" data-clock="ferry" title={ferryTitle} tabindex="0">
     <span class="pm-clock-glyph" aria-hidden="true">⛴</span>
-    <span class="pm-clock-what">next ferry</span>
-    <span class="pm-clock-when" data-clock-when>{marksPhrase(FERRY_MARKS)}</span>
-    <span class="pm-clock-in" data-clock-in></span>
+    <span class="pm-sr pm-clock-what">next ferry</span>
+    <span class="pm-sr pm-clock-when" data-clock-when>{marksPhrase(FERRY_MARKS)}</span>
+    <span class="pm-clock-in" data-clock-in>…</span>
   </span>
   <span class="pm-clock-sep" aria-hidden="true">·</span>
-  <span class="pm-clock" data-clock="settlement">
+  <span class="pm-clock" data-clock="settlement" title={settlementTitle} tabindex="0">
     <span class="pm-clock-glyph" aria-hidden="true">⚖</span>
-    <span class="pm-clock-what">next settlement</span>
-    <span class="pm-clock-when" data-clock-when>{marksPhrase(SETTLEMENT_MARKS)}</span>
-    <span class="pm-clock-in" data-clock-in></span>
-    <span class="pm-clock-window" data-clock-window hidden></span>
+    <span class="pm-sr pm-clock-what">next settlement</span>
+    <span class="pm-sr pm-clock-when" data-clock-when>{marksPhrase(SETTLEMENT_MARKS)}</span>
+    <span class="pm-clock-in" data-clock-in>…</span>
+    <span class="pm-sr pm-clock-window" data-clock-window hidden></span>
   </span>
 </div>
 
 <script>
   import {
     FERRY_MARKS, SETTLEMENT_MARKS, marksFromDerivation, marksFromSettlements,
-    nextMark, untilPhrase, windowNumber,
+    marksPhrase, nextMark, untilPhrase, windowNumber,
   } from "@/lib/clocks.mjs";
 
   (async () => {
@@ -51,6 +60,7 @@ import { FERRY_MARKS, SETTLEMENT_MARKS, marksPhrase } from "@/lib/clocks.mjs";
       ferry: marksFromDerivation(office?.crossing?.derivation) ?? FERRY_MARKS,
       settlement: marksFromSettlements(settlements) ?? SETTLEMENT_MARKS,
     };
+    const names = { ferry: "next ferry", settlement: "next settlement" };
     const win = windowNumber(office);
     const fmt = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
 
@@ -60,8 +70,12 @@ import { FERRY_MARKS, SETTLEMENT_MARKS, marksPhrase } from "@/lib/clocks.mjs";
         const box = root.querySelector(`[data-clock="${key}"]`);
         const at = nextMark(now, list);
         if (!box || !at) continue;
-        box.querySelector("[data-clock-when]").textContent = fmt.format(at);
+        const when = fmt.format(at);
+        box.querySelector("[data-clock-when]").textContent = when;
         box.querySelector("[data-clock-in]").textContent = untilPhrase(at.getTime() - now);
+        // The hover carries everything the strip no longer shows.
+        const extra = key === "settlement" && win !== null ? ` · window ${win}` : "";
+        box.title = `${names[key]} · ${when} · ${marksPhrase(list)}${extra}`;
       }
       if (win !== null) {
         const w = root.querySelector("[data-clock-window]");
@@ -77,17 +91,19 @@ import { FERRY_MARKS, SETTLEMENT_MARKS, marksPhrase } from "@/lib/clocks.mjs";
 <style>
   .pm-clocks {
     display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline;
-    gap: 0.25rem 0.7rem;
+    gap: 0.25rem 0.9rem;
     margin: -0.35rem auto 0.55rem; padding: 0 16px;
     font-family: var(--pm-mono); font-size: 0.66rem; letter-spacing: 0.05em;
     color: rgba(232, 196, 139, 0.62);
   }
-  .pm-clock { display: inline-flex; align-items: baseline; gap: 0.4em; flex-wrap: wrap; justify-content: center; }
+  .pm-clock { display: inline-flex; align-items: baseline; gap: 0.4em; cursor: help; border-radius: 999px; }
+  .pm-clock:focus-visible { outline: 1px solid rgba(232, 196, 139, 0.5); outline-offset: 3px; }
   .pm-clock-glyph { color: rgba(232, 196, 139, 0.8); }
-  .pm-clock-when { color: var(--pm-gold-bright); }
-  .pm-clock-in, .pm-clock-window { color: rgba(232, 196, 139, 0.55); }
-  .pm-clock-window {
-    border: 1px solid rgba(232, 196, 139, 0.22); border-radius: 999px; padding: 0 0.5em;
-  }
+  .pm-clock-in { color: var(--pm-gold-bright); }
   .pm-clock-sep { opacity: 0.5; }
+  /* whole for a screen reader, absent from the eye — the hover has it */
+  .pm-sr {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
 </style>
