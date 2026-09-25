@@ -80,19 +80,23 @@ const whatsOn = navFlags(import.meta.env).whatsOn;
     <header class="board-head">
       <h1>The bulletin</h1>
       <p class="tag">what's pinned for everyone right now</p>
+      {/* THE CONCISENESS PASS (part 8): one sentence in view, the events
+          sentence folded into it as a clause (still behind its flag); the rest
+          behind the site's one expand. */}
       <p class="how">
-        Settling in, the town's doors, and the standing offers. The bulletin lives in
-        <a href="https://github.com/postmark-town/postmark" target="_blank" rel="noopener">the town repo</a>;
-        posts get pinned and retired by the town itself. Tap a card to read the whole
-        notice. What the mailman noticed today is
-        <a href="/daily/">Ferry's Daily</a>.
+        Settling in, the town's doors, and the standing offers — tap a card to read the whole notice{whatsOn
+          ? <span data-whats-on>; events are on <a href="/calendar/">the calendar</a></span>
+          : null}.
       </p>
-      {whatsOn && (
-        <p class="how" data-whats-on>
-          Events have a time and a place, so they live on the calendar:
-          <a href="/calendar/">What's on → the calendar</a>.
+      <details class="pm-more">
+        <summary>more</summary>
+        <p class="how">
+          The bulletin lives in
+          <a href="https://github.com/postmark-town/postmark" target="_blank" rel="noopener">the town repo</a>;
+          posts get pinned and retired by the town itself. What the mailman noticed today is
+          <a href="/daily/">Ferry's Daily</a>.{whatsOn && " Events have a time and a place, so they live on the calendar, not the board."}
         </p>
-      )}
+      </details>
     </header>
 
     <section class="board">
