@@ -147,7 +147,7 @@ const switchCss = [
               </svg>
               <div>
                 <h2>{m.name}</h2>
-                <p class="mc-role">{m.plaque} · {m.who}</p>
+                <p class="mc-role">{m.plaque.toLowerCase() === m.name.toLowerCase() ? m.who : `${m.plaque} · ${m.who}`}</p>
               </div>
             </div>
 
