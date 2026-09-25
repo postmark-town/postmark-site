@@ -35,7 +35,14 @@ import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { RAIL, allEntries, sectionOf, chipsFor, subChipsFor, rowFor, HARBOR } from "../src/lib/nav.mjs";
+import { RAIL, allEntries, sectionOf, chipsFor, subChipsFor, rowFor, HARBOR, navFlags } from "../src/lib/nav.mjs";
+
+/** A flagged chip whose page has not landed on this branch, and says so: its
+ *  flag is OFF by default and its `waits` reason is on file. The only chip the
+ *  route laws let point at a page that is not here yet — see the flags' own
+ *  test below for why that is safe (the chip cannot render while it waits). */
+const waitsForItsPage = (e) =>
+  Boolean(e.flag) && navFlags({})[e.flag] === false && (e.waits ?? "").trim().length >= 20;
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PAGES = join(ROOT, "town", "pages");
@@ -111,6 +118,7 @@ test("every chip, at every depth, resolves to a route that exists", () => {
       assert.match(e.href, /^https:\/\//, `${e.key}: an external seat needs an absolute URL`);
       continue;
     }
+    if (waitsForItsPage(e) && !pageFileFor(e.href)) continue;
     assert.ok(pageFileFor(e.href), `${e.section}/${e.key} points at ${e.href}, which no page serves`);
   }
 });
@@ -130,6 +138,7 @@ test("every chip that owns a page is marked active by that page, or says why not
       assert.ok((e.noActive ?? "").trim().length >= 20, `${e.key} escapes the law with no reason on file`);
       continue;
     }
+    if (waitsForItsPage(e) && !pageFileFor(e.href)) continue;
     if (!CLAIMED.has(e.key)) orphans.push(`${e.section}/${e.key} (${e.href})`);
   }
   assert.deepEqual(orphans, [], `these chips can never light up — no page passes their key as \`active\`:\n  ${orphans.join("\n  ")}`);
@@ -873,5 +882,47 @@ test("LITTLE ICONS FOR THE TOWN'S CHIPS — decoration, never the name", () => {
   // renders `n.label` with nothing before it.
   for (const s of RAIL) {
     assert.equal(s.icon, undefined, `the ${s.label} seat grew an icon; only the chips were asked for`);
+  }
+});
+
+// ── THE NAV FLAGS (the site, reprojected — part 2) ─────────────────────────
+
+test("WHAT'S ON WAITS FOR ITS PAGE — the chip is flagged, off by default, and cannot render while off", () => {
+  // The brief, verbatim: "a chip to a 404 is worse than no chip: build the chip
+  // behind a flag the layout reads, default off, and say so."
+  assert.deepEqual(navFlags({}), { whatsOn: false }, "an unset build turns a nav flag on");
+  assert.deepEqual(navFlags(undefined), { whatsOn: false });
+  assert.equal(navFlags({ PUBLIC_NAV_WHATS_ON: "0" }).whatsOn, false);
+  assert.equal(navFlags({ PUBLIC_NAV_WHATS_ON: "1" }).whatsOn, true);
+
+  const town = RAIL.find((s) => s.key === "town");
+  const chip = town.members.find((m) => m.key === "calendar");
+  assert.ok(chip, "the Town has no what's-on chip");
+  assert.equal(chip.label, "what’s on");
+  assert.equal(chip.href, "/calendar/");
+  assert.equal(chip.flag, "whatsOn");
+
+  // OFF: the row is exactly the founder's list, every page, every depth.
+  for (const active of ["town", "bulletin", "daily", "meeps"]) {
+    assert.equal(chipsFor(active).chips.some((c) => c.key === "calendar"), false, `what's on renders on ${active} with its flag off`);
+    assert.equal(rowFor(active).chips.some((c) => c.key === "calendar"), false);
+  }
+
+  // ON: it hangs beside the bulletin, where feature/calendar seats its own chip.
+  const on = navFlags({ PUBLIC_NAV_WHATS_ON: "1" });
+  assert.deepEqual(rowFor("bulletin", { flags: on }).chips.map((c) => c.key),
+    ["town", "daily", "bulletin", "calendar", "works", "meeps", "numbers"]);
+
+  // and the layout reads the flag from the build — the one place it may come from.
+  const shell = readFileSync(join(ROOT, "src", "layouts", "PostmarkLayout.astro"), "utf8");
+  assert.match(shell, /rowFor\(active, \{ ownChips, flags: navFlags\(import\.meta\.env\) \}\)/);
+});
+
+test("a flag is an escape for a page NOT HERE YET, never for one that is", () => {
+  // The day /calendar/ lands, the chip is held to both route laws like any
+  // other — the exemption above only fires while the page file is missing.
+  for (const e of allEntries().filter((x) => x.flag)) {
+    assert.ok((e.waits ?? "").trim().length >= 20, `${e.key} is flagged with no reason on file`);
+    assert.equal(navFlags({})[e.flag], false, `${e.key}'s flag is on by default`);
   }
 });
