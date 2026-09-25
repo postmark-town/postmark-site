@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildOfficeData, fetchBlueprints, jsonText, shortFetchPlan } from "./lib/fetch-town-data.mjs";
+import { buildOfficeData, fetchBlueprints, fetchRollcall, jsonText, shortFetchPlan } from "./lib/fetch-town-data.mjs";
 import { worldPin } from "./lib/world-pin-publish.mjs";
 import { writeIfChanged } from "./lib/mirror.mjs";
 
@@ -73,6 +73,7 @@ function writeManifest(asOf, endpointGaps, problems) {
       "meeps.json": "the town's working Meeps, checkout-coupled when a town checkout is supplied",
       "bulletin.json": "the town bulletin, full text",
       "docs.json": "last committed docs snapshot until the office exposes town docs",
+      "rollcall.json": "the meeplings' bench: the office's deploy/box-rollcall-manifest.json read at the release the office serves (GET /release -> tag), trimmed to each unit's name, label, stage, cadence and heartbeat allowance",
       "blueprints.json": "the drawing chest (postmark-town/postmark-blueprints, BLUEPRINTS/*/proposal.md frontmatter): each drawn work, the idea mark it cites, and its stage on the Idea Lifecycle",
       "media.json": "town image paths -> processed site copies, owned by extract-town.mjs",
       "pin.json": "the postmark-world sha this site is pinned to, what it was built against, and when — the one fact the office cannot derive about the site (Lane A's A8)",
@@ -102,6 +103,14 @@ try {
     writeDataFile("blueprints.json", await fetchBlueprints());
   } catch (error) {
     console.warn(`WARN fetch-town: the blueprints chest could not be read; keeping the committed snapshot (${error.message})`);
+  }
+  // ── THE MEEPLINGS' BENCH (the site, reprojected — part 3) ──────────────────
+  // The box's roll-call, read at the office's served release. Fail-soft like
+  // the chest: a manifest that cannot be read keeps the committed rollcall.json.
+  try {
+    writeDataFile("rollcall.json", await fetchRollcall({ apiBase: API }));
+  } catch (error) {
+    console.warn(`WARN fetch-town: the box roll-call could not be read; keeping the committed snapshot (${error.message})`);
   }
   // ── THE SITE SAYS WHAT WORLD IT IS PINNED TO (Lane A's A8, 2026-09-07) ────
   // The office's focus receipt carries `site_pin` and cannot fill it: it holds
