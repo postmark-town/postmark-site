@@ -397,8 +397,11 @@ test("THE TOWN KEEPS THE FOUNDER'S OWN LIST, and the meeps is back in it", () =>
   //     card-grid mistake in miniature.
   // His 2026-08-25 list is still underneath: ferry's daily, the bulletin, the
   // works, and the meeps he appended. What changed is what wraps it.
+  // THE CALENDAR joined beside the bulletin 2026-09-24 (POS-211, Wright's
+  // brief on Keemin's "residents schedule events on a shared calendar"): the
+  // one chip in this row that is not from the founder's own sentence.
   assert.deepEqual(chipsFor("town").chips.map((c) => c.key),
-    ["town", "daily", "bulletin", "works", "meeps", "numbers"],
+    ["town", "daily", "bulletin", "calendar", "works", "meeps", "numbers"],
     `The Town's row reads: ${chipsFor("town").chips.map((c) => c.label).join(" · ")}`);
   assert.equal(town.members.some((m) => m.key === "numbers" && !m.held), true,
     "the S4 hold is over — the numbers chip hangs, unheld, at the end of the founder's list");
@@ -861,7 +864,7 @@ test("LITTLE ICONS FOR THE TOWN'S CHIPS — decoration, never the name", () => {
   // them. The claim is unchanged — every chip keeps its WORDS, and the icon is
   // decoration beside the label rather than a replacement for it.
   assert.deepEqual(row.map((c) => c.label),
-    ["the civic quarter", "ferry’s daily", "the bulletin", "the works", "the meeps", "the numbers"]);
+    ["the civic quarter", "ferry’s daily", "the bulletin", "the calendar", "the works", "the meeps", "the numbers"]);
 
   // AND THEY ARE HIDDEN FROM A SCREEN READER, because a decorative glyph read
   // aloud beside its own label says the chip twice in two vocabularies.
