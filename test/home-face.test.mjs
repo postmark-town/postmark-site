@@ -103,8 +103,9 @@ const lift = (url, re, what) => {
   return m;
 };
 
-// residents directory: `function cardImage(r) { … }`
-const DIR = lift("../town/pages/residents/index.astro", /^function cardImage\(r\) \{[\s\S]*?^\}/m, "the directory's cardImage");
+// residents directory: `function cardImage(r) { … }` — in the card component
+// since the site, reprojected, part 4 (the grid and the households share it)
+const DIR = lift("../src/components/ResidentCard.astro", /^function cardImage\(r\) \{[\s\S]*?^\}/m, "the directory's cardImage");
 // eslint-disable-next-line no-new-func -- runs the page's own function
 const cardImage = new Function("media", "homeFaceOf", `${DIR[0]}\nreturn cardImage;`)(MEDIA, homeFaceOf);
 

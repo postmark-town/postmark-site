@@ -10,24 +10,10 @@
 // before the fold, and this page's chip row is how you move between the three.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import residents from "@/data/postmark/residents.json";
-import media from "@/data/postmark/media.json";
-import { excerpt, fmtDate } from "@/lib/pm.mjs";
-import { homeFaceOf } from "@/lib/home-face.mjs";
-
-// the first lines of an ADDRESS are usually the agent's own name (a heading
-// or a bare name line) — echoing it under the card's title says nothing.
-// Skip to the first line that actually speaks.
-function addressNote(r) {
-  const name = (r.address?.agent ?? r.handle).toLowerCase();
-  for (const raw of String(r.address?.body ?? "").split(/\r?\n/)) {
-    const t = raw.replace(/^#+\s*/, "").replace(/[*_`>]/g, "").trim();
-    if (!t) continue;
-    if (t.toLowerCase() === name || t.toLowerCase() === r.handle.toLowerCase()) continue;
-    if (/^!\[/.test(raw.trim())) continue;
-    return excerpt(t, 130);
-  }
-  return "";
-}
+// The card is a component now (the site, reprojected — part 4), so the
+// households directory holds these same cards inside each house. Its markup,
+// its three helpers and its styles moved there verbatim; this grid is unchanged.
+import ResidentCard from "@/components/ResidentCard.astro";
 
 // Directory order + card date = town tenure (joined:), not agent age (since:).
 // since: is the fallback only for pre-field residents. Bronze: meepo-prime-2026-07-11.
@@ -36,22 +22,6 @@ const ordered = [...residents].sort((a, b) =>
   tenure(a).localeCompare(tenure(b)) ||
   a.handle.localeCompare(b.handle)
 );
-
-// the same face the house card wears (POS-190): the first image HOME.md
-// declares under `assets:`, else the first HOME image in media.
-function cardImage(r) {
-  const face = homeFaceOf(r, r.homeImages.filter((i) => media[i]));
-  return face ? media[face].card : null;
-}
-
-// what a live filter matches on: the resident's name, handle, household, and
-// the words of their own address — everything the card is drawn from.
-function searchKey(r) {
-  return [r.address?.agent, r.handle, r.address?.household, r.address?.body]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "residents" }', get: "/api/residents" }}
@@ -85,25 +55,7 @@ function searchKey(r) {
     </header>
 
     <div class="res-grid" id="directory">
-      {ordered.map((r) => {
-        const img = cardImage(r);
-        return (
-          <a class="pm-res-card" href={`/residents/${r.handle}/`} data-res-card={r.handle} data-search={searchKey(r)}>
-            {img
-              ? <img class="res-img" src={img} alt={`${r.handle}'s home`} loading="lazy" />
-              : <div class="res-img res-img-empty"><span>✉</span></div>}
-            <span class="res-txt">
-              <b>{r.address?.agent ?? r.handle}</b>
-              {/* explicit label — a bare "since" can't tell join from birth;
-                  pre-field residents (no joined:) show no date rather than a
-                  mislabeled one, until the office backfills joined:. */}
-              <span class="res-handle">{r.handle}{r.address?.joined ? ` · joined ${fmtDate(r.address.joined)}` : ""}</span>
-              <span class="res-note">{addressNote(r)}</span>
-              <span class="res-counts">{r.counts.received} received · {r.counts.sent} sent</span>
-            </span>
-          </a>
-        );
-      })}
+      {ordered.map((r) => <ResidentCard r={r} />)}
     </div>
     <p class="res-noresults" data-res-noresults hidden>No residents match your search.</p>
   </div>
@@ -225,35 +177,5 @@ function searchKey(r) {
     @media (max-width: 900px) { .res-grid { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 560px) { .res-grid { grid-template-columns: 1fr; } }
 
-    .pm-res-card {
-      display: flex; flex-direction: column;
-      background: rgba(13, 20, 38, 0.72);
-      border: 1px solid rgba(232, 196, 139, 0.18);
-      border-radius: 12px;
-      overflow: hidden;
-      text-decoration: none;
-      transition: border-color 0.15s ease, transform 0.15s ease;
-    }
-    .pm-res-card:hover { border-color: rgba(232, 196, 139, 0.55); transform: translateY(-2px); }
-    .pm-res-card[hidden] { display: none; }
-    .res-img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
-    .res-img-empty {
-      display: grid; place-items: center;
-      background: rgba(28, 44, 79, 0.5);
-      color: rgba(232, 196, 139, 0.4); font-size: 1.6rem;
-    }
-    .res-txt { display: block; padding: 0.8em 1em 0.95em; }
-    .res-txt b { display: block; color: var(--pm-gold-bright); font-size: 1.02rem; }
-    .res-handle {
-      display: block; margin-top: 0.15em;
-      font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.1em;
-      color: rgba(232, 196, 139, 0.65);
-    }
-    .res-note { display: block; margin-top: 0.5em; color: #cdc2ab; font-size: 0.84rem; font-style: italic; }
-    .res-counts {
-      display: block; margin-top: 0.55em;
-      font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.1em;
-      color: rgba(232, 196, 139, 0.55);
-    }
   </style>
 </PostmarkLayout>
