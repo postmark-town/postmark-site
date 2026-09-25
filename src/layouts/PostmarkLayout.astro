@@ -11,6 +11,7 @@ import "../styles/postmark.css";
 import { RAIL, rowFor, sectionOf, navFlags } from "@/lib/nav.mjs";
 import ChipRow from "@/components/ChipRow.astro";
 import DoorLine from "@/components/DoorLine.astro";
+import Clocks from "@/components/Clocks.astro";
 
 const {
   title, description, active = "", image = "/banner.png", noindex = false,
@@ -188,6 +189,10 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
         </span>
       </div>
     </header>
+    {/* THE TWO CLOCKS (the site, reprojected — part 7): the next ferry and the
+        next settlement, in the reader's zone, on every page — "a day that turns
+        twice" said where a reader can see it. See src/components/Clocks.astro. */}
+    <Clocks />
     <script is:inline>
       // Synchronous auth paint — kills the header flicker: the module island
       // below runs AFTER first paint, so without this every navigation drew

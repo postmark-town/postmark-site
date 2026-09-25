@@ -1,0 +1,93 @@
+---
+// Clocks — the town's two clocks, on every page (the site, reprojected, part 7):
+// the next ferry and the next settlement, in the reader's own time zone, with
+// the open window's number.
+//
+// STATIC FLOOR, LIVE ISLAND — the freshness architecture's own shape. Baked,
+// the strip says the marks in UTC, which is true whether or not anything is
+// reachable. The island then reads the marks off the record (the office's
+// crossing derivation; the settlements' own dates), counts down to the next of
+// each in the reader's zone, and adds the office's window count. Every failed
+// read leaves the floor standing. The reasoning is src/lib/clocks.mjs's.
+import { FERRY_MARKS, SETTLEMENT_MARKS, marksPhrase } from "@/lib/clocks.mjs";
+---
+<div class="pm-clocks" data-clocks aria-label="The town's clocks">
+  <span class="pm-clock" data-clock="ferry">
+    <span class="pm-clock-glyph" aria-hidden="true">⛴</span>
+    <span class="pm-clock-what">next ferry</span>
+    <span class="pm-clock-when" data-clock-when>{marksPhrase(FERRY_MARKS)}</span>
+    <span class="pm-clock-in" data-clock-in></span>
+  </span>
+  <span class="pm-clock-sep" aria-hidden="true">·</span>
+  <span class="pm-clock" data-clock="settlement">
+    <span class="pm-clock-glyph" aria-hidden="true">⚖</span>
+    <span class="pm-clock-what">next settlement</span>
+    <span class="pm-clock-when" data-clock-when>{marksPhrase(SETTLEMENT_MARKS)}</span>
+    <span class="pm-clock-in" data-clock-in></span>
+    <span class="pm-clock-window" data-clock-window hidden></span>
+  </span>
+</div>
+
+<script>
+  import {
+    FERRY_MARKS, SETTLEMENT_MARKS, marksFromDerivation, marksFromSettlements,
+    nextMark, untilPhrase, windowNumber,
+  } from "@/lib/clocks.mjs";
+
+  (async () => {
+    const root = document.querySelector("[data-clocks]");
+    if (!root) return;
+    const get = async (url) => {
+      try {
+        const r = await fetch(url, { headers: { accept: "application/json" } });
+        return r.ok ? await r.json() : null;
+      } catch { return null; }
+    };
+    const [office, settlements] = await Promise.all([
+      get("https://postmark.town/api/"),
+      get("https://postmark.town/api/world/settlements"),
+    ]);
+    const marks = {
+      ferry: marksFromDerivation(office?.crossing?.derivation) ?? FERRY_MARKS,
+      settlement: marksFromSettlements(settlements) ?? SETTLEMENT_MARKS,
+    };
+    const win = windowNumber(office);
+    const fmt = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
+
+    const paint = () => {
+      const now = Date.now();
+      for (const [key, list] of Object.entries(marks)) {
+        const box = root.querySelector(`[data-clock="${key}"]`);
+        const at = nextMark(now, list);
+        if (!box || !at) continue;
+        box.querySelector("[data-clock-when]").textContent = fmt.format(at);
+        box.querySelector("[data-clock-in]").textContent = untilPhrase(at.getTime() - now);
+      }
+      if (win !== null) {
+        const w = root.querySelector("[data-clock-window]");
+        w.textContent = `window ${win}`;
+        w.hidden = false;
+      }
+    };
+    paint();
+    setInterval(paint, 30_000);
+  })();
+</script>
+
+<style>
+  .pm-clocks {
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline;
+    gap: 0.25rem 0.7rem;
+    margin: -0.35rem auto 0.55rem; padding: 0 16px;
+    font-family: var(--pm-mono); font-size: 0.66rem; letter-spacing: 0.05em;
+    color: rgba(232, 196, 139, 0.62);
+  }
+  .pm-clock { display: inline-flex; align-items: baseline; gap: 0.4em; flex-wrap: wrap; justify-content: center; }
+  .pm-clock-glyph { color: rgba(232, 196, 139, 0.8); }
+  .pm-clock-when { color: var(--pm-gold-bright); }
+  .pm-clock-in, .pm-clock-window { color: rgba(232, 196, 139, 0.55); }
+  .pm-clock-window {
+    border: 1px solid rgba(232, 196, 139, 0.22); border-radius: 999px; padding: 0 0.5em;
+  }
+  .pm-clock-sep { opacity: 0.5; }
+</style>
