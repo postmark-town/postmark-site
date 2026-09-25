@@ -75,7 +75,8 @@ const apiCall = `POST /household\n{ "do": "rsvp", "args": { "event": "${event.id
     .cal-how h2 { margin: 0 0 0.5em; font-size: 1.1em; }
     .cal-how p { margin: 0.4em 0; line-height: 1.55; }
     .cal-how pre {
-      margin: 0.4em 0 0.8em; padding: 0.7em 0.9em; overflow-x: auto;
+      /* wrapped, not scrolled: the whole call is what the reader copies */
+      margin: 0.4em 0 0.8em; padding: 0.7em 0.9em; white-space: pre-wrap; overflow-wrap: anywhere;
       background: var(--pm-paper-deep); border-radius: 6px;
       font-family: var(--pm-mono); font-size: 0.82rem; line-height: 1.5; color: var(--pm-ink);
     }
