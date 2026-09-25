@@ -1,0 +1,130 @@
+---
+// DoorLine — the foot of every town page: the door this page is a picture of,
+// and one row of the town's rooms beyond the door (the socials).
+//
+// Rendered ONCE, by PostmarkLayout, from the `door` prop every page declares
+// (see src/lib/door-line.mjs for the law and the socials' sources). A page
+// that is not a door's picture declares `door={null}` and gets the socials row
+// alone — no door line, so nothing on Join claims a read it does not show.
+//
+// The age clause is an island over the site's own /build.json, the same stamp
+// and the same agePhrase PageFreshness uses. Its failure is silence: no stamp,
+// no clause. It uses its own data attributes so it never collides with a
+// PageFreshness on the same page (the mail explorer and the resident pages).
+import { doorLine, SOCIALS } from "@/lib/door-line.mjs";
+
+interface Props {
+  door: { mcp?: string | null; get?: string | null } | null;
+}
+const line = doorLine(Astro.props.door);
+---
+
+<footer class="pm-doorfoot" data-door-foot>
+  {line && (
+    <p class="pm-doorline" data-door-line>
+      <span class="pm-doorline-lead">this page is</span>
+      {line.mcp && <code class="pm-doorline-read" data-door-mcp>{line.mcp}</code>}
+      {line.mcp && line.get && <span class="pm-doorline-dot" aria-hidden="true">·</span>}
+      {line.get && (line.getHref
+        ? <a class="pm-doorline-get" href={line.getHref} data-door-get><code>GET {line.get}</code></a>
+        : <code class="pm-doorline-get" data-door-get>GET {line.get}</code>)}
+      <span class="pm-doorline-age" data-door-age hidden>
+        <span class="pm-doorline-dot" aria-hidden="true">·</span>
+        as the office read it <span data-door-ago></span>
+      </span>
+    </p>
+  )}
+  <ul class="pm-socials" aria-label="Postmark beyond the door">
+    {SOCIALS.map((s) => (
+      <li class:list={["pm-social", { "is-soon": s.soon, "is-unlinked": !s.href && !s.soon }]} data-social={s.key}>
+        {s.href ? (
+          <a href={s.href} target="_blank" rel="noopener" title={s.note ? `${s.name} — ${s.note}` : s.name}>
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="currentColor"><path d={s.path} /></svg>
+            <span class="pm-social-name">{s.name}</span>
+            {s.note && <span class="pm-social-note">{s.note}</span>}
+          </a>
+        ) : (
+          <span>
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="currentColor"><path d={s.path} /></svg>
+            <span class="pm-social-name">{s.name}</span>
+            {s.soon && <span class="pm-social-note">soon</span>}
+          </span>
+        )}
+      </li>
+    ))}
+  </ul>
+</footer>
+
+{line && (
+  <script>
+    import { agePhrase } from "@/lib/page-freshness.mjs";
+    (async function () {
+      const age = document.querySelector("[data-door-age]");
+      const ago = document.querySelector("[data-door-ago]");
+      if (!age || !ago) return;
+      try {
+        const r = await fetch("/build.json", { headers: { accept: "application/json" } });
+        if (!r.ok) return;
+        const stamp = await r.json();
+        const phrase = agePhrase(Date.now() - Date.parse(String(stamp?.built_at ?? "")));
+        if (!phrase) return;
+        ago.textContent = phrase;
+        age.hidden = false;
+      } catch { /* the floor: no clause */ }
+    })();
+  </script>
+)}
+
+<style>
+  .pm-doorfoot {
+    margin: 2.6rem auto 0;
+    padding: 1.1rem 16px 1.6rem;
+    max-width: 72rem;
+    border-top: 1px solid rgba(232, 196, 139, 0.16);
+    text-align: center;
+    font-family: var(--pm-mono);
+    color: rgba(232, 196, 139, 0.6);
+  }
+  .pm-doorline {
+    margin: 0 0 0.8rem;
+    font-size: 0.7rem;
+    line-height: 1.8;
+    letter-spacing: 0.04em;
+    overflow-wrap: anywhere;
+  }
+  .pm-doorline code {
+    font-family: inherit;
+    color: rgba(246, 220, 174, 0.88);
+    background: rgba(232, 196, 139, 0.07);
+    border: 1px solid rgba(232, 196, 139, 0.14);
+    border-radius: 4px;
+    padding: 0 0.35em;
+  }
+  .pm-doorline a.pm-doorline-get { color: inherit; text-decoration: none; }
+  .pm-doorline a.pm-doorline-get:hover code { border-color: rgba(232, 196, 139, 0.5); }
+  .pm-doorline-lead { margin-right: 0.4em; }
+  .pm-doorline-dot { margin: 0 0.45em; opacity: 0.6; }
+  .pm-socials {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem 1.1rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+  }
+  .pm-social a, .pm-social > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.42em;
+    color: rgba(232, 196, 139, 0.78);
+    text-decoration: none;
+  }
+  .pm-social a:hover { color: var(--pm-gold-bright); }
+  .pm-social svg { flex: none; }
+  .pm-social-note { opacity: 0.6; }
+  .pm-social.is-unlinked > span { color: rgba(232, 196, 139, 0.55); }
+  .pm-social.is-soon > span { color: rgba(232, 196, 139, 0.32); }
+</style>

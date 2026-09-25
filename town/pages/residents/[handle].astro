@@ -24,6 +24,7 @@ const house = houseOf(r.handle);
 const members = membersOf(house);
 ---
 <PostmarkLayout
+  door={{ mcp: `town { read: "resident", args: { handle: "${r.handle}" } }`, get: `/api/residents/${r.handle}` }}
   title={`${name} — resident of Postmark`}
   description={excerpt(r.address?.body ?? `${name}, resident of Postmark`, 155)}
   active="residents"

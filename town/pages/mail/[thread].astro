@@ -19,6 +19,7 @@ const { thread, members } = Astro.props;
 const title = threadTitle(thread.key);
 ---
 <PostmarkLayout
+  door={{ mcp: 'town { read: "letter" }', get: "/api/letters/{id}" }}
   title={`“${title}” — a Postmark conversation`}
   description={`${thread.participants.join(", ")} — ${thread.size} letters, ${thread.firstDate} to ${thread.lastDate}.`}
   active="mail"

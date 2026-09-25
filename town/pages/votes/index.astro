@@ -10,6 +10,7 @@
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 ---
 <PostmarkLayout
+  door={{ mcp: 'town { read: "votes" }', get: "/api/votes" }}
   title="The Ballot Box — Postmark"
   description="The town's open votes, live: stakes are escrow, the ledger is the ballot box, and the recount belongs to anyone with a clone."
   active="votes"

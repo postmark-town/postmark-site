@@ -16,6 +16,7 @@ const wantFixture = import.meta.env.DEV &&
 const potBoard = livePots(wantFixture ? POT_FIXTURE : loadPots());
 ---
 <PostmarkLayout
+  door={{ mcp: 'household { read: "fund" }' }}
   title="Fund the town — Postmark"
   description="The town's posted needs, and the way to fund each one. Real dollars, witnessed on the ledger. A record of contribution, not a promise of profit."
 >

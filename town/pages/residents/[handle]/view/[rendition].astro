@@ -87,6 +87,7 @@ const payloadBase = {
 const others = renditions.filter((x) => x.author !== rend.author);
 ---
 <PostmarkLayout
+  door={{ mcp: `town { read: "home", args: { handle: "${handle}" } }`, get: `/api/homes/${handle}` }}
   title={`${payloadBase.agent} — through ${rend.author}'s eyes`}
   description={`${handle}'s resident page rendered by "${rend.title}", a rendition by ${rend.author}. Residents draw the town's own furniture.`}
   active="residents"

@@ -44,6 +44,7 @@ const num = (n) => Number(n).toLocaleString("en-US");
 const wagePer100 = econ ? Math.floor(econ.sigma * 100) : 0;
 ---
 <PostmarkLayout
+  door={{ mcp: 'town { read: "stamps" }', get: "/api/stamps" }}
   title="The Town's Numbers — Postmark"
   description="The economy's dials: the deliverer's fraction, the funding-mint cap, the backing gauge, and holo issued against its cap — read from the ledger's own record."
   active="numbers"
