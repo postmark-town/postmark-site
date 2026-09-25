@@ -405,3 +405,17 @@ test("the routes that came back from a fold are real pages, not stubs", () => {
     assert.equal(/http-equiv="refresh"/.test(readFileSync(file, "utf8")), false, `${href} is a redirect again`);
   }
 });
+
+test("A SHARED HOUSE'S PAGE TAKES NO ROW FROM THE NAV — its own member rail is the row", () => {
+  // The Households has a row now, so /households/<slug>/ (which lights it by
+  // `alsoKey`) must hand the layout the same `ownChips` predicate the resident
+  // pages do — or a shared house shows the nav's row stacked over its own.
+  for (const file of [join(PAGES, "households", "[slug].astro"), join(PAGES, "residents", "[handle].astro")]) {
+    assert.match(layoutTagOf(file), /\bownChips=\{isShared\(house, members\)\}/, `${file.slice(PAGES.length + 1)} does not pass ownChips`);
+  }
+});
+
+test("the built page of a shared house carries one chip row, its own", { skip: !existsSync(builtPage("/households/starforge/")) }, () => {
+  const page = readFileSync(builtPage("/households/starforge/"), "utf8");
+  assert.equal((page.match(/class="pm-chiprow pm-chiprow--nav/g) ?? []).length, 0, "the nav's row stacks over Starforge's own member rail");
+});
