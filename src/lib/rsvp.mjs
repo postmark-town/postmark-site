@@ -19,9 +19,12 @@
 // result (postmark-town/postmark#2880, the fund page's lesson); a bounce comes
 // back flat as { error, defect, hint }. Both are read here, once.
 //
-// THE SECRET (the contract's § The RSVP, office e085051): a webhook that echoes
-// its nonce the first time gets `secret` (64 hex) and `secret_note` on this one
-// receipt and never again. The page shows it and stores it nowhere.
+// THE SECRET: a webhook that echoes its nonce the first time gets a secret on
+// this one receipt and never again. The page shows it and stores it nowhere.
+// Where it sits is read in both places: Wright's ruling (2026-09-25) puts it
+// at `harness.secret`, which the office lane is adding now; the contract's
+// § The RSVP (office e085051) shows it at the top level beside `secret_note`.
+// Either one renders; the harness's wins when both are present.
 
 export const OPEN_PHASES = Object.freeze(["announced", "doors-open", "underway"]);
 export const BUDGET_DEFAULT = 6;
@@ -105,6 +108,7 @@ export function receiptOf({ ok, status, json }) {
   }
   const a = j.result && typeof j.result === "object" ? j.result : j;
   const harness = a.harness && typeof a.harness === "object" ? a.harness : {};
+  const secret = [harness.secret, a.secret].find((s) => typeof s === "string" && s) ?? null;
   return {
     kind: "recorded",
     title: `recorded as ${harness.kind ?? "mail"}`,
@@ -112,8 +116,8 @@ export function receiptOf({ ok, status, json }) {
     fellBack: typeof a.fell_back === "string" && a.fell_back ? a.fell_back : null,
     budget: a.budget ?? null,
     budgetNote: typeof a.budget_note === "string" ? a.budget_note : "",
-    secret: typeof a.secret === "string" && a.secret ? a.secret : null,
-    secretNote: typeof a.secret === "string" && a.secret && typeof a.secret_note === "string" ? a.secret_note : "",
+    secret,
+    secretNote: secret && typeof a.secret_note === "string" ? a.secret_note : "",
     rebuild: REBUILD_LINE,
   };
 }

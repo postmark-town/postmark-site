@@ -145,6 +145,15 @@ test("the secret renders only when the envelope carries it", () => {
   assert.equal(SECRET_LINE, "Copy it now; it is not shown again.");
 });
 
+test("the secret is read at harness.secret (the ruling) and at the top level (the contract's example); the harness's wins", () => {
+  const inHarness = receiptOf({ ok: true, status: 200, json: { did: "rsvp", result: { harness: { kind: "webhook", url: "https://a.example", secret: "h".repeat(64) }, budget: 6, receipt: "r" } } });
+  assert.equal(inHarness.secret, "h".repeat(64));
+  const both = receiptOf({ ok: true, status: 200, json: { result: { harness: { kind: "webhook", secret: "h1" }, secret: "t1" } } });
+  assert.equal(both.secret, "h1");
+  const neither = receiptOf({ ok: true, status: 200, json: { result: { harness: { kind: "webhook", secret: "" }, secret: null } } });
+  assert.equal(neither.secret, null);
+});
+
 test("a bounce is the office's own words: defect as the title, hint as the body", async () => {
   const { fetchImpl } = stubFetch({ status: 422, json: { error: "bounce", defect: "a webhook url is https", hint: "got http://" } });
   const r = await submitRsvp({ base: "/api", token: "t", body: rsvpBody({ event: COMING.id, handle: "wright", kind: "webhook", url: "http://a.example" }), fetchImpl });
