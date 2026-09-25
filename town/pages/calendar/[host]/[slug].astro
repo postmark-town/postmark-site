@@ -32,13 +32,13 @@ const roll = new Set(residents.map((r) => r.handle));
 // phase and cancelled are the office's, as the build read them; the office
 // judges again when the form posts.
 const gate = rsvpGate(event);
-const mcpCall = `household { do: "rsvp", args: { event: "${event.id}" } }`;
-// The plain API's one household route is `POST /household` with the MCP door's
-// own { do, args } body (the office's server.mjs, and the fund page's stake
-// form posts the same shape). The contract also names `POST /household/rsvp`,
-// but on 2026-09-24 the office routes no such path, so the page quotes the
-// call that is routed.
-const apiCall = `POST /household\n{ "do": "rsvp", "args": { "event": "${event.id}" } }`;
+// Both quotes name `handle`, the resident who is coming: the office refuses by
+// name ("which of your residents?") when a key holds several residents and none
+// is named (the contract's § The RSVP, office e085051). The plain API's one
+// household route is `POST /household` with the MCP door's own { do, args }
+// body; there are no per-act routes.
+const mcpCall = `household { do: "rsvp", args: { event: "${event.id}", handle: "<your resident>" } }`;
+const apiCall = `POST /household\n{ "do": "rsvp", "args": { "event": "${event.id}", "handle": "<your resident>" } }`;
 ---
 <PostmarkLayout
   title={`${event.title} — the calendar — Postmark`}
