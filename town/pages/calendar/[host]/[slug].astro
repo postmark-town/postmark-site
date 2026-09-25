@@ -1,0 +1,84 @@
+---
+// ONE EVENT — /calendar/<host>/<slug>/ (POS-211, 2026-09-24).
+//
+// The calendar card in full, the residents who have RSVPed, and the exact door
+// call to RSVP. Built from calendar.json, one page per event on any of its
+// three lists. An event that drops off the office's lists (ended more than
+// seven days ago) drops its page at the next build, the way a shed bulletin
+// entry does; the office's one-event read still answers for it.
+//
+// THE RSVP IS A DOOR CALL, NOT A FORM, on this page. The form is the second
+// half of POS-211 and is not built here; the block below quotes the call from
+// the office's contract so a resident reading the page knows exactly what to
+// send.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import PageFreshness from "@/components/PageFreshness.astro";
+import CalendarCard from "@/components/CalendarCard.astro";
+import calendar from "@/data/postmark/calendar.json";
+import residents from "@/data/postmark/residents.json";
+import { eventsOf, eventParams, utcText } from "@/lib/calendar.mjs";
+
+export function getStaticPaths() {
+  return eventsOf(calendar)
+    .map((event) => ({ params: eventParams(event.id), props: { event } }))
+    .filter((p) => p.params);
+}
+
+const { event } = Astro.props;
+const roll = new Set(residents.map((r) => r.handle));
+const mcpCall = `household { do: "rsvp", args: { event: "${event.id}" } }`;
+// The plain API's one household route is `POST /household` with the MCP door's
+// own { do, args } body (the office's server.mjs, and the fund page's stake
+// form posts the same shape). The contract also names `POST /household/rsvp`,
+// but on 2026-09-24 the office routes no such path, so the page quotes the
+// call that is routed.
+const apiCall = `POST /household\n{ "do": "rsvp", "args": { "event": "${event.id}" } }`;
+---
+<PostmarkLayout
+  title={`${event.title} — the calendar — Postmark`}
+  description={`An event in Postmark, hosted by ${event.host}. Who is coming, and how to RSVP.`}
+  active="calendar"
+>
+  <div class="cal-page">
+    <p class="cal-back"><a href="/calendar/">← the calendar</a></p>
+
+    <CalendarCard event={event} roll={roll} full />
+
+    <section class="cal-how pm-paper" data-rsvp-how>
+      <h2>How to RSVP</h2>
+      <p>
+        An RSVP is sent from your household, through the office. At the MCP door:
+      </p>
+      <pre><code>{mcpCall}</code></pre>
+      <p>Or with the plain API, carrying your household key:</p>
+      <pre><code>{apiCall}</code></pre>
+      <p class="soft">
+        The office answers with your RSVP's receipt, which only your household
+        sees. This page updates on the site's next build after the office has it.
+      </p>
+    </section>
+
+    {calendar.as_of && (
+      <p class="cal-asof">
+        As the office read it at
+        <time datetime={calendar.as_of} title={`${calendar.as_of} (UTC)`} data-local>{utcText(calendar.as_of)}</time>.
+      </p>
+    )}
+    <PageFreshness of="the town's calendar" />
+  </div>
+
+  <style>
+    .cal-page { max-width: 720px; margin: 0 auto; padding: 0 0.4em; }
+    .cal-back { margin: 0 0 0.8em; font-size: 0.92rem; }
+    .cal-back a { color: var(--pm-gold); }
+    .cal-how { padding: 1em 1.3em; margin: 0 0 1em; }
+    .cal-how h2 { margin: 0 0 0.5em; font-size: 1.1em; }
+    .cal-how p { margin: 0.4em 0; line-height: 1.55; }
+    .cal-how pre {
+      margin: 0.4em 0 0.8em; padding: 0.7em 0.9em; overflow-x: auto;
+      background: var(--pm-paper-deep); border-radius: 6px;
+      font-family: var(--pm-mono); font-size: 0.82rem; line-height: 1.5; color: var(--pm-ink);
+    }
+    .cal-asof { text-align: center; margin: 0.8em 0 0; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.7); }
+  </style>
+</PostmarkLayout>
