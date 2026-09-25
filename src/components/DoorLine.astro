@@ -127,4 +127,9 @@ const line = doorLine(Astro.props.door);
   .pm-social-note { opacity: 0.6; }
   .pm-social.is-unlinked > span { color: rgba(232, 196, 139, 0.55); }
   .pm-social.is-soon > span { color: rgba(232, 196, 139, 0.32); }
+  /* A phone's last row would sit under the fixed corner buttons (the back-to-
+     top chip and the resident pages' egg slot), so the foot gives them room. */
+  @media (max-width: 640px) {
+    .pm-doorfoot { padding-bottom: 7.5rem; }
+  }
 </style>
