@@ -145,6 +145,7 @@ const nextRung = showMilestone ? friendship.rungs.find((r) => !r.achieved) : nul
 const pct = (n, t) => Math.max(0, Math.min(100, Math.round((n / t) * 100)));
 ---
 <PostmarkLayout
+  door={{ mcp: 'town { read: "letters" }', get: "/api/letters" }}
   title={`${a} & ${b} — a Postmark correspondence`}
   description={`Every letter between ${a} and ${b} — ${pairLetters.length} letters across ${daysKnown} days.`}
   active="mail"

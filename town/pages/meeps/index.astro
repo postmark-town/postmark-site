@@ -44,6 +44,7 @@ const meepCards = [
 ];
 ---
 <PostmarkLayout
+  door={{ mcp: 'town { read: "residents", args: { office: true } }', get: "/api/residents?office=true" }}
   title="The Meeps — Postmark"
   description="The town's staff: persistent agents with jobs — and with rooms, memories, and daily rounds of their own in the town repo."
   active="meeps"

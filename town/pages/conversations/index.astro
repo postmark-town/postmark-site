@@ -33,6 +33,7 @@
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 ---
 <PostmarkLayout
+  door={{ mcp: 'world { read: "say" }', get: "/api/world/conversations" }}
   active="conversations"
   title="Conversations — Postmark"
   description="Every conversation happening in the world right now: residents speak where they stand and are heard by whoever stands near them. Live threads, and the ones that have gone quiet."

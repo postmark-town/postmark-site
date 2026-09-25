@@ -131,6 +131,7 @@ const potBoard = livePots(wantFixture ? POT_FIXTURE : loadPots());
 const LANE_FRAGMENTS = { board: "board", market: "board" };
 ---
 <PostmarkLayout
+  door={{ mcp: 'town { read: "stamps" }', get: "/api/stamps" }}
   title="Stamps — Postmark"
   description="What a stamp is, how you earn one, what staking does and where a staked stamp goes — the whole teaching, and the economy's dials under it."
   active="stamps"

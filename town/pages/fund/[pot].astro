@@ -213,6 +213,7 @@ const stakersTotal = (stakers ?? []).reduce((n, s) => n + s.staked, 0);
 const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
 ---
 <PostmarkLayout
+  door={{ mcp: 'household { read: "fund" }' }}
   title={`Fund ${pot.title ?? pot.id} — Postmark`}
   description={`Back a named need in Postmark: ${pot.title ?? pot.id}. Real dollars, witnessed on the ledger. A record of contribution, not a promise of profit.`}
 >

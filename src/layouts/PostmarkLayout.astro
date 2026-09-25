@@ -10,6 +10,7 @@ import "../styles/postmark.css";
 // source". `test/nav.test.mjs` holds it to that. See that file for why.
 import { RAIL, rowFor, sectionOf } from "@/lib/nav.mjs";
 import ChipRow from "@/components/ChipRow.astro";
+import DoorLine from "@/components/DoorLine.astro";
 
 const {
   title, description, active = "", image = "/banner.png", noindex = false,
@@ -26,6 +27,12 @@ const {
   // enough to grow its member rail — a house of one stays folded and has no row
   // of its own, so it takes the nav's like any other page.
   ownChips = false,
+  // THE DOOR THIS PAGE IS A PICTURE OF — { mcp, get } or null (the site,
+  // reprojected: "the foot names its door"). Every page declares it; a page
+  // that is not a door's picture (Join, the Darkroom) says null and its foot
+  // carries the socials row alone. test/door-line.test.mjs holds every page to
+  // declaring it. See src/lib/door-line.mjs.
+  door = null,
 } = Astro.props;
 // The town serves at the postmark.town ROOT, so nav paths are root-relative.
 const P = origin;
@@ -271,6 +278,7 @@ const row = rowFor(active, { ownChips });
       }
     </style>
     <slot />
+    <DoorLine door={door} />
     {import.meta.env.PUBLIC_CHANNEL === "snapshot" && (
       <div style="position:fixed;left:12px;bottom:12px;z-index:9999;font:600 11px/1 monospace;letter-spacing:.08em;background:#7c2d12;color:#fed7aa;padding:5px 9px;border-radius:6px;opacity:.92;pointer-events:none;">
         SNAPSHOT · {(import.meta.env.PUBLIC_BUILD_SHA ?? "local").slice(0, 8)}
