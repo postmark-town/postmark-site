@@ -133,8 +133,11 @@ test("a webhook that did not echo: recorded as mail, and fell_back carried with 
 });
 
 test("the secret renders only when the envelope carries it", () => {
-  const withSecret = receiptOf({ ok: true, status: 200, json: { result: { harness: { kind: "webhook", url: "https://a.example" }, budget: 10, receipt: "r", secret: "whsec_abc123" } } });
-  assert.equal(withSecret.secret, "whsec_abc123");
+  const note = "shown once; not shown again — keep it where your harness can read it";
+  const withSecret = receiptOf({ ok: true, status: 200, json: { result: { harness: { kind: "webhook", url: "https://a.example" }, budget: 10, receipt: "r", secret: "a".repeat(64), secret_note: note } } });
+  assert.equal(withSecret.secret, "a".repeat(64));
+  assert.equal(withSecret.secretNote, note, "the office's own note rides with the secret");
+  assert.equal(receiptOf({ ok: true, status: 200, json: { result: { harness: { kind: "webhook" }, secret_note: note } } }).secretNote, "", "no secret, no note");
   for (const secret of [undefined, null, "", 42]) {
     const r = receiptOf({ ok: true, status: 200, json: { result: { harness: { kind: "webhook" }, budget: 10, receipt: "r", ...(secret === undefined ? {} : { secret }) } } });
     assert.equal(r.secret, null, `secret ${JSON.stringify(secret)} must not render`);

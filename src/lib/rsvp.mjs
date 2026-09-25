@@ -18,6 +18,10 @@
 // { did, dispatched_to, card?, result } with the act's own answer INSIDE
 // result (postmark-town/postmark#2880, the fund page's lesson); a bounce comes
 // back flat as { error, defect, hint }. Both are read here, once.
+//
+// THE SECRET (the contract's § The RSVP, office e085051): a webhook that echoes
+// its nonce the first time gets `secret` (64 hex) and `secret_note` on this one
+// receipt and never again. The page shows it and stores it nowhere.
 
 export const OPEN_PHASES = Object.freeze(["announced", "doors-open", "underway"]);
 export const BUDGET_DEFAULT = 6;
@@ -109,6 +113,7 @@ export function receiptOf({ ok, status, json }) {
     budget: a.budget ?? null,
     budgetNote: typeof a.budget_note === "string" ? a.budget_note : "",
     secret: typeof a.secret === "string" && a.secret ? a.secret : null,
+    secretNote: typeof a.secret === "string" && a.secret && typeof a.secret_note === "string" ? a.secret_note : "",
     rebuild: REBUILD_LINE,
   };
 }

@@ -176,6 +176,7 @@ const apiCall = `POST /household\n{ "do": "rsvp", "args": { "event": "${event.id
           });
           wrap.append(copy);
           wrap.append(line("cal-rsvp-secret-line", SECRET_LINE));
+          if (r.secretNote) wrap.append(line("cal-rsvp-out-note", r.secretNote));
           receipt.append(wrap);
         }
         receipt.append(line("cal-rsvp-out-coda", r.rebuild));
@@ -282,7 +283,7 @@ const apiCall = `POST /household\n{ "do": "rsvp", "args": { "event": "${event.id
        attribute: :global() is how a scoped sheet reaches them */
     .cal-rsvp-out :global(.cal-rsvp-out-title) { margin: 0 0 0.3em; font-family: var(--pm-mono); font-size: 0.84rem; letter-spacing: 0.04em; font-weight: 600; }
     .cal-rsvp-out :global(.cal-rsvp-out-body) { margin: 0.2em 0; font-size: 0.92rem; line-height: 1.55; overflow-wrap: anywhere; }
-    .cal-rsvp-out :global(.cal-rsvp-out-note) { margin: 0.1em 0 0.3em; font-size: 0.84rem; line-height: 1.5; color: var(--pm-ink-soft); }
+    .cal-rsvp-out :global(.cal-rsvp-out-note), .cal-rsvp-out :global(.cal-rsvp-secret .cal-rsvp-out-note) { margin: 0.1em 0 0.3em; font-size: 0.84rem; line-height: 1.5; color: var(--pm-ink-soft); }
     .cal-rsvp-out :global(.cal-rsvp-out-coda) { margin: 0.6em 0 0; font-size: 0.84rem; line-height: 1.5; color: var(--pm-ink-soft); font-style: italic; }
     .cal-rsvp-out :global(.cal-rsvp-secret) { margin: 0.7em 0 0.2em; padding: 0.7em 0.8em; border-radius: 8px; border: 1px dashed var(--pm-accent); background: #fffaf0; }
     .cal-rsvp-out :global(.cal-rsvp-secret-head) { margin: 0 0 0.35em; font-family: var(--pm-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pm-ink-soft); }
