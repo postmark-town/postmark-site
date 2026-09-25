@@ -68,6 +68,16 @@ export const ACCENTS = {
   votes: { a: "#a4632a", A: "#c9823d", m: "#6d4220" },
 };
 
+// THE MEEPS WEAR THE LANES' TRIPLES, by reference — the same objects, so a
+// lane's colour moving moves the meep that borrowed it, and no hex is typed twice.
+Object.assign(ACCENTS, {
+  postmaster: ACCENTS.listings,
+  illuminator: ACCENTS.quests,
+  registrar: ACCENTS.votes,
+  worldkeeper: ACCENTS.ideas,
+  architect: ACCENTS.bounties,
+});
+
 // A hex from the table above, as the three channels a CSS rgba() needs. Kept
 // here rather than in the page because it is the only place a palette entry is
 // allowed to change shape, and because a falsifier can then check that what a
@@ -268,12 +278,172 @@ const BALLOT_HOUSE = [
   "........................",
 ];
 
+
+// ── THE MEEPS' QUARTER (the site, reprojected — part 3) ──────────────────────
+// Five more buildings for /meeps/, one per meep with a room, drawn in the same
+// 24×24 grammar and on the same ground row so they stand on the same quay. They
+// share the SPRITES table (and so the same well-formedness check) and they wear
+// the lanes' own accent triples — no new hex: the Post Office takes the
+// Marketplace's wax red, the Illuminator the Guild's stamp purple, the Registry
+// the Ballot House's orange, the Worldkeeper the Think Tank's blue, and the
+// Architect the Bounty Board's timber.
+
+// FERRY'S POST OFFICE — a gabled hall with a pennant and a letter for a sign.
+const POST_OFFICE = [
+  "..........a.............",
+  "..........aAAAa.........",
+  "..........aAAa..........",
+  "..........a.............",
+  "......kkkkkkkkkkkk......",
+  ".....kaaaaaaaaaaaak.....",
+  "....kaaaaaaaaaaaaaak....",
+  "...kAAAAAAAAAAAAAAAAk...",
+  "...kmmmmmmmmmmmmmmmmk...",
+  "...kwwwwwwwwwwwwwwwwk...",
+  "...kwppppppppppppppwk...",
+  "...kwpkppppppppppkpwk...",
+  "...kwpppkppppppkpppwk...",
+  "...kwpppppkkkkpppppwk...",
+  "...kwppppppppppppppwk...",
+  "...kwwwwwwwwwwwwwwwwk...",
+  "...kwGgwwwddddwwwgGwk...",
+  "...kwggwwwddddwwwggwk...",
+  "...kwwwwwwddGdwwwwwwk...",
+  "...kwwwwwwddddwwwwwwk...",
+  "...kkkkkkkkkkkkkkkkkk...",
+  "..sSssssSsssssSssssSss..",
+  "........................",
+  "........................",
+];
+
+// THE ILLUMINATOR'S STUDIO — a skylit atelier, one wide window with the
+// paint still wet on it.
+const STUDIO = [
+  "........................",
+  "........................",
+  "..............aa........",
+  "..............aa........",
+  "......kkkkkkkkkkkk......",
+  ".....kaaaaGGGGaaaak.....",
+  "....kaaaaaGGGGaaaaak....",
+  "...kAAAAAAAAAAAAAAAAk...",
+  "...kmmmmmmmmmmmmmmmmk...",
+  "...kwwwwwwwwwwwwwwwwk...",
+  "...kwkkkkkkkkkkkkkkwk...",
+  "...kwkGGGGGGGGGGGGkwk...",
+  "...kwkGaaGGGAAGGGGkwk...",
+  "...kwkGGGAAGGGGppGkwk...",
+  "...kwkGGGGGGaaGGGGkwk...",
+  "...kwkkkkkkkkkkkkkkwk...",
+  "...kwwwwwwwwwwwwwwwwk...",
+  "...kwwtwwwwddddwwwwwk...",
+  "...kwwtwwwwddddwwwwwk...",
+  "...kwtttwwwddGdwwwwwk...",
+  "...kkkkkkkkkkkkkkkkkk...",
+  "..sSssssSsssssSssssSss..",
+  "........................",
+  "........................",
+];
+
+// THE REGISTRY — a long archive with the roll open over the door and its
+// shelves lit along the front.
+const REGISTRY = [
+  "........................",
+  "........................",
+  "........................",
+  "........................",
+  "..kkkkkkkkkkkkkkkkkkkk..",
+  "..kAAAAAAAAAAAAAAAAAAk..",
+  "..kaaaaaaaaaaaaaaaaaak..",
+  "..kmmmmmmmmmmmmmmmmmmk..",
+  "..kwwwwwppppppppwwwwwk..",
+  "..kwwwwwppppkppppwwwwk..",
+  "..kwwwwwppppkppppwwwwk..",
+  "..kwwwwwwwwwwwwwwwwwwk..",
+  "..kwgGwgGwgGwgGwgGwwwk..",
+  "..kwggwggwggwggwggwwwk..",
+  "..kwwwwwwwwwwwwwwwwwwk..",
+  "..ktwtwtwwwwwwwwtwtwtk..",
+  "..ktwtwtwwddddwwtwtwtk..",
+  "..ktwtwtwwddddwwtwtwtk..",
+  "..ktwtwtwwddGdwwtwtwtk..",
+  "..ktwtwtwwddddwwtwtwtk..",
+  "..kkkkkkkkkkkkkkkkkkkk..",
+  "..sSssssSsssssSssssSss..",
+  "........................",
+  "........................",
+];
+
+// THE WORLDKEEPER'S TOWER — the crossings kept by a clock, a lantern lit on
+// top for the blessing.
+const CROSSING_TOWER = [
+  "...........A............",
+  "..........aGa...........",
+  "..........aGa...........",
+  ".........kkkkk..........",
+  ".........kaaak..........",
+  "........kaaaaak.........",
+  ".......kAAAAAAAk........",
+  ".......kmmmmmmmk........",
+  ".......kwwwwwwwk........",
+  ".......kwkkkkkwk........",
+  ".......kwkpGpkwk........",
+  ".......kwkGkGkwk........",
+  ".......kwkpGpkwk........",
+  ".......kwkkkkkwk........",
+  ".....kkkwwwwwwwkkk......",
+  "....kaaaawwwwwwwaaaak...",
+  "....kwwwwwwwwwwwwwwwk...",
+  "....kwgGwwwddddwwgGwk...",
+  "....kwggwwwddddwwggwk...",
+  "....kwwwwwwddGdwwwwwk...",
+  "....kkkkkkkkkkkkkkkkk...",
+  "..ssssSsssssSssssssS....",
+  "........................",
+  "........................",
+];
+
+// THE ARCHITECT'S DRAFTING OFFICE — a blueprint on the front and a crane
+// still standing over it: the road from an idea to a law is under way.
+const DRAFTING_OFFICE = [
+  "..aaaaaaaaaaaa..........",
+  "..a.........a...........",
+  "..a.........a...........",
+  "..a.........G...........",
+  "..a.....................",
+  "..a......kkkkkkkkkkkk...",
+  "..a.....kaaaaaaaaaaaak..",
+  "..a....kAAAAAAAAAAAAAAk.",
+  "..a....kmmmmmmmmmmmmmmk.",
+  "..a....kwwwwwwwwwwwwwwk.",
+  "..a....kwppppppppppppwk.",
+  "..a....kwpaaApppAaappwk.",
+  "..a....kwppppppppppppwk.",
+  "..a....kwwwwwwwwwwwwwwk.",
+  ".tat...kwgGwwwwwwwgGwwk.",
+  ".tat...kwggwwddddwggwwk.",
+  ".ttt...kwwwwwddddwwwwwk.",
+  ".tat...kwwwwwddGdwwwwwk.",
+  ".tat...kwwwwwddddwwwwwk.",
+  ".ttt...kwwwwwwwwwwwwwwk.",
+  ".kkkkkkkkkkkkkkkkkkkkkk.",
+  "..sSssssSsssssSssssSss..",
+  "........................",
+  "........................",
+];
+
 export const SPRITES = {
   quests: QUEST_GUILD,
   ideas: THINK_TANK,
   bounties: BOUNTY_BOARD,
   listings: MARKETPLACE,
   votes: BALLOT_HOUSE,
+  // the meeps' quarter
+  postmaster: POST_OFFICE,
+  illuminator: STUDIO,
+  registrar: REGISTRY,
+  worldkeeper: CROSSING_TOWER,
+  architect: DRAFTING_OFFICE,
 };
 
 export const SPRITE_W = 24;

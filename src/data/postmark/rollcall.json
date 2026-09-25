@@ -1,0 +1,186 @@
+{
+ "fetched_at": "2026-09-25T16:28:53.661Z",
+ "repo": "postmark-town/postmark-office",
+ "tag": "release/2026-w39.9",
+ "path": "deploy/box-rollcall-manifest.json",
+ "href": "https://github.com/postmark-town/postmark-office/blob/release/2026-w39.9/deploy/box-rollcall-manifest.json",
+ "units": [
+  {
+   "unit": "postmark-ferry.timer",
+   "label": "the ferry",
+   "stage": "live",
+   "cadence": "00:00 and 12:00 UTC, sharp and unjittered",
+   "heartbeat": {
+    "kind": "unit_trigger",
+    "stale_after_minutes": 780
+   }
+  },
+  {
+   "unit": "postmark-crossing-save.timer",
+   "label": "the crossing save",
+   "stage": "live",
+   "cadence": "00:02 and 12:02 UTC, two minutes behind each crossing on purpose",
+   "heartbeat": {
+    "kind": "unit_trigger",
+    "stale_after_minutes": 780
+   }
+  },
+  {
+   "unit": "postmark-office-rehydrate.timer",
+   "label": "the office's read index",
+   "stage": "live",
+   "cadence": "every 15 minutes at :07, :22, :37, :52 — offset from the site extractor",
+   "heartbeat": {
+    "kind": "unit_trigger",
+    "stale_after_minutes": 45
+   }
+  },
+  {
+   "unit": "postmark-harbor-watch.timer",
+   "label": "the harbor watch",
+   "stage": "live",
+   "cadence": "every 15 minutes, jittered up to 60s",
+   "heartbeat": {
+    "kind": "state_file",
+    "stale_after_minutes": 50
+   }
+  },
+  {
+   "unit": "postmark-usdc-watch.timer",
+   "label": "the usdc watch",
+   "stage": "live",
+   "cadence": "every 10 minutes, jittered up to 45s",
+   "heartbeat": {
+    "kind": "state_file",
+    "stale_after_minutes": 30
+   }
+  },
+  {
+   "unit": "postmark-site-sentinel.timer",
+   "label": "the site sentinel",
+   "stage": "live",
+   "cadence": "every 10 minutes, jittered up to 45s",
+   "heartbeat": {
+    "kind": "state_file",
+    "stale_after_minutes": 30
+   }
+  },
+  {
+   "unit": "postmark-settlement.timer",
+   "label": "the settlement sweep",
+   "stage": "live",
+   "cadence": "05:45 and 17:45 UTC",
+   "heartbeat": {
+    "kind": "state_file",
+    "stale_after_minutes": 780
+   }
+  },
+  {
+   "unit": "postmark-settlement-shadow.timer",
+   "label": "the settlement shadow",
+   "stage": "live",
+   "cadence": "10:23 and 22:23 UTC — off the real crossing's 05:45/17:45 marks so the rehearsal never races the pen",
+   "heartbeat": {
+    "kind": "state_file",
+    "stale_after_minutes": 780
+   }
+  },
+  {
+   "unit": "postmark-dev-freshen.timer",
+   "label": "the dev sandbox freshen",
+   "stage": "live",
+   "cadence": "once daily at 08:10 UTC",
+   "heartbeat": {
+    "kind": "unit_trigger",
+    "stale_after_minutes": 1560
+   }
+  },
+  {
+   "unit": "postmark-office.service",
+   "label": "the office API",
+   "stage": "live",
+   "cadence": "always on",
+   "heartbeat": {
+    "kind": "unit_active",
+    "stale_after_minutes": null
+   }
+  },
+  {
+   "unit": "postmark-office-dev.service",
+   "label": "the dev office",
+   "stage": "live",
+   "cadence": "always on",
+   "heartbeat": {
+    "kind": "unit_active",
+    "stale_after_minutes": null
+   }
+  },
+  {
+   "unit": "postmark-stripe-watch.timer",
+   "label": "the stripe watch (Stage B)",
+   "stage": "live",
+   "cadence": "every 15 minutes at :07/:22/:37/:52 — offset from usdc-watch so the two funding watchers never contend for town.lock",
+   "heartbeat": {
+    "kind": "state_file",
+    "stale_after_minutes": 45
+   }
+  },
+  {
+   "unit": "postmark-site-refresh.timer",
+   "label": "the box publishes the site (atomic swap, lock, convergence)",
+   "stage": "live",
+   "cadence": "every 30 minutes at :10/:40 — phased ~10 min after the ferry crossings",
+   "heartbeat": {
+    "kind": "state_file",
+    "stale_after_minutes": 100
+   }
+  },
+  {
+   "unit": "postmark-world2-clearing.timer",
+   "label": "the World 2.0 candle",
+   "stage": "live",
+   "cadence": "05:45 and 17:45 UTC — the marks world LOGOS/classes.md § crossing ② holds until the w39 ship (2026-09-21), after which both this timer and postmark-settlement.timer read 06:00 and 18:00; the repo copies already carry the ship's marks and reach the box with the tag",
+   "heartbeat": {
+    "kind": "state_file",
+    "stale_after_minutes": 780
+   }
+  },
+  {
+   "unit": "postmark-world2-ingest.timer",
+   "label": "the World 2.0 projection poll",
+   "stage": "parked",
+   "cadence": "none while parked (the unit file keeps its :04/:19/:34/:49 UTC OnCalendar for the day it is re-adopted)",
+   "heartbeat": null
+  },
+  {
+   "unit": "postmark-world2-law-ingest.timer",
+   "label": "the World 2.0 law pen",
+   "stage": "live",
+   "cadence": "every 15 minutes, :04/:19/:34/:49 UTC — the same marks the parked poll carries, kept deliberately: they are off the :07/:22/:37/:52 that office-rehydrate and stripe-watch occupy, and a new cadence here would be a second decision riding along with the split",
+   "heartbeat": {
+    "kind": "state_file",
+    "stale_after_minutes": 45
+   }
+  },
+  {
+   "unit": "postmark-world2-notary.timer",
+   "label": "the World 2.0 notary",
+   "stage": "live",
+   "cadence": "nightly at 07:20 UTC, jittered up to 2 min — after the morning crossing has published and its receipt has landed, so the certification reads the docket the crossing cleared (office#83; was 03:20, which read every docketed mark as canon-absent two hours before the crossing cleared it)",
+   "heartbeat": {
+    "kind": "state_file",
+    "stale_after_minutes": 1560
+   }
+  },
+  {
+   "unit": "postmark-world2-backup.timer",
+   "label": "the World 2.0 durability lane",
+   "stage": "live",
+   "cadence": "nightly at 08:10 UTC, jittered up to 5 min — after the notary (moved with it, office#83), so the night's certification has already been pushed to its own repo before the dump ships to this one",
+   "heartbeat": {
+    "kind": "state_file",
+    "stale_after_minutes": 1560
+   }
+  }
+ ]
+}

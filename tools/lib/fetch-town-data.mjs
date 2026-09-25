@@ -881,3 +881,49 @@ export async function fetchBlueprints({ fetchImpl = fetch, repo = BLUEPRINTS_REP
   }
   return { fetched_at: new Date().toISOString(), repo, branch, works };
 }
+
+// ── THE MEEPLINGS' BENCH (the site, reprojected — part 3) ────────────────────
+// The office's deploy/box-rollcall-manifest.json is the roll-call of every
+// deterministic unit on the box — "every mechanism that is supposed to be
+// running on meepo-ec2" — and the Meeps page renders it as the meeplings'
+// bench. The office repo is public, so the file is read raw, keyless, AT THE
+// RELEASE THE OFFICE SERVES: GET /release names the tag, and the manifest is
+// read at that tag, so the bench shows the units the box actually runs rather
+// than the ones a train is still carrying toward it.
+//
+// Only the fields the page renders are kept. Any failure throws, and the caller
+// keeps the committed snapshot the way it does for every other data file — a
+// bench read from yesterday's release is a floor, not a lie, and the page says
+// which tag it was read at.
+export const OFFICE_REPO_SLUG = "postmark-town/postmark-office";
+export const ROLLCALL_PATH = "deploy/box-rollcall-manifest.json";
+export async function fetchRollcall({ fetchImpl = fetch, apiBase = "https://postmark.town/api", repo = OFFICE_REPO_SLUG, timeoutMs = 15000 } = {}) {
+  const get = async (url) => {
+    const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs), headers: { accept: "application/json" } });
+    if (!res.ok) throw new Error(`${url} answered ${res.status}`);
+    return res.json();
+  };
+  const release = await get(`${apiBase.replace(/\/+$/, "")}/release`);
+  const tag = typeof release?.tag === "string" && release.tag ? release.tag : null;
+  if (!tag) throw new Error("GET /release named no tag — the served release is unknown, so no bench is read");
+  const url = `https://raw.githubusercontent.com/${repo}/${tag}/${ROLLCALL_PATH}`;
+  const manifest = await get(url);
+  if (!Array.isArray(manifest?.units)) throw new Error(`${url} carries no units array`);
+  const units = manifest.units.map((u) => ({
+    unit: String(u.unit ?? ""),
+    label: String(u.label ?? u.unit ?? ""),
+    stage: u.stage ? String(u.stage) : null,
+    cadence: u.cadence ? String(u.cadence) : null,
+    heartbeat: u.heartbeat && typeof u.heartbeat === "object"
+      ? { kind: u.heartbeat.kind ?? null, stale_after_minutes: Number.isFinite(u.heartbeat.stale_after_minutes) ? u.heartbeat.stale_after_minutes : null }
+      : null,
+  })).filter((u) => u.unit);
+  return {
+    fetched_at: new Date().toISOString(),
+    repo,
+    tag,
+    path: ROLLCALL_PATH,
+    href: `https://github.com/${repo}/blob/${tag}/${ROLLCALL_PATH}`,
+    units,
+  };
+}
