@@ -331,9 +331,10 @@ test("THE TOP RAIL IS FOR HUMANS — Residents, the Mail and Stamps are lifted b
     assert.equal(town.members.some((m) => m.key === key), false, `${key} is a chip of The Town`);
     assert.equal(sectionOf(key).key, "record", `a page in ${key} lights another seat`);
   }
-  // THE BETA MARKER IS A DECIDED LOSS, not a dropped one: a chip row carries
-  // no beta mark, and the stamps page's own head says what is still cooking.
-  assert.equal(record.members.find((m) => m.key === "stamps").beta, undefined);
+  // Stamps keeps the honesty marker through the move — a move is exactly when
+  // a beta flag goes missing without anyone deciding to drop it.
+  assert.equal(record.members.find((m) => m.key === "stamps").beta, true,
+    "Stamps lost its beta chip on the way into The Record");
 
   // and the rest genuinely IS carried below — seats naming nothing else would
   // pass the list and fail the reader

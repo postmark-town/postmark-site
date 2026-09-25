@@ -282,13 +282,16 @@ test("the nav carries one Stamps entry, flagged beta", () => {
   // FOUR MOVES, ONE UNCHANGED LAW: one door, wearing the beta chip. Each move
   // cost a one-line red rather than a silent green, which is the whole reason
   // this reads the structure and not a regex over the layout's text.
+  // (5) 2026-09-25, the site reprojected, part 5: Stamps moved into The Record
+  // as a chip — what lasts, in one place. The law did not move: ONE door,
+  // wearing the beta chip, opening /stamps/. Its label is a chip's now
+  // ("stamps", the row's own casing); its section is The Record.
   const stamps = allEntries().filter((e) => e.key === "stamps");
   assert.equal(stamps.length, 1, "ONE Stamps door in the rail — a second rebuilds the split the portal removed");
-  assert.equal(stamps[0].label, "Stamps");
+  assert.equal(stamps[0].label, "stamps");
   assert.equal(stamps[0].beta, true, "the Stamps entry must wear the beta chip");
-  // its own seat: a top-level entry is its own section, so `section` is its key
-  assert.equal(stamps[0].section, "stamps", "Stamps is not a top-rail seat");
-  assert.equal(stamps[0].depth, 0, "Stamps is a chip of some section again");
+  assert.equal(stamps[0].section, "record", "Stamps is not a chip of The Record");
+  assert.equal(stamps[0].depth, 1, "Stamps is not a chip");
 
   // AND IT OPENS THE PAGE DIRECTLY. It wore a `noActive` escape for one
   // afternoon, while its destination was a fold of somebody else's page and it

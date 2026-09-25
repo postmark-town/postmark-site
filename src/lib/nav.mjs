@@ -394,9 +394,10 @@ export const RAIL = [
       { key: "mail", label: "the mail", href: "/mail/", icon: "✉" },
       { key: "crossings", label: "the crossings", href: "/records/crossings/", icon: "⛴" },
       { key: "works", label: "the works", href: "/works/", icon: "⚒" },
-      // Stamps wore a "beta" chip as a seat; a chip row carries no beta mark, so
-      // the page's own head says what is still cooking.
-      { key: "stamps", label: "stamps", href: "/stamps/", icon: "✦" },
+      // Stamps keeps the beta mark it wore as a seat — ONE door, wearing the
+      // beta chip, is the law test/civic-hub.test.mjs holds (ChipRow renders a
+      // chip's `beta` the way the rail renders a seat's).
+      { key: "stamps", label: "stamps", href: "/stamps/", icon: "✦", beta: true },
       { key: "numbers", label: "the numbers", href: "/numbers/", icon: "▦" },
       { key: "repos", label: "the repos", href: "/records/repos/", icon: "⌥" },
     ],
