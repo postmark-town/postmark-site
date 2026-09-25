@@ -148,7 +148,30 @@ export const HARBOR = "https://1f4ee.town/";
  *             split into real routes. Same first-is-the-aggregate law.
  *   icon      a small glyph before the label — decoration, never the name. The
  *             label alone still says what the chip is; `aria-hidden` in the row.
+ *   flag      the chip hangs only when this NAV FLAG is on (see `navFlags`
+ *             below) — for a chip whose page is built on another branch and
+ *             has not landed here. A chip to a 404 is worse than no chip.
+ *   waits     with `flag`: what the chip is waiting for, in a sentence. The
+ *             suite lets a flagged chip's page be missing only while its flag
+ *             is off by default and this reason is on file.
  */
+
+/**
+ * THE NAV FLAGS, read from the build's environment and nowhere else.
+ *
+ * `whatsOn` — the Town's "what's on" chip and the bulletin's "What's on → the
+ * calendar" line. The calendar page is built on `feature/calendar` (site #131 +
+ * #132) and has not landed on this branch; until it does, both stay off. Turn
+ * them on with PUBLIC_NAV_WHATS_ON=1 at build, or delete the flag the day the
+ * calendar merges (the site, reprojected — part 2).
+ *
+ * Default OFF, and the default is asserted: an unset environment is the dev and
+ * prod build today.
+ */
+export function navFlags(env = {}) {
+  return { whatsOn: env?.PUBLIC_NAV_WHATS_ON === "1" };
+}
+
 export const RAIL = [
   // The root stops squatting the town-apex's name (Keemin, 2026-08-25). It took
   // two passes to finish that: the trinity rail freed the LABEL, and this wave
@@ -242,6 +265,13 @@ export const RAIL = [
       // than the other way, because that word is the one in the URL, the key,
       // the frontmatter and every letter's deep link.
       { key: "bulletin", label: "the bulletin", href: "/bulletin/", icon: "⚑" },
+      // WHAT'S ON (the site, reprojected — part 2): the calendar, beside the
+      // bulletin, which no longer carries the town's happenings. Same key, href,
+      // icon and seat as feature/calendar's own chip (POS-211), so the day that
+      // branch merges the two lines meet in one place; the label is the design's.
+      { key: "calendar", label: "what’s on", href: "/calendar/", icon: "◷",
+        flag: "whatsOn",
+        waits: "the calendar page is built on feature/calendar (site #131 + #132) and has not landed on this branch" },
       // THE BALLOT AND THE BOUNTY BOARD LEFT THIS ROW, founder-ruled
       // 2026-08-30 evening: both are buildings of the civic quarter now, and
       // the quarter's chip is directly above. A chip row that lists the whole
@@ -465,11 +495,12 @@ export function sectionOf(active) {
   ) ?? null;
 }
 
-/** The section's chip row for this page, or null. Held chips never render. */
-export function chipsFor(active) {
+/** The section's chip row for this page, or null. Held chips never render;
+ *  a flagged chip renders only when its flag is on. */
+export function chipsFor(active, { flags = {} } = {}) {
   const s = sectionOf(active);
   if (!s || !s.members) return null;
-  return { of: s, chips: s.members.filter((m) => !m.held) };
+  return { of: s, chips: s.members.filter((m) => !m.held && (!m.flag || flags[m.flag] === true)) };
 }
 
 /**
@@ -508,11 +539,11 @@ export function subChipsFor(active) {
  * This lives here rather than in the layout so the suite can assert the real
  * decision instead of a copy of it that agrees today.
  */
-export function rowFor(active, { ownChips = false } = {}) {
+export function rowFor(active, { ownChips = false, flags = {} } = {}) {
   if (ownChips) return null;
   const room = subChipsFor(active);
   if (room) return { ...room, place: "page" };
-  const section = chipsFor(active);
+  const section = chipsFor(active, { flags });
   if (section) return { ...section, place: "section" };
   return null;
 }

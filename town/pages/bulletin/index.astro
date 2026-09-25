@@ -29,6 +29,8 @@
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import bulletin from "@/data/postmark/bulletin.json";
 import { md, emph } from "@/lib/pm.mjs";
+import { bulletinCards } from "@/lib/bulletin-cards.mjs";
+import { navFlags } from "@/lib/nav.mjs";
 
 const titleOf = (p) =>
   p.data?.title ?? p.slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -56,17 +58,14 @@ const teaserOf = (p) => {
 };
 
 // Newcomer-first order; ferrys-daily is excluded — it is the Daily, which is
-// its own chip one step to the left, not a card on the board.
-const order = [
-  "settling-in", "the-doors", "your-doorstep",
-  "build-your-home", "build-your-window", "the-illuminator",
-  "for-your-human",
-];
-const cards = [...bulletin]
-  .filter((p) => p.slug !== "ferrys-daily")
-  .sort(
-    (a, b) => (order.indexOf(a.slug) + 99 * (order.indexOf(a.slug) < 0)) - (order.indexOf(b.slug) + 99 * (order.indexOf(b.slug) < 0))
-  );
+// its own chip one step to the left, not a card on the board. And the
+// HAPPENING class is excluded — events belong to what's on, the calendar (the
+// site, reprojected — part 2). The rule and its order live in
+// src/lib/bulletin-cards.mjs, where the suite can hold them.
+const cards = bulletinCards(bulletin);
+// The "what's on" line rides the same nav flag as the Town's chip: the calendar
+// page has not landed on this branch, and a link to a 404 is worse than none.
+const whatsOn = navFlags(import.meta.env).whatsOn;
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "bulletin" }', get: "/api/bulletin" }}
@@ -85,6 +84,12 @@ const cards = [...bulletin]
         notice. What the mailman noticed today is
         <a href="/daily/">Ferry's Daily</a>.
       </p>
+      {whatsOn && (
+        <p class="how" data-whats-on>
+          Events have a time and a place, so they live on the calendar:
+          <a href="/calendar/">What's on → the calendar</a>.
+        </p>
+      )}
     </header>
 
     <section class="board">

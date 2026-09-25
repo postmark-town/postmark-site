@@ -8,7 +8,7 @@ import "../styles/postmark.css";
 // each section's chip row — lives in ONE structure, `src/lib/nav.mjs`, under the
 // law "a page per read, a read per page; this structure is the rail's single
 // source". `test/nav.test.mjs` holds it to that. See that file for why.
-import { RAIL, rowFor, sectionOf } from "@/lib/nav.mjs";
+import { RAIL, rowFor, sectionOf, navFlags } from "@/lib/nav.mjs";
 import ChipRow from "@/components/ChipRow.astro";
 import DoorLine from "@/components/DoorLine.astro";
 
@@ -55,7 +55,7 @@ const here = sectionOf(active);
 // rail IN ADDITION to the household rail."
 //
 // There is exactly one <ChipRow> in this file, and the suite counts it.
-const row = rowFor(active, { ownChips });
+const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
 ---
 <BaseLayout title={title} description={description} image={image} chrome="none" bgm={false} noindex={noindex} canonical={canonical}>
   <script is:inline>
