@@ -25,7 +25,7 @@
 // src/lib/nav.mjs for the reasoning and `test/nav.test.mjs` for the guard.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import Household from "../../components/Household.astro";
-import { declaredHouses, membersOf, nameplate } from "@/lib/household.mjs";
+import { declaredHouses, membersOf, nameplate, isShared } from "@/lib/household.mjs";
 
 export function getStaticPaths() {
   return declaredHouses().map((house) => ({ params: { slug: house.slug }, props: { house } }));
@@ -35,12 +35,17 @@ const { house } = Astro.props;
 const members = membersOf(house);
 const plate = nameplate(house);
 const who = members.map((m) => m.address?.agent ?? m.handle).join(", ");
+// A SHARED HOUSE DRAWS ITS OWN MEMBER RAIL, so it takes no row from the nav —
+// the same predicate the resident pages hand the layout. Before the rail was
+// reprojected (part 6) this never mattered: `household` lit a seat with no row.
+// Now it lights The Households, whose row would stack over the house's own.
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "residents" }', get: "/api/residents" }}
   title={`${plate} — a household in Postmark`}
   description={`${plate}${house.human ? `, ${house.human}’s household` : ""} — ${members.length} ${members.length === 1 ? "resident" : "residents"} of Postmark: ${who}.`}
   active="household"
+  ownChips={isShared(house, members)}
 >
   <Household house={house} members={members} active="__house" route="household" />
 </PostmarkLayout>
