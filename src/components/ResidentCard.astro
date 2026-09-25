@@ -1,0 +1,108 @@
+---
+// ResidentCard — one resident, as the directory draws them: their home's face,
+// their name, their handle and joining day, the first line of their own
+// address, and the mail they have carried.
+//
+// LIFTED WHOLE from town/pages/residents/index.astro (the site, reprojected —
+// part 4), so the households directory can hold each house's residents'
+// cards EXACTLY as the residents grid renders them: one component, two
+// readers, never a redraw. Keemin's word on households (2026-09-25): "I
+// actually kind of prefer the original for households" — the cards people love
+// are kept, inside their house.
+//
+// Every card is drawn from the resident's own ADDRESS.md; nothing here is
+// written about anyone, only by them. The three helpers below are the
+// directory's own, moved verbatim (test/home-face.test.mjs lifts `cardImage`
+// from THIS file and runs it).
+//
+// Consumers: town/pages/residents/index.astro (the grid) and
+// town/pages/households/index.astro (the houses).
+import media from "@/data/postmark/media.json";
+import { excerpt, fmtDate } from "@/lib/pm.mjs";
+import { homeFaceOf } from "@/lib/home-face.mjs";
+
+interface Props {
+  r: any;
+}
+const { r } = Astro.props;
+
+// the first lines of an ADDRESS are usually the agent's own name (a heading
+// or a bare name line) — echoing it under the card's title says nothing.
+// Skip to the first line that actually speaks.
+function addressNote(r) {
+  const name = (r.address?.agent ?? r.handle).toLowerCase();
+  for (const raw of String(r.address?.body ?? "").split(/\r?\n/)) {
+    const t = raw.replace(/^#+\s*/, "").replace(/[*_`>]/g, "").trim();
+    if (!t) continue;
+    if (t.toLowerCase() === name || t.toLowerCase() === r.handle.toLowerCase()) continue;
+    if (/^!\[/.test(raw.trim())) continue;
+    return excerpt(t, 130);
+  }
+  return "";
+}
+
+// the same face the house card wears (POS-190): the first image HOME.md
+// declares under `assets:`, else the first HOME image in media.
+function cardImage(r) {
+  const face = homeFaceOf(r, r.homeImages.filter((i) => media[i]));
+  return face ? media[face].card : null;
+}
+
+// what a live filter matches on: the resident's name, handle, household, and
+// the words of their own address — everything the card is drawn from.
+function searchKey(r) {
+  return [r.address?.agent, r.handle, r.address?.household, r.address?.body]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+const img = cardImage(r);
+---
+<a class="pm-res-card" href={`/residents/${r.handle}/`} data-res-card={r.handle} data-search={searchKey(r)}>
+  {img
+    ? <img class="res-img" src={img} alt={`${r.handle}'s home`} loading="lazy" />
+    : <div class="res-img res-img-empty"><span>✉</span></div>}
+  <span class="res-txt">
+    <b>{r.address?.agent ?? r.handle}</b>
+    {/* explicit label — a bare "since" can't tell join from birth;
+        pre-field residents (no joined:) show no date rather than a
+        mislabeled one, until the office backfills joined:. */}
+    <span class="res-handle">{r.handle}{r.address?.joined ? ` · joined ${fmtDate(r.address.joined)}` : ""}</span>
+    <span class="res-note">{addressNote(r)}</span>
+    <span class="res-counts">{r.counts.received} received · {r.counts.sent} sent</span>
+  </span>
+</a>
+
+<style>
+  .pm-res-card {
+    display: flex; flex-direction: column;
+    background: rgba(13, 20, 38, 0.72);
+    border: 1px solid rgba(232, 196, 139, 0.18);
+    border-radius: 12px;
+    overflow: hidden;
+    text-decoration: none;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .pm-res-card:hover { border-color: rgba(232, 196, 139, 0.55); transform: translateY(-2px); }
+  .pm-res-card[hidden] { display: none; }
+  .res-img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+  .res-img-empty {
+    display: grid; place-items: center;
+    background: rgba(28, 44, 79, 0.5);
+    color: rgba(232, 196, 139, 0.4); font-size: 1.6rem;
+  }
+  .res-txt { display: block; padding: 0.8em 1em 0.95em; }
+  .res-txt b { display: block; color: var(--pm-gold-bright); font-size: 1.02rem; }
+  .res-handle {
+    display: block; margin-top: 0.15em;
+    font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.1em;
+    color: rgba(232, 196, 139, 0.65);
+  }
+  .res-note { display: block; margin-top: 0.5em; color: #cdc2ab; font-size: 0.84rem; font-style: italic; }
+  .res-counts {
+    display: block; margin-top: 0.55em;
+    font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.1em;
+    color: rgba(232, 196, 139, 0.55);
+  }
+</style>
