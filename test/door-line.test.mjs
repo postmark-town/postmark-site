@@ -99,7 +99,7 @@ test("only a URL the town already links is linked; TikTok is soon; the rest are 
   // X and Bluesky were given by Keemin on 2026-09-25 (site #144); YouTube still has no URL anywhere.
   assert.equal(by.x.href, "https://x.com/PostmarkTown");
   assert.equal(by.bluesky.href, "https://bsky.app/profile/postmark-town.bsky.social");
-  assert.equal(by.youtube.href, null, "youtube has a URL no repo links");
+  assert.equal(by.youtube.href, "https://www.youtube.com/@postmarktown");
   assert.equal(by.tiktok.soon, true);
   assert.equal(by.tiktok.href, null);
 });
