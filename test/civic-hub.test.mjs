@@ -67,7 +67,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { FOUNDER_ACCOUNT } from "../src/lib/funding.mjs";
-import { allEntries } from "../src/lib/nav.mjs";
+import { allEntries, MOVED } from "../src/lib/nav.mjs";
 import { DEFAULT_LANE, STAGES } from "../src/lib/civic.mjs";
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
@@ -96,7 +96,7 @@ function everyPageFile(dir = new URL("../town/pages/", import.meta.url).pathname
 // content law in here went red at once while every sentence it asserts was
 // present and correct one file over.
 const HUB_PATH = "../town/pages/town/index.astro";
-const TEACHING_PATH = "../town/pages/stamps/index.astro";
+const TEACHING_PATH = "../town/pages/docs/stamps/index.astro";
 
 // Markup wraps quoted sentences across lines and threads <b> through them, so
 // every assertion below reads a whitespace-flattened, tag-stripped view. A
@@ -195,7 +195,7 @@ test("no dial value is written into the portal's rendered words", () => {
 });
 
 test("the portal points at the dials rather than owning them", () => {
-  assert.ok(teachRaw.includes('href="/numbers/"'), "the teaching must link The Town's Numbers");
+  assert.ok(teachRaw.includes('href="/docs/numbers/"'), "the teaching must link The Town's Numbers");
   assert.ok(/readEconomy\(loadEconomy\(\)\)/.test(teachSrc),
     "and read its tile values from the emission, never from a literal");
 });
@@ -245,7 +245,7 @@ test("every holo mention carries the ruling's line", () => {
   // as a link whose text is a question" — so the assertion asks for the link
   // and for the word inside its text, and the sibling law below asks that the
   // text is a question and that nothing else is left.
-  assert.ok(/href="\/stamps\/#\w+"[^>]*>[^<]*holo[^<]*</i.test(raw),
+  assert.ok(/href="\/docs\/stamps\/#\w+"[^>]*>[^<]*holo[^<]*</i.test(raw),
     "but the hub must still point a reader at where holo is explained");
   // AND NO TYPED COPY OF IT ANYWHERE. Counting occurrences was the wrong
   // instrument — with three mentions on the page, replacing one with prose
@@ -290,7 +290,10 @@ test("the nav carries one Stamps entry, flagged beta", () => {
   assert.equal(stamps.length, 1, "ONE Stamps door in the rail — a second rebuilds the split the portal removed");
   assert.equal(stamps[0].label, "stamps");
   assert.equal(stamps[0].beta, true, "the Stamps entry must wear the beta chip");
-  assert.equal(stamps[0].section, "record", "Stamps is not a chip of The Record");
+  // (6) 2026-09-26, the Site Lift (POS-249): The Record dissolved and Stamps
+  // is a chip of the Docs, at /docs/stamps/; the old path forwards, fragment
+  // and all. The law did not move: ONE door, wearing the beta chip.
+  assert.equal(stamps[0].section, "docs", "Stamps is not a chip of the Docs");
   assert.equal(stamps[0].depth, 1, "Stamps is not a chip");
 
   // AND IT OPENS THE PAGE DIRECTLY. It wore a `noActive` escape for one
@@ -298,12 +301,12 @@ test("the nav carries one Stamps entry, flagged beta", () => {
   // could therefore never light. That is gone with the reason for it: the seat
   // has its own room again and lights normally, which is what a top-rail seat
   // is supposed to do.
-  assert.equal(stamps[0].href, "/stamps/", "the Stamps seat must open the teaching");
+  assert.equal(stamps[0].href, "/docs/stamps/", "the Stamps seat must open the teaching");
   assert.equal(stamps[0].noActive, undefined,
     "the Stamps seat has its own page again — it must be able to light up");
   // and nothing in the rail deep-links PAST the door into the teaching's
   // sections, which would be a second Stamps door wearing a fragment
-  assert.deepEqual(allEntries().filter((e) => /^\/stamps\/.+/.test(e.href)), [],
+  assert.deepEqual(allEntries().filter((e) => /^\/docs\/stamps\/.+/.test(e.href)), [],
     "no second Stamps door in the rail");
 });
 
@@ -1136,14 +1139,17 @@ test("no pot page promises a close it does not run", () => {
 // ── the routes ───────────────────────────────────────────────────────────────
 
 test("both retired routes redirect somewhere that exists", () => {
-  const config = read("../astro.config.town.mjs");
-  assert.match(config, /'\/board\/':\s*'\/town\/#board'/,
+  // RE-AIMED 2026-09-26 (the Site Lift, POS-249): the redirects left the Astro
+  // config for ONE table, MOVED in src/lib/nav.mjs, whose forwarding page
+  // carries the #fragment a meta refresh drops. Same two rows, same targets,
+  // except the guide's, which follows the teaching to /docs/stamps/.
+  assert.equal(MOVED["/board/"], "/town/#board",
     "the board's old path must land on the block that absorbed it");
   // RE-AIMED TWICE IN ONE DAY: the guide pointed at /town/#rules while The
   // Town held the teaching, and comes back to /stamps/ now that the teaching
   // does. The guide's content and this route's target have been the same thing
   // throughout; only the address of that thing moved, and back.
-  assert.match(config, /'\/stamps\/guide\/':\s*'\/stamps\/'/,
+  assert.equal(MOVED["/stamps/guide/"], "/docs/stamps/",
     "and the guide's, on the page that carries the teaching");
   // a redirect at a fragment the target does not carry lands nowhere at all
   assert.ok(raw.includes('<div id="board"'), "#board must still be on the hub");
@@ -1164,7 +1170,7 @@ test("both retired routes redirect somewhere that exists", () => {
 });
 
 test("nothing in the repo still points at a retired route", () => {
-  for (const page of ["index.astro", "numbers/index.astro", "fund/[pot].astro", "town/index.astro"]) {
+  for (const page of ["index.astro", "docs/numbers/index.astro", "fund/[pot].astro", "town/index.astro"]) {
     const s = read(`../town/pages/${page}`);
     assert.equal(/href="\/board\/"/.test(s), false,
       `${page} still links /board/ — the redirect is for links the repo cannot reach`);
@@ -1190,7 +1196,7 @@ test("nothing in the repo still points at a retired route", () => {
   // file already reads — so a pointer at a section that was renamed or removed
   // still costs a red, which is the failure the original two names were a proxy
   // for.
-  const teachLinks = [...raw.matchAll(/href="\/stamps\/#([\w-]+)"/g)].map((m) => m[1]);
+  const teachLinks = [...raw.matchAll(/href="\/docs\/stamps\/#([\w-]+)"/g)].map((m) => m[1]);
   assert.ok(teachLinks.length > 0, "the hub points at no part of the teaching at all");
   for (const id of teachLinks) {
     assert.ok(RULE_IDS.includes(id),
@@ -1392,7 +1398,7 @@ test("RULE 2: explain by link, never inline — and what survives is a question"
   // shortened the same day, and named on 09-01 as not-a-removal. So the law is
   // not "the paragraph is shorter"; it is that what stands in its place is a
   // LINK and its TEXT IS A QUESTION.
-  const seam = /<a href="\/stamps\/#seam">([^<]+)<\/a>/.exec(raw);
+  const seam = /<a href="\/docs\/stamps\/#seam">([^<]+)<\/a>/.exec(raw);
   assert.ok(seam, "the holo pointer is gone entirely — a lane owes a word it uses and does not define");
   assert.match(seam[1], /^What's holo\?$/,
     `the holo pointer's text must be the question itself, not a sentence: got "${seam[1]}"`);
@@ -1430,7 +1436,7 @@ test("RULE 2: explain by link, never inline — and what survives is a question"
   // mechanism. It is declared in that file's KNOWN_OPEN with the reason:
   // where the price rows should land is a content call, not a typo.
   for (const [what, href] of [
-    ["where holo is explained", "/stamps/#seam"],
+    ["where holo is explained", "/docs/stamps/#seam"],
     ["the full quest board", "/town/#quests"],
     ["the price board", "/bulletin/#marketplace"],
     ["the postmaster, who hand-sets a listing", "/mail/compose/?to=postmaster"],

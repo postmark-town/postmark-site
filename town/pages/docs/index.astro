@@ -1,0 +1,64 @@
+---
+// /docs/ — THE DOCS, a placeholder that says so (the Site Lift, POS-249).
+//
+// Keemin, 2026-09-26: "The stamps and the numbers are the start of the Docs or
+// Guides, needed soon to explain the growing features. The repos probably
+// belong there too." The rail seats Docs now so no seat 404s; the Docs issue
+// replaces this page with the real landing. Until then it says what is coming
+// and points at the three pages that are already here. "Docs" is the working
+// name until Keemin names it.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+
+const here = [
+  { href: "/docs/stamps/", name: "Stamps", what: "what a stamp is, how one is earned, and where it goes" },
+  { href: "/docs/numbers/", name: "The numbers", what: "the town's dials, as they stand today" },
+  { href: "/docs/repos/", name: "The repos", what: "the five public repositories the town is made of" },
+  { href: "/projects/", name: "The projects", what: "what the town is building, and who is building it" },
+];
+---
+<PostmarkLayout
+  door={null}
+  title="Docs — Postmark"
+  description="The town's guides, being gathered: stamps, the numbers, the repos and the projects, with more to explain the town's growing features."
+  active="docs"
+>
+  <div class="ph">
+    <header class="ph-head">
+      <h1>Docs</h1>
+      <p class="tag">coming together</p>
+      <p class="how">This will be where the town explains itself: a guide for each of its features, written for the people who use them. It is being built. What is already here:</p>
+    </header>
+    <ul class="ph-list">
+      {here.map((d) => (
+        <li><a href={d.href}><b>{d.name}</b></a> <span>{d.what}</span></li>
+      ))}
+    </ul>
+  </div>
+
+  <style>
+    .ph { max-width: 44rem; margin: 0 auto; padding: 0 0.4em 2em; }
+    .ph-head { text-align: center; margin: 0 0 1.7em; }
+    .ph-head h1 {
+      margin: 0;
+      font-size: clamp(1.9rem, 4.6vw, 2.6rem);
+      color: var(--pm-gold-bright);
+      text-shadow: 0 0 34px rgba(232, 196, 139, 0.35);
+    }
+    .ph-head .tag {
+      margin: 0.4em 0 1em;
+      font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.12em;
+      color: rgba(232, 196, 139, 0.8);
+    }
+    .ph-head .how { max-width: 62ch; margin: 0 auto; color: #cdc2ab; font-size: 0.95rem; line-height: 1.6; }
+    .ph-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55em; }
+    .ph-list li {
+      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.3em 1em;
+      padding: 0.75em 1.2em;
+      background: rgba(13, 20, 38, 0.72);
+      border: 1px solid rgba(232, 196, 139, 0.18);
+      border-radius: 12px;
+    }
+    .ph-list a { color: var(--pm-gold-bright); text-decoration: none; }
+    .ph-list span { color: #cdc2ab; font-size: 0.9rem; }
+  </style>
+</PostmarkLayout>

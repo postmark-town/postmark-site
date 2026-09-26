@@ -20,7 +20,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { MEEPS } from "../src/lib/meeps-quarter.mjs";
-import { REPOS, crossingRows } from "../src/lib/record.mjs";
+import { REPOS } from "../src/lib/record.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = (f) => JSON.parse(readFileSync(join(ROOT, "src", "data", "postmark", f), "utf8"));
@@ -76,29 +76,14 @@ test("the Households: the intro's rest and a house of one", { skip: !built("hous
   ]);
 });
 
-test("the Record: the site's gloss on the founder's line", { skip: !built("records") }, () => {
-  const page = html("records");
-  assert.ok(plain(page).includes("We refuse to hide: the record is public."), "the founder's line left the page");
-  reachable(page, ["each kept in a repository anyone can clone and check."]);
-});
-
-test("the crossings: the intro's rest, and S81's window, tag, held count and receipt behind its expand",
-  { skip: !built("records", "crossings") }, () => {
-  const page = html("records", "crossings");
-  reachable(page, [
-    "Twice a day the Worldkeeper folds what residents placed in the world",
-    "A crossing that cannot go green settles nothing.",
-  ]);
-  const i = page.indexOf('data-crossing="81"');
-  const row = page.slice(i, page.indexOf("</li>", i));
-  const s81 = crossingRows(DATA("crossings.json")).find((r) => r.n === 81);
-  const firstLine = s81.receipt.split("\n").find((l) => l.trim());
-  reachable(row, [firstLine, s81.sha, "held 0", "window"]);
-});
-
+// THE RECORD'S LANDING AND ITS CROSSINGS PAGE RETIRED with the Record (the Site
+// Lift, POS-249, 2026-09-26): /records/ and /records/crossings/ forward to the
+// replay, which carries the settlements (POS-255). Their reachability checks
+// went with the pages; the repos page moved to the Docs and its check moved
+// with it.
 test("the repos: one line each, what it holds and what its maintainers said on its hover",
-  { skip: !built("records", "repos") }, () => {
-  const page = html("records", "repos");
+  { skip: !built("docs", "repos") }, () => {
+  const page = html("docs", "repos");
   reachable(page, ["The doors answer what the town holds; these are where it is kept."]);
   for (const r of REPOS) {
     const start = page.indexOf(`data-repo="${r.key}"`);

@@ -508,7 +508,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
           worked example
           {dialsAreLive
             ? <span class="s-dim"> · running against the town's published dials</span>
-            : <span class="s-dim"> · the cap runs at its constitutional ceiling here so the sums are followable; the town's own dials hang at <a href="/numbers/">The Town's Numbers</a>, and this example recomputes itself against them when the ledger publishes them to the site</span>}
+            : <span class="s-dim"> · the cap runs at its constitutional ceiling here so the sums are followable; the town's own dials hang at <a href="/docs/numbers/">The Town's Numbers</a>, and this example recomputes itself against them when the ledger publishes them to the site</span>}
         </p>
         <p class="s-example-lead">
           The town's box costs <b>{usd(POT_TARGET)} a month</b> — that is the pot's posted
@@ -672,7 +672,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         </blockquote>
         <p class="s-law-foot">
           The dial the close actually runs on — the cap — is published at
-          <a href="/numbers/"> The Town's Numbers</a> and owned by
+          <a href="/docs/numbers/"> The Town's Numbers</a> and owned by
           <a href={`${TOWN}/ECONOMY-DIALS.json`} target="_blank" rel="noopener"> ECONOMY-DIALS.json</a>.
           No page restates them; every page reads them.
         </p>
@@ -897,7 +897,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <p>
           Founder-set defaults for the pilot quarter, published in the open. After a
           quarter of real numbers, any household may petition a dial ballot. Live values:
-          <a href="/numbers/"> The Town's Numbers</a>.
+          <a href="/docs/numbers/"> The Town's Numbers</a>.
         </p>
       </details>
 
@@ -940,8 +940,8 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <div><dt>patron</dt><dd>Whoever paid the dollars. The town's record of a payment keeps the patron's name, the amount, the pot and the date, permanently and publicly — whether or not any holo minted.</dd></div>
         <div><dt>beneficiary</dt><dd>Where a pot's dollars go — the party that sends the bill. Receives dollars, never stamps.</dd></div>
         <div><dt>treasury</dt><dd>The town's own account. It never receives from its own seam, and its spending mints nothing.</dd></div>
-        <div><dt>σ (sigma)</dt><dd>The deliverer's fraction of a fulfilled bounty's staked mass, minted fresh as a wage at the conversion. No leg in a pot's close since 2026-09-14. Published at <a href="/numbers/">The Town's Numbers</a>.</dd></div>
-        <div><dt>ρ (rho)</dt><dd>The dial that caps what one household may be minted from money in a single close, as a fraction of everything it has earned. Published at <a href="/numbers/">The Town's Numbers</a>.</dd></div>
+        <div><dt>σ (sigma)</dt><dd>The deliverer's fraction of a fulfilled bounty's staked mass, minted fresh as a wage at the conversion. No leg in a pot's close since 2026-09-14. Published at <a href="/docs/numbers/">The Town's Numbers</a>.</dd></div>
+        <div><dt>ρ (rho)</dt><dd>The dial that caps what one household may be minted from money in a single close, as a fraction of everything it has earned. Published at <a href="/docs/numbers/">The Town's Numbers</a>.</dd></div>
         <div><dt>q</dt><dd>The scalar that would set how much the World-as-a-project pays its makers. Not yet set by the town — see <a href="#minterest">minterest</a>.</dd></div>
         <div><dt>crossing / settlement</dt><dd>The twice-daily moments the ferry runs and the world's record settles. Money moves on crossings, like everything else here.</dd></div>
         <div><dt>mark</dt><dd>Anything standing on the World's record — a home, a garden, a tool, a notice. Marks can be staked, and one day will pay their makers.</dd></div>
@@ -968,7 +968,7 @@ node tools/stamp-mint.mjs --derive      # recompute, from the mail, what the led
       <p class="s-note">
         If you'd rather not clone: <a href="/api/stamps">/api/stamps</a> carries the
         cumulative mint and every balance. The dials are at
-        <a href="/numbers/"> The Town's Numbers</a>, the open asks and pots at
+        <a href="/docs/numbers/"> The Town's Numbers</a>, the open asks and pots at
         <a href="/town/#board"> the board</a>, and every household's own record on
         <a href="/residents/"> their page</a>.
       </p>
@@ -1032,7 +1032,7 @@ node tools/stamp-mint.mjs --derive      # recompute, from the mail, what the led
           <p class="m-note">
             Every value above is read from the ledger's own derived record; none is written down
             here, so a ballot that moves a dial needs no edit. The full gauges hang at
-            <a href="/numbers/"> the Town's Numbers</a>, and the signed record itself is
+            <a href="/docs/numbers/"> the Town's Numbers</a>, and the signed record itself is
             <a href={LEDGER} target="_blank" rel="noopener"> the ledger ↗</a>.
           </p>
         </>

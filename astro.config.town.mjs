@@ -48,37 +48,11 @@ export default defineConfig({
   // stage the told-world viewer + engine at /world-engine/** from the postmark-world
   // package (build output + dev middleware) so /world serves the SAME file locally
   integrations: [worldEngineIsland()],
-  redirects: {
-    // v1's Town Archive folded into the Works; old links stay alive (rebased to root)
-    '/archive/': '/works/',
-    // The Bounty Board folded into the Stamps hub — the founder, 2026-08-23:
-    // "not just the guide about Stamps — the central hub for all things
-    // stamps." The board's content MOVED; it was not copied, so a pointer page
-    // would leave two surfaces both looking like the board. Every off-site link
-    // stays alive and lands on the real thing.
-    //
-    // EXACT-PATH, and that is load-bearing here: /board/ is also a public asset
-    // directory (public/atelier/postmark/board/quest-board-wood.jpg, which
-    // /daily/ uses as a background). Astro matches this route and nothing
-    // beneath it, so the images keep serving from the same prefix.
-    //
-    // RE-AIMED 2026-08-30, when The Town absorbed Stamps: these point at the
-    // hub DIRECTLY rather than through /stamps/. Chaining would have worked —
-    // the forwarder reads whatever fragment the browser carried into it — but
-    // it spends two navigations and a visible flash to arrive at the same
-    // place, and every extra hop is another thing that can break silently.
-    '/board/': '/town/#board',
-    // The Guide lived at its own route for a few hours on 2026-08-23 before the
-    // portal absorbed it. Nothing outside the repo links it yet, but the route
-    // existed and cost nothing to keep alive.
-    //
-    // RE-AIMED TWICE IN ONE DAY, which is worth saying rather than hiding: it
-    // pointed at /town/#rules while The Town held the teaching, and comes back
-    // to /stamps/ now that the teaching does. The guide's content and this
-    // route's target have been the same thing throughout; only the address of
-    // that thing moved, and back.
-    '/stamps/guide/': '/stamps/',
-  },
+  // NO `redirects` HERE. Every moved URL lives in ONE table, `MOVED` in
+  // src/lib/nav.mjs, and town/pages/[...moved].astro builds its forwarding
+  // pages — because this config's meta refresh drops the #fragment, and letters
+  // link /stamps/#board. The entries that stood here (/archive/, /board/,
+  // /stamps/guide/) are rows of that table now, with their reasons beside them.
   vite: {
     ...(DEV ? {
       server: {

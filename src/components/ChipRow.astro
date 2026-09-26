@@ -19,6 +19,7 @@
 //   origin   the layout's origin prefix, for pages served off another domain
 //   place    "section" (under the town header) | "page" (above a page's content)
 //   label    aria-label for the nav landmark
+import { iconSvg } from "@/lib/pixel-icons.mjs";
 const { kicker, chips, active = "", origin = "", place = "section", label } = Astro.props;
 const href = (c) => (c.external ? c.href : `${origin}${c.href}`);
 
@@ -30,14 +31,16 @@ const href = (c) => (c.external ? c.href : `${origin}${c.href}`);
 // stays reserved for the page you are actually on; the ancestor wears the
 // highlight without claiming to be the destination.
 const onPage = (c) => active === c.key;
-const inside = (c) => (c.chips ?? []).some((x) => x.key === active);
+// Inside includes a page the room carries without being its landing: the
+// calendar and the Daily hang on the Bulletin's board (`alsoKeys` in nav.mjs).
+const inside = (c) => (c.alsoKeys ?? []).includes(active) || (c.chips ?? []).some((x) => x.key === active);
 
-// A chip may carry a little icon (founder, 2026-08-25: "I'd like little icons
-// for the town's chips"). It is DECORATION and is marked as such: `aria-hidden`
-// on the glyph, the label untouched beside it, so a screen reader hears "the
-// ballot" and not "ballot box with check the ballot". A chip with no `icon`
-// renders exactly as it did — the field is opt-in per entry in `nav.mjs`, which
-// is what lets one row wear them without the others changing.
+// A chip carries a little PIXEL-ART icon (founder, 2026-08-25: "I'd like little
+// icons for the town's chips"; 2026-09-26: the secondary rail is hard to spot,
+// "little pixel-art icons for each chip, and bigger buttons"). The pictures are
+// drawn by hand in src/lib/pixel-icons.mjs, in the chip's own ink. It is
+// DECORATION and is marked as such: `aria-hidden` on the picture, the label
+// untouched beside it, so a screen reader hears "the ballot" and nothing more.
 ---
 <nav class:list={["pm-chiprow", "pm-chiprow--nav", `pm-chiprow--${place}`]} aria-label={label ?? `${kicker} — this section’s pages`}>
   <span class="pm-chiprow-head">{kicker}</span>
@@ -46,7 +49,7 @@ const inside = (c) => (c.chips ?? []).some((x) => x.key === active);
       class:list={["pm-chip", i === 0 && "is-first", (onPage(c) || inside(c)) && "is-on"]}
       href={href(c)}
       aria-current={onPage(c) ? "page" : undefined}
-    >{c.icon && <span class="pm-chip-icon" aria-hidden="true">{c.icon}</span>}{c.label}{c.beta && <span class="pm-nav-beta">beta</span>}</a>
+    >{c.icon && <span class="pm-chip-icon" aria-hidden="true" set:html={iconSvg(c.icon)} />}{c.label}{c.beta && <span class="pm-nav-beta">beta</span>}</a>
   ))}
   <slot />
 </nav>

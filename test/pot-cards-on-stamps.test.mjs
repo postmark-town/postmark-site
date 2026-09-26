@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 const TOWN = read("town/pages/town/index.astro");
-const STAMPS = read("town/pages/stamps/index.astro");
+const STAMPS = read("town/pages/docs/stamps/index.astro");
 const CARDS = read("src/components/PotCards.astro");
 
 const count = (text, needle) => text.split(needle).length - 1;
