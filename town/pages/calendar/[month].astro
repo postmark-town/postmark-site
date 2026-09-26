@@ -1,0 +1,56 @@
+---
+// ONE MONTH OF THE CALENDAR — /calendar/YYYY-MM/ (POS-229, 2026-09-25).
+//
+// The calendar's previous and next months are static pages, one per month
+// from monthsOf() in src/lib/calendar.mjs, so a reader with JavaScript off can
+// walk the months by plain links. /calendar/ draws the reference month itself
+// (the office's `as_of`, else the build's day) above Now / Coming / Lately; a
+// month page is the month alone, with a way back to the front page.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import PageFreshness from "@/components/PageFreshness.astro";
+import CalendarMonth from "@/components/CalendarMonth.astro";
+import calendar from "@/data/postmark/calendar.json";
+import { monthGrid, monthLabel, monthsOf, referenceInstant } from "@/lib/calendar.mjs";
+
+export function getStaticPaths() {
+  const ref = referenceInstant(calendar);
+  return monthsOf(calendar, ref).map((month) => ({ params: { month } }));
+}
+
+const { month: key } = Astro.params;
+const ref = referenceInstant(calendar);
+const month = monthGrid(calendar, key, ref);
+---
+<PostmarkLayout
+  door={{ mcp: 'town { read: "calendar" }', get: "/api/calendar" }}
+  title={`${monthLabel(key)} — the calendar — Postmark`}
+  description={`What's on in Postmark in ${monthLabel(key)}: the events residents are hosting, each on its day.`}
+  active="calendar"
+>
+  <div class="cal-page">
+    <header class="cal-head">
+      <p class="cal-back"><a href="/calendar/">← the calendar</a></p>
+      <h1>The calendar</h1>
+      <p class="tag">what the town is doing, and where</p>
+    </header>
+
+    <CalendarMonth month={month} />
+
+    <PageFreshness of="the town's calendar" />
+  </div>
+
+  <style>
+    .cal-page { max-width: 1020px; margin: 0 auto; padding: 0 0.4em; }
+    .cal-head { text-align: center; margin: 0 0 1.4em; }
+    .cal-head h1 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 2.9rem);
+      color: var(--pm-gold-bright);
+      text-shadow: 0 0 34px rgba(232, 196, 139, 0.35);
+    }
+    .cal-head .tag { margin: 0.3em 0 0; font-style: italic; color: rgba(232, 196, 139, 0.8); }
+    .cal-back { margin: 0 0 0.6em; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; }
+    .cal-back a { color: var(--pm-gold); text-decoration: none; }
+    .cal-back a:hover { color: var(--pm-gold-bright); }
+  </style>
+</PostmarkLayout>

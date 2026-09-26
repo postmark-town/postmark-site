@@ -1,0 +1,229 @@
+---
+// CalendarMonth — the calendar drawn as a month (POS-229, 2026-09-25).
+//
+// Two views of one month, both in the HTML so the page works with JavaScript
+// off: the grid (weeks as rows, Sunday first, today marked, each event on its
+// day as its start time and title, linking to its page) for a desk, and an
+// agenda (the month's events in order, each with its full date) for a phone,
+// where seven columns are too narrow to read. CSS picks one by width.
+//
+// The grid's days are UTC days and its times UTC clock times: the floor every
+// reader and every box agrees on, the same one CalendarCard bakes. The island
+// below does what only the reader's browser can: it rewrites each time into
+// the reader's zone, moves each event to its day in that zone, and marks the
+// reader's own today. The rules are in src/lib/calendar.mjs.
+//
+// Resident words (an event's title) render as TEXT through Astro's escaping.
+import {
+  WEEKDAYS, eventHref, monthHref, monthLabel, placeOf, utcClock, utcText,
+} from "@/lib/calendar.mjs";
+
+interface Props {
+  /** monthGrid(...) */
+  month: any;
+}
+const { month } = Astro.props;
+---
+<section class="cal-month" data-cal-month={month.key} data-count={month.count} aria-labelledby={`cal-month-${month.key}`}>
+  <nav class="cal-month-nav" aria-label="Months">
+    {month.prev
+      ? <a class="cal-month-step" href={monthHref(month.prev)} rel="prev" data-month-prev>← <span>{monthLabel(month.prev)}</span></a>
+      : <span class="cal-month-step is-off" aria-hidden="true">←</span>}
+    <h2 id={`cal-month-${month.key}`}>{month.label}</h2>
+    {month.next
+      ? <a class="cal-month-step" href={monthHref(month.next)} rel="next" data-month-next><span>{monthLabel(month.next)}</span> →</a>
+      : <span class="cal-month-step is-off" aria-hidden="true">→</span>}
+  </nav>
+  <p class="cal-zone" data-cal-zone>Times are in UTC.</p>
+
+  <table class="cal-grid" data-cal-grid>
+    <thead>
+      <tr>{WEEKDAYS.map((d) => <th scope="col">{d}</th>)}</tr>
+    </thead>
+    <tbody>
+      {month.weeks.map((week: any[]) => (
+        <tr>
+          {week.map((day) => (
+            <td
+              class:list={["cal-day", { "is-out": !day.inMonth, "is-today": day.today }]}
+              data-date={day.date}
+              data-today={day.today ? "" : undefined}
+              aria-current={day.today ? "date" : undefined}
+            >
+              <span class="cal-daynum">{day.day}</span>
+              <ul class="cal-day-events">
+                {day.events.map((e: any) => (
+                  <li class:list={["cal-item", { "is-cancelled": e.cancelled }]} data-cal-item={e.id} data-starts={e.starts}>
+                    {eventHref(e.id)
+                      ? <a href={eventHref(e.id)}><time datetime={e.starts} title={`${e.starts} (UTC)`} data-local-clock>{utcClock(e.starts)}</time> <span class="cal-item-title">{e.title}</span></a>
+                      : <span><time datetime={e.starts} title={`${e.starts} (UTC)`} data-local-clock>{utcClock(e.starts)}</time> <span class="cal-item-title">{e.title}</span></span>}
+                    {e.cancelled && <span class="cal-item-cancelled" data-cancelled> cancelled</span>}
+                  </li>
+                ))}
+              </ul>
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+
+  <ol class="cal-agenda" data-cal-agenda>
+    {month.events.map((e: any) => (
+      <li class:list={["cal-agenda-item", { "is-cancelled": e.cancelled }]} data-cal-item={e.id}>
+        <time class="cal-agenda-when" datetime={e.starts} title={`${e.starts} (UTC)`} data-local-when>{utcText(e.starts)}</time>
+        {eventHref(e.id)
+          ? <a class="cal-agenda-title" href={eventHref(e.id)}>{e.title}</a>
+          : <span class="cal-agenda-title">{e.title}</span>}
+        <span class="cal-agenda-place">
+          {e.cancelled && <span class="cal-item-cancelled" data-cancelled>cancelled · </span>}
+          at {placeOf(e.place).label}
+        </span>
+      </li>
+    ))}
+  </ol>
+
+  {month.count === 0 && <p class="cal-month-empty" data-empty-month>{month.empty}</p>}
+</section>
+
+<script>
+  import { LOCAL_CLOCK, LOCAL_FORMAT } from "@/lib/calendar.mjs";
+  // The reader's zone, from the reader's browser. Anything that will not parse
+  // keeps its UTC floor, which is still true.
+  const dayOf = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" });
+  const keyOf = (d: Date) => {
+    const p = Object.fromEntries(dayOf.formatToParts(d).map((x) => [x.type, x.value]));
+    return `${p.year}-${p.month}-${p.day}`;
+  };
+  for (const month of document.querySelectorAll<HTMLElement>("[data-cal-month]")) {
+    try {
+      const zone = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+        .formatToParts(new Date()).find((x) => x.type === "timeZoneName")?.value;
+      const said = month.querySelector("[data-cal-zone]");
+      if (said && zone) said.textContent = `Times are in your time zone (${zone}).`;
+    } catch {}
+    for (const el of month.querySelectorAll<HTMLTimeElement>("time[data-local-clock], time[data-local-when]")) {
+      try {
+        const d = new Date(el.getAttribute("datetime") ?? "");
+        if (Number.isNaN(d.getTime())) continue;
+        el.textContent = d.toLocaleString(undefined, el.hasAttribute("data-local-clock") ? LOCAL_CLOCK : LOCAL_FORMAT);
+      } catch {}
+    }
+    // Each event to its day in the reader's zone, when that day is on the grid.
+    const moved = new Set<Element>();
+    for (const item of month.querySelectorAll<HTMLElement>("[data-cal-grid] [data-cal-item][data-starts]")) {
+      try {
+        const d = new Date(item.dataset.starts ?? "");
+        if (Number.isNaN(d.getTime())) continue;
+        const cell = month.querySelector(`[data-cal-grid] td[data-date="${keyOf(d)}"] .cal-day-events`);
+        if (cell && cell !== item.parentElement) { cell.appendChild(item); moved.add(cell); }
+      } catch {}
+    }
+    for (const list of moved) {
+      [...list.children]
+        .sort((a, b) => String((a as HTMLElement).dataset.starts).localeCompare(String((b as HTMLElement).dataset.starts)))
+        .forEach((li) => list.appendChild(li));
+    }
+    // The reader's own today.
+    try {
+      const today = month.querySelector(`[data-cal-grid] td[data-date="${keyOf(new Date())}"]`);
+      for (const td of month.querySelectorAll("[data-cal-grid] td.is-today")) {
+        td.classList.remove("is-today"); td.removeAttribute("aria-current"); td.removeAttribute("data-today");
+      }
+      if (today) { today.classList.add("is-today"); today.setAttribute("aria-current", "date"); today.setAttribute("data-today", ""); }
+    } catch {}
+  }
+</script>
+
+<style>
+  .cal-month { margin: 0 0 2em; }
+  .cal-month-nav {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0.8em;
+    margin: 0 0 0.3em;
+  }
+  .cal-month-nav h2 {
+    margin: 0; text-align: center; font-size: 1.5rem; color: #f4e9d7; letter-spacing: 0.02em;
+  }
+  .cal-month-step {
+    justify-self: start; display: inline-flex; gap: 0.4em; align-items: center;
+    padding: 0.3em 0.9em; border-radius: 999px; border: 1px solid rgba(232, 196, 139, 0.35);
+    background: rgba(13, 20, 38, 0.6);
+    font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--pm-gold); text-decoration: none; white-space: nowrap;
+  }
+  .cal-month-nav > :last-child { justify-self: end; }
+  a.cal-month-step:hover { color: var(--pm-gold-bright); background: rgba(232, 196, 139, 0.08); }
+  a.cal-month-step:focus-visible { outline: 2px solid var(--pm-gold); outline-offset: 2px; }
+  .cal-month-step.is-off { opacity: 0.3; }
+  .cal-zone {
+    margin: 0 0 0.9em; text-align: center; font-family: var(--pm-mono); font-size: 0.68rem;
+    letter-spacing: 0.12em; text-transform: uppercase; color: rgba(232, 196, 139, 0.7);
+  }
+
+  .cal-grid {
+    width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0;
+    background: rgba(13, 20, 38, 0.6); border: 1px solid rgba(232, 196, 139, 0.25); border-radius: 12px;
+    overflow: hidden;
+  }
+  .cal-grid th {
+    padding: 0.6em 0 0.5em; font-family: var(--pm-mono); font-weight: 400; font-size: 0.68rem;
+    letter-spacing: 0.14em; text-transform: uppercase; color: rgba(232, 196, 139, 0.8);
+    border-bottom: 1px solid rgba(232, 196, 139, 0.25);
+  }
+  .cal-day {
+    vertical-align: top; height: 6.6em; padding: 0.35em 0.4em 0.5em;
+    border-top: 1px solid rgba(232, 196, 139, 0.12); border-left: 1px solid rgba(232, 196, 139, 0.12);
+  }
+  .cal-grid tbody tr:first-child .cal-day { border-top: 0; }
+  .cal-day:first-child { border-left: 0; }
+  .cal-day.is-out { background: rgba(7, 11, 21, 0.35); }
+  .cal-day.is-out .cal-daynum { opacity: 0.45; }
+  .cal-daynum {
+    display: inline-grid; place-items: center; min-width: 1.9em; height: 1.9em; margin: 0 0 0.2em;
+    font-family: var(--pm-mono); font-size: 0.78rem; color: #cdc2ab; border-radius: 50%;
+  }
+  .cal-day.is-today { background: rgba(232, 196, 139, 0.08); }
+  .cal-day.is-today .cal-daynum {
+    color: var(--pm-gold-bright); font-weight: 700; border: 1.5px solid var(--pm-gold);
+    box-shadow: 0 0 14px rgba(232, 196, 139, 0.35);
+  }
+  .cal-day-events { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25em; }
+  .cal-item { font-size: 0.8rem; line-height: 1.3; overflow-wrap: anywhere; }
+  .cal-item a, .cal-item > span {
+    display: block; padding: 0.2em 0.4em; border-radius: 8px; text-decoration: none;
+    color: #f4e9d7; background: rgba(232, 196, 139, 0.1); border-left: 2px solid var(--pm-gold);
+  }
+  .cal-item a:hover { color: var(--pm-gold-bright); background: rgba(232, 196, 139, 0.18); }
+  .cal-item a:focus-visible { outline: 2px solid var(--pm-gold); outline-offset: 1px; }
+  .cal-item time { font-family: var(--pm-mono); font-size: 0.72rem; color: var(--pm-gold); }
+  .cal-item.is-cancelled .cal-item-title { text-decoration: line-through; text-decoration-thickness: 1px; }
+  .cal-item.is-cancelled a { opacity: 0.8; }
+  .cal-item-cancelled {
+    font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: #e0846b;
+  }
+
+  .cal-agenda { display: none; list-style: none; margin: 0; padding: 0; }
+  .cal-agenda-item {
+    display: grid; gap: 0.15em; padding: 0.75em 0.9em; margin: 0 0 0.6em;
+    background: rgba(13, 20, 38, 0.6); border: 1px solid rgba(232, 196, 139, 0.25); border-radius: 12px;
+    border-left: 3px solid var(--pm-gold);
+  }
+  .cal-agenda-when {
+    font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pm-gold);
+  }
+  .cal-agenda-title { font-weight: 700; font-size: 1.05rem; color: #f4e9d7; text-decoration: none; overflow-wrap: anywhere; }
+  a.cal-agenda-title:hover { color: var(--pm-gold-bright); text-decoration: underline; }
+  .cal-agenda-item.is-cancelled .cal-agenda-title { text-decoration: line-through; text-decoration-thickness: 1px; }
+  .cal-agenda-place { font-size: 0.85rem; color: #cdc2ab; font-style: italic; overflow-wrap: anywhere; }
+
+  .cal-month-empty { margin: 0.9em 0 0; text-align: center; color: #b9ae98; font-style: italic; }
+
+  /* A phone: seven columns are too narrow to read, so the month is a list. */
+  @media (max-width: 719px) {
+    .cal-grid { display: none; }
+    .cal-agenda { display: block; }
+    .cal-month-nav { grid-template-columns: auto 1fr auto; gap: 0.5em; }
+    .cal-month-nav h2 { font-size: 1.2rem; }
+    .cal-month-step span { display: none; }
+  }
+</style>

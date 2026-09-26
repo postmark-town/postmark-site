@@ -39,6 +39,35 @@ function writeDataFile(name, value) {
   console.log(`data/${name}: src ${srcResult}, public ${pubResult}`);
 }
 
+// ── A BUILD INPUT, NOT A PUBLIC ENDPOINT ───────────────────────────────────
+// Deliberately NOT writeDataFile: the settlements record is here so the build
+// can stamp the exported world-state (postmark#2923), and mirroring it into
+// public/ would publish a second, staler copy of a door the office already
+// serves live at /world/settlements. One writer, one reader.
+function writeBuildInput(name, value) {
+  console.log(`data/${name} (build input): src ${writeIfChanged(join(DATA_DIR, name), jsonText(value))}`);
+}
+
+// ── WHICH SETTLEMENTS THE TOWN HAS BLESSED (POS-108, postmark#2923) ────────
+// The exported world-state is stamped with the settlement it reflects, and the
+// number, sha and date come from the office's OWN record so that a reader can
+// compare a downloaded export's `as_of` against GET /world/settlements without
+// a mapping — which is the whole point: when they differ, the difference is the
+// lag, said as a fact. `tools/lib/world-stamp.mjs` decides the stamp; this is
+// only the read.
+async function fetchSettlements() {
+  const url = `${API}/world/settlements`;
+  const response = await fetch(url, { headers: { accept: "application/json" } });
+  if (!response.ok) throw new Error(`GET ${url} -> ${response.status}`);
+  const body = await response.json();
+  // An answer carrying neither key is not an empty town, it is a door that did
+  // not answer this question — and a snapshot overwritten with it would be a
+  // silent downgrade from whatever was committed.
+  if (!body || typeof body !== "object" || (!body.current && !Array.isArray(body.recent)))
+    throw new Error(`GET ${url} answered with neither \`current\` nor \`recent\``);
+  return { current: body.current ?? null, recent: Array.isArray(body.recent) ? body.recent : [] };
+}
+
 // ── WHAT THIS BUILD COULD NOT GET, AS A SERVED VALUE (POS-180, 2026-09-21) ──
 //
 // `problems` has been assembled by buildOfficeData for a long time and, until
@@ -75,6 +104,7 @@ function writeManifest(asOf, endpointGaps, problems) {
       "docs.json": "last committed docs snapshot until the office exposes town docs",
       "crossings.json": "every settlement the Worldkeeper has blessed: the world repo's settlement/S<n> tags (number, sha, blessed_at = the tagged commit's date, the receipt = the tag's message verbatim) and the published count from WORLD/settlement-publications.json at each tag",
       "rollcall.json": "the meeplings' bench: the office's deploy/box-rollcall-manifest.json read at the release the office serves (GET /release -> tag), trimmed to each unit's name, label, stage, cadence and heartbeat allowance",
+      "calendar.json": "the town's calendar, the office's GET /calendar verbatim: events now, coming and ended in the last 7 days, with the office's phase; the last committed snapshot while that door is not live",
       "blueprints.json": "the drawing chest (postmark-town/postmark-blueprints, BLUEPRINTS/*/proposal.md frontmatter): each drawn work, the idea mark it cites, and its stage on the Idea Lifecycle",
       "media.json": "town image paths -> processed site copies, owned by extract-town.mjs",
       "pin.json": "the postmark-world sha this site is pinned to, what it was built against, and when — the one fact the office cannot derive about the site (Lane A's A8)",
@@ -123,6 +153,17 @@ try {
     writeDataFile("crossings.json", await fetchCrossings({ previous }));
   } catch (error) {
     console.warn(`WARN fetch-town: the settlement tags could not be read; keeping the committed snapshot (${error.message})`);
+  }
+  // Fail-soft like the chest above: a settlements read that does not answer
+  // keeps the committed snapshot, and the stamp degrades to "this build could
+  // not name the settlement" rather than to a wrong number. A kept snapshot can
+  // only ever be SHORT of a settlement, never wrong about one — a settlement's
+  // number, sha and date do not change once blessed — and the stamp's own
+  // sha cross-check is what would catch a re-cut tag.
+  try {
+    writeBuildInput("settlements.json", await fetchSettlements());
+  } catch (error) {
+    console.warn(`WARN fetch-town: the settlements record could not be read; keeping the committed snapshot (${error.message})`);
   }
   // ── THE SITE SAYS WHAT WORLD IT IS PINNED TO (Lane A's A8, 2026-09-07) ────
   // The office's focus receipt carries `site_pin` and cannot fill it: it holds
