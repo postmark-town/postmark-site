@@ -138,7 +138,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
 >
   <main class="pm-wrap portal">
     <header class="p-head">
-      <p class="p-crumb">POSTMARK · STAMPS</p>
+      <p class="p-crumb"><a href="/docs/">DOCS</a> · STAMPS</p>
       <h1>Stamps <span class="p-glyph">✦</span></h1>
       {/* WHAT IS THIS, before anything else. A reader who read the old page
           three times and still couldn't say what a stamp was is the finding
@@ -1346,6 +1346,8 @@ node tools/stamp-mint.mjs --derive      # recompute, from the mail, what the led
   /* ── the head: one breath, then the market ─────────────────────────── */
   .p-head { margin-bottom: 1.6rem; }
   .p-crumb { font-size: .7rem; letter-spacing: .18em; opacity: .6; margin: 0 0 .3rem; }
+  .p-crumb a { color: inherit; text-decoration: none; }
+  .p-crumb a:hover { text-decoration: underline; }
   .portal h1 { margin: 0 0 .6rem; }
   .p-glyph { color: var(--pm-gold); }
   .p-folk {

@@ -370,8 +370,9 @@ test("THE PROJECTS LIGHT THE CIVIC QUARTER — no chip of their own, one line on
   assert.ok(hub.includes('<a href="/projects/">the projects</a>'), "nothing on the quarter's page reaches The Projects");
 });
 
-test("A SEAT FOR A PAGE NOT BUILT YET STANDS ON AN HONEST PLACEHOLDER — /docs/ and /projects/ say what is coming", () => {
-  for (const href of ["/docs/", "/projects/"]) {
+test("A SEAT FOR A PAGE NOT BUILT YET STANDS ON AN HONEST PLACEHOLDER — /projects/ says what is coming", () => {
+  // /docs/ left this loop 2026-09-26: POS-257 built its real index.
+  for (const href of ["/projects/"]) {
     const src = readFileSync(pageFileFor(href), "utf8");
     assert.match(src, /<p class="tag">coming together<\/p>/, `${href} does not say it is coming`);
     assert.match(src, /It is being built\./, `${href} does not say it is being built`);
@@ -380,7 +381,7 @@ test("A SEAT FOR A PAGE NOT BUILT YET STANDS ON AN HONEST PLACEHOLDER — /docs/
   const docs = readFileSync(pageFileFor("/docs/"), "utf8");
   const line = docs.indexOf("We refuse to hide: the record is public.</p>");
   assert.ok(line > 0, "the founder's line left the site with The Record");
-  assert.ok(line < docs.indexOf('<ul class="ph-list">'), "the founder's line does not open the Docs");
+  assert.ok(line < docs.indexOf('<ul class="dx-guides">'), "the founder's line does not open the Docs");
 });
 
 // ── THE ONE REDIRECT TABLE ───────────────────────────────────────────────────
