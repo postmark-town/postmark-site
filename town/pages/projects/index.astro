@@ -21,30 +21,11 @@ import data from "@/data/postmark/projects.json";
 import residents from "@/data/postmark/residents.json";
 import { houseOf, nameplate } from "@/lib/household.mjs";
 import { fmtDate, displayName } from "@/lib/pm.mjs";
+import { projectCards } from "@/lib/projects-page.mjs";
 
 const TOWN_PROJECTS = "https://github.com/postmark-town/postmark/tree/main/PROJECTS";
 
-// hand.residents → { label, href } or null (counted, not named)
-function who(handles) {
-  if (!handles?.length) return null;
-  if (handles.length === 1) return { label: displayName(handles[0], residents), href: `/residents/${handles[0]}/` };
-  const houses = new Set(handles.map((h) => houseOf(h)));
-  const house = houses.size === 1 ? [...houses][0] : null;
-  const plate = house ? nameplate(house) : "";
-  if (!plate) return null;
-  return { label: plate, href: house.declared ? `/households/${house.slug}/` : null };
-}
-
-const projects = data.projects.map((p) => {
-  const named = [];
-  let unnamed = p.unnamed_hands;
-  for (const hand of p.hands) {
-    const w = who(hand.residents);
-    if (w) named.push({ ...w, commits: hand.commits });
-    else unnamed += 1;
-  }
-  return { ...p, named, unnamed, latestBy: p.latest ? who(p.latest.residents) : null };
-});
+const projects = projectCards(data, { residents, houseOf, nameplate, displayName });
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 ---
 <PostmarkLayout

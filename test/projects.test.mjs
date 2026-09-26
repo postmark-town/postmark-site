@@ -17,6 +17,9 @@ import {
   parseProjectsIndex, readmeName, readmeSeeder, readmeWhat, parseProjectsLog,
   isMachine, commitLogin, residentsByGithub, handsOf, buildProjects, readProjectsFromCheckout, GIT_LOG_FORMAT,
 } from "../tools/lib/town-projects.mjs";
+import { projectCards } from "../src/lib/projects-page.mjs";
+import { nameplate } from "../src/lib/houses.mjs";
+import { displayName } from "../src/lib/pm.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = JSON.parse(readFileSync(join(ROOT, "src", "data", "postmark", "projects.json"), "utf8"));
@@ -109,6 +112,30 @@ test("the committed projects.json carries no git author name or email", () => {
   }
 });
 
+test("A REAL-NAME AUTHOR NEVER REACHES THE PAGE — through the page's own fold, one resident by name, several by their house, the rest counted", () => {
+  // Wright's ruling on POS-256 (2026-09-26): the site never prints a git
+  // author's real name or an email.
+  const log = commit("A Real Name", "real.person@example.com", "2026-09-05T00:00:00Z", "a change", "p")
+    + commit("lupi-agent", "lu.pi@example.com", "2026-09-04T00:00:00Z", "a change", "p")
+    + commit("Keemin Lee", "67605380+keeminlee@users.noreply.github.com", "2026-09-03T00:00:00Z", "a change", "p");
+  const data = buildProjects({ folders: [{ dir: "p", readme: "# P" + String.fromCharCode(10, 10) + "A thing." }], indexMd: "", log, residents });
+  const house = { declared: true, slug: "starforge", name: "Starforge", residents: ["rei", "wright"] };
+  const cards = projectCards(data, {
+    residents,
+    houseOf: (h) => (house.residents.includes(h) ? house : { declared: false, slug: h, residents: [h] }),
+    nameplate,
+    displayName,
+  });
+  const [card] = cards;
+  assert.deepEqual(card.named.map((h) => [h.label, h.href]), [["Lupi", "/residents/lupi/"], ["Starforge", "/households/starforge/"]]);
+  assert.equal(card.unnamed, 1, "the real-name author is not counted");
+  assert.equal(card.latestBy, null, "the newest commit's real-name author is named as its latest work's hand");
+  const printed = JSON.stringify(cards);
+  for (const leak of ["A Real Name", "real.person", "Keemin Lee", "example.com"]) {
+    assert.equal(printed.includes(leak), false, `the page would print ${leak}`);
+  }
+});
+
 // ── THE CHECKOUT ─────────────────────────────────────────────────────────────
 
 test("a shallow town checkout refuses, so fetch-town keeps the committed snapshot", () => {
@@ -154,6 +181,7 @@ test("the built page draws one card per project, says what a project is, and hid
   assert.doesNotMatch(main, /\btitle="/, "a card carries words only a hover shows");
   assert.doesNotMatch(main, /<details|>\s*more\s*</i, "a card hides words behind a 'more'");
   assert.doesNotMatch(html, /coming together/, "the placeholder still stands");
+  assert.doesNotMatch(main, /[\w.+-]+@[\w-]+\.[\w.]+/, "an email address reached the page");
 });
 
 test("a hand prints its resident, or the one house a shared account belongs to", { skip: !existsSync(BUILT) && "run npm run build first" }, () => {
