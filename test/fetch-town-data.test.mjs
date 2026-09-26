@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
-import { apiGet, buildOfficeData, createRateGate, DEFAULT_FETCH_TOWN_DEADLINE_MS, fetchResidentRoll, fetchTownDeadlineMs, jsonText, mapLimit, MAX_NAMED_404S, RESIDENT_CARD_LANES, shortFetchPlan } from "../tools/lib/fetch-town-data.mjs";
+import { apiGet, buildOfficeData, CALENDAR_GAP, createRateGate, EMPTY_CALENDAR, DEFAULT_FETCH_TOWN_DEADLINE_MS, fetchResidentRoll, fetchTownDeadlineMs, jsonText, mapLimit, MAX_NAMED_404S, RESIDENT_CARD_LANES, shortFetchPlan } from "../tools/lib/fetch-town-data.mjs";
 import { readFileSync } from "node:fs";
 
 function writeJson(dir, name, value) {
@@ -108,6 +108,10 @@ function fixtureFetch({ door = true, stamp = null, roster = "array" } = {}) {
     }],
     ["/bulletin", [{ slug: "settling-in", title: "settling-in", first_line: "# Settling in" }]],
     ["/bulletin/settling-in", { slug: "settling-in", data: { posted: "2026-07-02" }, body: "# Settling in", path: "TOWN_BULLETIN/settling-in.md" }],
+    // The calendar door answering an empty town (POS-211). Served by default so
+    // a 404 here costs no test its retries; the tests at the foot of this file
+    // drive the before-the-door 404 on purpose.
+    ["/calendar", { as_of: "2026-07-02T00:00:00.000Z", now: [], coming: [], ended: [], total: 0 }],
     // Keyed on the bare path so ANY /letters?... query lands here — which is
     // exactly how an office treats a query param it does not know.
     ["/letters", door
@@ -1119,4 +1123,63 @@ test("THE POS-166 CASE, NOW SERVED: a dropped bulletin entry still drops AND its
   assert.equal(typeof line, "string", "a served value must be a plain string, not an Error or a Symbol");
   assert.equal(JSON.parse(JSON.stringify(r.problems)).includes(line), true,
     "…and must survive the JSON round trip the manifest and /build.json both put it through");
+});
+
+// ── THE CALENDAR, BEFORE AND AFTER ITS DOOR (POS-211, 2026-09-24) ────────────
+//
+// The site ships the calendar ingest before the office ships `GET /calendar`,
+// and today the office answers that path 404 "no such door". Every other read
+// in buildOfficeData throws on a 404, which fetch-town.mjs turns into a failed
+// build on the release channel (postmark#2884), so a calendar that is not live
+// yet would stop every release. These say what happens on each side of the
+// door landing, and that a 404 is the ONLY failure read as "not live yet".
+// (fixtureFetch serves an empty calendar, so every other test in this file
+// runs on the after-the-door side.)
+const CAL = JSON.parse(readFileSync(new URL("./fixtures/calendar.sample.json", import.meta.url), "utf8"));
+const answer = (status, body) => ({
+  ok: status >= 200 && status < 300, status, statusText: String(status),
+  headers: { get: () => null }, json: async () => JSON.parse(JSON.stringify(body)),
+});
+const withCalendar = (reply) => {
+  const inner = fixtureFetch();
+  return async (url) => (new URL(url).pathname === "/calendar" ? reply() : inner(url));
+};
+
+test("BEFORE THE DOOR: a 404 at /calendar keeps the committed calendar.json and names the gap; the build goes on", async () => {
+  const { data, town } = fixtureSnapshot();
+  writeJson(data, "calendar.json", CAL);
+  const r = await buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl: withCalendar(() => answer(404, { error: "bounce", defect: "no such door" })), retries: 1 });
+  assert.deepEqual(r.files["calendar.json"], CAL, "the committed calendar was not kept");
+  assert.equal(r.endpointGaps.includes(CALENDAR_GAP), true, "the missing door is not named as a gap");
+  assert.equal(r.problems.some((p) => /calendar/.test(p)), false, "a door that is not built yet is a gap, not a problem");
+  assert.equal(r.files["bulletin.json"].length, 1, "and the rest of the town built");
+});
+
+test("BEFORE THE DOOR, with no committed calendar: the file is the empty calendar, never a missing key", async () => {
+  const { data, town } = fixtureSnapshot();
+  const r = await buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl: withCalendar(() => answer(404, { error: "bounce", defect: "no such door" })), retries: 1 });
+  assert.deepEqual(r.files["calendar.json"], EMPTY_CALENDAR);
+  assert.equal(r.endpointGaps.includes(CALENDAR_GAP), true);
+});
+
+test("AFTER THE DOOR: the office's calendar is written verbatim and no gap is named", async () => {
+  const { data, town } = fixtureSnapshot();
+  writeJson(data, "calendar.json", EMPTY_CALENDAR);
+  const r = await buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl: withCalendar(() => answer(200, CAL)), retries: 1 });
+  assert.deepEqual(r.files["calendar.json"], CAL);
+  assert.equal(r.endpointGaps.includes(CALENDAR_GAP), false);
+});
+
+test("a calendar door that answers 500 still stops the build: only a 404 reads as not-yet-live", async () => {
+  const { data, town } = fixtureSnapshot();
+  await assert.rejects(
+    () => buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl: withCalendar(() => answer(500, {})), retries: 1 }),
+    /GET \/calendar failed/);
+});
+
+test("a calendar door that answers the wrong shape stops the build rather than publishing it", async () => {
+  const { data, town } = fixtureSnapshot();
+  await assert.rejects(
+    () => buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl: withCalendar(() => answer(200, { events: [] })), retries: 1 }),
+    /\/calendar: "now" is not an array/);
 });

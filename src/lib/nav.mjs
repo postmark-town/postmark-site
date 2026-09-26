@@ -242,6 +242,12 @@ export const RAIL = [
       // than the other way, because that word is the one in the URL, the key,
       // the frontmatter and every letter's deep link.
       { key: "bulletin", label: "the bulletin", href: "/bulletin/", icon: "⚑" },
+      // THE CALENDAR (POS-211, 2026-09-24), beside the bulletin: what is on,
+      // where the bulletin is what is pinned. `town.calendar` is its own read,
+      // so under the page-per-read law it has its own page. ◷ U+25F7, a clock
+      // face from the geometric-shapes block, which renders as text and not as
+      // colour emoji.
+      { key: "calendar", label: "the calendar", href: "/calendar/", icon: "◷" },
       // THE BALLOT AND THE BOUNTY BOARD LEFT THIS ROW, founder-ruled
       // 2026-08-30 evening: both are buildings of the civic quarter now, and
       // the quarter's chip is directly above. A chip row that lists the whole

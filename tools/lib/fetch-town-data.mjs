@@ -40,6 +40,7 @@ export const DATA_FILES = [
   "bulletin.json",
   "docs.json",
   "stats.json",
+  "calendar.json",
 ];
 
 // -- ON THE BOX, SHORT IS FAILED (2026-09-17, postmark#2884) -----------------
@@ -815,6 +816,10 @@ export async function buildOfficeData({
   const docs = readSnapshot("docs.json", {});
   endpointGaps.push("docs.json preserved from committed snapshot: office has no docs endpoint yet");
 
+  const calendarRead = await fetchCalendar({ apiBase, fetchImpl, retries, gate });
+  const calendar = calendarRead.missing ? readSnapshot("calendar.json", EMPTY_CALENDAR) : calendarRead.calendar;
+  if (calendarRead.missing) endpointGaps.push(CALENDAR_GAP);
+
   let meeps = null;
   if (townRoot) meeps = readMeepsFromCheckout(townRoot);
   if (!meeps) {
@@ -835,8 +840,41 @@ export async function buildOfficeData({
       "bulletin.json": bulletin,
       "docs.json": docs,
       "stats.json": buildStats({ town, metrics, residents, letters, ledger, snapshotStats }),
+      "calendar.json": calendar,
     },
   };
+}
+
+// ── THE CALENDAR (POS-211, 2026-09-24) ──────────────────────────────────────
+// `GET /calendar` is the office's read of the town's events (the contract is
+// the office's docs/calendar-contract.md). The site ships this ingest before
+// the office ships the door, so today the door answers 404 "no such door"
+// (measured at https://postmark.town/api/calendar, 2026-09-24).
+//
+// Why it is NOT one more read in the Promise.all above: every read there
+// throws on any failure, the throw lands in fetch-town.mjs's catch as "office
+// API unavailable", and on the release channel that exit is a failed build
+// (shortFetchPlan, postmark#2884). A calendar that is not live yet would have
+// stopped every release. So a 404 here is read as what it is, a door this
+// office does not have yet: an endpoint gap, and the committed calendar.json
+// is kept. Any other failure (a 500, a timeout, a body that is not a calendar)
+// still throws like every other read, because that is the office failing and
+// not the door missing.
+export const EMPTY_CALENDAR = Object.freeze({ as_of: null, now: [], coming: [], ended: [], total: 0 });
+export const CALENDAR_GAP = "calendar.json preserved from committed snapshot: the office answered 404 at GET /calendar, so its calendar door is not live yet";
+
+export async function fetchCalendar({ apiBase, fetchImpl = fetch, retries = 3, gate = null } = {}) {
+  let body;
+  try {
+    ({ body } = await apiGet("/calendar", { apiBase, fetchImpl, retries, gate }));
+  } catch (error) {
+    if (error?.status === 404) return { missing: true, calendar: null };
+    throw error;
+  }
+  for (const key of ["now", "coming", "ended"]) {
+    if (!Array.isArray(body?.[key])) throw new Error(`/calendar: "${key}" is not an array, so this is not the calendar the contract names`);
+  }
+  return { missing: false, calendar: body };
 }
 
 export function parseMaybeFrontmatter(text) {

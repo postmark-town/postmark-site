@@ -1,0 +1,128 @@
+---
+// CalendarCard — one event from the office's calendar (POS-211, 2026-09-24).
+//
+// The same card on /calendar/ and, with `full`, on the event's own page. The
+// reading law holds for `title` and `invitation`: they are a resident's words,
+// so they render as TEXT through Astro's escaping and never through set:html.
+//
+// Every instant is a <time> whose text is its UTC reading (the static floor,
+// true for every reader) and whose `datetime` and `title` carry the record. The
+// island below rewrites the text into the reader's own zone with the browser's
+// Intl, which is the only thing that knows the zone.
+import {
+  PHASE_WORDS, eventHref, placeOf, residentHref, whenLine, utcText,
+} from "@/lib/calendar.mjs";
+
+interface Props {
+  event: any;
+  /** handles that have a page under /residents/ */
+  roll: Set<string>;
+  /** the event page's card: the title is not a link, and the RSVP list shows */
+  full?: boolean;
+}
+const { event: e, roll, full = false } = Astro.props;
+const place = placeOf(e.place);
+const hostHref = residentHref(e.host, roll);
+const href = eventHref(e.id);
+const phase = PHASE_WORDS[e.phase] ?? e.phase;
+const when = whenLine(e);
+const rsvpTotal = Number(e.rsvps?.total ?? 0);
+const rsvpNames = Array.isArray(e.rsvps?.residents) ? e.rsvps.residents : [];
+const revised = Number(e.revised ?? 0);
+const times = [
+  ...(e.doors_open && e.doors_open !== e.starts ? [["doors open", e.doors_open]] : []),
+  ["starts", e.starts],
+  ["ends", e.ends],
+];
+---
+<article class:list={["cal-card", "pm-paper", { "is-cancelled": e.cancelled }]} data-event={e.id} data-phase={e.phase}>
+  <p class="cal-phase">
+    {e.cancelled && <span class="cal-cancelled" data-cancelled>cancelled</span>}
+    <span class="cal-phase-word">{phase}</span>
+    {when && <span class="cal-when"> · {when}</span>}
+  </p>
+  {full
+    ? <h1 class="cal-title">{e.title}</h1>
+    : <h3 class="cal-title">{href ? <a href={href}>{e.title}</a> : e.title}</h3>}
+  {e.invitation && <p class="cal-invitation">{e.invitation}</p>}
+
+  <dl class="cal-facts">
+    <dt>hosted by</dt>
+    <dd>{hostHref ? <a href={hostHref}>{e.host}</a> : e.host}</dd>
+    <dt>at</dt>
+    <dd>
+      {place.href
+        ? <a class="cal-place" href={place.href} title={place.point ? `in the World at ${place.point}` : undefined}>{place.label}</a>
+        : <span class="cal-place">{place.label}</span>}
+    </dd>
+    {times.map(([label, iso]) => (
+      <>
+        <dt>{label}</dt>
+        <dd><time datetime={iso} title={`${iso} (UTC)`} data-local>{utcText(iso)}</time></dd>
+      </>
+    ))}
+    <dt>RSVPs</dt>
+    <dd class="cal-rsvps">
+      {rsvpTotal === 1 ? "1 resident" : `${rsvpTotal} residents`}
+      {revised > 0 && <span class="cal-revised" data-revised> · revised {revised}×</span>}
+    </dd>
+  </dl>
+
+  {full && (
+    <section class="cal-rsvp-list">
+      <h2>Who is coming</h2>
+      {rsvpNames.length
+        ? (
+          <ul>
+            {rsvpNames.map((h) => {
+              const rh = residentHref(h, roll);
+              return <li>{rh ? <a href={rh}>{h}</a> : h}</li>;
+            })}
+          </ul>
+        )
+        : <p class="soft">No one has RSVPed yet.</p>}
+    </section>
+  )}
+</article>
+
+<script>
+  import { LOCAL_FORMAT } from "@/lib/calendar.mjs";
+  // The reader's zone, from the reader's browser. A <time> that will not parse
+  // keeps its UTC floor, which is still true.
+  for (const el of document.querySelectorAll("time[data-local]")) {
+    try {
+      const d = new Date(el.getAttribute("datetime"));
+      if (!Number.isNaN(d.getTime())) el.textContent = d.toLocaleString(undefined, LOCAL_FORMAT);
+    } catch {}
+  }
+</script>
+
+<style>
+  .cal-card { padding: 1.1em 1.3em 1em; margin: 0 0 1em; }
+  .cal-card.is-cancelled { opacity: 0.8; }
+  .cal-card.is-cancelled .cal-title { text-decoration: line-through; text-decoration-thickness: 1px; }
+  .cal-phase {
+    margin: 0 0 0.3em; font-family: var(--pm-mono); font-size: 0.72rem;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--pm-ink-soft);
+  }
+  .cal-phase-word { color: var(--pm-accent); font-weight: 600; }
+  .cal-cancelled {
+    display: inline-block; margin-right: 0.6em; padding: 0.05em 0.5em;
+    border: 1.5px solid var(--pm-wax); border-radius: 3px;
+    color: var(--pm-wax); font-weight: 700;
+  }
+  .cal-title { margin: 0 0 0.35em; font-size: 1.3em; overflow-wrap: anywhere; }
+  h1.cal-title { font-size: clamp(1.5rem, 4vw, 2rem); }
+  .cal-title a { text-decoration: none; }
+  .cal-title a:hover { text-decoration: underline; }
+  .cal-invitation { margin: 0 0 0.9em; font-style: italic; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-line; }
+  .cal-facts {
+    display: grid; grid-template-columns: max-content 1fr; gap: 0.25em 0.9em;
+    margin: 0; font-size: 0.93rem;
+  }
+  .cal-facts dt { color: var(--pm-ink-soft); font-family: var(--pm-mono); font-size: 0.78rem; padding-top: 0.15em; }
+  .cal-facts dd { margin: 0; overflow-wrap: anywhere; }
+  .cal-revised { color: var(--pm-ink-soft); font-size: 0.85em; }
+  .cal-rsvp-list h2 { font-size: 1.05em; margin: 1.2em 0 0.4em; }
+  .cal-rsvp-list ul { margin: 0; padding-left: 1.2em; }
+</style>
