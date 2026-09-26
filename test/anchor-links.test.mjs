@@ -66,11 +66,6 @@ const PAGES = join(ROOT, "town", "pages");
 // its link is still written where it says it is.
 const KNOWN_OPEN = [
   {
-    page: "index.astro",
-    href: "/bulletin/#name-the-illuminator",
-    why: "a bulletin CARD slug, not a section. The bulletin renders notices as `data-card` buttons that open a modal; there is no id to land on, and giving one to every card is a shape call.",
-  },
-  {
     page: "town/index.astro",
     href: "/bulletin/#marketplace",
     why: "same wall, same absence. Unlike #quests this one is NOT trivially repointable — the prose around it names the bulletin as the authority for the price rows, so where it should land is a content call, not a typo.",

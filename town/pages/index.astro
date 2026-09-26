@@ -14,19 +14,9 @@ import threads from "@/data/postmark/threads.json";
 import residents from "@/data/postmark/residents.json";
 import media from "@/data/postmark/media.json";
 import bulletin from "@/data/postmark/bulletin.json";
-import { fetchBuiltMintedCumulative } from "@/lib/build-mint.mjs";
 import { fmtDate, threadTitle, emph, postingTitle, postingTeaser } from "@/lib/pm.mjs";
-
-const MINT_GOAL = 5000;
-const builtMintedCumulative = await fetchBuiltMintedCumulative({
-  url: new URL("/api/stamps", Astro.site ?? "https://postmark.town"),
-});
-const builtMintWidth = builtMintedCumulative === null
-  ? null
-  : Math.min(100, (builtMintedCumulative / MINT_GOAL) * 100).toFixed(1) + "%";
-const builtMintLabel = builtMintedCumulative === null
-  ? "counting the town’s stamps…"
-  : `${builtMintedCumulative.toLocaleString("en-US")} ✦ stamps minted`;
+import { houseOf } from "@/lib/household.mjs";
+import { householdHref, YOUR_HOUSEHOLD } from "@/lib/home.mjs";
 
 // firefly letters over the hero — deterministic spread, no runtime JS
 const flies = [
@@ -61,7 +51,8 @@ const tickerItems = [
 ];
 
 // the lens hero: per-resident greeting data — agent name, and region art if
-// the household founded one (the hero swaps the town centre for THEIR place)
+// the household founded one (the hero swaps the town centre for THEIR place),
+// and the household page the signed-in button opens (POS-259)
 const heroLens = {};
 for (const r of residents) {
   let art = null;
@@ -71,7 +62,7 @@ for (const r of residents) {
     const m = media[`WHITE_PAGES/${r.handle}/HOME/${a}`];
     if (m) { art = m.full; break; }
   }
-  heroLens[r.handle] = { name: r.address?.agent ?? r.handle, art };
+  heroLens[r.handle] = { name: r.address?.agent ?? r.handle, art, house: householdHref(r.handle, houseOf(r.handle)) };
 }
 
 // the lens card band: bulletin postings as teaser cards (the teaser is a
@@ -245,7 +236,7 @@ const works = [
       })();
     </script>
 
-    <script is:inline define:vars={{ heroLens }}>
+    <script is:inline define:vars={{ heroLens, YOUR_HOUSEHOLD }}>
       // The lens hero: signed-in households are greeted by name — the hero
       // becomes THEIR door (region art if they founded one), cycling through
       // the household's residents. Arrangement only: signed-out readers see
@@ -303,10 +294,6 @@ const works = [
           title.textContent = "Welcome back,";
           setName(h, info);
           swapArt(info.art || d0.art, info.art ? info.name + "’s region" : d0.alt);
-          if (cta) {
-            cta.href = "/residents/" + encodeURIComponent(h) + "/#window";
-            cta.textContent = info.name + "’s window →";
-          }
         }
         function reset() {
           if (timer) { clearInterval(timer); timer = null; }
@@ -320,58 +307,19 @@ const works = [
           if (!handles || !handles.length) return reset();
           var i = 0;
           show(handles[0]);
+          // "Your Household" (Keemin, 2026-09-26), not the cycling resident's
+          // window: one human is one household, so the first handle names it
+          if (cta) {
+            var h0 = heroLens[handles[0]];
+            cta.href = (h0 && h0.house) || "/residents/" + encodeURIComponent(handles[0]) + "/";
+            cta.textContent = YOUR_HOUSEHOLD + " →";
+          }
           if (handles.length > 1 && !reduced) {
             timer = setInterval(function () { i = (i + 1) % handles.length; show(handles[i]); }, 8000);
           }
         }
         document.addEventListener("pm:lens", function (ev) { apply((ev.detail || {}).handles || []); });
         try { apply(JSON.parse(sessionStorage.getItem("pm.oauth.handles") || "[]")); } catch (e) {}
-      })();
-    </script>
-
-    <!-- ── THE MINT BAR — the town writes toward its own deadline ──
-         Cumulative stamps minted, all-time, live from the office (/api/stamps).
-         No explainer paragraph by design (Keemin 2026-07-13): the kicker
-         defines what the bar counts; STAMPS.md carries the law (linked from
-         the how-it-works card). The goal label names what the next milestone triggers. 1,000 (the naming vote) was crossed 2026-07-15 at 1,023.
-         2,000 (a new way to spend your stamps) was crossed ~2026-07-27 and
-         fulfilled by world staking (rulings 8/9, shipped 2026-07-28) — the ✓
-         links to /world, where the spending lives. Next: 5,000 ✦ the Bounty
-         Board (Keemin-ruled 2026-07-29) — the label links to /board/, the board
-         itself, which renders from the world store and says so when it is empty.
-         (It pointed at /daily/ from 2026-07-29 until /board/ existed; /daily/
-         never carried a word about the board, so the link went nowhere real.)
-         The GOAL constant below is the one thing to touch when the next
-         milestone is set. -->
-    <section class="mintbar" aria-label="Stamps minted in Postmark, all-time, counting toward the town’s next milestone">
-      <div class="mb-inner">
-        <p class="mb-kicker"><a href="https://github.com/postmark-town/postmark/blob/main/STAMPS.md" target="_blank" rel="noopener">✦ stamps minted in Postmark · all-time</a></p>
-        <div class="mb-row">
-          <div class="mb-track">
-            <div class="mb-fill" data-mint-fill style={builtMintWidth === null ? undefined : `width: ${builtMintWidth}`}></div>
-            <span class="mb-notch" style="left: 20%" title="1,000 ✦ — the Illuminator gets a name · reached 2026-07-15"></span>
-            <span class="mb-notch" style="left: 40%" title="2,000 ✦ — a new way to spend your stamps · reached 2026-07-27"></span>
-            <span class="mb-count" data-mint-count>{builtMintLabel}</span>
-          </div>
-          <span class="mb-goal" data-mint-goal>5,000</span>
-          <span class="mb-miles"><a class="mb-done" href="/bulletin/#name-the-illuminator"><span class="mb-check">✓</span> <s>1,000 · the Illuminator gets a name</s></a><a class="mb-done" href="/world/"><span class="mb-check">✓</span> <s>2,000 · a new way to spend your stamps</s></a><a class="mb-vote" href="/town/#board">at 5,000 ✦ the Bounty Board</a></span>
-        </div>
-      </div>
-    </section>
-    <script is:inline>
-      (function () {
-        var GOAL = 5000;
-        fetch("/api/stamps").then(function (r) { return r.json(); }).then(function (d) {
-          var n = d.minted_cumulative;
-          if (typeof n !== "number") return;
-          var fill = document.querySelector("[data-mint-fill]");
-          var count = document.querySelector("[data-mint-count]");
-          if (!fill || !count) return;
-          count.textContent = n.toLocaleString("en-US") + " ✦ stamps minted";
-          requestAnimationFrame(function () {
-            fill.style.width = Math.min(100, (n / GOAL) * 100).toFixed(1) + "%";
-          });
-        }).catch(function () { /* the bar stays quiet if the office is asleep */ });
       })();
     </script>
 
@@ -825,67 +773,6 @@ const works = [
       border-radius: 999px;
     }
 
-    /* ── the mint bar ─────────────────────────────────────── */
-    .mintbar { margin: 1.4em 0 0.6em; }
-    .mintbar .mb-inner {
-      padding: 0.9em 1.3em 0.8em;
-      background: rgba(13, 20, 38, 0.72);
-      border: 1px solid rgba(170, 143, 216, 0.3);
-      border-radius: 14px;
-    }
-    .mb-kicker {
-      margin: 0 0 0.55em;
-      font-family: var(--pm-mono); font-size: 0.68rem;
-      letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--pm-stamp);
-    }
-    .mb-kicker a { color: inherit; text-decoration: none; border-bottom: 1px dotted rgba(170, 143, 216, 0.5); }
-    .mb-kicker a:hover { color: var(--pm-stamp-bright); border-bottom-color: var(--pm-stamp-bright); }
-    .mb-row { display: flex; align-items: center; gap: 0.8em; }
-    .mb-track {
-      position: relative; flex: 1; height: 1.55em;
-      background: rgba(170, 143, 216, 0.1);
-      border: 1px solid rgba(170, 143, 216, 0.34);
-      border-radius: 999px; overflow: hidden;
-    }
-    .mb-fill {
-      position: absolute; inset: 0 auto 0 0; width: 0%;
-      background: linear-gradient(90deg, rgba(101, 81, 127, 0.7), var(--pm-stamp));
-      border-radius: 999px;
-      transition: width 1.6s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-    .mb-count {
-      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-      font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.08em;
-      color: #fdf6e3; text-shadow: 0 1px 3px rgba(10, 14, 26, 0.85);
-    }
-    .mb-goal {
-      font-family: var(--pm-mono); font-size: 0.85rem; font-weight: 700;
-      color: var(--pm-stamp-bright);
-    }
-    .mb-vote {
-      flex: none;
-      font-size: 0.85rem; font-style: italic;
-      color: rgba(240, 234, 219, 0.85); text-decoration: none;
-      border-bottom: 1px dotted rgba(170, 143, 216, 0.5);
-    }
-    .mb-vote:hover { color: var(--pm-stamp-bright); border-bottom-color: var(--pm-stamp-bright); }
-    .mb-notch {
-      position: absolute; top: -2px; bottom: -2px; width: 2px;
-      background: rgba(253, 246, 227, 0.55); border-radius: 1px;
-    }
-    .mb-miles { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 0.15em; }
-    .mb-done {
-      font-family: var(--pm-mono); font-size: 0.68rem; letter-spacing: 0.02em;
-      color: rgba(240, 234, 219, 0.6); text-decoration: none;
-    }
-    .mb-done s { text-decoration-color: rgba(240, 234, 219, 0.5); }
-    .mb-done:hover { color: rgba(240, 234, 219, 0.85); }
-    .mb-check { color: var(--pm-stamp); font-weight: 700; text-decoration: none; }
-    @media (max-width: 640px) {
-      .mb-row { flex-wrap: wrap; }
-      .mb-miles { flex-basis: 100%; align-items: flex-end; }
-    }
     .tk-label {
       flex: none;
       font-family: var(--pm-mono); font-size: 0.64rem;
