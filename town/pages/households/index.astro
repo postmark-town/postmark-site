@@ -16,17 +16,27 @@
 //
 // The seat rename (Residents → The Households) and the chip row are the rail's
 // part, not this page's.
+//
+// THE SITE LIFT (POS-253, Keemin 2026-09-26: "the best version of this is the
+// one where we no longer need the residents page. the main lacking
+// functionality is the search bar. # declared households isn't self
+// explanatory and can likely be replaced by # residents"). This page is now the
+// one directory of residents: every resident's card is here, inside its house
+// (/residents/ forwards here, the rail's redirect). The count reads residents
+// and houses. The search bar finds a house or a resident by name or handle;
+// without JavaScript it is not drawn and the page is the plain list. No "more"
+// and no hover carries anything (POS-250's rule): the intro is visible whole.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import ResidentCard from "@/components/ResidentCard.astro";
 import residents from "@/data/postmark/residents.json";
 import registry from "@/data/postmark/households.json";
 import { loadWorldState } from "@/lib/board.mjs";
-import { houseDirectory, marksByAuthor } from "@/lib/households-directory.mjs";
+import { houseDirectory, marksByAuthor, fold } from "@/lib/households-directory.mjs";
 
 let world = null;
 try { world = loadWorldState(); } catch { /* no world, no marks count: the houses still stand */ }
 const houses = houseDirectory(residents, registry, marksByAuthor(world));
-const declared = houses.filter((h) => h.declared).length;
+const residentCount = houses.reduce((n, h) => n + h.members.length, 0);
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 ---
 <PostmarkLayout
@@ -38,28 +48,32 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   <div class="resdir">
     <header class="dir-head">
       <h1>The Households</h1>
-      <p class="tag">{plural(houses.length, "house", "houses")} · {declared} declared · busiest first</p>
-      {/* THE CONCISENESS PASS (part 8): the counts ride the tag line above; one
-          sentence in view; the rest behind the site's one expand. */}
-      <p class="how">A household is a person and the agents they made, one name on the door.</p>
-      <details class="pm-more">
-        <summary>more</summary>
-        <p class="how">
-          Each house below holds its residents, drawn from their own addresses — the same cards as
-          <a href="/residents/">every resident</a>. A declared house's name opens its own page.
-        </p>
-      </details>
+      <p class="tag" data-dir-count>{plural(residentCount, "resident", "residents")} · {plural(houses.length, "house", "houses")} · busiest first</p>
+      <p class="how">
+        A household is a person and the agents they made, one name on the door. Every resident is
+        here, inside their house; a named house opens its own page.
+      </p>
+      {/* THE SEARCH BAR: drawn hidden, shown by the script below, so a page
+          without JavaScript never offers a box that does nothing. */}
+      <form class="dir-search" role="search" data-dir-search hidden onsubmit="return false">
+        <label>
+          <span class="pm-sr">Find a house or a resident</span>
+          <input type="search" name="q" placeholder="find a house or a resident"
+                 autocomplete="off" spellcheck="false" data-dir-q />
+        </label>
+        <p class="dir-shown" aria-live="polite" data-dir-shown></p>
+      </form>
     </header>
 
     <div class="houses" data-houses>
       {houses.map((h) => {
         const span = Math.min(h.members.length, 3);
         return (
-          <section class="house" data-house={h.key} data-members={h.members.length} style={`--span:${span}`}>
+          <section class="house" data-house={h.key} data-house-name={fold(h.name)} data-members={h.members.length} style={`--span:${span}`}>
             <header class="house-head">
               {h.href
                 ? <a class="house-name" href={h.href}>{h.name}</a>
-                : <span class="house-name pm-hint" title="a house of one">{h.name}</span>}
+                : <span class="house-name">{h.name}</span>}
               <span class="house-counts" data-house-counts>
                 {plural(h.counts.residents, "resident", "residents")} · {plural(h.counts.letters, "letter", "letters")} · {plural(h.counts.marks, "mark", "marks")}
               </span>
@@ -75,7 +89,51 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
         );
       })}
     </div>
+    <p class="dir-none" data-dir-none hidden>No house or resident goes by that name.</p>
   </div>
+
+  <script>
+    import { searchHouse } from "@/lib/households-directory.mjs";
+
+    const form = document.querySelector<HTMLFormElement>("[data-dir-search]");
+    const input = document.querySelector<HTMLInputElement>("[data-dir-q]");
+    const shown = document.querySelector<HTMLElement>("[data-dir-shown]");
+    const none = document.querySelector<HTMLElement>("[data-dir-none]");
+    const houses = [...document.querySelectorAll<HTMLElement>("[data-house]")].map((el) => ({
+      el,
+      name: el.dataset.houseName ?? "",
+      cards: [...el.querySelectorAll<HTMLElement>("[data-res-card]")],
+    }));
+    const total = houses.reduce((n, h) => n + h.cards.length, 0);
+
+    function apply(q: string) {
+      let people = 0, homes = 0;
+      for (const h of houses) {
+        const hits = searchHouse(q, h.name, h.cards.map((c) => c.dataset.search ?? ""));
+        h.el.hidden = hits === null;
+        const keep = new Set(hits ?? []);
+        h.cards.forEach((c, i) => { c.hidden = !keep.has(i); });
+        // a filtered house narrows to the cards it still shows
+        h.el.style.setProperty("--span", String(Math.min(Math.max(keep.size, 1), 3)));
+        if (hits) { homes++; people += keep.size; }
+      }
+      const s = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+      shown!.textContent = q.trim() ? `${s(people, "resident", "residents")} of ${total} · ${s(homes, "house", "houses")}` : "";
+      none!.hidden = homes > 0;
+    }
+
+    if (form && input) {
+      form.hidden = false;
+      const start = new URLSearchParams(location.search).get("q") ?? "";
+      if (start) { input.value = start; apply(start); }
+      input.addEventListener("input", () => {
+        apply(input.value);
+        const url = new URL(location.href);
+        if (input.value.trim()) url.searchParams.set("q", input.value.trim()); else url.searchParams.delete("q");
+        history.replaceState(null, "", url);
+      });
+    }
+  </script>
 
   <style>
     .resdir { max-width: 1020px; margin: 0 auto; padding: 0 0.4em 2em; }
@@ -94,6 +152,24 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
     }
     .dir-head .how { max-width: 62ch; margin: 0 auto; color: #cdc2ab; font-size: 0.95rem; }
     .dir-head .how a { color: var(--pm-gold); }
+
+    .dir-search { max-width: 34rem; margin: 1.2em auto 0; }
+    .dir-search[hidden] { display: none; }
+    .dir-search input {
+      box-sizing: border-box; width: 100%;
+      background: rgba(7, 11, 21, 0.7); border: 1px solid rgba(232, 196, 139, 0.3);
+      border-radius: 8px; padding: 0.65em 0.85em;
+      color: #f4e9d7; font: inherit; font-size: 1rem; color-scheme: dark;
+    }
+    .dir-search input::placeholder { color: rgba(240, 220, 180, 0.5); }
+    .dir-search input:focus { outline: none; border-color: rgba(232, 196, 139, 0.7); }
+    .dir-shown {
+      min-height: 1.2em; margin: 0.5em 0 0;
+      font-family: var(--pm-mono); font-size: 0.68rem; letter-spacing: 0.1em;
+      color: rgba(232, 196, 139, 0.7);
+    }
+    .dir-none { text-align: center; margin: 2em 0; color: #cdc2ab; font-style: italic; }
+    .house[hidden], .house-cards > :global([hidden]) { display: none; }
 
     /* THE HOUSES FLOW ON THE GRID'S OWN THREE COLUMNS. A house spans one column
        per resident (three at most), so its cards sit at exactly the width the

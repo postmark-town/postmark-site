@@ -14,7 +14,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { houseDirectory, marksByAuthor, foundingOrder, busiestFirst } from "../src/lib/households-directory.mjs";
+import { houseDirectory, marksByAuthor, foundingOrder, busiestFirst, fold, residentKey, searchHouse } from "../src/lib/households-directory.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = (f) => JSON.parse(readFileSync(join(ROOT, "src", "data", "postmark", f), "utf8"));
@@ -139,4 +139,51 @@ test("the built directory lists every house once, busiest first, and names the c
   // move a small house up visually; the source stays busiest first).
   assert.deepEqual(keys.slice(0, 10), expected.slice(0, 10));
   assert.match(page, /data-house-counts[^>]*>\s*\d+ residents? · \d+ letters? · \d+ marks?/);
+});
+
+// ── THE SEARCH BAR AND THE COUNT (the Site Lift, POS-253) ────────────────────
+
+test("fold: case, accents, spaces and a leading @ never stop a match", () => {
+  assert.equal(fold("  @Éloïse   Starforge "), "eloise starforge");
+  assert.equal(fold(null), "");
+  assert.equal(residentKey({ handle: "wright", address: { agent: "Wright" } }), "wright wright");
+  assert.equal(residentKey({ handle: "x" }), "x");
+});
+
+test("searchHouse: the house's name shows the whole house; a resident's name or handle shows them; else hidden", () => {
+  const members = [residentKey(res("wright", "2026-06-01")), residentKey({ handle: "rei-7", address: { agent: "Rei" } })];
+  assert.deepEqual(searchHouse("", "starforge", members), [0, 1], "an empty query hides someone");
+  assert.deepEqual(searchHouse("Star", "starforge", members), [0, 1], "the house's name does not show its house");
+  assert.deepEqual(searchHouse("@rei-7", "starforge", members), [1], "a handle does not find its resident alone");
+  assert.deepEqual(searchHouse("REI", "starforge", members), [1], "a name does not find its resident");
+  assert.equal(searchHouse("nobody", "starforge", members), null, "a house that matches nothing is still shown");
+});
+
+test("searchHouse finds by name or handle only, never by an address's words", () => {
+  const r = { handle: "moss", address: { agent: "Moss", body: "I write about lighthouses" } };
+  assert.equal(searchHouse("lighthouses", "moss", [residentKey(r)]), null);
+});
+
+// the count people read is residents (and houses), never "declared"
+test("the header counts residents and houses, and never says declared",
+  { skip: !existsSync(builtHouses) }, () => {
+  const page = readFileSync(builtHouses, "utf8");
+  const residents = DATA("residents.json").length;
+  const houses = houseDirectory(DATA("residents.json"), DATA("households.json")).length;
+  const tag = page.match(/data-dir-count[^>]*>([^<]*)</)?.[1] ?? "";
+  assert.equal(tag.trim(), `${residents} residents · ${houses} houses · busiest first`);
+  assert.equal(/declared/i.test(tag), false);
+});
+
+test("the search bar is on the page, hidden until the script shows it, and every card carries its search key",
+  { skip: !existsSync(builtHouses) }, () => {
+  const page = readFileSync(builtHouses, "utf8");
+  assert.match(page, /<form\b[^>]*data-dir-search[^>]*\bhidden\b/, "the bar is drawn without JavaScript (a box that does nothing)");
+  assert.match(page, /<input type="search"[^>]*data-dir-q/);
+  const byHandle = new Map(DATA("residents.json").map((r) => [r.handle, r]));
+  const keys = [...page.matchAll(/<a class="pm-res-card"[^>]*data-res-card="([^"]+)"[^>]*data-search="([^"]*)"/g)];
+  assert.equal(keys.length, byHandle.size, "a card has no search key");
+  const esc = (t) => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  for (const [, handle, key] of keys) assert.equal(key, esc(residentKey(byHandle.get(handle))), `${handle}'s card is found by something else`);
+  for (const m of page.matchAll(/<section\b[^>]*\bdata-house="[^"]+"[^>]*>/g)) assert.match(m[0], /data-house-name="[^"]*"/);
 });
