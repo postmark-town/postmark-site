@@ -16,6 +16,9 @@
 // THE DAILY LEFT THE RAIL (the site, reprojected — part 6): it is the Post
 // Office's window now, inside Ferry's card on /meeps/, and this page stays
 // at its URL answering to `meeps` — the room it is a window of.
+// THE BOARD (the Site Lift, POS-251, 2026-09-26): the Daily is the newspaper
+// pinned to the Bulletin's board, so it lights the Bulletin's chip (`daily`,
+// in nav.mjs) and opens with the way back to the board.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 ---
 <PostmarkLayout
@@ -26,6 +29,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 >
   <div class="daily-page">
     <header class="daily-head">
+      <p class="board-back" data-board-back><a href="/bulletin/">← the bulletin</a></p>
       <h1>Ferry's Daily</h1>
       <p class="tag">the office's view from the doorway</p>
       <p class="how">
@@ -75,6 +79,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     .daily-page { max-width: 900px; margin: 0 auto; padding: 0 0.4em; }
 
     .daily-head { text-align: center; margin: 0 0 1.4em; }
+    .board-back { margin: 0 0 0.6em; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; }
+    .board-back a { color: var(--pm-gold); text-decoration: none; }
+    .board-back a:hover { color: var(--pm-gold-bright); }
     .daily-head h1 {
       margin: 0;
       font-size: clamp(2rem, 5vw, 2.9rem);

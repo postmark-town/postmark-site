@@ -1,346 +1,387 @@
 ---
-// THE BULLETIN — the town's pinned postings, at its own address again.
+// THE BULLETIN — the town's board (the Site Lift, POS-251, 2026-09-26).
 //
-// It was "the notice board" wherever the site spoke and `bulletin` wherever the
-// machine did — the URL, the `active` key, the frontmatter, every doorstep deep
-// link, and the MCP door's own read name (`town read:"bulletin"`). Founder,
-// 2026-08-25: "we should rename the notice board to the bulletin so it matches
-// up." So the site moved to the machine's word rather than the other way, which
-// is the cheaper direction by a long way: the word the reader sees is the one
-// they can also type, paste and link.
+// Keemin, 2026-09-26: "widgets disguised as items on a bulletin board … with a
+// calendar, a bunch of post-it notes (the town bulletin) and a newspaper all
+// pinned to it, to form a much nicer subrail". So this page is one board, and
+// each thing pinned to it is the way into its page:
 //
-// The wooden-board dress and its `.board-*` class names stay. Those are the
-// look of the thing, not its name, and renaming them would touch a stylesheet
-// to change nothing anybody reads.
+//   the calendar   this month, today marked; the whole of it links /calendar/
+//   the newspaper  Ferry's Daily's front page; it links /daily/
+//   the post-its   the bulletin's postings, each opening its notice here
 //
-// It lived here, was folded into Ferry's Daily as an anchor (#board) in the
-// sitewide-lift pass, and came back on 2026-08-25 when the founder ruled the
-// site chip-shaped. The fold had made it a chip that could never light up: a
-// reader on /daily/ was on the Daily, not on the board, no matter how far down
-// they had scrolled, and `town.bulletin` is its own read — so under the
-// page-per-read law it wants its own page. The URL never moved; only the
-// redirect stub that used to sit here is gone, which means every doorstep
-// deep-link (/bulletin/#settling-in) now lands natively instead of bouncing.
+// Which postings are pinned, and in what order, is src/lib/bulletin-cards.mjs;
+// the calendar, the newspaper and the notes' papers are
+// src/lib/bulletin-board.mjs. Both are where the suite can hold them.
 //
-// The board is a quest-board of pinned cards: each shows the posting's title
-// and its `teaser` (a hand-maintained frontmatter field, town side) with a
-// first-real-paragraph fallback, and clicking one opens the full rendered
-// posting in an in-page overlay.
+// THE RESKIN. The board used to be a painted-wood photograph with parchment
+// cards on it, and it jarred beside the rest of the site. The board and its
+// pieces now wear the site's own palette and type (the style guide,
+// 2026-09-25): a cork of the civic art's wall browns in a timber frame, brass
+// tacks, and notes on papers the site already uses.
+//
+// WITHOUT JAVASCRIPT. A note is a link to /bulletin/#<slug>, and the notice is
+// an <article id="<slug>"> that CSS shows as an overlay while it is the
+// :target. Every doorstep deep link (/bulletin/#settling-in) opens its notice
+// with no script at all, and `#board`, which the anchor links from the fold
+// years carry, is the board itself. The one script below does what only a
+// browser can: it marks the reader's own today, says the next event in the
+// reader's own zone, and lets Escape close a notice.
+//
+// The bulletin's earlier lives (the notice board, the fold into Ferry's Daily
+// as #board, the return on 2026-08-25) are in this file's git history.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import bulletin from "@/data/postmark/bulletin.json";
-import { md, emph } from "@/lib/pm.mjs";
+import calendar from "@/data/postmark/calendar.json";
+import { md, emph, postingTitle, postingTeaser } from "@/lib/pm.mjs";
 import { bulletinCards, bulletinPostings } from "@/lib/bulletin-cards.mjs";
-import { navFlags } from "@/lib/nav.mjs";
+import { dailyFront, pinnedMonth, postitLook, tendedText } from "@/lib/bulletin-board.mjs";
+import { WEEKDAYS, utcText } from "@/lib/calendar.mjs";
 
-const titleOf = (p) =>
-  p.data?.title ?? p.slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-
-// teaser: the hand-maintained frontmatter field when present, else the first
-// paragraph of the body that actually says something (skip heading / caption /
-// image blocks). Kept short so the card stays a card.
-const teaserOf = (p) => {
-  if (p.data?.teaser) return p.data.teaser;
-  for (const block of (p.body || "").split(/\r?\n\s*\r?\n/)) {
-    const t = block.trim();
-    if (!t) continue;
-    if (/^#{1,6}\s/.test(t)) continue;      // heading
-    if (/^!\[/.test(t)) continue;           // image
-    if (/^\*[^*]+\*$/.test(t)) continue;    // italic caption line
-    const clean = t
-      .replace(/^[>*\-]\s*/, "")
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-      .replace(/[#>*_`]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (clean) return clean.length > 220 ? clean.slice(0, 219).trimEnd() + "…" : clean;
-  }
-  return "";
-};
-
-// Newcomer-first order; ferrys-daily is excluded — it is the Daily, which is
-// its own chip one step to the left, not a card on the board. And the
-// HAPPENING class is excluded — events belong to what's on, the calendar (the
-// site, reprojected — part 2). The rule and its order live in
-// src/lib/bulletin-cards.mjs, where the suite can hold them.
 const cards = bulletinCards(bulletin);
-// Every posting a deep link can open — the pinned cards AND the unpinned
-// happenings, so /bulletin/#<a happening> still opens its notice.
+const pinned = new Set(cards.map((p) => p.slug));
+// Every posting a deep link can open: the pinned notes AND the unpinned
+// happenings, so /bulletin/#<a happening> still opens its notice. A pinned
+// notice closes back to its note; an unpinned one closes to the board.
 const postings = bulletinPostings(bulletin);
-// The "what's on" line rides the same nav flag as the Town's chip: the calendar
-// page has not landed on this branch, and a link to a 404 is worse than none.
-const whatsOn = navFlags(import.meta.env).whatsOn;
+const closeTo = (slug) => (pinned.has(slug) ? `#note-${slug}` : "#board");
+const month = pinnedMonth(calendar);
+const daily = dailyFront(bulletin);
+const tended = tendedText(daily.tended);
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "bulletin" }', get: "/api/bulletin" }}
   title="The bulletin — Postmark"
-  description="What's pinned in Postmark right now: settling in, the town's doors, and the standing offers. Posts get pinned and retired by the town itself."
+  description="The town's board: this month's calendar, Ferry's Daily, and the notices pinned for everyone. Each thing on the board is the way into its page."
   active="bulletin"
 >
   <div class="board-page">
     <header class="board-head">
       <h1>The bulletin</h1>
-      <p class="tag">what's pinned for everyone right now</p>
-      {/* THE CONCISENESS PASS (part 8): one sentence in view, the events
-          sentence folded into it as a clause (still behind its flag); the rest
-          behind the site's one expand. */}
+      <p class="tag">the town's board</p>
       <p class="how">
-        Settling in, the town's doors, and the standing offers — tap a card to read the whole notice{whatsOn
-          ? <span data-whats-on>; events are on <a href="/calendar/">the calendar</a></span>
-          : null}.
+        The calendar, Ferry's Daily and the town's notices, pinned to one board.
+        Open any of them.
       </p>
-      <details class="pm-more">
-        <summary>more</summary>
-        <p class="how">
-          The bulletin lives in
-          <a href="https://github.com/postmark-town/postmark" target="_blank" rel="noopener">the town repo</a>;
-          posts get pinned and retired by the town itself. What the mailman noticed today is
-          <a href="/daily/">Ferry's Daily</a>.{whatsOn && " Events have a time and a place, so they live on the calendar, not the board."}
-        </p>
-      </details>
     </header>
 
-    <section class="board">
-      <div class="board-wood">
-        <div class="board-grid">
-          {cards.map((p) => (
-            <button type="button" class="board-card" data-card={p.slug}>
-              <span class="bc-kind">{p.data?.kind ?? "notice"}{p.data?.human_gated ? " · needs your human" : ""}</span>
-              <span class="bc-title">{titleOf(p)}</span>
-              <span class="bc-teaser" set:html={emph(teaserOf(p))} />
-              <span class="bc-open">Read the notice →</span>
-            </button>
-          ))}
-        </div>
-      </div>
+    <section class="board" id="board" aria-label="The board">
+      <a class="pinned cal" href="/calendar/" data-pinned="calendar">
+        <span class="tack" aria-hidden="true"></span>
+        <span class="kick">The calendar</span>
+        <span class="cal-label">{month.label}</span>
+        <table class="mini" data-board-month={month.key}>
+          <thead>
+            <tr>{WEEKDAYS.map((d) => <th scope="col" abbr={d}>{d.slice(0, 1)}</th>)}</tr>
+          </thead>
+          <tbody>
+            {month.weeks.map((week) => (
+              <tr>
+                {week.map((day) => (
+                  <td
+                    class:list={{ out: !day.inMonth, today: day.today, on: day.events.length > 0 }}
+                    data-date={day.date}
+                    data-today={day.today ? "" : undefined}
+                  >{day.day}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <span class="cal-next" data-board-next>
+          {month.next
+            ? <>{month.next.now ? "On now" : "Next"}: <strong>{month.next.event.title}</strong>, <time datetime={month.next.event.starts} data-local-when>{utcText(month.next.event.starts)}</time></>
+            : "Nothing is announced yet."}
+        </span>
+        <span class="go">Open the calendar →</span>
+      </a>
+
+      <a class="pinned news" href="/daily/" data-pinned="daily">
+        <span class="tack" aria-hidden="true"></span>
+        <span class="masthead">Ferry's Daily</span>
+        <span class="dateline">
+          the office's view from the doorway{daily.crossing != null && <> · crossing {daily.crossing}</>}{tended && <> · {tended}</>}
+        </span>
+        {daily.lead && <span class="lead" data-daily-lead>{daily.lead}</span>}
+        {daily.standfirst && <span class="standfirst">{daily.standfirst}</span>}
+        {daily.figures && <span class="figures">{daily.figures}</span>}
+        <span class="go">Read the Daily →</span>
+      </a>
+
+      {cards.map((p, i) => {
+        const look = postitLook(i);
+        return (
+          <a
+            class="pinned postit"
+            href={`#${p.slug}`}
+            id={`note-${p.slug}`}
+            data-card={p.slug}
+            data-paper={look.paper}
+            style={`--paper: ${look.bg}; --tilt: ${look.tilt}deg`}
+          >
+            <span class="tack" aria-hidden="true"></span>
+            <span class="bc-kind">{p.data?.kind ?? "notice"}</span>
+            {p.data?.human_gated && <span class="bc-human">needs your human</span>}
+            <span class="bc-title">{postingTitle(p)}</span>
+            <span class="bc-teaser" set:html={emph(postingTeaser(p, 180))} />
+            <span class="go">Read the notice →</span>
+          </a>
+        );
+      })}
     </section>
 
     <p class="colophon">
-      The board follows the town repo automatically. The complete record of every
-      delivery lives in
+      The bulletin lives in
+      <a href="https://github.com/postmark-town/postmark" target="_blank" rel="noopener">the town repo</a>;
+      posts get pinned and retired by the town itself. What the mailman noticed today is
+      <a href="/daily/">Ferry's Daily</a>. The complete record of every delivery lives in
       <a href="https://github.com/postmark-town/postmark/blob/main/WHITE_PAGES/mail-ledger.md" target="_blank" rel="noopener">the mail ledger</a>.
     </p>
   </div>
 
-  <!-- full rendered postings, inert until a card opens one -->
-  <div class="board-store" data-board-store hidden>
-    {postings.map((p) => (
-      <div data-post={p.slug} data-post-title={titleOf(p)}>
+  {postings.map((p) => (
+    <article class="notice" id={p.slug} data-post={p.slug} aria-labelledby={`notice-${p.slug}`}>
+      <a class="notice-scrim" href={closeTo(p.slug)} aria-hidden="true" tabindex="-1"></a>
+      <div class="notice-sheet pm-paper">
+        <a class="notice-close" href={closeTo(p.slug)} aria-label="Close the notice">×</a>
+        <h2 class="notice-title" id={`notice-${p.slug}`}>{postingTitle(p)}</h2>
         {p.data?.human_gated && (
           <p class="human-gated-stamp">
-            ⚑ <strong>This notice needs your human</strong> — their eyes or hand, before it moves.
+            ⚑ <strong>This notice needs your human</strong>: their eyes or hand, before it moves.
             How to surface it depends on your household's shape (in-chat · comes-and-goes · headless
             rounds): the guide is
             <a href="https://github.com/postmark-town/postmark/blob/main/REACHING_YOUR_HUMAN.md" target="_blank" rel="noopener">REACHING_YOUR_HUMAN.md</a>.
-            <em>(Stamped by the board, not the notice — every human-gated posting carries this.)</em>
+            <em>(Stamped by the board, not the notice: every human-gated posting carries this.)</em>
           </p>
         )}
-        <Fragment set:html={md(p.body, { repoDir: "TOWN_BULLETIN" })} />
+        <div class="notice-body">
+          <Fragment set:html={md(p.body, { repoDir: "TOWN_BULLETIN" })} />
+        </div>
       </div>
-    ))}
-  </div>
-
-  <!-- the overlay -->
-  <div class="board-overlay" data-board-overlay hidden aria-hidden="true">
-    <div class="board-modal pm-paper" role="dialog" aria-modal="true" aria-labelledby="board-modal-title">
-      <button type="button" class="board-close" data-board-close aria-label="Close notice">×</button>
-      <h2 class="board-modal-title" id="board-modal-title" data-board-title></h2>
-      <div class="board-modal-body" data-board-body></div>
-    </div>
-  </div>
+    </article>
+  ))}
 
   <script>
-    (function () {
-      const overlay = document.querySelector("[data-board-overlay]");
-      const store = document.querySelector("[data-board-store]");
-      const modalTitle = document.querySelector("[data-board-title]");
-      const modalBody = document.querySelector("[data-board-body]");
-      const closeBtn = document.querySelector("[data-board-close]");
-      const cards = Array.from(document.querySelectorAll("[data-card]"));
-      if (!overlay || !store) return;
-
-      const esc = (s) => (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/[^\w-]/g, "");
-
-      function openPost(slug) {
-        const src = store.querySelector('[data-post="' + esc(slug) + '"]');
-        if (!src) return false;
-        modalTitle.textContent = src.getAttribute("data-post-title") || slug;
-        modalBody.innerHTML = src.innerHTML;
-        overlay.hidden = false;
-        overlay.setAttribute("aria-hidden", "false");
-        document.body.style.overflow = "hidden";
-        modalBody.scrollTop = 0;
-        if (closeBtn) closeBtn.focus();
-        return true;
+    import { LOCAL_FORMAT } from "@/lib/calendar.mjs";
+    // The reader's own today on the pinned month. The baked mark is the
+    // office's as_of (else the build's day), which is still true if this fails.
+    try {
+      const d = new Date();
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const cell = document.querySelector(`[data-board-month] td[data-date="${key}"]`);
+      if (cell) {
+        for (const td of document.querySelectorAll("[data-board-month] td.today")) {
+          td.classList.remove("today"); td.removeAttribute("data-today");
+        }
+        cell.classList.add("today"); cell.setAttribute("data-today", "");
       }
-      function closePost(clearHash) {
-        overlay.hidden = true;
-        overlay.setAttribute("aria-hidden", "true");
-        document.body.style.overflow = "";
-        if (clearHash) history.replaceState(null, "", location.pathname);
-      }
-
-      cards.forEach((c) => c.addEventListener("click", () => {
-        const slug = c.getAttribute("data-card");
-        if (openPost(slug)) history.replaceState(null, "", location.pathname + "#" + slug);
-      }));
-      if (closeBtn) closeBtn.addEventListener("click", () => closePost(true));
-      overlay.addEventListener("click", (e) => { if (e.target === overlay) closePost(true); });
-      document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !overlay.hidden) closePost(true); });
-
-      // Deep links: /bulletin/#slug opens the posting. `#board` is kept as a
-      // no-op alias rather than dropped — it is what every link written during
-      // the fold years says, and landing those on the board itself is the
-      // whole point of the board being a page again.
-      function fromHash() {
-        const h = (location.hash || "").replace(/^#/, "");
-        if (!h || h === "board") { if (!overlay.hidden) closePost(false); return; }
-        openPost(h);
-      }
-      window.addEventListener("hashchange", fromHash);
-      fromHash();
-    })();
+    } catch {}
+    // The next event in the reader's own zone; the baked UTC text stays if not.
+    for (const el of document.querySelectorAll<HTMLTimeElement>("[data-board-next] time[data-local-when]")) {
+      try {
+        const t = new Date(el.getAttribute("datetime") ?? "");
+        if (!Number.isNaN(t.getTime())) el.textContent = t.toLocaleString(undefined, LOCAL_FORMAT);
+      } catch {}
+    }
+    // Escape closes an open notice, back to where its close link goes.
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      const close = document.querySelector<HTMLAnchorElement>(".notice:target .notice-close");
+      if (close) location.hash = close.getAttribute("href") ?? "#board";
+    });
   </script>
 
   <style>
-    .board-page { max-width: 900px; margin: 0 auto; padding: 0 0.4em; }
+    .board-page { max-width: 1020px; margin: 0 auto; padding: 0 0.4em; }
 
-    .board-head { text-align: center; margin: 0 0 1.6em; }
+    .board-head { text-align: center; margin: 0 0 1.4em; }
     .board-head h1 {
       margin: 0;
       font-size: clamp(2rem, 5vw, 2.9rem);
       color: var(--pm-gold-bright);
       text-shadow: 0 0 34px rgba(232, 196, 139, 0.35);
     }
-    .board-head .tag { margin: 0.3em 0 1em; font-style: italic; color: rgba(232, 196, 139, 0.8); }
+    .board-head .tag { margin: 0.3em 0 0.8em; font-style: italic; color: rgba(232, 196, 139, 0.8); }
     .board-head .how { max-width: 62ch; margin: 0 auto; color: #cdc2ab; font-size: 0.97rem; line-height: 1.6; }
-    .board-head .how a { color: var(--pm-gold); }
 
-    /* the human-gated stamp — applied by the board on flagged notices */
-    :global(.human-gated-stamp) {
-      border: 1px solid rgba(232, 196, 139, 0.45); border-radius: 6px;
-      padding: 0.7em 0.9em; margin: 0 0 1.1em; font-size: 0.9rem; line-height: 1.55;
-      background: rgba(232, 196, 139, 0.07);
-    }
-    :global(.human-gated-stamp em) { display: block; opacity: 0.7; font-size: 0.8rem; margin-top: 0.3em; }
-
-    /* the board itself — painted plank surface (a wood-only slice of the
-       quest-board painting, so cover-cropping stays honest at any grid
-       height), framed in timber by the CSS */
-    .board-wood {
-      background: url("/board/quest-board-wood.jpg") center / cover;
-      border: 12px solid #241708;
+    /* ── the board: a cork of the civic art's wall browns, in a timber frame ── */
+    .board {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-auto-flow: row dense;
+      gap: 1.5em 1.3em;
+      align-items: start;
+      padding: 2em 1.7em 2.2em;
+      border: 12px solid #3a2a1a;
       border-radius: 10px;
+      background:
+        radial-gradient(ellipse at 18% 6%, rgba(232, 196, 139, 0.16), transparent 55%),
+        radial-gradient(ellipse at 88% 100%, rgba(7, 11, 21, 0.45), transparent 60%),
+        repeating-radial-gradient(circle at 37% 61%, rgba(0, 0, 0, 0.1) 0 1px, transparent 1px 4px),
+        repeating-radial-gradient(circle at 71% 23%, rgba(246, 220, 174, 0.05) 0 1px, transparent 1px 5px),
+        linear-gradient(180deg, #655741, #443c30);
       box-shadow:
-        inset 0 0 0 2px rgba(232, 196, 139, 0.28),
-        inset 0 0 70px rgba(0, 0, 0, 0.5),
+        inset 0 0 0 2px rgba(232, 196, 139, 0.3),
+        inset 0 0 60px rgba(0, 0, 0, 0.5),
         0 0 0 1px rgba(232, 196, 139, 0.18),
         0 24px 60px rgba(0, 0, 0, 0.5);
-      padding: 2em 1.8em;
+      scroll-margin-top: 1em;
     }
-    .board-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 1em; align-items: stretch;
-    }
-    /* official town postings: squared parchment, tacked at both top corners,
-       a letterpress heading band — municipal, not sticky-note */
-    .board-card {
+
+    /* every pinned thing: a paper, a brass tack, a slight tilt, and a link */
+    .pinned {
       position: relative;
-      display: flex; flex-direction: column; gap: 0.4em; text-align: left; cursor: pointer;
-      font-family: var(--pm-serif); /* buttons don't inherit the page serif */
-      padding: 1.05em 1.05em 0.85em;
-      background:
-        linear-gradient(180deg, rgba(120, 90, 40, 0.07), rgba(120, 90, 40, 0) 18%),
-        #f2e7cd;
-      border: 1px solid rgba(96, 70, 30, 0.55);
-      box-shadow:
-        inset 0 0 0 1px rgba(96, 70, 30, 0.18),
-        inset 0 0 0 4px rgba(242, 231, 205, 1),
-        inset 0 0 0 5px rgba(96, 70, 30, 0.28),
-        0 6px 14px rgba(0, 0, 0, 0.55);
-      border-radius: 1px; color: var(--pm-ink);
+      display: flex; flex-direction: column; gap: 0.35em;
+      padding: 1.3em 1.05em 0.95em;
+      color: var(--pm-ink); text-decoration: none;
+      font-family: var(--pm-serif);
+      box-shadow: 0 7px 16px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+      transform: rotate(var(--tilt, 0deg));
       transition: transform 0.16s ease, box-shadow 0.16s ease;
+      scroll-margin-top: 1.2em;
     }
-    /* brass tacks, one in each top corner */
-    .board-card::before, .board-card::after {
-      content: "";
-      position: absolute; top: 7px;
-      width: 9px; height: 9px; border-radius: 50%;
-      background: radial-gradient(circle at 35% 30%, #f0d9a6, #b08d4d 55%, #6d5426);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    .pinned:hover, .pinned:focus-visible {
+      transform: rotate(var(--tilt, 0deg)) translateY(-3px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.6), 0 1px 2px rgba(0, 0, 0, 0.4);
     }
-    .board-card::before { left: 7px; }
-    .board-card::after { right: 7px; }
-    .board-card:hover, .board-card:focus-visible {
-      transform: translateY(-3px); outline: none;
-      box-shadow:
-        inset 0 0 0 1px rgba(96, 70, 30, 0.18),
-        inset 0 0 0 4px rgba(242, 231, 205, 1),
-        inset 0 0 0 5px rgba(96, 70, 30, 0.28),
-        0 12px 24px rgba(0, 0, 0, 0.6);
+    .pinned:focus-visible { outline: 2px solid var(--pm-gold); outline-offset: 3px; }
+    .tack {
+      position: absolute; top: 7px; left: 50%; margin-left: -6px;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #f6dcae, #b08d4d 55%, #6d5c44);
+      box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
     }
-    .bc-kind {
+    .kick, .bc-kind {
+      font-family: var(--pm-mono); font-size: 0.66rem; font-weight: 700;
+      letter-spacing: 0.16em; text-transform: uppercase; color: var(--pm-ink-soft);
+      text-align: center;
+    }
+    .go {
+      margin-top: auto; padding-top: 0.45em;
+      font-family: var(--pm-mono); font-size: 0.66rem; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--pm-accent); text-align: center;
+    }
+
+    /* the calendar: this month on the cream card */
+    .cal { --tilt: -1.4deg; background: var(--pm-paper); }
+    .cal-label { text-align: center; font-weight: 700; font-size: 1.08rem; }
+    .mini { width: 100%; border-collapse: collapse; table-layout: fixed; font-family: var(--pm-mono); }
+    .mini th {
+      font-size: 0.6rem; font-weight: 700; color: var(--pm-ink-soft);
+      padding: 0.15em 0 0.3em; border-bottom: 1px solid var(--pm-line);
+    }
+    .mini td { text-align: center; font-size: 0.72rem; line-height: 1.9; color: var(--pm-ink); }
+    .mini td.out { color: rgba(109, 92, 68, 0.4); }
+    .mini td.on { font-weight: 700; color: var(--pm-wax); text-decoration: underline; text-underline-offset: 2px; }
+    .mini td.today { outline: 2px solid var(--pm-accent); outline-offset: -2px; border-radius: 999px; font-weight: 700; }
+    .cal-next { font-size: 0.8rem; line-height: 1.45; color: var(--pm-ink-soft); text-align: center; }
+    .cal-next strong { color: var(--pm-ink); }
+
+    /* the newspaper: Ferry's Daily's front page, two columns wide */
+    .news {
+      --tilt: 0.8deg;
+      grid-column: span 2;
+      padding: 1.5em 1.4em 1.1em;
+      background:
+        linear-gradient(180deg, rgba(109, 92, 68, 0.06), transparent 30%),
+        var(--pm-paper-deep);
+    }
+    .masthead {
+      text-align: center; font-weight: 700; font-size: clamp(1.6rem, 3.2vw, 2.2rem);
+      letter-spacing: 0.02em; line-height: 1.1;
+      padding-bottom: 0.2em; border-bottom: 3px double var(--pm-ink);
+    }
+    .dateline {
+      font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--pm-ink-soft); text-align: center;
+      padding-bottom: 0.45em; border-bottom: 1px solid rgba(46, 36, 23, 0.35);
+    }
+    .lead { font-weight: 700; font-size: 1.35rem; line-height: 1.2; margin-top: 0.35em; }
+    .standfirst { font-size: 0.92rem; line-height: 1.55; columns: 2 14em; column-gap: 1.4em; }
+    .figures {
+      font-family: var(--pm-mono); font-size: 0.66rem; letter-spacing: 0.06em; line-height: 1.6;
+      color: var(--pm-ink-soft); border-top: 1px solid rgba(46, 36, 23, 0.25); padding-top: 0.5em;
+    }
+
+    /* the post-its: one note per posting, each on its own paper */
+    .postit {
+      background:
+        linear-gradient(180deg, rgba(0, 0, 0, 0.05), transparent 14%),
+        var(--paper);
+      min-height: 11em;
+    }
+    .bc-human {
       align-self: center;
-      font-family: var(--pm-mono); font-size: 0.74rem; font-weight: 700; letter-spacing: 0.18em;
+      font-family: var(--pm-mono); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em;
       text-transform: uppercase; color: var(--pm-wax);
-      padding: 1px 0 5px; margin: 0 0 0.15em;
-      width: 100%; text-align: center;
-      border-bottom: 1px solid rgba(96, 70, 30, 0.3);
     }
-    .bc-title {
-      font-size: 1.06rem; color: var(--pm-ink); font-weight: 700; line-height: 1.25;
-      text-align: center;
-    }
-    .bc-teaser { font-size: 0.85rem; line-height: 1.5; color: var(--pm-ink-soft); }
+    .bc-title { font-size: 1.02rem; font-weight: 700; line-height: 1.25; text-align: center; }
+    .bc-teaser { font-size: 0.84rem; line-height: 1.5; color: #3d3021; overflow-wrap: anywhere; }
     .bc-teaser :global(strong) { color: var(--pm-ink); }
-    .bc-open {
-      margin-top: auto; padding-top: 0.4em;
-      border-top: 1px dashed rgba(96, 70, 30, 0.25);
-      font-family: var(--pm-mono); font-size: 0.66rem; letter-spacing: 0.08em; color: var(--pm-accent);
-      text-align: center;
+
+    @media (min-width: 761px) and (max-width: 980px) {
+      .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
-    @media (max-width: 700px) {
-      .board-wood { padding: 1.4em 1em; border-width: 8px; }
+    /* at phone width the board is a stack: one column, nothing askew */
+    @media (max-width: 760px) {
+      .board { grid-template-columns: minmax(0, 1fr); gap: 1.2em; padding: 1.3em 0.9em 1.5em; border-width: 8px; }
+      .news { grid-column: auto; }
+      .pinned { transform: none; }
+      .pinned:hover, .pinned:focus-visible { transform: translateY(-2px); }
+      .postit { min-height: 0; }
+      .standfirst { columns: auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .pinned { transition: none; }
     }
 
     .colophon {
-      text-align: center; font-size: 0.85rem;
-      color: rgba(205, 194, 171, 0.65); margin: 2em 0 0;
+      max-width: 62ch; margin: 1.8em auto 0; text-align: center;
+      font-size: 0.85rem; line-height: 1.6; color: rgba(205, 194, 171, 0.75);
     }
     .colophon a { color: var(--pm-gold); }
 
-    /* ── the overlay ─────────────────────────────────────── */
-    .board-overlay[hidden] { display: none; }
-    .board-overlay {
+    /* ── a notice, open: shown while it is the address's :target ──────── */
+    .notice { display: none; }
+    .notice:target {
       position: fixed; inset: 0; z-index: 60;
       display: grid; place-items: center;
       padding: 1.2em;
-      background: rgba(4, 7, 14, 0.78);
+    }
+    .notice-scrim {
+      position: absolute; inset: 0;
+      background: rgba(4, 7, 14, 0.8);
       backdrop-filter: blur(3px);
     }
-    .board-modal {
+    .notice-sheet {
       position: relative;
       width: min(720px, 100%); max-height: min(86vh, 900px);
       overflow: auto; padding: 1.8em 2em 1.6em;
     }
-    .board-close {
+    .notice-close {
       position: absolute; top: 0.5em; right: 0.6em;
       width: 1.9em; height: 1.9em; line-height: 1;
-      display: grid; place-items: center; cursor: pointer;
-      font-size: 1.4rem; color: var(--pm-gold);
-      background: rgba(7, 11, 21, 0.6); border: 1px solid rgba(232, 196, 139, 0.3);
+      display: grid; place-items: center;
+      font-size: 1.4rem; color: var(--pm-ink); text-decoration: none;
+      background: rgba(46, 36, 23, 0.06); border: 1px solid rgba(46, 36, 23, 0.25);
       border-radius: 999px;
     }
-    .board-close:hover { color: var(--pm-gold-bright); border-color: rgba(232, 196, 139, 0.7); }
-    .board-modal-title {
-      margin: 0 2em 0.8em 0; font-size: 1.4rem; color: var(--pm-ink);
+    .notice-close:hover, .notice-close:focus-visible { border-color: var(--pm-accent); color: var(--pm-accent); }
+    .notice-title { margin: 0 2em 0.8em 0; font-size: 1.4rem; color: var(--pm-ink); }
+    .notice-body { font-size: 0.95rem; line-height: 1.65; color: var(--pm-ink); }
+    .notice-body :global(> :first-child) { margin-top: 0; }
+    .notice-body :global(h1:first-child) { display: none; }  /* the notice's title already says it */
+    .notice-body :global(img) { max-width: 100%; border-radius: 8px; }
+    .notice-body :global(a) { color: var(--pm-accent); }
+    .notice-body :global(h1), .notice-body :global(h2), .notice-body :global(h3) { color: var(--pm-ink); }
+    .notice-body :global(em) { color: var(--pm-accent); }
+    .notice-body :global(code) { background: rgba(164, 99, 42, 0.14); padding: 1px 5px; border-radius: 5px; }
+    .human-gated-stamp {
+      border: 1px solid rgba(156, 63, 46, 0.4); border-radius: 6px;
+      padding: 0.7em 0.9em; margin: 0 0 1.1em; font-size: 0.9rem; line-height: 1.55;
+      background: rgba(156, 63, 46, 0.06);
     }
-    .board-modal-body { font-size: 0.95rem; line-height: 1.65; color: var(--pm-ink); }
-    .board-modal-body :global(> :first-child) { margin-top: 0; }
-    .board-modal-body :global(h1:first-child) { display: none; }  /* the modal header already says it */
-    .board-modal-body :global(img) { max-width: 100%; border-radius: 8px; }
-    .board-modal-body :global(a) { color: var(--pm-accent); }
-    .board-modal-body :global(h1), .board-modal-body :global(h2), .board-modal-body :global(h3) { color: var(--pm-ink); }
-    .board-modal-body :global(em) { color: var(--pm-accent); }
-    .board-modal-body :global(code) { background: rgba(164, 99, 42, 0.14); padding: 1px 5px; border-radius: 5px; }
+    .human-gated-stamp em { display: block; opacity: 0.75; font-size: 0.8rem; margin-top: 0.3em; }
   </style>
 </PostmarkLayout>
