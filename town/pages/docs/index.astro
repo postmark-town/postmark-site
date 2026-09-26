@@ -1,74 +1,96 @@
 ---
-// /docs/ — THE DOCS, a placeholder that says so (the Site Lift, POS-249).
+// /docs/ — THE DOCS, the town's guides (the Site Lift, POS-257).
 //
-// Keemin, 2026-09-26: "The stamps and the numbers are the start of the Docs or
-// Guides, needed soon to explain the growing features. The repos probably
-// belong there too." The rail seats Docs now so no seat 404s; the Docs issue
-// replaces this page with the real landing. Until then it says what is coming
-// and points at the three pages that are already here. "Docs" is the working
-// name until Keemin names it.
+// What the guides are for, then the guides: one card each, with the questions
+// it answers in view (no "more", nothing in a hover: POS-250's rule). Then the
+// guides still to write, named in one line and not linked, so the index has
+// room for them without pretending they exist. The list is src/lib/docs.mjs's.
 //
 // THE FOUNDER'S LINE opens it: "We refuse to hide: the record is public." It
 // stood on The Record's landing, which dissolved; the repos and the numbers it
 // stood over live here now, so the line came with them (Wright's ruling on
 // POS-249, 2026-09-26).
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import { GUIDES, TO_WRITE } from "@/lib/docs.mjs";
 
-const here = [
-  { href: "/docs/stamps/", name: "Stamps", what: "what a stamp is, how one is earned, and where it goes" },
-  { href: "/docs/numbers/", name: "The numbers", what: "the town's dials, as they stand today" },
-  { href: "/docs/repos/", name: "The repos", what: "the five public repositories the town is made of" },
-];
+const toWrite = TO_WRITE.length > 1
+  ? `${TO_WRITE.slice(0, -1).join(", ")} and ${TO_WRITE.at(-1)}`
+  : TO_WRITE[0];
 ---
 <PostmarkLayout
   door={null}
   title="Docs — Postmark"
-  description="The town's guides, being gathered: stamps, the numbers and the repos, with more to explain the town's growing features."
+  description="The town's guides: stamps, the town's numbers and the repos, each written for the people who use them."
   active="docs"
 >
-  <div class="ph">
-    <header class="ph-head">
+  <div class="dx">
+    <header class="dx-head">
       <h1>Docs</h1>
-      <p class="tag">coming together</p>
       <p class="founder">We refuse to hide: the record is public.</p>
-      <p class="how">This will be where the town explains itself: a guide for each of its features, written for the people who use them. It is being built. What is already here:</p>
+      <p class="how">The town explains itself here: a guide for each of its features, written for the people who use them. Each guide reads the same record the doors serve, so what it tells you, you can check.</p>
     </header>
-    <ul class="ph-list">
-      {here.map((d) => (
-        <li><a href={d.href}><b>{d.name}</b></a> <span>{d.what}</span></li>
+
+    <ul class="dx-guides">
+      {GUIDES.map((g) => (
+        <li data-guide={g.key}>
+          <a class="dx-card" href={g.href}>
+            <span class="dx-name">{g.name}</span>
+            <span class="dx-what">{g.what}</span>
+            <span class="dx-asks">{g.asks.map((q) => <span class="dx-ask">{q}</span>)}</span>
+          </a>
+        </li>
       ))}
     </ul>
+
+    {TO_WRITE.length > 0 && (
+      <p class="dx-next">Still to write: {toWrite}.</p>
+    )}
   </div>
 
   <style>
-    .ph { max-width: 44rem; margin: 0 auto; padding: 0 0.4em 2em; }
-    .ph-head { text-align: center; margin: 0 0 1.7em; }
-    .ph-head h1 {
+    .dx { max-width: 44rem; margin: 0 auto; padding: 0 0.4em 2em; }
+    .dx-head { text-align: center; margin: 0 0 1.7em; }
+    .dx-head h1 {
       margin: 0;
       font-size: clamp(1.9rem, 4.6vw, 2.6rem);
       color: var(--pm-gold-bright);
       text-shadow: 0 0 34px rgba(232, 196, 139, 0.35);
     }
-    .ph-head .tag {
-      margin: 0.4em 0 1em;
-      font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.12em;
-      color: rgba(232, 196, 139, 0.8);
-    }
-    .ph-head .founder {
-      margin: 0 auto 1em;
+    .dx-head .founder {
+      margin: 0.5em auto 1em;
       font-family: var(--pm-serif); font-style: italic; font-size: 1.15rem;
       color: var(--pm-gold-bright);
     }
-    .ph-head .how { max-width: 62ch; margin: 0 auto; color: #cdc2ab; font-size: 0.95rem; line-height: 1.6; }
-    .ph-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55em; }
-    .ph-list li {
-      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.3em 1em;
-      padding: 0.75em 1.2em;
+    .dx-head .how { max-width: 62ch; margin: 0 auto; color: #cdc2ab; font-size: 0.95rem; line-height: 1.6; }
+
+    .dx-guides { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.7em; }
+    .dx-card {
+      display: flex; flex-direction: column; gap: 0.35em;
+      padding: 0.95em 1.2em 1em;
       background: rgba(13, 20, 38, 0.72);
       border: 1px solid rgba(232, 196, 139, 0.18);
       border-radius: 12px;
+      text-decoration: none;
+      transition: border-color 0.15s ease, transform 0.15s ease;
     }
-    .ph-list a { color: var(--pm-gold-bright); text-decoration: none; }
-    .ph-list span { color: #cdc2ab; font-size: 0.9rem; }
+    .dx-card:hover { border-color: rgba(232, 196, 139, 0.55); transform: translateY(-2px); }
+    .dx-card:focus-visible { outline: 2px solid var(--pm-gold); outline-offset: 2px; }
+    .dx-name { font-size: 1.2rem; font-weight: 700; color: var(--pm-gold-bright); }
+    .dx-what { color: #cdc2ab; font-size: 0.93rem; line-height: 1.55; }
+    .dx-asks { display: flex; flex-wrap: wrap; gap: 0.2em 0; margin-top: 0.15em; }
+    .dx-ask {
+      font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.03em;
+      color: rgba(232, 196, 139, 0.8);
+    }
+    .dx-ask + .dx-ask::before { content: "·"; margin: 0 0.6em; color: rgba(232, 196, 139, 0.45); }
+    @media (max-width: 560px) {
+      .dx-asks { flex-direction: column; }
+      .dx-ask + .dx-ask::before { content: none; }
+    }
+
+    .dx-next {
+      margin: 1.6em auto 0; max-width: 62ch; text-align: center;
+      color: rgba(205, 194, 171, 0.75); font-size: 0.88rem; font-style: italic;
+    }
   </style>
 </PostmarkLayout>

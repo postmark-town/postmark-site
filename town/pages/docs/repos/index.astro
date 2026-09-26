@@ -7,6 +7,11 @@
 // and its OWN description as its maintainers wrote it on GitHub, quoted
 // (postmark-site has none, and its card says only the site's own line). The
 // cards live in src/lib/record.mjs.
+//
+// THE SITE LIFT (POS-257, under POS-250's rule: no "more", nothing only in a
+// hover): the page moved under the Docs, and what each repo holds and what its
+// maintainers said are in view on its card, not on its hover. The "more" held
+// one sentence the page needs, so that sentence is in view too.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import { REPOS } from "@/lib/record.mjs";
 ---
@@ -18,26 +23,19 @@ import { REPOS } from "@/lib/record.mjs";
 >
   <div class="recdir">
     <header class="dir-head">
+      <p class="dir-crumb"><a href="/docs/">DOCS</a> · THE REPOS</p>
       <h1>The repos</h1>
       <p class="tag">the town's own source, all of it public</p>
-      {/* THE CONCISENESS PASS (part 8): one sentence in view, and one line
-          per repo — its name and what it is. What it holds and its maintainers'
-          own description ride the line's hover and stay in the DOM. */}
-      <p class="how">Postmark is five repositories: clone any of them and recompute what the site shows you.</p>
-      <details class="pm-more">
-        <summary>more</summary>
-        <p class="how">The doors answer what the town holds; these are where it is kept.</p>
-      </details>
+      <p class="how">Postmark is five repositories: clone any of them and recompute what the site shows you. The doors answer what the town holds; these are where it is kept.</p>
     </header>
 
     <div class="repo-grid">
       {REPOS.map((r) => (
-        <a class="repo-card" href={r.href} target="_blank" rel="noopener" data-repo={r.key}
-           title={r.said ? `${r.holds}\n“${r.said}”` : r.holds}>
+        <a class="repo-card" href={r.href} target="_blank" rel="noopener" data-repo={r.key}>
           <span class="repo-name"><code>postmark-town/{r.name}</code> ↗</span>
           <span class="repo-short">{r.short}</span>
-          <span class="repo-holds pm-sr">{r.holds}</span>
-          {r.said && <span class="repo-said pm-sr">“{r.said}”</span>}
+          <span class="repo-holds">{r.holds}</span>
+          {r.said && <span class="repo-said">“{r.said}”</span>}
         </a>
       ))}
     </div>
@@ -52,6 +50,9 @@ import { REPOS } from "@/lib/record.mjs";
       color: var(--pm-gold-bright);
       text-shadow: 0 0 34px rgba(232, 196, 139, 0.35);
     }
+    .dir-crumb { margin: 0 0 0.5em; font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.18em; color: rgba(232, 196, 139, 0.6); }
+    .dir-crumb a { color: inherit; text-decoration: none; }
+    .dir-crumb a:hover { color: var(--pm-gold-bright); }
     .dir-head .tag {
       margin: 0.4em 0 1em;
       font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.12em;
@@ -73,6 +74,7 @@ import { REPOS } from "@/lib/record.mjs";
     .repo-name { font-family: var(--pm-mono); font-size: 0.78rem; color: var(--pm-gold-bright); overflow-wrap: anywhere; }
     .repo-name code { font-family: inherit; }
     .repo-short { font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(232, 196, 139, 0.65); }
+    .repo-holds, .repo-said { flex-basis: 100%; }
     .repo-holds { color: #cdc2ab; font-size: 0.92rem; line-height: 1.55; }
     .repo-said { color: rgba(205, 194, 171, 0.7); font-size: 0.84rem; line-height: 1.55; font-style: italic; }
   </style>

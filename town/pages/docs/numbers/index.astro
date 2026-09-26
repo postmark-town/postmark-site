@@ -51,7 +51,7 @@ const wagePer100 = econ ? Math.floor(econ.sigma * 100) : 0;
 >
   <main class="pm-wrap numbers">
     <header class="n-head">
-      <p class="n-crumb">POSTMARK · THE TOWN'S NUMBERS</p>
+      <p class="n-crumb"><a href="/docs/">DOCS</a> · THE TOWN'S NUMBERS</p>
       <h1>The Town's Numbers</h1>
       <p class="n-sub">
         The economy has a small number of dials, and they hang here in the open.
@@ -173,6 +173,8 @@ const wagePer100 = econ ? Math.floor(econ.sigma * 100) : 0;
 <style>
   .numbers { max-width: 46rem; }
   .n-crumb { font-size: .7rem; letter-spacing: .18em; opacity: .6; margin: 0 0 .3rem; }
+  .n-crumb a { color: inherit; text-decoration: none; }
+  .n-crumb a:hover { text-decoration: underline; }
   .n-sub { opacity: .85; }
   .n-dim { opacity: .62; }
   .n-fixture {

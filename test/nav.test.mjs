@@ -370,18 +370,18 @@ test("THE PROJECTS LIGHT THE CIVIC QUARTER — no chip of their own, one line on
   assert.ok(hub.includes('<a href="/projects/">the projects</a>'), "nothing on the quarter's page reaches The Projects");
 });
 
-test("A SEAT FOR A PAGE NOT BUILT YET STANDS ON AN HONEST PLACEHOLDER — /docs/ says what is coming", () => {
-  // /projects/ left this test when The Projects were built (POS-256)
-  for (const href of ["/docs/"]) {
+test("THE FOUNDER'S LINE OPENS THE DOCS — and no seat stands on a placeholder any more", () => {
+  // Both placeholder seats are built (POS-257 /docs/, POS-256 /projects/, 2026-09-26),
+  // so the honest-placeholder loop has nothing left to hold; what stays is the line.
+  for (const href of ["/docs/", "/projects/"]) {
     const src = readFileSync(pageFileFor(href), "utf8");
-    assert.match(src, /<p class="tag">coming together<\/p>/, `${href} does not say it is coming`);
-    assert.match(src, /It is being built\./, `${href} does not say it is being built`);
+    assert.equal(/It is being built./.test(src), false, `${href} still says it is being built`);
   }
   // THE FOUNDER'S LINE came with the repos and the numbers when The Record dissolved
   const docs = readFileSync(pageFileFor("/docs/"), "utf8");
   const line = docs.indexOf("We refuse to hide: the record is public.</p>");
   assert.ok(line > 0, "the founder's line left the site with The Record");
-  assert.ok(line < docs.indexOf('<ul class="ph-list">'), "the founder's line does not open the Docs");
+  assert.ok(line < docs.indexOf('<ul class="dx-guides">'), "the founder's line does not open the Docs");
 });
 
 // ── THE ONE REDIRECT TABLE ───────────────────────────────────────────────────

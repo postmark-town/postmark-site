@@ -113,6 +113,23 @@ export function releaseLine(bulletin) {
   return week ? { week: `${week[1]}-w${week[2].padStart(2, "0")}`, title } : null;
 }
 
+/** A mark's id names the resident who placed it: "kogane/the-washstand" → "kogane". */
+export const placerOf = (id) => String(id ?? "").split("/")[0] || null;
+
+/**
+ * A settlement's locked or retired marks, as the ingest recorded them (the
+ * world's settlement-publications.json diffed tag to tag), each with the
+ * resident who placed it. null when the ingest could not record the change —
+ * never an empty list standing in for "we don't know".
+ */
+function changeList(list) {
+  if (!Array.isArray(list)) return null;
+  return list
+    .filter((m) => typeof m?.id === "string")
+    .map((m) => ({ id: m.id, who: placerOf(m.id) }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
 /**
  * The crossings page's rows, newest first.
  *
@@ -140,6 +157,8 @@ export function crossingRows(data, { bulletin = null } = {}) {
       held: heldFrom(c.receipt),
       receipt: receiptText(c.receipt, c.n),
       notes: notes && isoWeek(c.blessed_at) === notes.week ? notes.title : null,
+      locked: changeList(c.locked),
+      retired: changeList(c.retired),
       tagHref: `${GH}/postmark-world/releases/tag/${encodeURIComponent(c.tag ?? `settlement/S${c.n}`)}`,
     };
   });
@@ -157,4 +176,41 @@ export function newerThan(snapshotMax, doorBody) {
     .filter((r) => Number.isInteger(r?.n) && r.n > snapshotMax)
     .sort((a, b) => b.n - a.n)
     .map((r) => ({ n: r.n, sha: r.sha ? String(r.sha).slice(0, 9) : null, blessedAt: r.date ?? null }));
+}
+
+// ── THE SETTLEMENTS, ON THE REPLAY'S TIMELINE (the Site Lift, POS-255) ──────
+//
+// Keemin, 2026-09-26: "think we can just build the settlements page into the
+// replay". A settlement is a moment: the Worldkeeper blesses the world at an
+// instant, and that instant falls inside one of the replay's crossings (the
+// town's half-days, a different count from the settlements' S-numbers). This
+// places each settlement on that clock, from the same build's replay index.
+
+/**
+ * Every settlement, newest first, with where it falls on the replay.
+ *
+ * `crossing` is the replay crossing whose half-day holds the blessing, and
+ * `at` its instant in ms. `where` says why a settlement has no crossing:
+ * "before" the record began (crossing-by-crossing saving started at 118),
+ * "after" the build's newest crossing, or "between" two crossings the record
+ * does not join. The newest crossing may still be open — its `to` is its last
+ * written moment — so a blessing past that moment still belongs to it.
+ */
+export function settlementsOnReplay(data, replayCrossings, { bulletin = null } = {}) {
+  const spans = (Array.isArray(replayCrossings) ? replayCrossings : [])
+    .map((c) => ({ n: c.n, from: Date.parse(c.from), to: Date.parse(c.to), complete: !!c.complete }))
+    .filter((c) => Number.isInteger(c.n) && Number.isFinite(c.from))
+    .sort((a, b) => a.n - b.n);
+  const first = spans[0], last = spans[spans.length - 1];
+  return crossingRows(data, { bulletin }).map((r) => {
+    const at = Date.parse(String(r.blessedAt ?? ""));
+    let crossing = null, where = null;
+    if (!Number.isFinite(at) || !spans.length) where = "unknown";
+    else {
+      const hit = spans.find((c) => at >= c.from && (at < c.to || (c === last && !c.complete)));
+      if (hit) crossing = hit.n;
+      else where = at < first.from ? "before" : at >= last.to ? "after" : "between";
+    }
+    return { ...r, at: Number.isFinite(at) ? at : null, crossing, where };
+  });
 }
