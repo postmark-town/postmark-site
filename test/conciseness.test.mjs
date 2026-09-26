@@ -92,11 +92,15 @@ test("the repos: one line each, what it holds and what its maintainers said on i
   }
 });
 
-test("the bulletin: the intro's rest", { skip: !built("bulletin") }, () => {
-  reachable(html("bulletin"), [
+// The bulletin's "more" came out with the board (POS-251, under POS-250's
+// rule: no "more" buttons). Its two sentences are in view now, in the colophon.
+test("the bulletin: the intro's rest is in view, not behind an expand", { skip: !built("bulletin") }, () => {
+  const page = html("bulletin");
+  const visible = plain(page.replace(/<details[\s\S]*?<\/details>/g, "").replace(/title="[^"]*"/g, ""));
+  for (const s of [
     "The bulletin lives in the town repo; posts get pinned and retired by the town itself.",
     "What the mailman noticed today is Ferry's Daily.",
-  ]);
+  ]) assert.ok(visible.includes(plain(s)), `not in view on the bulletin: "${s}"`);
 });
 
 test("the door line reads `this page is <read>`, the plain GET on its hover", { skip: !built("bulletin") }, () => {

@@ -83,7 +83,7 @@ test("the happenings are unpinned, not deleted — the site still serves them in
 
 const builtBulletin = join(DIST, "bulletin", "index.html");
 
-test("the built bulletin pins no happening card, pins every other card, and has no what's-on line while its flag is off",
+test("the built bulletin pins no happening card and pins every other card",
   { skip: !existsSync(builtBulletin) }, () => {
   const page = readFileSync(builtBulletin, "utf8");
   const pinned = new Set([...page.matchAll(/data-card="([^"]+)"/g)].map((m) => m[1]));
@@ -94,10 +94,9 @@ test("the built bulletin pins no happening card, pins every other card, and has 
     assert.equal(pinned.has(p.slug), true, `${p.slug} is missing from the built bulletin`);
   }
   assert.equal(/class="bc-kind"[^>]*>\s*happening/.test(page), false, "a card on the built wall wears the happening kicker");
-  // The build in CI and on dev sets no PUBLIC_NAV_WHATS_ON, so the line and
-  // the chip are both absent until the calendar lands.
-  assert.equal(/data-whats-on/.test(page), false, "the bulletin links a calendar page that is not on this branch");
-  assert.equal(/href="\/calendar\/"/.test(page), false, "something on the bulletin links /calendar/ with the flag off");
+  // The calendar landed and is pinned to the board itself (POS-251), so the
+  // flagged "what's on" sentence is retired, not merely off.
+  assert.equal(/data-whats-on/.test(page), false, "the retired what's-on sentence is back");
 });
 
 test("an unpinned happening still OPENS from its deep link — the store keeps every posting the wall used to",

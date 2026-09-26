@@ -16,6 +16,9 @@
 // 2026-09-25): src/components/CalendarMonth.astro, a grid at a desk and an
 // agenda on a phone. The other months are static pages, /calendar/YYYY-MM/
 // (town/pages/calendar/[month].astro), linked as previous and next.
+//
+// The calendar is pinned to the Bulletin's board (the Site Lift, POS-251), so
+// the page opens with the way back to the board.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import PageFreshness from "@/components/PageFreshness.astro";
 import CalendarCard from "@/components/CalendarCard.astro";
@@ -37,6 +40,7 @@ const month = monthGrid(calendar, monthKey(ref), ref);
 >
   <div class="cal-page">
     <header class="cal-head">
+      <p class="board-back" data-board-back><a href="/bulletin/">← the bulletin</a></p>
       <h1>The calendar</h1>
       <p class="tag">what the town is doing, and where</p>
       <p class="how">
@@ -77,6 +81,9 @@ const month = monthGrid(calendar, monthKey(ref), ref);
     }
     .cal-head .tag { margin: 0.3em 0 1em; font-style: italic; color: rgba(232, 196, 139, 0.8); }
     .cal-head .how { max-width: 62ch; margin: 0 auto; color: #cdc2ab; font-size: 0.97rem; line-height: 1.6; }
+    .board-back { margin: 0 0 0.6em; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; }
+    .board-back a { color: var(--pm-gold); text-decoration: none; }
+    .board-back a:hover { color: var(--pm-gold-bright); }
     .cal-asof { margin: 0.8em 0 0; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.7); }
     .cal-group { max-width: 720px; margin: 0 auto 1.6em; }
     .cal-group h2 {
