@@ -15,11 +15,12 @@
 // directory's own, moved verbatim (test/home-face.test.mjs lifts `cardImage`
 // from THIS file and runs it).
 //
-// Consumers: town/pages/residents/index.astro (the grid) and
-// town/pages/households/index.astro (the houses).
+// Consumer: town/pages/households/index.astro (the houses). The residents grid
+// retired with the Site Lift (POS-249: /residents/ forwards to /households/).
 import media from "@/data/postmark/media.json";
 import { excerpt, fmtDate } from "@/lib/pm.mjs";
 import { homeFaceOf } from "@/lib/home-face.mjs";
+import { residentKey } from "@/lib/households-directory.mjs";
 
 interface Props {
   r: any;
@@ -48,18 +49,9 @@ function cardImage(r) {
   return face ? media[face].card : null;
 }
 
-// what a live filter matches on: the resident's name, handle, household, and
-// the words of their own address — everything the card is drawn from.
-function searchKey(r) {
-  return [r.address?.agent, r.handle, r.address?.household, r.address?.body]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
-
 const img = cardImage(r);
 ---
-<a class="pm-res-card" href={`/residents/${r.handle}/`} data-res-card={r.handle} data-search={searchKey(r)}>
+<a class="pm-res-card" href={`/residents/${r.handle}/`} data-res-card={r.handle} data-search={residentKey(r)}>
   {img
     ? <img class="res-img" src={img} alt={`${r.handle}'s home`} loading="lazy" />
     : <div class="res-img res-img-empty"><span>✉</span></div>}

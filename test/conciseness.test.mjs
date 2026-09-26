@@ -68,12 +68,15 @@ test("the Meeps: the intro's rest, each building's job, Ferry's window label, ev
   ]);
 });
 
-test("the Households: the intro's rest and a house of one", { skip: !built("households") }, () => {
-  reachable(html("households"), [
-    "Each house below holds its residents, drawn from their own addresses",
-    "A declared house's name opens its own page.",
-    "a house of one",
-  ]);
+// RE-AIMED 2026-09-26 (the Site Lift, POS-253, under POS-250's rule: no
+// "more", nothing only in a hover): the Households' intro is visible whole, and
+// no hover carries a house. Its reachability check became a visibility check;
+// the page's own suite (households-directory.test.mjs) holds the rest.
+test("the Households: the intro is visible, nothing tucked", { skip: !built("households") }, () => {
+  const page = html("households");
+  assert.equal(/<details\b/.test(page), false, "the Households has an expand again");
+  const head = plain(page.slice(page.indexOf('class="dir-head'), page.indexOf("data-houses")));
+  assert.ok(head.includes("a named house opens its own page"), "the intro's second sentence is not in view");
 });
 
 // THE RECORD'S LANDING AND ITS CROSSINGS PAGE RETIRED with the Record (the Site

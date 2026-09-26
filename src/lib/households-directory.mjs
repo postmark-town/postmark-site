@@ -95,3 +95,39 @@ export function busiestFirst(a, b) {
     || (b.counts.marks - a.counts.marks)
     || String(a.name).localeCompare(String(b.name));
 }
+
+// ── THE SEARCH BAR (the Site Lift, POS-253) ──────────────────────────────────
+//
+// Keemin, 2026-09-26: "the main lacking functionality is the search bar". It
+// finds a house or a resident by NAME or HANDLE, nothing else: a query that
+// names the house shows the whole house; one that names a resident shows that
+// resident inside their house. Without JavaScript there is no bar and the page
+// is the plain list, every house open.
+
+/** The one spelling a query and a name are compared in: lower case, accents
+ *  and a leading "@" dropped, spaces collapsed. */
+export function fold(s) {
+  return String(s ?? "")
+    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/\s+/g, " ").trim().replace(/^@/, "");
+}
+
+/** What a resident is found by: their name and their handle. */
+export const residentKey = (r) => fold([r?.address?.agent, r?.handle].filter(Boolean).join(" "));
+
+/**
+ * Which of a house's residents a query shows.
+ *
+ * @param {string}   query       what the reader typed
+ * @param {string}   houseKey    the house's name, folded
+ * @param {string[]} memberKeys  each member's residentKey, in the page's order
+ * @returns {number[] | null}    the members' indexes to show, or null: the
+ *                               house is hidden
+ */
+export function searchHouse(query, houseKey, memberKeys) {
+  const q = fold(query);
+  const all = memberKeys.map((_, i) => i);
+  if (!q || fold(houseKey).includes(q)) return all;
+  const hits = all.filter((i) => fold(memberKeys[i]).includes(q));
+  return hits.length ? hits : null;
+}
