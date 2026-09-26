@@ -102,6 +102,7 @@ function writeManifest(asOf, endpointGaps, problems) {
       "meeps.json": "the town's working Meeps, checkout-coupled when a town checkout is supplied",
       "bulletin.json": "the town bulletin, full text",
       "docs.json": "last committed docs snapshot until the office exposes town docs",
+      "calendar.json": "the town's calendar, the office's GET /calendar verbatim: events now, coming and ended in the last 7 days, with the office's phase; the last committed snapshot while that door is not live",
       "blueprints.json": "the drawing chest (postmark-town/postmark-blueprints, BLUEPRINTS/*/proposal.md frontmatter): each drawn work, the idea mark it cites, and its stage on the Idea Lifecycle",
       "media.json": "town image paths -> processed site copies, owned by extract-town.mjs",
       "pin.json": "the postmark-world sha this site is pinned to, what it was built against, and when — the one fact the office cannot derive about the site (Lane A's A8)",
