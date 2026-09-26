@@ -451,6 +451,62 @@ const switchCss = [
       <div class="c-body">
         <LaneHead lane={LANE_BY.quests} plaque={PLAQUES.quests} slides={tutorialFor("quests").length} />
 
+        {/* ── THE POTS COME FIRST (Keemin, 2026-09-26, POS-258: "the funding pots
+            should sit at the top of the quest guild, for visibility"). They
+            stood directly under the quest cards from 2026-08-31; they now open
+            the lane, above the quests, and the standings stay last. */}
+        {/* ── WHAT THE TOWN NEEDS MONEY FOR ───────────────────────────────
+            The pots live in the GUILD, and that is the asks matrix rather
+            than a convenience: in the economy the town pays through quests
+            and demands through funds, so quest|fund is one pair and this is
+            its other half. It kept id="pots" through the move for the same
+            reason the board kept id="board" — every deep link ever written
+            points at that word. */}
+        <div id="pots" class="m-block">
+        {/* "What the town needs money for · as of 2026-09-01 04:12 UTC" → "Pots".
+            The label names; the as-of moved to the ONE line at the foot of this
+            panel, because a stamp per block is four stamps saying the same
+            thing on one screen. */}
+        <p class="m-lab">Pots</p>
+
+        {/* THE CARDS ARE ONE COMPONENT (postmark#2810, 2026-09-14): the same
+            file renders them here and on /stamps/, so the two pages can never
+            say two things about a pot. What a card says is unchanged — see
+            src/components/PotCards.astro for the card law it carries. */}
+        <PotCards potBoard={potBoard} />
+
+        {/* THE HOLO EXPLANATION MOVED TO ITS ONE HOME, founder-ruled
+            2026-08-31. It stood here under the 2026-08-26 placement rule —
+            whichever surface says "holo" first carries the expansion — and that
+            rule was written when this page and the teaching were ONE page. They
+            split the next day, and the expansion has lived on /stamps/ ever
+            since in three fuller forms (the seam card, the minterest section,
+            the glossary entry). So this was not the first mention of a word,
+            it was a fourth copy of a paragraph.
+
+            NOTHING WAS ADDED TO /stamps/ TO RECEIVE IT, and that is worth
+            saying rather than assuming: the teaching already carried every
+            sentence this paragraph did, HOLO_LINE and HOLO_NAME_LINE included,
+            read from the same constants. What is left here is a pointer, which
+            is what a lane owes a word it uses and does not define. */}
+        {/* ── "REMOVED" MEANS GONE, AND THIS IS THE CASE THAT PROVED IT ─────
+            The founder struck the holo paragraph on 2026-08-31. It came back
+            SHORTER — "✧ is holo, the payers' keepsake — what it is, and what a
+            dollar does and doesn't get you, are in the Stamps teaching and on
+            each pot's own page." — and on 2026-09-01 he named that for what it
+            is: not removal. A shortened explanation is still an explanation
+            sitting on a page whose job is to show the town's state.
+
+            WHAT SURVIVES IS A LINK WHOSE TEXT IS THE QUESTION. That is the
+            general form of the whole ruling — "explain by link, never inline" —
+            and the question-as-link-text is what makes it work: a reader who
+            does not have the question never has to read the answer, and a
+            reader who does can see, before clicking, that this is where it gets
+            answered. /stamps/#seam is holo's one home and carries the expansion
+            in three fuller forms; nothing was added there to receive this. */}
+        <p class="m-note"><a href="/docs/stamps/#seam">What's holo?</a></p>
+        </div>
+
         {questRows.length > 0 && (
           <>
             {/* A LABEL NAMES, IT DOES NOT NARRATE. This read "The town's
@@ -516,63 +572,12 @@ const switchCss = [
             on the building, not in the lane. The mark keeps its plaque in the
             world for renderings that are not this one. */}
 
-        {/* ── WHAT THE TOWN NEEDS MONEY FOR ───────────────────────────────
-            The pots live in the GUILD, and that is the asks matrix rather
-            than a convenience: in the economy the town pays through quests
-            and demands through funds, so quest|fund is one pair and this is
-            its other half. It kept id="pots" through the move for the same
-            reason the board kept id="board" — every deep link ever written
-            points at that word. */}
-      <div id="pots" class="m-block">
-        {/* "What the town needs money for · as of 2026-09-01 04:12 UTC" → "Pots".
-            The label names; the as-of moved to the ONE line at the foot of this
-            panel, because a stamp per block is four stamps saying the same
-            thing on one screen. */}
-        <p class="m-lab">Pots</p>
-
-        {/* THE CARDS ARE ONE COMPONENT (postmark#2810, 2026-09-14): the same
-            file renders them here and on /stamps/, so the two pages can never
-            say two things about a pot. What a card says is unchanged — see
-            src/components/PotCards.astro for the card law it carries. */}
-        <PotCards potBoard={potBoard} />
-
-        {/* THE HOLO EXPLANATION MOVED TO ITS ONE HOME, founder-ruled
-            2026-08-31. It stood here under the 2026-08-26 placement rule —
-            whichever surface says "holo" first carries the expansion — and that
-            rule was written when this page and the teaching were ONE page. They
-            split the next day, and the expansion has lived on /stamps/ ever
-            since in three fuller forms (the seam card, the minterest section,
-            the glossary entry). So this was not the first mention of a word,
-            it was a fourth copy of a paragraph.
-
-            NOTHING WAS ADDED TO /stamps/ TO RECEIVE IT, and that is worth
-            saying rather than assuming: the teaching already carried every
-            sentence this paragraph did, HOLO_LINE and HOLO_NAME_LINE included,
-            read from the same constants. What is left here is a pointer, which
-            is what a lane owes a word it uses and does not define. */}
-        {/* ── "REMOVED" MEANS GONE, AND THIS IS THE CASE THAT PROVED IT ─────
-            The founder struck the holo paragraph on 2026-08-31. It came back
-            SHORTER — "✧ is holo, the payers' keepsake — what it is, and what a
-            dollar does and doesn't get you, are in the Stamps teaching and on
-            each pot's own page." — and on 2026-09-01 he named that for what it
-            is: not removal. A shortened explanation is still an explanation
-            sitting on a page whose job is to show the town's state.
-
-            WHAT SURVIVES IS A LINK WHOSE TEXT IS THE QUESTION. That is the
-            general form of the whole ruling — "explain by link, never inline" —
-            and the question-as-link-text is what makes it work: a reader who
-            does not have the question never has to read the answer, and a
-            reader who does can see, before clicking, that this is where it gets
-            answered. /stamps/#seam is holo's one home and carries the expansion
-            in three fuller forms; nothing was added there to receive this. */}
-        <p class="m-note"><a href="/docs/stamps/#seam">What's holo?</a></p>
-      </div>
 
       {/* ── TODAY'S STANDINGS, LAST ────────────────────────────────────────
-          Founder-ruled 2026-08-31: the pots go directly under the quest cards
-          and "the standings go below everything else." The order is the lane's
-          argument — what the town is asking of you, then what it is asking for,
-          and only then how everybody else is doing. A leaderboard read first
+          Founder-ruled 2026-08-31: "the standings go below everything else."
+          Since 2026-09-26 the pots open the lane (POS-258), so the lane reads
+          what the town needs money for, then what it is asking of you, and
+          only then how everybody else is doing. A leaderboard read first
           makes a page about ranking; read last it is a footnote about a day.
 
           The block itself is unchanged, and deliberately so: this is a MOVE,

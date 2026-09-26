@@ -9,8 +9,10 @@
 //
 // WHAT A CARD SAYS is unchanged and is the founder's card law (2026-08-26):
 // "THE MAIN PAGE CARDS EXPLAIN WHAT THE THING IS" — the kind line names the
-// close, the title, the pot file's own first sentence via potGist, the money
-// line, the patron roll, the staked chip, and the way in. How a pot closes and
+// close, the title, the pot file's own first sentence via potGist, who it is
+// for, the money line, the staked chip, the patron roll, and the way in.
+// THE ORDER IS A FIRST-TIME READER'S (Keemin, 2026-09-26, POS-258): what it is
+// for, how full it is, how to put stamps behind it. How a pot closes and
 // what a dollar mints live on /fund/<pot>/ and in the Rules, not here.
 //
 // The styles ride with the markup, scoped to this file, because a page's own
@@ -42,6 +44,9 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
           {/* WHAT THIS POT IS, before any number — the pot file's own first
               sentence, quoted, never invented. */}
           {potGist(p.source) && <p class="m-what">{potGist(p.source)}</p>}
+          {/* WHO IT IS FOR finishes "what it is for", so it sits under the gist
+              rather than in the foot (POS-258). */}
+          <p class="m-for m-dim">{p.beneficiaryLabel ? <>for {p.beneficiaryLabel}</> : <em>no beneficiary named yet</em>}</p>
           {/* THE MONEY LINE. An elastic pot's bar measures progress toward
               its CLOSE FLOOR, not a target: the floor gates the ceremony,
               never the door. A targetless, floorless pot gets no bar at all. */}
@@ -83,6 +88,9 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
               </p>
             </div>
           )}
+          {/* THE STAMPS BEHIND IT, beside the money: the other half of "how
+              full" (POS-258). */}
+          <p class="m-staked"><span class="m-chip is-stamp">{p.staked}<span class="m-u">✦</span> staked</span></p>
           {/* EVERY PATRON, the unattached ones told apart: patronLabel links a
               hand and names a gift (funding.mjs). The separator lives BETWEEN
               the nowrap spans so a long roll wraps instead of spilling. */}
@@ -93,11 +101,16 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
                 ); })}{p.patrons.length > PATRONS_SHOWN && <> · <span class="m-patron m-dim">and <a href={`/fund/${p.pot}/`}>{p.patrons.length - PATRONS_SHOWN} more</a></span></>}</>
               : <span class="m-dim">the roll is open — nobody has fed this pot yet</span>}
           </p>
-          <p class="m-foot">
-            <span class="m-chip is-stamp">{p.staked}<span class="m-u">✦</span> staked</span>
-            <span class="m-dim">{p.beneficiaryLabel ? <>for {p.beneficiaryLabel}</> : <em>no beneficiary named yet</em>}</span>
-            {p.status === "open" && <a class="m-fund" href={`/fund/${p.pot}/`}>Fund →</a>}
-          </p>
+          {/* THE WAY IN, last, and in words (POS-258): a first-time reader has
+              read what the pot is for and how full it is, and the card ends on
+              how to put stamps behind it — the stake form on the pot's own page
+              — beside the money route. Only an open pot takes either. */}
+          {p.status === "open" && (
+            <p class="m-foot">
+              <a class="m-stake" href={`/fund/${p.pot}/#stake`}>Stake stamps on it →</a>
+              <a class="m-fund" href={`/fund/${p.pot}/`}>Fund →</a>
+            </p>
+          )}
         </article>
       ))}
     </div>
@@ -136,7 +149,9 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
   .m-gift { font-style: italic; opacity: .8; }
   .m-patron { white-space: nowrap; }
   .m-dim { opacity: .6; }
-  .m-foot { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin: .1rem 0 0; font-size: var(--civic-body, .9rem); }
+  .m-for { font-size: var(--civic-body, .9rem); margin: 0; }
+  .m-staked { margin: 0; }
+  .m-foot { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem 1.2rem; margin: .1rem 0 0; font-size: var(--civic-body, .9rem); }
   .m-chip {
     font-family: var(--pm-mono); font-size: var(--civic-label, .7rem); padding: .25em .7em; border-radius: 999px;
     border: 1px solid rgba(232, 196, 139, .3); color: var(--pm-gold-bright);
@@ -144,7 +159,9 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
   }
   .m-chip.is-stamp { white-space: nowrap; border-color: rgba(var(--pm-stamp-rgb), 0.4); color: var(--pm-stamp-bright); }
   .m-u { opacity: 0.7; margin-left: 0.08em; }
-  .m-fund { margin-left: auto; color: var(--pm-gold-bright); text-decoration: none; border-bottom: 1px solid rgba(232,196,139,.4); }
+  .m-stake { color: var(--pm-stamp-bright); text-decoration: none; border-bottom: 1px solid rgba(var(--pm-stamp-rgb), .45); }
+  .m-stake:hover { border-bottom-color: var(--pm-stamp-bright); }
+  .m-fund { color: var(--pm-gold-bright); text-decoration: none; border-bottom: 1px solid rgba(232,196,139,.4); }
   .m-fund:hover { border-bottom-color: var(--pm-gold-bright); }
   .m-none {
     display: block; padding: 1.2rem 1.3rem; border: 1px dotted rgba(128,128,128,.5); border-radius: .5rem;
