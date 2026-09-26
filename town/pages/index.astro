@@ -631,7 +631,8 @@ const works = [
     }
     /* ── the ferry clock — the tide-line at the hero's top edge; the boat's
        position is the elapsed 12h window, docks are outbox (✉) and town (⌂);
-       the countdown line surfaces on hover ── */
+       the countdown line stands under it, in view (the Site Lift, POS-250:
+       nothing lives only in a hover; it used to surface on hover) ── */
     .ferry-clock {
       position: absolute; top: clamp(1em, 2.6vw, 1.7em); left: 0; right: 0;
       margin: 0 auto; max-width: 470px;
@@ -668,9 +669,7 @@ const works = [
       letter-spacing: 0.14em; text-transform: uppercase;
       color: rgba(232, 196, 139, 0.85); text-shadow: 0 1px 14px rgba(0, 0, 0, 0.85);
       white-space: nowrap;
-      opacity: 0; transition: opacity 0.25s ease;
     }
-    .ferry-clock:hover .fc-text, .ferry-clock:focus-within .fc-text { opacity: 1; }
     .fc-crossing .fc-boat { animation-duration: 1.2s; }
     .fc-crossing .fc-text { color: var(--pm-gold-bright); }
     /* the short mobile hero can't fit the full-size clock — scale it to stay inside */

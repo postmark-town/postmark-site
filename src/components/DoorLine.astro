@@ -17,27 +17,25 @@ interface Props {
   door: { mcp?: string | null; get?: string | null } | null;
 }
 const line = doorLine(Astro.props.door);
-// THE CONCISENESS PASS (part 8): the line reads `this page is <read>` — the
-// MCP read when the page has one, else its plain GET. The plain GET (when it
-// is not already the read) and the age ride the read's hover and stay in the
-// DOM for a screen reader. The read LINKS the plain GET, so the click the
-// line used to offer on the GET is still one click.
-const shown = line ? (line.mcp ?? `GET ${line.get}`) : null;
-const hover = line?.mcp && line?.get ? `GET ${line.get}` : undefined;
+// IN VIEW, WHOLE (the Site Lift, POS-250: nothing lives only in a hover). The
+// conciseness pass had put the plain GET and the age on the read's hover; they
+// are back on the line: the read, then the GET (a link to the office's own
+// answer), then the age.
 ---
 
 <footer class="pm-doorfoot" data-door-foot>
   {line && (
     <p class="pm-doorline" data-door-line>
       <span class="pm-doorline-lead">this page is</span>
-      {line.getHref
-        ? <a class="pm-doorline-read" href={line.getHref} title={hover} data-door-hover>
-            <code data-door-mcp={line.mcp ? "" : undefined} data-door-get={line.mcp ? undefined : ""}>{shown}</code>
-          </a>
-        : <code class="pm-doorline-read" title={hover} tabindex={hover ? "0" : undefined} data-door-hover
-                data-door-mcp={line.mcp ? "" : undefined} data-door-get={line.mcp ? undefined : ""}>{shown}</code>}
-      {line.mcp && line.get && <span class="pm-sr" data-door-get> · GET {line.get}</span>}
-      <span class="pm-sr" data-door-age hidden> · as the office read it <span data-door-ago></span></span>
+      {line.mcp && <code class="pm-doorline-read" data-door-mcp>{line.mcp}</code>}
+      {line.mcp && line.get && <span class="pm-doorline-dot" aria-hidden="true">·</span>}
+      {line.get && (line.getHref
+        ? <a class="pm-doorline-get" href={line.getHref} data-door-get><code>GET {line.get}</code></a>
+        : <code class="pm-doorline-get" data-door-get>GET {line.get}</code>)}
+      <span class="pm-doorline-age" data-door-age hidden>
+        <span class="pm-doorline-dot" aria-hidden="true">·</span>
+        as the office read it <span data-door-ago></span>
+      </span>
     </p>
   )}
   <ul class="pm-socials" aria-label="Postmark beyond the door">
@@ -76,9 +74,6 @@ const hover = line?.mcp && line?.get ? `GET ${line.get}` : undefined;
         if (!phrase) return;
         ago.textContent = phrase;
         age.hidden = false;
-        // the age rides the read's hover with the plain GET
-        const read = document.querySelector("[data-door-hover]");
-        if (read) read.title = [read.title, `as the office read it ${phrase}`].filter(Boolean).join(" · ");
       } catch { /* the floor: no clause */ }
     })();
   </script>
@@ -109,9 +104,8 @@ const hover = line?.mcp && line?.get ? `GET ${line.get}` : undefined;
     border-radius: 4px;
     padding: 0 0.35em;
   }
-  .pm-doorline a.pm-doorline-read { color: inherit; text-decoration: none; }
-  .pm-doorline a.pm-doorline-read:hover code { border-color: rgba(232, 196, 139, 0.5); }
-  .pm-doorline code[data-door-hover][title] { cursor: help; }
+  .pm-doorline a.pm-doorline-get { color: inherit; text-decoration: none; }
+  .pm-doorline a.pm-doorline-get:hover code { border-color: rgba(232, 196, 139, 0.5); }
   .pm-doorline-lead { margin-right: 0.4em; }
   .pm-doorline-dot { margin: 0 0.45em; opacity: 0.6; }
   .pm-socials {

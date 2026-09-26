@@ -64,25 +64,12 @@
 //      the permitted thing; what is forbidden is writing one down in prose.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
 import { FOUNDER_ACCOUNT } from "../src/lib/funding.mjs";
 import { allEntries, MOVED } from "../src/lib/nav.mjs";
 import { DEFAULT_LANE, STAGES } from "../src/lib/civic.mjs";
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
-
-// every .astro under town/pages — for laws about the pages tree rather than
-// about one named file in it
-function everyPageFile(dir = new URL("../town/pages/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")) {
-  const out = [];
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name);
-    if (statSync(full).isDirectory()) out.push(...everyPageFile(full));
-    else if (name.endsWith(".astro")) out.push(full);
-  }
-  return out;
-}
 
 // ── TWO SURFACES, AND WHICH LAW LIVES ON WHICH ───────────────────────────────
 // The founder split them on 2026-08-30 evening: the LANES are the civic
@@ -1202,11 +1189,12 @@ test("both retired routes redirect somewhere that exists", () => {
   // /bulletin/ and took its plank painting with it, so a probe keyed on WHICH
   // page paints went red on a move that changed nothing about the law. The law
   // is that the asset prefix is live, so it asks the pages tree, not one file.
-  assert.ok(existsSync(new URL("../public/atelier/postmark/board/quest-board-wood.jpg", import.meta.url)),
+  assert.ok(existsSync(new URL("../public/atelier/postmark/board/quest-board.jpg", import.meta.url)),
     "the redirect must be exact-path: the board's images still live under /board/");
   // RETIRED 2026-09-26 (POS-251, the Site Lift): the painters check. The bulletin
   // board paints in CSS now (a cork in the wall browns), so no page paints with
-  // the plank photo; the asset check above stays while the file does.
+  // the plank photo. The plank photo itself (quest-board-wood.jpg) retired the
+  // same day (POS-250); the check above asks for the image still under /board/.
 });
 
 test("nothing in the repo still points at a retired route", () => {
