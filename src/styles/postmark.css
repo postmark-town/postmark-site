@@ -444,12 +444,15 @@
    reaching for it, which is the whole reason the gutter rail read better than
    the page did. */
 .pm-chiprow--nav { justify-content: center; gap: 0.4em 0.5em; }
+/* BIGGER BUTTONS (Keemin, 2026-09-26: the chips are "hard to spot and will be
+   missed"). A row you can find: a label a size up from the old 0.66rem, a
+   button with room around it, and a border that shows before you hover. */
 .pm-chiprow--nav .pm-chip {
-  padding: 0.34em 0.85em;
-  font-family: var(--pm-mono); font-size: 0.66rem; letter-spacing: 0.08em;
-  color: rgba(232, 196, 139, 0.55);
-  background: rgba(13, 20, 38, 0.45);
-  border-color: rgba(232, 196, 139, 0.14);
+  padding: 0.5em 1.05em 0.5em 0.8em;
+  font-family: var(--pm-mono); font-size: 0.78rem; letter-spacing: 0.06em;
+  color: rgba(232, 196, 139, 0.72);
+  background: rgba(13, 20, 38, 0.6);
+  border-color: rgba(232, 196, 139, 0.26);
 }
 .pm-chiprow--nav .pm-chip:hover { color: var(--pm-gold); }
 .pm-chiprow--nav .pm-chip.is-on,
@@ -466,22 +469,20 @@
 .pm-chiprow--nav .pm-chip.is-first[aria-current="page"] {
   color: var(--pm-gold-bright); border-color: var(--pm-gold);
 }
-/* LITTLE ICONS — founder, 2026-08-25: "I'd like little icons for the town's
-   chips." Text-presentation glyphs, in the town's existing monochrome
-   vocabulary (✉ in the townmark, ✦ on the Join door, ✉/❖ on the Meeps' cards),
-   so they inherit the chip's own colour and mute and brighten with it. That is
-   the whole reason not to use colour emoji here: a chip's state is carried in
-   its colour, and a glyph that keeps its own palette would sit at full
-   brightness on a row of quiet chips and read as five things demanding
-   attention.
-   Set slightly larger than the 0.66rem mono label, because a glyph at label
-   size reads as punctuation rather than as a mark. Held a shade under the
-   label's own opacity so the word stays first. */
-.pm-chiprow--nav .pm-chip { gap: 0.42em; }
+/* PIXEL-ART ICONS — founder, 2026-08-25: "I'd like little icons for the
+   town's chips"; 2026-09-26: "little pixel-art icons for each chip". Drawn by
+   hand on a 16×16 grid (src/lib/pixel-icons.mjs) in currentColor, so each
+   mutes and brightens with its chip: a chip's state is carried in its colour,
+   the reason colour emoji were never used here.
+   EXACTLY 16px: one grid pixel per CSS pixel, two device pixels on a 2×
+   screen. Any size that is not a multiple of 16 lands grid pixels between
+   device pixels and smears the art, so the size is not a rem. */
+.pm-chiprow--nav .pm-chip { gap: 0.5em; }
 .pm-chiprow--nav .pm-chip-icon {
-  font-size: 0.88rem; line-height: 1; opacity: 0.66;
-  transition: opacity 0.12s ease;
+  display: inline-flex; flex: 0 0 auto; width: 16px; height: 16px;
+  opacity: 0.8; transition: opacity 0.12s ease;
 }
+.pm-chiprow--nav .pm-chip-icon svg { display: block; width: 16px; height: 16px; }
 .pm-chiprow--nav .pm-chip:hover .pm-chip-icon,
 .pm-chiprow--nav .pm-chip.is-on .pm-chip-icon,
 .pm-chiprow--nav .pm-chip[aria-current="page"] .pm-chip-icon { opacity: 1; }

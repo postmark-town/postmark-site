@@ -80,10 +80,16 @@ test("on the town's own roll: every resident is in the directory once", () => {
 
 // ── ONE CARD, TWO READERS ───────────────────────────────────────────────────
 
-test("the residents grid and the households page both draw the card from the one component", () => {
-  const grid = readFileSync(join(ROOT, "town", "pages", "residents", "index.astro"), "utf8");
+// RE-AIMED 2026-09-26 (the Site Lift, POS-249): the residents grid retired —
+// /residents/ forwards to /households/ ("the best version retires the Residents
+// page", Keemin on POS-244). The households page is the one reader of the card
+// now; the law that it draws the card from the one component, and never
+// redraws it, stands.
+test("the households page draws the card from the one component, and the grid is retired", () => {
+  assert.equal(existsSync(join(ROOT, "town", "pages", "residents", "index.astro")), false,
+    "the residents grid is back beside the households page");
   const houses = readFileSync(join(ROOT, "town", "pages", "households", "index.astro"), "utf8");
-  for (const [name, src] of [["residents", grid], ["households", houses]]) {
+  for (const [name, src] of [["households", houses]]) {
     assert.match(src, /import ResidentCard from "@\/components\/ResidentCard\.astro"/, `${name} does not import the card`);
     assert.match(src, /<ResidentCard r=\{r\} \/>/, `${name} does not render the card`);
     assert.equal(/class="pm-res-card"/.test(src), false, `${name} draws its own card markup — a redraw`);
@@ -92,7 +98,6 @@ test("the residents grid and the households page both draw the card from the one
 
 // ── THE BUILT PAGES (skipped until built, as POS-177 rules) ──────────────────
 
-const builtGrid = join(DIST, "residents", "index.html");
 const builtHouses = join(DIST, "households", "index.html");
 
 /** Every resident card in a built page, keyed by handle, as its exact bytes. */
@@ -102,16 +107,16 @@ function cardsIn(html) {
   return out;
 }
 
-test("every house holds its residents' cards byte-for-byte as the residents grid renders them",
-  { skip: !(existsSync(builtGrid) && existsSync(builtHouses)) }, () => {
-  const grid = cardsIn(readFileSync(builtGrid, "utf8"));
+// Held against the residents list itself now that the grid it compared to is
+// retired: every resident's card, once, each inside its own house.
+test("every resident's card is on the households page, once, inside its own house",
+  { skip: !existsSync(builtHouses) }, () => {
   const page = readFileSync(builtHouses, "utf8");
   const inHouses = cardsIn(page);
-  assert.ok(grid.size > 50, `only ${grid.size} cards read off the grid — the reader is broken`);
-  assert.equal(inHouses.size, grid.size, "the households page does not hold every resident's card");
-  for (const [handle, bytes] of grid) {
-    assert.equal(inHouses.get(handle), bytes, `${handle}'s card differs between the grid and their house`);
-  }
+  const everyone = DATA("residents.json");
+  assert.ok(inHouses.size > 50, `only ${inHouses.size} cards read off the page — the reader is broken`);
+  assert.equal(inHouses.size, everyone.length, "the households page does not hold every resident's card");
+  assert.equal((page.match(/<a class="pm-res-card"/g) ?? []).length, inHouses.size, "a resident's card is on the page twice");
   // and each card sits inside ITS house
   const expected = houseDirectory(DATA("residents.json"), DATA("households.json"));
   for (const h of expected.filter((x) => x.members.length > 1).slice(0, 25)) {

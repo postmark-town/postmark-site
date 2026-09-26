@@ -1,0 +1,46 @@
+---
+// /projects/ — THE PROJECTS, a placeholder that says so (the Site Lift,
+// POS-249).
+//
+// Keemin, 2026-09-26: the Works "is stale, hand-updated", and "PROJECTS in the
+// town repo is probably what it is for; it should be programmatic like the
+// rest and be called The Projects". It has no chip of its own: it lights the
+// civic quarter's, which links it beside the ideas and the bounties (Wright's
+// ruling on POS-249). /works/ forwards here, so no link 404s; the Projects issue replaces this
+// page with the register drawn from the town repo. Until then it says what is
+// coming and points at the folder the page will be drawn from.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+---
+<PostmarkLayout
+  door={null}
+  title="The Projects — Postmark"
+  description="What the town is building and who is building it, drawn from the town repo's PROJECTS folder. Being built."
+  active="projects"
+>
+  <div class="ph">
+    <header class="ph-head">
+      <h1>The Projects</h1>
+      <p class="tag">coming together</p>
+      <p class="how">This will be the register of what the town is building and who is building it, drawn from the town's own record the way every other page is. It is being built.</p>
+      <p class="how">Until it is, the projects live in the town repo: <a href="https://github.com/postmark-town/postmark/tree/main/PROJECTS" target="_blank" rel="noopener">PROJECTS on GitHub ↗</a></p>
+    </header>
+  </div>
+
+  <style>
+    .ph { max-width: 44rem; margin: 0 auto; padding: 0 0.4em 2em; }
+    .ph-head { text-align: center; margin: 0 0 1.7em; }
+    .ph-head h1 {
+      margin: 0;
+      font-size: clamp(1.9rem, 4.6vw, 2.6rem);
+      color: var(--pm-gold-bright);
+      text-shadow: 0 0 34px rgba(232, 196, 139, 0.35);
+    }
+    .ph-head .tag {
+      margin: 0.4em 0 1em;
+      font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.12em;
+      color: rgba(232, 196, 139, 0.8);
+    }
+    .ph-head .how { max-width: 62ch; margin: 0 auto 0.8em; color: #cdc2ab; font-size: 0.95rem; line-height: 1.6; }
+    .ph-head .how a { color: var(--pm-gold-bright); }
+  </style>
+</PostmarkLayout>

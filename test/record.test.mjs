@@ -140,34 +140,35 @@ test("five repos, all under postmark-town; every Record card that names a repo n
 const built = (...segs) => existsSync(join(DIST, ...segs, "index.html"));
 const html = (...segs) => readFileSync(join(DIST, ...segs, "index.html"), "utf8");
 
-test("the built crossings page lists S81 with its counts", { skip: !built("records", "crossings") }, () => {
-  const page = html("records", "crossings");
-  const i = page.indexOf('data-crossing="81"');
-  assert.ok(i > 0, "S81 is not on the page");
-  const row = page.slice(i, page.indexOf("</li>", i));
-  const s81 = crossingRows(DATA("crossings.json")).find((r) => r.n === 81);
-  assert.match(row, new RegExp(`data-published[^>]*>${s81.published} \\(\\+?-?\\d+\\)`));
-  assert.match(row, /data-held[^>]*>0</);
-  const listed = [...page.matchAll(/<li\b[^>]*\bdata-crossing="(\d+)"/g)].map((m) => Number(m[1]));
-  assert.equal(listed.length, DATA("crossings.json").crossings.length, "the page does not list every settlement");
+// THE RECORD DISSOLVED (the Site Lift, POS-249, 2026-09-26). Its landing and
+// its crossings page are gone; the settlements go into the replay (POS-255),
+// and the repos page moved to the Docs. The built crossings page's S81 check
+// retired with the page: crossingRows, which drew it, is still held above and
+// is what POS-255 draws the replay's settlements from. What the built site
+// owes now is that every old address FORWARDS, to the right place.
+
+/** The forward a built old path makes: its target, read off the page. */
+const forwardOf = (...segs) => /location\.replace\(/.test(html(...segs))
+  ? /http-equiv="refresh" content="0;url=([^"]+)"/.exec(html(...segs))?.[1] ?? null
+  : null;
+
+test("the Record's old addresses forward: the landing and the crossings to the replay, the repos to the Docs",
+  { skip: !built("records") }, () => {
+  assert.equal(forwardOf("records"), "/replay/");
+  assert.equal(forwardOf("records", "crossings"), "/replay/");
+  assert.equal(forwardOf("records", "repos"), "/docs/repos/");
+  assert.equal(forwardOf("works"), "/projects/");
+  assert.equal(forwardOf("stamps"), "/docs/stamps/");
+  assert.equal(forwardOf("numbers"), "/docs/numbers/");
 });
 
-test("the built Record landing: six cards, each linking its page; the repos page: five", { skip: !built("records") || !built("records", "repos") }, () => {
-  const landing = html("records");
-  assert.deepEqual([...landing.matchAll(/<article\b[^>]*\bdata-record-card="([^"]+)"/g)].map((m) => m[1]), RECORD_CARDS.map((c) => c.key));
-  // read each CARD's own link — the chip row above links the same pages, so a
-  // page-wide search would pass with every card's link gone
-  for (const c of RECORD_CARDS) {
-    const start = landing.indexOf(`data-record-card="${c.key}"`);
-    const card = landing.slice(start, landing.indexOf("</article>", start));
-    assert.ok(card.includes(`href="${c.href}"`), `${c.key}'s card does not link ${c.href}`);
-  }
-  const repos = html("records", "repos");
+test("the built repos page, at its Docs address: five", { skip: !built("docs", "repos") }, () => {
+  const repos = html("docs", "repos");
   assert.deepEqual([...repos.matchAll(/<a\b[^>]*\bdata-repo="([^"]+)"/g)].map((m) => m[1]), REPOS.map((r) => r.key));
 });
 
 test("every old URL of the record still builds", { skip: !built("records") }, () => {
-  for (const segs of [["mail"], ["stamps"], ["works"], ["numbers"], ["mail", "returned"], ["mail", "compose"]]) {
+  for (const segs of [["mail"], ["stamps"], ["works"], ["numbers"], ["mail", "returned"], ["mail", "compose"], ["records", "crossings"], ["records", "repos"]]) {
     assert.ok(built(...segs), `/${segs.join("/")}/ stopped building`);
   }
 });
