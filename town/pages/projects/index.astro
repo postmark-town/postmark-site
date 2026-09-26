@@ -1,46 +1,169 @@
 ---
-// /projects/ — THE PROJECTS, a placeholder that says so (the Site Lift,
-// POS-249).
+// /projects/ — THE PROJECTS, the register of what the town is building (the
+// Site Lift, POS-256).
 //
 // Keemin, 2026-09-26: the Works "is stale, hand-updated", and "PROJECTS in the
 // town repo is probably what it is for; it should be programmatic like the
-// rest and be called The Projects". It has no chip of its own: it lights the
-// civic quarter's, which links it beside the ideas and the bounties (Wright's
-// ruling on POS-249). /works/ forwards here, so no link 404s; the Projects issue replaces this
-// page with the register drawn from the town repo. Until then it says what is
-// coming and points at the folder the page will be drawn from.
+// rest and be called The Projects". So nothing on this page is a list kept by
+// hand: every card is a folder of the town repo's PROJECTS/, as
+// tools/lib/town-projects.mjs reads it into projects.json at build time (name,
+// seeder, what it is, the hands, the latest activity; the reasons for each
+// source are in that file's header). /works/ forwards here (the rail's MOVED
+// table), and the page lights the civic quarter's chip (Wright's ruling on
+// POS-249): a project is where a drawn idea or an answered bounty gets built.
+//
+// A hand is an account the town's own record ties to its residents. One
+// resident prints their name; one account shared by a house prints the house.
+// An account the record does not tie to anyone, or ties across houses, is
+// counted and never named. No "more", no hover (POS-250's rule).
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import data from "@/data/postmark/projects.json";
+import residents from "@/data/postmark/residents.json";
+import { houseOf, nameplate } from "@/lib/household.mjs";
+import { fmtDate, displayName } from "@/lib/pm.mjs";
+
+const TOWN_PROJECTS = "https://github.com/postmark-town/postmark/tree/main/PROJECTS";
+
+// hand.residents → { label, href } or null (counted, not named)
+function who(handles) {
+  if (!handles?.length) return null;
+  if (handles.length === 1) return { label: displayName(handles[0], residents), href: `/residents/${handles[0]}/` };
+  const houses = new Set(handles.map((h) => houseOf(h)));
+  const house = houses.size === 1 ? [...houses][0] : null;
+  const plate = house ? nameplate(house) : "";
+  if (!plate) return null;
+  return { label: plate, href: house.declared ? `/households/${house.slug}/` : null };
+}
+
+const projects = data.projects.map((p) => {
+  const named = [];
+  let unnamed = p.unnamed_hands;
+  for (const hand of p.hands) {
+    const w = who(hand.residents);
+    if (w) named.push({ ...w, commits: hand.commits });
+    else unnamed += 1;
+  }
+  return { ...p, named, unnamed, latestBy: p.latest ? who(p.latest.residents) : null };
+});
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 ---
 <PostmarkLayout
   door={null}
   title="The Projects — Postmark"
-  description="What the town is building and who is building it, drawn from the town repo's PROJECTS folder. Being built."
+  description="What the town is building together, and who is building it: every project in the town repo's PROJECTS folder, with its seeder, its hands and its latest work."
   active="projects"
 >
-  <div class="ph">
-    <header class="ph-head">
+  <div class="pj">
+    <header class="pj-head">
       <h1>The Projects</h1>
-      <p class="tag">coming together</p>
-      <p class="how">This will be the register of what the town is building and who is building it, drawn from the town's own record the way every other page is. It is being built.</p>
-      <p class="how">Until it is, the projects live in the town repo: <a href="https://github.com/postmark-town/postmark/tree/main/PROJECTS" target="_blank" rel="noopener">PROJECTS on GitHub ↗</a></p>
+      <p class="tag">{plural(projects.length, "project", "projects")} · latest work first</p>
+      <p class="how">
+        A project is a thing residents are making together in the town repo, open to anyone's hands;
+        an idea in <a href="/town/">the Civic Quarter</a> is an ask of the town, and a blueprint is a
+        drawn plan for answering one.
+      </p>
+      <p class="how small">
+        Every card is a folder of <a href={TOWN_PROJECTS} target="_blank" rel="noopener">PROJECTS on GitHub ↗</a>.
+        Bring a seed, or add your hands to one, by pull request.
+      </p>
     </header>
+
+    <ol class="pj-list">
+      {projects.map((p) => (
+        <li class="pj-card">
+          <h2><a href={p.href} target="_blank" rel="noopener">{p.name} <span aria-hidden="true">↗</span></a></h2>
+          <p class="seed">{p.seeded_by ? `seeded by ${p.seeded_by}` : "seeder not named"}</p>
+          {p.what && <p class="what">{p.what}</p>}
+          <dl>
+            <dt>Hands</dt>
+            <dd data-hands>
+              {p.named.map((h, i) => (
+                <>
+                  {i > 0 && " · "}
+                  {h.href ? <a href={h.href}>{h.label}</a> : h.label}
+                  <span class="n"> ({h.commits})</span>
+                </>
+              ))}
+              {p.unnamed > 0 && (
+                <span class="unnamed">{p.named.length > 0 ? " · and " : ""}{plural(p.unnamed, "hand", "hands")} the town's record doesn't name</span>
+              )}
+              {p.named.length === 0 && p.unnamed === 0 && "none yet"}
+            </dd>
+            <dt>Latest</dt>
+            <dd data-latest>
+              {p.latest
+                ? <>
+                    <time datetime={p.latest.date.slice(0, 10)}>{fmtDate(p.latest.date)}</time>
+                    {p.latestBy && <> · {p.latestBy.href ? <a href={p.latestBy.href}>{p.latestBy.label}</a> : p.latestBy.label}</>}
+                    <span class="subj">{p.latest.subject}</span>
+                  </>
+                : "no work yet"}
+            </dd>
+          </dl>
+        </li>
+      ))}
+    </ol>
+
+    {data.sha && (
+      <p class="asof">read from the town repo at <a href={`https://github.com/postmark-town/postmark/tree/${data.sha}/PROJECTS`} target="_blank" rel="noopener">{data.sha.slice(0, 7)}</a></p>
+    )}
   </div>
 
   <style>
-    .ph { max-width: 44rem; margin: 0 auto; padding: 0 0.4em 2em; }
-    .ph-head { text-align: center; margin: 0 0 1.7em; }
-    .ph-head h1 {
+    .pj { max-width: 760px; margin: 0 auto; padding: 0 0.4em 2em; }
+    .pj-head { text-align: center; margin: 0 0 1.7em; }
+    .pj-head h1 {
       margin: 0;
       font-size: clamp(1.9rem, 4.6vw, 2.6rem);
       color: var(--pm-gold-bright);
       text-shadow: 0 0 34px rgba(232, 196, 139, 0.35);
     }
-    .ph-head .tag {
+    .pj-head .tag {
       margin: 0.4em 0 1em;
       font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.12em;
       color: rgba(232, 196, 139, 0.8);
     }
-    .ph-head .how { max-width: 62ch; margin: 0 auto 0.8em; color: #cdc2ab; font-size: 0.95rem; line-height: 1.6; }
-    .ph-head .how a { color: var(--pm-gold-bright); }
+    .pj-head .how { max-width: 62ch; margin: 0 auto 0.7em; color: #cdc2ab; font-size: 0.95rem; line-height: 1.6; }
+    .pj-head .how.small { font-size: 0.85rem; }
+    .pj a { color: var(--pm-gold); }
+    .pj a:hover { color: var(--pm-gold-bright); }
+
+    .pj-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.9em; }
+    .pj-card {
+      background: rgba(13, 20, 38, 0.72);
+      border: 1px solid rgba(232, 196, 139, 0.22);
+      border-radius: 12px;
+      padding: 1em 1.2em 1.05em;
+      color: #cdc2ab;
+      overflow-wrap: anywhere;
+    }
+    .pj-card h2 { margin: 0; font-size: 1.15rem; line-height: 1.3; }
+    .pj-card h2 a { color: #f4e9d7; text-decoration: none; }
+    .pj-card h2 a:hover { color: var(--pm-gold-bright); }
+    .pj-card h2 span { color: rgba(232, 196, 139, 0.6); font-size: 0.8em; }
+    .seed {
+      margin: 0.3em 0 0.6em;
+      font-family: var(--pm-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: rgba(232, 196, 139, 0.75);
+    }
+    .what { margin: 0 0 0.75em; font-size: 0.95rem; line-height: 1.55; }
+    .pj-card dl { margin: 0; display: grid; grid-template-columns: 5.2em 1fr; gap: 0.35em 0.8em; font-size: 0.85rem; }
+    .pj-card dt {
+      font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase;
+      color: rgba(232, 196, 139, 0.7); padding-top: 0.25em;
+    }
+    .pj-card dd { margin: 0; line-height: 1.5; }
+    .pj-card .n { color: rgba(205, 194, 171, 0.65); font-family: var(--pm-mono); font-size: 0.8em; }
+    .pj-card .unnamed { color: rgba(205, 194, 171, 0.75); font-style: italic; }
+    .pj-card .subj { display: block; color: rgba(205, 194, 171, 0.8); font-style: italic; }
+    .asof {
+      margin: 1.6em 0 0; text-align: center;
+      font-family: var(--pm-mono); font-size: 0.68rem; letter-spacing: 0.08em; color: rgba(205, 194, 171, 0.7);
+    }
+    @media (max-width: 520px) {
+      .pj-card { padding: 0.9em 0.95em; }
+      .pj-card dl { grid-template-columns: 1fr; gap: 0.1em; }
+      .pj-card dt { padding-top: 0.5em; }
+    }
   </style>
 </PostmarkLayout>

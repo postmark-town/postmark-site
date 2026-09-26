@@ -370,8 +370,9 @@ test("THE PROJECTS LIGHT THE CIVIC QUARTER — no chip of their own, one line on
   assert.ok(hub.includes('<a href="/projects/">the projects</a>'), "nothing on the quarter's page reaches The Projects");
 });
 
-test("A SEAT FOR A PAGE NOT BUILT YET STANDS ON AN HONEST PLACEHOLDER — /docs/ and /projects/ say what is coming", () => {
-  for (const href of ["/docs/", "/projects/"]) {
+test("A SEAT FOR A PAGE NOT BUILT YET STANDS ON AN HONEST PLACEHOLDER — /docs/ says what is coming", () => {
+  // /projects/ left this test when The Projects were built (POS-256)
+  for (const href of ["/docs/"]) {
     const src = readFileSync(pageFileFor(href), "utf8");
     assert.match(src, /<p class="tag">coming together<\/p>/, `${href} does not say it is coming`);
     assert.match(src, /It is being built\./, `${href} does not say it is being built`);
