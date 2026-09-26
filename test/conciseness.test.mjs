@@ -96,12 +96,15 @@ test("the bulletin: the intro's rest is in view, not behind an expand", { skip: 
   ]) assert.ok(visible.includes(plain(s)), `not in view on the bulletin: "${s}"`);
 });
 
-test("the door line reads `this page is <read>`, the plain GET on its hover", { skip: !built("bulletin") }, () => {
+// RE-AIMED 2026-09-26 (the Site Lift, POS-250: nothing lives only in a
+// hover): the plain GET came off the read's hover and back onto the line. The
+// age clause is an island that fills after load, so the built page carries it
+// hidden and empty; its words are asserted in view, not its phrase.
+test("the door line reads the read, then the plain GET, in view; nothing on a hover", { skip: !built("bulletin") }, () => {
   const page = html("bulletin");
   const foot = page.slice(page.indexOf("data-door-foot"));
   const line = foot.slice(0, foot.indexOf("</p>"));
-  reachable(line, ["GET /api/bulletin"]);
-  // the plain GET is not in view: only the read is
-  const visible = plain(line.replace(/\btitle="[^"]*"/g, "").replace(/<span\b[^>]*class="pm-sr"[^>]*>[\s\S]*?<\/span>\s*<\/span>|<span\b[^>]*class="pm-sr"[^>]*>[\s\S]*?<\/span>/g, ""));
-  assert.match(visible, /this page is town \{ read: "bulletin" \}$/);
+  assert.equal(/\btitle=/.test(line), false, "the door line carries a hover again");
+  assert.equal(/\bpm-sr\b/.test(line), false, "the door line tucks a clause out of view again");
+  assert.match(plain(line), /this page is town \{ read: "bulletin" \} · GET \/api\/bulletin · as the office read it$/);
 });
