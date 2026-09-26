@@ -11,15 +11,23 @@
 //
 // Each card links to the event's own page, /calendar/<host>/<slug>/, which
 // carries who is coming and the exact door call to RSVP.
+//
+// Above the groups the page draws the reference month as a calendar (POS-229,
+// 2026-09-25): src/components/CalendarMonth.astro, a grid at a desk and an
+// agenda on a phone. The other months are static pages, /calendar/YYYY-MM/
+// (town/pages/calendar/[month].astro), linked as previous and next.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import PageFreshness from "@/components/PageFreshness.astro";
 import CalendarCard from "@/components/CalendarCard.astro";
+import CalendarMonth from "@/components/CalendarMonth.astro";
 import calendar from "@/data/postmark/calendar.json";
 import residents from "@/data/postmark/residents.json";
-import { groupsOf, utcText } from "@/lib/calendar.mjs";
+import { groupsOf, monthGrid, monthKey, referenceInstant, utcText } from "@/lib/calendar.mjs";
 
 const roll = new Set(residents.map((r) => r.handle));
 const groups = groupsOf(calendar);
+const ref = referenceInstant(calendar);
+const month = monthGrid(calendar, monthKey(ref), ref);
 ---
 <PostmarkLayout
   title="The calendar — Postmark"
@@ -43,6 +51,8 @@ const groups = groupsOf(calendar);
       )}
     </header>
 
+    <CalendarMonth month={month} />
+
     {groups.map((g) => (
       <section class="cal-group" data-group={g.key}>
         <h2>{g.label}</h2>
@@ -56,8 +66,8 @@ const groups = groupsOf(calendar);
   </div>
 
   <style>
-    .cal-page { max-width: 720px; margin: 0 auto; padding: 0 0.4em; }
-    .cal-head { text-align: center; margin: 0 0 1.4em; }
+    .cal-page { max-width: 1020px; margin: 0 auto; padding: 0 0.4em; }
+    .cal-head { max-width: 720px; text-align: center; margin: 0 auto 1.4em; }
     .cal-head h1 {
       margin: 0;
       font-size: clamp(2rem, 5vw, 2.9rem);
@@ -67,7 +77,7 @@ const groups = groupsOf(calendar);
     .cal-head .tag { margin: 0.3em 0 1em; font-style: italic; color: rgba(232, 196, 139, 0.8); }
     .cal-head .how { max-width: 62ch; margin: 0 auto; color: #cdc2ab; font-size: 0.97rem; line-height: 1.6; }
     .cal-asof { margin: 0.8em 0 0; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.7); }
-    .cal-group { margin: 0 0 1.6em; }
+    .cal-group { max-width: 720px; margin: 0 auto 1.6em; }
     .cal-group h2 {
       margin: 0 0 0.6em; font-size: 1.15rem; letter-spacing: 0.06em;
       color: var(--pm-gold); border-bottom: 1px solid rgba(232, 196, 139, 0.25); padding-bottom: 0.25em;

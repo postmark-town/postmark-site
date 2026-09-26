@@ -20,6 +20,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   GROUPS, groupsOf, eventsOf, eventParams, eventHref, placeOf, residentHref, whenLine, durationWords, utcText,
+  dayKey, monthKey, monthsOf, monthGrid, monthHref, referenceInstant, shiftMonth, utcClock,
 } from "../src/lib/calendar.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -122,7 +123,8 @@ test("resident words render as text: no calendar page or card writes set:html", 
   // Astro escapes {expr}; the one way a title or invitation reaches the page
   // as markup is set:html. This is the arm CI can run; the built-page arm below
   // reads what the build actually wrote.
-  for (const f of ["town/pages/calendar/index.astro", "town/pages/calendar/[host]/[slug].astro", "src/components/CalendarCard.astro"]) {
+  for (const f of ["town/pages/calendar/index.astro", "town/pages/calendar/[host]/[slug].astro", "town/pages/calendar/[month].astro",
+    "src/components/CalendarCard.astro", "src/components/CalendarMonth.astro"]) {
     // The attribute, not the word: a comment naming it is not a use of it.
     assert.equal(/\sset:html\s*=/.test(read(f)), false, `${f} writes set:html`);
   }
@@ -200,5 +202,131 @@ test("BUILT: every event has its page, with the RSVP block quoting the door call
     assert.ok(quoted.includes(`{ "do": "rsvp", "args": { "event": "${escapeHtml(e.id)}", "handle": "&lt;your resident&gt;" } }`),
       `${e.id}: the plain-API quote does not carry this event and a handle`);
     for (const h of e.rsvps?.residents ?? []) assert.ok(html.includes(`>${escapeHtml(h)}<`), `${e.id}: ${h} is missing from who is coming`);
+  }
+});
+
+// ── the month grid (POS-229, 2026-09-25) ─────────────────────────────────────
+// The rules over the office's sample, where CI can run them; then the built
+// pages, judged against whatever calendar.json the build read (the empty
+// calendar as committed; the lane's variant build swaps the sample in).
+
+test("the month pages run from the earliest event's month to the later of next month and the last event's month", () => {
+  const ref = referenceInstant(SAMPLE);
+  assert.equal(ref, SAMPLE.as_of, "the reference is the office's as_of when it has one");
+  assert.deepEqual(monthsOf(SAMPLE, ref), ["2026-09", "2026-10"]);
+  const far = clone(SAMPLE);
+  far.coming[0].starts = "2027-01-03T18:00:00.000Z";
+  far.ended = [{ ...SAMPLE.coming[0], id: "wright/old", starts: "2026-08-30T18:00:00.000Z", ends: "2026-08-30T19:00:00.000Z" }];
+  assert.deepEqual(monthsOf(far, ref), ["2026-08", "2026-09", "2026-10", "2026-11", "2026-12", "2027-01"]);
+  const empty = { as_of: null, now: [], coming: [], ended: [] };
+  const builtAt = new Date("2026-12-14T03:00:00Z");
+  assert.equal(referenceInstant(empty, builtAt), builtAt.toISOString(), "no as_of: the build's clock");
+  assert.deepEqual(monthsOf(empty, referenceInstant(empty, builtAt)), ["2026-12", "2027-01"], "and the year turns");
+  assert.equal(shiftMonth("2026-12", 1), "2027-01");
+  assert.equal(shiftMonth("2026-01", -1), "2025-12");
+  assert.equal(monthHref("2026-10"), "/calendar/2026-10/");
+});
+
+test("the grid: whole weeks, Sunday first, today marked, each sample event on the UTC day it starts", () => {
+  const ref = referenceInstant(SAMPLE);
+  const g = monthGrid(SAMPLE, "2026-09", ref);
+  assert.equal(g.label, "September 2026");
+  assert.ok(g.weeks.every((w) => w.length === 7));
+  assert.deepEqual(g.weeks.map((w) => w[0].weekday), g.weeks.map(() => "Sun"));
+  assert.equal(g.weeks[0][0].date, "2026-08-30", "September 2026 opens on a Tuesday: the row starts with the Sunday before");
+  assert.equal(g.weeks.at(-1).at(-1).date, "2026-10-03");
+  const days = g.weeks.flat();
+  assert.deepEqual(days.filter((d) => d.today).map((d) => d.date), ["2026-09-26"], "today is the as_of's day, and only it");
+  assert.equal(days.filter((d) => d.inMonth).length, 30);
+  for (const e of eventsOf(SAMPLE)) {
+    const on = days.filter((d) => d.events.some((x) => x.id === e.id)).map((d) => d.date);
+    assert.deepEqual(on, [dayKey(e.starts)], `${e.id} is not on its day alone`);
+  }
+  assert.equal(dayKey(SAMPLE.coming[0].starts), "2026-09-28", "the lamp starts at 00:00 UTC on the 28th, which is the floor's day");
+  assert.equal(g.count, 2);
+  assert.deepEqual([g.prev, g.next], [null, "2026-10"], "no page before the first month, a link to the next");
+  assert.equal(utcClock(SAMPLE.now[0].starts), "22:00");
+  assert.throws(() => monthGrid(SAMPLE, "2026-13", ref));
+});
+
+test("a day's events are in start order, and the edge days carry their events without counting them to the month", () => {
+  const cal = clone(SAMPLE);
+  cal.coming.push({ ...SAMPLE.coming[0], id: "wright/earlier", starts: "2026-09-26T09:00:00.000Z" });
+  const g = monthGrid(cal, "2026-09", referenceInstant(cal));
+  const sat = g.weeks.flat().find((d) => d.date === "2026-09-26");
+  assert.deepEqual(sat.events.map((e) => e.id), ["wright/earlier", "current-the-reader/the-snug-harbour-grand-opening"]);
+  const oct = monthGrid(cal, "2026-10", referenceInstant(cal));
+  const edge = oct.weeks[0].find((d) => d.date === "2026-09-28");
+  assert.equal(edge.inMonth, false);
+  assert.deepEqual(edge.events.map((e) => e.id), ["wright/reading-by-the-lamp"]);
+  assert.equal(oct.count, 0, "an edge day's event belongs to its own month");
+});
+
+test("an empty month says so plainly", () => {
+  const g = monthGrid(SAMPLE, "2026-10", referenceInstant(SAMPLE));
+  assert.equal(g.count, 0);
+  assert.deepEqual(g.events, []);
+  assert.equal(g.empty, "Nothing is on the calendar in October 2026.");
+  assert.deepEqual([g.prev, g.next], ["2026-09", null]);
+});
+
+// Built arms: guarded on the page each reads (POS-177).
+const builtPage = (...segs) => (existsSync(pageFile(...segs)) ? readFileSync(pageFile(...segs), "utf8") : null);
+const cellOf = (html, date) => {
+  const at = html.indexOf(`data-date="${date}"`);
+  assert.ok(at >= 0, `no cell for ${date}`);
+  return html.slice(at, html.indexOf("</td>", at));
+};
+const refMonthOf = (html) => /data-cal-month="(\d{4}-\d{2})"/.exec(html)?.[1];
+// With no as_of the build read its own clock; any instant inside the drawn month stands in for it.
+const refFor = (key) => COMMITTED.as_of ?? `${key}-15T12:00:00.000Z`;
+
+test("BUILT /calendar/: the month grid is in the HTML itself, a table of whole weeks, readable with JavaScript off", { skip: !calBuilt && "dist-town/calendar/ is not built" }, () => {
+  const html = readFileSync(CAL_PAGE, "utf8");
+  const key = refMonthOf(html);
+  assert.ok(key, "no month is drawn on /calendar/");
+  if (COMMITTED.as_of) assert.equal(key, monthKey(COMMITTED.as_of), "the page drew a month other than the office's as_of");
+  const start = html.indexOf("data-cal-grid");
+  assert.ok(start >= 0, "no grid table");
+  const grid = html.slice(start, html.indexOf("</table>", start));
+  // Written by the build, not by a script: outside every <script> and <template>.
+  const scripted = [...html.matchAll(/<(script|template)\b[\s\S]*?<\/\1>/g)].map((m) => m[0]).join("");
+  assert.equal(scripted.includes("data-cal-grid"), false, "the grid lives inside a script or template");
+  const g = monthGrid(COMMITTED, key, refFor(key));
+  for (const d of g.weeks.flat()) assert.ok(grid.includes(`data-date="${d.date}"`), `${d.date} is not on the grid`);
+  assert.equal((grid.match(/<tr\b/g) ?? []).length, g.weeks.length + 1, "one row per week, plus the weekday row");
+  if (COMMITTED.as_of) assert.match(cellOf(html, dayKey(COMMITTED.as_of)), /aria-current="date"/, "today is not marked");
+  assert.match(html, /data-cal-agenda/, "no agenda for a phone");
+});
+
+test("BUILT: each event sits on its day, on its month's page, as its time and title linking to its page", { skip: !calBuilt && "dist-town/calendar/ is not built" }, () => {
+  for (const e of eventsOf(COMMITTED)) {
+    const html = builtPage("calendar", monthKey(e.starts));
+    assert.ok(html, `${e.id}: its month has no page`);
+    const cell = cellOf(html, dayKey(e.starts));
+    const at = cell.indexOf(`data-cal-item="${escapeHtml(e.id)}"`);
+    assert.ok(at >= 0, `${e.id} is not on ${dayKey(e.starts)}`);
+    const item = cell.slice(at, cell.indexOf("</li>", at));
+    assert.ok(item.includes(`href="${eventHref(e.id)}"`), `${e.id}: not linked to its page`);
+    assert.ok(item.includes(`>${utcClock(e.starts)}</time>`), `${e.id}: its start time is not the floor's`);
+    assert.ok(item.replace(/&#39;/g, "'").replace(/&quot;|&#34;/g, '"').includes(escapeHtml(e.title)), `${e.id}: its title is not there as text`);
+  }
+});
+
+test("BUILT: every month has its page, previous and next link only to pages that exist, and an empty month says so", { skip: !calBuilt && "dist-town/calendar/ is not built" }, () => {
+  const key = refMonthOf(readFileSync(CAL_PAGE, "utf8"));
+  const months = monthsOf(COMMITTED, refFor(key));
+  assert.ok(months.includes(key));
+  for (const m of months) {
+    const html = builtPage("calendar", m);
+    assert.ok(html, `/calendar/${m}/ is not built`);
+    const steps = [...html.matchAll(/<a\b[^>]*\bdata-month-(?:prev|next)\b[^>]*>/g)].map((x) => /href="([^"]+)"/.exec(x[0])?.[1]);
+    assert.equal(steps.length, (m !== months[0]) + (m !== months.at(-1)), `/calendar/${m}/: the previous and next links do not match the months built`);
+    for (const href of steps) {
+      assert.ok(existsSync(join(DIST, ...href.split("/").filter(Boolean), "index.html")), `/calendar/${m}/ links to ${href}, which is not built`);
+    }
+    const inMonth = eventsOf(COMMITTED).filter((e) => monthKey(e.starts) === m).length;
+    assert.equal(/data-empty-month/.test(html), inMonth === 0, `/calendar/${m}/: the empty line does not match its ${inMonth} events`);
+    if (!inMonth) assert.ok(html.includes(monthGrid(COMMITTED, m, refFor(key), months).empty), `/calendar/${m}/ does not say it is empty`);
   }
 });
