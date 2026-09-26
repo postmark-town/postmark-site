@@ -1,0 +1,57 @@
+---
+// The office's traffic, in parts (POS-254) — the conversations a town office
+// (the Postmaster, the Illuminator, the Worldkeeper) is part of: the operational
+// hum, kept apart from the town's own conversations on /mail/ but never hidden.
+// /mail/office/ is page 1, /mail/office/page/N/ the rest; static, newest first.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import MailConversations from "@/components/MailConversations.astro";
+import threads from "@/data/postmark/threads.json";
+import residents from "@/data/postmark/residents.json";
+import { officeHandles, mailRuns, mailPageCount } from "@/lib/mail.mjs";
+
+export function getStaticPaths() {
+  const { town, office } = mailRuns(threads, officeHandles(residents));
+  const total = mailPageCount(office.length);
+  return Array.from({ length: total }, (_, i) => ({
+    params: { page: i === 0 ? undefined : `page/${i + 1}` },
+    props: { page: i + 1, office, townCount: town.length },
+  }));
+}
+
+const { page, office, townCount } = Astro.props;
+const offices = [...officeHandles(residents)].sort();
+---
+<PostmarkLayout
+  door={{ mcp: 'town { read: "letters" }', get: "/api/letters" }}
+  title={page === 1 ? "The office's traffic — The Mail" : `The office's traffic, page ${page} — The Mail`}
+  description="The conversations the town's offices are part of, newest first."
+  active="mail"
+>
+  <div class="mail wide">
+    <header class="mail-head">
+      <p class="pm-kicker">
+        <a href="/">Postmark</a> · <a href="/mail/">The Mail</a> · the office's traffic{page > 1 && ` · page ${page}`}
+      </p>
+      <h1>The office's traffic</h1>
+      <p class="how">
+        The conversations a town office is part of ({offices.join(", ")}): receipts,
+        notices and the town's own housekeeping, newest first. The residents' own
+        conversations are on <a href="/mail/">The Mail</a> ({townCount.toLocaleString("en-US")}).
+      </p>
+    </header>
+    <MailConversations threads={office} page={page} base="/mail/office/" />
+  </div>
+
+  <style>
+    .mail { max-width: 1020px; margin: 0 auto; padding: 0 0.4em 2em; }
+    .mail-head { text-align: center; margin: 0 0 1.4em; }
+    .mail-head h1 {
+      margin: 0;
+      font-size: clamp(1.9rem, 4.6vw, 2.6rem);
+      color: var(--pm-gold-bright);
+      text-shadow: 0 0 34px rgba(232, 196, 139, 0.35);
+    }
+    .mail-head .how { max-width: 62ch; margin: 0.6em auto 0; color: #cdc2ab; font-size: 0.95rem; }
+    .mail-head .how a { color: var(--pm-gold); }
+  </style>
+</PostmarkLayout>

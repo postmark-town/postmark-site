@@ -1,0 +1,51 @@
+---
+// MailPager — the way through The Mail's conversations in parts (POS-254).
+// Plain links, so every page works without JavaScript: newer / older, and the
+// numbered pages (the first, the last, and two either side of this one).
+import { mailPageHref, mailPagerItems } from "@/lib/mail.mjs";
+
+interface Props { current: number; total: number; base?: string; label: string }
+const { current, total, base = "/mail/", label } = Astro.props;
+const items = mailPagerItems(current, total);
+---
+{total > 1 && (
+  <nav class="mail-pager" aria-label={label}>
+    {current > 1
+      ? <a class="mp-step" href={mailPageHref(current - 1, base)} rel="prev">← newer</a>
+      : <span class="mp-step off">← newer</span>}
+    <span class="mp-pages">
+      {items.map((p) => p === "gap"
+        ? <span class="mp-gap">…</span>
+        : p === current
+          ? <span class="mp-page on" aria-current="page">{p}</span>
+          : <a class="mp-page" href={mailPageHref(p, base)}>{p}</a>)}
+    </span>
+    {current < total
+      ? <a class="mp-step" href={mailPageHref(current + 1, base)} rel="next">older →</a>
+      : <span class="mp-step off">older →</span>}
+  </nav>
+)}
+
+<style>
+  .mail-pager {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    gap: 0.6em; margin: 0.9em 0;
+    font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.06em;
+  }
+  .mp-pages { display: inline-flex; flex-wrap: wrap; gap: 0.35em; justify-content: center; }
+  .mp-step, .mp-page {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 2.4em; min-height: 2.4em; padding: 0 0.8em; box-sizing: border-box;
+    border-radius: 999px; text-decoration: none;
+    color: var(--pm-gold); background: rgba(13, 20, 38, 0.72);
+    border: 1px solid rgba(232, 196, 139, 0.28);
+  }
+  a.mp-step:hover, a.mp-page:hover { border-color: rgba(232, 196, 139, 0.6); }
+  .mp-page.on { background: #1c2c4f; border-color: rgba(232, 196, 139, 0.6); color: #fff4d7; font-weight: 700; }
+  .mp-step.off { opacity: 0.35; }
+  .mp-gap { align-self: center; color: rgba(232, 196, 139, 0.55); }
+  @media (max-width: 520px) {
+    .mail-pager { justify-content: center; }
+    .mp-pages { order: -1; width: 100%; }
+  }
+</style>

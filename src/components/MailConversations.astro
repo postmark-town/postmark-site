@@ -1,0 +1,54 @@
+---
+// MailConversations — one page of The Mail's conversations (POS-254). The run
+// (`threads`) arrives newest first, sorted by each conversation's newest letter;
+// this renders page `page` of it, MAIL_PAGE_SIZE at a time, between two pagers.
+// Every page is static, so the list reads the same with JavaScript off.
+import MailPager from "@/components/MailPager.astro";
+import letters from "@/data/postmark/letters.json";
+import { fmtDate, excerpt, threadTitle } from "@/lib/pm.mjs";
+import { MAIL_PAGE_SIZE, mailPageCount, mailPageSlice, previewLines } from "@/lib/mail.mjs";
+
+interface Props { threads: any[]; page: number; base?: string; noun?: string }
+const { threads, page, base = "/mail/", noun = "conversations" } = Astro.props;
+
+const byId = new Map(letters.map((l) => [l.id, l]));
+const total = mailPageCount(threads.length);
+const shown = mailPageSlice(threads, page);
+const from = (page - 1) * MAIL_PAGE_SIZE + 1;
+const to = from + shown.length - 1;
+const n = (x: number) => x.toLocaleString("en-US");
+---
+<div class="conv-run" data-conv-run>
+<p class="conv-range" data-conv-range>
+  {noun} <b>{n(from)}–{n(to)}</b> of {n(threads.length)}, newest first · page {page} of {total}
+</p>
+<MailPager current={page} total={total} base={base} label={`${noun}, pages (top)`} />
+<div class="thread-list" data-thread-list>
+  {shown.map((t) => {
+    const first = byId.get(t.key);
+    return (
+      <a class="pm-thread-card" href={`/mail/${t.key}/`}>
+        <span class="t-title">{threadTitle(t.key)}</span>
+        <div class="t-meta">
+          {t.participants.join(" · ")} — {t.size} {t.size === 1 ? "letter" : "letters"},
+          {" "}{fmtDate(t.firstDate)}{t.lastDate !== t.firstDate ? ` → ${fmtDate(t.lastDate)}` : ""}
+        </div>
+        {first && <div class="t-excerpt">{excerpt(previewLines(first.body).join(" "), 220)}</div>}
+      </a>
+    );
+  })}
+</div>
+<MailPager current={page} total={total} base={base} label={`${noun}, pages (bottom)`} />
+</div>
+
+<style>
+  .conv-range {
+    margin: 0 0 0.2em;
+    font-family: var(--pm-mono); font-size: 0.68rem; letter-spacing: 0.08em;
+    color: rgba(232, 196, 139, 0.7);
+  }
+  .conv-range b { color: var(--pm-gold-bright); }
+  .thread-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.7em; align-items: start; }
+  .conv-run[hidden] { display: none; }
+  @media (max-width: 760px) { .thread-list { grid-template-columns: 1fr; } }
+</style>

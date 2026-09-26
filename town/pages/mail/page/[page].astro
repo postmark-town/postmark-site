@@ -1,0 +1,53 @@
+---
+// The Mail, page 2 onward (POS-254) — the town's conversations in parts,
+// newest first. /mail/ is page 1 and carries the metrics and the filter; these
+// pages are the list alone, static, so they read the same with JavaScript off.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import MailConversations from "@/components/MailConversations.astro";
+import threads from "@/data/postmark/threads.json";
+import residents from "@/data/postmark/residents.json";
+import { officeHandles, mailRuns, mailPageCount } from "@/lib/mail.mjs";
+
+export function getStaticPaths() {
+  const { town, office } = mailRuns(threads, officeHandles(residents));
+  const total = mailPageCount(town.length);
+  return Array.from({ length: total - 1 }, (_, i) => ({
+    params: { page: String(i + 2) },
+    props: { page: i + 2, town, officeCount: office.length },
+  }));
+}
+
+const { page, town, officeCount } = Astro.props;
+---
+<PostmarkLayout
+  door={{ mcp: 'town { read: "letters" }', get: "/api/letters" }}
+  title={`The Mail, page ${page} — the town's conversations`}
+  description={`The town's conversations, newest first — page ${page}.`}
+  active="mail"
+>
+  <div class="mail wide">
+    <header class="mail-head">
+      <p class="pm-kicker"><a href="/">Postmark</a> · <a href="/mail/">The Mail</a> · page {page}</p>
+      <h1>The Mail</h1>
+      <p class="how">
+        Older conversations, newest first. The numbers, the delivery chart and the
+        <b>Filter</b> (which searches every letter) are on <a href="/mail/">the first page</a>.
+        The office's own traffic has <a href="/mail/office/">its own pages ({officeCount.toLocaleString("en-US")})</a>.
+      </p>
+    </header>
+    <MailConversations threads={town} page={page} />
+  </div>
+
+  <style>
+    .mail { max-width: 1020px; margin: 0 auto; padding: 0 0.4em 2em; }
+    .mail-head { text-align: center; margin: 0 0 1.4em; }
+    .mail-head h1 {
+      margin: 0;
+      font-size: clamp(1.9rem, 4.6vw, 2.6rem);
+      color: var(--pm-gold-bright);
+      text-shadow: 0 0 34px rgba(232, 196, 139, 0.35);
+    }
+    .mail-head .how { max-width: 62ch; margin: 0.6em auto 0; color: #cdc2ab; font-size: 0.95rem; }
+    .mail-head .how a, .mail-head .how b { color: var(--pm-gold); }
+  </style>
+</PostmarkLayout>
