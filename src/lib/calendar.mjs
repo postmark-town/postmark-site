@@ -129,3 +129,131 @@ export function utcText(iso) {
 export const LOCAL_FORMAT = Object.freeze({
   weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZoneName: "short",
 });
+
+// ── the month grid (POS-229, 2026-09-25) ─────────────────────────────────────
+//
+// The page draws the calendar as a month: its weeks as rows, Sunday first, each
+// event on the day it starts. The grid is built here, at build time, so it is in
+// the HTML for a reader with JavaScript off. Its days are UTC days, the same
+// floor every <time> on the page bakes; the page's island then moves each event
+// to its day in the reader's own zone and marks the reader's own today. Nothing
+// here works out an offset.
+//
+// Months are static pages, /calendar/YYYY-MM/, one per month from the earliest
+// month with an event (or the reference month) to the later of the month after
+// the reference and the last month with an event. The reference instant is the
+// office's `as_of` when the calendar carries one, else the build's clock.
+
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+export const WEEKDAYS = Object.freeze(DAYS);
+
+const dayKeyOf = (d) => `${d.getUTCFullYear()}-${two(d.getUTCMonth() + 1)}-${two(d.getUTCDate())}`;
+
+/** The UTC day of an instant as YYYY-MM-DD, or null. */
+export function dayKey(iso) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : dayKeyOf(d);
+}
+
+/** The UTC month of an instant as YYYY-MM, or null. */
+export function monthKey(iso) {
+  return dayKey(iso)?.slice(0, 7) ?? null;
+}
+
+const isMonthKey = (k) => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(k));
+
+/** The month `n` months after `key` (negative for before). */
+export function shiftMonth(key, n) {
+  const [y, m] = key.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${two(d.getUTCMonth() + 1)}`;
+}
+
+/** "September 2026". */
+export function monthLabel(key) {
+  const [y, m] = key.split("-").map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+export function monthHref(key) {
+  return `/calendar/${key}/`;
+}
+
+/** The instant the page reads "today" from: the office's as_of, else the build's clock. */
+export function referenceInstant(calendar, now = new Date()) {
+  const asOf = calendar?.as_of;
+  if (asOf && !Number.isNaN(new Date(asOf).getTime())) return new Date(asOf).toISOString();
+  return now.toISOString();
+}
+
+/** Every month that gets a page, oldest first. */
+export function monthsOf(calendar, ref) {
+  const refMonth = monthKey(ref);
+  const starts = eventsOf(calendar).map((e) => monthKey(e.starts)).filter(Boolean).sort();
+  let first = refMonth;
+  let last = shiftMonth(refMonth, 1);
+  if (starts.length && starts[0] < first) first = starts[0];
+  if (starts.length && starts[starts.length - 1] > last) last = starts[starts.length - 1];
+  const out = [];
+  for (let k = first; k <= last; k = shiftMonth(k, 1)) out.push(k);
+  return out;
+}
+
+/**
+ * One month as the page draws it: whole weeks, Sunday first, with the days of
+ * the months on either side filling the first and last rows (marked out of the
+ * month, and carrying their events too, so a reader at a month's edge sees the
+ * week whole). Each day holds the events that start on it, earliest first.
+ * `prev` and `next` are null past the first and last month that has a page.
+ */
+export function monthGrid(calendar, key, ref, months = monthsOf(calendar, ref)) {
+  if (!isMonthKey(key)) throw new Error(`monthGrid: "${key}" is not a YYYY-MM month`);
+  const byDay = new Map();
+  for (const e of eventsOf(calendar)) {
+    const k = dayKey(e.starts);
+    if (!k) continue;
+    if (!byDay.has(k)) byDay.set(k, []);
+    byDay.get(k).push(e);
+  }
+  for (const list of byDay.values()) list.sort(byStarts);
+
+  const [y, m] = key.split("-").map(Number);
+  const firstOfMonth = new Date(Date.UTC(y, m - 1, 1));
+  const cursor = new Date(Date.UTC(y, m - 1, 1 - firstOfMonth.getUTCDay()));
+  const today = dayKey(ref);
+  const weeks = [];
+  let count = 0;
+  do {
+    const week = [];
+    for (let i = 0; i < 7; i++) {
+      const date = dayKeyOf(cursor);
+      const inMonth = date.startsWith(key);
+      const events = byDay.get(date) ?? [];
+      if (inMonth) count += events.length;
+      week.push({ date, day: cursor.getUTCDate(), weekday: DAYS[cursor.getUTCDay()], inMonth, today: date === today, events });
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    weeks.push(week);
+  } while (cursor.getUTCMonth() === m - 1);
+
+  const at = months.indexOf(key);
+  return {
+    key,
+    label: monthLabel(key),
+    weeks,
+    count,
+    events: weeks.flat().filter((d) => d.inMonth).flatMap((d) => d.events),
+    prev: at > 0 ? months[at - 1] : null,
+    next: at >= 0 && at < months.length - 1 ? months[at + 1] : null,
+    empty: `Nothing is on the calendar in ${monthLabel(key)}.`,
+  };
+}
+
+/** The baked text of a start in a grid cell: its UTC clock time. The island replaces it. */
+export function utcClock(iso) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : `${two(d.getUTCHours())}:${two(d.getUTCMinutes())}`;
+}
+
+/** The island's options for a grid cell's time: the clock only, the zone is said once above the grid. */
+export const LOCAL_CLOCK = Object.freeze({ hour: "2-digit", minute: "2-digit" });
