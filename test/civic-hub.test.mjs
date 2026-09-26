@@ -1164,9 +1164,9 @@ test("both retired routes redirect somewhere that exists", () => {
   // is that the asset prefix is live, so it asks the pages tree, not one file.
   assert.ok(existsSync(new URL("../public/atelier/postmark/board/quest-board-wood.jpg", import.meta.url)),
     "the redirect must be exact-path: the board's images still live under /board/");
-  const painters = everyPageFile()
-    .filter((f) => readFileSync(f, "utf8").includes("/board/quest-board-wood.jpg"));
-  assert.ok(painters.length, "no page paints with /board/ any more — the exact-path reason is gone, and so is this test's premise");
+  // RETIRED 2026-09-26 (POS-251, the Site Lift): the painters check. The bulletin
+  // board paints in CSS now (a cork in the wall browns), so no page paints with
+  // the plank photo; the asset check above stays while the file does.
 });
 
 test("nothing in the repo still points at a retired route", () => {
