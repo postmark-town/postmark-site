@@ -10,6 +10,7 @@ import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildOfficeData, fetchBlueprints, fetchRollcall, fetchCrossings, jsonText, shortFetchPlan } from "./lib/fetch-town-data.mjs";
 import { worldPin } from "./lib/world-pin-publish.mjs";
+import { readProjectsFromCheckout } from "./lib/town-projects.mjs";
 import { writeIfChanged } from "./lib/mirror.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -105,6 +106,7 @@ function writeManifest(asOf, endpointGaps, problems) {
       "crossings.json": "every settlement the Worldkeeper has blessed: the world repo's settlement/S<n> tags (number, sha, blessed_at = the tagged commit's date, the receipt = the tag's message verbatim) and the published count from WORLD/settlement-publications.json at each tag",
       "rollcall.json": "the meeplings' bench: the office's deploy/box-rollcall-manifest.json read at the release the office serves (GET /release -> tag), trimmed to each unit's name, label, stage, cadence and heartbeat allowance",
       "calendar.json": "the town's calendar, the office's GET /calendar verbatim: events now, coming and ended in the last 7 days, with the office's phase; the last committed snapshot while that door is not live",
+      "projects.json": "the town's projects (postmark-town/postmark, PROJECTS/): each folder with a README, its name, seeder and what it is (PROJECTS/INDEX.md, else the README), the residents whose declared GitHub account committed to it, and its newest non-machine commit; read from a full town checkout only",
       "blueprints.json": "the drawing chest (postmark-town/postmark-blueprints, BLUEPRINTS/*/proposal.md frontmatter): each drawn work, the idea mark it cites, and its stage on the Idea Lifecycle",
       "media.json": "town image paths -> processed site copies, owned by extract-town.mjs",
       "pin.json": "the postmark-world sha this site is pinned to, what it was built against, and when — the one fact the office cannot derive about the site (Lane A's A8)",
@@ -134,6 +136,18 @@ try {
     writeDataFile("blueprints.json", await fetchBlueprints());
   } catch (error) {
     console.warn(`WARN fetch-town: the blueprints chest could not be read; keeping the committed snapshot (${error.message})`);
+  }
+  // ── THE PROJECTS (the Site Lift, POS-256) ─────────────────────────────────
+  // Read from the town checkout's PROJECTS/ and its history, so only a run
+  // handed a full --town (the box's own clone) writes it. Fail-soft like the
+  // chest: no checkout, a shallow one, or a failed read keeps the committed
+  // projects.json.
+  if (TOWN) {
+    try {
+      writeDataFile("projects.json", readProjectsFromCheckout(TOWN, result.files["residents.json"]));
+    } catch (error) {
+      console.warn(`WARN fetch-town: the town's projects could not be read; keeping the committed snapshot (${error.message})`);
+    }
   }
   // ── THE MEEPLINGS' BENCH (the site, reprojected — part 3) ──────────────────
   // The box's roll-call, read at the office's served release. Fail-soft like
