@@ -2,7 +2,12 @@
 // The Mail — the town's correspondence, readable. Metrics (letters/day, active
 // threads, bounces) plus the conversations, refocused to the town's living
 // correspondence: office traffic (the Postmaster/Illuminator's operational hum)
-// is one toggle away, never hidden.
+// has its own pages at /mail/office/, one link away, never hidden.
+//
+// The conversations load in parts (POS-254): this page is page 1 of the town's
+// conversations, newest first; /mail/page/N/ carries the rest, static, so the
+// list works without JavaScript. The metrics, the heatmap and the filter stay
+// here, and the filter still searches every letter (/data/letters.json).
 //
 // The old /mail/explorer/ is folded in here: a filter panel (resident/region/
 // date/thread/full-text) opens from the toolbar, URL-addressable with the SAME
@@ -17,17 +22,14 @@
 // the office is down.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import PageFreshness from "@/components/PageFreshness.astro";
+import MailConversations from "@/components/MailConversations.astro";
 import threads from "@/data/postmark/threads.json";
-import letters from "@/data/postmark/letters.json";
 import ledger from "@/data/postmark/ledger.json";
 import residents from "@/data/postmark/residents.json";
-import { fmtDate, excerpt, threadTitle } from "@/lib/pm.mjs";
 import {
-  officeHandles, threadIsOffice, metricsFromLedger, recentDays, deliveriesOn,
-  regionList, previewLines,
+  officeHandles, mailRuns, metricsFromLedger, recentDays, deliveriesOn, regionList,
 } from "@/lib/mail.mjs";
 
-const byId = new Map(letters.map((l) => [l.id, l]));
 const office = officeHandles(residents);
 
 const metrics = metricsFromLedger(ledger, threads);
@@ -39,9 +41,8 @@ const todayDeliveries = deliveriesOn(metrics.days, metrics.as_of);
 const residentHandles = residents.map((r) => r.handle).sort();
 const regions = regionList(residents);
 
-// threads carry a data-office flag; the default view hides office-involved
-// conversations (empty until PR #224 lands the roster flags), the toggle shows them
-const townThreads = threads.filter((t) => !threadIsOffice(t, office));
+// the town's conversations are the list; the office's traffic has its own pages
+const runs = mailRuns(threads, office);
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "letters" }', get: "/api/letters" }}
@@ -93,19 +94,16 @@ const townThreads = threads.filter((t) => !threadIsOffice(t, office));
     <div class="pm-rule night" id="conversations"><span>The conversations</span></div>
     <div class="mail-toolbar">
       <div class="tb-left">
-        <label class="office-toggle">
-          <input type="checkbox" data-office-toggle />
-          <span>show office traffic</span>
-        </label>
         <button type="button" class="filter-btn" data-filter-toggle aria-expanded="false" aria-controls="mail-filter">
           <span class="funnel" aria-hidden="true">⧩</span> Filter
         </button>
       </div>
-      <span class="conv-count" data-conv-count><b data-conv-shown>{townThreads.length}</b> of {threads.length} conversations</span>
+      <a class="office-link" href="/mail/office/">the office's traffic ({runs.office.length.toLocaleString("en-US")}) →</a>
     </div>
 
     <!-- FILTER PANEL — folded in from the old explorer; same query contract -->
     <form class="filter-panel" id="mail-filter" data-filter-panel autocomplete="off" hidden>
+      <p class="fp-scope">The filter searches every letter the town has carried, on every page — not only the conversations listed below.</p>
       <div class="fp-row">
         <label class="fp-field fp-grow">
           <span>Search</span>
@@ -141,26 +139,16 @@ const townThreads = threads.filter((t) => !threadIsOffice(t, office));
           <span>Thread id</span>
           <input type="text" name="thread" placeholder="a letter id that names a conversation" />
         </label>
+        <label class="office-toggle">
+          <input type="checkbox" data-office-toggle />
+          <span>include the office's letters</span>
+        </label>
         <button type="button" class="pm-btn ghost" data-filter-clear>Clear filters</button>
       </div>
     </form>
 
-    <!-- DEFAULT VIEW — the thread list -->
-    <div class="thread-list hide-office" data-thread-list>
-      {threads.map((t) => {
-        const first = byId.get(t.key);
-        return (
-          <a class="pm-thread-card" href={`/mail/${t.key}/`} data-office={String(threadIsOffice(t, office))}>
-            <span class="t-title">{threadTitle(t.key)}</span>
-            <div class="t-meta">
-              {t.participants.join(" · ")} — {t.size} {t.size === 1 ? "letter" : "letters"},
-              {" "}{fmtDate(t.firstDate)}{t.lastDate !== t.firstDate ? ` → ${fmtDate(t.lastDate)}` : ""}
-            </div>
-            {first && <div class="t-excerpt">{excerpt(previewLines(first.body).join(" "), 220)}</div>}
-          </a>
-        );
-      })}
-    </div>
+    <!-- DEFAULT VIEW — page 1 of the town's conversations; /mail/page/N/ has the rest -->
+    <MailConversations threads={runs.town} page={1} />
 
     <!-- FILTERED VIEW — client-rendered letter list (hidden until a filter is set) -->
     <p class="mail-status" data-mail-status hidden></p>
@@ -184,7 +172,7 @@ const townThreads = threads.filter((t) => !threadIsOffice(t, office));
 
   <script>
     import {
-      filterLetters, queryToState, stateToQuery, officeHandles, regionOfFn, previewLines,
+      filterLetters, newestLettersFirst, queryToState, stateToQuery, officeHandles, regionOfFn, previewLines,
     } from "@/lib/mail.mjs";
 
     // ── elements ──────────────────────────────────────────────────────────
@@ -192,11 +180,9 @@ const townThreads = threads.filter((t) => !threadIsOffice(t, office));
     const filterBtn = document.querySelector("[data-filter-toggle]");
     const panel = document.querySelector("[data-filter-panel]");
     const clearBtn = document.querySelector("[data-filter-clear]");
-    const threadList = document.querySelector("[data-thread-list]");
+    const convRun = document.querySelector("[data-conv-run]");
     const resultsEl = document.querySelector("[data-letter-results]");
     const statusEl = document.querySelector("[data-mail-status]");
-    const convCount = document.querySelector("[data-conv-count]");
-    const convShown = document.querySelector("[data-conv-shown]");
     const bars = Array.from(document.querySelectorAll("[data-bar]"));
     const PANEL_FIELDS = ["q", "resident", "region", "since", "until", "thread"];
     const RENDER_CAP = 60;
@@ -260,16 +246,16 @@ const townThreads = threads.filter((t) => !threadIsOffice(t, office));
     }
 
     function renderLetters(s) {
-      const rows = filterLetters(LETTERS, s, { officeSet, regionOf });
+      const rows = newestLettersFirst(filterLetters(LETTERS, s, { officeSet, regionOf }));
       if (!rows.length) {
-        statusEl.textContent = "No letters match — try widening the filters.";
+        statusEl.textContent = "No letters match, across all the mail — try widening the filters.";
         resultsEl.innerHTML = "";
         return;
       }
       const capped = rows.slice(0, RENDER_CAP);
       statusEl.textContent = rows.length > RENDER_CAP
-        ? `${rows.length} letters — showing the first ${RENDER_CAP}, narrow to see the rest`
-        : `${rows.length} letter${rows.length === 1 ? "" : "s"}`;
+        ? `${rows.length} letters across all the mail — showing the newest ${RENDER_CAP}, narrow to see the rest`
+        : `${rows.length} letter${rows.length === 1 ? "" : "s"} across all the mail`;
       resultsEl.innerHTML = capped.map((l) => {
         if (l.isBounce) {
           return `<div class="lt-card lt-bounce">
@@ -288,28 +274,19 @@ const townThreads = threads.filter((t) => !threadIsOffice(t, office));
     }
 
     // ── view switch ─────────────────────────────────────────────────────────
-    function showThreads(s) {
-      threadList.hidden = false;
+    function showThreads() {
+      if (convRun) convRun.hidden = false;
       resultsEl.hidden = true;
       statusEl.hidden = true;
-      if (convCount) convCount.hidden = false;
-      const showOffice = !!s.office;
-      threadList.classList.toggle("hide-office", !showOffice);
-      if (convShown) {
-        const total = threadList.querySelectorAll(".pm-thread-card").length;
-        const offices = threadList.querySelectorAll('.pm-thread-card[data-office="true"]').length;
-        convShown.textContent = String(showOffice ? total : total - offices);
-      }
     }
     async function showLetters(s) {
-      threadList.hidden = true;
-      if (convCount) convCount.hidden = true;
+      if (convRun) convRun.hidden = true;
       resultsEl.hidden = false;
       statusEl.hidden = false;
       statusEl.textContent = "Loading the mail…";
       const ok = await ensureLetters();
       if (!ok) {
-        statusEl.innerHTML = "The mail index could not be loaded right now — the thread list above still browses every conversation.";
+        statusEl.innerHTML = 'The mail index could not be loaded right now — <a href="/mail/">the conversations</a> still browse every letter, a page at a time.';
         resultsEl.innerHTML = "";
         return;
       }
@@ -477,8 +454,6 @@ const townThreads = threads.filter((t) => !threadIsOffice(t, office));
     .filter-btn:hover { border-color: rgba(232, 196, 139, 0.6); }
     .filter-btn.on { background: rgba(232, 196, 139, 0.14); border-color: rgba(232, 196, 139, 0.6); }
     .filter-btn .funnel { font-size: 0.9em; }
-    .conv-count { font-family: var(--pm-mono); font-size: 0.68rem; color: rgba(232, 196, 139, 0.7); }
-    .conv-count b { color: var(--pm-gold-bright); }
 
     /* filter panel (folded-in explorer controls) */
     .filter-panel {
@@ -502,10 +477,8 @@ const townThreads = threads.filter((t) => !threadIsOffice(t, office));
     }
     .fp-field input:focus, .fp-field select:focus { outline: none; border-color: rgba(232, 196, 139, 0.6); }
 
-    .thread-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.7em; align-items: start; }
-    .thread-list.hide-office .pm-thread-card[data-office="true"] { display: none; }
-    .thread-list[hidden] { display: none; }
-    @media (max-width: 760px) { .thread-list { grid-template-columns: 1fr; } }
+    .office-link { font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.06em; color: var(--pm-gold); }
+    .fp-scope { margin: 0; color: #cdc2ab; font-size: 0.85rem; }
 
     /* filtered letter results — larger cards, salutation-skipped previews */
     .mail-status {

@@ -183,3 +183,55 @@ export function filterLetters(letters, state, { officeSet = new Set(), regionOf 
     return true;
   });
 }
+
+// ── the conversation list in parts (POS-254) ─────────────────────────────────
+// /mail/ is page 1; /mail/page/2/ onward are their own static pages, so every
+// page works without JavaScript. The list arrives newest-first (threads.json is
+// sorted by each conversation's newest letter); the pages keep that order.
+// MAIL_PAGE_SIZE, measured (2026-09-26, 1,626 conversations): a card is ~624
+// bytes, so 50 cards are ~31 KB, the same order as the ~43 KB of frame every
+// page carries; /mail/ went from 1,072,675 bytes to 78,981 (22 town pages).
+export const MAIL_PAGE_SIZE = 50;
+
+export function mailPageCount(total, size = MAIL_PAGE_SIZE) {
+  return Math.max(1, Math.ceil((total ?? 0) / size));
+}
+
+export function mailPageSlice(items, page, size = MAIL_PAGE_SIZE) {
+  const start = (page - 1) * size;
+  return (items ?? []).slice(start, start + size);
+}
+
+// `base` is the run's first page ("/mail/"); page N lives at <base>page/N/
+export function mailPageHref(page, base = "/mail/") {
+  return page <= 1 ? base : `${base}page/${page}/`;
+}
+
+// the numbered links a pager shows: the first and last page, the pages around
+// the current one, and a gap ("…") wherever pages are skipped
+export function mailPagerItems(current, total, { around = 2 } = {}) {
+  const keep = new Set([1, total]);
+  for (let p = current - around; p <= current + around; p++) if (p >= 1 && p <= total) keep.add(p);
+  const pages = [...keep].sort((a, b) => a - b);
+  const out = [];
+  for (let i = 0; i < pages.length; i++) {
+    if (i > 0 && pages[i] - pages[i - 1] > 1) out.push("gap");
+    out.push(pages[i]);
+  }
+  return out;
+}
+
+// the two runs The Mail pages through: the town's own conversations (the
+// default view) and the office's traffic, each keeping threads.json's order
+export function mailRuns(threads, officeSet) {
+  const town = [], office = [];
+  for (const t of threads ?? []) (threadIsOffice(t, officeSet) ? office : town).push(t);
+  return { town, office };
+}
+
+// the filtered letters, newest first on the town's clock (delivery date, else
+// the written date), so a capped result shows the newest mail, not the oldest
+export function newestLettersFirst(rows) {
+  const when = (l) => l.delivered ?? l.date ?? "";
+  return [...(rows ?? [])].sort((a, b) => when(b).localeCompare(when(a)));
+}
