@@ -30,6 +30,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
 
 import { RAIL, MOVED, allEntries, sectionOf, chipsFor, subChipsFor, rowFor, HARBOR, navFlags } from "../src/lib/nav.mjs";
 import { ICONS, GRID, iconSvg } from "../src/lib/pixel-icons.mjs";
@@ -115,7 +116,7 @@ test("each seat's row, in Keemin's words and order", () => {
   assert.deepEqual(row("town"), ["the bulletin", "the civic quarter", "the meeps"],
     "The Town = the Bulletin, the Civic Quarter, the Meeps, in that order");
   assert.deepEqual(row("world"), ["the living map", "conversations", "replay", "the atlas", "the harbor · beyond the water"]);
-  assert.deepEqual(row("docs"), ["the docs", "stamps", "the numbers", "the repos", "the projects"]);
+  assert.deepEqual(row("docs"), ["the docs", "stamps", "the numbers", "the repos"]);
   // a seat whose family is one read wears no row
   for (const k of ["postmark", "mail", "households", "join"]) assert.equal(chipsFor(k), null, `${k} grew a row`);
 });
@@ -273,7 +274,7 @@ test("a page anywhere in a family finds its section, so the seat lights up", () 
     world: "world", conversations: "world", replay: "world", atlas: "world", harbor: "world", birthday: "world",
     mail: "mail",
     households: "households", household: "households", residents: "households",
-    docs: "docs", stamps: "docs", numbers: "docs", repos: "docs", projects: "docs",
+    docs: "docs", stamps: "docs", numbers: "docs", repos: "docs", projects: "town",
     join: "join",
   };
   for (const [key, seat] of Object.entries(cases)) {
@@ -346,15 +347,27 @@ test("THE MAIL IS A SEAT AGAIN, and its rooms light it", () => {
   assert.equal(sectionOf("mail").key, "mail");
 });
 
-test("DOCS: the stamps, the numbers and the repos start it; the projects sit with them", () => {
+test("DOCS: the stamps, the numbers and the repos start it", () => {
   const docs = RAIL.find((s) => s.key === "docs");
   assert.deepEqual(docs.members.map((m) => [m.key, m.href]), [
-    ["docs", "/docs/"], ["stamps", "/docs/stamps/"], ["numbers", "/docs/numbers/"], ["repos", "/docs/repos/"], ["projects", "/projects/"],
+    ["docs", "/docs/"], ["stamps", "/docs/stamps/"], ["numbers", "/docs/numbers/"], ["repos", "/docs/repos/"],
   ]);
   assert.equal(docs.members.find((m) => m.key === "stamps").beta, true, "Stamps lost its beta mark");
   for (const [href, key] of docs.members.map((m) => [m.href, m.key])) {
     assert.equal(activeKeyOf(pageFileFor(href)), key, `${href} does not claim "${key}"`);
   }
+});
+
+test("THE PROJECTS LIGHT THE CIVIC QUARTER — no chip of their own, one line on the quarter's page", () => {
+  // Wright's ruling on POS-249 (2026-09-26): Keemin named the blurred boundary
+  // between the Works and the civic quarter; Docs are guides, not resident builds.
+  assert.equal(allEntries().some((e) => e.key === "projects" || e.href === "/projects/"), false, "The Projects grew a chip");
+  const quarter = RAIL.find((s) => s.key === "town").members.find((m) => m.href === "/town/");
+  assert.deepEqual(quarter.alsoKeys, ["projects"]);
+  assert.equal(activeKeyOf(pageFileFor("/projects/")), "projects");
+  assert.equal(rowFor("projects").of.key, "town");
+  const hub = readFileSync(join(PAGES, "town", "index.astro"), "utf8");
+  assert.ok(hub.includes('<a href="/projects/">the projects</a>'), "nothing on the quarter's page reaches The Projects");
 });
 
 test("A SEAT FOR A PAGE NOT BUILT YET STANDS ON AN HONEST PLACEHOLDER — /docs/ and /projects/ say what is coming", () => {
@@ -363,6 +376,11 @@ test("A SEAT FOR A PAGE NOT BUILT YET STANDS ON AN HONEST PLACEHOLDER — /docs/
     assert.match(src, /<p class="tag">coming together<\/p>/, `${href} does not say it is coming`);
     assert.match(src, /It is being built\./, `${href} does not say it is being built`);
   }
+  // THE FOUNDER'S LINE came with the repos and the numbers when The Record dissolved
+  const docs = readFileSync(pageFileFor("/docs/"), "utf8");
+  const line = docs.indexOf("We refuse to hide: the record is public.</p>");
+  assert.ok(line > 0, "the founder's line left the site with The Record");
+  assert.ok(line < docs.indexOf('<ul class="ph-list">'), "the founder's line does not open the Docs");
 });
 
 // ── THE ONE REDIRECT TABLE ───────────────────────────────────────────────────
@@ -484,6 +502,7 @@ test("the built chip rows wear their pixel icons, and the lit chip is the right 
   assert.deepEqual(lit("/calendar/"), ["the bulletin"], "the calendar does not light the Bulletin");
   assert.deepEqual(lit("/town/"), ["the civic quarter"]);
   assert.deepEqual(lit("/docs/stamps/"), ["stampsbeta"]);
+  assert.deepEqual(lit("/projects/"), ["the civic quarter"], "The Projects do not light the civic quarter");
   for (const href of ["/bulletin/", "/replay/", "/docs/"]) {
     const r = row(href);
     const chips = (r.match(/<a class="pm-chip/g) ?? []).length;
@@ -500,6 +519,24 @@ test("every moved path builds a forward, and every forward lands", { skip: !exis
     assert.ok(s.includes(`content="0;url=${to}"`), `${from} does not forward to ${to}`);
     assert.ok(existsSync(builtPage(to.split("#")[0])), `${from} forwards to ${to}, which did not build`);
   }
+});
+
+test("THE BUILT FORWARD LANDS WITH ITS FRAGMENT — /stamps/#board reaches /docs/stamps/#board", { skip: !existsSync(builtPage("/stamps/")) }, () => {
+  // Run the built page's own forwarding script against a location that
+  // arrived with a fragment, and read where it sends the reader.
+  const run = (from, hash) => {
+    const page = readFileSync(builtPage(from), "utf8");
+    const js = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((x) => x.includes("location.replace"));
+    assert.ok(js, `${from} carries no forwarding script`);
+    const went = [];
+    runInNewContext(js, { location: { hash, replace: (u) => went.push(u), assign: (u) => went.push("ASSIGN " + u) } });
+    return went;
+  };
+  assert.deepEqual(run("/stamps/", "#board"), ["/docs/stamps/#board"]);
+  assert.deepEqual(run("/stamps/", "#earning"), ["/docs/stamps/#earning"]);
+  assert.deepEqual(run("/stamps/", ""), ["/docs/stamps/"]);
+  // a target with its own fragment keeps its own
+  assert.deepEqual(run("/board/", "#elsewhere"), ["/town/#board"]);
 });
 
 test("the routes that came back from a fold are real pages, not stubs", () => {

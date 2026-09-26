@@ -186,8 +186,9 @@ export const RAIL = [
   // "Fewer rails." What moved, and where every old URL now lands (MOVED, below):
   //
   //   The Record     dissolves: the settlements go into the replay (POS-255),
-  //                  the Works becomes The Projects, stamps, the numbers and
-  //                  the repos start the Docs, and the Mail is a seat again
+  //                  the Works becomes The Projects (reached from the civic
+  //                  quarter, and lighting it), stamps, the numbers and the
+  //                  repos start the Docs, and the Mail is a seat again
   //   Residents      gives its page to The Households (/residents/ forwards)
   //   Ferry's Daily  and the calendar leave the chips; they live on the
   //                  Bulletin's board, so their pages light the Bulletin
@@ -202,8 +203,12 @@ export const RAIL = [
   // (Keemin, 2026-09-26: the bulletin first, "the most important"). The first
   // chip is the aggregate, so the seat opens the Bulletin. Its board carries
   // the calendar and Ferry's Daily, so those pages light the Bulletin chip
-  // (`alsoKeys`). `votes` answers here because the Ballot House is a building
-  // of the quarter.
+  // (`alsoKeys`). THE PROJECTS light the civic quarter's chip and have none of
+  // their own (Wright's ruling on POS-249, 2026-09-26): Keemin named the blurred
+  // boundary between the Works and the quarter, a project is where a drawn idea
+  // or an answered bounty gets built, and the quarter's page links it beside
+  // them. `votes` answers here because the Ballot House is a building of the
+  // quarter.
   {
     key: "town",
     label: "The Town",
@@ -212,7 +217,8 @@ export const RAIL = [
     members: [
       { key: "bulletin", label: "the bulletin", href: "/bulletin/", icon: "bulletin",
         alsoKeys: ["calendar", "daily"] },
-      { key: "town", label: "the civic quarter", href: "/town/", icon: "quarter" },
+      { key: "town", label: "the civic quarter", href: "/town/", icon: "quarter",
+        alsoKeys: ["projects"] },
       { key: "meeps", label: "the meeps", href: "/meeps/", icon: "meeps" },
     ],
   },
@@ -255,10 +261,8 @@ export const RAIL = [
 
   // DOCS — what explains the town ("Docs" is the working name until Keemin
   // names it). The stamps, the numbers and the repos start it (Keemin: "the
-  // start of the Docs or Guides"). THE PROJECTS SIT HERE, not under The Town:
-  // the Town is ruled at three rooms, and a register of the town's works reads
-  // with the numbers and the repos, as a thing you look up. It keeps its own
-  // URL, /projects/, so the page can move seats without moving address.
+  // start of the Docs or Guides"). Docs are guides; what residents build is
+  // The Projects, which lives with the civic quarter (above).
   {
     key: "docs",
     label: "Docs",
@@ -270,7 +274,6 @@ export const RAIL = [
       { key: "stamps", label: "stamps", href: "/docs/stamps/", icon: "stamp", beta: true },
       { key: "numbers", label: "the numbers", href: "/docs/numbers/", icon: "numbers" },
       { key: "repos", label: "the repos", href: "/docs/repos/", icon: "repos" },
-      { key: "projects", label: "the projects", href: "/projects/", icon: "projects" },
     ],
   },
 
