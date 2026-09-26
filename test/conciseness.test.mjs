@@ -20,7 +20,6 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { MEEPS } from "../src/lib/meeps-quarter.mjs";
-import { REPOS } from "../src/lib/record.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = (f) => JSON.parse(readFileSync(join(ROOT, "src", "data", "postmark", f), "utf8"));
@@ -82,18 +81,9 @@ test("the Households: the intro is visible, nothing tucked", { skip: !built("hou
 // THE RECORD'S LANDING AND ITS CROSSINGS PAGE RETIRED with the Record (the Site
 // Lift, POS-249, 2026-09-26): /records/ and /records/crossings/ forward to the
 // replay, which carries the settlements (POS-255). Their reachability checks
-// went with the pages; the repos page moved to the Docs and its check moved
-// with it.
-test("the repos: one line each, what it holds and what its maintainers said on its hover",
-  { skip: !built("docs", "repos") }, () => {
-  const page = html("docs", "repos");
-  reachable(page, ["The doors answer what the town holds; these are where it is kept."]);
-  for (const r of REPOS) {
-    const start = page.indexOf(`data-repo="${r.key}"`);
-    const card = page.slice(page.lastIndexOf("<a", start), page.indexOf("</a>", start));
-    reachable(card, [r.holds, ...(r.said ? [r.said] : [])]);
-  }
-});
+// went with the pages. The repos page moved to the Docs, and under POS-250's
+// rule its cards carry what each repo holds in view, not on a hover (POS-257):
+// its check became a visibility check in docs.test.mjs.
 
 // The bulletin's "more" came out with the board (POS-251, under POS-250's
 // rule: no "more" buttons). Its two sentences are in view now, in the colophon.
