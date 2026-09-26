@@ -987,8 +987,28 @@ export async function fetchRollcall({ fetchImpl = fetch, apiBase = "https://post
 // same sha, so a build reads one or two files, not eighty. A tag whose file is
 // absent (the earliest settlements predate it) carries null, never a guess.
 //
+// WHAT EACH SETTLEMENT CHANGED (the Site Lift, POS-255: the replay marks every
+// settlement and shows "what it changed in the world"). The same file, read at
+// this tag and at the one before, answers it exactly: a mark in this tag's
+// `published` and not the previous one's was LOCKED here, and one in the
+// previous tag's and not this one's was RETIRED here. `locked` and `retired`
+// are those lists, each entry the mark's id and the household the file names.
+// A new tag costs its own file and its predecessor's; a tag either file is
+// missing for carries null for both, and the page says "not recorded".
+// Refusals are not in the file: the Worldkeeper states them in the receipt.
+//
 // Any failure throws, and the caller keeps the committed snapshot.
 export const WORLD_REPO_SLUG = "postmark-town/postmark-world";
+
+/** Two tags' `published` maps → the marks locked and retired between them, by id. */
+export function publicationChanges(before, now) {
+  const entry = (map) => (id) => ({ id, household: map[id]?.household ?? null });
+  const byId = (a, b) => a.id.localeCompare(b.id);
+  return {
+    locked: Object.keys(now).filter((id) => !(id in before)).map(entry(now)).sort(byId),
+    retired: Object.keys(before).filter((id) => !(id in now)).map(entry(before)).sort(byId),
+  };
+}
 export async function fetchCrossings({ fetchImpl = fetch, repo = WORLD_REPO_SLUG, previous = null, timeoutMs = 15000, git = null } = {}) {
   const { execFileSync } = await import("node:child_process");
   const { mkdtempSync, rmSync } = await import("node:fs");
@@ -1012,23 +1032,38 @@ export async function fetchCrossings({ fetchImpl = fetch, repo = WORLD_REPO_SLUG
   }
 
   const prev = new Map((previous?.crossings ?? []).map((c) => [c.n, c]));
+  // One read per tag per build, shared by the tag itself and its successor.
+  const files = new Map();
+  const publications = (tag) => {
+    if (!files.has(tag)) files.set(tag, (async () => {
+      try {
+        const res = await fetchImpl(`https://raw.githubusercontent.com/${repo}/${tag}/WORLD/settlement-publications.json`, { signal: AbortSignal.timeout(timeoutMs) });
+        if (!res.ok) return null;
+        const body = await res.json();
+        return body && typeof body.published === "object" && body.published ? body.published : null;
+      } catch { return null; /* the count stays null; the receipt still stands */ }
+    })());
+    return files.get(tag);
+  };
+  const tags = rows
+    .map((row) => ({ row, m: /^settlement\/S(\d+)$/.exec(row.tag ?? "") }))
+    .filter(({ m }) => m)
+    .map(({ row, m }) => ({ row, n: Number(m[1]) }))
+    .sort((a, b) => a.n - b.n);
   const crossings = [];
-  for (const row of rows) {
-    const m = /^settlement\/S(\d+)$/.exec(row.tag ?? "");
-    if (!m) continue;
-    const n = Number(m[1]);
+  for (const [i, { row, n }] of tags.entries()) {
     const sha = row.sha || null;
     const kept = prev.get(n);
-    let published = kept && kept.sha === sha && "published_total" in kept ? kept.published_total : undefined;
-    if (published === undefined) {
-      published = null;
-      try {
-        const res = await fetchImpl(`https://raw.githubusercontent.com/${repo}/${row.tag}/WORLD/settlement-publications.json`, { signal: AbortSignal.timeout(timeoutMs) });
-        if (res.ok) {
-          const body = await res.json();
-          if (body && typeof body.published === "object" && body.published) published = Object.keys(body.published).length;
-        }
-      } catch { /* the count stays null; the receipt still stands */ }
+    const same = kept && kept.sha === sha;
+    let published = same && "published_total" in kept ? kept.published_total : undefined;
+    let changes = same && "locked" in kept && "retired" in kept ? { locked: kept.locked, retired: kept.retired } : undefined;
+    if (published === undefined || changes === undefined) {
+      const now = await publications(row.tag);
+      if (published === undefined) published = now ? Object.keys(now).length : null;
+      if (changes === undefined) {
+        const before = i > 0 ? await publications(tags[i - 1].row.tag) : null;
+        changes = now && before ? publicationChanges(before, now) : { locked: null, retired: null };
+      }
     }
     crossings.push({
       n,
@@ -1038,6 +1073,8 @@ export async function fetchCrossings({ fetchImpl = fetch, repo = WORLD_REPO_SLUG
       tagged_at: row.tagged || null,
       receipt: String(row.message ?? "").trim(),
       published_total: published,
+      locked: changes.locked,
+      retired: changes.retired,
     });
   }
   crossings.sort((a, b) => b.n - a.n);

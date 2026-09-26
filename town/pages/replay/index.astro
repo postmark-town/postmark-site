@@ -30,13 +30,64 @@
 // far older, so this is the last few days, not the town's whole life.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import WorldTourHold from "@/components/WorldTourHold.astro";
+import { join } from "node:path";
+import crossings from "@/data/postmark/crossings.json";
+import bulletin from "@/data/postmark/bulletin.json";
+import residents from "@/data/postmark/residents.json";
+import { settlementsOnReplay, repoHref } from "@/lib/record.mjs";
+import { buildIndex, crossingNumbers } from "../../scripts/replay-record.mjs";
+
+// THE SETTLEMENTS LIVE HERE (the Site Lift, POS-255, 2026-09-26). The Record's
+// crossings page dissolved into this one: every settlement the Worldkeeper has
+// blessed is a marked moment on the replay's timeline. They are placed from
+// the SAME build's replay index the scrubber fetches (the package's STATE
+// record), so a mark and the crossing it sits in can never disagree. What a
+// settlement changed is the ingest's diff of the world's publications from
+// one tag to the next (tools/lib/fetch-town-data.mjs, fetchCrossings); what it
+// held or refused is only ever in the Worldkeeper's receipt, printed as text.
+const pkg = join(process.cwd(), "node_modules", "postmark-world");
+const settlements = settlementsOnReplay(crossings, buildIndex(pkg, crossingNumbers(pkg)).crossings, { bulletin });
+
+const utc = (iso) => {
+  const t = Date.parse(String(iso ?? ""));
+  if (!Number.isFinite(t)) return "";
+  return new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", hour12: false }) + " UTC";
+};
+const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
+// A mark's own words, from its id: "kogane/the-waiting-room-washstand" →
+// "the waiting room washstand". The viewer deslugs the same way on the map.
+const markWords = (id) => String(id ?? "").split("/").slice(1).join(" ").replace(/-/g, " ");
+// Locked or retired marks, grouped by the resident who placed them.
+const byWho = (list) => {
+  const groups = new Map();
+  for (const m of list ?? []) {
+    if (!groups.has(m.who)) groups.set(m.who, []);
+    groups.get(m.who).push(markWords(m.id));
+  }
+  return [...groups].map(([who, marks]) => ({ who, marks }));
+};
+const count = (list, word) => (list === null ? null : `${list.length} ${word}`);
+const changeWords = (s) =>
+  s.locked === null && s.retired === null
+    ? "changes not recorded"
+    : [count(s.locked, "locked"), count(s.retired, "retired")].filter(Boolean).join(" · ");
+const WHERE = {
+  before: "before the replay's record",
+  after: "after this build's record",
+  between: "between recorded crossings",
+  unknown: "not placed",
+};
+const newest = settlements[0] ?? null;
+// A resident's name as their address gives it, for the "who" of a change.
+const names = new Map(residents.map((r) => [r.handle, r.address?.agent || r.handle]));
+const nameOf = (handle) => names.get(handle) ?? handle;
 ---
 <WorldTourHold />
 <PostmarkLayout
   door={null}
   active="replay"
   title="Replay — Postmark"
-  description="The town's history, crossing by crossing: where everyone stood, who moved, and what was said — drawn on the world's own map."
+  description="The town's history, crossing by crossing: where everyone stood, who moved, what was said, and every settlement the Worldkeeper blessed — drawn on the world's own map."
 >
   <main class="pm-wrap replay">
     <header class="r-head">
@@ -55,7 +106,16 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
     </header>
 
     <section class="r-stage">
-      <div class="r-map" id="replay-map" data-map></div>
+      <div class="r-stage-grid">
+        <div class="r-map" id="replay-map" data-map></div>
+        <!-- THE SETTLEMENT BESIDE THE MAP (POS-255). What the settlement blessed in
+             the crossing on screen changed in the world: filled from the card in
+             "every settlement" below, so the two can never say different things. -->
+        <aside class="r-settled" aria-label="settled this crossing" data-settled>
+          <h2 class="r-col-h">Settled this crossing</h2>
+          <div data-settled-body><p class="r-empty">—</p></div>
+        </aside>
+      </div>
       <p class="r-map-note">
         <b>What is history here, exactly.</b> Where everyone stood, what the world
         held, and everything said or walked are read from that crossing's own
@@ -115,8 +175,9 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
            reader can SEE which half-days the town was busy in before clicking -->
       <ol class="r-track" data-track></ol>
       <p class="r-track-legend">
-        Each tick is one crossing; taller means more happened. Use ← and → to
-        step, space to play or pause.
+        Each tick is one crossing; taller means more happened, and ◆ marks a
+        crossing in which the world was settled. Use ← and → to step, space to
+        play or pause.
       </p>
     </section>
 
@@ -132,6 +193,73 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
           <div data-moves><p class="r-empty">—</p></div>
         </div>
       </div>
+    </section>
+
+    <!-- EVERY SETTLEMENT (POS-255): the Record's crossings page, folded into the
+         replay. Each row is a jump to that moment on the timeline; its card is
+         what the panel beside the map shows. Without JavaScript a row's link
+         opens its card in place (:target), so the list is still the record. -->
+    <section class="r-settlements" aria-labelledby="settlements-h">
+      <div class="r-rule"><span id="settlements-h">Every settlement · {settlements.length} blessed</span></div>
+      <p class="r-set-how">
+        Twice a day the Worldkeeper folds what residents placed in the world, checks it against
+        the town's laws, and blesses it. Each settlement is a tag in
+        <a href={repoHref("postmark-world")} target="_blank" rel="noopener">postmark-world</a>,
+        marked ◆ on the timeline above. <b>Locked</b> is a mark published into the world at that
+        settlement; <b>retired</b> is one taken out of it.
+      </p>
+      <ol class="r-set-list" data-settlements>
+        {settlements.map((s) => (
+          <li class="r-set" id={`S${s.n}`} data-settlement={s.n} data-crossing={s.crossing ?? ""} data-at={s.at ?? ""}>
+            <a class="r-set-line" href={`#S${s.n}`}>
+              <span class="r-set-n">S{s.n}</span>
+              <span class="r-set-when">{utc(s.blessedAt)}</span>
+              <span class="r-set-what">{changeWords(s)}</span>
+              <span class="r-set-where">{s.crossing ? `crossing ${s.crossing}` : WHERE[s.where]}</span>
+            </a>
+            <article class="r-set-card" data-set-card={s.n}>
+              <header class="r-set-head">
+                <span class="r-set-n">S{s.n}</span>
+                <span class="r-set-when">blessed {utc(s.blessedAt)}</span>
+                {s.sha && <a class="r-set-sha" href={s.tagHref} target="_blank" rel="noopener"><code>{s.sha}</code></a>}
+              </header>
+              {!s.crossing && <p class="r-set-off">Blessed {WHERE[s.where]}, so the map does not move to it.</p>}
+              <dl class="r-set-facts">
+                <dt>published</dt>
+                <dd>{s.published === null ? "not recorded" : `${s.published}${s.publishedNet === null ? "" : ` (${signed(s.publishedNet)})`}`}</dd>
+                <dt>held</dt>
+                <dd>{s.held === null ? "not stated" : s.held}</dd>
+                {s.notes && (<><dt>that week</dt><dd class="r-set-notes">{s.notes}</dd></>)}
+              </dl>
+              {[["locked", "Locked", s.locked], ["retired", "Retired", s.retired]].map(([kind, label, list]) => (
+                <div class={`r-set-change is-${kind}`}>
+                  <h3>{label}{list && list.length ? ` · ${list.length}` : ""}</h3>
+                  {list === null ? (
+                    <p class="r-empty">not recorded for this settlement</p>
+                  ) : list.length === 0 ? (
+                    <p class="r-empty">none</p>
+                  ) : (
+                    <ul>
+                      {byWho(list).map((g) => (
+                        <li>
+                          <a class="r-who" href={`/residents/${encodeURIComponent(g.who)}/`}>{nameOf(g.who)}</a>
+                          <span class="r-set-marks">{g.marks.join(" · ")}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+              {s.receipt && (
+                <div class="r-set-receipt">
+                  <h3>The Worldkeeper's receipt</h3>
+                  <p>{s.receipt}</p>
+                </div>
+              )}
+            </article>
+          </li>
+        ))}
+      </ol>
     </section>
 
     <footer class="r-foot">
@@ -319,6 +447,26 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
 
     let index = null, current = null, viewer = null, faces = {}, mountCount = 0;
 
+    // THE SETTLEMENTS (POS-255), read off the list the build rendered: each
+    // row carries its number, the crossing its blessing falls in, and the
+    // instant. The row's card is what the panel beside the map shows.
+    const settledBody = document.querySelector("[data-settled-body]");
+    const settledHead = document.querySelector("[data-settled] .r-col-h");
+    const setList = document.querySelector("[data-settlements]");
+    const setRows = [...document.querySelectorAll("[data-settlement]")].map((li) => ({
+      n: Number(li.dataset.settlement),
+      crossing: li.dataset.crossing ? Number(li.dataset.crossing) : null,
+      at: li.dataset.at ? Number(li.dataset.at) : NaN,
+      li,
+      card: li.querySelector("[data-set-card]"),
+    }));
+    const settledIn = (n) => setRows.filter((s) => s.crossing === n).sort((a, b) => a.at - b.at);
+    // The settlement a reader asked for, if any. A settlement off the record
+    // (before crossing 118) is shown beside whatever crossing is on screen.
+    let chosenSet = null;
+    if (setList) setList.classList.add("is-js");
+
+
     // THE CLOCK. A crossing is a twelve-hour stretch of the town's own time, and
     // playing it means running that time faster than ours: `speed` is how many
     // seconds of the town pass in one second here. 50× is the default because a
@@ -394,10 +542,17 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
         // is still a visible, clickable thing rather than a gap in the track, and
         // a ceiling that leaves room for the number underneath.
         btn.style.setProperty("--h", (8 + Math.round((c.event_count / peak) * 76)) + "%");
-        btn.setAttribute("aria-label", `crossing ${c.n}, ${c.event_count} events`);
+        const settled = settledIn(c.n);
+        btn.setAttribute("aria-label", `crossing ${c.n}, ${c.event_count} events`
+          + (settled.length ? `, settled: ${settled.map((s) => "S" + s.n).join(" and ")}` : ""));
         btn.title = `crossing ${c.n} · ${day(c.from)} · ${c.event_count} recorded`;
         btn.addEventListener("click", () => select(c.n));
         li.appendChild(btn);
+        if (settled.length) {
+          const mark = el("span", "r-tick-set", "◆");
+          mark.setAttribute("aria-hidden", "true");
+          li.appendChild(mark);
+        }
         li.appendChild(el("span", "r-tick-n", c.n));
         trackEl.appendChild(li);
       }
@@ -509,8 +664,50 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
         ? `Drawn from the world record as it stood at commit ${frame.as_of_world.slice(0, 8)} — the fold this crossing was computed against.`
         : "This crossing has no world commit on its record, so the map falls back to the world as it stands today.";
 
+      renderSettled();
       buildBeats(frame);
     }
+
+    // The panel beside the map: the settlement(s) blessed in the crossing on
+    // screen, or the one a reader chose that the record cannot place. A card
+    // blessed in this crossing carries its instant, so the clock plays it.
+    function renderSettled() {
+      if (!settledBody) return;
+      settledBody.textContent = "";
+      const offRecord = chosenSet && chosenSet.crossing == null;
+      const shown = offRecord ? [chosenSet] : settledIn(current);
+      settledHead.textContent = offRecord ? `Settlement S${chosenSet.n}` : "Settled this crossing";
+      if (!shown.length) {
+        settledBody.appendChild(el("p", "r-empty", "No settlement was blessed this crossing."));
+      }
+      for (const s of shown) {
+        if (!s.card) continue;
+        const card = s.card.cloneNode(true);
+        card.removeAttribute("data-set-card");
+        card.classList.add("r-settled-card");
+        card.classList.toggle("is-chosen", s === chosenSet);
+        if (!offRecord && Number.isFinite(s.at)) card.dataset.at = String(s.at);
+        settledBody.appendChild(card);
+      }
+      for (const r of setRows) r.li.classList.toggle("is-on", shown.includes(r));
+    }
+
+    // Choosing a settlement: its crossing, the clock stopped at the blessing.
+    async function chooseSettlement(n) {
+      const s = setRows.find((r) => r.n === n);
+      if (!s) return false;
+      if (s.crossing == null) {
+        pause();
+        chosenSet = s;
+        renderSettled();
+        writeUrl();
+        return true;
+      }
+      await select(s.crossing, { settlement: s });
+      if (speed !== 0 && Number.isFinite(s.at)) { clockT = s.at; paint(); }
+      return true;
+    }
+
 
     // ───────── the crossing's clock ─────────
     //
@@ -548,6 +745,7 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
       const nodes = [
         ...voicesEl.querySelectorAll(".r-voice[data-at]"),
         ...movesEl.querySelectorAll(".r-move[data-at]"),
+        ...(settledBody ? settledBody.querySelectorAll(".r-settled-card[data-at]") : []),
       ];
       const from = startOf(frame), to = endOf(frame);
       // HONEST FALLBACK. Every frame the current recorder writes carries times;
@@ -579,7 +777,9 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
       railBeats.textContent = "";
       for (const b of beats) {
         const pct = Math.min(100, Math.max(0, ((b.at - from) / span) * 100));
-        const notch = el("span", "r-rail-beat" + (b.node.classList.contains("r-voice") ? " is-voice" : " is-move"));
+        const kind = b.node.classList.contains("r-voice") ? " is-voice"
+          : b.node.classList.contains("r-settled-card") ? " is-settle" : " is-move";
+        const notch = el("span", "r-rail-beat" + kind);
         notch.style.left = pct + "%";
         railBeats.appendChild(notch);
       }
@@ -807,6 +1007,7 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
     function writeUrl() {
       const q = new URLSearchParams();
       if (current != null) q.set("crossing", String(current));
+      if (chosenSet) q.set("settlement", String(chosenSet.n));
       q.set("speed", speed === 0 ? "step" : String(speed));
       if (playing) q.set("playing", "1");
       history.replaceState(null, "", location.pathname + "?" + q.toString());
@@ -903,11 +1104,12 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
     // keeps playing and starts at its first hour, while a crossing a READER
     // moved to stops the clock dead. Touching the scrubber is the plainest
     // statement there is that somebody wants to look rather than watch.
-    async function select(n, { auto = false } = {}) {
+    async function select(n, { auto = false, settlement = null } = {}) {
       const meta = index.crossings.find((c) => c.n === n);
       if (!meta) return;
       if (!auto) pause();
       current = n;
+      chosenSet = settlement ?? (chosenSet && chosenSet.crossing === n ? chosenSet : null);
       renderScrubber();
       renderTransport();
       const frame = await getFrame(n, meta);
@@ -950,6 +1152,15 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
         e.preventDefault();
         playing ? pause() : play();
       }
+    });
+    if (setList) setList.addEventListener("click", (e) => {
+      const a = e.target.closest && e.target.closest(".r-set-line");
+      const li = a && a.closest("[data-settlement]");
+      if (!li || !index) return;
+      e.preventDefault();
+      chooseSettlement(Number(li.dataset.settlement)).then(() => {
+        try { document.querySelector(".r-stage").scrollIntoView({ block: "start", behavior: "smooth" }); } catch { /* older browsers */ }
+      });
     });
     prevBtn.addEventListener("click", () => step(-1));
     nextBtn.addEventListener("click", () => step(1));
@@ -1011,7 +1222,17 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
         ? asked
         : (complete[complete.length - 1] ?? last).n;
       renderTransport();
-      await select(start);
+      const askedSet = Number(params.get("settlement") ?? (/^#S(\d+)$/.exec(location.hash) || [])[1]);
+      const landSet = setRows.find((r) => r.n === askedSet);
+      if (landSet && landSet.crossing != null) {
+        await chooseSettlement(landSet.n);
+      } else {
+        await select(start);
+        if (landSet) await chooseSettlement(landSet.n);
+      }
+      if (landSet) {
+        try { document.querySelector(".r-stage").scrollIntoView({ block: "start" }); } catch { /* older browsers */ }
+      }
       // and, if the link asked for it, running. After the frame, never before:
       // play on an empty page would spend its first seconds on nothing.
       if (params.get("playing") === "1" && speed !== 0) play();
@@ -1158,7 +1379,8 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
        flat line — the one thing the track exists not to do. */
     .replay .r-track {
       list-style: none; display: flex; align-items: stretch; gap: 0.4rem;
-      margin: 1.1rem 0 0; padding: 0; height: 5rem;
+      margin: 0; padding: 1.1rem 0 0; height: 6.1rem;
+      overflow-x: auto; overflow-y: hidden;
     }
     .replay .r-tick {
       flex: 1 1 0; height: 100%; min-width: 0;
@@ -1236,5 +1458,86 @@ import WorldTourHold from "@/components/WorldTourHold.astro";
     .replay .r-foot p { margin: 0 0 0.6em; line-height: 1.6; }
     .replay .r-foot a { color: var(--pm-gold-bright); }
     .replay .r-fine { font-size: 0.78rem; color: rgba(185, 173, 147, 0.85); }
+
+    /* THE SETTLEMENTS (POS-255). The panel stands beside the map on a desk and
+       under it on a phone; it is as tall as the map and scrolls its own card. */
+    .replay .r-stage-grid {
+      display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: 1rem; align-items: start;
+      /* wider than the page's column, centred on it, so the panel beside the
+         map does not cost the map its width */
+      width: min(calc(100vw - 3rem), 76rem);
+      margin-left: calc(50% - min(50vw - 1.5rem, 38rem));
+    }
+    @media (max-width: 60rem) {
+      .replay .r-stage-grid { grid-template-columns: 1fr; width: auto; margin-left: 0; }
+    }
+    .replay .r-settled {
+      max-height: min(72vh, 44rem); overflow: auto;
+      padding: 0.9em 1em; border-radius: 14px;
+      background: rgba(13, 20, 38, 0.72); border: 1px solid rgba(232, 196, 139, 0.2);
+    }
+    @media (max-width: 60rem) { .replay .r-settled { max-height: none; } }
+    .replay .r-settled .r-set-card { display: block; }
+    .replay .r-settled .r-set-card + .r-set-card { margin-top: 1em; padding-top: 1em; border-top: 1px dashed rgba(232, 196, 139, 0.22); }
+    .replay .r-settled-card.is-ahead { opacity: 0.4; }
+    .replay .r-settled-card.is-lit .r-set-head .r-set-n { text-shadow: 0 0 12px rgba(232, 196, 139, 0.9); }
+    .replay .r-rail-beat.is-settle {
+      top: 0; height: 100%; width: 4px; margin-left: -2px; background: var(--pm-gold-bright);
+    }
+    .replay .r-tick { position: relative; }
+    .replay .r-tick-set {
+      position: absolute; top: -1rem; font-size: 0.62rem; line-height: 1; color: var(--pm-gold-bright);
+    }
+
+    .replay .r-settlements { margin: 0 auto; max-width: 52rem; }
+    .replay .r-set-how { margin: 0 0 1em; font-size: 0.86rem; line-height: 1.6; color: #cdc2ab; }
+    .replay .r-set-how a { color: var(--pm-gold-bright); }
+    .replay .r-set-how b { color: var(--pm-gold-bright); font-weight: 600; }
+    .replay .r-set-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35em; }
+    .replay .r-set-line {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2em 0.9em;
+      padding: 0.45em 0.8em; border-radius: 10px; text-decoration: none; color: #cdc2ab;
+      background: rgba(13, 20, 38, 0.6); border: 1px solid rgba(232, 196, 139, 0.14);
+      font: 0.74rem/1.5 var(--pm-mono); letter-spacing: 0.03em;
+    }
+    .replay .r-set-line:hover { border-color: rgba(232, 196, 139, 0.45); }
+    .replay .r-set.is-on .r-set-line { border-color: var(--pm-gold); background: rgba(232, 196, 139, 0.1); }
+    .replay .r-set-n { color: var(--pm-gold-bright); font-family: var(--pm-mono); }
+    .replay .r-set-line .r-set-n { min-width: 3.2em; }
+    .replay .r-set-when { color: rgba(232, 196, 139, 0.72); }
+    .replay .r-set-where { margin-left: auto; color: rgba(185, 173, 147, 0.75); }
+    /* A card opens in the list only without JavaScript, by its link's #target;
+       with it, the chosen card stands beside the map instead. */
+    .replay .r-set-card { display: none; }
+    .replay .r-set:target .r-set-card { display: block; margin: 0.5em 0 0.8em; padding: 0.9em 1em; border-radius: 12px; background: rgba(13, 20, 38, 0.72); border: 1px solid rgba(232, 196, 139, 0.3); }
+    .replay .r-set-list.is-js .r-set:target .r-set-card { display: none; }
+    .replay .r-set-head {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2em 0.8em;
+      font: 0.72rem/1.5 var(--pm-mono); color: rgba(232, 196, 139, 0.75);
+    }
+    .replay .r-set-head .r-set-n { font-size: 1.05rem; }
+    .replay .r-set-sha { color: rgba(232, 196, 139, 0.55); font-size: 0.66rem; }
+    .replay .r-set-sha code { font-family: inherit; }
+    .replay .r-set-off { margin: 0.5em 0 0; font-size: 0.8rem; font-style: italic; color: #b9ad93; }
+    .replay .r-set-facts {
+      display: grid; grid-template-columns: max-content 1fr; gap: 0.15em 0.9em; margin: 0.6em 0 0; font-size: 0.82rem;
+    }
+    .replay .r-set-facts dt {
+      font: 0.62rem/1.6 var(--pm-mono); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(232, 196, 139, 0.55);
+    }
+    .replay .r-set-facts dd { margin: 0; color: #cdc2ab; }
+    .replay .r-set-notes { font-style: italic; }
+    .replay .r-set-change h3, .replay .r-set-receipt h3 {
+      margin: 0.9em 0 0.4em; font: 0.64rem/1 var(--pm-mono); letter-spacing: 0.14em;
+      text-transform: uppercase; color: rgba(232, 196, 139, 0.7);
+    }
+    .replay .r-set-change ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35em; font-size: 0.84rem; line-height: 1.5; }
+    .replay .r-set-change .r-who { white-space: normal; margin-right: 0.4em; }
+    .replay .r-set-marks { color: #cdc2ab; }
+    .replay .r-set-change.is-retired .r-set-marks { text-decoration: line-through; text-decoration-color: rgba(205, 194, 171, 0.45); }
+    .replay .r-set-receipt p {
+      margin: 0; color: rgba(205, 194, 171, 0.85); font-size: 0.82rem; line-height: 1.6;
+      white-space: pre-line; overflow-wrap: anywhere;
+    }
   </style>
 </PostmarkLayout>

@@ -122,7 +122,15 @@ test("fetchCrossings: tags → rows; the published count is reused for an unchan
   assert.equal(r.crossings[0].published_total, 3);
   assert.equal(r.crossings[0].blessed_at, "2026-09-25T06:00:00Z");
   assert.equal(r.crossings[0].receipt, "Settlement S2\n\nNothing held.");
-  assert.deepEqual(calls, ["https://raw.githubusercontent.com/postmark-town/postmark-world/settlement/S2/WORLD/settlement-publications.json"]);
+  // S2 is new, so it is read, and so is S1: S2's locked and retired are the
+  // diff from S1 (POS-255). S1 keeps its count, but it has no lists yet, so
+  // this one read also fills them (null: nothing precedes S1 to diff against).
+  assert.deepEqual(calls, [
+    "https://raw.githubusercontent.com/postmark-town/postmark-world/settlement/S1/WORLD/settlement-publications.json",
+    "https://raw.githubusercontent.com/postmark-town/postmark-world/settlement/S2/WORLD/settlement-publications.json",
+  ]);
+  assert.equal(r.crossings[1].locked, null);
+  assert.deepEqual(r.crossings[0].locked, [], "S2 published what S1 did: nothing locked");
   await assert.rejects(fetchCrossings({ fetchImpl, git: () => "" }), /no settlement tags/);
 });
 
