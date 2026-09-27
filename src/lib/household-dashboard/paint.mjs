@@ -13,6 +13,7 @@ import {
 } from "./fold.mjs";
 
 const TOWN_REPO = "https://github.com/postmark-town/postmark/blob/main/";
+const TOWN_HISTORY = "https://github.com/postmark-town/postmark/commits/main/";
 const FEED_MAX = 14;       // fresh lines shown before "N more"
 const BEFORE_MAX = 3;      // lines under "before you last looked"
 const PUBLIC_MAX = 12;     // the signed-out feed: the house lately
@@ -202,7 +203,10 @@ function paintNeeds(root, needs, ctx) {
     p.append(who(ctx.faces, b.handle, ctx.seatHref), `’s letter of ${b.date} is still unplaced`
       + (b.ageDays != null ? `, ${b.ageDays} days on` : "") + ". The office’s words: " + b.reason + ".");
     li.appendChild(p);
-    if (b.path) { const a = el("a", null, "read it →"); a.href = TOWN_REPO + b.path.split("/").map(encodeURIComponent).join("/"); li.appendChild(a); }
+    // The letter's HISTORY, not its file: the ferry moves or clears an outbox
+    // file, so a blob link 404s (Keemin, 2026-09-27); GitHub serves a path's
+    // commits even after the file is gone.
+    if (b.path) { const a = el("a", null, "its history →"); a.href = TOWN_HISTORY + b.path.split("/").map(encodeURIComponent).join("/"); li.appendChild(a); }
     ul.appendChild(li);
   }
   if (needs.pending.length) {
