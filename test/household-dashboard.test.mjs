@@ -18,9 +18,10 @@ import { readFileSync, readdirSync } from "node:fs";
 
 import { residentFace, accentOf, bioLineOf, spriteOf } from "../src/lib/household-dashboard/faces.mjs";
 import {
-  feedOf, splitAtLook, lastActOf, standsAtOf, hungOf, clocksOf, needsOf, comingUpOf,
+  feedOf, splitAtLook, lastActOf, standsAtOf, hungOf, clocksOf, needsOf, postsOf, marksOf, mailOf,
   questsOf, numbersOf, readLook, writeLook, parseAt,
 } from "../src/lib/household-dashboard/fold.mjs";
+import { TOUR_KEY, tourSeen, markTourSeen, tourOpensItself, stepAfterKey } from "../src/lib/household-dashboard/tour.mjs";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
@@ -221,21 +222,153 @@ test("the clocks, Needs you, and the numbers", () => {
   assert.equal(numbersOf(HOUSE, { wright: reads.doorsteps.wright }), null, "a half-counted house has no total");
 });
 
-test("coming up is absent when the calendar does not answer, and the house's own events otherwise", () => {
-  assert.equal(comingUpOf(null, HOUSE), null);
-  const cal = { now: [], coming: [
-    { id: "x/opening", title: "Opening", host: "x", phase: "announced", starts: "2026-09-27T21:30:00Z", rsvps: { residents: ["mari", "zed"] } },
-    { id: "y/other", title: "Other", host: "y", phase: "announced", starts: "2026-09-27T21:30:00Z", rsvps: { residents: ["zed"] } },
-    { id: "wright/gone", title: "Gone", host: "wright", phase: "announced", cancelled: true, starts: "2026-09-27T21:30:00Z" },
-  ] };
-  const ev = comingUpOf(cal, HOUSE);
-  assert.deepEqual(ev.map((e) => e.id), ["x/opening"]);
-  assert.deepEqual(ev[0].going, ["mari"]);
-  assert.deepEqual(comingUpOf({ now: [], coming: [] }, HOUSE), [], "an answering calendar with nothing for the house is empty, not absent");
+// ── posts · marks · mail (POS-293) ──────────────────────────────────────────
+//
+// Keemin, 2026-09-28: "Posts are what we want. Marks are what Postmark is.
+// Mail is whom we trust." The calendar's "coming up" folded into Posts the
+// same day: events are posts.
+
+const POSTS = {
+  put_up: { total: 4, shown: 2, rows: [
+    { class: "event", id: "wright/office-hours", title: "Office Hours", author: "wright", household: "hh:starforge", state: "announced", latest: { act: "rsvp", at: "2026-09-27T18:00:00.000Z" }, responses: 1, role: "author", stake: 0, ours: 0 },
+    { class: "idea", id: "rei/events", title: "Events should be town objects.", author: "rei", household: "hh:starforge", state: "posted", latest: { act: "stake", at: "2026-09-27" }, responses: 5, role: "author", stake: 11, ours: 2 },
+  ] },
+  taking_part: { total: 1, shown: 1, rows: [
+    { class: "idea", id: "kai/observation", title: "Make observation state first-class.", author: "kai", household: "hh:window", state: "posted", latest: { act: "stake", at: "2026-09-24" }, responses: 10, role: "participant", stake: 30, ours: 1 },
+  ] },
+};
+
+test("posts: the house's, from the first doorstep that carries the segment; absent everywhere, the section is null", () => {
+  assert.equal(postsOf(HOUSE, reads.doorsteps), null, "no doorstep carries posts (prod before the w41 ship): the section says so, never guesses");
+  const p = postsOf(HOUSE, { wright: { ...reads.doorsteps.wright }, mari: { ...reads.doorsteps.mari, posts: POSTS } });
+  assert.deepEqual(p.putUp.rows.map((r) => r.id), ["wright/office-hours", "rei/events"]);
+  assert.equal(p.putUp.total, 4, "the office's true total rides beside its cut");
+  assert.deepEqual(p.takingPart.rows.map((r) => r.id), ["kai/observation"]);
+  assert.equal(p.behind, 11 + 1, "what stands behind the house's posts: the stake on its own, its share on others'");
+  assert.deepEqual(p.unavailable, []);
+  const partly = postsOf(HOUSE, { wright: { posts: { ...POSTS, unavailable: ["the events could not be read from the office's record"] } } });
+  assert.deepEqual(partly.unavailable, ["the events could not be read from the office's record"], "a class the office could not read is said on the page");
+});
+
+test("a post row is drawn from the general fields, and never asks its class anything but the chip's colour", () => {
+  const paint = read("../src/lib/household-dashboard/paint.mjs");
+  const row = paint.slice(paint.indexOf("function postRow("), paint.indexOf("function paintPostList("));
+  assert.ok(row.length > 100, "postRow is not where this test looks");
+  assert.equal((row.match(/\.class\b/g) ?? []).length, 2, "r.class is read for the chip's word and its data-cls, and nowhere else");
+  assert.doesNotMatch(row, /\.class\s*===|===\s*"(event|idea|quest|bug)"|switch\s*\(\s*r\.class/, "a row branches on its class");
+  assert.doesNotMatch(row, /\.fields\b/, "a row reads a class's own fields");
+});
+
+test("marks: per resident, with stamps, and the most-backed few across the house", () => {
+  const ds = {
+    wright: { stakes: { count: 3, rows: [{ mark: "wright/a", escrow: 3 }, { mark: "wright/b", escrow: 0 }, { mark: "wright/c", escrow: 9 }] } },
+    mari: { stakes: { count: 1, rows: [{ mark: "mari/garland", escrow: 5 }] } },
+  };
+  const m = marksOf(HOUSE, ds);
+  assert.deepEqual(m.by, [{ handle: "wright", marks: 3, backed: 2 }, { handle: "mari", marks: 1, backed: 1 }]);
+  assert.deepEqual([m.marks, m.backed, m.complete], [4, 3, true]);
+  assert.deepEqual(m.top.map((t) => [t.mark, t.escrow]), [["wright/c", 9], ["mari/garland", 5], ["wright/a", 3]]);
+  assert.equal(marksOf(HOUSE, { wright: ds.wright }).complete, false, "a resident whose segment did not answer makes the counts short, and the page says so");
+  assert.equal(marksOf(HOUSE, {}), null);
+});
+
+test("mail: in and out per resident, the newest letters from outside the house, and NEW IS UNREAD, never new_inbound", () => {
+  const ds = {
+    wright: { counts: { received: 408, sent: 419 }, awaiting: { summary: { new_inbound: 135 } },
+      mail: { letters: [
+        { id: "l1", from: "lupi", delivered_at: "2026-09-26T12:00:10Z", first_line: "Your key holds." },
+        { id: "w2", from: "mari", delivered_at: "2026-09-26T13:00:10Z", first_line: "Inside the house." },
+      ] } },
+    mari: { counts: { received: 20, sent: 18 }, awaiting: { summary: { new_inbound: 4 } }, mail: { letters: [] } },
+  };
+  const m = mailOf(HOUSE, ds);
+  assert.deepEqual([m.received, m.sent], [428, 437]);
+  assert.equal(m.unread, null, "no doorstep carries unread (a signed-out reader, or prod before the ship): there is NO new count, and 135 + 4 never stands in for one");
+  assert.ok(m.by.every((x) => x.unread === null), "nor per resident");
+  assert.deepEqual(m.latest.map((l) => l.id), ["l1"], "a letter between housemates is not mail from outside");
+  const signedIn = mailOf(HOUSE, { wright: { ...ds.wright, unread: { count: 2 } }, mari: { ...ds.mari, unread: { count: 0 } } });
+  assert.equal(signedIn.unread, 2, "with the house's own sign-in, new is the unread letters");
+  assert.equal(mailOf(HOUSE, { wright: { ...ds.wright, unread: { count: 2 } }, mari: ds.mari }).unread, null, "a house total only when every resident's unread answered");
+  assert.equal(mailOf(HOUSE, { wright: { ...ds.wright, unread: { count: null, unavailable: "the record could not be read" } }, mari: ds.mari }).by[0].unread, null, "an unread the office could not read is not a zero");
+  // and the source of the section never reaches for the old count
+  const fold = read("../src/lib/household-dashboard/fold.mjs");
+  const mail = fold.slice(fold.indexOf("export function mailOf("), fold.indexOf("// ── quests and numbers"));
+  assert.ok(mail.length > 100, "mailOf is not where this test looks");
+  assert.doesNotMatch(mail.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ""), /new_inbound/, "mailOf reads new_inbound");
+});
+
+// (the day's quests keep their 09-27 place until Keemin rules on the move: that
+// order is test/house-quests-and-mail-paper.test.mjs's, not this file's)
+test("the page's order: the house, then Posts, Marks, Mail, then since you last looked; coming up is gone and the calendar is not read", () => {
+  const dash = read("../src/components/household-dashboard/HouseDashboard.astro");
+  const at = (needle) => { const i = dash.indexOf(needle); assert.ok(i >= 0, `the dashboard carries ${needle}`); return i; };
+  const order = ['class="hd-house"', 'id="hd-posts-h"', 'id="hd-marks-h"', 'id="hd-mail-h"', 'id="hd-feed-h"', 'id="hd-res-h"'].map(at);
+  assert.deepEqual([...order].sort((a, b) => a - b), order, "the sections are not in Keemin's order");
+  assert.equal(dash.includes("data-hd-coming"), false, "Coming up is still on the page");
+  assert.equal(/\/calendar`/.test(read("../src/lib/household-dashboard/reads.mjs")), false, "the calendar is still read");
+});
+
+// ── the tour (POS-293) ──────────────────────────────────────────────────────
+
+test("the tour opens by itself once, on the house's own page only, and every way out sets the flag", () => {
+  const box = new Map();
+  const storage = { getItem: (k) => box.get(k) ?? null, setItem: (k, v) => box.set(k, v) };
+  assert.equal(tourOpensItself({ owner: false, storage }), false, "a signed-out reader, or another house's page, never gets it by itself");
+  assert.equal(tourOpensItself({ owner: true, storage }), true);
+  assert.equal(tourOpensItself({ owner: true, storage, openedThisPage: true }), false, "once a page, even before the flag lands");
+  assert.equal(markTourSeen(storage), true);
+  assert.equal(box.get(TOUR_KEY), "1");
+  assert.equal(tourOpensItself({ owner: true, storage }), false, "seen is seen");
+  const broken = { getItem() { throw new Error("private mode"); }, setItem() { throw new Error("private mode"); } };
+  assert.equal(tourSeen(broken), false);
+  assert.equal(markTourSeen(broken), false, "a storage that throws is survived, not thrown through");
+  assert.deepEqual([stepAfterKey("ArrowRight", 0, 5), stepAfterKey("ArrowRight", 4, 5), stepAfterKey("ArrowLeft", 0, 5), stepAfterKey("a", 2, 5)], [1, 4, 0, null]);
+  const tour = read("../src/components/household-dashboard/Tour.astro");
+  for (const way of ['[data-tour-skip]")?.addEventListener("click", close)', 'if (e.key === "Escape") { e.preventDefault(); close();', "if (i === steps.length - 1) close();"])
+    assert.ok(tour.includes(way), `a way out of the tour does not go through close: ${way}`);
+  assert.match(tour, /const close = \(\) => \{[^}]*markTourSeen\(storage\)/, "closing sets the flag");
+  assert.match(tour, /role="dialog" aria-modal="true" aria-labelledby=/);
+});
+
+test("the tour's words are the ruled words, and it promises nothing that is not live", () => {
+  const tour = read("../src/components/household-dashboard/Tour.astro");
+  for (const line of [
+    "A town that people and their AI build together",
+    "Your household is you and the AI residents you keep. Everything they do here is public, and a real person answers for it.",
+    "A <b>post</b> is something someone hopes the town will have or do: an <b>event</b> to gather for, or an <b>idea</b> for the town.",
+    "RSVP to an event, or back an idea with stamps",
+    "A <b>mark</b> is anything that's really part of Postmark right now: a home, a garden, a bench, a gift left at a neighbour's door.",
+    "not everything needs a post first, some things are just made for joy",
+    "<b>Letters</b> are how residents get to know each other. Mail is slow on purpose: the ferry sails twice a day.",
+    "the ferry sails at 8 AM and 8 PM Eastern",
+    "You can open this again any time from <b>How Postmark works</b> on your household page.",
+  ]) assert.ok(tour.includes(line), `the tour lost a ruled line: ${line}`);
+  const shown = tour.replace(/<script>[\s\S]*?<\/script>|<style>[\s\S]*?<\/style>/g, "").replace(/^\/\/[^\n]*$/gm, "");
+  assert.doesNotMatch(shown, /whoever builds it/i, "the tour promises stakes go to builders, which is not live");
+  for (const word of ["prior", "posterior", "ensemble", "latent", "initiative", "case"])
+    assert.doesNotMatch(shown, new RegExp(`\\b${word}\\b`, "i"), `the tour says "${word}" to a resident`);
 });
 
 test("the day's quests at the house's grain", () => {
   const q = questsOf(HOUSE, reads.quests);
   assert.deepEqual(q.rows.map((r) => [r.id, r.done, r.target]), [["correspond-send", 3, 5]]);
   assert.equal(q.shareSize, 7);
+});
+
+test("the tour's scenes: every one paints from known inks on its 32×20 grid, and the guide is one constant the scenes never name", async () => {
+  const icons = await import("../src/lib/pixel-icons.mjs");
+  const { SCENES, SCENE_W, SCENE_H, GUIDE, TOUR_GUIDE, ART, ART_INK, sceneRects, sceneSvg } = icons;
+  assert.deepEqual(Object.keys(SCENES), ["welcome", "posts", "marks", "mail", "dash"]);
+  for (const n of Object.keys(SCENES)) {
+    const rects = sceneRects(n);
+    assert.ok(rects.length > 0, n);
+    assert.ok(rects.every((r) => r.x >= 0 && r.x + r.w <= SCENE_W && r.y >= 0 && r.y < SCENE_H), `${n} paints off its grid`);
+    assert.equal(SCENES[n].filter((l) => l === GUIDE).length, 1, `${n} places the guide once, by the sentinel`);
+    assert.ok(!SCENES[n].some((l) => Array.isArray(l) && l[0] === ART.julian), `${n} names the figure instead of the guide`);
+    assert.match(sceneSvg(n), /viewBox="0 0 32 20"[^>]*shape-rendering="crispEdges" aria-hidden="true"/);
+  }
+  assert.equal(TOUR_GUIDE, ART.julian, "the guide is Julian until Keemin says otherwise");
+  assert.ok(ART_INK.a, "the water ink the mail scene's waves use");
+  assert.ok(Tour().includes('import { sceneSvg } from "@/lib/pixel-icons.mjs"'), "the tour draws its scenes from pixel-icons");
+  function Tour() { return read("../src/components/household-dashboard/Tour.astro"); }
 });

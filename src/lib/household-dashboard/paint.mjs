@@ -9,7 +9,7 @@
 
 import {
   feedOf, splitAtLook, countKinds, lastActOf, standsAtOf, hungOf, cardNumbersOf,
-  clocksOf, needsOf, comingUpOf, questsOf, numbersOf, readLook, writeLook, whenOf, dayWordOf,
+  clocksOf, needsOf, postsOf, marksOf, mailOf, questsOf, numbersOf, readLook, writeLook, whenOf, dayWordOf,
 } from "./fold.mjs";
 
 const TOWN_REPO = "https://github.com/postmark-town/postmark/blob/main/";
@@ -88,10 +88,12 @@ export function paintHouse(root, reads, ctx) {
   root.dataset.hdView = owner ? "owner" : "public";
 
   paintClocks(root, clocksOf(handles, reads.doorsteps), now);
+  paintPosts(root, postsOf(handles, reads.doorsteps), ctx);
+  paintMarks(root, marksOf(handles, reads.doorsteps), ctx);
+  paintMail(root, mailOf(handles, reads.doorsteps), ctx);
   paintFeed(root, items, ctx);
   if (owner) paintNeeds(root, needsOf(handles, reads.doorsteps), ctx);
   paintCards(root, items, reads, ctx);
-  paintComing(root, comingUpOf(reads.calendar, handles), ctx);
   paintShare(root, questsOf(handles, reads.quests), handles);
   paintNumbers(root, numbersOf(handles, reads.doorsteps), handles, reads, ctx);
   root.querySelector("[data-hd-loading]")?.remove();
@@ -277,40 +279,165 @@ function paintCards(root, items, reads, ctx) {
   }
 }
 
-function paintComing(root, events, ctx) {
-  const sec = root.querySelector("[data-hd-coming]");
+// ── the three sections (POS-293) ────────────────────────────────────────────
+
+const POSTS_SHOWN = 3;     // rows per list before "all"
+// The latest act in plain words. Acts, not classes: an RSVP and a stake are
+// what somebody did, whatever the post is.
+const ACT_SAID = { post: "posted", amend: "changed", close: "called off", rsvp: "RSVP", announce: "announced", stake: "backed", unstake: "unbacked" };
+const TOP_MARKS = 5;
+const LATEST_MAIL = 4;
+
+/** A section whose read did not answer: its body goes, one line says why. */
+function sectionDown(sec, line) {
+  sec.querySelector("[data-hd-body]")?.setAttribute("hidden", "");
+  const why = sec.querySelector("[data-hd-down]");
+  if (why) { why.textContent = line; why.hidden = false; }
+}
+function sectionUp(sec) {
+  sec.querySelector("[data-hd-body]")?.removeAttribute("hidden");
+  const why = sec.querySelector("[data-hd-down]");
+  if (why) why.hidden = true;
+}
+function kpi(sec, key, value) {
+  const k = sec.querySelector(`[data-hd-kpi="${key}"]`);
+  if (!k) return;
+  k.hidden = value == null;
+  const v = k.querySelector(".v");
+  if (v) v.textContent = value == null ? "" : String(value);
+}
+
+/** A stake is dated by the town's day, not an instant: "27 Sep", never the
+ *  8 PM that a bare date read as UTC midnight turns into west of Greenwich. */
+function latestWhen(at, now) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(at)) return new Date(at + "T12:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" });
+  return whenOf(Date.parse(at), now);
+}
+
+/**
+ * One post, drawn from the general fields alone. THE ROW NEVER ASKS WHAT
+ * CLASS IT IS: `class` is the chip's word and, through `data-cls`, its colour,
+ * and nothing else here reads it. A class that arrives tomorrow draws today.
+ */
+function postRow(r, ctx) {
+  const li = el("li", "hd-post");
+  const chip = el("span", "hd-cls", r.class);
+  chip.dataset.cls = r.class;
+  li.appendChild(chip);
+  const body = el("div", "hd-post-b");
+  body.appendChild(el("span", "hd-post-t", clip(String(r.title ?? ""), 150)));
+  const line = el("span", "hd-post-l");
+  if (r.role === "author") line.append(who(ctx.faces, r.author, ctx.seatHref));
+  else line.append("by ", other(r.author));
+  if (r.latest?.at) line.append(" · " + (ACT_SAID[r.latest.act] ?? r.latest.act) + " " + latestWhen(r.latest.at, ctx.now));
+  body.appendChild(line);
+  li.appendChild(body);
+  const side = el("div", "hd-post-r");
+  side.appendChild(el("span", "hd-post-s", r.state));
+  side.appendChild(el("span", "hd-post-n", plural(Number(r.responses ?? 0), "response")));
+  if (Number(r.stake) > 0) side.appendChild(el("span", "hd-post-st", "✦ " + r.stake + (Number(r.ours) > 0 && r.role !== "author" ? " · " + r.ours + " ours" : "")));
+  li.appendChild(side);
+  return li;
+}
+
+function paintPostList(sec, key, list, empty, ctx) {
+  const ul = sec.querySelector(`[data-hd-posts="${key}"]`);
+  const count = sec.querySelector(`[data-hd-posts-n="${key}"]`);
+  if (!ul) return;
+  ul.textContent = "";
+  if (count) count.textContent = list.total == null ? "" : String(list.total);
+  const shown = ctx.expandedPosts ? list.rows : list.rows.slice(0, POSTS_SHOWN);
+  shown.forEach((r) => ul.appendChild(postRow(r, ctx)));
+  if (!list.rows.length) ul.appendChild(el("li", "hd-empty", empty));
+  const rest = (list.total ?? list.rows.length) - shown.length;
+  if (rest > 0) ul.appendChild(el("li", "hd-post-more", `and ${rest} more`));
+}
+
+function paintPosts(root, posts, ctx) {
+  const sec = root.querySelector("[data-hd-posts-box]");
   if (!sec) return;
-  if (events == null) { sec.hidden = true; return; } // the calendar did not answer
-  const list = sec.querySelector("[data-hd-events]");
-  list.textContent = "";
-  if (!events.length) list.appendChild(el("p", "hd-empty", "Nothing on the calendar that the house is hosting or going to."));
-  for (const e of events) {
-    const row = el("div", "hd-event");
-    const date = el("div", "hd-date");
-    const at = e.starts != null ? new Date(e.starts) : null;
-    date.appendChild(el("div", "m", at ? at.toLocaleDateString(undefined, { weekday: "short" }) : ""));
-    date.appendChild(el("div", "d", at ? String(at.getDate()) : "?"));
-    date.appendChild(el("div", "m", e.phase === "announced" ? "" : e.phase.replace("-", " ")));
-    row.appendChild(date);
-    const body = el("div");
-    const h3 = el("h3");
-    const link = el("a", null, e.title);
-    link.href = "/calendar/" + e.id.split("/").map(encodeURIComponent).join("/") + "/";
-    h3.appendChild(link);
-    body.appendChild(h3);
-    const time = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-    body.appendChild(el("p", null, [
-      e.doorsOpen != null ? "doors at " + time(e.doorsOpen) : e.starts != null ? time(e.starts) : null,
-      e.place,
-      "hosted by " + (ctx.faces[e.host]?.name ?? e.host),
-    ].filter(Boolean).join(" · ")));
-    row.appendChild(body);
-    const going = el("div", "hd-going");
-    e.going.forEach((h) => going.appendChild(who(ctx.faces, h, ctx.seatHref)));
-    row.appendChild(going);
-    list.appendChild(row);
+  if (!posts) { sectionDown(sec, "The house’s posts did not answer, so none are shown here."); return; }
+  sectionUp(sec);
+  kpi(sec, "put-up", posts.putUp.total);
+  kpi(sec, "taking-part", posts.takingPart.total);
+  kpi(sec, "behind", posts.behind > 0 ? "✦" + posts.behind : null);
+  paintPostList(sec, "put-up", posts.putUp, "Nothing put up in the last week.", ctx);
+  paintPostList(sec, "taking-part", posts.takingPart, "Not taking part in anyone else’s posts yet.", ctx);
+  const note = sec.querySelector("[data-hd-posts-note]");
+  if (note) {
+    note.textContent = posts.unavailable.length ? "Not everything could be read: " + posts.unavailable.join("; ") + "." : "";
+    note.hidden = !posts.unavailable.length;
   }
-  sec.hidden = false;
+}
+
+function paintMarks(root, marks, ctx) {
+  const sec = root.querySelector("[data-hd-marks-box]");
+  if (!sec) return;
+  if (!marks) { sectionDown(sec, "The house’s marks did not answer, so none are shown here."); return; }
+  sectionUp(sec);
+  kpi(sec, "marks", marks.marks);
+  kpi(sec, "backed", marks.backed);
+  const top = sec.querySelector("[data-hd-marks-top]");
+  if (top) {
+    top.textContent = "";
+    marks.top.forEach((m) => {
+      const li = el("li", "hd-mini-row");
+      li.append(who(ctx.faces, m.handle, ctx.seatHref), " ", el("span", "hd-mini-t", m.mark.split("/").slice(1).join("/").replace(/-/g, " ")));
+      li.appendChild(el("span", "hd-mini-st", "✦ " + m.escrow));
+      top.appendChild(li);
+    });
+    if (!marks.top.length) top.appendChild(el("li", "hd-empty", "No mark of the house’s has stamps behind it yet."));
+  }
+  const by = sec.querySelector("[data-hd-marks-by]");
+  if (by) {
+    by.textContent = "";
+    marks.by.forEach((x) => {
+      const li = el("li", "hd-mini-row");
+      li.append(who(ctx.faces, x.handle, ctx.seatHref));
+      li.appendChild(el("span", "hd-mini-n", `${plural(x.marks, "mark")} · ${x.backed} with stamps`));
+      by.appendChild(li);
+    });
+  }
+  const note = sec.querySelector("[data-hd-marks-note]");
+  if (note) note.hidden = marks.complete;
+}
+
+function paintMail(root, mail, ctx) {
+  const sec = root.querySelector("[data-hd-mail-box]");
+  if (!sec) return;
+  if (!mail) { sectionDown(sec, "The house’s mail did not answer, so none is shown here."); return; }
+  sectionUp(sec);
+  // "new" is POS-286's unread and nothing else: absent, it is not drawn
+  kpi(sec, "new", mail.unread);
+  kpi(sec, "in", mail.received);
+  kpi(sec, "out", mail.sent);
+  const latest = sec.querySelector("[data-hd-mail-latest]");
+  if (latest) {
+    latest.textContent = "";
+    mail.latest.forEach((l) => {
+      const li = el("li", "hd-mini-row is-letter");
+      const head = el("span", "hd-mini-h");
+      head.append(other(l.from), " to ", who(ctx.faces, l.to, ctx.seatHref), " · " + whenOf(l.at, ctx.now));
+      li.appendChild(head);
+      if (l.text) li.appendChild(el("span", "hd-mini-q", "“" + clip(l.text, 90) + "”"));
+      latest.appendChild(li);
+    });
+    if (!mail.latest.length) latest.appendChild(el("li", "hd-empty", "No letters from outside the house yet."));
+  }
+  const by = sec.querySelector("[data-hd-mail-by]");
+  if (by) {
+    by.textContent = "";
+    mail.by.forEach((x) => {
+      const li = el("li", "hd-mini-row");
+      li.append(who(ctx.faces, x.handle, ctx.seatHref));
+      const parts = [];
+      if (x.unread != null) parts.push(x.unread + " new");
+      if (x.received != null) parts.push(x.received + " in");
+      if (x.sent != null) parts.push(x.sent + " out");
+      li.appendChild(el("span", "hd-mini-n", parts.join(" · ")));
+      by.appendChild(li);
+    });
+  }
 }
 
 // The day's quest cards are the house's board, drawn by Household.astro into
