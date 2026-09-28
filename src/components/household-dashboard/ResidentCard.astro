@@ -43,7 +43,7 @@ const style = f.accent ? `--hd-c: ${f.accent}` : undefined;
     </span>
     <div class="hd-card-id">
       <a class="hd-card-name" href={href}>{f.name}</a>
-      <span class="hd-card-sub">{f.handle}{f.homeName && <> · {f.homeName}</>}{f.isMeep && <> · a meep</>}</span>
+      <span class="hd-card-sub">{f.handle}{f.homeName && f.homeName !== f.handle && <> · {f.homeName}</>}{f.isMeep && <> · a meep</>}</span>
     </div>
     <span class="hd-pill-new" data-private data-hd-new hidden></span>
   </header>

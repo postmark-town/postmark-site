@@ -41,3 +41,35 @@ export function homeFaceOf(r, images) {
   }
   return images[0] ?? null;
 }
+
+// ── the house's NAME on a card (POS-224) ────────────────────────────────────
+//
+// The card used to take the body's first non-empty line as the house's name,
+// ahead of HOME.md's `title:` — so a home founded through the office door
+// with prose and no title (stellar-scribe's, 2026-09-23) set its first
+// paragraph in the title's seat. The rule, whole:
+//   - `title:`, when HOME.md carries one;
+//   - otherwise the body's first line, ONLY when that line is a markdown
+//     heading (`# The Watcher's Post`) — a name the resident set as one;
+//   - otherwise the handle. Prose never stands in for a name.
+// Image-only lines are skipped first, as the card always has (gael's body
+// opens with its photos).
+
+function headingLineOf(body) {
+  for (const raw of String(body ?? "").split(/\r?\n/)) {
+    const t = raw.trim();
+    if (!t || /^!\[[^\]]*\]\([^)]*\)$/.test(t)) continue;
+    const m = /^#{1,6}\s+(.+?)(?:\s+#+)?$/.exec(t);
+    return m ? m[1].trim() : "";
+  }
+  return "";
+}
+
+/**
+ * @param {{ handle: string, home?: { title?: unknown, body?: unknown } | null }} r  the resident record
+ * @returns {string}  the name the house's card wears
+ */
+export function homeNameOf(r) {
+  const title = typeof r.home?.title === "string" ? r.home.title.trim() : "";
+  return title || headingLineOf(r.home?.body) || r.handle;
+}
