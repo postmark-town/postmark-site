@@ -188,23 +188,97 @@ export function needsOf(handles, doorsteps) {
   };
 }
 
-// ── coming up ───────────────────────────────────────────────────────────────
+// ── the three sections: posts, marks, mail (POS-293) ────────────────────────
+//
+// Keemin, 2026-09-28: "Posts are what we want. Marks are what Postmark is.
+// Mail is whom we trust." Each section is null when its read did not answer,
+// and the page then leaves the section's body out with one honest line.
 
-/** Null when the calendar did not answer — the section is then absent, not
- *  empty. Otherwise the open and coming events the house hosts or RSVPed to. */
-export function comingUpOf(calendar, handles) {
-  if (!calendar || typeof calendar !== "object") return null;
+/** The house's posts, from the doorstep's `posts` segment: the office answers
+ *  it for the whole house, so the first resident's doorstep that carries it
+ *  speaks. Rows pass through as the office sent them (the general fields). */
+export function postsOf(handles, doorsteps) {
+  const seg = handles.map((h) => doorsteps?.[h]?.posts).find((p) => p && typeof p === "object" && p.put_up && p.taking_part);
+  if (!seg) return null;
+  const list = (l) => ({ total: num(l.total), rows: asArray(l.rows).filter((r) => r && r.id) });
+  const putUp = list(seg.put_up);
+  const takingPart = list(seg.taking_part);
+  const behind = putUp.rows.reduce((n, r) => n + (num(r.stake) ?? 0), 0) + takingPart.rows.reduce((n, r) => n + (num(r.ours) ?? 0), 0);
+  return { putUp, takingPart, behind, unavailable: asArray(seg.unavailable).map(str) };
+}
+
+/** The ids of the ideas, which are POSTS and so never Marks (Wright's review,
+ *  2026-09-28): every idea the Think Tank read names, and every idea row the
+ *  posts segment carries. `known` is false when the Think Tank did not answer,
+ *  and then only the house's own posted ideas can be told apart. */
+export function ideaIdsOf(ideasRead, posts) {
+  const ids = new Set();
+  for (const i of asArray(ideasRead?.ideas)) if (i?.id) ids.add(str(i.id));
+  for (const r of [...asArray(posts?.putUp?.rows), ...asArray(posts?.takingPart?.rows)]) if (r?.class === "idea" && r.id) ids.add(str(r.id));
+  return { ids, known: Array.isArray(ideasRead?.ideas) };
+}
+
+/** The house's marks, from each doorstep's `stakes` segment: how many each
+ *  resident has, how many carry stamps, and the most-backed few across the
+ *  house. An idea is a post, not a mark, so the ideas are left out of every
+ *  list and count here. `complete` is false when a resident's segment did not
+ *  answer. */
+export function marksOf(handles, doorsteps, { top = 5, ideas = { ids: new Set(), known: false } } = {}) {
+  const by = [];
+  const all = [];
+  for (const h of handles) {
+    const s = doorsteps?.[h]?.stakes;
+    if (!s || !Array.isArray(s.rows)) continue;
+    const listed = s.rows.filter((r) => r && r.mark);
+    const rows = listed.filter((r) => !ideas.ids.has(str(r.mark)));
+    const dropped = listed.length - rows.length;
+    by.push({ handle: h, marks: (num(s.count) ?? listed.length) - dropped, backed: rows.filter((r) => (num(r.escrow) ?? 0) > 0).length });
+    for (const r of rows) all.push({ handle: h, mark: str(r.mark), escrow: num(r.escrow) });
+  }
+  if (!by.length) return null;
+  return {
+    by,
+    marks: by.reduce((n, x) => n + x.marks, 0),
+    backed: by.reduce((n, x) => n + x.backed, 0),
+    top: all.filter((r) => (r.escrow ?? 0) > 0).sort((a, b) => b.escrow - a.escrow || a.mark.localeCompare(b.mark)).slice(0, top),
+    complete: by.length === handles.length,
+    ideasKnown: ideas.known,
+  };
+}
+
+/** The house's mail: each resident's letters in and out, and the newest
+ *  letters from outside the house.
+ *
+ *  NEW IS UNREAD, AND ONLY UNREAD (POS-286). It is the doorstep's `unread`
+ *  count, which rides the house's own sign-in; where it is absent the page
+ *  shows no "new" at all. It is never `awaiting.summary.new_inbound`, which
+ *  counts threads where someone else spoke last, not letters nobody opened. */
+export function mailOf(handles, doorsteps, { latest = 4 } = {}) {
   const house = new Set(handles);
-  return [...asArray(calendar.now), ...asArray(calendar.coming)]
-    .filter((e) => e && !e.cancelled)
-    .map((e) => ({
-      id: str(e.id), title: str(e.title), host: str(e.host), phase: str(e.phase),
-      doorsOpen: parseAt(e.doors_open), starts: parseAt(e.starts),
-      place: e.place?.name ? str(e.place.name).replace(/-/g, " ") : null,
-      going: asArray(e.rsvps?.residents).filter((h) => house.has(h)),
-    }))
-    .filter((e) => house.has(e.host) || e.going.length)
-    .sort((a, b) => (a.starts ?? 0) - (b.starts ?? 0));
+  const by = [];
+  const letters = new Map();
+  for (const h of handles) {
+    const d = doorsteps?.[h];
+    if (!d) continue;
+    const unread = num(d.unread?.count);
+    by.push({ handle: h, received: num(d.counts?.received), sent: num(d.counts?.sent), unread });
+    for (const l of asArray(d.mail?.letters)) {
+      if (!l?.id || house.has(l.from) || letters.has(l.id)) continue;
+      const at = parseAt(l.delivered_at) ?? parseAt(l.date);
+      if (at == null) continue;
+      letters.set(l.id, { id: str(l.id), to: h, from: str(l.from), at, text: str(l.first_line) });
+    }
+  }
+  if (!by.length) return null;
+  const sum = (k) => (by.every((x) => x[k] != null) ? by.reduce((n, x) => n + x[k], 0) : null);
+  return {
+    by,
+    received: sum("received"),
+    sent: sum("sent"),
+    // a house total only when every resident's count answered
+    unread: by.length === handles.length ? sum("unread") : null,
+    latest: [...letters.values()].sort((a, b) => b.at - a.at || a.id.localeCompare(b.id)).slice(0, latest),
+  };
 }
 
 // ── quests and numbers ──────────────────────────────────────────────────────
