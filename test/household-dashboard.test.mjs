@@ -18,7 +18,7 @@ import { readFileSync, readdirSync } from "node:fs";
 
 import { residentFace, accentOf, bioLineOf, spriteOf } from "../src/lib/household-dashboard/faces.mjs";
 import {
-  feedOf, splitAtLook, lastActOf, standsAtOf, hungOf, clocksOf, needsOf, postsOf, marksOf, mailOf,
+  feedOf, splitAtLook, lastActOf, standsAtOf, hungOf, clocksOf, needsOf, postsOf, marksOf, ideaIdsOf, mailOf,
   questsOf, numbersOf, readLook, writeLook, parseAt,
 } from "../src/lib/household-dashboard/fold.mjs";
 import { TOUR_KEY, tourSeen, markTourSeen, tourOpensItself, stepAfterKey } from "../src/lib/household-dashboard/tour.mjs";
@@ -297,15 +297,40 @@ test("mail: in and out per resident, the newest letters from outside the house, 
   assert.doesNotMatch(mail.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ""), /new_inbound/, "mailOf reads new_inbound");
 });
 
-// (the day's quests keep their 09-27 place until Keemin rules on the move: that
-// order is test/house-quests-and-mail-paper.test.mjs's, not this file's)
 test("the page's order: the house, then Posts, Marks, Mail, then since you last looked; coming up is gone and the calendar is not read", () => {
   const dash = read("../src/components/household-dashboard/HouseDashboard.astro");
   const at = (needle) => { const i = dash.indexOf(needle); assert.ok(i >= 0, `the dashboard carries ${needle}`); return i; };
   const order = ['class="hd-house"', 'id="hd-posts-h"', 'id="hd-marks-h"', 'id="hd-mail-h"', 'id="hd-feed-h"', 'id="hd-res-h"'].map(at);
   assert.deepEqual([...order].sort((a, b) => a - b), order, "the sections are not in Keemin's order");
+  const posts = dash.slice(at("data-hd-posts-box"), at("data-hd-marks-box"));
+  const town = posts.indexOf("From the town");
+  assert.ok(town >= 0 && town < posts.indexOf('<slot name="quests" />'), "the quest board is Posts' last group, under From the town");
+  assert.equal(dash.split('<slot name="quests" />').length, 2, "the board has one place");
   assert.equal(dash.includes("data-hd-coming"), false, "Coming up is still on the page");
   assert.equal(/\/calendar`/.test(read("../src/lib/household-dashboard/reads.mjs")), false, "the calendar is still read");
+});
+
+test("an idea is a post, never a mark: the Think Tank's ideas and the house's idea posts are out of Marks' lists and counts", () => {
+  const ds = {
+    wright: { stakes: { count: 3, rows: [{ mark: "wright/a-newcomers-first-hour", escrow: 1 }, { mark: "wright/the-trueing-terrace", escrow: 77 }, { mark: "wright/comparison-desk", escrow: 0 }] } },
+    mari: { stakes: { count: 2, rows: [{ mark: "rei/events", escrow: 11 }, { mark: "mari/garland", escrow: 5 }] } },
+  };
+  const tank = { ideas: [{ id: "wright/a-newcomers-first-hour" }, { id: "kai/elsewhere" }] };
+  const posts = postsOf(HOUSE, { wright: { posts: POSTS } }); // carries idea rei/events
+  const m = marksOf(HOUSE, ds, { ideas: ideaIdsOf(tank, posts) });
+  const listed = [...m.top.map((t) => t.mark)];
+  for (const idea of ["wright/a-newcomers-first-hour", "rei/events"]) assert.equal(listed.includes(idea), false, `the idea ${idea} is listed in Marks`);
+  assert.deepEqual(m.top.map((t) => t.mark), ["wright/the-trueing-terrace", "mari/garland"]);
+  assert.deepEqual(m.by, [{ handle: "wright", marks: 2, backed: 1 }, { handle: "mari", marks: 1, backed: 1 }], "the counts leave the ideas out too");
+  assert.equal(m.ideasKnown, true);
+  // the Think Tank not answering: the house's own idea posts still come out, and the page is told
+  const blind = marksOf(HOUSE, ds, { ideas: ideaIdsOf(null, posts) });
+  assert.equal(blind.ideasKnown, false);
+  assert.equal(blind.top.some((t) => t.mark === "rei/events"), false);
+  // and the page feeds Marks the ideas it read
+  const paint = read("../src/lib/household-dashboard/paint.mjs");
+  assert.match(paint, /marksOf\(handles, reads\.doorsteps, \{ ideas: ideaIdsOf\(reads\.ideas, posts\) \}\)/, "Marks is painted without the ideas");
+  assert.match(read("../src/lib/household-dashboard/reads.mjs"), /\/town\/apex\?read=ideas`/, "the Think Tank is not read");
 });
 
 // ── the tour (POS-293) ──────────────────────────────────────────────────────

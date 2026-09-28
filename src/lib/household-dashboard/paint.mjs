@@ -9,7 +9,7 @@
 
 import {
   feedOf, splitAtLook, countKinds, lastActOf, standsAtOf, hungOf, cardNumbersOf,
-  clocksOf, needsOf, postsOf, marksOf, mailOf, questsOf, numbersOf, readLook, writeLook, whenOf, dayWordOf,
+  clocksOf, needsOf, postsOf, marksOf, ideaIdsOf, mailOf, questsOf, numbersOf, readLook, writeLook, whenOf, dayWordOf,
 } from "./fold.mjs";
 
 const TOWN_REPO = "https://github.com/postmark-town/postmark/blob/main/";
@@ -88,8 +88,9 @@ export function paintHouse(root, reads, ctx) {
   root.dataset.hdView = owner ? "owner" : "public";
 
   paintClocks(root, clocksOf(handles, reads.doorsteps), now);
-  paintPosts(root, postsOf(handles, reads.doorsteps), ctx);
-  paintMarks(root, marksOf(handles, reads.doorsteps), ctx);
+  const posts = postsOf(handles, reads.doorsteps);
+  paintPosts(root, posts, ctx);
+  paintMarks(root, marksOf(handles, reads.doorsteps, { ideas: ideaIdsOf(reads.ideas, posts) }), ctx);
   paintMail(root, mailOf(handles, reads.doorsteps), ctx);
   paintFeed(root, items, ctx);
   if (owner) paintNeeds(root, needsOf(handles, reads.doorsteps), ctx);
@@ -399,7 +400,13 @@ function paintMarks(root, marks, ctx) {
     });
   }
   const note = sec.querySelector("[data-hd-marks-note]");
-  if (note) note.hidden = marks.complete;
+  if (note) {
+    const lines = [];
+    if (!marks.complete) lines.push("Not every resident’s marks answered, so these counts are short.");
+    if (!marks.ideasKnown) lines.push("The Think Tank did not answer, so an idea may be counted here as a mark.");
+    note.textContent = lines.join(" ");
+    note.hidden = !lines.length;
+  }
 }
 
 function paintMail(root, mail, ctx) {

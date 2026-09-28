@@ -207,17 +207,32 @@ export function postsOf(handles, doorsteps) {
   return { putUp, takingPart, behind, unavailable: asArray(seg.unavailable).map(str) };
 }
 
+/** The ids of the ideas, which are POSTS and so never Marks (Wright's review,
+ *  2026-09-28): every idea the Think Tank read names, and every idea row the
+ *  posts segment carries. `known` is false when the Think Tank did not answer,
+ *  and then only the house's own posted ideas can be told apart. */
+export function ideaIdsOf(ideasRead, posts) {
+  const ids = new Set();
+  for (const i of asArray(ideasRead?.ideas)) if (i?.id) ids.add(str(i.id));
+  for (const r of [...asArray(posts?.putUp?.rows), ...asArray(posts?.takingPart?.rows)]) if (r?.class === "idea" && r.id) ids.add(str(r.id));
+  return { ids, known: Array.isArray(ideasRead?.ideas) };
+}
+
 /** The house's marks, from each doorstep's `stakes` segment: how many each
  *  resident has, how many carry stamps, and the most-backed few across the
- *  house. `complete` is false when a resident's segment did not answer. */
-export function marksOf(handles, doorsteps, { top = 5 } = {}) {
+ *  house. An idea is a post, not a mark, so the ideas are left out of every
+ *  list and count here. `complete` is false when a resident's segment did not
+ *  answer. */
+export function marksOf(handles, doorsteps, { top = 5, ideas = { ids: new Set(), known: false } } = {}) {
   const by = [];
   const all = [];
   for (const h of handles) {
     const s = doorsteps?.[h]?.stakes;
     if (!s || !Array.isArray(s.rows)) continue;
-    const rows = s.rows.filter((r) => r && r.mark);
-    by.push({ handle: h, marks: num(s.count) ?? rows.length, backed: rows.filter((r) => (num(r.escrow) ?? 0) > 0).length });
+    const listed = s.rows.filter((r) => r && r.mark);
+    const rows = listed.filter((r) => !ideas.ids.has(str(r.mark)));
+    const dropped = listed.length - rows.length;
+    by.push({ handle: h, marks: (num(s.count) ?? listed.length) - dropped, backed: rows.filter((r) => (num(r.escrow) ?? 0) > 0).length });
     for (const r of rows) all.push({ handle: h, mark: str(r.mark), escrow: num(r.escrow) });
   }
   if (!by.length) return null;
@@ -227,6 +242,7 @@ export function marksOf(handles, doorsteps, { top = 5 } = {}) {
     backed: by.reduce((n, x) => n + x.backed, 0),
     top: all.filter((r) => (r.escrow ?? 0) > 0).sort((a, b) => b.escrow - a.escrow || a.mark.localeCompare(b.mark)).slice(0, top),
     complete: by.length === handles.length,
+    ideasKnown: ideas.known,
   };
 }
 

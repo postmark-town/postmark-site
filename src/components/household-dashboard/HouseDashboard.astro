@@ -12,12 +12,15 @@
 // order ("Posts are what we want. Marks are what Postmark is. Mail is whom we
 // trust.") — then since you last looked, needs you, the residents (each hung
 // window beside its resident), the keys, and the numbers last. The day's
-// quests are the house's board, handed in by Household.astro through the
-// `quests` slot. Coming up folded into Posts the same day: events are posts.
+// quests are the town's posts, so the house's board (handed in by
+// Household.astro through the `quests` slot) is Posts' last group, "From the
+// town" (Keemin, 2026-09-28, on moving it and on the guard that held its old
+// place: "Yeah that's fine, delete the guard (it's overkill)."). Coming up
+// folded into Posts the same day: events are posts.
 //
-// ⚑ HELD: the brief moves the board into Posts; Keemin's 2026-09-27 placement
-// ("put them between 'Since you last looked' and 'your residents'") stands
-// until his word on the move, so the board is still there today.
+// REPEALED, kept dated beside it: until 2026-09-28 the quests sat between
+// since you last looked and the residents (Keemin, 2026-09-27: "put them
+// between 'Since you last looked' and 'your residents'").
 //
 // SIGNED IN AND SIGNED OUT ARE ONE PAGE. The doorstep is public, so a visitor
 // sees almost everything the house sees. What only the house's own sign-in
@@ -115,12 +118,9 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
         <p class="hd-note" data-hd-posts-note hidden></p>
       </div>
       <noscript><p class="hd-empty">The house’s posts are read live from the town; this part of the page needs scripts.</p></noscript>
-      {/* THE BOARD'S PLACE, HELD (POS-293): the brief puts the day's quests here
-          as this section's last group, "From the town", and Keemin's 09-27
-          placement (the guard in test/house-quests-and-mail-paper.test.mjs)
-          keeps them between since you last looked and the residents. His
-          answer decides; the move is the `quests` slot and its heading, to
-          here. */}
+      {/* the day's quests: the town's posts, the house's board (Household.astro) */}
+      <p class="hd-grp hd-town"><span>From the town</span></p>
+      <slot name="quests" />
     </section>
 
     <section class="hd-panel hd-room" data-hd-marks-box aria-labelledby="hd-marks-h" style="--hd-k: var(--hd-c-marks)">
@@ -135,7 +135,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
         <ul class="hd-mini" data-hd-marks-top></ul>
         <p class="hd-grp"><span>By resident</span></p>
         <ul class="hd-mini" data-hd-marks-by></ul>
-        <p class="hd-note" data-hd-marks-note hidden>Not every resident’s marks answered, so these counts are short.</p>
+        <p class="hd-note" data-hd-marks-note hidden></p>
       </div>
       <noscript><p class="hd-empty">The house’s marks are read live from the town; this part of the page needs scripts.</p></noscript>
     </section>
@@ -193,9 +193,6 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
       <ul data-hd-needs></ul>
     </aside>
   </div>
-
-  {/* ═════════ THE DAY'S QUESTS (Household.astro draws the board) ═════════ */}
-  <slot name="quests" />
 
   {/* ═════════ THE RESIDENTS, AND THEIR WINDOWS ═════════ */}
   <section class="hd-block" aria-labelledby="hd-res-h">
@@ -505,7 +502,8 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   .hd-mini :global(.hd-other) { color: var(--pm-gold); }
 
   /* ── the quests (drawn by Household.astro) and the numbers ── */
-  .hd :global([data-quests]) { margin: 1.6em 0 1.8em; }
+  .hd-town { margin-top: 0.9em; }
+  .hd :global([data-quests]) { margin: 0.3em 0 0; }
   .hd-small { margin-top: 2.2em; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1em; font-size: 0.86rem; }
   .hd-small .hd-panel { padding: 0.8em 0.95em; }
   .hd-small h2 { font-size: 1rem; }
