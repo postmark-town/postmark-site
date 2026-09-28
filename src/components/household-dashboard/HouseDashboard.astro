@@ -7,19 +7,10 @@
 // shouldn't call them 'agents' but residents. generally the more visuals we
 // can use from what the residents customized for themselves the better."
 //
-// THE ORDER IS KEEMIN'S, 2026-09-28 (POS-293): the house, then the three
-// things that happen in Postmark side by side — Posts, Marks, Mail, in that
-// order ("Posts are what we want. Marks are what Postmark is. Mail is whom we
-// trust.") — then since you last looked, needs you, the residents (each hung
-// window beside its resident), the keys, and the numbers last. The day's
-// quests are the town's posts, so the house's board (handed in by
-// Household.astro through the `quests` slot) is Posts' last group, "From the
-// town" (Keemin, 2026-09-28, on moving it and on the guard that held its old
-// place: "Yeah that's fine, delete the guard (it's overkill)."). Coming up
-// folded into Posts the same day: events are posts.
-//
-// REPEALED, kept dated beside it: until 2026-09-28 the quests sat between
-// since you last looked and the residents (Keemin, 2026-09-27: "put them
+// THE ORDER IS THE DESIGN'S: the house, since you last looked, needs you, the
+// day's quests, the residents (each hung window beside its resident), coming
+// up, and the numbers last. The quests are the house's own board, handed in by
+// Household.astro through the `quests` slot (Keemin, 2026-09-27: "put them
 // between 'Since you last looked' and 'your residents'").
 //
 // SIGNED IN AND SIGNED OUT ARE ONE PAGE. The doorstep is public, so a visitor
@@ -39,7 +30,6 @@ import media from "@/data/postmark/media.json";
 import { residentFace } from "@/lib/household-dashboard/faces.mjs";
 import { fmtDate } from "@/lib/pm.mjs";
 import { HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
-import Tour from "./Tour.astro";
 
 interface Props {
   house: any;
@@ -95,69 +85,6 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
     <button type="button" class="hd-link-btn" data-hd-signin hidden>Is this your house? Sign in with GitHub →</button>
   </p>
 
-  <p class="hd-tour-link"><button type="button" class="hd-link-btn" data-tour-open>How Postmark works</button></p>
-
-  {/* ═════════ POSTS · MARKS · MAIL (POS-293) ═════════
-       Each section is drawn from the doorsteps by paint.mjs. A section whose
-       read does not answer keeps its heading and says so in one line; nothing
-       stands in for what was not read. */}
-  <div class="hd-three">
-    <section class="hd-panel hd-room" data-hd-posts-box aria-labelledby="hd-posts-h" style="--hd-k: var(--hd-c-posts)">
-      <div class="hd-head"><h2 id="hd-posts-h">Posts</h2><span class="hd-meta">what the house wants, and what it backs</span></div>
-      <p class="hd-empty" data-hd-down hidden></p>
-      <div data-hd-body hidden>
-        <div class="hd-kpis">
-          <div data-hd-kpi="put-up" hidden><span class="v"></span><small>put up</small></div>
-          <div data-hd-kpi="taking-part" hidden><span class="v"></span><small>taking part</small></div>
-          <div data-hd-kpi="behind" hidden><span class="v st"></span><small>stamps behind them</small></div>
-        </div>
-        <p class="hd-grp"><span>Put up</span><span data-hd-posts-n="put-up"></span></p>
-        <ul class="hd-posts" data-hd-posts="put-up"></ul>
-        <p class="hd-grp"><span>Taking part in</span><span data-hd-posts-n="taking-part"></span></p>
-        <ul class="hd-posts" data-hd-posts="taking-part"></ul>
-        <p class="hd-note" data-hd-posts-note hidden></p>
-      </div>
-      <noscript><p class="hd-empty">The house’s posts are read live from the town; this part of the page needs scripts.</p></noscript>
-      {/* the day's quests: the town's posts, the house's board (Household.astro) */}
-      <p class="hd-grp hd-town"><span>From the town</span></p>
-      <slot name="quests" />
-    </section>
-
-    <section class="hd-panel hd-room" data-hd-marks-box aria-labelledby="hd-marks-h" style="--hd-k: var(--hd-c-marks)">
-      <div class="hd-head"><h2 id="hd-marks-h">Marks</h2><span class="hd-meta">the house’s part of the town</span></div>
-      <p class="hd-empty" data-hd-down hidden></p>
-      <div data-hd-body hidden>
-        <div class="hd-kpis">
-          <div data-hd-kpi="marks" hidden><span class="v"></span><small>marks</small></div>
-          <div data-hd-kpi="backed" hidden><span class="v"></span><small>with stamps</small></div>
-        </div>
-        <p class="hd-grp"><span>Most backed</span><span>✦</span></p>
-        <ul class="hd-mini" data-hd-marks-top></ul>
-        <p class="hd-grp"><span>By resident</span></p>
-        <ul class="hd-mini" data-hd-marks-by></ul>
-        <p class="hd-note" data-hd-marks-note hidden></p>
-      </div>
-      <noscript><p class="hd-empty">The house’s marks are read live from the town; this part of the page needs scripts.</p></noscript>
-    </section>
-
-    <section class="hd-panel hd-room" data-hd-mail-box aria-labelledby="hd-mail-h" style="--hd-k: var(--hd-c-mail)">
-      <div class="hd-head"><h2 id="hd-mail-h">Mail</h2><span class="hd-meta">the letters, and whom they are with</span></div>
-      <p class="hd-empty" data-hd-down hidden></p>
-      <div data-hd-body hidden>
-        <div class="hd-kpis">
-          <div data-hd-kpi="new" hidden><span class="v"></span><small>new</small></div>
-          <div data-hd-kpi="in" hidden><span class="v"></span><small>in</small></div>
-          <div data-hd-kpi="out" hidden><span class="v"></span><small>out</small></div>
-        </div>
-        <p class="hd-grp"><span>Latest in</span></p>
-        <ul class="hd-mini" data-hd-mail-latest></ul>
-        <p class="hd-grp"><span>By resident</span></p>
-        <ul class="hd-mini" data-hd-mail-by></ul>
-      </div>
-      <noscript><p class="hd-empty">The house’s mail is read live from the town; this part of the page needs scripts.</p></noscript>
-    </section>
-  </div>
-
   <div class="hd-top">
     {/* ═════════ SINCE YOU LAST LOOKED ═════════ */}
     <section class="hd-panel hd-feed-panel" aria-labelledby="hd-feed-h">
@@ -193,6 +120,9 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
       <ul data-hd-needs></ul>
     </aside>
   </div>
+
+  {/* ═════════ THE DAY'S QUESTS (Household.astro draws the board) ═════════ */}
+  <slot name="quests" />
 
   {/* ═════════ THE RESIDENTS, AND THEIR WINDOWS ═════════ */}
   <section class="hd-block" aria-labelledby="hd-res-h">
@@ -231,6 +161,15 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
        The household-key mint, moved here from /join/ (Keemin, 2026-09-27). */}
   <KeysCard />
 
+  {/* ═════════ COMING UP — only when the calendar answers ═════════ */}
+  <section class="hd-block" data-hd-coming hidden aria-labelledby="hd-coming-h">
+    <div class="hd-head hd-rule">
+      <h2 id="hd-coming-h">Coming up</h2>
+      <span class="hd-meta">what the house is hosting or going to</span>
+    </div>
+    <div class="hd-events" data-hd-events></div>
+  </section>
+
   {/* ═════════ NUMBERS, SMALLER, LAST ═════════ */}
   <section class="hd-small">
     {/* `dash-stamps` names the shared house's numbers for the holo law: on a
@@ -250,8 +189,6 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
       </div>
     </div>
   </section>
-
-  <Tour />
 </section>
 
 <script>
@@ -302,8 +239,6 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
       ctx.owner = mine().length > 0;
       if (signin) signin.hidden = !layoutSignin || !!token();
       paintHouse(root!, reads, ctx);
-      // the tour opens by itself only for the house's own sign-in (Tour.astro)
-      if (ctx.owner) document.dispatchEvent(new CustomEvent("pm:house-owner"));
     }
 
     async function load() {
@@ -341,9 +276,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
 </script>
 
 <style>
-  .hd { --hd-hair: rgba(232, 196, 139, 0.22); --hd-glass: rgba(13, 20, 38, 0.62); --hd-warm: #f4e9d7; --hd-moon: #cdc2ab; --hd-coral: #e0846b; --hd-ok: #9be29b; color: var(--hd-moon);
-    /* the three sections' colours, and each class's chip (the tour wears the same three) */
-    --hd-c-posts: #aabef9; --hd-c-marks: #9be29b; --hd-c-mail: var(--pm-gold); }
+  .hd { --hd-hair: rgba(232, 196, 139, 0.22); --hd-glass: rgba(13, 20, 38, 0.62); --hd-warm: #f4e9d7; --hd-moon: #cdc2ab; --hd-coral: #e0846b; --hd-ok: #9be29b; color: var(--hd-moon); }
   /* global: the cards are another component's markup, and the feed is the script's */
   .hd :global([hidden]) { display: none !important; }
   .hd[data-hd-view="public"] :global([data-private]) { display: none !important; }
@@ -465,45 +398,18 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   .hd-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 0.45em 0.7em; background: linear-gradient(transparent, rgba(7, 11, 21, 0.92) 40%); font-family: var(--pm-mono); font-size: 0.62rem; color: var(--hd-moon); display: flex; justify-content: space-between; gap: 0.6em; flex-wrap: wrap; pointer-events: none; }
   .hd-cap a { pointer-events: auto; }
 
-  /* ── posts · marks · mail ── */
-  .hd-tour-link { margin: 0.7em 0 0; font-family: var(--pm-mono); font-size: 0.72rem; text-align: right; }
-  .hd-three { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 1.1em; margin-top: 1.2em; align-items: start; }
-  .hd-room { border-top: 3px solid var(--hd-k); }
-  .hd-room h2 { font-size: 1.25rem; }
-  .hd-kpis { display: flex; gap: 1.1em; flex-wrap: wrap; margin: 0.3em 0 0.5em; }
-  .hd-kpis > div { display: grid; }
-  .hd-kpis .v { font-size: 1.8rem; color: var(--hd-warm); line-height: 1; }
-  .hd-kpis .v.st { color: var(--pm-stamp-bright); }
-  .hd-kpis small { font-family: var(--pm-mono); font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(205, 194, 171, 0.7); }
-  .hd-grp { display: flex; justify-content: space-between; margin: 0; padding: 0.8em 0 0.25em; border-top: 1px solid var(--hd-hair); font-family: var(--pm-mono); font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(232, 196, 139, 0.6); }
-  .hd-kpis + .hd-grp { border-top: 0; padding-top: 0.2em; }
-  .hd-note { margin: 0.4em 0 0; font-size: 0.8rem; font-style: italic; color: rgba(205, 194, 171, 0.75); }
-  .hd-posts, .hd-mini { list-style: none; margin: 0; padding: 0; }
-  .hd-posts :global(.hd-post) { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.2em 0.6em; padding: 0.55em 0; border-top: 1px dashed rgba(232, 196, 139, 0.14); align-items: start; }
-  .hd-posts :global(.hd-post:first-child) { border-top: 0; }
-  .hd :global(.hd-cls) { --k: var(--hd-moon); font-family: var(--pm-mono); font-size: 0.56rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--k) 55%, transparent); color: var(--k); white-space: nowrap; margin-top: 0.2em; }
-  .hd :global(.hd-cls[data-cls="event"]) { --k: #aabef9; }
-  .hd :global(.hd-cls[data-cls="idea"]) { --k: var(--pm-gold); }
-  .hd :global(.hd-cls[data-cls="quest"]) { --k: #9be29b; }
-  .hd :global(.hd-cls[data-cls="bug"]) { --k: var(--hd-coral); }
-  .hd-posts :global(.hd-post-b) { min-width: 0; display: grid; gap: 0.15em; }
-  .hd-posts :global(.hd-post-t) { color: var(--hd-warm); font-size: 0.95rem; overflow-wrap: anywhere; }
-  .hd-posts :global(.hd-post-l) { font-size: 0.8rem; color: rgba(205, 194, 171, 0.8); }
-  .hd-posts :global(.hd-post-r) { display: grid; gap: 0.15em; justify-items: end; font-family: var(--pm-mono); font-size: 0.64rem; white-space: nowrap; }
-  .hd-posts :global(.hd-post-s) { color: var(--hd-warm); }
-  .hd-posts :global(.hd-post-st) { color: var(--pm-stamp-bright); }
-  .hd-posts :global(.hd-post-more) { font-family: var(--pm-mono); font-size: 0.64rem; color: rgba(232, 196, 139, 0.7); padding: 0.3em 0; }
-  .hd-mini :global(.hd-mini-row) { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.2em 0.6em; padding: 0.45em 0; border-top: 1px dashed rgba(232, 196, 139, 0.14); font-size: 0.88rem; }
-  .hd-mini :global(.hd-mini-row:first-child) { border-top: 0; }
-  .hd-mini :global(.hd-mini-t) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-  .hd-mini :global(.hd-mini-st) { color: var(--pm-stamp-bright); font-family: var(--pm-mono); font-size: 0.72rem; }
-  .hd-mini :global(.hd-mini-n) { font-family: var(--pm-mono); font-size: 0.66rem; color: rgba(205, 194, 171, 0.8); }
-  .hd-mini :global(.hd-mini-q) { flex-basis: 100%; font-style: italic; font-size: 0.84rem; color: rgba(205, 194, 171, 0.85); }
-  .hd-mini :global(.hd-other) { color: var(--pm-gold); }
+  /* ── coming up ── */
+  .hd-events :global(.hd-event) { display: grid; grid-template-columns: 5.2em minmax(0, 1fr) auto; gap: 1em; align-items: center; background: var(--hd-glass); border: 1px solid var(--hd-hair); border-radius: 12px; padding: 0.8em 1em; margin-bottom: 0.7em; }
+  .hd-events :global(.hd-date) { text-align: center; border-right: 1px solid var(--hd-hair); padding-right: 0.9em; }
+  .hd-events :global(.hd-date .d) { font-size: 1.7rem; color: var(--hd-warm); line-height: 1; }
+  .hd-events :global(.hd-date .m) { font-family: var(--pm-mono); font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--pm-gold); }
+  .hd-events :global(h3) { margin: 0; font-size: 1.1rem; }
+  .hd-events :global(h3 a) { color: var(--hd-warm); }
+  .hd-events :global(p) { margin: 0.15em 0 0; font-size: 0.88rem; }
+  .hd-events :global(.hd-going) { display: flex; gap: 0.5em; flex-wrap: wrap; justify-content: flex-end; font-size: 0.85rem; }
 
   /* ── the quests (drawn by Household.astro) and the numbers ── */
-  .hd-town { margin-top: 0.9em; }
-  .hd :global([data-quests]) { margin: 0.3em 0 0; }
+  .hd :global([data-quests]) { margin: 0 0 1.8em; }
   .hd-small { margin-top: 2.2em; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1em; font-size: 0.86rem; }
   .hd-small .hd-panel { padding: 0.8em 0.95em; }
   .hd-small h2 { font-size: 1rem; }
@@ -515,17 +421,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   .hd-nums dd { order: 1; }
   .dash-holo-note { margin: 0.6em 0 0; font-size: 0.8rem; }
 
-  @media (max-width: 1040px) {
-    .hd-three { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-    .hd-three > :first-child { grid-column: 1 / -1; }
-  }
   @media (max-width: 760px) {
-    /* the three stack in their order: posts, marks, mail */
-    .hd-three { grid-template-columns: minmax(0, 1fr); }
-    /* a post's chip and its state share the top line; the title takes the width */
-    .hd-posts :global(.hd-post) { grid-template-columns: auto minmax(0, 1fr); }
-    .hd-posts :global(.hd-post-r) { grid-column: 2; grid-row: 1; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.2em 0.7em; align-self: center; }
-    .hd-posts :global(.hd-post-b) { grid-column: 1 / -1; grid-row: 2; }
     .hd-house { grid-template-columns: minmax(0, 1fr); }
     .hd-clocks { justify-content: flex-start; }
     .hd-clock { min-width: 0; flex: 1 1 9em; }
@@ -538,5 +434,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
     .hd-window { min-height: 0; aspect-ratio: 3 / 2; }
     .hd-grid { grid-template-columns: minmax(0, 1fr); }
     .hd :global(.hd-card-live), .hd :global(.hd-card.is-compact .hd-card-live) { grid-template-columns: 5.2em minmax(0, 1fr); }
+    .hd-events :global(.hd-event) { grid-template-columns: 4em minmax(0, 1fr); }
+    .hd-events :global(.hd-going) { grid-column: 1 / -1; justify-content: flex-start; }
   }
 </style>

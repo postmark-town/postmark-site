@@ -352,7 +352,6 @@ export const ART_INK = {
   f: "#f4d6a0", // skin
   c: "#f3b5a6", // cheek
   u: "#4a5c8a", // his shirt — the Think Tank's blue
-  a: "#6fb2c9", // water — the harbour's water (src/styles/harbor.css, the quay's sea)
 };
 
 export const ART = {
@@ -559,88 +558,4 @@ export function artRects(name) {
 export function artSvg(name, { size = 48 } = {}) {
   const body = artRects(name).map((r) => `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="1" fill="${r.fill}"/>`).join("");
   return `<svg class="pm-pixart" viewBox="0 0 ${GRID} ${GRID}" width="${size}" height="${size}" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${body}</svg>`;
-}
-
-// ── THE TOUR'S SCENES (POS-293) ─────────────────────────────────────────────
-//
-// "How Postmark works" opens on the household page with a picture for each of
-// its five steps: the guide beside a few props on a 32×20 grid, drawn with the
-// same inks and the same run-length rects as the pictures above. Ported from
-// the prototype's pix-scenes.js (design-notes/dashboard-proto, 2026-09-28).
-//
-// THE GUIDE IS ONE CONSTANT. The scenes place props around it and never name
-// it, so swapping the figure is one line here and touches no scene. It is
-// Julian today; his use in the tour waits on Keemin's word with his household.
-
-export const SCENE_W = 32;
-export const SCENE_H = 20;
-
-/** The figure every scene stands at its left edge. */
-export const TOUR_GUIDE = ART.julian;
-const GUIDE_AT = [1, 4];
-
-const PROPS = {
-  bubble: [".kkkkkkkkkk.", "kwwwwwwwwwwk", "kwwkwwkwwkwk", "kwwwwwwwwwwk", ".kkkkkkkkkk.", "kk.........."],
-  wave: ["...kk", "..kffk", "..kffk", "..kffk", ".kfffk", ".kffk."],
-  envelope: ["kkkkkkkkkk", "kggggggggk", "kwggggggwk", "kwwggggwwk", "kwwwrrwwwk", "kwwwwwwwwk", "kkkkkkkkkk"],
-  ministamp: ["kmkmk", "mwwwm", "kwgwk", "mwwwm", "kmkmk"],
-  hand: ["kffk", "kffk", ".kk."],
-  boat: ["....k.....", "....kw....", "....kww...", "....kwww..", "kkkkkkkkkk", ".kooooook."],
-  waves: ["a.aa..aa..aa..", ".a..aa..aa..aa"],
-  house: ["....k....", "...kgk...", "..kgggk..", ".kgggggk.", "kkkkkkkkk", ".kwwkwwk.", ".kwwkkwk.", ".kkkkkkk."],
-  flag: ["kn..", "knn.", "knnn", "k...", "k...", "k..."],
-  ground: ["nnnnnnnnnnnnnnnn", "n.n.n.n.n.n.n.n."],
-  board: ["kkkkkkkkkkkkkk", "kooooooooooook", "kowwwwwooooook", "kommwwwowwwwok", "kolllwwoggwwok", "kowwwwwowllwok", "kooooooowwwwok", "koxxwwwooooook", "kollwwwooooook", "kowwwwwooooook", "kkkkkkkkkkkkkk"],
-  pin: ["r"],
-  legs: ["ko", "ko", "ko", "ko", "ko"],
-  spark: [".g.", "ggg", ".g."],
-  dash: ["kkkkkkkkkkkkkkk", "kwwwwwwwwwwwwwk", "kkkkkkkkkkkkkkk", "...............", "uuuu.nnnn.gggg.", "u..u.n..n.g..g.", "ubbu.nssn.gwwg.", "u..u.n..n.g..g.", "ubbu.nssn.gwwg.", "u..u.n..n.g..g.", "ubbu.nssn.gwwg.", "u..u.n..n.g..g.", "uuuu.nnnn.gggg."],
-  point: ["kkkk", "kfffk", "kkkk"],
-};
-
-/** Where in a scene's painting order the guide stands (at its own spot). */
-export const GUIDE = "guide";
-
-/** Each scene's layers, `[rows, x, y]` or GUIDE, painted in order. */
-export const SCENES = {
-  welcome: [GUIDE, [PROPS.wave, 15, 8], [PROPS.bubble, 18, 2], [PROPS.spark, 27, 11], [PROPS.spark, 21, 14]],
-  posts: [GUIDE, [PROPS.board, 17, 3], [PROPS.legs, 18, 14], [PROPS.legs, 28, 14], [PROPS.pin, 21, 5], [PROPS.pin, 28, 7], [PROPS.pin, 20, 10]],
-  marks: [[PROPS.ground, 16, 17], GUIDE, [PROPS.house, 19, 9], [PROPS.flag, 28, 11], [PROPS.spark, 29, 6]],
-  mail: [GUIDE, [PROPS.boat, 20, 1], [PROPS.waves, 17, 7], [PROPS.envelope, 17, 11], [PROPS.hand, 15, 14], [PROPS.ministamp, 26, 14]],
-  dash: [GUIDE, [PROPS.dash, 17, 4], [PROPS.point, 14, 13]],
-};
-
-/** A scene as rects on its 32×20 grid, its layers painted in order and
- *  clipped to the grid. Throws on an ink with no colour, as artRects does. */
-export function sceneRects(name) {
-  const props = SCENES[name];
-  if (!props) throw new Error(`pixel-icons: no tour scene named "${name}"`);
-  const grid = Array.from({ length: SCENE_H }, () => Array(SCENE_W).fill("."));
-  for (const [rows, x0, y0] of props.map((l) => (l === GUIDE ? [TOUR_GUIDE, ...GUIDE_AT] : l))) {
-    rows.forEach((row, dy) => [...row].forEach((c, dx) => {
-      const x = x0 + dx, y = y0 + dy;
-      if (c !== "." && x >= 0 && x < SCENE_W && y >= 0 && y < SCENE_H) grid[y][x] = c;
-    }));
-  }
-  const rects = [];
-  grid.forEach((row, y) => {
-    let x = 0;
-    while (x < SCENE_W) {
-      const c = row[x];
-      let w = 1;
-      while (row[x + w] === c) w++;
-      if (c !== ".") {
-        if (!ART_INK[c]) throw new Error(`pixel-icons: tour scene "${name}" row ${y} uses ink "${c}", which has no colour`);
-        rects.push({ x, y, w, fill: ART_INK[c] });
-      }
-      x += w;
-    }
-  });
-  return rects;
-}
-
-/** A tour scene as <svg> markup, as wide as its box. Decoration, so aria-hidden. */
-export function sceneSvg(name) {
-  const body = sceneRects(name).map((r) => `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="1" fill="${r.fill}"/>`).join("");
-  return `<svg class="pm-pixart pm-scene" viewBox="0 0 ${SCENE_W} ${SCENE_H}" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${body}</svg>`;
 }
