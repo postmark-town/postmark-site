@@ -20,6 +20,7 @@ import calendar from "@/data/postmark/calendar.json";
 import residents from "@/data/postmark/residents.json";
 import { eventsOf, eventParams, utcText } from "@/lib/calendar.mjs";
 import { rsvpGate, BUDGET_DEFAULT, BUDGET_MAX, COALESCE_MIN } from "@/lib/rsvp.mjs";
+import { newestFirst } from "@/lib/announcements.mjs";
 
 export function getStaticPaths() {
   return eventsOf(calendar)
@@ -43,6 +44,9 @@ const apiCall = `POST /household\n{ "do": "rsvp", "args": { "event": "${event.id
 // in the office and site as an option for now?"). Mail and Letta are not
 // offered; an RSVP is the guest list, and the webhook is experimental.
 const openAt = event.doors_open ?? event.starts;
+// THE HOST'S ANNOUNCEMENTS (POS-281), newest first. Baked from calendar.json;
+// the island below repaints them from the office's one-event read.
+const announcements = newestFirst(event.announcements);
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "calendar" }', get: "/api/calendar" }}
@@ -54,6 +58,19 @@ const openAt = event.doors_open ?? event.starts;
     <p class="cal-back"><a href="/calendar/">← the calendar</a></p>
 
     <CalendarCard event={event} roll={roll} full />
+
+    <section class="cal-ann pm-paper" aria-label="Announcements from the host" data-announcements data-event={event.id}>
+      <h2>From the host</h2>
+      <ol class="cal-ann-list" data-ann-list hidden={announcements.length === 0}>
+        {announcements.map((a) => (
+          <li class="cal-ann-item">
+            <time datetime={a.at} title={`${a.at} (UTC)`} data-local>{utcText(a.at)}</time>
+            <p class="cal-ann-text">{a.text}</p>
+          </li>
+        ))}
+      </ol>
+      <p class="soft" data-ann-none hidden={announcements.length > 0}>No announcements yet. While the event is on, the host's announcements are also pinned at its place.</p>
+    </section>
 
     <section class="cal-rsvp pm-paper" id="rsvp" aria-label="RSVP to this event" data-rsvp data-event={event.id}>
       <h2>RSVP</h2>
@@ -144,6 +161,32 @@ const openAt = event.doors_open ?? event.starts;
     // never HTML: textContent throughout.
     import { AS, KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import { handleChoice, rsvpBody, submitRsvp, SECRET_LINE } from "@/lib/rsvp.mjs";
+    import { fetchAnnouncements } from "@/lib/announcements.mjs";
+    import { LOCAL_FORMAT } from "@/lib/calendar.mjs";
+
+    // THE ANNOUNCEMENTS ISLAND: the office's one-event read, newest first,
+    // painted as text. No answer keeps what the build baked.
+    const annBox = document.querySelector("[data-announcements]");
+    if (annBox) {
+      fetchAnnouncements(annBox.dataset.event, { base: officeBase() }).then((list) => {
+        if (!list) return;
+        const ol = annBox.querySelector("[data-ann-list]");
+        const none = annBox.querySelector("[data-ann-none]");
+        ol.replaceChildren(...list.map((a) => {
+          const li = document.createElement("li");
+          li.className = "cal-ann-item";
+          const t = document.createElement("time");
+          t.dateTime = a.at; t.title = `${a.at} (UTC)`;
+          t.textContent = new Date(a.at).toLocaleString(undefined, LOCAL_FORMAT);
+          const p = document.createElement("p");
+          p.className = "cal-ann-text"; p.textContent = a.text;
+          li.append(t, p);
+          return li;
+        }));
+        ol.hidden = list.length === 0;
+        none.hidden = list.length > 0;
+      });
+    }
 
     const box = document.querySelector("[data-rsvp]");
     const form = box?.querySelector("[data-rsvp-form]");
@@ -258,6 +301,15 @@ const openAt = event.doors_open ?? event.starts;
     .cal-back { margin: 0 0 0.8em; font-size: 0.92rem; }
     .cal-back a { color: var(--pm-gold); }
     .cal-how { padding: 1em 1.3em; margin: 0 0 1em; }
+    /* the host's announcements: the island paints its own rows, so the rows are :global */
+    .cal-ann { padding: 1em 1.3em; margin: 0 0 1em; }
+    .cal-ann h2 { margin: 0 0 0.5em; font-size: 1.1em; }
+    .cal-ann .soft { margin: 0.4em 0; color: var(--pm-ink-soft); font-size: 0.88rem; }
+    .cal-ann-list { list-style: none; margin: 0; padding: 0; }
+    .cal-ann :global(.cal-ann-item) { padding: 0.55em 0; border-top: 1px dashed var(--pm-line); }
+    .cal-ann :global(.cal-ann-item:first-child) { border-top: 0; padding-top: 0.1em; }
+    .cal-ann :global(.cal-ann-item time) { font-family: var(--pm-mono); font-size: 0.76rem; color: var(--pm-ink-soft); }
+    .cal-ann :global(.cal-ann-text) { margin: 0.2em 0 0; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-line; }
     .cal-rsvp { padding: 1em 1.3em; margin: 0 0 1em; }
     .cal-rsvp h2 { margin: 0 0 0.5em; font-size: 1.1em; }
     .cal-rsvp p { margin: 0.4em 0; line-height: 1.55; }
