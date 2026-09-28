@@ -35,15 +35,13 @@ test("a resident page of a shared house opens on the rail and carries no quest b
     assert.ok(board > at(house, "data-hd "), "the board is inside the household dashboard");
   });
 
-// THE BOARD'S POSITION IS NO LONGER PINNED HERE. Keemin, 2026-09-28, moving the
-// board into the household page's Posts section (POS-293): "Yeah that's fine,
-// delete the guard (it's overkill)." The order assertions (feed → quests →
-// residents) are gone from this test and the house-of-one test below; what
-// each still holds, it holds.
-test("the household seat carries the day's quests, and the dashboard's old small quest panel is gone",
+test("the household seat puts the day's quests between Since you last looked and the residents",
   { skip: !built("households", "starforge", "index.html") }, () => {
     const html = page("households", "starforge", "index.html");
-    assert.ok(at(html, "data-quests ") > at(html, "data-hd "), "the board is inside the household dashboard");
+    const feed = at(html, 'id="hd-feed-h"');
+    const board = at(html, "data-quests ");
+    const residents = at(html, 'id="hd-res-h"');
+    assert.ok(feed < board && board < residents, "feed → quests → residents");
     assert.equal(html.includes("data-hd-quests"), false, "the dashboard's old small quest panel is gone");
   });
 
@@ -92,7 +90,9 @@ test("a declared house of one has its household page: rail, dashboard, board",
     const html = page("households", "casa-nera", "index.html");
     const house = html.slice(at(html, "data-house "));
     assert.ok(at(house, "data-house-tabs") < at(house, "data-hd "), "the rail tops the page");
-    assert.ok(at(house, "data-quests ") > at(house, "data-hd "), "the board is in the dashboard");
+    const feed = at(house, 'id="hd-feed-h"');
+    const board = at(house, "data-quests ");
+    assert.ok(feed < board && board < at(house, 'id="hd-res-h"'), "feed → quests → the resident");
     assert.equal(/data-shared/.test(house.slice(0, 200)), false, "a house of one is not marked shared, so its whole board shows");
   });
 

@@ -3,20 +3,15 @@
 // The page asks `readHouse(handles, { token })` and nothing else. Today that
 // composes the reads that exist, per resident:
 //
-//   GET /doorstep/{h}             mail (inbox), awaiting (bounces), stamps,
-//                                 counts, window.pane, stances, rulings, stakes,
-//                                 posts (the house's, POS-293), next_crossing —
-//                                 public; with the house's own bearer it adds
-//                                 your_pending_letters and unread (POS-286)
+//   GET /doorstep/{h}             mail (inbox), awaiting (bounces, new inbound),
+//                                 stamps, window.pane, stances, rulings, stakes,
+//                                 next_crossing — public; with the house's own
+//                                 bearer it adds your_pending_letters
 //   GET /mail/{h}?box=outbox      what they wrote (the doorstep carries the inbox only)
 //   GET /quests/{h}               the day's board, and whom the mint counted
 //   GET /world/walkers            where each one stands (one read for the town)
 //   GET /world/conversations      what each one said (one read for the town)
-//   GET /town/apex?read=ideas     the Think Tank (one read for the town): its
-//                                 ideas are posts, so Marks leaves them out
-//
-// The calendar is not read here since POS-293: events are posts, and the
-// doorstep's `posts` segment carries the house's.
+//   GET /calendar                 coming up — answers 404 until POS-207 ships
 //
 // THE SWITCH IS ONE CHANGE. POS-276 is building the house-wide read,
 // `household { read: "house" }`; when it lands, readHouse() asks it once and
@@ -51,7 +46,7 @@ async function getJSON(url, token) {
  * @param {{ token?: string|null, mine?: string[] }} opts
  *        token: the reader's bearer, sent only on the doorsteps of residents
  *        the reader's own sign-in holds (`mine`) — never on anyone else's
- * @returns {Promise<{ doorsteps, outboxes, quests, walkers, conversations, ideas }>}
+ * @returns {Promise<{ doorsteps, outboxes, quests, walkers, conversations, calendar }>}
  */
 export async function readHouse(handles, { token = null, mine = [] } = {}) {
   const api = officeOrigin();
@@ -59,14 +54,14 @@ export async function readHouse(handles, { token = null, mine = [] } = {}) {
   const each = (fn) => Promise.all(handles.map(fn)).then((rows) =>
     Object.fromEntries(handles.map((h, i) => [h, rows[i]])));
   const e = encodeURIComponent;
-  const [doorsteps, outboxes, quests, walkers, conversations, ideas] = await Promise.all([
+  const [doorsteps, outboxes, quests, walkers, conversations, calendar] = await Promise.all([
     each((h) => getJSON(`${api}/doorstep/${e(h)}`, token && own.has(h) ? token : null)),
     each((h) => getJSON(`${api}/mail/${e(h)}?box=outbox`)),
     each((h) => getJSON(`${api}/quests/${e(h)}`)),
     getJSON(`${api}/world/walkers`),
     getJSON(`${api}/world/conversations`),
-    getJSON(`${api}/town/apex?read=ideas`),
+    getJSON(`${api}/calendar`),
   ]);
-  return { doorsteps, outboxes, quests, walkers, conversations, ideas };
+  return { doorsteps, outboxes, quests, walkers, conversations, calendar };
 }
 
