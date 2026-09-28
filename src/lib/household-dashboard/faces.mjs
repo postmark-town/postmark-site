@@ -16,7 +16,7 @@
 //               `avatar_url:` at the town's media door, else the basename in
 //               the public town repo — world-cockpit.mjs residentAvatar, the
 //               site's one fallback, shared rather than copied
-//   homeName    HOME.md's first heading          residents.json home.body / home.title
+//   homeName    HOME.md `title:`, else a heading  home-face.mjs homeNameOf (POS-224)
 //   homeFace    HOME.md `assets:`, first entry   home-face.mjs homeFaceOf
 //   homeImages  the rest of HOME/, claimed       residents.json homeImages ∩ media.json
 //   sprite      the meep's own drawing           civic-art.mjs SPRITES (POS-252),
@@ -28,7 +28,7 @@
 // does not, because a gold card here would read as a colour the resident chose.
 // `accent` is null and the card draws in the neutral hairline.
 
-import { homeFaceOf } from "../home-face.mjs";
+import { homeFaceOf, homeNameOf } from "../home-face.mjs";
 import { residentAvatar } from "../world-cockpit.mjs";
 import { SPRITES, paint, SPRITE_W, SPRITE_H } from "../civic-art.mjs";
 import { MEEPS } from "../meeps-quarter.mjs";
@@ -60,17 +60,6 @@ export function bioLineOf(bio, max = 150) {
   const sentence = /^(.+?[.!?])(\s|$)/.exec(line)?.[1];
   if (sentence && sentence.length <= max) return sentence;
   return line.slice(0, max - 1).trimEnd() + "…";
-}
-
-// The first heading of a markdown body that is not an image line.
-function headingOf(body) {
-  for (const raw of String(body ?? "").split(/\r?\n/)) {
-    const t = raw.trim();
-    if (!t || /^!\[/.test(t)) continue;
-    const h = t.replace(/^#+\s*/, "").trim();
-    if (h) return h;
-  }
-  return "";
 }
 
 const meepHandles = new Set(MEEPS.map((m) => m.handle));
@@ -111,7 +100,7 @@ export function residentFace(r, media = {}) {
     bioLine: bioLineOf(profile.bio),
     avatar,
     monogram: Array.from(name.replace(/^the\s+/i, ""))[0]?.toLocaleUpperCase() ?? "?",
-    homeName: hasBody ? (headingOf(r.home?.body) || r.home?.title || null) : null,
+    homeName: hasBody ? homeNameOf(r) : null,
     homeFace: faceKey ? media[faceKey].card : null,
     homeImages: images.filter((k) => k !== faceKey).slice(0, 3).map((k) => media[k].card),
     sprite: spriteOf(handle),
