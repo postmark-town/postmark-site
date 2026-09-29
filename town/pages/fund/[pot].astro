@@ -88,7 +88,6 @@ import { qrSvg } from "@/lib/qr.mjs";
 // office's own hand. Manual at first, founder-accepted. A patron told
 // "witnessed" and then left waiting deserves to know a person is doing it.
 export const STRIPE = "https://buy.stripe.com/eVq9AV78zdI2h2o0lbd7q00";
-const API = import.meta.env.PUBLIC_POSTMARK_API ?? "https://postmark.town/api";
 
 // ONE page per pot SLUG, not per pot-epoch row.
 //
@@ -666,7 +665,20 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   </main>
 </PostmarkLayout>
 
-<script is:inline define:vars={{ API }}>
+<script is:inline>
+    // THE OFFICE THIS PAGE TALKS TO IS THE ONE THE SIGN-IN CAME FROM (2026-09-29).
+    // This page used to take a build-time absolute URL (a build env var,
+    // defaulting to production), while the sign-in and every other page ask
+    // `officeBase()` (src/lib/auth.mjs): the relative /api, or the operator's
+    // `pm.office.base` override. On dev.postmark.town that sent a dev sign-in's
+    // token to the production office, which answered "the estate is your
+    // household's own books" to a founder whose header showed every resident.
+    // An inline script cannot import auth.mjs, so this is officeBase() restated;
+    // its test pins the two to the same answer.
+    var API = (function () {
+      try { return String(window.localStorage.getItem("pm.office.base") || "/api").replace(/\/+$/, ""); }
+      catch (e) { return "/api"; }
+    })();
   (function () {
     var copy = document.querySelector("[data-copy]");
     if (copy) copy.addEventListener("click", function () {
