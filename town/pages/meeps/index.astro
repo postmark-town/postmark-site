@@ -48,6 +48,8 @@ import {
   MEEPS, meepLinks, profileOf, displayName, favouriteColour, accentVars, bench,
 } from "@/lib/meeps-quarter.mjs";
 import { PANELS, NEW_ISSUE_URL } from "@/lib/bug-strip.mjs";
+// a strip text is a list of segments; a { stamps } segment renders as <amount>✦ in the stamp family
+const segs = (x) => (typeof x === "string" ? [x] : x);
 
 const byHandle = new Map(residents.map((r) => [r.handle, r]));
 const cards = MEEPS.map((m) => {
@@ -234,13 +236,13 @@ const switchCss = [
                 {PANELS.map((p) => (
                   <li class="bs-panel" data-strip-panel={p.n}>
                     <img class="bs-img" src={p.img} alt={p.scene} width="112" height="112" loading="lazy" />
-                    <p class="bs-cap"><span class="bs-n">{p.n}</span>{p.caption}</p>
+                    <p class="bs-cap"><span class="bs-n">{p.n}</span>{segs(p.caption).map((s) => typeof s === "string" ? s : <b class="bs-stamp">{s.stamps}<span class="m-u">✦</span></b>)}</p>
                     <details class="bs-bubble" data-bubble={p.n}>
-                      <summary>{p.bubble.title}</summary>
+                      <summary>{segs(p.bubble.title).map((s) => typeof s === "string" ? s : <b class="bs-stamp">{s.stamps}<span class="m-u">✦</span></b>)}</summary>
                       <div class="bs-more">
-                        <p>{p.bubble.lines[0]}</p>
+                        <p>{segs(p.bubble.lines[0]).map((s) => typeof s === "string" ? s : <b class="bs-stamp">{s.stamps}<span class="m-u">✦</span></b>)}</p>
                         {p.bubble.call && <p><code class="bs-call">{p.bubble.call}</code></p>}
-                        {p.bubble.lines.slice(1).map((l) => <p>{l}</p>)}
+                        {p.bubble.lines.slice(1).map((l) => <p>{segs(l).map((s) => typeof s === "string" ? s : <b class="bs-stamp">{s.stamps}<span class="m-u">✦</span></b>)}</p>)}
                         {(p.bubble.links ?? []).map((a) => (
                           <p><a href={a.href} target="_blank" rel="noopener">{a.label} →</a></p>
                         ))}
@@ -603,6 +605,13 @@ const switchCss = [
       display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; margin-right: 0.45em;
       border: 2px solid #2e2417; border-radius: 50%; font-family: var(--pm-mono); font-size: 0.7rem; vertical-align: 0.12em;
     }
+    /* STAMPS ARE PURPLE (postmark.css's law; Keemin 2026-09-29 "use the stamp
+       purple font for the numbers and stamps"). Every stamp amount in the strip
+       is a .bs-stamp: the family's dark member on the cream panels, where it
+       reads 5.63:1 (6.92:1 on the white bubble); the family's middle member
+       would read 2.24:1 there and fail AA. */
+    .bs-stamp { color: var(--pm-stamp-dark); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .bs-stamp .m-u { margin-left: 0.08em; }
     .bs-bubble { position: relative; }
     .bs-bubble > summary {
       cursor: pointer; list-style: none;

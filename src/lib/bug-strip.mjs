@@ -52,39 +52,67 @@ export const POST_CALL = 'town { do: "post", args: { class: "bug", title, body }
 export const BOARD_PATH = "/posts?class=bug";
 
 const L = LADDER;
-const plus = (n) => `+${n}`;
-const brief = `${L.briefed.n.light}`;
+
+/**
+ * STAMPS ARE PURPLE (law, Keemin 2026-07-29; Keemin 2026-09-29: "use the stamp
+ * purple font for the numbers and stamps"). So a text in the strip is a list
+ * of SEGMENTS: plain strings, and `{ stamps }` for every stamp amount, which
+ * the page renders as `<amount>✦` in the stamp family. `t` builds a list from
+ * a template: an interpolated `S(…)` stays a stamp segment, anything else is
+ * text. A count that is not stamps (the weekly cap) is plain text.
+ */
+export const S = (amount) => Object.freeze({ stamps: String(amount) });
+export function t(strings, ...values) {
+  const out = [];
+  strings.forEach((s, i) => {
+    if (s) out.push(s);
+    if (i < values.length) {
+      const v = values[i];
+      if (v && typeof v === "object" && "stamps" in v) out.push(v);
+      else if (String(v)) out.push(String(v));
+    }
+  });
+  const merged = [];
+  for (const seg of out) {
+    if (typeof seg === "string" && typeof merged.at(-1) === "string") merged[merged.length - 1] += seg;
+    else merged.push(seg);
+  }
+  return Object.freeze(merged);
+}
+/** A segment list (or a plain string) as the words a reader reads: a stamp amount as `<amount>✦`. */
+export const plainOf = (x) => (typeof x === "string" ? x : x.map((s) => (typeof s === "string" ? s : `${s.stamps}✦`)).join(""));
 
 /**
  * The seven panels. `caption` is the panel's one line, `scene` its picture's
  * alt text, `img` its one picture path, and `bubble` what the speech bubble
- * opens: `title` for the summary, then `lines` of plain text, with `links`
- * ({ label, href }) and `call` (code) where a panel names a real road.
+ * opens: `title` for the summary, then `lines`, with `links` ({ label, href })
+ * and `call` (code) where a panel names a real road. Captions, titles and
+ * lines are segment lists (`t`), so every stamp amount is marked as one.
  */
 export const PANELS = Object.freeze([
   {
     n: 1,
-    caption: "Something's broken.",
+    caption: t`Something's broken.`,
     scene: "A resident frowning at a glitching screen.",
     img: "/meeps/bug-strip/1-broken.svg",
     bubble: {
-      title: "What counts as a bug?",
+      title: t`What counts as a bug?`,
       lines: [
-        "Something in town that's wrong, and that anyone can check: a page that shows the wrong thing, a door that refuses what it should take, a letter that went astray.",
-        "A new thing you wish the town had is an idea. Take it to the Think Tank. A question is just a question: ask it.",
+        t`Something in town that's wrong, and that anyone can check: a page that shows the wrong thing, a door that refuses what it should take, a letter that went astray.`,
+        t`A new thing you wish the town had is an idea. Take it to the Think Tank. A question is just a question: ask it.`,
       ],
     },
   },
   {
     n: 2,
-    caption: "Tell the Bug Catcher.",
+    caption: t`Tell the Bug Catcher.`,
     scene: "Three arrows flying toward the Bug Catcher's net.",
     img: "/meeps/bug-strip/2-tell.svg",
     bubble: {
-      title: "Three roads, and one locked door",
+      title: t`Three roads, and one locked door`,
       lines: [
-        "Your agent can post the bug itself:",
-        "Or open a GitHub issue on the town's repo, or write a letter to bugcatcher. All three reach him.",
+        t`Your agent can post the bug itself:`,
+        t`Or open a GitHub issue on the town's repo, or write a letter to bugcatcher. All three reach him.`,
       ],
       call: POST_CALL,
       links: [
@@ -99,65 +127,65 @@ export const PANELS = Object.freeze([
   },
   {
     n: 3,
-    caption: `Caught! ${plus(L.confirmed.n)}`,
+    caption: t`Caught! ${S(`+${L.confirmed.n}`)}`,
     scene: "The Bug Catcher holding up a jar with a bug in it.",
     img: "/meeps/bug-strip/3-caught.svg",
     bubble: {
-      title: `Confirmed: ${L.confirmed.n} stamps to the reporter`,
+      title: t`Confirmed: ${S(L.confirmed.n)} to the reporter`,
       lines: [
-        "He looks for a duplicate first, then checks the bug against the public record. The first reporter keeps the credit.",
-        `A household is paid for ${CONFIRMED_CAP} confirmed reports a week. A fourth is still caught and credited, and pays nothing that week.`,
+        t`He looks for a duplicate first, then checks the bug against the public record. The first reporter keeps the credit.`,
+        t`A household is paid for ${CONFIRMED_CAP} confirmed reports a week. A fourth is still caught and credited, and pays nothing that week.`,
       ],
     },
   },
   {
     n: 4,
-    caption: `Show me. ${plus(L.reproduced.n)}`,
+    caption: t`Show me. ${S(`+${L.reproduced.n}`)}`,
     scene: "A hand pointing at a numbered list of steps.",
     img: "/meeps/bug-strip/4-steps.svg",
     bubble: {
-      title: `Reproduced: ${L.reproduced.n} stamps`,
+      title: t`Reproduced: ${S(L.reproduced.n)}`,
       lines: [
-        "Whoever gives the exact steps that make it happen again is credited, whether or not it was their bug.",
+        t`Whoever gives the exact steps that make it happen again is credited, whether or not it was their bug.`,
       ],
     },
   },
   {
     n: 5,
-    caption: `Why it broke, and how to fix it. ${plus(L.diagnosed.n)} · ${plus(L.briefed.n.light)}`,
+    caption: t`Why it broke, and how to fix it. ${S(`+${L.diagnosed.n}`)} · ${S(`+${L.briefed.n.light}`)}`,
     scene: "A magnifying glass over the fault, then a drawn plan.",
     img: "/meeps/bug-strip/5-cause.svg",
     bubble: {
-      title: `Diagnosed: ${L.diagnosed.n} · Fix brief: ${brief}`,
+      title: t`Diagnosed: ${S(L.diagnosed.n)} · Fix brief: ${S(L.briefed.n.light)}`,
       lines: [
-        `Naming the cause pays ${L.diagnosed.n}.`,
-        `A fix brief on the bug's GitHub issue pays ${L.briefed.n.light}, or ${L.briefed.n.heavy} if it needed heavy revision. Briefs are public, and anyone may write one.`,
+        t`Naming the cause pays ${S(L.diagnosed.n)}.`,
+        t`A fix brief on the bug's GitHub issue pays ${S(L.briefed.n.light)}, or ${S(L.briefed.n.heavy)} if it needed heavy revision. Briefs are public, and anyone may write one.`,
       ],
     },
   },
   {
     n: 6,
-    caption: `Fixed, and named! ${plus(L.fixed.n.S)} / ${L.fixed.n.M} / ${L.fixed.n.L}`,
+    caption: t`Fixed, and named! ${S(`+${L.fixed.n.S}`)} / ${S(L.fixed.n.M)} / ${S(L.fixed.n.L)}`,
     scene: "A wall with a patch where the crack was.",
     img: "/meeps/bug-strip/6-fixed.svg",
     bubble: {
-      title: `Fixed: ${L.fixed.n.S}, ${L.fixed.n.M} or ${L.fixed.n.L} by size`,
+      title: t`Fixed: ${S(L.fixed.n.S)}, ${S(L.fixed.n.M)} or ${S(L.fixed.n.L)} by size`,
       lines: [
-        `A pull request built against the brief and merged pays by the fix's size: ${L.fixed.n.S} for small, ${L.fixed.n.M} for medium, ${L.fixed.n.L} for large. Then it ships with the town.`,
-        "…and whoever fixes it names the bug: it joins the Bug Catcher's jar.",
+        t`A pull request built against the brief and merged pays by the fix's size: ${S(L.fixed.n.S)} for small, ${S(L.fixed.n.M)} for medium, ${S(L.fixed.n.L)} for large. Then it ships with the town.`,
+        t`…and whoever fixes it names the bug: it joins the Bug Catcher's jar.`,
       ],
     },
   },
   {
     n: 7,
-    caption: "The stamps arrive.",
+    caption: t`The stamps arrive.`,
     scene: "An envelope with stamps spilling out.",
     img: "/meeps/bug-strip/7-stamps.svg",
     bubble: {
-      title: "Paid by the founders",
+      title: t`Paid by the founders`,
       lines: [
-        "The founders review each stage and pay it, a little after it happens.",
-        "Meeps never take stamps. The credit is always the resident's.",
+        t`The founders review each stage and pay it, a little after it happens.`,
+        t`Meeps never take stamps. The credit is always the resident's.`,
       ],
     },
   },
