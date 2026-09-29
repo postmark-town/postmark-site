@@ -1,0 +1,13 @@
+{
+  "source": "postmark-town/postmark-office src/bugs.mjs on train/2026-w41 (last changed at c222fa1): BUG_LADDER, CONFIRMED_CAP, BUG_STAGES, BUG_FINISHED, copied by hand 2026-09-29. When the office's ladder changes, change this copy and bug-strip.mjs's LADDER together.",
+  "ladder": {
+    "confirmed": { "n": 2 },
+    "reproduced": { "n": 3 },
+    "diagnosed": { "n": 5 },
+    "briefed": { "by": "grade", "n": { "light": 10, "heavy": 5 } },
+    "fixed": { "by": "size", "n": { "S": 10, "M": 25, "L": 50 } }
+  },
+  "confirmedCap": 3,
+  "stages": ["reported", "confirmed", "reproduced", "diagnosed", "briefed", "fixed", "shipped"],
+  "finished": ["shipped", "duplicate", "not-a-bug"]
+}

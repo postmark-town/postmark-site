@@ -1,0 +1,200 @@
+// bug-strip.test.mjs — the bug lane as a comic strip under the Bug Catcher's
+// card, and the open-bugs board (POS-236, Keemin 2026-09-29).
+//
+//   node --test test/bug-strip.test.mjs
+//
+// The strip's numbers are the office's ladder, pinned here against a fixture
+// copy of postmark-office src/bugs.mjs (test/fixtures/office-bug-ladder.json
+// names its source). The bubbles open without script, the security road is the
+// private advisory and never the mail or an issue, and a resident's title on
+// the board is text, never markup.
+
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, existsSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+
+import {
+  LADDER, CONFIRMED_CAP, STAGES, FINISHED, PANELS, ADVISORY_URL, NEW_ISSUE_URL, POST_CALL, BOARD_PATH,
+  boardOf, paintBoard,
+} from "../src/lib/bug-strip.mjs";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const FIX = JSON.parse(readFileSync(join(ROOT, "test", "fixtures", "office-bug-ladder.json"), "utf8"));
+const SRC = readFileSync(join(ROOT, "src", "lib", "bug-strip.mjs"), "utf8");
+const DIST = join(ROOT, "dist-town");
+const builtMeeps = join(DIST, "meeps", "index.html");
+
+// ── THE NUMBERS ──────────────────────────────────────────────────────────────
+
+test("the ladder, the cap and the stages are the office's (fixture: postmark-office src/bugs.mjs)", () => {
+  assert.deepEqual(JSON.parse(JSON.stringify(LADDER)), FIX.ladder, "the strip's ladder drifted from BUG_LADDER");
+  assert.equal(CONFIRMED_CAP, FIX.confirmedCap, "the weekly cap drifted from CONFIRMED_CAP");
+  assert.deepEqual([...STAGES], FIX.stages);
+  assert.deepEqual([...FINISHED], FIX.finished);
+});
+
+test("every number in the strip is read from the ladder, never typed into a panel", () => {
+  const block = SRC.slice(SRC.indexOf("export const PANELS"), SRC.indexOf("// ── THE BOARD"));
+  assert.ok(block.length > 500, "the PANELS block was not found");
+  const stripped = block
+    .replace(/\$\{[^}]*\}/g, "")        // interpolations read the ladder
+    .replace(/^\s*n: \d+,$/gm, "")      // the panel's own number
+    .replace(/^\s*img: "[^"]*",$/gm, "");  // its picture path
+  const typed = stripped.match(/\d+/g) ?? [];
+  assert.deepEqual(typed, [], "a number is typed into a panel instead of read from LADDER");
+});
+
+test("the captions and bubbles say the ladder's amounts, in order", () => {
+  const L = FIX.ladder;
+  const cap = PANELS.map((p) => p.caption);
+  assert.equal(PANELS.length, 7);
+  assert.deepEqual(PANELS.map((p) => p.n), [1, 2, 3, 4, 5, 6, 7]);
+  assert.match(cap[2], new RegExp(`\\+${L.confirmed.n}$`));
+  assert.match(cap[3], new RegExp(`\\+${L.reproduced.n}$`));
+  assert.match(cap[4], new RegExp(`\\+${L.diagnosed.n} · \\+${L.briefed.n.light}$`));
+  assert.match(cap[5], new RegExp(`\\+${L.fixed.n.S} / ${L.fixed.n.M} / ${L.fixed.n.L}$`));
+  const all = (p) => [p.bubble.title, ...p.bubble.lines].join(" ");
+  assert.match(all(PANELS[2]), new RegExp(`paid for ${FIX.confirmedCap} confirmed reports a week`));
+  assert.match(all(PANELS[4]), new RegExp(`pays ${L.briefed.n.light}, or ${L.briefed.n.heavy} if it needed heavy revision`));
+  assert.match(all(PANELS[6]), /Meeps never take stamps/);
+});
+
+test("each panel has one picture path, and the drawn pictures are the tool's (bug-strip-art --check)", () => {
+  for (const p of PANELS) {
+    assert.match(p.img, /^\/meeps\/bug-strip\/[a-z0-9-]+\.svg$/, `panel ${p.n}'s picture is not one path`);
+    assert.ok(existsSync(join(ROOT, "public", "atelier", "postmark", ...p.img.split("/").filter(Boolean))), `panel ${p.n}'s picture ${p.img} is missing`);
+    assert.ok(p.scene.length > 10, `panel ${p.n} has no alt text`);
+  }
+  execFileSync(process.execPath, [join(ROOT, "tools", "bug-strip-art.mjs"), "--check"], { stdio: "pipe" });
+});
+
+test("the security road is the private advisory: never the mail, never an issue", () => {
+  const two = PANELS[1].bubble;
+  assert.equal(two.locked.link.href, ADVISORY_URL);
+  assert.equal(ADVISORY_URL, "https://github.com/postmark-town/postmark/security/advisories/new");
+  assert.doesNotMatch(JSON.stringify(two.locked), /mailto:|\/issues/, "the locked door points at the mail or an issue");
+  assert.match(two.locked.text, /Never put it in a letter/);
+  // the three open roads, each a real road
+  assert.equal(two.call, POST_CALL);
+  assert.equal(POST_CALL, 'town { do: "post", args: { class: "bug", title, body } }');
+  assert.deepEqual(two.links.map((l) => l.href), [NEW_ISSUE_URL]);
+  assert.match(two.lines.join(" "), /letter to bugcatcher/);
+});
+
+// ── THE BOARD ────────────────────────────────────────────────────────────────
+
+const READ = {
+  as_of: "2026-09-29T20:00:00.000Z", class: "bug", finished: ["shipped", "duplicate", "not-a-bug"], total: 5,
+  posts: [
+    { class: "bug", id: "mari/the-map-forgets", title: "The map forgets my pin", author: "mari", state: "confirmed", fields: { issue: "https://github.com/postmark-town/postmark/issues/3300" } },
+    { class: "bug", id: "vermillion/<b>bold</b>", title: "<img src=x onerror=alert(1)> letters vanish", author: "vermillion", state: "reported", fields: { issue: "javascript:alert(1)" } },
+    { class: "bug", id: "sage/old", title: "Fixed long ago", author: "sage", state: "shipped", fields: {} },
+    { class: "bug", id: "sage/dupe", title: "A duplicate", author: "sage", state: "duplicate", fields: { of: "mari/the-map-forgets" } },
+    { class: "bug", id: "odd/state", title: "An unknown state", author: "odd", state: "exploded", fields: {} },
+  ],
+};
+
+test("boardOf: the open bugs grouped by stage in the lifecycle's order; finished and unknown states left off", () => {
+  const b = boardOf(READ);
+  assert.equal(b.ok, true);
+  assert.equal(b.open, 2);
+  assert.deepEqual(b.groups.map((g) => [g.stage, g.rows.map((r) => r.id)]), [
+    ["reported", ["vermillion/<b>bold</b>"]],
+    ["confirmed", ["mari/the-map-forgets"]],
+  ]);
+  const mari = b.groups[1].rows[0];
+  assert.deepEqual(mari, { id: "mari/the-map-forgets", title: "The map forgets my pin", reporter: "mari", stage: "confirmed", issue: "https://github.com/postmark-town/postmark/issues/3300" });
+  assert.equal(b.groups[0].rows[0].issue, null, "a non-issue URL became a link");
+});
+
+test("boardOf: an empty board is empty; a failed read is a failed read, never an empty board", () => {
+  assert.deepEqual(boardOf({ ...READ, posts: [] }), { ok: true, groups: [], open: 0 });
+  for (const bad of [null, undefined, {}, { posts: "no" }, "<html>"]) assert.equal(boardOf(bad).ok, false, `${JSON.stringify(bad)} read as a board`);
+});
+
+// A document just big enough for paintBoard, whose innerHTML refuses: the
+// painter must build with elements and textContent only.
+function stubDoc() {
+  const make = (tag) => {
+    const el = {
+      tagName: tag.toUpperCase(), className: "", dataset: {}, children: [], textContent: "", href: "", rel: "", target: "",
+      append(...c) { el.children.push(...c); },
+      replaceChildren(...c) { el.children = [...c]; },
+    };
+    Object.defineProperty(el, "innerHTML", { set() { throw new Error("innerHTML used"); }, get() { return ""; } });
+    return el;
+  };
+  return { createElement: make, root: make("div") };
+}
+const textOf = (el) => (el.children.length ? el.children.map(textOf).join(" ") : el.textContent);
+const find = (el, pred) => (pred(el) ? [el] : []).concat(...el.children.map((c) => find(c, pred)));
+
+test("paintBoard: stages, titles and reporters as text; a title's markup stays text", () => {
+  const doc = stubDoc();
+  paintBoard(doc.root, boardOf(READ), doc);
+  const text = textOf(doc.root);
+  assert.match(text, /Reported · 1/);
+  assert.match(text, /Caught · 1/);
+  assert.match(text, /<img src=x onerror=alert\(1\)> letters vanish/, "the title was not kept as text");
+  assert.match(text, /reported by mari/);
+  const links = find(doc.root, (e) => e.tagName === "A");
+  assert.deepEqual(links.map((a) => [a.href, a.textContent]), [["https://github.com/postmark-town/postmark/issues/3300", "issue #3300"]]);
+  assert.doesNotMatch(SRC.slice(SRC.indexOf("export function paintBoard")), /innerHTML|insertAdjacentHTML|outerHTML/);
+});
+
+test("paintBoard: says 'No open bugs right now.' for an empty board, and something else for a failed read", () => {
+  const empty = stubDoc();
+  paintBoard(empty.root, boardOf({ ...READ, posts: [] }), empty);
+  assert.equal(textOf(empty.root), "No open bugs right now.");
+  const failed = stubDoc();
+  paintBoard(failed.root, boardOf(null), failed);
+  assert.match(textOf(failed.root), /can't be read right now/);
+  assert.doesNotMatch(textOf(failed.root), /No open bugs/);
+});
+
+// ── THE BUILT PAGE (skipped until it is built, as POS-177 rules) ────────────
+
+function panelOf(page, key) {
+  const at = page.indexOf(`<section class="mq-panel" id="${key}"`);
+  assert.ok(at >= 0, `no panel for ${key}`);
+  const next = page.indexOf('<section class="mq-panel"', at + 1);
+  return page.slice(at, next > 0 ? next : page.indexOf("<script", at));
+}
+
+test("the built strip stands under the Bug Catcher's card only, seven panels, each bubble a <details>",
+  { skip: !existsSync(builtMeeps) }, () => {
+  const page = readFileSync(builtMeeps, "utf8");
+  assert.equal(page.split("data-bug-strip").length - 1, 1, "the strip stands more than once");
+  const bc = panelOf(page, "bugcatcher");
+  assert.ok(bc.includes("data-bug-strip"), "the strip is not under the Bug Catcher's card");
+  assert.ok(bc.indexOf("data-bug-strip") > bc.indexOf("</article>"), "the strip is not after his card");
+  const panels = [...bc.matchAll(/<li\b[^>]*data-strip-panel="(\d)"/g)].map((m) => Number(m[1]));
+  assert.deepEqual(panels, [1, 2, 3, 4, 5, 6, 7]);
+  const bubbles = [...bc.matchAll(/<details\b[^>]*class="bs-bubble"[^>]*>\s*<summary\b[^>]*>([^<]+)<\/summary>/g)].map((m) => m[1]);
+  assert.equal(bubbles.length, 7, "a bubble is not a <details> with a summary");
+  for (const s of bubbles) assert.doesNotMatch(s, /^(?:\+ ?)?(?:read |show |see )?more\b/i, `a bubble opens on a bare "more": ${s}`);
+  for (const p of PANELS) assert.ok(bc.includes(`src="${p.img}"`), `panel ${p.n}'s picture is not its img path`);
+  for (const m of ["postmaster", "illuminator", "registrar", "worldkeeper", "architect"]) {
+    assert.doesNotMatch(panelOf(page, m), /data-bug-strip|bs-bubble/, `the strip leaked into ${m}'s panel`);
+  }
+});
+
+test("the built security panel opens onto the advisory page, and never the mail or an issue",
+  { skip: !existsSync(builtMeeps) }, () => {
+  const bc = panelOf(readFileSync(builtMeeps, "utf8"), "bugcatcher");
+  const locked = bc.slice(bc.indexOf("data-locked"), bc.indexOf("</details>", bc.indexOf("data-locked")));
+  assert.ok(locked.length > 50, "no locked door in panel 2");
+  assert.match(locked, new RegExp(`href="${ADVISORY_URL.replace(/[/.]/g, "\\$&")}"`));
+  assert.doesNotMatch(locked, /mailto:|\/issues\b/);
+});
+
+test("the built board: read live from the office's bug posts, a placeholder that says so, and the Report button",
+  { skip: !existsSync(builtMeeps) }, () => {
+  const bc = panelOf(readFileSync(builtMeeps, "utf8"), "bugcatcher");
+  assert.match(bc, new RegExp(`data-bug-board data-src="https://postmark\\.town/api${BOARD_PATH.replace("?", "\\?")}"`));
+  assert.match(bc, /class="bb-empty"[^>]*>The board is read live from the office/);
+  assert.match(bc, new RegExp(`<a class="pm-btn" href="${NEW_ISSUE_URL}"[^>]*\\bdata-report\\b[^>]*>Report a bug</a>`));
+});

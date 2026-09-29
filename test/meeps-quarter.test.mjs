@@ -20,11 +20,13 @@ import {
   profileOf, displayName, RUNTIME_OVERRIDE, favouriteColour, accentVars, PLACEHOLDER_COLOUR, MEEPLING_DOES,
 } from "../src/lib/meeps-quarter.mjs";
 import { ICONS, iconSvg } from "../src/lib/pixel-icons.mjs";
+import { PANELS } from "../src/lib/bug-strip.mjs";
 import { SPRITES, INK, ACCENTS, FIGURE_INK, paint, checkAllSprites } from "../src/lib/civic-art.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = (f) => JSON.parse(readFileSync(join(ROOT, "src", "data", "postmark", f), "utf8"));
 const DIST = join(ROOT, "dist-town");
+const PANELS_N = PANELS.length;
 
 // ── WHO ─────────────────────────────────────────────────────────────────────
 
@@ -388,7 +390,9 @@ test("the built page prints what the meeps wrote as text — no markup rides in 
   const panels = page.slice(page.indexOf('class="mq-panels"'), page.indexOf("<script", page.indexOf('class="mq-panels"')));
   // The panels' own markup is a fixed vocabulary; anything else arrived from content.
   const tags = new Set([...panels.matchAll(/<([a-z][a-z0-9-]*)\b/gi)].map((m) => m[1].toLowerCase()));
-  const allowed = new Set(["div", "section", "article", "svg", "rect", "path", "img", "h2", "p", "span", "a", "b", "code", "ul", "li"]);
+  const allowed = new Set(["div", "section", "article", "svg", "rect", "path", "img", "h2", "p", "span", "a", "b", "code", "ul", "li",
+    // the bug strip's own markup (POS-236): its headings, its panels, its bubbles
+    "h3", "ol", "details", "summary"]);
   assert.deepEqual([...tags].filter((t) => !allowed.has(t)), [], "a tag the page does not write is inside the cards");
 });
 
@@ -445,7 +449,12 @@ test("the built page: the Postmaster by that name, nothing behind \"more\", noth
   assert.ok(naming.length >= MEEPS.length * 3, `only ${naming.length} naming lines were read`);
   assert.equal(naming.filter((t) => /post office/i.test(t)).length, 0, "the site still calls a meep the Post Office");
   assert.ok(naming.some((t) => t.includes("the Postmaster")), "the Postmaster is not named on the page");
-  assert.doesNotMatch(body, /<details\b/, "an expand is on the Meeps page");
+  // The one expand this page allows: the bug strip's speech bubbles, by
+  // Keemin's own later word (2026-09-29: "clickable bubbles for more detailed
+  // info"). Only those; test/bug-strip.test.mjs holds them.
+  const unbubbled = body.replace(/<details class="bs-bubble"[\s\S]*?<\/details>/g, "");
+  assert.equal(body.split('<details class="bs-bubble"').length - 1, PANELS_N, "the bug strip's bubbles are not all here to carve out");
+  assert.doesNotMatch(unbubbled, /<details\b/, "an expand is on the Meeps page");
   assert.doesNotMatch(body, /\btitle="/, "a hover carries text on the Meeps page");
   assert.doesNotMatch(body, /class="[^"]*\bpm-sr\b/, "text is tucked for screen readers only");
 });

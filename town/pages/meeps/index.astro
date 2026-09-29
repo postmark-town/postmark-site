@@ -47,6 +47,7 @@ import { iconSvg } from "@/lib/pixel-icons.mjs";
 import {
   MEEPS, meepLinks, profileOf, displayName, favouriteColour, accentVars, bench,
 } from "@/lib/meeps-quarter.mjs";
+import { PANELS, NEW_ISSUE_URL, BOARD_PATH } from "@/lib/bug-strip.mjs";
 
 const byHandle = new Map(residents.map((r) => [r.handle, r]));
 const cards = MEEPS.map((m) => {
@@ -78,6 +79,10 @@ const accentStyle = (t) => `--lane-edge:${t.edge};--lane-edge-open:${t.edgeOpen}
 const newspaper = iconSvg("newspaper");
 
 const rows = bench(rollcall);
+
+// The open-bugs board is read in the reader's browser from the office.
+const API = import.meta.env.PUBLIC_POSTMARK_API ?? "https://postmark.town/api";
+const BOARD_URL = API + BOARD_PATH;
 
 // The switching, exactly /town/'s: every panel shows where :has() is missing;
 // where it is present one shows — the targeted one, or the Postmaster.
@@ -217,6 +222,56 @@ const switchCss = [
               ))}
             </div>
           </article>
+
+          {/* ── THE BUG LANE, AS A STRIP (Keemin, 2026-09-29: "a nice visual
+              comic-book like explanation of the process, with clickable
+              bubbles for more detailed info"). Under the Bug Catcher's card
+              only. Seven panels from bug-strip.mjs § PANELS, each one picture
+              path, one caption and a bubble that opens its detail; then the
+              open bugs, read live, and the Report button. The bubbles are
+              <details>, so they open without script and by keyboard: the one
+              expand this page allows, by that word. */}
+          {m.key === "bugcatcher" && (
+            <section class="bug-strip" aria-labelledby="bs-h" data-bug-strip>
+              <h3 id="bs-h" class="cq-h">How a bug gets caught</h3>
+              <ol class="bs-panels">
+                {PANELS.map((p) => (
+                  <li class="bs-panel" data-strip-panel={p.n}>
+                    <img class="bs-img" src={p.img} alt={p.scene} width="112" height="112" loading="lazy" />
+                    <p class="bs-cap"><span class="bs-n">{p.n}</span>{p.caption}</p>
+                    <details class="bs-bubble" data-bubble={p.n}>
+                      <summary>{p.bubble.title}</summary>
+                      <div class="bs-more">
+                        <p>{p.bubble.lines[0]}</p>
+                        {p.bubble.call && <p><code class="bs-call">{p.bubble.call}</code></p>}
+                        {p.bubble.lines.slice(1).map((l) => <p>{l}</p>)}
+                        {(p.bubble.links ?? []).map((a) => (
+                          <p><a href={a.href} target="_blank" rel="noopener">{a.label} →</a></p>
+                        ))}
+                        {p.bubble.locked && (
+                          <div class="bs-locked" data-locked>
+                            <p class="bs-locked-h">{p.bubble.locked.title}</p>
+                            <p>{p.bubble.locked.text}</p>
+                            <p><a href={p.bubble.locked.link.href} target="_blank" rel="noopener">{p.bubble.locked.link.label} →</a></p>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  </li>
+                ))}
+              </ol>
+
+              <section class="bug-board" aria-labelledby="bb-h">
+                <h3 id="bb-h" class="cq-h">The open bugs</h3>
+                <div class="bb-list" data-bug-board data-src={BOARD_URL} aria-live="polite">
+                  <p class="bb-empty">The board is read live from the office when this page opens in a browser with scripts on.</p>
+                </div>
+                <p class="bb-report">
+                  <a class="pm-btn" href={NEW_ISSUE_URL} target="_blank" rel="noopener" data-report>Report a bug</a>
+                </p>
+              </section>
+            </section>
+          )}
         </section>
       ))}
 
@@ -271,6 +326,20 @@ const switchCss = [
   </div>
   <script>
     import { heartbeatFor } from "@/lib/meeps-quarter.mjs";
+    import { boardOf, paintBoard } from "@/lib/bug-strip.mjs";
+
+    // The open bugs, live from the office's bug posts. A read that fails says
+    // so; it never reads as an empty board.
+    (async () => {
+      const root = document.querySelector("[data-bug-board]");
+      if (!root) return;
+      let read = null;
+      try {
+        const r = await fetch(root.getAttribute("data-src") || "", { headers: { accept: "application/json" } });
+        read = r.ok ? await r.json() : null;
+      } catch { read = null; }
+      paintBoard(root, boardOf(read));
+    })();
 
     // THE CLICK DOES NOT SCROLL — /town/'s fix (w37.2), here too (Keemin,
     // 2026-09-27: "The meeps similarly should lose their auto-scroll"). The
@@ -501,6 +570,61 @@ const switchCss = [
     .coop-u.is-parked { opacity: 0.55; border-style: dashed; }
     .coop-src { margin: 1rem 0 0; text-align: center; font-size: 0.72rem; line-height: 1.6; color: rgba(205, 194, 171, 0.6); overflow-wrap: anywhere; }
     .coop-src a { color: var(--pm-gold); }
+
+    /* ── THE BUG STRIP: paper panels in ink, a speech bubble under each ───── */
+    .bug-strip { margin: 1.4rem 0 0; }
+    .bs-panels {
+      list-style: none; margin: 0; padding: 0;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr)); gap: 0.9rem;
+    }
+    .bs-panel {
+      display: flex; flex-direction: column; gap: 0.6rem;
+      padding: 0.9rem 0.9rem 1rem;
+      background: #f3e7c9; color: #2e2417;
+      border: 3px solid #2e2417; border-radius: 6px;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+    }
+    .bs-img { display: block; width: 112px; height: 112px; margin: 0 auto; image-rendering: pixelated; }
+    .bs-cap { margin: 0; font-weight: 700; font-size: 1.02rem; line-height: 1.35; }
+    .bs-n {
+      display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; margin-right: 0.45em;
+      border: 2px solid #2e2417; border-radius: 50%; font-family: var(--pm-mono); font-size: 0.7rem; vertical-align: 0.12em;
+    }
+    .bs-bubble { position: relative; margin-top: auto; }
+    .bs-bubble > summary {
+      cursor: pointer; list-style: none;
+      position: relative; padding: 0.55em 0.8em;
+      background: #fff; color: #2e2417; border: 2px solid #2e2417; border-radius: 16px;
+      font-size: 0.86rem; line-height: 1.35;
+    }
+    .bs-bubble > summary::-webkit-details-marker { display: none; }
+    .bs-bubble > summary::before {
+      content: ""; position: absolute; top: -9px; left: 1.4em;
+      border: 8px solid transparent; border-top: 0; border-bottom: 9px solid #2e2417;
+    }
+    .bs-bubble > summary::after { content: " ▾"; color: #6d5c44; }
+    .bs-bubble[open] > summary::after { content: " ▴"; }
+    .bs-bubble > summary:focus-visible { outline: 3px solid #9c3f2e; outline-offset: 2px; }
+    .bs-more { padding: 0.5em 0.2em 0; font-size: 0.86rem; line-height: 1.5; }
+    .bs-more p { margin: 0 0 0.55em; }
+    .bs-more a { color: #9c3f2e; font-weight: 700; }
+    .bs-call { font-size: 0.74rem; overflow-wrap: anywhere; background: rgba(46, 36, 23, 0.08); padding: 0.1em 0.3em; border-radius: 3px; }
+    .bs-locked { margin-top: 0.4em; padding: 0.6em 0.7em; border: 2px dashed #9c3f2e; border-radius: 6px; background: rgba(156, 63, 46, 0.07); }
+    .bs-locked-h { font-weight: 700; }
+
+    .bug-board { margin: 1.6rem 0 0; }
+    .bb-list section + section { margin-top: 0.9rem; }
+    .bb-list h4 { margin: 0 0 0.4rem; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(232, 196, 139, 0.85); font-weight: 400; }
+    .bb-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+    .bb-row {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3em 0.9em;
+      padding: 0.55em 0.8em; border: 1px solid rgba(232, 196, 139, 0.2); border-radius: 8px; color: #e6dcc6;
+    }
+    .bb-title { font-weight: 700; overflow-wrap: anywhere; }
+    .bb-by { font-size: 0.82rem; color: rgba(205, 194, 171, 0.75); }
+    .bb-issue { margin-left: auto; font-size: 0.8rem; color: var(--pm-gold); }
+    .bb-empty { margin: 0; color: #cdc2ab; font-style: italic; }
+    .bb-report { margin: 1rem 0 0; text-align: center; }
 
     @media (max-width: 720px) {
       .cq-frame, .cq-art { width: 60px; height: 60px; }
