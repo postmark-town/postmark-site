@@ -1,4 +1,4 @@
-// meeps-quarter.mjs — the Meeps quarter's reader: who the five are, what each
+// meeps-quarter.mjs — the Meeps quarter's reader: who the six are, what each
 // of them does, and the meeplings' coop beside them.
 //
 // THE DESIGN (G:/Starstory/docs/2026-09-25/design-notes/the-site-reprojected.md,
@@ -12,13 +12,17 @@
 // room, no handle and no page of its own; the row is the roll-call rendered".
 // 2026-09-27 the bench became the coop, in the meeplings' own panel (below).
 //
-// WHO THE FIVE ARE, MEASURED 2026-09-25 (jetto-site-reprojected):
-//   - the town repo's MEEPS/ holds exactly five rooms: architect, illuminator,
-//     postmaster, registrar, worldkeeper (postmark-town/postmark @ f4eb30468);
-//   - the town's tools/households.json lists all five under Starforge;
-//   - GET /api/residents?office=true answers FOUR — it misses the registrar.
+// WHO THE SIX ARE, MEASURED 2026-09-25 (jetto-site-reprojected) AND
+// 2026-09-29 (plumb-bugcatcher-arrives):
+//   - the town repo's MEEPS/ holds exactly six rooms: architect, bugcatcher,
+//     illuminator, postmaster, registrar, worldkeeper (the first five at
+//     postmark-town/postmark @ f4eb30468, the Bug Catcher's by 3a0b3642c);
+//   - the town's tools/households.json lists five under Starforge, the Bug
+//     Catcher under the-town (2026-09-29);
+//   - GET /api/residents?office=true answered FOUR on 09-25 — it missed the
+//     registrar.
 // The rooms are the definition a meep carries ("a meepling has no room"), so
-// the rooms are the list. Never a sixth.
+// the rooms are the list. Never a seventh.
 //
 // RESIDENT WORDS RENDER AS TEXT. Everything this file returns that a meep
 // wrote — a bio, an address's first paragraph, a sentinel's reason — is plain
@@ -31,9 +35,9 @@ import { residentAvatar } from "./world-cockpit.mjs";
 const TOWN_REPO = "https://github.com/postmark-town/postmark";
 
 /**
- * The five, in the quarter's order: the Postmaster first (the town's oldest
+ * The six, in the quarter's order: the Postmaster first (the town's oldest
  * office and the one every letter crosses), then the rest as the design lists
- * them.
+ * them, and the Bug Catcher, the newest, last (2026-09-29).
  *
  * THE MEEPS ARE THE MEEPS THEMSELVES (POS-252, Keemin 2026-09-26: "the meeps
  * should use the profiles of the actual meeps … The Post Office should just be
@@ -109,6 +113,19 @@ export const MEEPS = [
     job: "Walks the town's ideas from the Think Tank to the blueprints that turn them into law.",
     daily: null,
   },
+  {
+    // The community names him once they know him (the founder, 2026-09-26),
+    // so the office is his name until then.
+    key: "bugcatcher",
+    handle: "bugcatcher",
+    name: null,
+    office: "the Bug Catcher",
+    pronoun: "his",
+    door: { mcp: 'town { read: "posts", args: { class: "bug" } }', get: "/api/posts?class=bug" },
+    round: "MEEPS/SKILLS/bugcatcher-round.md",
+    job: "He catches the bugs residents report, confirms them, and makes sure whoever found each one is credited.",
+    daily: null,
+  },
 ];
 
 /**
@@ -117,7 +134,7 @@ export const MEEPS = [
  * selection." The card's runtime text is PROFILE.md's `runtime:` in the town
  * repo, and the only meep with one (WHITE_PAGES/postmaster/PROFILE.md:6) still
  * says Claude Code. The town's record is corrected at its source by hand; until
- * then this one table says it for all five. Delete a row once that meep's own
+ * then this one table says it for all six. Delete a row once that meep's own
  * record carries the line, and the table once it is empty.
  */
 export const RUNTIME_OVERRIDE = {
@@ -126,6 +143,7 @@ export const RUNTIME_OVERRIDE = {
   registrar: "Letta, flexible model selection",
   worldkeeper: "Letta, flexible model selection",
   architect: "Letta, flexible model selection",
+  bugcatcher: "Letta, flexible model selection",
 };
 
 /**

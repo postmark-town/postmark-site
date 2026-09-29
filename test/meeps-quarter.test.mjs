@@ -1,6 +1,6 @@
-// meeps-quarter.test.mjs — the Meeps quarter: five meeps with rooms, never a
-// sixth; each card simple enough for a reader, its words as text; the
-// meeplings' coop from the box's roll-call.
+// meeps-quarter.test.mjs — the Meeps quarter: six meeps with rooms (the Bug
+// Catcher the sixth, 2026-09-29), never a seventh; each card simple enough for
+// a reader, its words as text; the meeplings' coop from the box's roll-call.
 //
 //   node --test test/meeps-quarter.test.mjs
 //
@@ -28,12 +28,12 @@ const DIST = join(ROOT, "dist-town");
 
 // ── WHO ─────────────────────────────────────────────────────────────────────
 
-test("five meeps, the five with rooms, in the quarter's order — never a sixth", () => {
-  assert.deepEqual(MEEPS.map((m) => m.key), ["postmaster", "illuminator", "registrar", "worldkeeper", "architect"]);
-  assert.equal(new Set(MEEPS.map((m) => m.handle)).size, 5);
+test("six meeps, the six with rooms, in the quarter's order — never a seventh", () => {
+  assert.deepEqual(MEEPS.map((m) => m.key), ["postmaster", "illuminator", "registrar", "worldkeeper", "architect", "bugcatcher"]);
+  assert.equal(new Set(MEEPS.map((m) => m.handle)).size, 6);
   // The notary is machinery, not a meep (Keemin: "the notary is a meep now?").
   assert.equal(MEEPS.some((m) => /notary/i.test(`${m.key} ${m.name} ${m.office}`)), false);
-  // Every meep the site's own meeps extract names is one of the five: a room
+  // Every meep the site's own meeps extract names is one of the six: a room
   // the extract knows and the quarter does not would be a meep left outside.
   for (const m of DATA("meeps.json")) {
     assert.ok(MEEPS.some((x) => x.handle === m.name), `meeps.json names ${m.name}, who has no building`);
@@ -113,6 +113,24 @@ test("profileOf: the profile's bio first, else the address; the portrait through
   assert.equal(profileOf(meep, undefined, media).words, null);
 });
 
+test("the Bug Catcher's card stands before his resident record does: the typed fields, and nothing the record would say", () => {
+  // The page builds before Sunday's bind (2026-10-04), so the committed roll
+  // carries no `bugcatcher`. His card is then what the site types — office,
+  // job, round, colour placeholder, monogram — and says plainly why there is
+  // no bio; no resident page is linked, because none is built.
+  const bc = MEEPS.find((m) => m.key === "bugcatcher");
+  assert.deepEqual(
+    { name: bc.name, office: bc.office, pronoun: bc.pronoun, round: bc.round, daily: bc.daily },
+    { name: null, office: "the Bug Catcher", pronoun: "his", round: "MEEPS/SKILLS/bugcatcher-round.md", daily: null });
+  assert.equal(bc.job, "He catches the bugs residents report, confirms them, and makes sure whoever found each one is credited.");
+  assert.deepEqual(bc.door, { mcp: 'town { read: "posts", args: { class: "bug" } }', get: "/api/posts?class=bug" });
+  assert.equal(displayName(bc), "The Bug Catcher");
+  assert.deepEqual(profileOf(bc, undefined, DATA("media.json")),
+    { inRoll: false, words: null, from: null, portrait: null, runtime: "Letta, flexible model selection" });
+  assert.deepEqual(meepLinks(bc, { inRoll: false }).map((l) => l.label), ["the Full Job Description"]);
+  assert.equal(favouriteColour(undefined), null, "no record wears the placeholder");
+});
+
 test("profileOf holds avatar_url to the town's media door", () => {
   const meep = MEEPS[1];
   const at = (url) => profileOf(meep, { handle: "illuminator", profile: { avatar_url: url } }).portrait;
@@ -176,7 +194,7 @@ test("each meep carries its job in one plain sentence, and only Ferry keeps a Da
   assert.deepEqual(MEEPS.filter((m) => m.daily).map((m) => [m.key, m.daily.href, m.daily.label]), [["postmaster", "/daily/", "Ferry's Daily"]]);
 });
 
-test("the runtime line: Letta for all five, from one temporary table", () => {
+test("the runtime line: Letta for all six, from one temporary table", () => {
   assert.deepEqual(Object.keys(RUNTIME_OVERRIDE).sort(), MEEPS.map((m) => m.handle).sort());
   for (const m of MEEPS) assert.equal(profileOf(m, { handle: m.handle, profile: { runtime: "Claude Code" } }).runtime, "Letta, flexible model selection");
   const src = readFileSync(join(ROOT, "src", "lib", "meeps-quarter.mjs"), "utf8");
@@ -267,7 +285,7 @@ test("a live beat only where the sentinel watches the unit by name", () => {
 const builtMeeps = join(DIST, "meeps", "index.html");
 const KEYS = [...MEEPS.map((m) => m.key), "meeplings"];
 
-test("the built Meeps page: five meeps and the meeplings on the quay, six panels, and the coop from the manifest",
+test("the built Meeps page: six meeps and the meeplings on the quay, seven panels, and the coop from the manifest",
   { skip: !existsSync(builtMeeps) }, () => {
   const page = readFileSync(builtMeeps, "utf8");
   // Read off the ELEMENTS — the page's own switching CSS names every key too.
