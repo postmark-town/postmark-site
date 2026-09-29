@@ -298,6 +298,22 @@ test("the built Meeps page: six meeps and the meeplings on the quay, seven panel
   assert.ok(page.includes(DATA("rollcall.json").tag), "the coop does not say which release it was read at");
 });
 
+test("the meeplings stand on a row of their own, so the six meeps keep a whole quay at phone width",
+  { skip: !existsSync(builtMeeps) }, () => {
+  // Wright's ruling, 2026-09-29: a seventh lot crowded the names at 390px.
+  const page = readFileSync(builtMeeps, "utf8");
+  const fig = page.indexOf('<a class="cq-b" href="#meeplings"');
+  assert.ok(fig > 0, "no meeplings figure");
+  assert.match(page.slice(page.lastIndexOf("<li ", fig), fig), /class="cq-lot cq-apart"/, "the meeplings' lot is not set apart");
+  for (const m of MEEPS) {
+    const f = page.indexOf(`<a class="cq-b" href="#${m.key}"`);
+    assert.doesNotMatch(page.slice(page.lastIndexOf("<li ", f), f), /cq-apart/, `${m.key} is set apart like a meepling`);
+  }
+  const css = readFileSync(join(ROOT, "town", "pages", "meeps", "index.astro"), "utf8");
+  assert.match(css, /\.cq-apart \{ flex: 0 0 100%;/, "the meeplings' row is not a whole row");
+  assert.match(css, /\.cq-lot \{ flex: 0 1 calc\(100% \/ 6\); min-width: 0; \}/, "on a phone a meep's lot is not a sixth of the quay");
+});
+
 test("the coop is named the coop and lives only in the meeplings' panel",
   { skip: !existsSync(builtMeeps) }, () => {
   const page = readFileSync(builtMeeps, "utf8");

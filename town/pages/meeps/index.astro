@@ -143,7 +143,7 @@ const switchCss = [
             </a>
           </li>
         ))}
-        <li class="cq-lot" style={accentStyle(meeplings.accent)}>
+        <li class="cq-lot cq-apart" style={accentStyle(meeplings.accent)}>
           <a class="cq-b" href={`#${MEEPLINGS}`} data-meep={MEEPLINGS} data-face="sprite">
             <span class="cq-frame">
               <svg class="cq-art" viewBox={`0 0 ${SPRITE_W} ${SPRITE_H}`}
@@ -349,6 +349,10 @@ const switchCss = [
       gap: 0; flex-wrap: wrap;
     }
     .cq-lot { flex: 0 1 auto; }
+    /* the meeplings stand on a row of their own under the meeps, at every
+       width: they are not a meep (Wright's ruling, 2026-09-29, when the sixth
+       meep arrived and a seventh lot crowded the names at phone width) */
+    .cq-apart { flex: 0 0 100%; display: flex; justify-content: center; }
     .cq-b {
       display: flex; flex-direction: column; align-items: center;
       gap: 0; padding: 0.5rem 0 0.7rem; width: 8.6rem;
@@ -513,13 +517,15 @@ const switchCss = [
       .mc-daily { grid-column: 1 / -1; flex-direction: row; justify-self: start; gap: 0.6em; font-size: 0.72rem; }
       .mc-daily :global(svg) { width: 32px; height: 32px; }
     }
-    /* a phone: all six on one quay, not a wrapped 2-2-2 */
+    /* a phone: the six meeps on one quay, not a wrapped 2-2-2, and the
+       meeplings under them, one lot wide */
     @media (max-width: 480px) {
       .cq { padding: 1.2rem 0.2rem 0; }
       .cq-quay { margin: 0 -0.2rem; }
-      .cq-row { flex-wrap: nowrap; }
-      .cq-lot { flex: 1 1 0; min-width: 0; }
+      .cq-lot { flex: 0 1 calc(100% / 6); min-width: 0; }
+      .cq-apart { flex: 0 0 100%; }
       .cq-b { width: auto; padding: 0.4rem 0.1rem 0.6rem; }
+      .cq-apart .cq-b { width: calc(100% / 6); }
       .cq-frame, .cq-art { width: 44px; height: 44px; }
       .cq-portrait, .cq-mono { width: 40px; height: 40px; margin-bottom: 2px; }
       .cq-mono { font-size: 1.2rem; }
