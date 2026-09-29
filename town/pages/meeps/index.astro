@@ -47,7 +47,7 @@ import { iconSvg } from "@/lib/pixel-icons.mjs";
 import {
   MEEPS, meepLinks, profileOf, displayName, favouriteColour, accentVars, bench,
 } from "@/lib/meeps-quarter.mjs";
-import { PANELS, NEW_ISSUE_URL, BOARD_PATH } from "@/lib/bug-strip.mjs";
+import { PANELS, NEW_ISSUE_URL } from "@/lib/bug-strip.mjs";
 
 const byHandle = new Map(residents.map((r) => [r.handle, r]));
 const cards = MEEPS.map((m) => {
@@ -79,10 +79,6 @@ const accentStyle = (t) => `--lane-edge:${t.edge};--lane-edge-open:${t.edgeOpen}
 const newspaper = iconSvg("newspaper");
 
 const rows = bench(rollcall);
-
-// The open-bugs board is read in the reader's browser from the office.
-const API = import.meta.env.PUBLIC_POSTMARK_API ?? "https://postmark.town/api";
-const BOARD_URL = API + BOARD_PATH;
 
 // The switching, exactly /town/'s: every panel shows where :has() is missing;
 // where it is present one shows — the targeted one, or the Postmaster.
@@ -272,7 +268,7 @@ const switchCss = [
 
               <section class="bug-board" aria-labelledby="bb-h">
                 <h3 id="bb-h" class="cq-h">The open bugs</h3>
-                <div class="bb-list" data-bug-board data-src={BOARD_URL} aria-live="polite">
+                <div class="bb-list" data-bug-board aria-live="polite">
                   <p class="bb-empty">The board is read live from the office when this page opens in a browser with scripts on.</p>
                 </div>
                 <p class="bb-report">
@@ -335,16 +331,21 @@ const switchCss = [
   </div>
   <script>
     import { heartbeatFor } from "@/lib/meeps-quarter.mjs";
-    import { boardOf, paintBoard, jarOf, paintJar } from "@/lib/bug-strip.mjs";
+    import { boardOf, paintBoard, jarOf, paintJar, BOARD_PATH } from "@/lib/bug-strip.mjs";
+    import { officeBase } from "@/lib/auth.mjs";
 
     // The jar and the open bugs, live from one read of the office's bug posts.
-    // A read that fails says so; it never reads as an empty jar or board.
+    // The page asks its own office (officeBase(): the operator's pm.office.base,
+    // else the same-origin /api), never a build-time production URL: on dev a
+    // baked prod URL read prod's office, which had no /posts (the fund page's
+    // lesson, #197). A read that fails says so; it never reads as an empty jar
+    // or board.
     (async () => {
       const root = document.querySelector("[data-bug-board]");
       if (!root) return;
       let read = null;
       try {
-        const r = await fetch(root.getAttribute("data-src") || "", { headers: { accept: "application/json" } });
+        const r = await fetch(officeBase() + BOARD_PATH, { headers: { accept: "application/json" } });
         read = r.ok ? await r.json() : null;
       } catch { read = null; }
       const jar = document.querySelector("[data-bug-jar]");

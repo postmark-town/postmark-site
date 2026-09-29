@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
 import {
-  LADDER, CONFIRMED_CAP, STAGES, FINISHED, PANELS, ADVISORY_URL, NEW_ISSUE_URL, POST_CALL, BOARD_PATH,
+  LADDER, CONFIRMED_CAP, STAGES, FINISHED, PANELS, ADVISORY_URL, NEW_ISSUE_URL, POST_CALL,
   boardOf, paintBoard, jarOf, paintJar, JAR_ART,
 } from "../src/lib/bug-strip.mjs";
 
@@ -249,7 +249,9 @@ test("the built security panel opens onto the advisory page, and never the mail 
 test("the built board: read live from the office's bug posts, a placeholder that says so, and the Report button",
   { skip: !existsSync(builtMeeps) }, () => {
   const bc = panelOf(readFileSync(builtMeeps, "utf8"), "bugcatcher");
-  assert.match(bc, new RegExp(`data-bug-board data-src="https://postmark\\.town/api${BOARD_PATH.replace("?", "\\?")}"`));
+  // the board names no office: the script asks officeBase() (test/meeps-page-office.test.mjs)
+  assert.match(bc, /<div class="bb-list" data-bug-board aria-live="polite"/);
+  assert.doesNotMatch(bc, /postmark\.town\/api/);
   assert.match(bc, /class="bb-empty"[^>]*>The board is read live from the office/);
   // the jar stands between the strip and the open bugs
   const jar = bc.indexOf("data-bug-jar");
