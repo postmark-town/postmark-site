@@ -18,7 +18,7 @@ import { execFileSync } from "node:child_process";
 
 import {
   LADDER, CONFIRMED_CAP, STAGES, FINISHED, PANELS, ADVISORY_URL, NEW_ISSUE_URL, POST_CALL,
-  boardOf, paintBoard, jarOf, paintJar, JAR_ART, plainOf,
+  boardOf, paintBoard, jarOf, paintJar, JAR_ART, JAR_EMPTY, plainOf,
 } from "../src/lib/bug-strip.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -182,22 +182,22 @@ const POSTS = JSON.parse(readFileSync(join(ROOT, "test", "fixtures", "office-bug
 test("jarOf: a slot for every bug, named by fields.critter and fields.named_by (fixture: office #260); side exits get none", () => {
   const j = jarOf(POSTS);
   assert.equal(j.ok, true);
-  assert.deepEqual(j.slots.map((s) => [s.id, s.named]), [
-    ["mari/the-map-forgets-my-pin", true],
-    ["vermillion/letters-vanish", false],
-    ["sage/old-crack", true],
-    ["odd/fixed-before-names", false],
+  assert.deepEqual(j.slots.map((s) => [s.id, s.finished, s.critter]), [
+    ["mari/the-map-forgets-my-pin", true, "Pinwhistle"],
+    ["vermillion/letters-vanish", false, null],
+    ["sage/old-crack", true, "<b>Crackle</b>"],
+    ["odd/fixed-before-names", true, null],
   ]);
-  assert.equal(j.named, 2);
-  assert.deepEqual(j.slots[0], { id: "mari/the-map-forgets-my-pin", title: "The map forgets my pin after a crossing", named: true, critter: "Pinwhistle", namedBy: "lupi" });
-  assert.deepEqual(j.slots[1], { id: "vermillion/letters-vanish", title: "Letters vanish from my outbox", named: false, critter: null, namedBy: null });
-  // the field names are the office's: rename either and the named slots fall silent
+  assert.equal(j.finished, 3);
+  assert.deepEqual(j.slots[0], { id: "mari/the-map-forgets-my-pin", title: "The map forgets my pin after a crossing", finished: true, critter: "Pinwhistle", namedBy: "lupi" });
+  assert.deepEqual(j.slots[1], { id: "vermillion/letters-vanish", title: "Letters vanish from my outbox", finished: false, critter: null, namedBy: null });
+  // the field names are the office's: rename either and the names fall silent
   const renamed = { ...POSTS, posts: POSTS.posts.map((p) => ({ ...p, fields: Object.fromEntries(Object.entries(p.fields).map(([k, v]) => [k === "critter" ? "name" : k, v])) })) };
-  assert.equal(jarOf(renamed).named, 0);
+  assert.equal(jarOf(renamed).slots.filter((s) => s.critter).length, 0);
 });
 
 test("jarOf: an empty jar is empty; a failed read is a failed read", () => {
-  assert.deepEqual(jarOf({ ...POSTS, posts: [] }), { ok: true, slots: [], named: 0 });
+  assert.deepEqual(jarOf({ ...POSTS, posts: [] }), { ok: true, slots: [], finished: 0 });
   for (const bad of [null, {}, { posts: 3 }]) assert.equal(jarOf(bad).ok, false);
 });
 
@@ -209,18 +209,32 @@ test("paintJar: the critter, 'named by', and the title as text; an open bug is '
   assert.equal(textOf(slots[0]), " Pinwhistle named by lupi The map forgets my pin after a crossing");
   assert.equal(textOf(slots[1]), " ? Letters vanish from my outbox");
   assert.match(textOf(slots[2]), /<b>Crackle<\/b> named by sage/, "the critter's name was not kept as text");
-  assert.deepEqual(find(doc.root, (e) => e.tagName === "IMG").map((i) => i.src), [JAR_ART.named, JAR_ART.open, JAR_ART.named, JAR_ART.open]);
-  assert.doesNotMatch(textOf(doc.root), /The jar is empty/, "a jar with named bugs says it is empty");
+  assert.doesNotMatch(textOf(doc.root), /The jar is empty|still being caught/, "a jar with fixed bugs says none is fixed");
   assert.doesNotMatch(SRC.slice(SRC.indexOf("export function paintJar"), SRC.indexOf("// ── THE BOARD")), /innerHTML|insertAdjacentHTML|outerHTML/);
 });
 
-test("paintJar: 'The jar is empty: no bug has been fixed yet.' until one is named; a failed read says otherwise", () => {
+test("paintJar: only an open bug is '?'; a finished bug with no name gets the lit jar and 'unnamed' (Wright's review, 2026-09-29)", () => {
+  const doc = stubDoc();
+  paintJar(doc.root, jarOf(POSTS), doc);
+  const slots = find(doc.root, (e) => e.tagName === "LI");
+  assert.equal(textOf(slots[3]), " unnamed Fixed before the jar", "a finished bug without a name reads as open");
+  assert.deepEqual(find(doc.root, (e) => e.tagName === "IMG").map((i) => i.src),
+    [JAR_ART.finished, JAR_ART.open, JAR_ART.finished, JAR_ART.finished], "only the open bug wears the silhouette");
+  assert.deepEqual(slots.filter((li) => /\?/.test(textOf(li))).map((li) => li.dataset.post), ["vermillion/letters-vanish"], "a '?' stands on a bug that is not open");
+});
+
+test("paintJar: the empty line only with no slot at all; slots with none fixed say they are still being caught", () => {
   const empty = stubDoc();
   paintJar(empty.root, jarOf({ ...POSTS, posts: [] }), empty);
-  assert.equal(textOf(empty.root), "The jar is empty: no bug has been fixed yet.");
+  assert.equal(textOf(empty.root), JAR_EMPTY);
+  assert.equal(JAR_EMPTY, "The jar is empty: no bug has been fixed yet.");
   const openOnly = stubDoc();
   paintJar(openOnly.root, jarOf({ ...POSTS, posts: [POSTS.posts[1]] }), openOnly);
-  assert.match(textOf(openOnly.root), /^The jar is empty: no bug has been fixed yet\. .*\?/);
+  assert.match(textOf(openOnly.root), /^No bug has been fixed yet\. These are still being caught\. .*\?/);
+  assert.doesNotMatch(textOf(openOnly.root), /The jar is empty/, "the jar says it is empty above its own slots");
+  const unnamedOnly = stubDoc();
+  paintJar(unnamedOnly.root, jarOf({ ...POSTS, posts: [POSTS.posts[3]] }), unnamedOnly);
+  assert.doesNotMatch(textOf(unnamedOnly.root), /still being caught|The jar is empty/, "a fixed bug without a name reads as none fixed");
   const failed = stubDoc();
   paintJar(failed.root, jarOf(null), failed);
   assert.equal(textOf(failed.root), "The jar can't be read right now.");

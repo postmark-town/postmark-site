@@ -194,41 +194,47 @@ export const PANELS = Object.freeze([
 // ── THE JAR ──────────────────────────────────────────────────────────────────
 //
 // Keemin, 2026-09-29: the fixer names the bug, and it joins the Bug Catcher's
-// jar. Every bug gets a slot: an open one is a silhouette with "?", a fixed or
-// shipped one shows the name its fixer gave it (fields.critter) and who named
-// it (fields.named_by: the resident credited with the fix, office
-// events-store.mjs). The side exits (duplicate, not-a-bug) were never bugs to
-// catch, so they get no slot.
+// jar. Every bug gets a slot. An OPEN one (not yet fixed) is a silhouette with
+// "?". A FINISHED one (fixed or shipped) is the lit jar with the name its fixer
+// gave it (fields.critter) and who named it (fields.named_by: the resident
+// credited with the fix, office events-store.mjs), or "unnamed" when it
+// finished before names (Wright's review, 2026-09-29: only open bugs are "?").
+// The side exits (duplicate, not-a-bug) were never bugs to catch, so they get
+// no slot.
 
-/** The jar's two pictures: a bug still loose, and a caught, named one. */
+/** The jar's two pictures: a bug still loose, and a caught, finished one. */
 export const JAR_ART = Object.freeze({
   open: "/meeps/bug-strip/jar-open.svg",
-  named: "/meeps/bug-strip/3-caught.svg",
+  finished: "/meeps/bug-strip/3-caught.svg",
 });
-const NAMED_STATES = new Set(["fixed", "shipped"]);
+const FINISHED_STATES = new Set(["fixed", "shipped"]);
 const SIDE_EXITS = new Set(["duplicate", "not-a-bug"]);
+
+/** The jar's two lines: no slot at all, or slots with none fixed yet. */
+export const JAR_EMPTY = "The jar is empty: no bug has been fixed yet.";
+export const JAR_NONE_FIXED = "No bug has been fixed yet. These are still being caught.";
 
 /**
  * The jar, from the same `GET /posts?class=bug` answer as the board. A slot is
- * `{ id, title, named, critter, namedBy }`, all plain strings; `named` is true
- * only for a fixed or shipped bug whose fixer gave it a name.
+ * `{ id, title, finished, critter, namedBy }`: `finished` for a fixed or
+ * shipped bug; `critter` its name when its fixer gave one, else null.
  */
 export function jarOf(read) {
-  if (!read || typeof read !== "object" || !Array.isArray(read.posts)) return { ok: false, slots: [], named: 0 };
+  if (!read || typeof read !== "object" || !Array.isArray(read.posts)) return { ok: false, slots: [], finished: 0 };
   const slots = read.posts
     .filter((p) => p && typeof p === "object" && STAGES.includes(p.state) && !SIDE_EXITS.has(p.state))
     .map((p) => {
-      const critter = text(p.fields?.critter, 40);
-      const named = NAMED_STATES.has(p.state) && Boolean(critter);
+      const finished = FINISHED_STATES.has(p.state);
+      const critter = finished ? text(p.fields?.critter, 40) || null : null;
       return {
         id: text(p.id, 120),
         title: text(p.title) || "(untitled)",
-        named,
-        critter: named ? critter : null,
-        namedBy: named ? text(p.fields?.named_by, 40) || null : null,
+        finished,
+        critter,
+        namedBy: critter ? text(p.fields?.named_by, 40) || null : null,
       };
     });
-  return { ok: true, slots, named: slots.filter((s) => s.named).length };
+  return { ok: true, slots, finished: slots.filter((s) => s.finished).length };
 }
 
 /** Paints `jarOf`'s answer into `root`: createElement and textContent only. */
@@ -236,17 +242,17 @@ export function paintJar(root, jar, doc = globalThis.document) {
   root.replaceChildren();
   const el = (tag, cls, s) => { const e = doc.createElement(tag); e.className = cls; if (s !== undefined) e.textContent = s; return e; };
   if (!jar.ok) { root.append(el("p", "jar-empty", "The jar can't be read right now.")); return; }
-  if (!jar.named) root.append(el("p", "jar-empty", "The jar is empty: no bug has been fixed yet."));
-  if (!jar.slots.length) return;
+  if (!jar.slots.length) { root.append(el("p", "jar-empty", JAR_EMPTY)); return; }
+  if (!jar.finished) root.append(el("p", "jar-empty", JAR_NONE_FIXED));
   const ul = el("ul", "jar-slots");
   for (const s of jar.slots) {
-    const li = el("li", s.named ? "jar-slot is-named" : "jar-slot is-open");
+    const li = el("li", s.finished ? "jar-slot is-named" : "jar-slot is-open");
     li.dataset.post = s.id;
     const img = doc.createElement("img");
-    img.className = "jar-img"; img.src = s.named ? JAR_ART.named : JAR_ART.open; img.alt = ""; img.width = 64; img.height = 64;
+    img.className = "jar-img"; img.src = s.finished ? JAR_ART.finished : JAR_ART.open; img.alt = ""; img.width = 64; img.height = 64;
     li.append(img);
-    if (s.named) {
-      li.append(el("span", "jar-name", s.critter));
+    if (s.finished) {
+      li.append(el("span", s.critter ? "jar-name" : "jar-name jar-unnamed", s.critter ?? "unnamed"));
       if (s.namedBy) li.append(el("span", "jar-by", `named by ${s.namedBy}`));
     } else {
       li.append(el("span", "jar-name jar-q", "?"));
