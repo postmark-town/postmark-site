@@ -89,7 +89,9 @@ export function paintHouse(root, reads, ctx) {
 
   paintClocks(root, clocksOf(handles, reads.doorsteps), now);
   paintFeed(root, items, ctx);
-  if (owner) paintNeeds(root, needsOf(handles, reads.doorsteps), ctx);
+  const needs = needsOf(handles, reads.doorsteps);
+  if (owner) paintNeeds(root, needs, ctx);
+  paintNextBoat(root, owner ? needs.pending : [], ctx);
   paintCards(root, items, reads, ctx);
   paintComing(root, comingUpOf(reads.calendar, handles), ctx);
   paintShare(root, questsOf(handles, reads.quests), handles);
@@ -179,9 +181,9 @@ function paintNeeds(root, needs, ctx) {
   const ul = root.querySelector("[data-hd-needs]");
   if (!ul) return;
   ul.textContent = "";
-  const item = (k, calm) => {
+  const item = (k) => {
     const li = el("li");
-    li.appendChild(el("span", "k" + (calm ? " calm" : ""), k));
+    li.appendChild(el("span", "k", k));
     return li;
   };
   if (needs.stances.total > 0) {
@@ -205,23 +207,34 @@ function paintNeeds(root, needs, ctx) {
     if (b.path) { const a = el("a", null, "read it →"); a.href = TOWN_REPO + b.path.split("/").map(encodeURIComponent).join("/"); li.appendChild(a); }
     ul.appendChild(li);
   }
-  if (needs.pending.length) {
-    const li = item("written, not yet sailed · " + needs.pending.length);
-    const p = el("p");
-    needs.pending.forEach((x, i) => {
-      if (i) p.append("; ");
-      p.append(who(ctx.faces, x.handle, ctx.seatHref), " to " + (x.to || "someone") + (x.title ? ` — “${clip(x.title, 60)}”` : ""));
-    });
-    p.append(". They ride the next crossing.");
-    li.appendChild(p);
+  if (needs.atRisk > 0) {
+    const risk = item("at the keeper’s settlement");
+    risk.appendChild(el("p", null, `${plural(needs.atRisk, "mark")} of the house’s ${needs.atRisk === 1 ? "is" : "are"} at risk: published without stamps behind ${needs.atRisk === 1 ? "it" : "them"}.`));
+    ul.appendChild(risk);
+  }
+  // the box stays up when it is empty, so the house sees it was checked
+  if (!ul.children.length) {
+    const li = el("li");
+    li.appendChild(el("p", "hd-calm", "Nothing needs you right now."));
     ul.appendChild(li);
   }
-  const risk = item("at the keeper’s settlement", needs.atRisk === 0);
-  risk.appendChild(el("p", null, needs.atRisk > 0
-    ? `${plural(needs.atRisk, "mark")} of the house’s ${needs.atRisk === 1 ? "is" : "are"} at risk: published without stamps behind ${needs.atRisk === 1 ? "it" : "them"}.`
-    : "Nothing of the house’s is at risk: every published mark has stamps behind it."));
-  ul.appendChild(risk);
   root.querySelector("[data-hd-needs-box]")?.removeAttribute("hidden");
+}
+
+// Letters written and not yet sailed ask nothing of the house: they ride the
+// next crossing on their own. A status line under the feed, not a need.
+function paintNextBoat(root, pending, ctx) {
+  const line = root.querySelector("[data-hd-boat]");
+  if (!line) return;
+  line.textContent = "";
+  line.hidden = !pending.length;
+  if (!pending.length) return;
+  line.append("On the next boat · " + plural(pending.length, "letter") + ": ");
+  pending.forEach((x, i) => {
+    if (i) line.append("; ");
+    line.append(who(ctx.faces, x.handle, ctx.seatHref), " to " + (x.to || "someone") + (x.title ? ` — “${clip(x.title, 60)}”` : ""));
+  });
+  line.append(".");
 }
 
 function paintCards(root, items, reads, ctx) {
@@ -341,4 +354,4 @@ function paintNumbers(root, n, handles, reads, ctx) {
   box.hidden = false;
 }
 
-export { readLook, writeLook };
+export { readLook, writeLook, paintNeeds, paintNextBoat };
