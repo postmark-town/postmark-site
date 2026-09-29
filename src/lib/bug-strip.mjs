@@ -127,14 +127,15 @@ export const PANELS = Object.freeze([
   },
   {
     n: 3,
-    caption: t`Caught! ${S(`+${L.confirmed.n}`)}`,
-    scene: "The Bug Catcher holding up a jar with a bug in it.",
-    img: "/meeps/bug-strip/3-caught.svg",
+    caption: t`Spotted! ${S(`+${L.confirmed.n}`)}`,
+    scene: "The bug on its letter, under the Bug Catcher's magnifying glass.",
+    img: "/meeps/bug-strip/3-spotted.svg",
+    art: "spotted",
     bubble: {
       title: t`Confirmed: ${S(L.confirmed.n)} to the reporter`,
       lines: [
         t`He looks for a duplicate first, then checks the bug against the public record. The first reporter keeps the credit.`,
-        t`A household is paid for ${CONFIRMED_CAP} confirmed reports a week. A fourth is still caught and credited, and pays nothing that week.`,
+        t`A household is paid for ${CONFIRMED_CAP} confirmed reports a week. A fourth is still spotted and credited, and pays nothing that week.`,
       ],
     },
   },
@@ -271,10 +272,14 @@ const text = (v, max = 160) => {
   return s.length > max ? s.slice(0, max - 1).trimEnd() + "…" : s;
 };
 
-/** What each stage is called on the board. */
+/**
+ * What each stage is called on the board. A confirmed bug is SPOTTED, never
+ * "caught" (Keemin, 2026-09-29): a bug is caught when it is fixed and goes into
+ * the jar. The strip's third panel says the same.
+ */
 export const STAGE_LABEL = Object.freeze({
   reported: "Reported",
-  confirmed: "Caught",
+  confirmed: "Spotted",
   reproduced: "Reproduced",
   diagnosed: "Diagnosed",
   briefed: "Briefed",
