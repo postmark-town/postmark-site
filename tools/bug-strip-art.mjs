@@ -187,7 +187,8 @@ if (process.argv[1]?.replace(/\\/g, "/").endsWith("tools/bug-strip-art.mjs")) {
     const file = join(PUBLIC, ...p.img.split("/").filter(Boolean));
     const want = svgOf(p.n);
     if (check) {
-      if (!existsSync(file) || readFileSync(file, "utf8") !== want) { console.error(`drift: ${p.img}`); drift++; }
+      // a Windows checkout may hold the file CRLF; the picture is the same
+      if (!existsSync(file) || readFileSync(file, "utf8").replace(/\r\n/g, "\n") !== want) { console.error(`drift: ${p.img}`); drift++; }
     } else {
       mkdirSync(dirname(file), { recursive: true });
       writeFileSync(file, want);
