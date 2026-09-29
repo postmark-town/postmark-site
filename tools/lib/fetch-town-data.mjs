@@ -41,6 +41,7 @@ export const DATA_FILES = [
   "docs.json",
   "stats.json",
   "calendar.json",
+  "quest-posts.json",
 ];
 
 // -- ON THE BOX, SHORT IS FAILED (2026-09-17, postmark#2884) -----------------
@@ -829,6 +830,10 @@ export async function buildOfficeData({
   const calendar = calendarRead.missing ? readSnapshot("calendar.json", EMPTY_CALENDAR) : calendarRead.calendar;
   if (calendarRead.missing) endpointGaps.push(CALENDAR_GAP);
 
+  const questRead = await fetchQuestPosts({ apiBase, fetchImpl, retries, gate });
+  const questPosts = questRead.missing ? readSnapshot("quest-posts.json", EMPTY_QUEST_POSTS) : questRead.questPosts;
+  if (questRead.missing) endpointGaps.push(questRead.gap);
+
   let meeps = null;
   if (townRoot) meeps = readMeepsFromCheckout(townRoot);
   if (!meeps) {
@@ -850,6 +855,7 @@ export async function buildOfficeData({
       "docs.json": docs,
       "stats.json": buildStats({ town, metrics, residents, letters, ledger, snapshotStats }),
       "calendar.json": calendar,
+      "quest-posts.json": questPosts,
     },
   };
 }
@@ -884,6 +890,38 @@ export async function fetchCalendar({ apiBase, fetchImpl = fetch, retries = 3, g
     if (!Array.isArray(body?.[key])) throw new Error(`/calendar: "${key}" is not an array, so this is not the calendar the contract names`);
   }
   return { missing: false, calendar: body };
+}
+
+// ── THE QUEST POSTS (POS-294, 2026-09-28) ───────────────────────────────────
+// The town's quests are its posts (Keemin, 2026-09-28), and the Quest Guild
+// draws its cards from them: `GET /posts?class=quest`, the office's one posts
+// read (the office's docs/posts-contract.md). Read the calendar's way, for the
+// calendar's reason: a door this office does not have yet (404) is an endpoint
+// gap and the committed quest-posts.json is kept, while anything else failing
+// throws like every other read.
+//
+// ONE MORE CASE KEEPS THE SNAPSHOT: a door that answers with NO quest posts.
+// The rows exist only once the town has posted them (the office's
+// world2/tools/quests-post.mjs, run at the ship), and a closed quest stays a
+// post, so zero posts is an office whose quests have not been put up yet,
+// never a town with no quests. Publishing it would empty the Guild, so the
+// snapshot stands and the gap says why.
+export const EMPTY_QUEST_POSTS = Object.freeze({ as_of: null, class: "quest", finished: ["closed"], total: 0, posts: [] });
+export const QUEST_POSTS_GAP = "quest-posts.json preserved from committed snapshot: the office answered 404 at GET /posts?class=quest, so its posts door is not live yet";
+export const QUEST_POSTS_UNSEEDED_GAP = "quest-posts.json preserved from committed snapshot: the office's posts door answered no quest posts, so the town's quests are not posted yet";
+
+export async function fetchQuestPosts({ apiBase, fetchImpl = fetch, retries = 3, gate = null } = {}) {
+  let body;
+  try {
+    ({ body } = await apiGet("/posts?class=quest", { apiBase, fetchImpl, retries, gate }));
+  } catch (error) {
+    if (error?.status === 404) return { missing: true, gap: QUEST_POSTS_GAP, questPosts: null };
+    throw error;
+  }
+  if (body?.class !== "quest" || !Array.isArray(body?.posts))
+    throw new Error(`/posts?class=quest: not the quest class's posts the contract names (class "quest", a posts array)`);
+  if (!body.posts.length) return { missing: true, gap: QUEST_POSTS_UNSEEDED_GAP, questPosts: null };
+  return { missing: false, questPosts: body };
 }
 
 export function parseMaybeFrontmatter(text) {

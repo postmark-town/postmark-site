@@ -879,6 +879,30 @@ export const QUEST_REGISTRY = {
   ],
 };
 
+// THE GUILD'S LIST IS THE TOWN'S QUEST POSTS (POS-294, 2026-09-28).
+//
+// Keemin, 2026-09-28: "All quests are technically posts. They are the town's
+// posts." So the Guild's cards come from the office's posts read,
+// `GET /posts?class=quest` (quest-posts.json), and not from the copy above:
+// each OPEN quest post whose cadence is daily or milestone is a card, in the
+// order the office answers (the registry's own), with the terms the office
+// joined from the registry (title, source, reward). The copy above stays for
+// the teaching's Earning section (docs/stamps), which also lists the arriving
+// rows; it is left as it stands tonight.
+//
+// A closed quest is not drawn: finished is the class's word for "no longer
+// asked". A post whose terms the office could not read has no card, rather
+// than a card with its stored title and nothing else.
+export function questBoardFrom(questPosts) {
+  const open = (Array.isArray(questPosts?.posts) ? questPosts.posts : [])
+    .filter((p) => p?.class === "quest" && p.state === "open" && p.terms);
+  const card = (p) => ({ title: p.terms.title, source: p.terms.source, reward: p.terms.reward, target: p.terms.target ?? null });
+  return {
+    daily: open.filter((p) => p.terms.cadence === "daily").map(card),
+    milestone: open.filter((p) => p.terms.cadence === "milestone").map(card),
+  };
+}
+
 // The Guild's cards, JOINED BY TITLE to the mirror's own columns.
 //
 // THE ROSTER IS NOT WRITTEN DOWN HERE. The cards are whatever the registry
