@@ -57,7 +57,7 @@
 </section>
 
 <script>
-  import { KEYS, OFFICE, tokenIsFresh } from "@/lib/auth.mjs";
+  import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
   // the apex's path has one speller (test/world-cockpit-door.test.mjs, THE CLASS);
   // the handoff names it from there, now that the prompt lives under src/
   import { APEX_PATH } from "@/lib/world-cockpit-door.mjs";
@@ -74,7 +74,7 @@
       var handText = document.querySelector("[data-handoff-text]");
       var handNote = document.querySelector("[data-handoff-note]");
       if (!btn) return;
-      var BASE = (function () { try { return localStorage.getItem("pm.office.base") || OFFICE; } catch { return OFFICE; } })();
+      var BASE = officeBase();
       function say(msg) {
         if (!msg) { status.hidden = true; status.textContent = ""; return; }
         status.hidden = false; status.textContent = msg;

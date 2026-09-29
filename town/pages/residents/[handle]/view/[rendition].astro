@@ -137,7 +137,13 @@ const others = renditions.filter((x) => x.author !== rend.author);
     // rendition itself is never allowed to fetch); re-sent when they land
     (async () => {
       try {
-        const s = await fetch("https://postmark.town/api/stamps", { headers: { accept: "application/json" } });
+        // the page's own office: officeBase() (src/lib/auth.mjs), restated because
+        // a define:vars script is inline and cannot import
+        const office = (function () {
+          try { return String(window.localStorage.getItem("pm.office.base") || "/api").replace(/\/+$/, ""); }
+          catch (e) { return "/api"; }
+        })();
+        const s = await fetch(office + "/stamps", { headers: { accept: "application/json" } });
         if (s.ok) {
           const roster = await s.json();
           const mine = (roster.balances ?? roster ?? []).find?.((x) => x.handle === payload.handle);

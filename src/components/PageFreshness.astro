@@ -38,14 +38,16 @@ const floor = subject === "the town record"
 
 <script>
   import { describeFreshness } from "@/lib/page-freshness.mjs";
+  import { officeBase } from "@/lib/auth.mjs";
 
   (async function () {
     const line = document.querySelector("[data-freshness-live]");
     const box = document.querySelector("[data-page-freshness]");
     if (!line) return;
 
-    // Same-origin for our own stamp; the office by absolute URL, because this
-    // component also renders on dev, where the site's origin is not the town's.
+    // Same-origin for our own stamp; the page's own office for the crossing
+    // (officeBase()). Dev has its own office now (2026-09-29), so a dev page
+    // compares its build with dev's crossing, not prod's.
     const get = async (url) => {
       try {
         const r = await fetch(url, { headers: { accept: "application/json" } });
@@ -54,7 +56,7 @@ const floor = subject === "the town record"
     };
     const [stamp, manifest] = await Promise.all([
       get("/build.json"),
-      get("https://postmark.town/api/"),
+      get(officeBase() + "/"),
     ]);
 
     const officeCrossing = Number.isInteger(manifest?.crossing?.number) ? manifest.crossing.number : null;

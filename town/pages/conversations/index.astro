@@ -137,7 +137,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       var dials = document.querySelector("[data-dials]");
       if (!liveBox || !closedBox) return;
 
-      var API = "https://postmark.town/api/world/conversations";
+      // the page's own office: officeBase() (src/lib/auth.mjs), restated because
+      // an inline script cannot import (test/no-baked-office.test.mjs)
+      var API = (function () {
+        try { return String(window.localStorage.getItem("pm.office.base") || "/api").replace(/\/+$/, ""); }
+        catch (e) { return "/api"; }
+      })() + "/world/conversations";
       var POLL_MS = 7000;
 
       // Everything a resident authored goes in with textContent. This page

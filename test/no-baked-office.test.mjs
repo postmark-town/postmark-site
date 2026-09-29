@@ -10,10 +10,11 @@
 // page's open-bugs board asked prod for /posts it did not have yet while dev's
 // own office answered it. A browser read asks the page's own office:
 // officeBase() (src/lib/auth.mjs), or a restatement of it where an inline
-// script cannot import (test/fund-page-office.test.mjs pins that one).
+// script cannot import (every restatement is held to the one expression below).
 //
-// WHAT IS SCANNED: every .astro file under town/pages. In each, the
-// frontmatter (between the opening `---` fences) and every <script> block.
+// WHAT IS SCANNED: every .astro file under town/pages, town/components,
+// src/components and src/layouts. In each, the frontmatter (between the
+// opening `---` fences) and every <script> block.
 //
 // WHAT IS ALLOWED, AND WHY:
 //   - A build-time fetch in the frontmatter: a line that awaits fetch() bakes
@@ -22,29 +23,35 @@
 //     public address in a <code> line; that is text a reader copies, not a
 //     read the page makes.
 //   - <script type="application/ld+json">: data, not code.
+//   - PUBLISHED, below: the town's public address shown to a person or handed
+//     to an agent as text to copy, never fetched by the page. Each is named
+//     with its line, and must still carry it.
 //
-// THE KNOWN DEBT. Four pages read prod's office from the browser today. They
-// predate this law and are public reads (no token rides them); each is named
-// below with the line it carries. The list only shrinks: a page fixed and
-// still listed fails here too, so the entry comes out with the fix.
+// THE DEBT IS PAID. Four pages and four component scripts read prod's office
+// from the browser until 2026-09-29; every one now asks officeBase(). There is
+// no debt list any more: a new one is simply red.
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const PAGES = join(ROOT, "town", "pages");
+const ROOTS = ["town/pages", "town/components", "src/components", "src/layouts"].map((d) => join(ROOT, d));
 
-export const KNOWN = new Map([
-  ["town/pages/conversations/index.astro", 'var API = "https://postmark.town/api/world/conversations";'],
-  ["town/pages/mail/index.astro", 'fetch("https://postmark.town/api/metrics/mail"'],
-  ["town/pages/residents/[handle]/view/[rendition].astro", 'fetch("https://postmark.town/api/stamps"'],
-  ["town/pages/votes/index.astro", 'fetch("https://postmark.town/api/votes"'],
+/** The town's public address, published as text to copy: never a read. */
+export const PUBLISHED = new Map([
+  // the Connect-your-agent box: the MCP connector's address, in a <pre> a human copies
+  ["src/components/ConnectAgent.astro", 'export const MCP_URL = "https://postmark.town/api/mcp";'],
+  // the signed-in keys card's hand-off prompt: text an agent is given, two lines of it
+  ["src/components/household-dashboard/KeysCard.astro", '"The door is plain HTTP. The base is https://postmark.town/api,'],
+  ["src/components/household-dashboard/KeysCard.astro#mcp", '"If your shape prefers tools to HTTP, the same office answers MCP at https://postmark.town/api/mcp'],
 ]);
+const fileOf = (key) => key.split("#")[0];
 
 function astroFiles(dir, out = []) {
+  if (!existsSync(dir)) return out;
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) astroFiles(full, out);
@@ -55,7 +62,7 @@ function astroFiles(dir, out = []) {
 
 const BAKED = /PUBLIC_POSTMARK_API|https:\/\/postmark\.town\/api\b/;
 
-/** Each baked office a page's browser code carries: `{ file, where, line }`. */
+/** Each baked office a file's browser code carries: `{ file, where, line }`. */
 export function bakedOffices(file, src) {
   const out = [];
   const text = src.replace(/\r\n/g, "\n");
@@ -73,23 +80,36 @@ export function bakedOffices(file, src) {
   return out;
 }
 
-const found = astroFiles(PAGES).flatMap((f) => {
-  const file = relative(ROOT, f).split("\\").join("/");
-  return bakedOffices(file, readFileSync(f, "utf8"));
-});
+const files = ROOTS.flatMap((d) => astroFiles(d)).map((f) => [relative(ROOT, f).split("\\").join("/"), readFileSync(f, "utf8")]);
+const found = files.flatMap(([file, src]) => bakedOffices(file, src));
+const published = (b) => [...PUBLISHED].some(([key, line]) => fileOf(key) === b.file && b.line.includes(line));
 
-test("no page under town/pages bakes an office into its browser code, beyond the named debt", () => {
-  const fresh = found.filter((b) => !(KNOWN.has(b.file) && b.line.includes(KNOWN.get(b.file))));
+test("no page or component bakes an office into its browser code", () => {
+  const fresh = found.filter((b) => !published(b));
   assert.deepEqual(fresh.map((b) => `${b.file} (${b.where}): ${b.line}`), [],
     "a page asks a build-time office from the browser: read officeBase() + the path instead");
 });
 
-test("the named debt only shrinks: every listed page still carries exactly the line it is listed for", () => {
-  for (const [file, line] of KNOWN) {
-    const hits = found.filter((b) => b.file === file);
-    assert.ok(hits.some((b) => b.line.includes(line)), `${file} no longer carries its listed line: take it off KNOWN`);
-    assert.equal(hits.length, 1, `${file} carries more baked offices than its one listed line`);
+test("every published address is still where it is named, and is the only office its file names", () => {
+  for (const [key, line] of PUBLISHED) {
+    const file = fileOf(key);
+    assert.ok(found.some((b) => b.file === file && b.line.includes(line)), `${key} no longer publishes its line: take it off PUBLISHED`);
   }
+  for (const file of new Set([...PUBLISHED.keys()].map(fileOf))) {
+    const hits = found.filter((b) => b.file === file);
+    assert.ok(hits.every(published), `${file} names an office beyond its published address`);
+  }
+});
+
+test("every inline restatement of officeBase() is the one expression (pm.office.base, else /api, trailing slash trimmed)", () => {
+  const CANON = 'String(window.localStorage.getItem("pm.office.base") || "/api").replace(/\\/+$/, "")';
+  const restated = files.flatMap(([file, src]) => src.split(/\r?\n/).filter((l) => l.includes('"pm.office.base"')).map((l) => [file, l.trim()]));
+  assert.ok(restated.length >= 4, `only ${restated.length} restatements found: the scan is not reading what it names`);
+  for (const [file, line] of restated) assert.ok(line.includes(CANON), `${file} restates officeBase() differently: ${line}`);
+  // and the expression answers what officeBase() answers
+  const run = (base) => new Function("window", `return ${CANON};`)({ localStorage: { getItem: (k) => (k === "pm.office.base" ? base : null) } });
+  assert.equal(run(null), "/api");
+  assert.equal(run("https://dev.postmark.town/api/"), "https://dev.postmark.town/api");
 });
 
 test("the scanner sees what it names: a frontmatter const, a bundled script, an inline script; and passes a build-time fetch and prose", () => {

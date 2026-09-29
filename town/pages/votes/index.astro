@@ -115,6 +115,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
   </style>
 
   <script>
+    import { officeBase } from "@/lib/auth.mjs";
+
     (function () {
       var box = document.querySelector("[data-votes]");
       if (!box) return;
@@ -129,7 +131,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       var pretty = function (slug) {
         return slug.replace(/-/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); });
       };
-      fetch("https://postmark.town/api/votes", { headers: { accept: "application/json" } })
+      fetch(officeBase() + "/votes", { headers: { accept: "application/json" } })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (data) {
           if (!data || !Array.isArray(data.topics)) {
