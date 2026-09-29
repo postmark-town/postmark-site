@@ -7,9 +7,9 @@
 // G:/Starstory/docs/2026-09-29/rail/briefs/bugcatcher-strip.md, POS-236.)
 //
 // SEVEN PANELS, ONE PICTURE PATH EACH. A panel's picture is `img` and nothing
-// else, so Iris can paint a panel by replacing one file. The pictures that
-// stand now are drawn in the page's own pixel kit (tools/bug-strip-art.mjs
-// writes them from pixel-icons.mjs's inks).
+// else, so a panel is repainted by replacing one file. The pictures are drawn
+// in the page's own pixel kit (tools/bug-strip-art.mjs writes them from
+// pixel-icons.mjs's inks; Keemin, 2026-09-29: "pixel is fine").
 //
 // EVERY NUMBER IS TYPED ONCE, HERE. The ladder and the cap are the office's
 // (postmark-office src/bugs.mjs, BUG_LADDER and CONFIRMED_CAP, as of
@@ -137,13 +137,14 @@ export const PANELS = Object.freeze([
   },
   {
     n: 6,
-    caption: `Fixed! ${plus(L.fixed.n.S)} / ${L.fixed.n.M} / ${L.fixed.n.L}`,
+    caption: `Fixed, and named! ${plus(L.fixed.n.S)} / ${L.fixed.n.M} / ${L.fixed.n.L}`,
     scene: "A wall with a patch where the crack was.",
     img: "/meeps/bug-strip/6-fixed.svg",
     bubble: {
       title: `Fixed: ${L.fixed.n.S}, ${L.fixed.n.M} or ${L.fixed.n.L} by size`,
       lines: [
         `A pull request built against the brief and merged pays by the fix's size: ${L.fixed.n.S} for small, ${L.fixed.n.M} for medium, ${L.fixed.n.L} for large. Then it ships with the town.`,
+        "…and whoever fixes it names the bug: it joins the Bug Catcher's jar.",
       ],
     },
   },
@@ -161,6 +162,72 @@ export const PANELS = Object.freeze([
     },
   },
 ]);
+
+// ── THE JAR ──────────────────────────────────────────────────────────────────
+//
+// Keemin, 2026-09-29: the fixer names the bug, and it joins the Bug Catcher's
+// jar. Every bug gets a slot: an open one is a silhouette with "?", a fixed or
+// shipped one shows the name its fixer gave it (fields.critter) and who named
+// it (fields.named_by: the resident credited with the fix, office
+// events-store.mjs). The side exits (duplicate, not-a-bug) were never bugs to
+// catch, so they get no slot.
+
+/** The jar's two pictures: a bug still loose, and a caught, named one. */
+export const JAR_ART = Object.freeze({
+  open: "/meeps/bug-strip/jar-open.svg",
+  named: "/meeps/bug-strip/3-caught.svg",
+});
+const NAMED_STATES = new Set(["fixed", "shipped"]);
+const SIDE_EXITS = new Set(["duplicate", "not-a-bug"]);
+
+/**
+ * The jar, from the same `GET /posts?class=bug` answer as the board. A slot is
+ * `{ id, title, named, critter, namedBy }`, all plain strings; `named` is true
+ * only for a fixed or shipped bug whose fixer gave it a name.
+ */
+export function jarOf(read) {
+  if (!read || typeof read !== "object" || !Array.isArray(read.posts)) return { ok: false, slots: [], named: 0 };
+  const slots = read.posts
+    .filter((p) => p && typeof p === "object" && STAGES.includes(p.state) && !SIDE_EXITS.has(p.state))
+    .map((p) => {
+      const critter = text(p.fields?.critter, 40);
+      const named = NAMED_STATES.has(p.state) && Boolean(critter);
+      return {
+        id: text(p.id, 120),
+        title: text(p.title) || "(untitled)",
+        named,
+        critter: named ? critter : null,
+        namedBy: named ? text(p.fields?.named_by, 40) || null : null,
+      };
+    });
+  return { ok: true, slots, named: slots.filter((s) => s.named).length };
+}
+
+/** Paints `jarOf`'s answer into `root`: createElement and textContent only. */
+export function paintJar(root, jar, doc = globalThis.document) {
+  root.replaceChildren();
+  const el = (tag, cls, s) => { const e = doc.createElement(tag); e.className = cls; if (s !== undefined) e.textContent = s; return e; };
+  if (!jar.ok) { root.append(el("p", "jar-empty", "The jar can't be read right now.")); return; }
+  if (!jar.named) root.append(el("p", "jar-empty", "The jar is empty: no bug has been fixed yet."));
+  if (!jar.slots.length) return;
+  const ul = el("ul", "jar-slots");
+  for (const s of jar.slots) {
+    const li = el("li", s.named ? "jar-slot is-named" : "jar-slot is-open");
+    li.dataset.post = s.id;
+    const img = doc.createElement("img");
+    img.className = "jar-img"; img.src = s.named ? JAR_ART.named : JAR_ART.open; img.alt = ""; img.width = 64; img.height = 64;
+    li.append(img);
+    if (s.named) {
+      li.append(el("span", "jar-name", s.critter));
+      if (s.namedBy) li.append(el("span", "jar-by", `named by ${s.namedBy}`));
+    } else {
+      li.append(el("span", "jar-name jar-q", "?"));
+    }
+    li.append(el("span", "jar-title", s.title));
+    ul.append(li);
+  }
+  root.append(ul);
+}
 
 // ── THE BOARD ────────────────────────────────────────────────────────────────
 

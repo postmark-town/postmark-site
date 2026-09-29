@@ -18,7 +18,7 @@ import { execFileSync } from "node:child_process";
 
 import {
   LADDER, CONFIRMED_CAP, STAGES, FINISHED, PANELS, ADVISORY_URL, NEW_ISSUE_URL, POST_CALL, BOARD_PATH,
-  boardOf, paintBoard,
+  boardOf, paintBoard, jarOf, paintJar, JAR_ART,
 } from "../src/lib/bug-strip.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -37,7 +37,7 @@ test("the ladder, the cap and the stages are the office's (fixture: postmark-off
 });
 
 test("every number in the strip is read from the ladder, never typed into a panel", () => {
-  const block = SRC.slice(SRC.indexOf("export const PANELS"), SRC.indexOf("// ── THE BOARD"));
+  const block = SRC.slice(SRC.indexOf("export const PANELS"), SRC.indexOf("// ── THE JAR"));
   assert.ok(block.length > 500, "the PANELS block was not found");
   const stripped = block
     .replace(/\$\{[^}]*\}/g, "")        // interpolations read the ladder
@@ -60,6 +60,9 @@ test("the captions and bubbles say the ladder's amounts, in order", () => {
   assert.match(all(PANELS[2]), new RegExp(`paid for ${FIX.confirmedCap} confirmed reports a week`));
   assert.match(all(PANELS[4]), new RegExp(`pays ${L.briefed.n.light}, or ${L.briefed.n.heavy} if it needed heavy revision`));
   assert.match(all(PANELS[6]), /Meeps never take stamps/);
+  // the fixer names the bug (Keemin, 2026-09-29)
+  assert.match(cap[5], /^Fixed, and named!/);
+  assert.ok(PANELS[5].bubble.lines.includes("…and whoever fixes it names the bug: it joins the Bug Catcher's jar."), "panel 6 does not say the fixer names the bug");
 });
 
 test("each panel has one picture path, and the drawn pictures are the tool's (bug-strip-art --check)", () => {
@@ -68,6 +71,7 @@ test("each panel has one picture path, and the drawn pictures are the tool's (bu
     assert.ok(existsSync(join(ROOT, "public", "atelier", "postmark", ...p.img.split("/").filter(Boolean))), `panel ${p.n}'s picture ${p.img} is missing`);
     assert.ok(p.scene.length > 10, `panel ${p.n} has no alt text`);
   }
+  for (const img of Object.values(JAR_ART)) assert.ok(existsSync(join(ROOT, "public", "atelier", "postmark", ...img.split("/").filter(Boolean))), `the jar's picture ${img} is missing`);
   execFileSync(process.execPath, [join(ROOT, "tools", "bug-strip-art.mjs"), "--check"], { stdio: "pipe" });
 });
 
@@ -155,6 +159,57 @@ test("paintBoard: says 'No open bugs right now.' for an empty board, and somethi
   assert.doesNotMatch(textOf(failed.root), /No open bugs/);
 });
 
+// ── THE JAR ──────────────────────────────────────────────────────────────────
+
+const POSTS = JSON.parse(readFileSync(join(ROOT, "test", "fixtures", "office-bug-posts.json"), "utf8"));
+
+test("jarOf: a slot for every bug, named by fields.critter and fields.named_by (fixture: office #260); side exits get none", () => {
+  const j = jarOf(POSTS);
+  assert.equal(j.ok, true);
+  assert.deepEqual(j.slots.map((s) => [s.id, s.named]), [
+    ["mari/the-map-forgets-my-pin", true],
+    ["vermillion/letters-vanish", false],
+    ["sage/old-crack", true],
+    ["odd/fixed-before-names", false],
+  ]);
+  assert.equal(j.named, 2);
+  assert.deepEqual(j.slots[0], { id: "mari/the-map-forgets-my-pin", title: "The map forgets my pin after a crossing", named: true, critter: "Pinwhistle", namedBy: "lupi" });
+  assert.deepEqual(j.slots[1], { id: "vermillion/letters-vanish", title: "Letters vanish from my outbox", named: false, critter: null, namedBy: null });
+  // the field names are the office's: rename either and the named slots fall silent
+  const renamed = { ...POSTS, posts: POSTS.posts.map((p) => ({ ...p, fields: Object.fromEntries(Object.entries(p.fields).map(([k, v]) => [k === "critter" ? "name" : k, v])) })) };
+  assert.equal(jarOf(renamed).named, 0);
+});
+
+test("jarOf: an empty jar is empty; a failed read is a failed read", () => {
+  assert.deepEqual(jarOf({ ...POSTS, posts: [] }), { ok: true, slots: [], named: 0 });
+  for (const bad of [null, {}, { posts: 3 }]) assert.equal(jarOf(bad).ok, false);
+});
+
+test("paintJar: the critter, 'named by', and the title as text; an open bug is '?'; a critter's markup stays text", () => {
+  const doc = stubDoc();
+  paintJar(doc.root, jarOf(POSTS), doc);
+  const slots = find(doc.root, (e) => e.tagName === "LI");
+  assert.equal(slots.length, 4);
+  assert.equal(textOf(slots[0]), " Pinwhistle named by lupi The map forgets my pin after a crossing");
+  assert.equal(textOf(slots[1]), " ? Letters vanish from my outbox");
+  assert.match(textOf(slots[2]), /<b>Crackle<\/b> named by sage/, "the critter's name was not kept as text");
+  assert.deepEqual(find(doc.root, (e) => e.tagName === "IMG").map((i) => i.src), [JAR_ART.named, JAR_ART.open, JAR_ART.named, JAR_ART.open]);
+  assert.doesNotMatch(textOf(doc.root), /The jar is empty/, "a jar with named bugs says it is empty");
+  assert.doesNotMatch(SRC.slice(SRC.indexOf("export function paintJar"), SRC.indexOf("// ── THE BOARD")), /innerHTML|insertAdjacentHTML|outerHTML/);
+});
+
+test("paintJar: 'The jar is empty: no bug has been fixed yet.' until one is named; a failed read says otherwise", () => {
+  const empty = stubDoc();
+  paintJar(empty.root, jarOf({ ...POSTS, posts: [] }), empty);
+  assert.equal(textOf(empty.root), "The jar is empty: no bug has been fixed yet.");
+  const openOnly = stubDoc();
+  paintJar(openOnly.root, jarOf({ ...POSTS, posts: [POSTS.posts[1]] }), openOnly);
+  assert.match(textOf(openOnly.root), /^The jar is empty: no bug has been fixed yet\. .*\?/);
+  const failed = stubDoc();
+  paintJar(failed.root, jarOf(null), failed);
+  assert.equal(textOf(failed.root), "The jar can't be read right now.");
+});
+
 // ── THE BUILT PAGE (skipped until it is built, as POS-177 rules) ────────────
 
 function panelOf(page, key) {
@@ -196,5 +251,9 @@ test("the built board: read live from the office's bug posts, a placeholder that
   const bc = panelOf(readFileSync(builtMeeps, "utf8"), "bugcatcher");
   assert.match(bc, new RegExp(`data-bug-board data-src="https://postmark\\.town/api${BOARD_PATH.replace("?", "\\?")}"`));
   assert.match(bc, /class="bb-empty"[^>]*>The board is read live from the office/);
+  // the jar stands between the strip and the open bugs
+  const jar = bc.indexOf("data-bug-jar");
+  assert.ok(jar > bc.lastIndexOf("data-strip-panel=") && jar < bc.indexOf("data-bug-board"), "the jar is not between the strip and the board");
+  assert.match(bc, /class="jar-empty"[^>]*>The jar is read live from the office/);
   assert.match(bc, new RegExp(`<a class="pm-btn" href="${NEW_ISSUE_URL}"[^>]*\\bdata-report\\b[^>]*>Report a bug</a>`));
 });
