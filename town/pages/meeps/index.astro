@@ -47,7 +47,9 @@ import { iconSvg } from "@/lib/pixel-icons.mjs";
 import {
   MEEPS, meepLinks, profileOf, displayName, favouriteColour, accentVars, bench,
 } from "@/lib/meeps-quarter.mjs";
-import { PANELS, NEW_ISSUE_URL, BOARD_PATH } from "@/lib/bug-strip.mjs";
+import { PANELS, NEW_ISSUE_URL } from "@/lib/bug-strip.mjs";
+// a strip text is a list of segments; a { stamps } segment renders as <amount>✦ in the stamp family
+const segs = (x) => (typeof x === "string" ? [x] : x);
 
 const byHandle = new Map(residents.map((r) => [r.handle, r]));
 const cards = MEEPS.map((m) => {
@@ -79,10 +81,6 @@ const accentStyle = (t) => `--lane-edge:${t.edge};--lane-edge-open:${t.edgeOpen}
 const newspaper = iconSvg("newspaper");
 
 const rows = bench(rollcall);
-
-// The open-bugs board is read in the reader's browser from the office.
-const API = import.meta.env.PUBLIC_POSTMARK_API ?? "https://postmark.town/api";
-const BOARD_URL = API + BOARD_PATH;
 
 // The switching, exactly /town/'s: every panel shows where :has() is missing;
 // where it is present one shows — the targeted one, or the Postmaster.
@@ -238,13 +236,13 @@ const switchCss = [
                 {PANELS.map((p) => (
                   <li class="bs-panel" data-strip-panel={p.n}>
                     <img class="bs-img" src={p.img} alt={p.scene} width="112" height="112" loading="lazy" />
-                    <p class="bs-cap"><span class="bs-n">{p.n}</span>{p.caption}</p>
+                    <p class="bs-cap"><span class="bs-n">{p.n}</span>{segs(p.caption).map((s) => typeof s === "string" ? s : <b class="bs-stamp">{s.stamps}<span class="m-u">✦</span></b>)}</p>
                     <details class="bs-bubble" data-bubble={p.n}>
-                      <summary>{p.bubble.title}</summary>
+                      <summary>{segs(p.bubble.title).map((s) => typeof s === "string" ? s : <b class="bs-stamp">{s.stamps}<span class="m-u">✦</span></b>)}</summary>
                       <div class="bs-more">
-                        <p>{p.bubble.lines[0]}</p>
+                        <p>{segs(p.bubble.lines[0]).map((s) => typeof s === "string" ? s : <b class="bs-stamp">{s.stamps}<span class="m-u">✦</span></b>)}</p>
                         {p.bubble.call && <p><code class="bs-call">{p.bubble.call}</code></p>}
-                        {p.bubble.lines.slice(1).map((l) => <p>{l}</p>)}
+                        {p.bubble.lines.slice(1).map((l) => <p>{segs(l).map((s) => typeof s === "string" ? s : <b class="bs-stamp">{s.stamps}<span class="m-u">✦</span></b>)}</p>)}
                         {(p.bubble.links ?? []).map((a) => (
                           <p><a href={a.href} target="_blank" rel="noopener">{a.label} →</a></p>
                         ))}
@@ -261,9 +259,18 @@ const switchCss = [
                 ))}
               </ol>
 
+              {/* THE JAR (Keemin, 2026-09-29: the fixer names the bug, and it
+                  joins the Bug Catcher's jar). Painted from the same read. */}
+              <section class="bug-jar" aria-labelledby="bj-h">
+                <h3 id="bj-h" class="cq-h">The Bug Catcher's jar</h3>
+                <div class="jar-list" data-bug-jar aria-live="polite">
+                  <p class="jar-empty">The jar is read live from the office when this page opens in a browser with scripts on.</p>
+                </div>
+              </section>
+
               <section class="bug-board" aria-labelledby="bb-h">
                 <h3 id="bb-h" class="cq-h">The open bugs</h3>
-                <div class="bb-list" data-bug-board data-src={BOARD_URL} aria-live="polite">
+                <div class="bb-list" data-bug-board aria-live="polite">
                   <p class="bb-empty">The board is read live from the office when this page opens in a browser with scripts on.</p>
                 </div>
                 <p class="bb-report">
@@ -326,18 +333,25 @@ const switchCss = [
   </div>
   <script>
     import { heartbeatFor } from "@/lib/meeps-quarter.mjs";
-    import { boardOf, paintBoard } from "@/lib/bug-strip.mjs";
+    import { boardOf, paintBoard, jarOf, paintJar, BOARD_PATH } from "@/lib/bug-strip.mjs";
+    import { officeBase } from "@/lib/auth.mjs";
 
-    // The open bugs, live from the office's bug posts. A read that fails says
-    // so; it never reads as an empty board.
+    // The jar and the open bugs, live from one read of the office's bug posts.
+    // The page asks its own office (officeBase(): the operator's pm.office.base,
+    // else the same-origin /api), never a build-time production URL: on dev a
+    // baked prod URL read prod's office, which had no /posts (the fund page's
+    // lesson, #197). A read that fails says so; it never reads as an empty jar
+    // or board.
     (async () => {
       const root = document.querySelector("[data-bug-board]");
       if (!root) return;
       let read = null;
       try {
-        const r = await fetch(root.getAttribute("data-src") || "", { headers: { accept: "application/json" } });
+        const r = await fetch(officeBase() + BOARD_PATH, { headers: { accept: "application/json" } });
         read = r.ok ? await r.json() : null;
       } catch { read = null; }
+      const jar = document.querySelector("[data-bug-jar]");
+      if (jar) paintJar(jar, jarOf(read));
       paintBoard(root, boardOf(read));
     })();
 
@@ -591,6 +605,13 @@ const switchCss = [
       display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; margin-right: 0.45em;
       border: 2px solid #2e2417; border-radius: 50%; font-family: var(--pm-mono); font-size: 0.7rem; vertical-align: 0.12em;
     }
+    /* STAMPS ARE PURPLE (postmark.css's law; Keemin 2026-09-29 "use the stamp
+       purple font for the numbers and stamps"). Every stamp amount in the strip
+       is a .bs-stamp: the family's dark member on the cream panels, where it
+       reads 5.63:1 (6.92:1 on the white bubble); the family's middle member
+       would read 2.24:1 there and fail AA. */
+    .bs-stamp { color: var(--pm-stamp-dark); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .bs-stamp .m-u { margin-left: 0.08em; }
     .bs-bubble { position: relative; }
     .bs-bubble > summary {
       cursor: pointer; list-style: none;
@@ -615,6 +636,24 @@ const switchCss = [
 
     /* the board's rows are painted by the page's script, so they carry no
        scope attribute: their rules are :global under the board */
+    .bug-jar { margin: 1.6rem 0 0; }
+    .jar-list :global(.jar-empty) { margin: 0 0 0.8rem; text-align: center; color: #cdc2ab; font-style: italic; }
+    .jar-list :global(.jar-slots) {
+      list-style: none; margin: 0; padding: 0;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.7rem;
+    }
+    .jar-list :global(.jar-slot) {
+      display: flex; flex-direction: column; align-items: center; gap: 0.25rem; text-align: center;
+      padding: 0.7rem 0.5rem 0.8rem; border: 1px solid rgba(232, 196, 139, 0.2); border-radius: 10px; color: #e6dcc6;
+    }
+    .jar-list :global(.jar-slot.is-named) { border-color: rgba(79, 163, 122, 0.55); background: rgba(79, 163, 122, 0.07); }
+    .jar-list :global(.jar-img) { width: 64px; height: 64px; image-rendering: pixelated; }
+    .jar-list :global(.jar-slot.is-open .jar-img) { opacity: 0.7; }
+    .jar-list :global(.jar-name) { font-weight: 700; font-size: 1rem; overflow-wrap: anywhere; }
+    .jar-list :global(.jar-unnamed) { font-style: italic; font-weight: 400; opacity: 0.75; }
+    .jar-list :global(.jar-q) { font-family: var(--pm-mono); font-size: 1.3rem; color: var(--pm-gold); }
+    .jar-list :global(.jar-by) { font-size: 0.76rem; color: rgba(205, 194, 171, 0.75); }
+    .jar-list :global(.jar-title) { font-size: 0.8rem; line-height: 1.35; color: rgba(230, 220, 198, 0.85); overflow-wrap: anywhere; }
     .bug-board { margin: 1.6rem 0 0; }
     .bb-list :global(.bb-stage + .bb-stage) { margin-top: 0.9rem; }
     .bb-list :global(h4) { margin: 0 0 0.4rem; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(232, 196, 139, 0.85); font-weight: 400; }
