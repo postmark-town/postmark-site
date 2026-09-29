@@ -576,6 +576,7 @@ const switchCss = [
     .bs-panels {
       list-style: none; margin: 0; padding: 0;
       display: grid; grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr)); gap: 0.9rem;
+      align-items: start; /* an opened bubble grows its own panel, not its row */
     }
     .bs-panel {
       display: flex; flex-direction: column; gap: 0.6rem;
@@ -590,7 +591,7 @@ const switchCss = [
       display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; margin-right: 0.45em;
       border: 2px solid #2e2417; border-radius: 50%; font-family: var(--pm-mono); font-size: 0.7rem; vertical-align: 0.12em;
     }
-    .bs-bubble { position: relative; margin-top: auto; }
+    .bs-bubble { position: relative; }
     .bs-bubble > summary {
       cursor: pointer; list-style: none;
       position: relative; padding: 0.55em 0.8em;
@@ -612,18 +613,20 @@ const switchCss = [
     .bs-locked { margin-top: 0.4em; padding: 0.6em 0.7em; border: 2px dashed #9c3f2e; border-radius: 6px; background: rgba(156, 63, 46, 0.07); }
     .bs-locked-h { font-weight: 700; }
 
+    /* the board's rows are painted by the page's script, so they carry no
+       scope attribute: their rules are :global under the board */
     .bug-board { margin: 1.6rem 0 0; }
-    .bb-list section + section { margin-top: 0.9rem; }
-    .bb-list h4 { margin: 0 0 0.4rem; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(232, 196, 139, 0.85); font-weight: 400; }
-    .bb-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
-    .bb-row {
+    .bb-list :global(.bb-stage + .bb-stage) { margin-top: 0.9rem; }
+    .bb-list :global(h4) { margin: 0 0 0.4rem; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(232, 196, 139, 0.85); font-weight: 400; }
+    .bb-list :global(ul) { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+    .bb-list :global(.bb-row) {
       display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3em 0.9em;
       padding: 0.55em 0.8em; border: 1px solid rgba(232, 196, 139, 0.2); border-radius: 8px; color: #e6dcc6;
     }
-    .bb-title { font-weight: 700; overflow-wrap: anywhere; }
-    .bb-by { font-size: 0.82rem; color: rgba(205, 194, 171, 0.75); }
-    .bb-issue { margin-left: auto; font-size: 0.8rem; color: var(--pm-gold); }
-    .bb-empty { margin: 0; color: #cdc2ab; font-style: italic; }
+    .bb-list :global(.bb-title) { font-weight: 700; overflow-wrap: anywhere; }
+    .bb-list :global(.bb-by) { font-size: 0.82rem; color: rgba(205, 194, 171, 0.75); }
+    .bb-list :global(.bb-issue) { margin-left: auto; font-size: 0.8rem; color: var(--pm-gold); }
+    .bb-list :global(.bb-empty) { margin: 0; color: #cdc2ab; font-style: italic; }
     .bb-report { margin: 1rem 0 0; text-align: center; }
 
     @media (max-width: 720px) {
