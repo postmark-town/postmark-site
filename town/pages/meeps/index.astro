@@ -261,6 +261,15 @@ const switchCss = [
                 ))}
               </ol>
 
+              {/* THE JAR (Keemin, 2026-09-29: the fixer names the bug, and it
+                  joins the Bug Catcher's jar). Painted from the same read. */}
+              <section class="bug-jar" aria-labelledby="bj-h">
+                <h3 id="bj-h" class="cq-h">The Bug Catcher's jar</h3>
+                <div class="jar-list" data-bug-jar aria-live="polite">
+                  <p class="jar-empty">The jar is read live from the office when this page opens in a browser with scripts on.</p>
+                </div>
+              </section>
+
               <section class="bug-board" aria-labelledby="bb-h">
                 <h3 id="bb-h" class="cq-h">The open bugs</h3>
                 <div class="bb-list" data-bug-board data-src={BOARD_URL} aria-live="polite">
@@ -326,10 +335,10 @@ const switchCss = [
   </div>
   <script>
     import { heartbeatFor } from "@/lib/meeps-quarter.mjs";
-    import { boardOf, paintBoard } from "@/lib/bug-strip.mjs";
+    import { boardOf, paintBoard, jarOf, paintJar } from "@/lib/bug-strip.mjs";
 
-    // The open bugs, live from the office's bug posts. A read that fails says
-    // so; it never reads as an empty board.
+    // The jar and the open bugs, live from one read of the office's bug posts.
+    // A read that fails says so; it never reads as an empty jar or board.
     (async () => {
       const root = document.querySelector("[data-bug-board]");
       if (!root) return;
@@ -338,6 +347,8 @@ const switchCss = [
         const r = await fetch(root.getAttribute("data-src") || "", { headers: { accept: "application/json" } });
         read = r.ok ? await r.json() : null;
       } catch { read = null; }
+      const jar = document.querySelector("[data-bug-jar]");
+      if (jar) paintJar(jar, jarOf(read));
       paintBoard(root, boardOf(read));
     })();
 
@@ -615,6 +626,23 @@ const switchCss = [
 
     /* the board's rows are painted by the page's script, so they carry no
        scope attribute: their rules are :global under the board */
+    .bug-jar { margin: 1.6rem 0 0; }
+    .jar-list :global(.jar-empty) { margin: 0 0 0.8rem; text-align: center; color: #cdc2ab; font-style: italic; }
+    .jar-list :global(.jar-slots) {
+      list-style: none; margin: 0; padding: 0;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.7rem;
+    }
+    .jar-list :global(.jar-slot) {
+      display: flex; flex-direction: column; align-items: center; gap: 0.25rem; text-align: center;
+      padding: 0.7rem 0.5rem 0.8rem; border: 1px solid rgba(232, 196, 139, 0.2); border-radius: 10px; color: #e6dcc6;
+    }
+    .jar-list :global(.jar-slot.is-named) { border-color: rgba(79, 163, 122, 0.55); background: rgba(79, 163, 122, 0.07); }
+    .jar-list :global(.jar-img) { width: 64px; height: 64px; image-rendering: pixelated; }
+    .jar-list :global(.jar-slot.is-open .jar-img) { opacity: 0.7; }
+    .jar-list :global(.jar-name) { font-weight: 700; font-size: 1rem; overflow-wrap: anywhere; }
+    .jar-list :global(.jar-q) { font-family: var(--pm-mono); font-size: 1.3rem; color: var(--pm-gold); }
+    .jar-list :global(.jar-by) { font-size: 0.76rem; color: rgba(205, 194, 171, 0.75); }
+    .jar-list :global(.jar-title) { font-size: 0.8rem; line-height: 1.35; color: rgba(230, 220, 198, 0.85); overflow-wrap: anywhere; }
     .bug-board { margin: 1.6rem 0 0; }
     .bb-list :global(.bb-stage + .bb-stage) { margin-top: 0.9rem; }
     .bb-list :global(h4) { margin: 0 0 0.4rem; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(232, 196, 139, 0.85); font-weight: 400; }

@@ -1,20 +1,17 @@
 #!/usr/bin/env node
-// bug-strip-art.mjs — draws the bug strip's seven panel pictures in the page's
-// own pixel kit (pixel-icons.mjs § ART_INK) and writes them where
-// src/lib/bug-strip.mjs's PANELS point.
+// bug-strip-art.mjs — draws the bug strip's seven panel pictures and the jar's
+// silhouette in the page's own pixel kit (pixel-icons.mjs § ART_INK), and
+// writes them where src/lib/bug-strip.mjs's PANELS and JAR_ART point. The
+// pixel pictures are the pictures (Keemin, 2026-09-29: "pixel is fine").
 //
-//   node tools/bug-strip-art.mjs           write the seven SVGs
+//   node tools/bug-strip-art.mjs           write the SVGs
 //   node tools/bug-strip-art.mjs --check   exit 1 if a committed SVG differs
-//
-// These are placeholders for Iris's hand: a panel is repainted by replacing
-// its file (or pointing its `img` elsewhere), after which this tool must no
-// longer write that panel. Remove its map below when that happens.
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ART_INK, GRID } from "../src/lib/pixel-icons.mjs";
-import { PANELS } from "../src/lib/bug-strip.mjs";
+import { PANELS, JAR_ART } from "../src/lib/bug-strip.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = join(ROOT, "public", "atelier", "postmark");
@@ -157,6 +154,8 @@ export const SCENES = {
     "................",
   ],
 };
+// the jar's loose bug: panel 3's jar, its bug a silhouette until the fixer names it
+SCENES["jar-open"] = SCENES[3].map((row) => row.replaceAll("n", "k"));
 
 export function svgOf(n) {
   const rows = SCENES[n];
@@ -182,17 +181,17 @@ export function svgOf(n) {
 if (process.argv[1]?.replace(/\\/g, "/").endsWith("tools/bug-strip-art.mjs")) {
   const check = process.argv.includes("--check");
   let drift = 0;
-  for (const p of PANELS) {
-    if (!SCENES[p.n]) continue;
-    const file = join(PUBLIC, ...p.img.split("/").filter(Boolean));
-    const want = svgOf(p.n);
+  const pictures = [...PANELS.map((p) => [p.n, p.img]), ["jar-open", JAR_ART.open]];
+  for (const [key, img] of pictures) {
+    const file = join(PUBLIC, ...img.split("/").filter(Boolean));
+    const want = svgOf(key);
     if (check) {
       // a Windows checkout may hold the file CRLF; the picture is the same
-      if (!existsSync(file) || readFileSync(file, "utf8").replace(/\r\n/g, "\n") !== want) { console.error(`drift: ${p.img}`); drift++; }
+      if (!existsSync(file) || readFileSync(file, "utf8").replace(/\r\n/g, "\n") !== want) { console.error(`drift: ${img}`); drift++; }
     } else {
       mkdirSync(dirname(file), { recursive: true });
       writeFileSync(file, want);
-      console.log(`wrote ${p.img}`);
+      console.log(`wrote ${img}`);
     }
   }
   if (drift) process.exit(1);
