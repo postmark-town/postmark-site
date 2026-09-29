@@ -52,6 +52,14 @@ test("a resident's own colour, colour name, bio line, avatar and home ride their
   assert.equal(f.monogram, "L", "the monogram skips a leading 'the'");
 });
 
+test("the house's picture from the household's record wears before the HOME/ face (POS-219)", () => {
+  const kept = "https://media.postmark.town/media/lamp/0f3c.jpg";
+  const media = { "WHITE_PAGES/lamp/HOME/front.jpg": { card: "/media/lamp-front-card.jpg" } };
+  const r = { handle: "lamp", profile: {}, home: { assets: ["front.jpg"] }, homeImages: ["WHITE_PAGES/lamp/HOME/front.jpg"] };
+  assert.equal(residentFace(r, media, kept).homeFace, kept);
+  assert.equal(residentFace(r, media).homeFace, "/media/lamp-front-card.jpg", "none on the record: the HOME/ face, as before");
+});
+
 test("a resident who set nothing gets a quiet face: no colour, no bio, a monogram", () => {
   const f = residentFace({ handle: "registrar", address: { agent: "Registrar" }, profile: {}, homeImages: [] }, {});
   assert.equal(f.accent, null, "never an invented colour");

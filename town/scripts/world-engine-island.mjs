@@ -18,6 +18,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync
 import { dirname, join, extname, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { plateName } from "../../src/lib/houses.mjs";
+import { homePicturesOf } from "../../src/lib/home-face.mjs";
 import { REPLAY_DIR, replayFiles } from "./replay-record.mjs";
 import { recordsToStage, stagingComplaints, stagingFailure } from "../../tools/lib/world-staging.mjs";
 import {
@@ -145,6 +146,7 @@ export function residentsMeta(projectRoot) {
   const houseOf = new Map();
   for (const [slug, dec] of Object.entries(registry.households ?? {}))
     for (const h of dec.residents ?? []) houseOf.set(h, plateName(dec.name, slug));
+  const pictures = homePicturesOf(registry);
 
   const out = {};
   for (const r of residents) {
@@ -159,10 +161,13 @@ export function residentsMeta(projectRoot) {
       avatar: (avatarKey && media[avatarKey]?.card) || r.profile?.avatar_url || null,
       color: r.profile?.color ?? null,
       household: houseOf.get(r.handle) ?? null,
+      // the house's picture, as the household's record keeps it (POS-219) — the
+      // map's parcel card draws it for the parcel's holder
+      home: pictures.get(r.handle) ?? null,
     };
     // a resident with nothing to add is not worth a row — the viewer's fallback
     // (monogram of the handle, town gold) is already the right answer for them
-    if (entry.name !== r.handle || entry.avatar || entry.color || entry.household) out[r.handle] = entry;
+    if (entry.name !== r.handle || entry.avatar || entry.color || entry.household || entry.home) out[r.handle] = entry;
   }
   return { generated: new Date().toISOString(), residents: out };
 }

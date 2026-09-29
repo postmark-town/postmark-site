@@ -20,6 +20,7 @@
 import media from "@/data/postmark/media.json";
 import { excerpt, fmtDate } from "@/lib/pm.mjs";
 import { homeFaceOf } from "@/lib/home-face.mjs";
+import { homePictureOf } from "@/lib/home-picture.mjs";
 import { residentKey } from "@/lib/households-directory.mjs";
 
 interface Props {
@@ -46,7 +47,7 @@ function addressNote(r) {
 // declares under `assets:`, else the first HOME image in media.
 function cardImage(r) {
   const face = homeFaceOf(r, r.homeImages.filter((i) => media[i]));
-  return face ? media[face].card : null;
+  return homePictureOf(r.handle) ?? (face ? media[face].card : null);
 }
 
 const img = cardImage(r);
