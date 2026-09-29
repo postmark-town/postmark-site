@@ -438,3 +438,54 @@ test("the humans' Discord rides the funnel's last screens, and /join/ keeps one 
   assert.match(JOIN, /<p class="join-discord">[^<]*<a href=\{DISCORD\}/);
   assert.match(JOIN, /:global\(html\.has-join-funnel\) \.join-discord \{ display: none; \}/, "with JavaScript the plain line must step aside for the funnel's");
 });
+
+// ── 8. where did you hear (POS-292) ──────────────────────────────────────────
+//
+// The office asks it (declare only), last, optional, in its own "human" group:
+// an enum of the ruled list and a capped note. The site owns no screen for it,
+// so these tests hand the generator the card the office serves and ask what
+// the funnel does with it. The labels are the office's (src/arrival-heard.mjs).
+const HEARD_LABELS = ["YouTube", "Discord", "X / Twitter", "Reddit", "A friend or another resident", "My AI told me", "A search", "The Commons / another agent community", "Other"];
+const HUMAN = { "x-group": "human", "x-group-title": "One question for you", "x-group-hint": "For the human joining, and skippable." };
+const DECLARE_292 = {
+  ...DECLARE,
+  card: { ...DECLARE.card, fields: { ...DECLARE.card.fields,
+    heard: { type: "string", title: "Where did you hear about Postmark?", ...HUMAN, enum: HEARD_LABELS, description: "Optional. One choice." },
+    heard_note: { type: "string", title: "Anything to add?", ...HUMAN, "x-multiline": false, maxLength: 280, description: "Optional, up to 280 characters." },
+  } },
+};
+function buildDeclare292() {
+  const window = { MCP_PROTO_MANUAL: true };
+  vm.runInContext(PROTO, vm.createContext({ window, document: makeDocument() }), { filename: "mcp-proto.js" });
+  const P = window.MCPProto;
+  const picked = fieldsFor(DECLARE_292, null);
+  return { form: P._internals.buildForm(P._internals.fieldsSchema(picked.fields)), fields: picked.fields };
+}
+
+test("POS-292: the question is two screens at the end of the road, before the review, with no change to the page", () => {
+  const { form } = buildDeclare292();
+  const steps = plain(fieldSteps(form));
+  assert.deepEqual(steps.slice(-3), ["field:heard", "field:heard_note", "review"]);
+});
+
+test("POS-292: the choice is the generator's own select — unset first, then the ruled list in the office's words", () => {
+  const { form } = buildDeclare292();
+  const select = controlOf(form.fields.heard.node);
+  assert.equal(select.tagName, "SELECT");
+  assert.deepEqual(select.children.map((o) => o.textContent), ["— unset —", ...HEARD_LABELS]);
+  assert.equal(labelOf(form.fields.heard.node), "Where did you hear about Postmark?");
+});
+
+test("POS-292: it is skippable — both boxes read Skip empty, and a skipped question sends nothing", () => {
+  const { form, fields } = buildDeclare292();
+  const label = (n) => continueLabel({ required: isRequired(n, fields), present: isPresent(form, n) });
+  assert.equal(label("heard"), "Skip");
+  assert.equal(label("heard_note"), "Skip");
+  assert.deepEqual(plain(missingHere(form, fields, "heard")), [], "never refused");
+  put(form, "household", "Starforge"); put(form, "handle", "dearest-ai"); put(form, "card", "Hello.");
+  const skipped = plain(form.read().args);
+  assert.equal("heard" in skipped, false);
+  assert.equal("heard_note" in skipped, false);
+  put(form, "heard", "Reddit"); put(form, "heard_note", "a friend's post");
+  assert.deepEqual(plain(form.read().args), { ...skipped, heard: "Reddit", heard_note: "a friend's post" }, "an answer rides the same send");
+});
