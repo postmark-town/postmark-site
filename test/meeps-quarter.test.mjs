@@ -310,7 +310,7 @@ test("the meeplings stand on a row of their own, so the six meeps keep a whole q
     assert.doesNotMatch(page.slice(page.lastIndexOf("<li ", f), f), /cq-apart/, `${m.key} is set apart like a meepling`);
   }
   const css = readFileSync(join(ROOT, "town", "pages", "meeps", "index.astro"), "utf8");
-  assert.match(css, /\.cq-apart \{ flex: 0 0 100%;/, "the meeplings' row is not a whole row");
+  assert.ok(css.includes(".cq-apart { flex: 0 0 100%; display: flex; justify-content: center; }"), "the meeplings' row is not a whole row at every width");
   assert.match(css, /\.cq-lot \{ flex: 0 1 calc\(100% \/ 6\); min-width: 0; \}/, "on a phone a meep's lot is not a sixth of the quay");
 });
 
