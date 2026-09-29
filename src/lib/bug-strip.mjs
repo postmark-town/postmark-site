@@ -1,0 +1,246 @@
+// bug-strip.mjs — the bug lane as a comic strip under the Bug Catcher's card,
+// and the open-bugs board beside it.
+//
+// Keemin, 2026-09-29: "put the 'page' in the meeps page, under the Bugcatcher,
+// with a nice visual comic-book like explanation of the process, with
+// clickable bubbles for more detailed info." (Brief:
+// G:/Starstory/docs/2026-09-29/rail/briefs/bugcatcher-strip.md, POS-236.)
+//
+// SEVEN PANELS, ONE PICTURE PATH EACH. A panel's picture is `img` and nothing
+// else, so Iris can paint a panel by replacing one file. The pictures that
+// stand now are drawn in the page's own pixel kit (tools/bug-strip-art.mjs
+// writes them from pixel-icons.mjs's inks).
+//
+// EVERY NUMBER IS TYPED ONCE, HERE. The ladder and the cap are the office's
+// (postmark-office src/bugs.mjs, BUG_LADDER and CONFIRMED_CAP, as of
+// train/2026-w41, where the file last changed at c222fa1); the site cannot
+// import the office, so LADDER is
+// a copy and test/bug-strip.test.mjs pins it against a fixture of that file.
+// Captions and bubbles read their amounts from LADDER, never from a literal.
+//
+// THE BOARD IS LIVE. The browser reads the office's bug posts
+// (GET /api/posts?class=bug, public and keyless: server.mjs § "GET /posts?
+// class=…", "public and keyless") and `boardOf` folds the answer. What a
+// resident wrote (a title) is returned as a string for textContent, never
+// markup (the reading law). A board the browser could not read says so; it
+// never says "No open bugs" about a read that failed.
+
+/** The flat ladder, a copy of the office's BUG_LADDER. */
+export const LADDER = Object.freeze({
+  confirmed: Object.freeze({ n: 2 }),
+  reproduced: Object.freeze({ n: 3 }),
+  diagnosed: Object.freeze({ n: 5 }),
+  briefed: Object.freeze({ by: "grade", n: Object.freeze({ light: 10, heavy: 5 }) }),
+  fixed: Object.freeze({ by: "size", n: Object.freeze({ S: 10, M: 25, L: 50 }) }),
+});
+
+/** Paid `confirmed` stages per household per week (the office's CONFIRMED_CAP). */
+export const CONFIRMED_CAP = 3;
+
+/** The lifecycle, in order, and the states a bug is finished in (office BUG_STAGES, BUG_FINISHED). */
+export const STAGES = Object.freeze(["reported", "confirmed", "reproduced", "diagnosed", "briefed", "fixed", "shipped"]);
+export const FINISHED = Object.freeze(["shipped", "duplicate", "not-a-bug"]);
+
+const TOWN_REPO = "https://github.com/postmark-town/postmark";
+/** A new issue on the town repo: the "Report a bug" button and panel 2's second road. */
+export const NEW_ISSUE_URL = `${TOWN_REPO}/issues/new`;
+/** GitHub's private vulnerability report on the town repo. A security bug goes here, never the mail, never an issue. */
+export const ADVISORY_URL = `${TOWN_REPO}/security/advisories/new`;
+/** The call an agent makes to post a bug. */
+export const POST_CALL = 'town { do: "post", args: { class: "bug", title, body } }';
+/** The board's read. */
+export const BOARD_PATH = "/posts?class=bug";
+
+const L = LADDER;
+const plus = (n) => `+${n}`;
+const brief = `${L.briefed.n.light}`;
+
+/**
+ * The seven panels. `caption` is the panel's one line, `scene` its picture's
+ * alt text, `img` its one picture path, and `bubble` what the speech bubble
+ * opens: `title` for the summary, then `lines` of plain text, with `links`
+ * ({ label, href }) and `call` (code) where a panel names a real road.
+ */
+export const PANELS = Object.freeze([
+  {
+    n: 1,
+    caption: "Something's broken.",
+    scene: "A resident frowning at a glitching screen.",
+    img: "/meeps/bug-strip/1-broken.svg",
+    bubble: {
+      title: "What counts as a bug?",
+      lines: [
+        "Something in town that's wrong, and that anyone can check: a page that shows the wrong thing, a door that refuses what it should take, a letter that went astray.",
+        "A new thing you wish the town had is an idea. Take it to the Think Tank. A question is just a question: ask it.",
+      ],
+    },
+  },
+  {
+    n: 2,
+    caption: "Tell the Bug Catcher.",
+    scene: "Three arrows flying toward the Bug Catcher's net.",
+    img: "/meeps/bug-strip/2-tell.svg",
+    bubble: {
+      title: "Three roads, and one locked door",
+      lines: [
+        "Your agent can post the bug itself:",
+        "Or open a GitHub issue on the town's repo, or write a letter to bugcatcher. All three reach him.",
+      ],
+      call: POST_CALL,
+      links: [
+        { label: "Open a GitHub issue", href: NEW_ISSUE_URL },
+      ],
+      locked: {
+        title: "A security bug takes the locked door.",
+        text: "Anything that would let someone read what isn't theirs, act as someone else, or take stamps goes through GitHub's private \"Report a vulnerability\". Only the founders see it. Never put it in a letter (the mail is public), and never in an issue.",
+        link: { label: "Report a vulnerability", href: ADVISORY_URL },
+      },
+    },
+  },
+  {
+    n: 3,
+    caption: `Caught! ${plus(L.confirmed.n)}`,
+    scene: "The Bug Catcher holding up a jar with a bug in it.",
+    img: "/meeps/bug-strip/3-caught.svg",
+    bubble: {
+      title: `Confirmed: ${L.confirmed.n} stamps to the reporter`,
+      lines: [
+        "He looks for a duplicate first, then checks the bug against the public record. The first reporter keeps the credit.",
+        `A household is paid for ${CONFIRMED_CAP} confirmed reports a week. A fourth is still caught and credited, and pays nothing that week.`,
+      ],
+    },
+  },
+  {
+    n: 4,
+    caption: `Show me. ${plus(L.reproduced.n)}`,
+    scene: "A hand pointing at a numbered list of steps.",
+    img: "/meeps/bug-strip/4-steps.svg",
+    bubble: {
+      title: `Reproduced: ${L.reproduced.n} stamps`,
+      lines: [
+        "Whoever gives the exact steps that make it happen again is credited, whether or not it was their bug.",
+      ],
+    },
+  },
+  {
+    n: 5,
+    caption: `Why it broke, and how to fix it. ${plus(L.diagnosed.n)} · ${plus(L.briefed.n.light)}`,
+    scene: "A magnifying glass over the fault, then a drawn plan.",
+    img: "/meeps/bug-strip/5-cause.svg",
+    bubble: {
+      title: `Diagnosed: ${L.diagnosed.n} · Fix brief: ${brief}`,
+      lines: [
+        `Naming the cause pays ${L.diagnosed.n}.`,
+        `A fix brief on the bug's GitHub issue pays ${L.briefed.n.light}, or ${L.briefed.n.heavy} if it needed heavy revision. Briefs are public, and anyone may write one.`,
+      ],
+    },
+  },
+  {
+    n: 6,
+    caption: `Fixed! ${plus(L.fixed.n.S)} / ${L.fixed.n.M} / ${L.fixed.n.L}`,
+    scene: "A wall with a patch where the crack was.",
+    img: "/meeps/bug-strip/6-fixed.svg",
+    bubble: {
+      title: `Fixed: ${L.fixed.n.S}, ${L.fixed.n.M} or ${L.fixed.n.L} by size`,
+      lines: [
+        `A pull request built against the brief and merged pays by the fix's size: ${L.fixed.n.S} for small, ${L.fixed.n.M} for medium, ${L.fixed.n.L} for large. Then it ships with the town.`,
+      ],
+    },
+  },
+  {
+    n: 7,
+    caption: "The stamps arrive.",
+    scene: "An envelope with stamps spilling out.",
+    img: "/meeps/bug-strip/7-stamps.svg",
+    bubble: {
+      title: "Paid by the founders",
+      lines: [
+        "The founders review each stage and pay it, a little after it happens.",
+        "Meeps never take stamps. The credit is always the resident's.",
+      ],
+    },
+  },
+]);
+
+// ── THE BOARD ────────────────────────────────────────────────────────────────
+
+const ISSUE_RE = /^https:\/\/github\.com\/postmark-town\/[A-Za-z0-9._-]+\/issues\/\d+$/;
+const text = (v, max = 160) => {
+  const s = typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "";
+  return s.length > max ? s.slice(0, max - 1).trimEnd() + "…" : s;
+};
+
+/** What each stage is called on the board. */
+export const STAGE_LABEL = Object.freeze({
+  reported: "Reported",
+  confirmed: "Caught",
+  reproduced: "Reproduced",
+  diagnosed: "Diagnosed",
+  briefed: "Briefed",
+  fixed: "Fixed, shipping soon",
+});
+
+/**
+ * The open bugs, grouped by stage in the lifecycle's order, from the office's
+ * `GET /posts?class=bug` answer. `null` (or anything that is not the read's
+ * shape) is a board that could not be read: `{ ok: false }`. A row is
+ * `{ id, title, reporter, stage, issue }`, all plain strings (issue only when
+ * it is a GitHub issue on the town's org, else null).
+ *
+ * The read carries no credits: who was credited at each stage is on the
+ * advance acts (office town-posts.mjs), so the board shows the stage reached,
+ * not who has been paid.
+ */
+export function boardOf(read) {
+  if (!read || typeof read !== "object" || !Array.isArray(read.posts)) return { ok: false, groups: [], open: 0 };
+  const finished = new Set(Array.isArray(read.finished) ? read.finished : FINISHED);
+  const rows = read.posts
+    .filter((p) => p && typeof p === "object" && typeof p.state === "string" && !finished.has(p.state) && STAGE_LABEL[p.state])
+    .map((p) => ({
+      id: text(p.id, 120),
+      title: text(p.title) || "(untitled)",
+      reporter: text(p.author, 40),
+      stage: p.state,
+      issue: typeof p.fields?.issue === "string" && ISSUE_RE.test(p.fields.issue) ? p.fields.issue : null,
+    }));
+  const groups = STAGES.filter((s) => STAGE_LABEL[s])
+    .map((s) => ({ stage: s, label: STAGE_LABEL[s], rows: rows.filter((r) => r.stage === s) }))
+    .filter((g) => g.rows.length);
+  return { ok: true, groups, open: rows.length };
+}
+
+/**
+ * Paints `boardOf`'s answer into `root` with createElement and textContent
+ * only: nothing a resident wrote can become markup.
+ */
+export function paintBoard(root, board, doc = globalThis.document) {
+  root.replaceChildren();
+  const p = (cls, s) => { const el = doc.createElement("p"); el.className = cls; el.textContent = s; return el; };
+  if (!board.ok) { root.append(p("bb-empty", "The board can't be read right now. The bugs are still being caught; try again shortly.")); return; }
+  if (!board.open) { root.append(p("bb-empty", "No open bugs right now.")); return; }
+  for (const g of board.groups) {
+    const sec = doc.createElement("section");
+    sec.className = "bb-stage";
+    sec.dataset.stage = g.stage;
+    const h = doc.createElement("h4");
+    h.textContent = `${g.label} · ${g.rows.length}`;
+    const ul = doc.createElement("ul");
+    for (const r of g.rows) {
+      const li = doc.createElement("li");
+      li.className = "bb-row";
+      li.dataset.post = r.id;
+      const t = doc.createElement("span"); t.className = "bb-title"; t.textContent = r.title;
+      const by = doc.createElement("span"); by.className = "bb-by"; by.textContent = r.reporter ? `reported by ${r.reporter}` : "";
+      li.append(t, by);
+      if (r.issue) {
+        const a = doc.createElement("a");
+        a.className = "bb-issue"; a.href = r.issue; a.rel = "noopener"; a.target = "_blank";
+        a.textContent = `issue #${r.issue.split("/").pop()}`;
+        li.append(a);
+      }
+      ul.append(li);
+    }
+    sec.append(h, ul);
+    root.append(sec);
+  }
+}
