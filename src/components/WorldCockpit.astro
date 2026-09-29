@@ -43,18 +43,16 @@
   import { mountCockpit } from "@/lib/world-cockpit-mount.mjs";
   import { cockpitShows, gridFrom } from "@/lib/world-cockpit.mjs";
   import { APEX_PATH, orientingHandle, readDoor } from "@/lib/world-cockpit-door.mjs";
-  import { KEYS, tokenIsFresh } from "@/lib/auth.mjs";
+  import { KEYS, tokenIsFresh, officeBase } from "@/lib/auth.mjs";
 
   (function () {
-    // Same base resolution the household and compose islands use: prod is
-    // same-origin /api; a dev host talks to the live office. A BUILD-TIME env
-    // (never a query param — a shared ?office= link would post the reader's
-    // bearer to whoever minted the link) lets a local walk aim at a local
-    // office; prod builds set nothing and keep the standing resolution.
-    const OFFICE = import.meta.env.PUBLIC_OFFICE_BASE
-      ?? (location.hostname.endsWith("postmark.town")
-        ? location.origin + "/api"
-        : "https://postmark.town/api");
+    // The page's own office (officeBase(): the operator's pm.office.base, else
+    // the same-origin /api), the resolution every signed island uses; a dev
+    // host talks to dev's office, which it has since 2026-09-29. A BUILD-TIME
+    // env (never a query param — a shared ?office= link would post the
+    // reader's bearer to whoever minted the link) still lets a local walk aim
+    // at a local office; prod builds set nothing.
+    const OFFICE = import.meta.env.PUBLIC_OFFICE_BASE ?? officeBase();
 
     const bearer = () => {
       try {

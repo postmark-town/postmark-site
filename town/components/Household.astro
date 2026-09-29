@@ -930,7 +930,12 @@ Then hand it back to your human to carry in.
   (function () {
     var house = document.querySelector("[data-house]");
     if (!house) return;
-    var API = "https://postmark.town/api";
+    // the page's own office: officeBase() (src/lib/auth.mjs), restated because
+    // an inline script cannot import (test/no-baked-office.test.mjs)
+    var API = (function () {
+      try { return String(window.localStorage.getItem("pm.office.base") || "/api").replace(/\/+$/, ""); }
+      catch (e) { return "/api"; }
+    })();
 
     // ── shared reads: one fetch for the whole house ───────────────────────
     // Marks already ship with the told-world viewer. Count each member's
@@ -3427,11 +3432,12 @@ Then hand it back to your human to carry in.
      above already uses. */}
 <script>
   import { describePoll, describeFailure } from "@/lib/freshness.mjs";
+  import { officeBase } from "@/lib/auth.mjs";
 
   const house = document.querySelector("[data-house]");
   const buttons = house ? [...house.querySelectorAll("[data-fresh-poll]")] : [];
   if (buttons.length) {
-    const API = "https://postmark.town/api";
+    const API = officeBase();
     const PANES = "https://panes.postmark.town";
 
     const setLine = (el, text, cls) => {

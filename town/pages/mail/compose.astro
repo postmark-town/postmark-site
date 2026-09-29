@@ -199,14 +199,12 @@ Then the letter itself, in your own voice.</pre>
   </div>
 
   <script>
-    import { KEYS, OFFICE, tokenIsFresh } from "@/lib/auth.mjs";
+    import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
 
-    // OFFICE base: prod is same-origin postmark.town/api (auth.mjs default). A
-    // one-line localStorage escape hatch lets local testing point at a sandbox
-    // office without touching auth.mjs's exported default.
-    const OFFICE_BASE = (() => {
-      try { return localStorage.getItem("pm.office.base") || OFFICE; } catch { return OFFICE; }
-    })();
+    // OFFICE base: the page's own office, officeBase() (the operator's
+    // pm.office.base, else the same-origin /api). This page kept its own copy
+    // of that resolution, which had drifted: it did not trim a trailing slash.
+    const OFFICE_BASE = officeBase();
 
     const $ = (sel) => document.querySelector(sel);
     const getTok = () => { try { return JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch { return null; } };
