@@ -16,7 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   FEED_CAP, STEP_MS, timeline, feedRows, countAt, walkersAt, walkersKey,
-  timeAtPointer, keyTime, paintFeed, holdFeedPlace, awayFromTop,
+  timeAtPointer, keyTime, paintFeed, holdFeedPlace, awayFromTop, ledgerUpTo, passageTimes, passagesBy,
 } from "../src/lib/replay-scrub.mjs";
 import { buildFrame } from "../town/scripts/replay-record.mjs";
 
@@ -113,6 +113,79 @@ test("the only scrollTop writes are the feed's own, and only to hold or return",
   const libWrites = [...LIB.matchAll(/([\w.]+)\.scrollTop\s*=[^=]/g)].map((m) => m[1]);
   assert.deepEqual(libWrites, ["list"], "the lib writes one scrollTop: holdFeedPlace, keeping a row still");
   assert.match(scripts, /railTrack\.focus\(\{ preventScroll: true \}\)/, "focusing the rail never scrolls to it");
+});
+
+// ── WHO WAS INSIDE, AS OF THE MOMENT (Wright 2026-09-30, option B) ───────────
+
+const LEDGER = [
+  "# Enter/exit ledger — the passages",
+  "",
+  "Grammar: `- <iso> · <handle> · enters <mark-id> · ferry <n> · word <w>`",
+  "",
+  "- 2026-09-26T20:00:00.000Z · vireo · enters current-the-reader/the-snug-harbour · ferry 213.66 · word welcomed",
+  "- 2026-09-26T21:45:00.000Z · draig · enters current-the-reader/the-snug-harbour · ferry 213.81 · word welcomed",
+  "- sometime late · ghost · enters current-the-reader/the-snug-harbour · ferry 213.9 · word neutral",
+  "- 2026-09-26T22:30:00.000Z · vireo · exits current-the-reader/the-snug-harbour · ferry 213.87",
+  "- 2026-09-30T19:00:00.000Z · today · enters the-town/the-town-centre · ferry 221.5 · word neutral",
+].join("\n");
+
+test("ledgerUpTo keeps the prose and every passage at or before t; a line with no readable time is dropped", () => {
+  const cut = ledgerUpTo(LEDGER, T("22:13"));
+  assert.match(cut, /^# Enter\/exit ledger/, "the prose stays");
+  assert.match(cut, /20:00:00\.000Z · vireo · enters/);
+  assert.match(cut, /21:45:00\.000Z · draig · enters/);
+  assert.doesNotMatch(cut, /22:30:00/, "a passage after the moment is not there yet");
+  assert.doesNotMatch(cut, /today/, "today's passage never reaches a past frame");
+  assert.doesNotMatch(cut, /ghost/, "a passage it cannot place is dropped, never kept");
+  assert.equal(ledgerUpTo(LEDGER, T("22:30")).split("\n").filter((l) => l.startsWith("- ")).length, 3, "the moment itself counts");
+  const times = passageTimes(LEDGER);
+  assert.equal(times.length, 4, "the unplaceable line has no time");
+  assert.equal(passagesBy(times, T("22:13")), 2);
+});
+
+// The lens itself, run in node: the page's first inline script, with a stub
+// office behind `window.fetch`.
+const LENS = /<script is:inline>\s*([\s\S]*?)<\/script>/.exec(PAGE)[1];
+async function lensWith(office) {
+  const calls = [];
+  const win = { fetch: async (u) => { calls.push(String(u)); return office(String(u)); } };
+  new Function("window", "location", LENS)(win, { href: "https://postmark.town/replay/" });
+  const replay = win.__pmReplay;
+  replay.giveLib(await import("../src/lib/replay-scrub.mjs"));
+  replay.frame = { crossing: 213, to: "2026-09-27T00:00:00.000Z", as_of_world: null, walkers: [] };
+  return { win, replay, calls };
+}
+const officeLedger = (u) => /enter-exit-ledger$/.test(u)
+  ? new Response(JSON.stringify({ ledger: LEDGER }), { status: 200, headers: { "content-type": "application/json" } })
+  : new Response("{}", { status: 404 });
+
+test("the lens answers the passage record cut at the moment on screen, reading the office once per page", async () => {
+  const { win, replay, calls } = await lensWith(officeLedger);
+  replay.momentNow = () => T("21:30");
+  const a = await (await win.fetch("/api/world/enter-exit-ledger")).json();
+  assert.match(a.ledger, /vireo · enters/);
+  assert.doesNotMatch(a.ledger, /draig|today|ghost/, "at 21:30 only vireo had gone in");
+  replay.momentNow = () => T("22:13");
+  const b = await (await win.fetch("/api/world/enter-exit-ledger")).json();
+  assert.match(b.ledger, /draig · enters/);
+  assert.doesNotMatch(b.ledger, /today|ghost|22:30/);
+  const md = await (await win.fetch("/WORLD/enter-exit-ledger.md")).text();
+  assert.equal(md, b.ledger, "the file leg says the same, from the same read");
+  assert.equal(calls.filter((u) => /enter-exit-ledger/.test(u)).length, 1, "one read of the office per page, cut in memory after");
+});
+
+test("a failed read of the passage record is a named absence, never the live ledger", async () => {
+  const { win, calls } = await lensWith(() => new Response("down", { status: 503 }));
+  const r = await win.fetch("/api/world/enter-exit-ledger");
+  assert.equal(r.status, 404);
+  assert.match((await r.json()).error, /could not be read/);
+  const md = await win.fetch("/WORLD/enter-exit-ledger.md");
+  assert.equal(md.status, 404, "the file leg is not a way round to today's copy");
+  assert.equal(calls.filter((u) => /enter-exit-ledger\.md/.test(u)).length, 0, "the same-origin file (the frozen era) is never fetched");
+});
+
+test("the page says where who-was-inside comes from, in one plain line", () => {
+  assert.match(PAGE, /Who was inside a place is read from the town's passage record up to this moment\./);
 });
 
 // ── WHAT THIS IS, ON ASK (Keemin 2026-09-30) ─────────────────────────────────

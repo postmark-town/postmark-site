@@ -131,6 +131,7 @@ const nameOf = (handle) => names.get(handle) ?? handle;
           </section>
         </div>
       </div>
+      <p class="r-passages">Who was inside a place is read from the town's passage record up to this moment.</p>
       <!-- WHAT THIS IS, ON ASK (Keemin, 2026-09-30). The explanation is the same
            words; it waits behind a native <details>, closed, so the map and the
            clock sit together and a reader who wants the why opens it. A summary
@@ -310,8 +311,13 @@ const nameOf = (handle) => names.get(handle) ?? handle;
         world: Object.create(null),
         stats: { bytes: 0, fetches: 0 },
         walkersNow: null,
+        // the moment on screen, set by the page; the passage record is cut here
+        momentNow: null,
+        // the town's passage record, read ONCE per page load and cut in memory
+        ledger: null,
+        libNow: null,
         lib: new Promise(function (resolve) { giveLib = resolve; }),
-        giveLib: function (lib) { giveLib(lib); },
+        giveLib: function (lib) { replay.libNow = lib; giveLib(lib); },
       });
 
       function pathOf(url) {
@@ -407,6 +413,40 @@ const nameOf = (handle) => names.get(handle) ?? handle;
           return real(RAW + "/" + frame.as_of_world + "/WORLD/walk-ledger.md", { credentials: "omit" })
             .then(function (r) { return r.ok ? r : real(input, init); })
             .catch(function () { return real(input, init); });
+        }
+
+        // WHO WAS INSIDE, AS OF THE MOMENT ON SCREEN (Wright, 2026-09-30). The
+        // passages since 2026-08-24 live only in the office's journal: the
+        // world repo's copy of the ledger is the frozen era, and the crossing's
+        // record holds no passages. So the office's ledger is read ONCE per
+        // page load and every answer is cut in memory to the lines whose own
+        // time is at or before the moment on screen. A passage is history with
+        // its own timestamp, so that is what the town had recorded by then, and
+        // a past frame never gets a passage after it. A failed read is a named
+        // absence (the viewer says "could not be read"), never the live ledger.
+        // Both legs the viewer knows are answered here; only the office leg is
+        // ever fetched, since the same-origin file is the frozen era.
+        if (/\/world\/enter-exit-ledger$/.test(p) || /\/WORLD\/enter-exit-ledger\.md$/.test(p)) {
+          var officeLeg = !/\.md$/.test(p);
+          if (!replay.ledger && officeLeg) {
+            replay.ledger = real(url, { credentials: "same-origin", cache: "no-store" })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .then(function (j) { return j && typeof j.ledger === "string" && j.ledger ? j.ledger : null; })
+              .catch(function () { return null; })
+              .then(function (text) { replay.ledgerText = text; return text; });
+          }
+          return (replay.ledger || Promise.resolve(null)).then(function (text) {
+            var lib = replay.libNow;
+            if (text == null || !lib) {
+              return new Response(JSON.stringify({ error: "the passage record could not be read for this moment" }),
+                { status: 404, headers: { "content-type": "application/json" } });
+            }
+            var at = replay.momentNow ? replay.momentNow() : Date.parse(frame.to);
+            var cut = lib.ledgerUpTo(text, at);
+            return officeLeg
+              ? json({ ledger: cut })
+              : new Response(cut, { status: 200, headers: { "content-type": "text/markdown; charset=utf-8" } });
+          });
         }
 
         // Anonymous, always. This is what switches the act controls off through
@@ -878,10 +918,18 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     const MAP_EVERY_MS = 600;
     let mapKey = "", mapBusy = false, mapAgain = false, mapTimer = 0, mapLast = 0, holdMap = false;
     const mapStats = { reloads: 0, lastMs: 0, maxMs: 0 };
+    let passageTimes = null;
     function showMapAt(frame, at) {
       const walkers = lib.walkersAt(frame, at, LAW);
-      window.__pmReplay.walkersNow = () => walkers;
-      const key = frame.crossing + ":" + lib.walkersKey(walkers);
+      const r = window.__pmReplay;
+      r.walkersNow = () => walkers;
+      // The passage record is cut at this same moment by the lens. Who was
+      // inside can change while nobody walks, so a passage crossing the clock
+      // is also a reason to ask the viewer to look again.
+      r.momentNow = () => at;
+      if (!passageTimes && r.ledgerText) passageTimes = lib.passageTimes(r.ledgerText);
+      const passed = passageTimes ? lib.passagesBy(passageTimes, at) : -1;
+      const key = frame.crossing + ":" + passed + ":" + lib.walkersKey(walkers);
       if (key === mapKey) return;
       mapKey = key;
       if (!holdMap) refreshMap();
@@ -1441,6 +1489,7 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     @media (max-width: 48rem) {
       .replay .r-map.wv, .replay .r-map.wv:not(:root) { height: min(64vh, 30rem); }
     }
+    .replay .r-passages { margin: 0.6em 0 0; font-size: 0.76rem; font-style: italic; color: rgba(185, 173, 147, 0.85); }
     .replay .r-about { margin: 0.6em 0 0; }
     .replay .r-about-btn {
       display: inline-flex; align-items: center; gap: 0.45em; cursor: pointer; list-style: none;

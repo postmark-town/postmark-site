@@ -51,11 +51,11 @@ export function timeline(frame) {
 }
 
 // How many moments of an ascending timeline are at or before t.
-export function countAt(line, t) {
+export function countAt(line, t, atOf = (e) => e.at) {
   let lo = 0, hi = line.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (line[mid].at <= t) lo = mid + 1;
+    if (atOf(line[mid]) <= t) lo = mid + 1;
     else hi = mid;
   }
   return lo;
@@ -132,6 +132,38 @@ export function walkersAt(frame, t, law) {
 // redraw when somebody actually moved.
 export function walkersKey(walkers) {
   return walkers.map((w) => `${w.handle}@${Math.round(w.x)},${Math.round(w.y)}`).join("|");
+}
+
+// ── who was inside, as of t ─────────────────────────────────────────────────
+
+// The town's passage record (the enter/exit ledger) as it stood at t: the
+// prose around it, and every passage line whose own time is at or before t.
+// A passage is history with its own timestamp, so this is exactly what the
+// town had recorded by then. A passage line with no readable time is dropped:
+// a past frame never keeps a line it cannot place. (Wright, 2026-09-30.)
+export function ledgerUpTo(text, t) {
+  const out = [];
+  for (const line of String(text ?? "").replace(/\r\n/g, "\n").split("\n")) {
+    if (!line.startsWith("- ")) { out.push(line); continue; }
+    const at = Date.parse(line.slice(2).split(" · ")[0].trim());
+    if (Number.isFinite(at) && at <= t) out.push(line);
+  }
+  return out.join("\n");
+}
+
+// The readable passage times, ascending, so "how many passages by t" is a
+// binary search the page can ask on every paint.
+export function passageTimes(text) {
+  const out = [];
+  for (const line of String(text ?? "").replace(/\r\n/g, "\n").split("\n")) {
+    if (!line.startsWith("- ")) continue;
+    const at = Date.parse(line.slice(2).split(" · ")[0].trim());
+    if (Number.isFinite(at)) out.push(at);
+  }
+  return out.sort((a, b) => a - b);
+}
+export function passagesBy(times, t) {
+  return countAt(times, t, (x) => x);
 }
 
 // ── the rail as a slider ────────────────────────────────────────────────────
