@@ -29,9 +29,15 @@ export const CUSTOM_SEP = "|";
 export const CUSTOM_MAX = 127;
 export const DEFAULT_USD = 10;
 
-/** The SDK's URL for a client ID: dollars, capture, buttons only. */
+/**
+ * PAY LATER IS OFF (Keemin, 2026-09-29): a gift to a pot is not a purchase to
+ * finance. The giver's PayPal balance and a card through PayPal stay on.
+ */
+export const DISABLED_FUNDING = Object.freeze(["paylater"]);
+
+/** The SDK's URL for a client ID: dollars, capture, buttons only, and no Pay Later. */
 export function sdkUrl(clientId) {
-  return `${SDK_HOST}?client-id=${encodeURIComponent(String(clientId ?? ""))}&currency=USD&intent=capture&components=buttons`;
+  return `${SDK_HOST}?client-id=${encodeURIComponent(String(clientId ?? ""))}&currency=USD&intent=capture&components=buttons&disable-funding=${DISABLED_FUNDING.join(",")}`;
 }
 
 /** `<pot>|<handle>`, the handle trimmed (or empty), bounded to PayPal's 127. */

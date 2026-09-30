@@ -104,7 +104,7 @@ test("1 · no PayPal script is in the page's source, and none loads on mount —
   const pressed = go.fire("click");
   await new Promise((r) => setImmediate(r));
   assert.equal(doc.scripts().length, 1, "pressing adds exactly one script");
-  assert.equal(doc.scripts()[0].src, `${SDK_HOST}?client-id=sb-client-id&currency=USD&intent=capture&components=buttons`);
+  assert.equal(doc.scripts()[0].src, `${SDK_HOST}?client-id=sb-client-id&currency=USD&intent=capture&components=buttons&disable-funding=paylater`);
   await sdk.arrive();
   await pressed;
   assert.equal(sdk.made.length, 1, "the buttons render once the SDK arrives");
@@ -144,7 +144,13 @@ test("2 · custom_id is `<pot>|<handle>`, trimmed and bounded — the office's p
   assert.equal(customIdFor("darko-fund", ""), "darko-fund|");
   assert.equal(customIdFor("keep", "x".repeat(300)).length, CUSTOM_MAX);
   assert.equal(CUSTOM_MAX, 127);
-  assert.equal(sdkUrl("a b"), `${SDK_HOST}?client-id=a%20b&currency=USD&intent=capture&components=buttons`);
+  assert.equal(sdkUrl("a b"), `${SDK_HOST}?client-id=a%20b&currency=USD&intent=capture&components=buttons&disable-funding=paylater`);
+});
+
+test("2 · Pay Later is off, and only Pay Later: the SDK is asked to disable exactly paylater (Keemin, 2026-09-29)", () => {
+  const u = new URL(sdkUrl("sb-client-id"));
+  assert.equal(u.searchParams.get("disable-funding"), "paylater", "exactly paylater: the card and the PayPal balance stay on");
+  assert.equal(u.searchParams.get("enable-funding"), null, "nothing is force-enabled");
 });
 
 test("2 · only a whole number of dollars, at least one, opens PayPal", async () => {
