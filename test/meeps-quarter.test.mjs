@@ -61,10 +61,12 @@ test("a sprite on the quay is a well-formed map; the retired buildings are gone"
   }
 });
 
-test("Ferry is drawn, and only Ferry: the others' faces wait for their own word", () => {
+test("Ferry and the Bug Catcher are drawn, and only they: the others' faces wait for their own word", () => {
   // Wright's ruling, 2026-09-26: a sprite from the portrait seven gave the
-  // office; no invented likeness for a meep that has given no face.
-  assert.deepEqual(MEEPS.filter((m) => SPRITES[m.key]).map((m) => m.key), ["postmaster"]);
+  // office; no invented likeness for a meep that has given no face. The Bug
+  // Catcher's face is the one the bug video gave him (Keemin, 2026-09-29).
+  assert.deepEqual(MEEPS.filter((m) => SPRITES[m.key]).map((m) => m.key), ["postmaster", "bugcatcher"]);
+  assert.deepEqual(checkAllSprites(), {});
 });
 
 test("a meep's own inks are hexes the site already wears", () => {
@@ -75,12 +77,28 @@ test("a meep's own inks are hexes the site already wears", () => {
     readFileSync(join(ROOT, "town", "pages", "mail", "with", "[pair].astro"), "utf8"),
   ].join(" ").toLowerCase();
   for (const [meep, inks] of Object.entries(FIGURE_INK)) {
+    if (meep === "bugcatcher") continue; // the one exception, held just below
     for (const [ch, hex] of Object.entries(inks)) {
       assert.ok(worn.includes(hex.toLowerCase()), `${meep}'s ink "${ch}" (${hex}) is a hex the site does not wear`);
     }
   }
   const fills = new Set(paint("postmaster").map((r) => r.fill));
   for (const hex of Object.values(FIGURE_INK.postmaster)) assert.ok(fills.has(hex), `Ferry's ink ${hex} is declared and never painted`);
+});
+
+test("the Bug Catcher's inks are the video kit's, so the page and the video draw the same frog", () => {
+  // The one exception to the rule above (civic-art § A MEEP'S OWN INKS): his
+  // inks are the shorts kit's, G:/content-creation/shorts/_kit/kit.js § BC2_INK
+  // (outside this repo, so copied here by hand, Keemin 2026-09-29), with the
+  // kit's `m` hat band as `v` and its `w` eye-whites as `o`. The band is the
+  // site's own stamp purple.
+  const BC2_INK = { F: "#7cc05a", f: "#4f8f3f", y: "#eef5c4", c: "#f3a6a0", h: "#c9a36a", H: "#9a7a48", m: "#aa8fd8", w: "#ffffff" };
+  const { v, o, ...rest } = FIGURE_INK.bugcatcher;
+  assert.deepEqual({ ...rest, m: v, w: o }, BC2_INK);
+  assert.match(readFileSync(join(ROOT, "src", "styles", "postmark.css"), "utf8"), new RegExp(`--pm-stamp:\\s*${v}`, "i"), "his hat band is not the site's stamp purple");
+  const fills = new Set(paint("bugcatcher").map((r) => r.fill));
+  for (const hex of Object.values(FIGURE_INK.bugcatcher)) assert.ok(fills.has(hex), `his ink ${hex} is declared and never painted`);
+  assert.ok(fills.has(INK.d), "his pupils are not the town's night ink");
 });
 
 test("each meep's given name is the one on its own resident record", () => {
