@@ -290,7 +290,10 @@ const BALLOT_HOUSE = [
 // A MEEP'S OWN INKS. A figure needs colours a building never did (skin, a
 // coat), so a meep's sprite may add inks of its own here, merged over INK and
 // its accent triple at paint time. The rule stays the table's: every hex below
-// is one the site already wears, named where it is worn.
+// is one the site already wears, named where it is worn. The one exception is
+// the Bug Catcher: his inks are the shorts kit's (G:/content-creation/shorts/
+// _kit/kit.js § BC2_INK, Keemin 2026-09-29), so the page and the video draw
+// the same frog; his hat band is the site's own stamp purple.
 export const FIGURE_INK = {
   postmaster: {
     e: "#97a266", // skin, lit — global.css --moss, the banner green
@@ -305,6 +308,17 @@ export const FIGURE_INK = {
     Y: "#c9823d", // chick, shade — the Ballot House's lit copper
     b: "#a4632a", // beak — the Ballot House's copper
     q: "#cdbda4", // eggshell, shade — global.css, the parchment
+  },
+  // the shorts kit's BC2_INK, the same frog as the video (see the header above)
+  bugcatcher: {
+    F: "#7cc05a", // frog green (the video kit's BC2_INK)
+    f: "#4f8f3f", // frog green, in shade: his feet
+    y: "#eef5c4", // his pale belly
+    c: "#f3a6a0", // his cheeks
+    h: "#c9a36a", // the field hat
+    H: "#9a7a48", // the hat's brim, in shade
+    v: "#aa8fd8", // the hat's band: stamp purple, postmark.css --pm-stamp
+    o: "#ffffff", // the whites of his eyes
   },
 };
 
@@ -373,6 +387,39 @@ const MEEPLINGS = [
   "........................",
 ];
 
+// THE BUG CATCHER — drawn as he is in the bug video (G:/content-creation/
+// shorts/_kit/kit.js § BUGCATCHER2): a small round frog, big shiny eyes, a tiny
+// khaki field hat with a stamp-purple band, a pale belly, standing on the
+// quay's shelf like Ferry. The kit's 16-wide rows, centred in 24 (Wright's
+// conversion, Keemin 2026-09-29: "add the Bug Catcher's sprite to the meeps
+// page"); the kit's `k` pupils are the town's night ink `d`.
+const BUGCATCHER = [
+  "........................",
+  "........................",
+  "........................",
+  "........................",
+  "........................",
+  "........................",
+  "........................",
+  ".........hhhhhh.........",
+  ".....ooo.hvvvvh.ooo.....",
+  "....ooodoHHHHHHodooo....",
+  "....ooddoFFFFFFoddoo....",
+  ".....oooFFFFFFFFooo.....",
+  ".....FFFFFFFFFFFFFF.....",
+  "....FcFFFFFFFFFFFFcF....",
+  "....FFFFFFdFFdFFFFFF....",
+  "....FFFFFFFddFFFFFFF....",
+  ".....FFFFyyyyyyFFFF.....",
+  ".....FFFyyyyyyyyFFF.....",
+  ".....FFFyyyyyyyyFFF.....",
+  "......FFFyyyyyyFFF......",
+  "......ffff....ffff......",
+  "..sSssssSsssssSssssSss..",
+  "........................",
+  "........................",
+];
+
 export const SPRITES = {
   quests: QUEST_GUILD,
   ideas: THINK_TANK,
@@ -381,6 +428,7 @@ export const SPRITES = {
   votes: BALLOT_HOUSE,
   // the meeps, each drawn as itself (a meep with no entry has no sprite yet)
   postmaster: FERRY,
+  bugcatcher: BUGCATCHER,
   // the meeplings, as a gathering (they are not a meep; /meeps/ shows them apart)
   meeplings: MEEPLINGS,
 };

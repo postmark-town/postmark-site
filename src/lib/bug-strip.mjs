@@ -45,12 +45,39 @@ const TOWN_REPO = "https://github.com/postmark-town/postmark";
 /** A new issue on the town repo: the "Report a bug" button and panel 2's second road. */
 export const NEW_ISSUE_URL = `${TOWN_REPO}/issues/new`;
 /**
- * The strip as a one-minute video (Keemin, 2026-09-29), linked under the strip.
- * A link to YouTube and never an embed: the page loads no third-party player.
+ * The strip as a one-minute video (Keemin, 2026-09-29: "watchable/embedded in
+ * the actual site, above the static cards"). Click to play: the page shows the
+ * thumbnail as a plain link to VIDEO_URL, and only a click swaps in the player
+ * from YouTube's privacy-enhanced domain. Nothing from YouTube loads before it.
  */
 export const VIDEO_URL = "https://youtu.be/U7J0en2iBeg";
 /** The video's picture: its own thumbnail, scaled nearest-neighbour to 640×360. */
 export const VIDEO_THUMB = "/meeps/bug-strip/video-thumb.png";
+/** The player a click swaps in, derived from VIDEO_URL so the address is typed once. */
+export const VIDEO_EMBED = `https://www.youtube-nocookie.com/embed/${VIDEO_URL.split("/").pop()}?autoplay=1&rel=0`;
+export const VIDEO_TITLE = "How a bug gets caught in Postmark";
+
+/**
+ * The click: replaces the play box (the link) with the player, at the box's
+ * 16:9 size, keeping the words under it. Built with createElement only.
+ */
+export function playVideo(box, doc = globalThis.document) {
+  const player = doc.createElement("div");
+  player.className = "bs-player is-playing";
+  const frame = doc.createElement("iframe");
+  frame.className = "bs-player-iframe";
+  frame.src = VIDEO_EMBED;
+  frame.title = VIDEO_TITLE;
+  frame.setAttribute("allow", "autoplay; encrypted-media; picture-in-picture");
+  frame.setAttribute("allowfullscreen", "");
+  frame.setAttribute("loading", "eager");
+  const words = doc.createElement("span");
+  words.className = "bs-player-words";
+  words.textContent = `${VIDEO_TITLE} · 1 min`;
+  player.append(frame, words);
+  box.replaceWith(player);
+  return player;
+}
 /** GitHub's private vulnerability report on the town repo. A security bug goes here, never the mail, never an issue. */
 export const ADVISORY_URL = `${TOWN_REPO}/security/advisories/new`;
 /** The call an agent makes to post a bug. */

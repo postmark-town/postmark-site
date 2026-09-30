@@ -18,7 +18,7 @@ import { execFileSync } from "node:child_process";
 
 import {
   LADDER, CONFIRMED_CAP, STAGES, FINISHED, PANELS, ADVISORY_URL, NEW_ISSUE_URL, POST_CALL,
-  boardOf, paintBoard, jarOf, paintJar, JAR_ART, JAR_EMPTY, plainOf, VIDEO_URL, VIDEO_THUMB,
+  boardOf, paintBoard, jarOf, paintJar, JAR_ART, JAR_EMPTY, plainOf, VIDEO_URL, VIDEO_THUMB, VIDEO_EMBED, playVideo,
 } from "../src/lib/bug-strip.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -142,6 +142,7 @@ function stubDoc() {
     const el = {
       tagName: tag.toUpperCase(), className: "", dataset: {}, children: [], textContent: "", href: "", rel: "", target: "",
       append(...c) { el.children.push(...c); },
+      attrs: {}, setAttribute(k, v) { el.attrs[k] = String(v); },
       replaceChildren(...c) { el.children = [...c]; },
     };
     Object.defineProperty(el, "innerHTML", { set() { throw new Error("innerHTML used"); }, get() { return ""; } });
@@ -297,39 +298,70 @@ test("the built strip: every ✦ sits in a .bs-stamp, one per stamp amount",
   assert.equal(stars.length, amounts.length, "the built strip's ✦ are not one per stamp amount");
 });
 
-// ── THE VIDEO (Keemin, 2026-09-29: "get the video on the site") ──────────────
+// ── THE VIDEO, ABOVE THE STRIP (Keemin, 2026-09-29: "watchable/embedded in the
+// actual site, above the static cards") ─────────────────────────────────────
 
-test("the video is typed once, and its picture is on disk under public/", () => {
+test("the video is typed once: the player's address is derived from VIDEO_URL, and the picture is on disk", () => {
   assert.equal(VIDEO_URL, "https://youtu.be/U7J0en2iBeg");
+  assert.equal(VIDEO_EMBED, "https://www.youtube-nocookie.com/embed/U7J0en2iBeg?autoplay=1&rel=0");
+  assert.equal(SRC.split("U7J0en2iBeg").length - 1, 1, "the video's id is typed more than once in bug-strip.mjs");
   const page = readFileSync(join(ROOT, "town", "pages", "meeps", "index.astro"), "utf8");
-  assert.equal(page.includes("U7J0en2iBeg"), false, "the page types the video's address instead of reading VIDEO_URL");
-  assert.ok(existsSync(join(ROOT, "public", "atelier", "postmark", ...VIDEO_THUMB.split("/").filter(Boolean))), `the card's picture ${VIDEO_THUMB} is missing`);
+  assert.equal(/U7J0en2iBeg|youtu\.be\/|youtube(?:-nocookie)?\.com/i.test(page), false, "the page types a YouTube address instead of reading bug-strip.mjs");
+  assert.ok(existsSync(join(ROOT, "public", "atelier", "postmark", ...VIDEO_THUMB.split("/").filter(Boolean))), `the player's picture ${VIDEO_THUMB} is missing`);
 });
 
-test("the built Bug Catcher panel carries one link to the video, after the strip and before the jar",
-  { skip: !existsSync(builtMeeps) }, () => {
-  const page = readFileSync(builtMeeps, "utf8");
-  const bc = panelOf(page, "bugcatcher");
-  const links = [...bc.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>/g)].filter((m) => m[1] === VIDEO_URL);
-  assert.equal(links.length, 1, "the video is not linked exactly once in his panel");
-  assert.match(links[0][0], /target="_blank"/);
-  assert.match(links[0][0], /rel="noopener"/);
-  const at = links[0].index;
-  assert.ok(at > bc.lastIndexOf("data-strip-panel=") && at < bc.indexOf("data-bug-jar"), "the video card is not between the strip and the jar");
-  const card = bc.slice(at, bc.indexOf("</a>", at));
-  assert.ok(card.includes(`src="${VIDEO_THUMB}"`), "the card's picture is not its thumbnail");
-  assert.match(card, /alt="[^"]{20,}"/, "the card's picture has no real alt text");
-  assert.match(card, /Watch: How a bug gets caught in Postmark · 1 min/);
-  assert.equal(page.split(VIDEO_URL).length - 1, 1, "the video is linked somewhere else on the page too");
+test("playVideo: a click swaps the box for the privacy-enhanced player, 16:9, with its title and permissions", () => {
+  const doc = stubDoc();
+  const parent = doc.createElement("section");
+  const box = doc.createElement("a");
+  box.replaceWith = (n) => { parent.children[parent.children.indexOf(box)] = n; };
+  parent.append(box);
+  const player = playVideo(box, doc);
+  assert.equal(parent.children[0], player, "the box was not replaced");
+  const frame = player.children[0];
+  assert.equal(frame.tagName, "IFRAME");
+  assert.ok(frame.src.startsWith("https://www.youtube-nocookie.com/embed/U7J0en2iBeg"), `the player asks ${frame.src}`);
+  assert.equal(frame.title, "How a bug gets caught in Postmark");
+  assert.equal(frame.attrs.allow, "autoplay; encrypted-media; picture-in-picture");
+  assert.ok("allowfullscreen" in frame.attrs);
+  assert.equal(textOf(player.children[1]), "How a bug gets caught in Postmark · 1 min");
 });
 
-test("the Meeps page loads no third-party player: no <iframe>, no YouTube embed or iframe API",
+test("the built Bug Catcher panel has the play box BEFORE the strip: the plain link, the thumbnail, real alt text; the old card is gone",
+  { skip: !existsSync(builtMeeps) }, () => {
+  const bc = panelOf(readFileSync(builtMeeps, "utf8"), "bugcatcher");
+  const at = bc.indexOf("data-bug-player");
+  assert.ok(at > 0 && at < bc.indexOf("data-strip-panel="), "the play box is not above the strip");
+  const open = bc.lastIndexOf("<a ", at);
+  const box = bc.slice(open, bc.indexOf("</a>", at));
+  assert.match(box, new RegExp(`href="${VIDEO_URL}"`));
+  assert.match(box, /target="_blank"/);
+  assert.match(box, /rel="noopener"/);
+  assert.ok(box.includes(`src="${VIDEO_THUMB}"`), "the box's picture is not the thumbnail");
+  assert.match(box, /alt="Play the video: [^"]{20,}"/, "the box's picture has no real alt text");
+  assert.match(box, /How a bug gets caught in Postmark · 1 min/);
+  assert.doesNotMatch(bc, /data-bug-video|class="bs-video"/, "the old link card under the strip is still there");
+});
+
+test("nothing from YouTube loads before the click: no iframe, no iframe API, no preconnect; the player lives only in the click's script",
   { skip: !existsSync(builtMeeps) }, () => {
   const page = readFileSync(builtMeeps, "utf8");
-  assert.doesNotMatch(page, /<iframe\b/i, "an iframe is on the Meeps page");
-  assert.doesNotMatch(page, /youtube\.com\/(?:iframe_api|embed)|youtube-nocookie\.com/i, "a YouTube player is wired into the Meeps page");
-  const src = readFileSync(join(ROOT, "town", "pages", "meeps", "index.astro"), "utf8");
-  assert.doesNotMatch(src, /<iframe\b|youtube\.com\/(?:iframe_api|embed)/i);
+  assert.doesNotMatch(page, /<iframe\b/i, "an iframe is on the built Meeps page");
+  assert.doesNotMatch(page, /youtube\.com\/iframe_api|youtube\.com\/embed/i, "a YouTube player API is wired into the page");
+  assert.doesNotMatch(page, /<link\b[^>]*\b(?:preconnect|dns-prefetch|preload)\b[^>]*(?:youtube|ytimg|googlevideo)/i, "the page warms a connection to YouTube before the click");
+  // a YouTube address in the HTML is only ever a plain link someone clicks (the
+  // play box's, and the footer's channel link), never a src, a <link> or a script
+  const YT = /https?:\/\/[^"'\s)]*(?:youtube|youtu\.be|ytimg)[^"'\s)]*/i;
+  const withoutLinks = page.replace(/<a\b[^>]*>/gi, "");
+  assert.doesNotMatch(withoutLinks, YT, "a YouTube address is on the page outside a plain link");
+  assert.ok([...page.matchAll(/<a\b[^>]*\bhref="([^"]+)"/gi)].some((m) => m[1] === VIDEO_URL), "the play box's link is not a plain <a href>");
+  // and the player's address rides only in the page's own script, for the click
+  const scripts = [...page.matchAll(/<script\b[^>]*\bsrc="\/_astro\/([^"]+\.js)"/g)].map((m) => readFileSync(join(DIST, "_astro", m[1]), "utf8"));
+  const js = scripts.join("\n");
+  const deps = [...js.matchAll(/from\s*"\.\/([^"]+\.js)"/g)].map((m) => m[1]).filter((d) => existsSync(join(DIST, "_astro", d)));
+  const all = [js, ...deps.map((d) => readFileSync(join(DIST, "_astro", d), "utf8"))].join("\n");
+  assert.match(all, /youtube-nocookie\.com\/embed/, "the click's script does not carry the privacy-enhanced player");
+  assert.doesNotMatch(all, /www\.youtube\.com\/(?:embed|iframe_api)/, "the script reaches the tracking domain");
 });
 
 test("the built security panel opens onto the advisory page, and never the mail or an issue",

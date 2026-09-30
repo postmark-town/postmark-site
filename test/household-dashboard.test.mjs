@@ -83,6 +83,7 @@ test("the bio's first line: first non-empty line, first sentence when it runs lo
 
 test("a sprite belongs to a meep; a lane building in SPRITES is nobody's face", () => {
   assert.ok(spriteOf("postmaster"), "the Postmaster has a drawing (POS-252)");
+  assert.ok(spriteOf("bugcatcher"), "the Bug Catcher has a drawing (the video's frog, 2026-09-29)");
   assert.equal(spriteOf("quests"), null, "the quest board's building is not a resident");
   assert.equal(spriteOf("wright"), null);
 });
