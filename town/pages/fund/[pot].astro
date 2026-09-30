@@ -62,6 +62,7 @@
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import { livePots, loadPots, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel } from "@/lib/funding.mjs";
 import { qrSvg } from "@/lib/qr.mjs";
+import { closeAt } from "@/lib/fund-close.mjs";
 
 // THE ADDRESS IS NO LONGER ONE STRING. Since 2026-08-25 a pot may have an
 // intake address of its own (keeping-ec2 was the first), and a pot with one
@@ -251,7 +252,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             fallback for a pot with no posted close. The beneficiary rides
             beside it as the LABEL, never the routing handle. */}
         <p class="f-kind">
-          {pot.firstCloseLabel ? <>closes {pot.firstCloseLabel}</> : pot.epoch}
+          {pot.firstCloseLabel ? <>closes <span data-first-close={pot.firstClose}>{closeAt(pot.firstClose).closeLabel}</span></> : pot.epoch}
           {pot.beneficiaryLabel ? <> · for {pot.beneficiaryLabel}</> : <> · <em>no beneficiary named yet</em></>}
         </p>
         <h1>{pot.title ?? pot.id}</h1>
@@ -491,8 +492,8 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
               that an early dollar is not a lost one. */}
           {pot.firstCloseLabel && (
             <p class="f-how-note">
-              Either way, dollars arriving now belong to the <strong>{pot.epochLabel}</strong> epoch —
-              this pot's first close is at the <strong>{pot.firstCloseLabel}</strong>. Money sent today
+              Either way, dollars arriving now belong to the <strong data-first-close={pot.firstClose} data-say="epoch">{closeAt(pot.firstClose).epochLabel}</strong> epoch —
+              this pot closes at the <strong data-first-close={pot.firstClose}>{closeAt(pot.firstClose).closeLabel}</strong>. Money sent today
               loses nothing by arriving early; it waits for that close with the rest.
             </p>
           )}
@@ -708,6 +709,14 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   // It does nothing on a page that offers no PayPal, and loads no SDK until pressed.
   import { mountPaypal } from "@/lib/paypal.mjs";
   mountPaypal(document);
+</script>
+
+<script>
+  // THE CLOSE, SAID FOR THE READER'S MONTH (POS-231): the page was built with
+  // the answer as of its build; the reader's clock gets the last word, so no
+  // sentence names a month that has already closed.
+  import { paintCloses } from "@/lib/fund-close.mjs";
+  paintCloses();
 </script>
 
 <script is:inline>
