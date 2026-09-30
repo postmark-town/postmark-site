@@ -171,3 +171,11 @@ test("3 · the page offers PayPal only with the build's public client ID, and on
   assert.match(PAGE.slice(at, at + 400), /data-pp-client=\{PAYPAL_CLIENT_ID\} data-pp-pot=\{pot\.pot\}/);
   assert.match(PAGE, /import \{ mountPaypal \} from "@\/lib\/paypal\.mjs";/);
 });
+
+test("3 · no element on the page is id=\"paypal\": an id becomes a window property and would shadow the SDK's own window.paypal", () => {
+  // Caught in the lane's own render (2026-09-29): with the fold at id="paypal",
+  // window.paypal was the <details> element, the SDK's global never took, and
+  // pressing the button answered "Buttons is not a function".
+  assert.ok(!/\bid=["']paypal["']/.test(PAGE), 'the page carries id="paypal"');
+  assert.match(PAGE, /id="pay-paypal"/);
+});

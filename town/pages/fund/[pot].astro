@@ -361,7 +361,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
       <div class="f-pay-hero">
         <h2>Fund it</h2>
         <p class="f-pay-lead">
-          Two ways to send. Either one lands the same dollar on the same pot and is recorded the
+          {PAYPAL_CLIENT_ID ? "Three" : "Two"} ways to send. Each one lands the same dollar on the same pot and is recorded the
           same way.
         </p>
         {/* client_reference_id lands on the Stripe checkout session, so a card
@@ -381,9 +381,12 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
       {/* THE THIRD RAIL (POS-183 part 2): for a giver whose bank balks at a card
           charge from abroad. Nothing from PayPal loads until the button below is
           pressed; the order carries custom_id "<pot>|<handle>", which the
-          office's paypal-watch reads back to name the pot and the hand. */}
+          office's paypal-watch reads back to name the pot and the hand. The id is
+          NOT "paypal": an element id becomes a window property, and window.paypal
+          is the SDK's own global, so that id shadowed the SDK and the buttons
+          never rendered (caught in the lane's own render). */}
       {PAYPAL_CLIENT_ID && (
-      <details class="f-usdc f-paypal" id="paypal" data-pp-client={PAYPAL_CLIENT_ID} data-pp-pot={pot.pot} data-pp-title={pot.title ?? pot.pot}>
+      <details class="f-usdc f-paypal" id="pay-paypal" data-pp-client={PAYPAL_CLIENT_ID} data-pp-pot={pot.pot} data-pp-title={pot.title ?? pot.pot}>
         <summary><span class="f-usdc-sum">or pay with PayPal</span><span class="f-dim"> — if your bank balks at a card charge from abroad</span></summary>
         <div class="f-rail">
           <div class="f-pp-form">
@@ -992,6 +995,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   .f-pp-field { display: flex; flex-direction: column; gap: .3rem; font-size: .82rem; opacity: .9; flex: 1 1 14rem; min-width: 0; }
   .f-pp-field input { font: inherit; padding: .5rem .6rem; border-radius: 6px; border: 1px solid rgba(232, 196, 139, .35); background: rgba(0, 0, 0, .15); color: inherit; min-width: 0; }
   .f-pp-go { cursor: pointer; border: 0; font: inherit; }
+  .f-pp-go[hidden] { display: none; }
   .f-pp-buttons { max-width: 28rem; }
   .f-pp-buttons:empty { display: none; }
   .f-usdc { margin-top: 1.1rem; border-top: 1px dotted rgba(232, 196, 139, .25); padding-top: .8rem; }
