@@ -108,14 +108,36 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     <section class="r-stage">
       <div class="r-stage-grid">
         <div class="r-map" id="replay-map" data-map></div>
-        <!-- THE SETTLEMENT BESIDE THE MAP (POS-255). What the settlement blessed in
-             the crossing on screen changed in the world: filled from the card in
-             "every settlement" below, so the two can never say different things. -->
-        <aside class="r-settled" aria-label="settled this crossing" data-settled>
-          <h2 class="r-col-h">Settled this crossing</h2>
-          <div data-settled-body><p class="r-empty">—</p></div>
-        </aside>
+        <div class="r-side">
+          <!-- THE SETTLEMENT BESIDE THE MAP (POS-255). What the settlement blessed in
+               the crossing on screen changed in the world: filled from the card in
+               "every settlement" below, so the two can never say different things. -->
+          <aside class="r-settled" aria-label="settled this crossing" data-settled>
+            <h2 class="r-col-h">Settled this crossing</h2>
+            <div data-settled-body><p class="r-empty">—</p></div>
+          </aside>
+          <!-- THE FEED (w41, Keemin 2026-09-30). What was said and who set out,
+               up to the clock, newest on top: a new moment appears at the top and
+               pushes the older ones down. It is a fixed-height panel that scrolls
+               inside itself, so however busy the town gets the page never grows
+               and never moves; it holds the newest 200 at most. Scroll it down
+               to read back and it stays put; the chip says how many arrived
+               above and takes you back up. -->
+          <section class="r-feed" aria-label="what happened, newest first" data-feed-box>
+            <h2 class="r-col-h">Said and moved<span data-convo></span></h2>
+            <button type="button" class="r-feed-new" data-feed-new hidden></button>
+            <ol class="r-feed-list" data-feed aria-live="off"></ol>
+            <p class="r-feed-foot" data-feed-foot></p>
+          </section>
+        </div>
       </div>
+      <p class="r-passages">Who was inside a place is read from the town's passage record up to this moment.</p>
+      <!-- WHAT THIS IS, ON ASK (Keemin, 2026-09-30). The explanation is the same
+           words; it waits behind a native <details>, closed, so the map and the
+           clock sit together and a reader who wants the why opens it. A summary
+           is a real control: Enter and Space open it, and it never scrolls. -->
+      <details class="r-about" data-about>
+        <summary class="r-about-btn">What is this?</summary>
       <p class="r-map-note">
         <b>What is history here, exactly.</b> Where everyone stood, what the world
         held, and everything said or walked are read from that crossing's own
@@ -123,13 +145,15 @@ const nameOf = (handle) => names.get(handle) ?? handle;
         computed against. The <em>painted</em> map underneath is the town's
         atlas as it looks today: the painting is kept by the town, not by the
         world's record, so it has no earlier version to show you. Nothing on this
-        page is reconstructed or filled in — a quiet crossing shows as quiet.
-        The record holds one standing of the town per crossing, taken as it
-        opened, so <b>the map changes when the ferry sails and not between</b>:
-        pressing play runs the crossing's clock through what was said and set
-        out below, and moves the map on at the boundary. Nobody is animated
-        walking, because nobody's walk was written down step by step.
+        page is invented — a quiet crossing shows as quiet. The record holds
+        where everyone stood as the crossing opened and every walk declared
+        inside it, and a walk is a line the world's own law turns into a place
+        at any moment: positions between crossings are worked out from each
+        walk's recorded departure and pace, by the same law the living map moves
+        by. So <b>the map shows the moment on the clock</b>: drag the clock or
+        press play, and everyone is where their walk had carried them by then.
       </p>
+      </details>
     </section>
 
     <section class="r-scrub" aria-label="choose a crossing">
@@ -158,9 +182,12 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       <!-- THE CROSSING'S OWN CLOCK. The rail is the half-day laid out end to
            end, one notch per recorded moment, and the playhead is where the
            replay has got to. A reader can see the crossing's rhythm — three
-           voices in one minute, then four silent hours — before it plays. -->
+           voices in one minute, then four silent hours — before it plays.
+           It is also the scrubber (w41): drag it or click anywhere on it and
+           the map and the feed go to that moment, without playing through. -->
       <div class="r-rail" data-rail>
-        <div class="r-rail-track" data-rail-track>
+        <div class="r-rail-track" data-rail-track role="slider" tabindex="0"
+             aria-label="the crossing's clock" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
           <div class="r-rail-fill" data-rail-fill></div>
           <div class="r-rail-beats" data-rail-beats></div>
           <div class="r-rail-head" data-rail-head hidden></div>
@@ -176,23 +203,10 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       <ol class="r-track" data-track></ol>
       <p class="r-track-legend">
         Each tick is one crossing; taller means more happened, and ◆ marks a
-        crossing in which the world was settled. Use ← and → to step, space to
-        play or pause.
+        crossing in which the world was settled. Drag the clock to go to any
+        moment; ← and → move it five minutes, shift+← and shift+→ step a
+        crossing, and space plays or pauses.
       </p>
-    </section>
-
-    <section class="r-digest">
-      <div class="r-rule"><span>What happened this crossing<span data-convo></span></span></div>
-      <div class="r-digest-grid">
-        <div class="r-col">
-          <h2 class="r-col-h">Said</h2>
-          <div data-voices><p class="r-empty">—</p></div>
-        </div>
-        <div class="r-col">
-          <h2 class="r-col-h">Moved</h2>
-          <div data-moves><p class="r-empty">—</p></div>
-        </div>
-      </div>
     </section>
 
     <!-- EVERY SETTLEMENT (POS-255): the Record's crossings page, folded into the
@@ -284,10 +298,26 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       // fold, and when they are, stepping between them should cost nothing at
       // all. `stats` is not decoration: it is how the page's own claim about
       // scrub cost is measured rather than asserted.
+      // `world` holds each fold as the TEXT it arrived as: every scrub asks the
+      // viewer to look again, and answering from the text spares re-serialising
+      // 0.7 MB on each ask. `walkersNow`, when the page sets it, is who stood
+      // where at the clock's moment; without it the lens answers with the
+      // crossing's opening snapshot, as it always did. `lib` is the scrubber's
+      // pure module (src/lib/replay-scrub.mjs), handed over by the bundled
+      // script at the end of the page whichever order the two arrive in.
+      var giveLib;
       var replay = (window.__pmReplay = {
         frame: null,
         world: Object.create(null),
         stats: { bytes: 0, fetches: 0 },
+        walkersNow: null,
+        // the moment on screen, set by the page; the passage record is cut here
+        momentNow: null,
+        // the town's passage record, read ONCE per page load and cut in memory
+        ledger: null,
+        libNow: null,
+        lib: new Promise(function (resolve) { giveLib = resolve; }),
+        giveLib: function (lib) { replay.libNow = lib; giveLib(lib); },
       });
 
       function pathOf(url) {
@@ -305,13 +335,13 @@ const nameOf = (handle) => names.get(handle) ?? handle;
           .then(function (body) {
             if (!body || replay.world[sha]) return false;
             replay.stats.bytes += body.length; replay.stats.fetches += 1;
-            replay.world[sha] = JSON.parse(body);
+            replay.world[sha] = body;
             return true;
           })
           .catch(function () { return false; });
       };
       function json(body, headers) {
-        return new Response(JSON.stringify(body), {
+        return new Response(typeof body === "string" ? body : JSON.stringify(body), {
           status: 200,
           headers: Object.assign({ "content-type": "application/json" }, headers || {}),
         });
@@ -335,10 +365,11 @@ const nameOf = (handle) => names.get(handle) ?? handle;
 
         if (!frame) return real(input, init);
 
-        // Who was standing where, as the crossing opened — handed over in the
-        // same shape /world/walkers publishes.
+        // Who was standing where at the clock's moment (as the crossing opened,
+        // until the page says otherwise) — handed over in the same shape
+        // /world/walkers publishes.
         if (/\/world\/walkers$/.test(p) || /\/walks$/.test(p))
-          return Promise.resolve(json({ at: frame.crossing, walkers: frame.walkers, standing: [] }));
+          return Promise.resolve(json({ at: frame.crossing, walkers: replay.walkersNow ? replay.walkersNow() : frame.walkers, standing: [] }));
 
         // The world as that crossing recorded it. Every crossing's meta names the
         // world commit it was computed against (`as_of_world`), and the repo is
@@ -360,9 +391,8 @@ const nameOf = (handle) => names.get(handle) ?? handle;
               if (!r.ok) return real(input, init);
               return r.text().then(function (body) {
                 replay.stats.bytes += body.length; replay.stats.fetches += 1;
-                var parsed = JSON.parse(body);
-                replay.world[frame.as_of_world] = parsed;
-                return json(parsed, { "x-postmark-as-of": String(frame.crossing) });
+                replay.world[frame.as_of_world] = body;
+                return json(body, { "x-postmark-as-of": String(frame.crossing) });
               });
             })
             .catch(function () { return real(input, init); });
@@ -383,6 +413,40 @@ const nameOf = (handle) => names.get(handle) ?? handle;
           return real(RAW + "/" + frame.as_of_world + "/WORLD/walk-ledger.md", { credentials: "omit" })
             .then(function (r) { return r.ok ? r : real(input, init); })
             .catch(function () { return real(input, init); });
+        }
+
+        // WHO WAS INSIDE, AS OF THE MOMENT ON SCREEN (Wright, 2026-09-30). The
+        // passages since 2026-08-24 live only in the office's journal: the
+        // world repo's copy of the ledger is the frozen era, and the crossing's
+        // record holds no passages. So the office's ledger is read ONCE per
+        // page load and every answer is cut in memory to the lines whose own
+        // time is at or before the moment on screen. A passage is history with
+        // its own timestamp, so that is what the town had recorded by then, and
+        // a past frame never gets a passage after it. A failed read is a named
+        // absence (the viewer says "could not be read"), never the live ledger.
+        // Both legs the viewer knows are answered here; only the office leg is
+        // ever fetched, since the same-origin file is the frozen era.
+        if (/\/world\/enter-exit-ledger$/.test(p) || /\/WORLD\/enter-exit-ledger\.md$/.test(p)) {
+          var officeLeg = !/\.md$/.test(p);
+          if (!replay.ledger && officeLeg) {
+            replay.ledger = real(url, { credentials: "same-origin", cache: "no-store" })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .then(function (j) { return j && typeof j.ledger === "string" && j.ledger ? j.ledger : null; })
+              .catch(function () { return null; })
+              .then(function (text) { replay.ledgerText = text; return text; });
+          }
+          return (replay.ledger || Promise.resolve(null)).then(function (text) {
+            var lib = replay.libNow;
+            if (text == null || !lib) {
+              return new Response(JSON.stringify({ error: "the passage record could not be read for this moment" }),
+                { status: 404, headers: { "content-type": "application/json" } });
+            }
+            var at = replay.momentNow ? replay.momentNow() : Date.parse(frame.to);
+            var cut = lib.ledgerUpTo(text, at);
+            return officeLeg
+              ? json({ ledger: cut })
+              : new Response(cut, { status: 200, headers: { "content-type": "text/markdown; charset=utf-8" } });
+          });
         }
 
         // Anonymous, always. This is what switches the act controls off through
@@ -412,13 +476,20 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     // turning "stella-letta/the-lamp-that-stays-on" into readable words is the
     // world's rule, and it lives in the world.
     import { mountViewer, deslugMarkId } from "/world-engine/spectator/viewer.mjs";
+    // The walk law, from the same file the viewer imports it from: where a
+    // walker is at a moment is the world's function, and the page only asks it.
+    import { positionAt, fractionalCrossing } from "/world-engine/tools/walk.mjs";
+    const LAW = { positionAt, fractionalCrossing };
+    const lib = await window.__pmReplay.lib;
 
     const host = document.querySelector("[data-map]");
     const trackEl = document.querySelector("[data-track]");
     const whenEl = document.querySelector("[data-when]");
     const spanEl = document.querySelector("[data-span]");
-    const voicesEl = document.querySelector("[data-voices]");
-    const movesEl = document.querySelector("[data-moves]");
+    const feedEl = document.querySelector("[data-feed]");
+    const feedNewBtn = document.querySelector("[data-feed-new]");
+    const feedFoot = document.querySelector("[data-feed-foot]");
+    const railTrack = document.querySelector("[data-rail-track]");
     const coverageEl = document.querySelector("[data-coverage]");
     const convoEl = document.querySelector("[data-convo]");
     const provenanceEl = document.querySelector("[data-provenance]");
@@ -490,13 +561,20 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     let speed = DEFAULT_SPEED;
     let playing = false;
     let clockT = null;        // where the replay has got to, in the town's time
-    let rafId = 0, lastWall = 0, litRow = null, lastFollow = 0;
-    // Rows in the digest, in the order the record has them happening, so the
-    // playhead has something to walk down. Rebuilt with the digest.
+    let rafId = 0, lastWall = 0;
+    // The crossing's said and moved in the order they happened (lib.timeline),
+    // which is what the feed is cut from at every paint. Rebuilt per crossing.
+    let line = [];
+    // The settlement cards beside the map that carry an instant, so the clock
+    // can light them. Rebuilt with the digest.
     let beats = [];
-    // True when a crossing's record carries no readable times and the page has
-    // paced it evenly instead. Stated in the chrome rather than hidden.
-    let evenlyPaced = false;
+    // Moments the record holds with no readable time. The current recorder
+    // writes a time on every one; an older frame might not, and those cannot be
+    // put on a clock, so the rail says how many were left off rather than
+    // placing them somewhere invented.
+    let untimed = 0;
+    // New rows that arrived above a reader who had scrolled the feed down.
+    let feedPending = 0;
     // What the rail says when the clock is not running; the running note is
     // written over it and put back on pause.
     let baseNote = "";
@@ -585,80 +663,12 @@ const nameOf = (handle) => names.get(handle) ?? handle;
         convoEl.appendChild(a);
       }
 
-      voicesEl.textContent = "";
-      if (!frame.voices.length) {
-        voicesEl.appendChild(el("p", "r-empty", "Nobody spoke within earshot of anybody this crossing."));
-      } else {
-        const list = el("ol", "r-voices");
-        for (const v of frame.voices) {
-          const li = el("li", "r-voice");
-          li.dataset.at = String(momentOf(v));
-          const head = el("p", "r-voice-head");
-          head.appendChild(personLink(v.handle));
-          // the place words go to the place, same door the conversations page
-          // now uses (/world/?at=x,y) — a spectator reading what was said should
-          // be one click from where it was said
-          if (v.place) {
-            if (isFinite(v.x) && isFinite(v.y)) {
-              const toMap = el("a", "r-place r-place-link", v.place);
-              toMap.href = `/world/?at=${v.x},${v.y}`;
-              toMap.title = "see this place on the map";
-              head.appendChild(toMap);
-            } else {
-              head.appendChild(el("span", "r-place", v.place));
-            }
-          }
-          head.appendChild(el("span", "r-at", time(v.at) + " UTC"));
-          li.appendChild(head);
-          li.appendChild(el("p", "r-said", v.said));   // textContent, always
-          list.appendChild(li);
-        }
-        voicesEl.appendChild(list);
-      }
-
-      movesEl.textContent = "";
-      if (!frame.moves.length) {
-        movesEl.appendChild(el("p", "r-empty", "Nobody set out this crossing."));
-      } else {
-        const list = el("ol", "r-moves");
-        for (const m of frame.moves) {
-          const li = el("li", "r-move");
-          li.dataset.at = String(momentOf(m));
-          li.appendChild(personLink(m.handle));
-          // A stop is recorded as a zero-distance departure, so the record can
-          // say "stopped" without a second event type — and the page says the
-          // same word rather than reporting a 0 m walk.
-          if (m.stopped) {
-            li.appendChild(el("span", "r-move-what", "stopped where they stood"));
-          } else if (m.to) {
-            // WHERE THEY WERE HEADED, ON THE MAP. The record carries the asked-for
-            // mark AND the coordinates it resolved to, so a destination can be a
-            // door rather than a noun — same `/world/?at=` arrival the said column
-            // has used since the round trip landed. A departure with no resolved
-            // coordinates keeps the plain words rather than getting a link that
-            // lands nowhere.
-            const what = el("span", "r-move-what");
-            what.appendChild(document.createTextNode("set out for "));
-            const name = deslugMarkId(m.to);
-            if (m.toward && isFinite(m.toward.x) && isFinite(m.toward.y)) {
-              const a = el("a", "r-place-link", name);
-              a.href = `/world/?at=${m.toward.x},${m.toward.y}`;
-              a.title = "see this place on the map";
-              what.appendChild(a);
-            } else {
-              what.appendChild(document.createTextNode(name));
-            }
-            li.appendChild(what);
-            if (m.distance_m != null) li.appendChild(el("span", "r-dist", m.distance_m + " m"));
-          } else {
-            li.appendChild(el("span", "r-move-what", "set out across the world"));
-            if (m.distance_m != null) li.appendChild(el("span", "r-dist", m.distance_m + " m"));
-          }
-          li.appendChild(el("span", "r-at", time(m.at) + " UTC"));
-          list.appendChild(li);
-        }
-        movesEl.appendChild(list);
-      }
+      // The feed is cut fresh from this crossing's record; the old crossing's
+      // rows go, and nothing is waiting above a reader who was scrolled down.
+      line = lib.timeline(frame);
+      untimed = frame.voices.length + frame.moves.length - line.length;
+      feedEl.textContent = "";
+      feedPending = 0;
 
       provenanceEl.textContent = frame.as_of_world
         ? `Drawn from the world record as it stood at commit ${frame.as_of_world.slice(0, 8)} — the fold this crossing was computed against.`
@@ -710,17 +720,6 @@ const nameOf = (handle) => names.get(handle) ?? handle;
 
 
     // ───────── the crossing's clock ─────────
-    //
-    // A moment's time comes off the record: replay-record writes `at_ms` beside
-    // every `at`, so nothing here parses what the build already parsed. The
-    // string is the fallback, and a record with neither is handled below rather
-    // than pretended about.
-    const momentOf = (row) => {
-      const ms = Number(row.at_ms);
-      if (Number.isFinite(ms)) return ms;
-      const parsed = Date.parse(row.at);
-      return Number.isFinite(parsed) ? parsed : NaN;
-    };
 
     const startOf = (frame) => Date.parse(frame.from);
     // WHERE A CROSSING ENDS. A finished one ends where the record says it did.
@@ -738,33 +737,19 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     const clockLabel = (ms) =>
       new Date(ms).toLocaleTimeString("en-US", clock) + " UTC";
 
-    // The digest's rows, in the order they happened, each holding the DOM node
-    // that says it. This is the whole of "what plays": the playhead walks this
-    // list, and a row lights when its moment arrives.
+    // The moment on screen. With no clock — step mode, or a crossing chosen by
+    // hand before anyone touched the clock — that is the crossing's end: the
+    // crossing whole, as it finished.
+    const shownAt = (frame) => (speed === 0 || clockT == null ? endOf(frame) : clockT);
+
+    // The settlement cards beside the map that carry an instant, so the clock
+    // can light them. What was said and moved is not here: that is the feed,
+    // cut from `line` at every paint.
     function buildBeats(frame) {
-      const nodes = [
-        ...voicesEl.querySelectorAll(".r-voice[data-at]"),
-        ...movesEl.querySelectorAll(".r-move[data-at]"),
-        ...(settledBody ? settledBody.querySelectorAll(".r-settled-card[data-at]") : []),
-      ];
-      const from = startOf(frame), to = endOf(frame);
-      // HONEST FALLBACK. Every frame the current recorder writes carries times;
-      // a frame from an older build might not, and a crossing whose moments all
-      // read NaN would otherwise play as one flat instant. Rather than fake a
-      // precision the record does not have, the moments are spread evenly across
-      // the crossing and the rail says so in words.
-      evenlyPaced = nodes.length > 0 && nodes.some((n) => !Number.isFinite(Number(n.dataset.at)));
-      if (evenlyPaced) {
-        const span = Math.max(1, to - from);
-        nodes.forEach((n, i) => {
-          n.dataset.at = String(from + Math.round(((i + 1) / (nodes.length + 1)) * span));
-        });
-      }
-      beats = nodes
+      beats = [...(settledBody ? settledBody.querySelectorAll(".r-settled-card[data-at]") : [])]
         .map((node) => ({ node, at: Number(node.dataset.at) }))
         .filter((b) => Number.isFinite(b.at))
         .sort((a, b) => a.at - b.at);
-      litRow = null;
       renderRail(frame);
     }
 
@@ -775,20 +760,21 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       const from = startOf(frame), to = endOf(frame);
       const span = Math.max(1, to - from);
       railBeats.textContent = "";
-      for (const b of beats) {
-        const pct = Math.min(100, Math.max(0, ((b.at - from) / span) * 100));
-        const kind = b.node.classList.contains("r-voice") ? " is-voice"
-          : b.node.classList.contains("r-settled-card") ? " is-settle" : " is-move";
-        const notch = el("span", "r-rail-beat" + kind);
-        notch.style.left = pct + "%";
-        railBeats.appendChild(notch);
-      }
-      railEl.classList.toggle("is-empty", beats.length === 0);
+      const notch = (at, kind) => {
+        const n = el("span", "r-rail-beat " + kind);
+        n.style.left = Math.min(100, Math.max(0, ((at - from) / span) * 100)) + "%";
+        railBeats.appendChild(n);
+      };
+      for (const e of line) notch(e.at, e.kind === "voice" ? "is-voice" : "is-move");
+      for (const b of beats) notch(b.at, "is-settle");
+      const n = line.length + beats.length;
+      railEl.classList.toggle("is-empty", n === 0);
+      railTrack.setAttribute("aria-valuemin", String(from));
+      railTrack.setAttribute("aria-valuemax", String(to));
       // At rest the rail says what it is a rail OF, so it is not read as a
       // second copy of the crossing track underneath it.
-      const n = beats.length;
       baseNote = (n === 0 ? "· nothing recorded" : `· ${n} moment${n === 1 ? "" : "s"} recorded`)
-        + (evenlyPaced ? " · no times in this record, so they are spread evenly" : "")
+        + (untimed ? ` · ${untimed} with no time in the record, so not on the clock` : "")
         + (frame.complete ? "" : " · still being written");
       railNote.textContent = baseNote;
     }
@@ -796,11 +782,9 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     // A HALF-DAY IS MOSTLY QUIET, AND THAT IS NOT A BUG TO DESIGN AWAY. The
     // town's moments cluster: crossing 119's first is an hour and three quarters
     // in, and at 50× that is over two minutes of a still page before anything
-    // happens. The page will not skip that stretch — "a quiet crossing shows as
-    // quiet" is the law it opens with, and hopping the playhead over the empty
-    // water would be the page editing the day. What it can do is say what the
-    // reader is waiting for, so the wait reads as the town being quiet rather
-    // than as the replay being stuck.
+    // happens. Play will not skip that stretch — "a quiet crossing shows as
+    // quiet" is the law this page opens with. The rail is the reader's way
+    // across it; while playing, the page says what the reader is waiting for.
     function gapWords(ms) {
       const m = Math.round(ms / 60000);
       if (m < 1) return "seconds";
@@ -808,26 +792,190 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       const h = Math.floor(m / 60);
       return `${h}h ${String(m % 60).padStart(2, "0")}m`;
     }
+    function nextMomentAfter(t) {
+      const said = line[lib.countAt(line, t)];
+      const settle = beats.find((b) => b.at > t);
+      if (!said) return settle ? settle.at : null;
+      return settle && settle.at < said.at ? settle.at : said.at;
+    }
 
-    // Paint the playhead: the rail, the clock, and every row's relation to now.
-    // `is-ahead` is a row whose moment has not come; the newest passed row is
-    // lit for a fixed number of OUR seconds, so the eye can follow it at any
-    // speed. In step mode nothing is ahead of anything — the crossing is shown
-    // whole, exactly as this page has always shown it.
+    // ───────── the feed ─────────
+    //
+    // One row per moment, newest on top. `paintFeed` keeps every row already
+    // drawn and only adds the new ones and drops the ones past the cap, so at
+    // 1000× with the whole town talking the DOM holds FEED_CAP rows at most
+    // and a paint touches only what changed.
+    function buildRow(entry) {
+      if (entry.kind === "voice") {
+        const v = entry.row;
+        const li = el("li", "r-feed-row r-voice");
+        const head = el("p", "r-voice-head");
+        head.appendChild(personLink(v.handle));
+        // the place words go to the place, same door the conversations page
+        // now uses (/world/?at=x,y) — a spectator reading what was said should
+        // be one click from where it was said
+        if (v.place) {
+          if (isFinite(v.x) && isFinite(v.y)) {
+            const toMap = el("a", "r-place r-place-link", v.place);
+            toMap.href = `/world/?at=${v.x},${v.y}`;
+            toMap.title = "see this place on the map";
+            head.appendChild(toMap);
+          } else {
+            head.appendChild(el("span", "r-place", v.place));
+          }
+        }
+        head.appendChild(el("span", "r-at", time(v.at) + " UTC"));
+        li.appendChild(head);
+        li.appendChild(el("p", "r-said", v.said));   // textContent, always
+        return li;
+      }
+      const m = entry.row;
+      const li = el("li", "r-feed-row r-move");
+      li.appendChild(personLink(m.handle));
+      // A stop is recorded as a zero-distance departure, so the record can
+      // say "stopped" without a second event type — and the page says the
+      // same word rather than reporting a 0 m walk.
+      if (m.stopped) {
+        li.appendChild(el("span", "r-move-what", "stopped where they stood"));
+      } else if (m.to) {
+        // WHERE THEY WERE HEADED, ON THE MAP. The record carries the asked-for
+        // mark AND the coordinates it resolved to, so a destination can be a
+        // door rather than a noun. A departure with no resolved coordinates
+        // keeps the plain words rather than getting a link that lands nowhere.
+        const what = el("span", "r-move-what");
+        what.appendChild(document.createTextNode("set out for "));
+        const name = deslugMarkId(m.to);
+        if (m.toward && isFinite(m.toward.x) && isFinite(m.toward.y)) {
+          const a = el("a", "r-place-link", name);
+          a.href = `/world/?at=${m.toward.x},${m.toward.y}`;
+          a.title = "see this place on the map";
+          what.appendChild(a);
+        } else {
+          what.appendChild(document.createTextNode(name));
+        }
+        li.appendChild(what);
+        if (m.distance_m != null) li.appendChild(el("span", "r-dist", m.distance_m + " m"));
+      } else {
+        li.appendChild(el("span", "r-move-what", "set out across the world"));
+        if (m.distance_m != null) li.appendChild(el("span", "r-dist", m.distance_m + " m"));
+      }
+      li.appendChild(el("span", "r-at", time(m.at) + " UTC"));
+      return li;
+    }
+
+    function renderFeedNew() {
+      const show = feedPending > 0 && lib.awayFromTop(feedEl);
+      feedNewBtn.hidden = !show;
+      feedNewBtn.textContent = show ? `↑ ${feedPending} new` : "";
+    }
+
+    function paintFeedAt(at) {
+      const { rows, total } = lib.feedRows(line, at, lib.FEED_CAP);
+      const away = lib.awayFromTop(feedEl);
+      const created = lib.holdFeedPlace(feedEl, () => lib.paintFeed(feedEl, rows, buildRow));
+      if (created.length) {
+        // what arrived ABOVE the reader: the new rows before the first row
+        // that was already there (all of them, when the list was redrawn)
+        const fresh = new Set(created);
+        let above = 0;
+        for (const node of feedEl.children) { if (!fresh.has(node)) break; above += 1; }
+        if (playing) for (const node of created) node.classList.add("is-new");
+        feedPending = away ? feedPending + above : 0;
+      }
+      if (!away) feedPending = 0;
+      renderFeedNew();
+      feedFoot.textContent = !line.length
+        ? "Nobody spoke or set out this crossing."
+        : total === 0
+          ? "Nothing yet at this moment of the crossing."
+          : total > lib.FEED_CAP
+            ? `The newest ${lib.FEED_CAP} of ${total} so far — drag the clock back for earlier ones.`
+            : "";
+    }
+
+    feedEl.addEventListener("scroll", () => {
+      if (!lib.awayFromTop(feedEl)) { feedPending = 0; renderFeedNew(); }
+    }, { passive: true });
+    // The chip is the reader's own button, so this is the one place the page
+    // moves the feed's scroll: back to its top, where the newest row is.
+    feedNewBtn.addEventListener("click", () => {
+      feedPending = 0;
+      feedEl.scrollTop = 0;
+      renderFeedNew();
+    });
+
+    // ───────── the map at the moment ─────────
+    //
+    // Where everyone stood at `at`, from the crossing's own record by the walk
+    // law (lib.walkersAt), handed to the lens so the viewer's walker read gets
+    // it. The viewer is asked to look again only when somebody actually moved,
+    // one reload at a time, and at most every MAP_EVERY_MS while the clock
+    // runs — a drag or a 1000× play asks far more often than a redraw can land.
+    // A reload is the viewer's whole re-fold and re-render (measured 0.5–0.9 s
+    // on crossing 213), because its published handle has no walkers-only
+    // redraw; the gap between asks keeps the page answering the reader while
+    // the map catches up, and the last ask always lands.
+    const MAP_EVERY_MS = 600;
+    let mapKey = "", mapBusy = false, mapAgain = false, mapTimer = 0, mapLast = 0, holdMap = false;
+    const mapStats = { reloads: 0, lastMs: 0, maxMs: 0 };
+    let passageTimes = null;
+    function showMapAt(frame, at) {
+      const walkers = lib.walkersAt(frame, at, LAW);
+      const r = window.__pmReplay;
+      r.walkersNow = () => walkers;
+      // The passage record is cut at this same moment by the lens. Who was
+      // inside can change while nobody walks, so a passage crossing the clock
+      // is also a reason to ask the viewer to look again.
+      r.momentNow = () => at;
+      if (!passageTimes && r.ledgerText) passageTimes = lib.passageTimes(r.ledgerText);
+      const passed = passageTimes ? lib.passagesBy(passageTimes, at) : -1;
+      const key = frame.crossing + ":" + passed + ":" + lib.walkersKey(walkers);
+      if (key === mapKey) return;
+      mapKey = key;
+      if (!holdMap) refreshMap();
+    }
+    async function refreshMap() {
+      if (!viewer || typeof viewer.reload !== "function") return;
+      if (mapBusy) { mapAgain = true; return; }
+      const wait = mapLast + MAP_EVERY_MS - performance.now();
+      if (wait > 0) {
+        if (!mapTimer) mapTimer = setTimeout(() => { mapTimer = 0; refreshMap(); }, wait);
+        return;
+      }
+      mapBusy = true;
+      mapLast = performance.now();
+      try {
+        await viewer.reload();
+        const ms = performance.now() - mapLast;
+        mapStats.reloads += 1; mapStats.lastMs = ms; mapStats.maxMs = Math.max(mapStats.maxMs, ms);
+      } finally {
+        mapBusy = false;
+      }
+      if (mapAgain) { mapAgain = false; refreshMap(); }
+    }
+
+    // Paint the moment: the feed, the map, the rail, the clock, and the
+    // settlement cards' relation to it. A card whose moment has not come is
+    // dimmed; the newest passed one is lit for a fixed number of OUR seconds.
     function paint() {
       const frame = window.__pmReplay.frame;
       if (!frame) return;
       const from = startOf(frame), to = endOf(frame);
       const span = Math.max(1, to - from);
+      const at = shownAt(frame);
+      paintFeedAt(at);
+      showMapAt(frame, at);
+      railTrack.setAttribute("aria-valuenow", String(at));
+      railTrack.setAttribute("aria-valuetext", clockLabel(at));
 
       if (speed === 0 || clockT == null) {
         railFill.style.width = "100%";
         railHead.hidden = true;
-        clockEl.textContent = beats.length
+        clockEl.textContent = line.length + beats.length
           ? `${clockLabel(from)} – ${clockLabel(to)}`
           : clockLabel(from);
         for (const b of beats) b.node.classList.remove("is-ahead", "is-lit");
-        litRow = null;
+        railNote.textContent = baseNote;
         return;
       }
 
@@ -837,7 +985,6 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       railHead.style.left = pct + "%";
       clockEl.textContent = clockLabel(clockT);
 
-      // the last moment that has happened, and how long ago in our seconds
       let newest = null;
       for (const b of beats) {
         const ahead = b.at > clockT;
@@ -847,30 +994,59 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       const litFor = newest ? (clockT - newest.at) / Math.max(1, speed) : Infinity;
       for (const b of beats) b.node.classList.toggle("is-lit", b === newest && litFor < LIT_MS);
 
-      // Follow the playhead down the page, but only while it is moving and only
-      // when the row has left the window — `nearest` is what keeps this from
-      // yanking a reader who is already looking at the right place. The town
-      // talks in bursts (crossing 119 puts thirty-three lines inside one
-      // conversation), so the follow is rate-limited: at 1000× that burst would
-      // otherwise fire thirty-three smooth scrolls inside half a second.
-      if (playing && newest && newest !== litRow) {
-        litRow = newest;
-        const wall = performance.now();
-        if (wall - lastFollow > 500) {
-          lastFollow = wall;
-          try { newest.node.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch { /* older browsers */ }
-        }
-      }
-      if (!newest) litRow = null;
-
       if (playing) {
-        const next = beats.find((b) => b.at > clockT);
-        railNote.textContent = next
-          ? `· next moment ${gapWords(next.at - clockT)} on`
-          : (beats.length ? "· quiet from here to the sailing" : "· nothing was recorded this crossing");
+        const next = nextMomentAfter(clockT);
+        railNote.textContent = next != null
+          ? `· next moment ${gapWords(next - clockT)} on`
+          : (line.length + beats.length ? "· quiet from here to the sailing" : "· nothing was recorded this crossing");
       } else {
         railNote.textContent = baseNote;
       }
+    }
+
+    // ───────── the rail as the scrubber ─────────
+    //
+    // Press anywhere on the rail and the clock is there; drag and it follows.
+    // The map and the feed are computed AT that moment, never played through
+    // to it, so a jump across the whole half-day costs one paint. Playing
+    // carries on from wherever the rail is left.
+    function seek(t) {
+      const frame = window.__pmReplay.frame;
+      if (!frame || speed === 0) return;
+      clockT = lib.clamp(t, startOf(frame), endOf(frame));
+      if (playing) lastWall = performance.now();
+      paint();
+    }
+    let dragging = false;
+    const railTime = (e) => {
+      const frame = window.__pmReplay.frame;
+      return lib.timeAtPointer(e.clientX, railTrack.getBoundingClientRect(), startOf(frame), endOf(frame));
+    };
+    railTrack.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || !window.__pmReplay.frame) return;
+      e.preventDefault();
+      dragging = true;
+      try { railTrack.setPointerCapture(e.pointerId); } catch { /* synthetic pointers */ }
+      railTrack.focus({ preventScroll: true });
+      seek(railTime(e));
+    });
+    railTrack.addEventListener("pointermove", (e) => { if (dragging) seek(railTime(e)); });
+    const release = () => { if (!dragging) return; dragging = false; writeUrl(); };
+    railTrack.addEventListener("pointerup", release);
+    railTrack.addEventListener("pointercancel", release);
+
+    // A key's move of the clock (lib.keyTime): ← → five minutes anywhere on
+    // the page, and on the focused rail PageUp/PageDown an hour, Home/End the
+    // ends. From "no clock" it starts at the crossing's end, which is where
+    // the page was showing.
+    function nudge(key, opts) {
+      const frame = window.__pmReplay.frame;
+      if (!frame || speed === 0) return false;
+      const t = lib.keyTime(key, shownAt(frame), startOf(frame), endOf(frame), opts);
+      if (t == null) return false;
+      seek(t);
+      writeUrl();
+      return true;
     }
 
     // ───────── the transport ─────────
@@ -886,7 +1062,11 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     // click", "pause froze it", "1000× is faster than 1×") are claims about a
     // number that is otherwise only inferable from pixels, and QA that has to
     // infer them is QA that can pass while the thing is broken.
-    window.__pmReplayClock = () => ({ crossing: current, t: clockT, speed, playing, beats: beats.length });
+    window.__pmReplayClock = () => ({ crossing: current, t: clockT, speed, playing, beats: beats.length, moments: line.length });
+    // The feed and the map, readable the same way: how many rows the DOM holds
+    // against its cap, and what each ask of the viewer to look again cost.
+    window.__pmReplayFeed = () => ({ rows: feedEl.children.length, cap: lib.FEED_CAP, pending: feedPending, top: feedEl.firstElementChild?.dataset.key ?? null });
+    window.__pmReplayMap = () => ({ ...mapStats, busy: mapBusy, walkers: window.__pmReplay.walkersNow ? window.__pmReplay.walkersNow() : null });
 
     function schedule() {
       if (!rafId && playing) rafId = requestAnimationFrame(tick);
@@ -1002,6 +1182,7 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     // WHERE THE PAGE KEEPS ITS PLACE. A moment worth showing somebody is a
     // crossing and a pace, so both are in the query — `/replay/?crossing=124&speed=50`
     // opens on that crossing at that pace, and `&playing=1` opens it running.
+    // `&at=21:30` is the clock's moment (UTC), once the reader has set one.
     // The old `#124` deep links are still read on arrival; they are simply not
     // written any more, because a hash cannot carry the second half.
     function writeUrl() {
@@ -1009,6 +1190,7 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       if (current != null) q.set("crossing", String(current));
       if (chosenSet) q.set("settlement", String(chosenSet.n));
       q.set("speed", speed === 0 ? "step" : String(speed));
+      if (clockT != null && speed !== 0) q.set("at", new Date(clockT).toISOString().slice(11, 16));
       if (playing) q.set("playing", "1");
       history.replaceState(null, "", location.pathname + "?" + q.toString());
     }
@@ -1104,7 +1286,7 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     // keeps playing and starts at its first hour, while a crossing a READER
     // moved to stops the clock dead. Touching the scrubber is the plainest
     // statement there is that somebody wants to look rather than watch.
-    async function select(n, { auto = false, settlement = null } = {}) {
+    async function select(n, { auto = false, settlement = null, at = null } = {}) {
       const meta = index.crossings.find((c) => c.n === n);
       if (!meta) return;
       if (!auto) pause();
@@ -1114,18 +1296,26 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       renderTransport();
       const frame = await getFrame(n, meta);
       if (!frame) {
-        voicesEl.textContent = "";
-        voicesEl.appendChild(el("p", "r-empty", "That crossing's record could not be read."));
+        feedEl.textContent = "";
+        feedFoot.textContent = "That crossing's record could not be read.";
         return;
       }
       // The lens must be holding the new frame BEFORE the viewer is asked to look
       // again, or it re-pulls the crossing it was already showing.
       window.__pmReplay.frame = frame;
       // A crossing arrived at while playing opens at its first hour; one arrived
-      // at by hand opens whole, so the reader sees everything that happened in it.
-      clockT = speed === 0 ? null : (auto ? startOf(frame) : null);
+      // at by hand opens whole, so the reader sees everything that happened in it
+      // (or at the moment a shared link names).
+      clockT = speed === 0 ? null
+        : auto ? startOf(frame)
+        : Number.isFinite(at) ? Math.min(endOf(frame), Math.max(startOf(frame), at))
+        : null;
       renderDigest(frame, meta);
+      // The paint sets who stands where; showFrame is what asks the viewer to
+      // look, so the paint must not ask as well.
+      holdMap = true;
       paint();
+      holdMap = false;
       await showFrame(frame);
       writeUrl();
       preloadNeighbours(n);
@@ -1141,14 +1331,25 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       // the viewer binds its own keys; don't fight it while a field has focus
       const t = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-      if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
-      if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
+      // ← → move the clock; with shift, or in step mode where there is no
+      // clock, they step a crossing. The rail, focused, also takes PageUp,
+      // PageDown, Home and End.
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        if (e.shiftKey || speed === 0) step(e.key === "ArrowLeft" ? -1 : 1);
+        else nudge(e.key);
+      }
+      if (t === railTrack && ["PageUp", "PageDown", "Home", "End"].includes(e.key)) {
+        e.preventDefault();
+        nudge(e.key, { rail: true });
+      }
       // space is the transport key everywhere else a thing plays, so it is the
       // transport key here — and it must not also scroll the page. A button with
       // focus is left alone: space is already ITS key, and taking it would mean
       // a keyboard reader pressing "250×" got play instead.
       if (e.key === " " || e.key === "Spacebar") {
-        if (speed === 0 || (t && t.tagName === "BUTTON")) return;
+        // (and a summary — the "What is this?" control opens on space too)
+        if (speed === 0 || (t && t.closest && t.closest("button, summary"))) return;
         e.preventDefault();
         playing ? pause() : play();
       }
@@ -1158,9 +1359,9 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       const li = a && a.closest("[data-settlement]");
       if (!li || !index) return;
       e.preventDefault();
-      chooseSettlement(Number(li.dataset.settlement)).then(() => {
-        try { document.querySelector(".r-stage").scrollIntoView({ block: "start", behavior: "smooth" }); } catch { /* older browsers */ }
-      });
+      // The map and the card beside it change; the page stays where the
+      // reader is (w41: the page never moves by itself).
+      chooseSettlement(Number(li.dataset.settlement));
     });
     prevBtn.addEventListener("click", () => step(-1));
     nextBtn.addEventListener("click", () => step(1));
@@ -1222,21 +1423,37 @@ const nameOf = (handle) => names.get(handle) ?? handle;
         ? asked
         : (complete[complete.length - 1] ?? last).n;
       renderTransport();
+      // `&at=HH:MM` is a moment of the crossing, on that crossing's own UTC day
+      // (or the next, for a crossing that runs past midnight).
+      const atWords = /^(\d{1,2}):(\d{2})$/.exec(params.get("at") ?? "");
+      const startMeta = index.crossings.find((c) => c.n === start);
+      let at = null;
+      if (atWords && startMeta) {
+        const from = new Date(startMeta.from);
+        at = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate())
+          + (Number(atWords[1]) * 60 + Number(atWords[2])) * 60000;
+        if (at < from.getTime()) at += 24 * 3600 * 1000;
+      }
       const askedSet = Number(params.get("settlement") ?? (/^#S(\d+)$/.exec(location.hash) || [])[1]);
       const landSet = setRows.find((r) => r.n === askedSet);
       if (landSet && landSet.crossing != null) {
         await chooseSettlement(landSet.n);
       } else {
-        await select(start);
+        await select(start, { at });
         if (landSet) await chooseSettlement(landSet.n);
-      }
-      if (landSet) {
-        try { document.querySelector(".r-stage").scrollIntoView({ block: "start" }); } catch { /* older browsers */ }
       }
       // and, if the link asked for it, running. After the frame, never before:
       // play on an empty page would spend its first seconds on nothing.
       if (params.get("playing") === "1" && speed !== 0) play();
     })();
+  </script>
+
+  <!-- The scrubber's pure module, bundled from src/lib so node tests the same
+       code the page runs, and handed to the module above through the lens's
+       one global (it waits on `__pmReplay.lib`, whichever arrives first). -->
+  <script>
+    import * as replayScrub from "@/lib/replay-scrub.mjs";
+    window.__pmReplay.giveLib(replayScrub);
   </script>
 
   <style is:global>
@@ -1272,6 +1489,17 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     @media (max-width: 48rem) {
       .replay .r-map.wv, .replay .r-map.wv:not(:root) { height: min(64vh, 30rem); }
     }
+    .replay .r-passages { margin: 0.6em 0 0; font-size: 0.76rem; font-style: italic; color: rgba(185, 173, 147, 0.85); }
+    .replay .r-about { margin: 0.6em 0 0; }
+    .replay .r-about-btn {
+      display: inline-flex; align-items: center; gap: 0.45em; cursor: pointer; list-style: none;
+      padding: 0.35em 0.85em; border-radius: 999px;
+      border: 1px dashed rgba(232, 196, 139, 0.45); color: var(--pm-gold-bright);
+      font: 0.72rem/1.2 var(--pm-mono); letter-spacing: 0.06em;
+    }
+    .replay .r-about-btn::-webkit-details-marker { display: none; }
+    .replay .r-about[open] .r-about-btn { border-style: solid; background: rgba(232, 196, 139, 0.12); }
+    .replay .r-about-btn:focus-visible { outline: 2px solid var(--pm-gold-bright); outline-offset: 2px; }
     .replay .r-map-note {
       margin: 0.6em 0 0; font-size: 0.8rem; line-height: 1.55; color: rgba(185, 173, 147, 0.85);
     }
@@ -1358,18 +1586,62 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     }
     .replay .r-rail-note { color: rgba(185, 173, 147, 0.75); }
 
-    /* A moment that has not come yet is present but quiet — dimmed rather than
-       absent, so the column keeps its height and the page never jumps under a
-       reader while it plays. The one just passed is lit for a fixed number of
-       OUR seconds, whatever pace the town's clock is running at. */
-    .replay .r-voice.is-ahead, .replay .r-move.is-ahead { opacity: 0.28; }
-    .replay .r-voice, .replay .r-move { transition: opacity 240ms linear; }
-    .replay .r-voice.is-lit {
-      border-color: var(--pm-gold); background: rgba(232, 196, 139, 0.1);
+    /* The rail is also the scrubber: it takes a pointer anywhere along it. */
+    .replay .r-rail-track { cursor: pointer; touch-action: none; overflow: visible; }
+    .replay .r-rail-track:focus-visible { outline: 2px solid var(--pm-gold-bright); outline-offset: 3px; }
+    .replay .r-rail-fill { border-radius: 999px 0 0 999px; }
+    .replay .r-rail-head::after {
+      content: ""; position: absolute; top: 50%; left: 50%; width: 0.85rem; height: 0.85rem;
+      margin: -0.425rem 0 0 -0.425rem; border-radius: 50%;
+      background: var(--pm-gold-bright); box-shadow: 0 0 8px rgba(232, 196, 139, 0.8);
     }
-    .replay .r-move.is-lit { border-top-color: var(--pm-gold); color: var(--pm-gold-bright); }
+
+    /* THE FEED. A fixed-height panel beside the map that scrolls inside itself;
+       the newest moment is on top. A row that arrives while playing pops in. */
+    .replay .r-side {
+      display: flex; flex-direction: column; gap: 0.8rem; min-width: 0;
+      height: min(72vh, 44rem);
+    }
+    .replay .r-side .r-settled { flex: none; max-height: 40%; }
+    .replay .r-feed {
+      position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column;
+      padding: 0.9em 0.6em 0.5em 1em; border-radius: 14px;
+      background: rgba(13, 20, 38, 0.72); border: 1px solid rgba(232, 196, 139, 0.2);
+    }
+    .replay .r-feed .r-col-h { flex: none; }
+    .replay .r-feed-list {
+      position: relative; flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+      overflow-anchor: none;
+      list-style: none; margin: 0; padding: 0 0.4em 0 0; display: flex; flex-direction: column; gap: 0.55em;
+    }
+    .replay .r-feed-row { flex: none; }
+    .replay .r-feed-row.r-move {
+      padding: 0.45em 0.2em 0 0; border-top: 1px solid rgba(232, 196, 139, 0.1);
+    }
+    .replay .r-feed-row.is-new { animation: r-pop 420ms ease-out; }
+    @keyframes r-pop {
+      from { opacity: 0; transform: translateY(-6px); background: rgba(232, 196, 139, 0.16); }
+      to { opacity: 1; transform: none; }
+    }
     @media (prefers-reduced-motion: reduce) {
-      .replay .r-voice, .replay .r-move { transition: none; }
+      .replay .r-feed-row.is-new { animation: none; }
+    }
+    .replay .r-feed-new {
+      position: absolute; z-index: 2; top: 2.4em; left: 50%; transform: translateX(-50%);
+      cursor: pointer; padding: 0.3em 0.9em; border-radius: 999px;
+      background: var(--pm-gold); border: 1px solid var(--pm-gold-bright); color: #1a1408;
+      font: 0.7rem/1.2 var(--pm-mono); letter-spacing: 0.04em;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+    }
+    .replay .r-feed-new[hidden] { display: none; }
+    .replay .r-feed-foot {
+      flex: none; margin: 0.5em 0 0; font-size: 0.74rem; font-style: italic; color: #b9ad93;
+    }
+    .replay .r-feed-foot:empty { display: none; }
+    @media (max-width: 60rem) {
+      .replay .r-side { height: auto; }
+      .replay .r-side .r-settled { max-height: none; }
+      .replay .r-feed { height: 26rem; flex: none; }
     }
 
     /* The track's whole job is to make a busy half-day visibly taller than a
@@ -1414,13 +1686,10 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     }
     .replay .r-rule-link { color: var(--pm-gold-bright); text-decoration: none; border-bottom: 1px solid rgba(232, 196, 139, 0.35); }
     .replay .r-rule-link:hover { border-bottom-color: var(--pm-gold-bright); }
-    .replay .r-digest-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 1.6rem; align-items: start; }
-    @media (max-width: 46rem) { .replay .r-digest-grid { grid-template-columns: 1fr; gap: 1.1rem; } }
     .replay .r-col-h {
       margin: 0 0 0.7em; font: 0.7rem/1 var(--pm-mono); letter-spacing: 0.16em;
       text-transform: uppercase; color: rgba(232, 196, 139, 0.75);
     }
-    .replay .r-voices, .replay .r-moves { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7em; }
     .replay .r-voice {
       padding: 0.75em 0.9em; border-radius: 12px;
       background: rgba(13, 20, 38, 0.6); border: 1px solid rgba(232, 196, 139, 0.18);
@@ -1462,7 +1731,7 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     /* THE SETTLEMENTS (POS-255). The panel stands beside the map on a desk and
        under it on a phone; it is as tall as the map and scrolls its own card. */
     .replay .r-stage-grid {
-      display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: 1rem; align-items: start;
+      display: grid; grid-template-columns: minmax(0, 1fr) 22rem; gap: 1rem; align-items: start;
       /* wider than the page's column, centred on it, so the panel beside the
          map does not cost the map its width */
       width: min(calc(100vw - 3rem), 76rem);
