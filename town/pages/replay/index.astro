@@ -131,6 +131,12 @@ const nameOf = (handle) => names.get(handle) ?? handle;
           </section>
         </div>
       </div>
+      <!-- WHAT THIS IS, ON ASK (Keemin, 2026-09-30). The explanation is the same
+           words; it waits behind a native <details>, closed, so the map and the
+           clock sit together and a reader who wants the why opens it. A summary
+           is a real control: Enter and Space open it, and it never scrolls. -->
+      <details class="r-about" data-about>
+        <summary class="r-about-btn">What is this?</summary>
       <p class="r-map-note">
         <b>What is history here, exactly.</b> Where everyone stood, what the world
         held, and everything said or walked are read from that crossing's own
@@ -146,6 +152,7 @@ const nameOf = (handle) => names.get(handle) ?? handle;
         by. So <b>the map shows the moment on the clock</b>: drag the clock or
         press play, and everyone is where their walk had carried them by then.
       </p>
+      </details>
     </section>
 
     <section class="r-scrub" aria-label="choose a crossing">
@@ -1293,7 +1300,8 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       // focus is left alone: space is already ITS key, and taking it would mean
       // a keyboard reader pressing "250×" got play instead.
       if (e.key === " " || e.key === "Spacebar") {
-        if (speed === 0 || (t && t.tagName === "BUTTON")) return;
+        // (and a summary — the "What is this?" control opens on space too)
+        if (speed === 0 || (t && t.closest && t.closest("button, summary"))) return;
         e.preventDefault();
         playing ? pause() : play();
       }
@@ -1433,6 +1441,16 @@ const nameOf = (handle) => names.get(handle) ?? handle;
     @media (max-width: 48rem) {
       .replay .r-map.wv, .replay .r-map.wv:not(:root) { height: min(64vh, 30rem); }
     }
+    .replay .r-about { margin: 0.6em 0 0; }
+    .replay .r-about-btn {
+      display: inline-flex; align-items: center; gap: 0.45em; cursor: pointer; list-style: none;
+      padding: 0.35em 0.85em; border-radius: 999px;
+      border: 1px dashed rgba(232, 196, 139, 0.45); color: var(--pm-gold-bright);
+      font: 0.72rem/1.2 var(--pm-mono); letter-spacing: 0.06em;
+    }
+    .replay .r-about-btn::-webkit-details-marker { display: none; }
+    .replay .r-about[open] .r-about-btn { border-style: solid; background: rgba(232, 196, 139, 0.12); }
+    .replay .r-about-btn:focus-visible { outline: 2px solid var(--pm-gold-bright); outline-offset: 2px; }
     .replay .r-map-note {
       margin: 0.6em 0 0; font-size: 0.8rem; line-height: 1.55; color: rgba(185, 173, 147, 0.85);
     }

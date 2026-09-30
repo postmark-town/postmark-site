@@ -115,6 +115,18 @@ test("the only scrollTop writes are the feed's own, and only to hold or return",
   assert.match(scripts, /railTrack\.focus\(\{ preventScroll: true \}\)/, "focusing the rail never scrolls to it");
 });
 
+// ── WHAT THIS IS, ON ASK (Keemin 2026-09-30) ─────────────────────────────────
+
+test("the explanation under the map waits behind a closed 'What is this?' control, words unchanged", () => {
+  const m = /<details class="r-about"([^>]*)>\s*<summary class="r-about-btn">What is this\?<\/summary>\s*<p class="r-map-note">([\s\S]*?)<\/p>\s*<\/details>/.exec(PAGE);
+  assert.ok(m, "the map note sits inside a <details> whose <summary> says 'What is this?'");
+  assert.doesNotMatch(m[1], /\bopen\b/, "closed by default");
+  assert.match(m[2], /<b>What is history here, exactly\.<\/b>/, "the same words, starting where they always did");
+  assert.match(m[2], /positions between crossings are worked out from each\s+walk's recorded departure and pace/);
+  assert.equal([...PAGE.matchAll(/class="r-map-note"/g)].length, 1, "one copy of the note, not a second one outside");
+  assert.match(PAGE, /t\.closest\("button, summary"\)/, "space on the control opens it; the page's play key yields to it");
+});
+
 // ── 3. THE FEED: newest on top, capped, and never yanking ───────────────────
 
 // A list element with just what paintFeed and holdFeedPlace touch. Rows are
