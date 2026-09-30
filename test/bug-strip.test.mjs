@@ -157,7 +157,8 @@ test("paintBoard: stages, titles and reporters as text; a title's markup stays t
   paintBoard(doc.root, boardOf(READ), doc);
   const text = textOf(doc.root);
   assert.match(text, /Reported · 1/);
-  assert.match(text, /Caught · 1/);
+  assert.match(text, /Spotted · 1/);
+  assert.doesNotMatch(text, /Caught ·/, "a confirmed bug is spotted; caught is the jar's word, at the fix");
   assert.match(text, /<img src=x onerror=alert\(1\)> letters vanish/, "the title was not kept as text");
   assert.match(text, /reported by mari/);
   const links = find(doc.root, (e) => e.tagName === "A");

@@ -154,7 +154,28 @@ export const SCENES = {
     "................",
   ],
 };
-// the jar's loose bug: panel 3's jar, its bug a silhouette until the fixer names it
+// 3-spotted · the bug on its letter, under a magnifying glass (panel 3 since
+// Keemin's 2026-09-29 word: confirming a bug is SPOTTING it; it is caught at the
+// fix, when it goes into the jar, which is scene 3 above)
+SCENES.spotted = [
+  "................",
+  ".kkkkkkkkk......",
+  ".kwwwwwwwk......",
+  ".kwlllllwk......",
+  ".kwwwwwwwk......",
+  ".kwwkrkwwk......",
+  ".kwkrrrkwk.kkkk.",
+  ".kwwkrkwwkkbbbbk",
+  ".kwlllllwkbbrbbk",
+  ".kwwwwwwwkbrrrbk",
+  ".kkkkkkkkkbbrbbk",
+  "..........kbbbbk",
+  "...........kkkk.",
+  "..............o.",
+  "...............o",
+  "................",
+];
+// the jar's loose bug: the jar (scene 3), its bug a silhouette until the fixer names it
 SCENES["jar-open"] = SCENES[3].map((row) => row.replaceAll("n", "k"));
 
 export function svgOf(n) {
@@ -181,7 +202,7 @@ export function svgOf(n) {
 if (process.argv[1]?.replace(/\\/g, "/").endsWith("tools/bug-strip-art.mjs")) {
   const check = process.argv.includes("--check");
   let drift = 0;
-  const pictures = [...PANELS.map((p) => [p.n, p.img]), ["jar-open", JAR_ART.open]];
+  const pictures = [...PANELS.map((p) => [p.art ?? p.n, p.img]), [3, JAR_ART.finished], ["jar-open", JAR_ART.open]];
   for (const [key, img] of pictures) {
     const file = join(PUBLIC, ...img.split("/").filter(Boolean));
     const want = svgOf(key);
