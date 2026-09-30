@@ -47,7 +47,7 @@ import { iconSvg } from "@/lib/pixel-icons.mjs";
 import {
   MEEPS, meepLinks, profileOf, displayName, favouriteColour, accentVars, bench,
 } from "@/lib/meeps-quarter.mjs";
-import { PANELS, NEW_ISSUE_URL } from "@/lib/bug-strip.mjs";
+import { PANELS, NEW_ISSUE_URL, VIDEO_URL, VIDEO_THUMB } from "@/lib/bug-strip.mjs";
 // a strip text is a list of segments; a { stamps } segment renders as <amount>✦ in the stamp family
 const segs = (x) => (typeof x === "string" ? [x] : x);
 
@@ -258,6 +258,15 @@ const switchCss = [
                   </li>
                 ))}
               </ol>
+
+              {/* THE VIDEO (Keemin, 2026-09-29: "get the video on the site"). A
+                  plain link card, never an embed: the page loads no third-party
+                  player, and the card works without script. */}
+              <a class="bs-video" href={VIDEO_URL} target="_blank" rel="noopener" data-bug-video>
+                <img class="bs-video-img" src={VIDEO_THUMB} width="640" height="360" loading="lazy"
+                     alt="A pixel-art title card: How a bug gets caught in Postmark, with a glitching purple bug in the grass and the Bug Catcher's frog beside a tree." />
+                <span class="bs-video-words">Watch: How a bug gets caught in Postmark · 1 min</span>
+              </a>
 
               {/* THE JAR (Keemin, 2026-09-29: the fixer names the bug, and it
                   joins the Bug Catcher's jar). Painted from the same read. */}
@@ -636,6 +645,22 @@ const switchCss = [
 
     /* the board's rows are painted by the page's script, so they carry no
        scope attribute: their rules are :global under the board */
+    /* the video card wears a strip panel: paper, ink border, its drop shadow */
+    .bs-video {
+      display: flex; align-items: center; gap: 1.1rem;
+      margin: 1.4rem 0 0; padding: 0.9rem;
+      background: #f3e7c9; color: #2e2417; text-decoration: none;
+      border: 3px solid #2e2417; border-radius: 6px;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+    }
+    .bs-video:hover .bs-video-words, .bs-video:focus-visible .bs-video-words { text-decoration: underline; }
+    .bs-video:focus-visible { outline: 3px solid #9c3f2e; outline-offset: 2px; }
+    .bs-video-img { display: block; width: 320px; max-width: 100%; height: auto; flex: 0 0 auto; border: 2px solid #2e2417; image-rendering: pixelated; }
+    .bs-video-words { font-weight: 700; font-size: 1.05rem; line-height: 1.4; }
+    @media (max-width: 600px) {
+      .bs-video { flex-direction: column; align-items: stretch; }
+      .bs-video-img { width: 100%; }
+    }
     .bug-jar { margin: 1.6rem 0 0; }
     .jar-list :global(.jar-empty) { margin: 0 0 0.8rem; text-align: center; color: #cdc2ab; font-style: italic; }
     .jar-list :global(.jar-slots) {

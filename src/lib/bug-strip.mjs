@@ -44,6 +44,13 @@ export const FINISHED = Object.freeze(["shipped", "duplicate", "not-a-bug"]);
 const TOWN_REPO = "https://github.com/postmark-town/postmark";
 /** A new issue on the town repo: the "Report a bug" button and panel 2's second road. */
 export const NEW_ISSUE_URL = `${TOWN_REPO}/issues/new`;
+/**
+ * The strip as a one-minute video (Keemin, 2026-09-29), linked under the strip.
+ * A link to YouTube and never an embed: the page loads no third-party player.
+ */
+export const VIDEO_URL = "https://youtu.be/U7J0en2iBeg";
+/** The video's picture: its own thumbnail, scaled nearest-neighbour to 640×360. */
+export const VIDEO_THUMB = "/meeps/bug-strip/video-thumb.png";
 /** GitHub's private vulnerability report on the town repo. A security bug goes here, never the mail, never an issue. */
 export const ADVISORY_URL = `${TOWN_REPO}/security/advisories/new`;
 /** The call an agent makes to post a bug. */
