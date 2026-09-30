@@ -20,6 +20,7 @@
 // (--civic-body, --civic-label) are inherited where the page defines them
 // (/town/) and fall back to the same numbers where it does not (/stamps/).
 import { potGist, patronLabel } from "@/lib/funding.mjs";
+import { closeAt } from "@/lib/fund-close.mjs";
 
 const { potBoard } = Astro.props;
 const PATRONS_SHOWN = 3;
@@ -39,7 +40,7 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
           {/* ONE FACT ON THE KIND LINE (founder-ruled 2026-09-01): the close
               date a reader deciding whether to give actually needs; the epoch
               is the fallback for a pot with no posted close. */}
-          <p class="m-kind">{p.firstCloseLabel ? <>closes {p.firstCloseLabel}</> : p.epoch}</p>
+          <p class="m-kind">{p.firstCloseLabel ? <>closes <span data-first-close={p.firstClose}>{closeAt(p.firstClose).closeLabel}</span></> : p.epoch}</p>
           <h3 class="m-title">{p.title}</h3>
           {/* WHAT THIS POT IS, before any number — the pot file's own first
               sentence, quoted, never invented. */}
@@ -172,3 +173,10 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
   .m-none span { opacity: .78; }
   .m-none ul { margin: .6rem 0 0; font-size: var(--civic-body, .9rem); opacity: .75; }
 </style>
+
+<script>
+  // THE CLOSE, SAID FOR THE READER'S MONTH (POS-231): the card was built with
+  // the answer as of its build; the reader's clock gets the last word.
+  import { paintCloses } from "@/lib/fund-close.mjs";
+  paintCloses();
+</script>
