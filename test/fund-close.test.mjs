@@ -34,6 +34,11 @@ test("closeAt: the month boundary is UTC — the close runs at 00:00 UTC, which 
   assert.equal(closeAt("2026-09-30", T("2026-10-01T00:00:00Z")).closeLabel, "end of October");
   // a reader in New York at 21:00 EDT on the 30th already reads October
   assert.equal(closeAt("2026-09-30", T("2026-09-30T21:00:00-04:00")).closeLabel, "end of October");
+  // the close runs at the END of its day: a mid-month first close holds its own
+  // date through that whole UTC day, and only then gives way (a month-end close
+  // cannot show this, because its day is still in the same month)
+  assert.equal(closeAt("2026-09-12", T("2026-09-12T23:59:59Z")).closeLabel, "12 September");
+  assert.equal(closeAt("2026-09-12", T("2026-09-13T00:00:00Z")).closeLabel, "end of September");
 });
 
 test("closeAt: meeps-fund's first_close 2026-10-31 reads 'end of October' until it passes", () => {
