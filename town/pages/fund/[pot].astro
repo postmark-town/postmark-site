@@ -143,6 +143,10 @@ const { pot, tabs } = Astro.props;
 // the founder has not opened cannot pass it, and neither can anything else that
 // is not, right now, open.
 const open = pot.status === "open";
+// THE PAYPAL CHOICE (POS-183 part 2): offered only when the build carries the
+// app's public client ID (the sandbox app's on dev, the live app's on prod),
+// and its SDK loads only when the giver presses the button (src/lib/paypal.mjs).
+const PAYPAL_CLIENT_ID = import.meta.env.PUBLIC_PAYPAL_CLIENT_ID ?? "";
 const target = pot.target ?? null;
 const received = pot.received ?? 0;
 const headroom = target == null ? null : Math.max(0, target - received);
@@ -373,6 +377,37 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           gift, but it cannot be written down in your name.
         </p>
       </div>
+
+      {/* THE THIRD RAIL (POS-183 part 2): for a giver whose bank balks at a card
+          charge from abroad. Nothing from PayPal loads until the button below is
+          pressed; the order carries custom_id "<pot>|<handle>", which the
+          office's paypal-watch reads back to name the pot and the hand. */}
+      {PAYPAL_CLIENT_ID && (
+      <details class="f-usdc f-paypal" id="paypal" data-pp-client={PAYPAL_CLIENT_ID} data-pp-pot={pot.pot} data-pp-title={pot.title ?? pot.pot}>
+        <summary><span class="f-usdc-sum">or pay with PayPal</span><span class="f-dim"> — if your bank balks at a card charge from abroad</span></summary>
+        <div class="f-rail">
+          <div class="f-pp-form">
+            <label class="f-pp-field">amount, in whole US dollars
+              <input name="pp-usd" type="number" min="1" step="1" inputmode="numeric" value="10" />
+            </label>
+            <label class="f-pp-field">your Postmark handle, if you keep house here
+              <input name="pp-handle" placeholder="the name you keep house under" spellcheck="false" autocomplete="off" />
+            </label>
+          </div>
+          <button type="button" class="f-card f-pp-go" data-pp-go>Pay with PayPal</button>
+          <div class="f-pp-buttons" data-pp-buttons></div>
+          <p class="f-card-note" data-pp-out aria-live="polite"></p>
+          <p class="f-card-note">
+            Taken by PayPal; the town never sees your account, and nothing from PayPal loads on this page
+            until you press the button. <strong>The pot and your handle ride the payment</strong>, so there
+            is nothing further to do. <strong>It is witnessed by the office's own watcher:</strong> once PayPal
+            lists it (up to three hours) and one crossing has passed, it lands on the ledger like any other
+            dollar. Whole dollars only. A payment the office cannot attach to a handle can still be a gift,
+            but it cannot be written down in your name.
+          </p>
+        </div>
+      </details>
+      )}
 
       <details class="f-usdc" id="usdc">
         <summary><span class="f-usdc-sum">or send USDC on Base</span><span class="f-dim"> — the address, the QR, and the form that witnesses it</span></summary>
@@ -665,6 +700,13 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   </main>
 </PostmarkLayout>
 
+<script>
+  // THE PAYPAL CHOICE, bundled so it can share src/lib/paypal.mjs with its test.
+  // It does nothing on a page that offers no PayPal, and loads no SDK until pressed.
+  import { mountPaypal } from "@/lib/paypal.mjs";
+  mountPaypal(document);
+</script>
+
 <script is:inline>
     // THE OFFICE THIS PAGE TALKS TO IS THE ONE THE SIGN-IN CAME FROM (2026-09-29).
     // This page used to take a build-time absolute URL (a build env var,
@@ -946,6 +988,12 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   .f-card:hover { transform: translateY(-1px); filter: brightness(1.04); box-shadow: 0 14px 36px -12px rgba(232, 196, 139, .9), 0 0 0 1px rgba(232, 196, 139, .35); }
   .f-card:active { transform: translateY(0); }
   .f-card-note { font-size: .8rem; line-height: 1.55; margin: .8rem 0 0; opacity: .78; }
+  .f-pp-form { display: flex; flex-wrap: wrap; gap: .8rem 1.2rem; margin: 0 0 1rem; }
+  .f-pp-field { display: flex; flex-direction: column; gap: .3rem; font-size: .82rem; opacity: .9; flex: 1 1 14rem; min-width: 0; }
+  .f-pp-field input { font: inherit; padding: .5rem .6rem; border-radius: 6px; border: 1px solid rgba(232, 196, 139, .35); background: rgba(0, 0, 0, .15); color: inherit; min-width: 0; }
+  .f-pp-go { cursor: pointer; border: 0; font: inherit; }
+  .f-pp-buttons { max-width: 28rem; }
+  .f-pp-buttons:empty { display: none; }
   .f-usdc { margin-top: 1.1rem; border-top: 1px dotted rgba(232, 196, 139, .25); padding-top: .8rem; }
   .f-usdc > summary, .f-how-fold > summary { cursor: pointer; font-size: .88rem; line-height: 1.5; }
   .f-usdc > summary::marker, .f-how-fold > summary::marker, .f-fold > summary::marker { color: var(--pm-gold); }
