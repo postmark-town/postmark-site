@@ -18,7 +18,7 @@ import { execFileSync } from "node:child_process";
 
 import {
   LADDER, CONFIRMED_CAP, STAGES, FINISHED, PANELS, ADVISORY_URL, NEW_ISSUE_URL, POST_CALL,
-  boardOf, paintBoard, jarOf, paintJar, JAR_ART, JAR_EMPTY, plainOf,
+  boardOf, paintBoard, jarOf, paintJar, JAR_ART, JAR_EMPTY, plainOf, VIDEO_URL, VIDEO_THUMB,
 } from "../src/lib/bug-strip.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -294,6 +294,41 @@ test("the built strip: every ✦ sits in a .bs-stamp, one per stamp amount",
   }
   const amounts = PANELS.flatMap((p) => [p.caption, p.bubble.title, ...p.bubble.lines]).flatMap((x) => x.filter((s) => typeof s !== "string"));
   assert.equal(stars.length, amounts.length, "the built strip's ✦ are not one per stamp amount");
+});
+
+// ── THE VIDEO (Keemin, 2026-09-29: "get the video on the site") ──────────────
+
+test("the video is typed once, and its picture is on disk under public/", () => {
+  assert.equal(VIDEO_URL, "https://youtu.be/U7J0en2iBeg");
+  const page = readFileSync(join(ROOT, "town", "pages", "meeps", "index.astro"), "utf8");
+  assert.equal(page.includes("U7J0en2iBeg"), false, "the page types the video's address instead of reading VIDEO_URL");
+  assert.ok(existsSync(join(ROOT, "public", "atelier", "postmark", ...VIDEO_THUMB.split("/").filter(Boolean))), `the card's picture ${VIDEO_THUMB} is missing`);
+});
+
+test("the built Bug Catcher panel carries one link to the video, after the strip and before the jar",
+  { skip: !existsSync(builtMeeps) }, () => {
+  const page = readFileSync(builtMeeps, "utf8");
+  const bc = panelOf(page, "bugcatcher");
+  const links = [...bc.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>/g)].filter((m) => m[1] === VIDEO_URL);
+  assert.equal(links.length, 1, "the video is not linked exactly once in his panel");
+  assert.match(links[0][0], /target="_blank"/);
+  assert.match(links[0][0], /rel="noopener"/);
+  const at = links[0].index;
+  assert.ok(at > bc.lastIndexOf("data-strip-panel=") && at < bc.indexOf("data-bug-jar"), "the video card is not between the strip and the jar");
+  const card = bc.slice(at, bc.indexOf("</a>", at));
+  assert.ok(card.includes(`src="${VIDEO_THUMB}"`), "the card's picture is not its thumbnail");
+  assert.match(card, /alt="[^"]{20,}"/, "the card's picture has no real alt text");
+  assert.match(card, /Watch: How a bug gets caught in Postmark · 1 min/);
+  assert.equal(page.split(VIDEO_URL).length - 1, 1, "the video is linked somewhere else on the page too");
+});
+
+test("the Meeps page loads no third-party player: no <iframe>, no YouTube embed or iframe API",
+  { skip: !existsSync(builtMeeps) }, () => {
+  const page = readFileSync(builtMeeps, "utf8");
+  assert.doesNotMatch(page, /<iframe\b/i, "an iframe is on the Meeps page");
+  assert.doesNotMatch(page, /youtube\.com\/(?:iframe_api|embed)|youtube-nocookie\.com/i, "a YouTube player is wired into the Meeps page");
+  const src = readFileSync(join(ROOT, "town", "pages", "meeps", "index.astro"), "utf8");
+  assert.doesNotMatch(src, /<iframe\b|youtube\.com\/(?:iframe_api|embed)/i);
 });
 
 test("the built security panel opens onto the advisory page, and never the mail or an issue",
