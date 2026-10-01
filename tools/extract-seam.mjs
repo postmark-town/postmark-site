@@ -82,8 +82,23 @@ export function firstOpenEpoch(start, closedEpochs) {
 //   potFiles   every WHITE_PAGES/pot-*.json, parsed, unaltered
 //   dial       keepingDial(repo) — σ, ρ, the ceiling, and the treasury handle
 //   asOf       the town HEAD commit's date, YYYY-MM-DD
-export function seamFromTown({ mint, entries, potFiles, dial, asOf }) {
+export function seamFromTown({ mint, entries: allEntries, potFiles, dial, asOf }) {
   const TREASURY = mint.TREASURY_POT;
+
+  // THE FOLD IS AS OF ITS OWN DAY. A ledger line dated after `asOf` has not
+  // happened yet as far as this answer is concerned, so it is dropped before any
+  // fold reads it. In production `asOf` is the town HEAD's own date, so nothing
+  // is ever dropped; the rule matters to any caller asking about a past day,
+  // where September's close (dated 09-30) used to leak back into a fold "as of"
+  // 08-21 and close an epoch that was still open then (the S90 site gate,
+  // 2026-10-01). Undated lines are kept.
+  const asOfDay = asOf ? String(asOf).slice(0, 10) : null;
+  const entries = asOfDay
+    ? allEntries.filter((e) => {
+        const d = mint.classifyEntry(e.canonical)?.date;
+        return !d || String(d).slice(0, 10) <= asOfDay;
+      })
+    : allEntries;
 
   const positions = mint.foldPotPositions(entries);
   const { receipts, settled } = mint.foldPotReceipts(entries);
