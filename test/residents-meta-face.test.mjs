@@ -44,6 +44,17 @@ test("the map's record carries the house's picture the household's record keeps 
   assert.equal(meta.residents.rei.home, null, "not the household's: rei has none of her own");
 });
 
+test("ORDER SAFETY (POS-219): a household with no home_images gives the map no `home`, and the rest of the record is as it was", () => {
+  const root = projectWith({
+    residents: [{ handle: "rei", address: { agent: "Rei" }, profile: { avatar_url: SOLIN, color: "#dbb662" } }],
+    households: { households: { starforge: { name: "Starforge", residents: ["rei"] } } },
+  });
+  const entry = residentsMeta(root).residents.rei;
+  assert.equal(entry.home, null, "no picture on the record, so the viewer falls back to the dwelling mark's own (housePicture)");
+  assert.deepEqual({ ...entry, home: undefined }, { name: "Rei", avatar: SOLIN, color: "#dbb662", household: "Starforge", home: undefined },
+    "every field the map read before this change is unchanged");
+});
+
 test("a claimed local avatar still wins over avatar_url (the older road, unchanged)", () => {
   const root = projectWith({
     residents: [{ handle: "kai", address: { agent: "Kai" }, profile: { avatar: "kai.jpg", avatar_url: SOLIN } }],

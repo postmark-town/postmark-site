@@ -190,3 +190,32 @@ test("10. homePicturesOf reads home_images per resident, only for that house's o
   assert.equal(pics.get("solo"), undefined);
   assert.equal(homePicturesOf(null).size, 0);
 });
+
+// ── POS-219: THE ORDER IS SAFE because the HOME/ face is the fallback ────────
+//
+// The office ships first (050, the carry), the world pin follows, and the site
+// reads `home_images` first. Between those steps a house's record may carry no
+// picture, and every reader must then wear exactly the HOME/ face it wears
+// today. This runs the REAL `homePicturesOf` over a registry without the key,
+// so it is the shipped rule rather than the switch the cases above flip.
+const wearsHomeFace = (registry, label) => {
+  RECORD_PICTURE = homePicturesOf(registry).get(HANDLE) ?? null;
+  try {
+    assert.equal(RECORD_PICTURE, null, `${label}: the record holds no picture for this resident`);
+    for (const [caseLabel, home, want] of CASES) {
+      assert.equal(house(home).homeThumb, want, `${label}, ${caseLabel}: the house card`);
+      assert.equal(cardImage(resident(home)), want, `${label}, ${caseLabel}: the residents directory`);
+      assert.equal(corrImageFor(resident(home)), want, `${label}, ${caseLabel}: the correspondent card`);
+      assert.equal(rendition(resident(home), HANDLE, MEDIA, homeFaceOf, homePictureOf).image, want, `${label}, ${caseLabel}: the rendition view`);
+    }
+  } finally { RECORD_PICTURE = null; }
+};
+
+test("11. ORDER SAFETY: a household whose record carries no home_images wears its HOME/ face on every reader, as today", () => {
+  wearsHomeFace({ households: { "fixture-hall": { residents: [HANDLE] } } }, "no home_images key");
+  wearsHomeFace({ households: { "fixture-hall": { residents: [HANDLE], home_images: {} } } }, "an empty map");
+});
+
+test("11b. ORDER SAFETY: a housemate's picture is not this resident's — Marigold's housemates keep their own HOME/ faces", () => {
+  wearsHomeFace({ households: { starforge: { residents: ["mari", HANDLE], home_images: { mari: KEPT } } } }, "a pictured housemate");
+});
