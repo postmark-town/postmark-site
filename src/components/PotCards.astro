@@ -22,7 +22,12 @@
 import { potGist, patronLabel } from "@/lib/funding.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
 
-const { potBoard } = Astro.props;
+const { potBoard: given } = Astro.props;
+// THIS MONTH'S POTS ONLY (Keemin, 2026-10-01): a closed epoch is history, not an
+// ask, so it leaves the board and lives under its own fund as a past month
+// (/fund/<pot>/ § Past months). One filter here covers every page that draws
+// the cards, so the Guild, /fund/ and /stamps/ can never disagree about it.
+const potBoard = { ...given, pots: (given?.pots ?? []).filter((p) => p.status !== "closed") };
 const PATRONS_SHOWN = 3;
 const usd = (n) => "$" + Number(n).toLocaleString("en-US");
 const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
