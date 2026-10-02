@@ -382,7 +382,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
       {PAYPAL_CLIENT_ID && (
       <div class="f-usdc f-paypal f-panel" id="pay-paypal" data-pp-client={PAYPAL_CLIENT_ID} data-pp-pot={pot.pot} data-pp-title={pot.title ?? pot.pot} hidden>
         <div class="f-rail">
-          <p class="f-dim">For a giver whose bank balks at a card charge from abroad.</p>
+          <p class="f-card-note f-panel-lead">For a giver whose bank balks at a card charge from abroad.</p>
           <div class="f-pp-form">
             <label class="f-pp-field">amount, in whole US dollars
               <input name="pp-usd" type="number" min="1" step="1" inputmode="numeric" value="10" />
@@ -397,7 +397,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
 
       <div class="f-usdc f-panel" id="usdc" hidden>
         <div class="f-rail">
-          <p class="f-dim">USDC on Base: the address, the QR, and the form that witnesses it.</p>
+          <p class="f-card-note f-panel-lead">USDC on Base: the address, the QR, and the form that witnesses it.</p>
           <p class="f-step">Step 1 — send</p>
           <div class="f-payrow">
             <div class="f-qr" set:html={qr}></div>
@@ -984,6 +984,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   .f-rail-btn { text-align: center; cursor: pointer; border: 0; font: inherit; }
   .f-rail-btn[aria-expanded="true"] { filter: brightness(1.08); box-shadow: 0 0 0 2px rgba(232, 196, 139, .7); }
   .f-panel { margin-top: .9rem; }
+  .f-panel-lead { margin: 0 0 .8rem; }
   .f-panel[hidden] { display: none; }
   .f-ledger-line { font-size: .86rem; line-height: 1.55; margin: 0 0 .9rem; }
   .f-pp-go[hidden] { display: none; }
