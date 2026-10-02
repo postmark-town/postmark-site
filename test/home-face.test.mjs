@@ -20,7 +20,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { homeFaceOf, homePicturesOf } from "../src/lib/home-face.mjs";
+import { homeFaceOf, homeGalleryOf, homePicturesOf } from "../src/lib/home-face.mjs";
 
 // POS-219: every reader asks the household record's picture first. The fixtures
 // below set it per test through this one switch; null is "the record holds none".
@@ -36,10 +36,12 @@ const THUMB = /^\s*homeThumb:\s*(.+),\s*$/m.exec(SOURCE);
 assert.ok(BLOCK, "Household.astro still derives regionAssets … homeFace as one block");
 assert.ok(THUMB, "Household.astro still derives homeThumb on one line");
 assert.match(BLOCK[1], /const images = /, "the lifted block still builds the gallery list");
+assert.match(BLOCK[1], /const images = homeGalleryOf\(/, "the gallery list still asks homeGalleryOf (POS-321)");
 
 // eslint-disable-next-line no-new-func -- the point is to run the component's lines, not a copy of them
-const derive = new Function("r", "media", "homeFaceOf", "homePictureOf",
+const deriveRaw = new Function("r", "media", "homeFaceOf", "homePictureOf", "homeGalleryOf",
   `${BLOCK[1]}\nreturn { images, homeThumb: (${THUMB[1]}) };`);
+const derive = (r, media, faceOf, pictureOf) => deriveRaw(r, media, faceOf, pictureOf, homeGalleryOf);
 
 const HANDLE = "fixture-house";
 const key = (f) => `WHITE_PAGES/${HANDLE}/HOME/${f}`;
@@ -56,7 +58,8 @@ const house = (home) => derive({ handle: HANDLE, home, region: null, homeImages:
 test("1. assets: [b.png] with a.png and b.png in HOME/ → the face is b.png", () => {
   const t = house({ assets: ["b.png"], body: "# the house" });
   assert.equal(t.homeThumb, "/media/b-card.png", "the declared image is the face, not the first filename");
-  assert.deepEqual(t.images, HOME_IMAGES, "the gallery keeps every image in filename order");
+  // POS-190 kept every image in the gallery; POS-321 (Kev, 2026-10-02) shows only what `assets:` chose.
+  assert.deepEqual(t.images, [key("b.png")], "the gallery shows what HOME.md chose (POS-321)");
 });
 
 test("2. no assets → the face is a.png, the first by filename (today's rule)", () => {
@@ -218,4 +221,46 @@ test("11. ORDER SAFETY: a household whose record carries no home_images wears it
 
 test("11b. ORDER SAFETY: a housemate's picture is not this resident's — Marigold's housemates keep their own HOME/ faces", () => {
   wearsHomeFace({ households: { starforge: { residents: ["mari", HANDLE], home_images: { mari: KEPT } } } }, "a pictured housemate");
+});
+
+// ── POS-321: the gallery shows what HOME.md chose ───────────────────────────
+//
+// Kev (Lyra, wayward-archivist), 2026-10-02: `assets: ["shared-parcel.png"]`,
+// and the page showed all four files in HOME/. Her HOME/, as on town main.
+const LYRA = "wayward-archivist";
+const lyraKey = (f) => `WHITE_PAGES/${LYRA}/HOME/${f}`;
+const LYRA_FILES = ["House of Many Doors_ Parcel Plans.png", "Wayward-archivist.png", "lyra-desk-marge.jpg", "shared-parcel.png"];
+const LYRA_MEDIA = Object.fromEntries(LYRA_FILES.map((f) => [lyraKey(f), { card: `/media/${f}-card`, full: `/media/${f}-full` }]));
+const lyra = (home, region = null) => derive({ handle: LYRA, home, region, homeImages: LYRA_FILES.map(lyraKey) }, LYRA_MEDIA, homeFaceOf, homePictureOf);
+
+test("12. assets: [shared-parcel.png] → the house card's gallery shows that one picture, and it is the face (Lyra's page)", () => {
+  const t = lyra({ assets: ["shared-parcel.png"], body: "**The Starling House**" });
+  assert.deepEqual(t.images, [lyraKey("shared-parcel.png")]);
+  assert.equal(t.homeThumb, "/media/shared-parcel.png-card");
+});
+
+test("13. no assets → every picture in HOME/, in filename order (today's behaviour)", () => {
+  assert.deepEqual(lyra({ body: "x" }).images, LYRA_FILES.map(lyraKey));
+  assert.deepEqual(lyra(null).images, LYRA_FILES.map(lyraKey), "no HOME.md at all");
+  assert.deepEqual(lyra({ assets: [], body: "x" }).images, LYRA_FILES.map(lyraKey), "an empty list chose nothing");
+});
+
+test("14. a list of several keeps filename order; a typo among them drops only the typo", () => {
+  const t = lyra({ assets: ["shared-parcel.png", "missing.png", "Wayward-archivist.png"] });
+  assert.deepEqual(t.images, [lyraKey("Wayward-archivist.png"), lyraKey("shared-parcel.png")]);
+  assert.equal(t.homeThumb, "/media/shared-parcel.png-card", "the face is still the first declared");
+});
+
+test("15. a list that names nothing showable keeps every picture: a typo never empties the house", () => {
+  assert.deepEqual(lyra({ assets: ["missing.png"] }).images, LYRA_FILES.map(lyraKey));
+  assert.deepEqual(lyra({ assets: "shared-parcel.png" }).images, [lyraKey("shared-parcel.png")], "a scalar is a one-item list");
+  // the only chosen picture is the region's: the Region card keeps it, the house keeps the rest
+  const t = lyra({ assets: ["shared-parcel.png"] }, { assets: ["shared-parcel.png"] });
+  assert.deepEqual(t.images, LYRA_FILES.filter((f) => f !== "shared-parcel.png").map(lyraKey));
+});
+
+test("16. a first entry that is a typo: the face is still one of the pictures shown", () => {
+  const t = lyra({ assets: ["missing.png", "lyra-desk-marge.jpg"] });
+  assert.deepEqual(t.images, [lyraKey("lyra-desk-marge.jpg")]);
+  assert.equal(t.homeThumb, "/media/lyra-desk-marge.jpg-card");
 });

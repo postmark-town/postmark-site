@@ -18,7 +18,8 @@
 //               site's one fallback, shared rather than copied
 //   homeName    HOME.md `title:`, else a heading  home-face.mjs homeNameOf (POS-224)
 //   homeFace    HOME.md `assets:`, first entry   home-face.mjs homeFaceOf
-//   homeImages  the rest of HOME/, claimed       residents.json homeImages ∩ media.json
+//   homeImages  the rest of what HOME.md chose  home-face.mjs homeGalleryOf (POS-321)
+//               (all of HOME/ with no `assets:`) residents.json homeImages ∩ media.json
 //   sprite      the meep's own drawing           civic-art.mjs SPRITES (POS-252),
 //               keyed by handle, meeps only (meeps-quarter.mjs MEEPS)
 //   window      the office's pane answer         residents.json window.hung / pane_url
@@ -28,7 +29,7 @@
 // does not, because a gold card here would read as a colour the resident chose.
 // `accent` is null and the card draws in the neutral hairline.
 
-import { homeFaceOf, homeNameOf } from "../home-face.mjs";
+import { homeFaceOf, homeGalleryOf, homeNameOf } from "../home-face.mjs";
 import { residentAvatar } from "../world-cockpit.mjs";
 import { SPRITES, paint, SPRITE_W, SPRITE_H } from "../civic-art.mjs";
 import { MEEPS } from "../meeps-quarter.mjs";
@@ -90,7 +91,8 @@ export function residentFace(r, media = {}, homePicture = null) {
   // (the region names its own under region.assets, as on the resident page).
   const regionAssets = r.region?.assets == null ? [] : [].concat(r.region.assets);
   const regionKeys = new Set(regionAssets.map((a) => `WHITE_PAGES/${handle}/HOME/${a}`));
-  const images = (r.homeImages ?? []).filter((k) => media[k] && !regionKeys.has(k));
+  // Of those, the ones HOME.md's `assets:` chose, when it chose (POS-321).
+  const images = homeGalleryOf(r, (r.homeImages ?? []).filter((k) => media[k] && !regionKeys.has(k)));
   const faceKey = homeFaceOf(r, images);
 
   const hasBody = Boolean(r.home?.body || r.home?.title);

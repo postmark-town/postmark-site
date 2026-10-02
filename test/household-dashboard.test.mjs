@@ -36,7 +36,7 @@ test("a resident's own colour, colour name, bio line, avatar and home ride their
     handle: "lamp",
     address: { agent: "the Lamp" },
     profile: { color: "#E6AC52", color_name: "the running lamp", bio: "First line here.\nSecond line.", avatar: "avatar.png" },
-    home: { body: "# the Waystation\n\nA hut.", assets: ["front.jpg"] },
+    home: { body: "# the Waystation\n\nA hut.", assets: ["front.jpg", "back.jpg"] },
     homeImages: ["WHITE_PAGES/lamp/HOME/back.jpg", "WHITE_PAGES/lamp/HOME/front.jpg"],
     window: { hung: true, pane_url: "https://panes.postmark.town/~lamp/" },
   }, media);
@@ -50,6 +50,26 @@ test("a resident's own colour, colour name, bio line, avatar and home ride their
   assert.deepEqual(f.homeImages, ["/media/lamp-back-card.jpg"]);
   assert.equal(f.windowHung, true);
   assert.equal(f.monogram, "L", "the monogram skips a leading 'the'");
+});
+
+test("the card's extra pictures are the ones HOME.md chose; no list, the rest of HOME/ (POS-321)", () => {
+  const key = (f) => `WHITE_PAGES/wayward-archivist/HOME/${f}`;
+  const files = ["House of Many Doors_ Parcel Plans.png", "Wayward-archivist.png", "lyra-desk-marge.jpg", "shared-parcel.png"];
+  const media = Object.fromEntries(files.map((f) => [key(f), { card: `/media/${f}-card` }]));
+  const lyra = (home) => residentFace({ handle: "wayward-archivist", profile: {}, home, homeImages: files.map(key) }, media);
+
+  const chose = lyra({ body: "**The Starling House**", assets: ["shared-parcel.png"] });
+  assert.equal(chose.homeFace, "/media/shared-parcel.png-card");
+  assert.deepEqual(chose.homeImages, [], "one picture chosen: the face, and no extras");
+
+  const two = lyra({ assets: ["shared-parcel.png", "lyra-desk-marge.jpg"] });
+  assert.deepEqual(two.homeImages, ["/media/lyra-desk-marge.jpg-card"]);
+
+  const none = lyra({ body: "x" });
+  assert.equal(none.homeFace, "/media/House of Many Doors_ Parcel Plans.png-card", "no list: the first by filename, as before");
+  assert.deepEqual(none.homeImages, files.slice(1, 4).map((f) => `/media/${f}-card`), "no list: up to three of the rest, as before");
+
+  assert.deepEqual(lyra({ assets: ["missing.png"] }).homeImages, files.slice(1, 4).map((f) => `/media/${f}-card`), "a typo keeps every picture");
 });
 
 test("the house's picture from the household's record wears before the HOME/ face (POS-219)", () => {

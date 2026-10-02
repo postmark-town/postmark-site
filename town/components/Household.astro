@@ -26,7 +26,7 @@ import renditions from "@/data/postmark/renditions.json";
 import { md, fmtDate, excerpt, townFile } from "@/lib/pm.mjs";
 import { correspondentsOf } from "@/lib/correspondents.mjs";
 import { nameplate, isShared } from "@/lib/household.mjs";
-import { homeFaceOf, homeNameOf } from "@/lib/home-face.mjs";
+import { homeFaceOf, homeGalleryOf, homeNameOf } from "@/lib/home-face.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
@@ -128,7 +128,9 @@ function view(r) {
     Array.isArray(r.region.assets) ? r.region.assets : [r.region.assets];
   const regionKeys = new Set(regionAssets.map((a) => `WHITE_PAGES/${r.handle}/HOME/${a}`));
   const regionImages = [...regionKeys].filter((k) => media[k]);
-  const images = r.homeImages.filter((i) => media[i] && !regionKeys.has(i));
+  // the gallery: the images HOME.md chose under `assets:`, when it chose
+  // (POS-321), else every one, in filename order.
+  const images = homeGalleryOf(r, r.homeImages.filter((i) => media[i] && !regionKeys.has(i)));
   // the house's face: the first image HOME.md declares under `assets:`, else
   // the first by filename (POS-190). The gallery keeps `images` in its order.
   const homeFace = homeFaceOf(r, images);
