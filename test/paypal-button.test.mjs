@@ -68,9 +68,9 @@ function fundPage({ withPaypal = true } = {}) {
     scripts: () => head.children.filter((c) => c.tagName === "SCRIPT"),
   };
   if (withPaypal) {
-    const box = body.appendChild(el("details", { "data-pp-client": "sb-client-id", "data-pp-pot": "darko-fund", "data-pp-title": "Keep the lights on" }));
+    // POS-317: the "for" row (fund-for.mjs) puts the signed-in account on the box; nobody types a handle
+    const box = body.appendChild(el("details", { "data-pp-client": "sb-client-id", "data-pp-pot": "darko-fund", "data-pp-title": "Keep the lights on", "data-pp-account": "273009068" }));
     box.appendChild(el("input", { name: "pp-usd", value: "25" }));
-    box.appendChild(el("input", { name: "pp-handle", value: "  paz  " }));
     box.appendChild(el("button", { "data-pp-go": "" }));
     box.appendChild(el("div", { "data-pp-buttons": "" }));
     box.appendChild(el("p", { "data-pp-out": "" }));
@@ -120,7 +120,7 @@ test("1 · a page with no PayPal choice mounts nothing and loads nothing", () =>
 
 // ── 2 ───────────────────────────────────────────────────────────────────────
 
-test("2 · the order carries custom_id <pot>|<handle>, whole US dollars, and the pot's title", async () => {
+test("2 · the order carries custom_id <pot>|g<id> (the signed-in account), whole US dollars, and the pot's title", async () => {
   const doc = fundPage();
   const win = {};
   mountPaypal(doc, { win });
@@ -132,17 +132,18 @@ test("2 · the order carries custom_id <pot>|<handle>, whole US dollars, and the
   let order = null;
   await sdk.made[0].cfg.createOrder({}, { order: { create: async (o) => { order = o; return "ORDER-1"; } } });
   assert.deepEqual(order, { intent: "CAPTURE", purchase_units: [{
-    custom_id: "darko-fund|paz", description: "Postmark · Keep the lights on", amount: { currency_code: "USD", value: "25.00" } }] });
-  // the giver may change the handle after pressing; the order reads it at payment time
-  doc.querySelector("[name='pp-handle']").value = "";
+    custom_id: "darko-fund|g273009068", description: "Postmark · Keep the lights on", amount: { currency_code: "USD", value: "25.00" } }] });
+  // signed out after all (the row removes the account): the order is the bare pot, an outside gift
+  delete doc.querySelector("[data-pp-client]").attrs["data-pp-account"];
   await sdk.made[0].cfg.createOrder({}, { order: { create: async (o) => { order = o; } } });
-  assert.equal(order.purchase_units[0].custom_id, "darko-fund|");
+  assert.equal(order.purchase_units[0].custom_id, "darko-fund");
 });
 
-test("2 · custom_id is `<pot>|<handle>`, trimmed and bounded — the office's paypal-watch pins the same cases", () => {
-  assert.equal(customIdFor("darko-fund", "  paz  "), "darko-fund|paz");
-  assert.equal(customIdFor("darko-fund", ""), "darko-fund|");
-  assert.equal(customIdFor("keep", "x".repeat(300)).length, CUSTOM_MAX);
+test("2 · custom_id is `<pot>|g<id>` signed in and the bare pot signed out — the office's fund-holder pins the same cases", () => {
+  assert.equal(customIdFor("darko-fund", "273009068"), "darko-fund|g273009068");
+  assert.equal(customIdFor("darko-fund", null), "darko-fund");
+  assert.equal(customIdFor("darko-fund", ""), "darko-fund");
+  assert.ok(customIdFor("keep", "99999999999999999999").length <= CUSTOM_MAX);
   assert.equal(CUSTOM_MAX, 127);
   assert.equal(sdkUrl("a b"), `${SDK_HOST}?client-id=a%20b&currency=USD&intent=capture&components=buttons&disable-funding=paylater`);
 });

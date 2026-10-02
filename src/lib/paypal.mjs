@@ -8,13 +8,13 @@
 //     paypal.com is on the page until the "Pay with PayPal" button is pressed;
 //     then one script tag is added, once. A page that loaded a payment SDK on
 //     every visit would be the town telling PayPal about every reader.
-//   · THE ORDER NAMES ITS POT. `purchase_units[0].custom_id` is
-//     `<pot>|<handle>`, where the handle is the text the giver typed, trimmed,
-//     or empty. The office's paypal-watch reads it back as `custom_field` and
-//     resolves the pot and the hand by the card rail's own rule, so the two
-//     spellings must agree: this file's customIdFor and the office's
-//     tools/paypal-watch.mjs § customIdFor are pinned to the same cases by
-//     each repo's tests.
+//   · THE ORDER NAMES ITS POT AND, SIGNED IN, THE HOUSEHOLD (POS-317).
+//     `purchase_units[0].custom_id` is `<pot>|g<id>`: the pot and the signed-in
+//     account, which the "for" row (fund-for.mjs) puts on the box as
+//     `data-pp-account`. Signed out it is the bare `<pot>`, an outside gift.
+//     Nobody types anything. The office's paypal-watch reads it back as
+//     `custom_field` and resolves the account to its household (postmark-office
+//     src/fund-holder.mjs); the spelling is fund-ref.mjs's, pinned on both sides.
 //   · WHOLE US DOLLARS. The ledger records whole dollars; the order is for a
 //     whole number of them, in USD.
 //
@@ -22,6 +22,8 @@
 // from build config, `PUBLIC_PAYPAL_CLIENT_ID`: the sandbox app's on the dev
 // build, the live app's on prod. Never the secret, which only the office's
 // watcher holds. With no client ID the page offers no PayPal choice at all.
+
+import { fundRefFor } from "./fund-ref.mjs";
 
 export const SDK_HOST = "https://www.paypal.com/sdk/js";
 export const CUSTOM_SEP = "|";
@@ -40,10 +42,9 @@ export function sdkUrl(clientId) {
   return `${SDK_HOST}?client-id=${encodeURIComponent(String(clientId ?? ""))}&currency=USD&intent=capture&components=buttons&disable-funding=${DISABLED_FUNDING.join(",")}`;
 }
 
-/** `<pot>|<handle>`, the handle trimmed (or empty), bounded to PayPal's 127. */
-export function customIdFor(pot, handle) {
-  const h = String(handle ?? "").trim();
-  return `${pot}${CUSTOM_SEP}${h}`.slice(0, CUSTOM_MAX);
+/** `<pot>|g<id>` signed in, the bare `<pot>` signed out; bounded to PayPal's 127. */
+export function customIdFor(pot, account) {
+  return fundRefFor(pot, account || null, "paypal").slice(0, CUSTOM_MAX);
 }
 
 /** A whole number of dollars, at least one, or null. */
@@ -55,11 +56,11 @@ export function wholeUsd(v) {
 }
 
 /** The order the giver's approval creates. */
-export function orderFor({ pot, title, handle, usd }) {
+export function orderFor({ pot, title, account, usd }) {
   return {
     intent: "CAPTURE",
     purchase_units: [{
-      custom_id: customIdFor(pot, handle),
+      custom_id: customIdFor(pot, account),
       description: `Postmark · ${title ?? pot}`.slice(0, 127),
       amount: { currency_code: "USD", value: Number(usd).toFixed(2) },
     }],
@@ -95,7 +96,6 @@ export function mountPaypal(doc, { win = globalThis } = {}) {
   const title = box.getAttribute("data-pp-title");
   const go = box.querySelector("[data-pp-go]");
   const usdIn = box.querySelector("[name='pp-usd']");
-  const handleIn = box.querySelector("[name='pp-handle']");
   const target = box.querySelector("[data-pp-buttons]");
   const out = box.querySelector("[data-pp-out]");
   const say = (text) => { if (out) out.textContent = text; };
@@ -109,8 +109,8 @@ export function mountPaypal(doc, { win = globalThis } = {}) {
     try {
       const paypal = await loadSdk(doc, clientId, win);
       await paypal.Buttons({
-        // read at the moment of payment, so a change after pressing is what is paid
-        createOrder: (_data, actions) => actions.order.create(orderFor({ pot, title, handle: handleIn?.value, usd: wholeUsd(usdIn?.value) ?? usd })),
+        // read at the moment of payment: the amount as typed, the account as the "for" row set it
+        createOrder: (_data, actions) => actions.order.create(orderFor({ pot, title, account: box.getAttribute("data-pp-account"), usd: wholeUsd(usdIn?.value) ?? usd })),
         onApprove: (_data, actions) => actions.order.capture().then(() => say(
           "Paid, thank you. PayPal has it; the office's watcher writes it on the ledger once PayPal lists it (up to three hours) and one crossing's grace has passed.")),
         onCancel: () => say("Cancelled — nothing was taken."),

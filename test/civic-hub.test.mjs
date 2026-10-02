@@ -1139,9 +1139,14 @@ test("the card rail rides the same gate and the same disclosures as the address"
   const fund = read("../town/pages/fund/[pot].astro");
   assert.ok(fund.includes("https://buy.stripe.com/"), "the fund page carries the card rail");
   const gate = fund.indexOf("{open && (<>");
-  const law = fund.indexOf('<section class="f-law"');
-  assert.ok(law > 0 && gate > law,
-    "the disclosures sit ABOVE both rails — §10's second consent gate");
+  // MOVED 2026-10-02 (POS-317, Keemin: the page gets shorter): the consent
+  // sentence is the one line between the "for" row and the three rails, inside
+  // the open-pot gate (a draft pot shows no rails, so it needs no gate before
+  // them). The order §10 asks for holds: it precedes every rail.
+  const law = fund.indexOf('<p class="f-ledger-line">');
+  const firstRail = fund.indexOf('<div class="f-rails">');
+  assert.ok(law > gate && firstRail > law,
+    "the disclosures sit ABOVE every rail — §10's second consent gate");
   // The href grew a query since 2026-08-25: `${STRIPE}?client_reference_id=
   // ${pot.pot}` — the card payment names its pot on the checkout session (the
   // first real $10 arrived pot-ambiguous). The anchor is the template opening,
@@ -1151,8 +1156,11 @@ test("the card rail rides the same gate and the same disclosures as the address"
   assert.equal(fund.slice(0, gate).includes("${STRIPE}"), false,
     "and nowhere above it — a draft pot must have no way to pay");
   const fbody = flat(fund.slice(fund.indexOf("---", 3) + 3));
-  assert.ok(fbody.includes("witnessed by the office's own hand"),
-    "a card payment is witnessed by a person, and the page says so");
+  // AMENDED 2026-10-02 (POS-317): the card note said "a person does the
+  // witnessing, so it is not instant", stale since the Stripe watcher was
+  // adopted (2026-08-27). The page now says what is true.
+  assert.ok(fbody.includes("witness each payment on their timer"),
+    "a card payment is witnessed by the office's watcher, and the page says so");
   assert.ok(fbody.includes("cannot see a card payment"),
     "the chain form cannot verify a card payment, and the page says that too");
 });
