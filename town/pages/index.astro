@@ -11,10 +11,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import AtlasInvite from "@/components/AtlasInvite.astro";
 import stats from "@/data/postmark/stats.json";
 import threads from "@/data/postmark/threads.json";
+import letters from "@/data/postmark/letters.json";
 import residents from "@/data/postmark/residents.json";
 import media from "@/data/postmark/media.json";
 import bulletin from "@/data/postmark/bulletin.json";
 import { fmtDate, threadTitle, emph, postingTitle, postingTeaser } from "@/lib/pm.mjs";
+import { letterAddresses, letterHref } from "@/lib/mail.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { householdHref, YOUR_HOUSEHOLD } from "@/lib/home.mjs";
 
@@ -35,13 +37,13 @@ const flies = [
   { l: 95, d: 8.4,  t: 19, s: 12, dx: 18 },
 ];
 
-// the live ticker: latest deliveries link into their conversations,
-// arrivals into their pages — a stock-tape strip above the hero
-const idToThread = new Map();
-for (const t of threads) for (const id of t.letterIds) idToThread.set(id, t.key);
+// the live ticker: latest deliveries link to the letter itself, on its
+// conversation's page (POS-320), arrivals into their pages — a stock-tape strip
+// above the hero
+const letterBook = letterAddresses(threads, letters);
 const tickerItems = [
   ...stats.latestDeliveries.slice(0, 8).map((d) => ({
-    href: idToThread.has(d.id) ? `/mail/${idToThread.get(d.id)}/` : "/mail/",
+    href: letterHref(d.id, letterBook),
     text: `${fmtDate(d.date)} · ${d.from} → ${d.to} — “${threadTitle(d.id)}”`,
   })),
   ...stats.arrivals.slice(0, 3).map((a) => ({

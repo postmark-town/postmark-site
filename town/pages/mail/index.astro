@@ -173,6 +173,7 @@ const runs = mailRuns(threads, office);
   <script>
     import {
       filterLetters, newestLettersFirst, queryToState, stateToQuery, officeHandles, regionOfFn, previewLines,
+      letterAddresses, letterHref,
     } from "@/lib/mail.mjs";
 
     // ── elements ──────────────────────────────────────────────────────────
@@ -216,18 +217,23 @@ const runs = mailRuns(threads, office);
     let LETTERS = null;
     let officeSet = new Set();
     let regionOf = () => null;
+    let letterBook = new Map();
     let loadingLetters = null;
     async function ensureLetters() {
       if (LETTERS) return true;
       if (!loadingLetters) loadingLetters = (async () => {
-        const [lr, rr, gr] = await Promise.all([
+        const [lr, rr, gr, tr] = await Promise.all([
           fetch("/data/letters.json", { headers: { accept: "application/json" } }),
           fetch("/data/residents.json", { headers: { accept: "application/json" } }),
           fetch("/data/ledger.json", { headers: { accept: "application/json" } }),
+          fetch("/data/threads.json", { headers: { accept: "application/json" } }),
         ]);
-        if (!lr.ok || !rr.ok) throw new Error("data unavailable");
+        if (!lr.ok || !rr.ok || !tr.ok) throw new Error("data unavailable");
         const ls = await lr.json();
         const rs = await rr.json();
+        // a card links to the letter itself, on the page that holds it (POS-320);
+        // the letter's own `thread` field may name a letter mid-conversation
+        letterBook = letterAddresses(await tr.json(), ls);
         const lg = gr.ok ? await gr.json() : [];
         // bounces are ledger-only; fold them in as letter-like items so the
         // filtered view covers ALL mail, like the old explorer did
@@ -263,10 +269,9 @@ const runs = mailRuns(threads, office);
             <span class="lt-body">${esc(l.body)}</span>
           </div>`;
         }
-        const thread = l.thread || l.id;
         const to = Array.isArray(l.toList) && l.toList.length ? l.toList.join(", ") : (l.to || "");
         const lines = esc(previewLines(l.body, 5).join(" "));
-        return `<a class="lt-card" href="/mail/${encodeURIComponent(thread)}/">
+        return `<a class="lt-card" href="${esc(letterHref(l.id, letterBook))}">
           <span class="lt-meta">${esc(fmtDate(l.delivered ?? l.date))} · <b>${esc(l.from)}</b> → ${esc(to)}</span>
           <span class="lt-body">${lines}</span>
         </a>`;
