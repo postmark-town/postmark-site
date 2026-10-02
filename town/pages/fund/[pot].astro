@@ -63,6 +63,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import { livePots, loadPots, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel } from "@/lib/funding.mjs";
 import { qrSvg } from "@/lib/qr.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
+import PotSprite from "@/components/PotSprite.astro";
 
 // THE ADDRESS IS NO LONGER ONE STRING. Since 2026-08-25 a pot may have an
 // intake address of its own (keeping-ec2 was the first), and a pot with one
@@ -230,7 +231,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
     <nav class="f-tabs" aria-label="The town's open pots">
       {tabs.map((t) => (
         <a class:list={["f-tab", t.pot === pot.pot && "is-here"]} href={`/fund/${t.pot}/`} aria-current={t.pot === pot.pot ? "page" : undefined}>
-          <span class="f-tab-title">{t.title}</span>
+          <span class="f-tab-title"><PotSprite pot={t.pot} size={24} />{t.title}</span>
           <span class="f-tab-meta">
             <b>{usd(t.received)}</b>{t.target != null && <span class="f-dim"> of {usd(t.target)}</span>}
             <span class="f-tab-sep">·</span>
@@ -240,7 +241,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
       ))}
       {!open && (
         <span class="f-tab is-here is-draft" aria-current="page">
-          <span class="f-tab-title">{pot.title ?? pot.id}</span>
+          <span class="f-tab-title"><PotSprite pot={pot.pot} size={24} />{pot.title ?? pot.id}</span>
           <span class="f-tab-meta f-dim">draft · not open</span>
         </span>
       )}
@@ -257,7 +258,13 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           {pot.firstCloseLabel ? <>closes <span data-first-close={pot.firstClose}>{closeAt(pot.firstClose).closeLabel}</span></> : pot.epoch}
           {pot.beneficiaryLabel ? <> · for {pot.beneficiaryLabel}</> : <> · <em>no beneficiary named yet</em></>}
         </p>
-        <h1>{pot.title ?? pot.id}</h1>
+        {/* THE POT'S SPRITE beside its name (2026-10-02), the cards' drawing
+            at half again their size; none for a pot with no line in
+            civic-art.mjs § POT_SPRITES. */}
+        <div class="f-titled">
+          <PotSprite pot={pot.pot} size={72} />
+          <h1>{pot.title ?? pot.id}</h1>
+        </div>
         {/* WHAT THIS IS, in one breath — the pot file's own first sentence. The
             full paragraph lives in the fine print below the rails: the founder's
             page law (2026-08-26) is that this page DIRECTS TO WHERE YOU CAN PAY
@@ -917,7 +924,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   .f-tab:hover { border-color: rgba(232, 196, 139, .45); background: rgba(232, 196, 139, .07); transform: translateY(-1px); }
   .f-tab.is-here { border-color: var(--pm-gold); background: rgba(232, 196, 139, .1); box-shadow: 0 0 0 1px rgba(232, 196, 139, .25) inset; }
   .f-tab.is-draft { border-style: dashed; }
-  .f-tab-title { font-size: .92rem; color: var(--pm-gold-bright); line-height: 1.3; }
+  .f-tab-title { font-size: .92rem; color: var(--pm-gold-bright); line-height: 1.3; display: flex; align-items: center; gap: .5rem; }
   .f-tab-meta { font-family: var(--pm-mono); font-size: .72rem; font-variant-numeric: tabular-nums; opacity: .85; display: flex; flex-wrap: wrap; gap: .35em; align-items: baseline; }
   .f-tab-sep { opacity: .45; }
   .f-tab-stamp { color: var(--pm-stamp-bright); }
@@ -932,7 +939,8 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
     box-shadow: 0 12px 40px -24px rgba(0, 0, 0, .9), 0 0 0 1px rgba(232, 196, 139, .06) inset;
   }
   .f-kind { font-family: var(--pm-mono); font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; opacity: .62; margin: 0 0 .3rem; }
-  .f-head h1 { margin: 0 0 .5rem; font-size: clamp(1.6rem, 4.2vw, 2.3rem); line-height: 1.12; }
+  .f-head h1 { margin: 0; font-size: clamp(1.6rem, 4.2vw, 2.3rem); line-height: 1.12; }
+  .f-titled { display: flex; align-items: center; gap: 1rem; margin: 0 0 .5rem; }
   .f-source { margin: 0; opacity: .85; line-height: 1.6; }
   .f-need { margin-top: 1.15rem; }
   .f-big { font-family: var(--pm-mono); font-size: 1.55rem; color: var(--pm-gold-bright); margin: 0 0 .55rem; font-variant-numeric: tabular-nums; }
