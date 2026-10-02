@@ -966,7 +966,8 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   .f-for { margin: .2rem 0 1rem; font-size: 1rem; }
   .f-for strong { font-weight: 600; }
   .f-for-signin { font: inherit; background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; }
-  .f-rails { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .6rem; }
+  .f-rails { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
+  @media (max-width: 420px) { .f-rails { grid-template-columns: 1fr; } }
   .f-rail-btn { text-align: center; }
   .f-ledger-line { font-size: .86rem; line-height: 1.55; margin: 0 0 .9rem; }
   .f-pp-go[hidden] { display: none; }
