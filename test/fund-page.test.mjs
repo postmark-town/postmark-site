@@ -145,11 +145,15 @@ test("the consent line sits ABOVE the address, and the full terms below it", () 
   assert.ok(PAGE.indexOf("This buys stamps that do everything a stamp does", fine) > fine,
     "the full what-this-buys sentence lives in the fine print, verbatim");
   const consent = PAGE.slice(law, PAGE.indexOf("</p>", law));
-  assert.ok(consent.includes("Recorded in your name on the town's public ledger"), "the line says whose name it is written in");
+  assert.ok(consent.includes("Recorded in your household's name on the town's public ledger"), "the line says whose name it is written in");
   assert.ok(consent.includes("stake, vote and pay"),
     "the consent line says what the stamps a gift mints actually do");
-  assert.ok(consent.includes("is capped"),
-    "and names the bound in the same breath — the verb without the amount is half the truth");
+  // AMENDED 2026-10-02 (Wright's visual review of #213): the lead drops "money's
+  // share of a household is capped, and it promises no return"; the fine print,
+  // one link away, carries both, and that is asserted instead.
+  const finePrint = PAGE.slice(fine);
+  assert.ok(finePrint.includes("Money's share of a household is capped, and a gift promises no return"),
+    "the bound and the no-return clause live in the fine print the line links to");
   assert.equal(consent.includes("no say"), false,
     "the repealed promise must not stand above the address");
   assert.ok(consent.includes("#fineprint"), "and points at the full terms");
