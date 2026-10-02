@@ -343,8 +343,9 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
     {/* THE CONSENT LINE MOVED (POS-317, Keemin 2026-10-02: the page gets shorter).
         §10's second consent gate holds in its new place: one honest sentence,
         written down in your name, what the stamps do, what bounds them, no
-        promised return, a link to the full terms, sits directly under the three
-        rails and still ABOVE the first copyable character (the USDC address).
+        promised return, a link to the full terms, sits between the "for" row
+        and the three rails: ABOVE every rail, the card button included, as §10's
+        gate asks (test/civic-hub.test.mjs pins it), and above the USDC address.
         The full disclosures stay in the fine print. */}
 
     {open && (<>
@@ -364,17 +365,17 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           <span data-for-when="no-household" hidden>Your account keeps no household in town yet, so this is an outside gift.</span>
           <span data-for-when="signed-out">Sign in to put it in your household's name. <button type="button" class="f-for-signin" data-for-signin>Sign in</button></span>
         </p>
-        <div class="f-rails">
-          <a class="f-card f-rail-btn" data-card data-pot={pot.pot} href={`${STRIPE}?client_reference_id=${pot.pot}`} target="_blank" rel="noopener">Card ↗</a>
-          {PAYPAL_CLIENT_ID && <a class="f-card f-rail-btn" href="#pay-paypal" data-open="pay-paypal">PayPal</a>}
-          <a class="f-card f-rail-btn" href="#usdc" data-open="usdc">USDC</a>
-        </div>
         <p class="f-ledger-line">
           <span data-ledger-when="household" hidden>Recorded in your name on the town's public ledger.</span>
           <span data-ledger-when="outside">Recorded on the town's public ledger, as an outside gift.</span>
           The stamps it mints <em>stake, vote and pay</em>; money's share of a household is capped, and it promises no return.
           <a class="f-law-more" href="#fineprint">The fine print ↓</a>
         </p>
+        <div class="f-rails">
+          <a class="f-card f-rail-btn" data-card data-pot={pot.pot} href={`${STRIPE}?client_reference_id=${pot.pot}`} target="_blank" rel="noopener">Card ↗</a>
+          {PAYPAL_CLIENT_ID && <a class="f-card f-rail-btn" href="#pay-paypal" data-open="pay-paypal">PayPal</a>}
+          <a class="f-card f-rail-btn" href="#usdc" data-open="usdc">USDC</a>
+        </div>
         <p class="f-card-note">
           Card is taken by Stripe and PayPal by PayPal; the town never sees your card or your account. The
           office's own watchers witness each payment on their timer once one crossing's grace has passed
@@ -423,7 +424,8 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             <p class="f-step">Step 2 — tell the town <span class="f-only">(USDC only)</span></p>
             <p class="f-verify-lead">
               Paste the transaction hash. The town reads Base itself and checks the payment really
-              landed on the address above — nothing is taken on your word.
+              landed on the address above — nothing is taken on your word. It reads Base directly, so it
+              <strong>cannot see a card payment</strong> or a PayPal one; those are witnessed on their own.
             </p>
             <p class="f-dim" data-usdc-when="signed-out">
               Sign in to witness it in your household's name. A transfer that is not witnessed here still
@@ -966,7 +968,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   .f-for-signin { font: inherit; background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; }
   .f-rails { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .6rem; }
   .f-rail-btn { text-align: center; }
-  .f-ledger-line { font-size: .86rem; line-height: 1.55; margin: .9rem 0 0; }
+  .f-ledger-line { font-size: .86rem; line-height: 1.55; margin: 0 0 .9rem; }
   .f-pp-go[hidden] { display: none; }
   .f-pp-buttons { max-width: 28rem; }
   .f-pp-buttons:empty { display: none; }
