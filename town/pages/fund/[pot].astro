@@ -366,9 +366,12 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           <span data-for-when="signed-out">Sign in to put it in your household's name. <button type="button" class="f-for-signin" data-for-signin>Sign in</button></span>
         </p>
         <p class="f-ledger-line">
-          <span data-ledger-when="household" hidden>Recorded in your household's name on the town's public ledger.</span>
-          <span data-ledger-when="outside">Recorded on the town's public ledger, as an outside gift.</span>
-          The stamps it mints <em>stake, vote and pay</em>. <a class="f-law-more" href="#fineprint">The fine print ↓</a>
+          {/* an outside gift mints no stamps (the watchers write it "mint no
+              holo"), so only the household's line speaks of them (Wright's
+              review of #214) */}
+          <span data-ledger-when="household" hidden>Recorded in your household's name on the town's public ledger. The stamps it mints <em>stake, vote and pay</em>.</span>
+          <span data-ledger-when="outside">Recorded on the town's public ledger as a gift from outside the town; it mints no stamps.</span>
+          <a class="f-law-more" href="#fineprint">The fine print ↓</a>
         </p>
         <div class="f-rails">
           <a class="f-card f-rail-btn" data-card data-pot={pot.pot} href={`${STRIPE}?client_reference_id=${pot.pot}`} target="_blank" rel="noopener">Card ↗</a>

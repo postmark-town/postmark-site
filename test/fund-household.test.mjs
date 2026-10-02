@@ -144,6 +144,12 @@ test("4 · nothing on the fund page asks the payer to type a handle; the stale c
   assert.ok(!/which is which — the two rails/.test(PAGE), "the which-is-which box is gone");
   assert.match(PAGE, /data-fund-for/);
   assert.match(PAGE, /Recorded in your household's name on the town's public ledger\./);
+  // an outside gift mints nothing: the signed-out lead says so, and never promises stamps
+  const outside = PAGE.match(/<span data-ledger-when="outside">([^]*?)<\/span>/)?.[1] ?? "";
+  assert.match(outside, /as a gift from outside the town; it mints no stamps\./);
+  const ledgerLine = PAGE.match(/<p class="f-ledger-line">([^]*?)<\/p>/)?.[1] ?? "";
+  const shownSignedOut = ledgerLine.replace(/<span data-ledger-when="household" hidden>[^]*?<\/span>/, "");
+  assert.ok(ledgerLine && !/stamps it mints/.test(shownSignedOut), "the signed-out lead never says \"stamps it mints\"");
   // the PayPal and USDC buttons open their panels; no separate disclosure row repeats them
   assert.ok(!/<summary>[^]*?PayPal<\/span>/.test(PAGE) && !/<summary><span class="f-usdc-sum">USDC/.test(PAGE), "no summary row repeats a rail button");
   assert.match(PAGE, /aria-controls="usdc" aria-expanded="false" data-open="usdc">USDC</);
