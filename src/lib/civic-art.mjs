@@ -291,6 +291,15 @@ const BALLOT_HOUSE = [
 // coat), so a meep's sprite may add inks of its own here, merged over INK and
 // its accent triple at paint time. The rule stays the table's: every hex below
 // is one the site already wears, named where it is worn.
+//
+// ONE EXCEPTION, and it is named: DARKO's eyes. Keemin's token
+// (public/birthday/darko-token.png, worn as his token in the world cockpit's
+// HUMAN_TOKENS) has cyan eyes that no stylesheet types, so the hex is the one
+// the token's own trace fills them with (content-creation, ep01
+// art/darko/darko-eyes.svg, 2026-10-01). The eyes ARE the token; a nearer
+// colour the site already wears would draw somebody else.
+export const DARKO_EYE = "#8cfffb";
+
 export const FIGURE_INK = {
   postmaster: {
     e: "#97a266", // skin, lit — global.css --moss, the banner green
@@ -305,6 +314,13 @@ export const FIGURE_INK = {
     Y: "#c9823d", // chick, shade — the Ballot House's lit copper
     b: "#a4632a", // beak — the Ballot House's copper
     q: "#cdbda4", // eggshell, shade — global.css, the parchment
+  },
+  darko: {
+    c: DARKO_EYE, // the eyes — the token's own cyan (see DARKO_EYE)
+    C: "#5fc9d0", // the eyes' edge — global.css --teal, "eye-glow"
+    h: "#cdbda4", // the hood's lining — global.css, the parchment
+    o: "#4d7d54", // the jacket — the mail pair page's check green
+    O: "#97a266", // the jacket, lit — global.css --moss, the banner green
   },
 };
 
@@ -373,6 +389,39 @@ const MEEPLINGS = [
   "........................",
 ];
 
+// DARKO — the founder's token, drawn as Keemin asked on 2026-10-02: "my DARKO
+// token in pixel art for the cyan eyes". The token is a face in shadow under a
+// cap with a gold star, a hood lined pale over a green jacket, and two cyan eyes
+// in the dark; at 24 pixels the eyes carry it, so they are drawn first and
+// everything else is there to hold them. Each eye is split by a slit pupil and
+// pointed at its outer tip, as in the token.
+const DARKO = [
+  "........................",
+  ".........kkkkkk.........",
+  ".......kSdddddddk.......",
+  "......kSddddddgdddk.....",
+  ".....kSddddddgGgdddk....",
+  ".....kddddddddgdddk.....",
+  "...kddddddddddddddddk...",
+  "....SSSSSSSSSSSSSSSS....",
+  "....dkdkkkkkkkkkkdkd....",
+  "....dCckCkkkkkkCkcCd....",
+  "....dkkcccCkkCccckkd....",
+  "....dkkkCkkkkkkCkkkd....",
+  "....dkkkkkkkkkkkkkkd....",
+  ".....dkkkkkkkkkkkkd.....",
+  "...hh.kkkkkkkkkkkk.hh...",
+  "..hhho..kkkkkkkk..ohhh..",
+  "..hhoo...kkkkkk...oohh..",
+  ".hhhoooookkkkkkooooohhh.",
+  ".hhoooooOkkkkkkOooooohh.",
+  "hhhoooooOOkkkkOOoooooohh",
+  "hhooooooooOkkOoooooooohh",
+  "hhooooooooOOOOoooooooohh",
+  "........................",
+  "........................",
+];
+
 export const SPRITES = {
   quests: QUEST_GUILD,
   ideas: THINK_TANK,
@@ -383,7 +432,24 @@ export const SPRITES = {
   postmaster: FERRY,
   // the meeplings, as a gathering (they are not a meep; /meeps/ shows them apart)
   meeplings: MEEPLINGS,
+  // the founder's token (not a meep, and not a building: it wears a pot)
+  darko: DARKO,
 };
+
+// WHICH POT WEARS WHICH SPRITE — the one map (Keemin, 2026-10-02: "little pixel
+// art sprites for each pot"). Pot slug → sprite name. A pot with no line here
+// wears no sprite and nothing else changes; a new pot gets one by adding a line.
+export const POT_SPRITES = {
+  "darko-fund": "darko",       // the DARKO fund: his token's eyes
+  "keeping-ec2": "meeplings",  // the town box: the box's machinery
+  "meeps-fund": "postmaster",  // the meeps: Ferry, the one meep drawn
+};
+
+// A pot's sprite as rects, or null for a pot with no line in POT_SPRITES.
+export function potSprite(pot) {
+  const name = Object.hasOwn(POT_SPRITES, pot) ? POT_SPRITES[pot] : null;
+  return name ? paint(name) : null;
+}
 
 export const SPRITE_W = 24;
 export const SPRITE_H = 24;

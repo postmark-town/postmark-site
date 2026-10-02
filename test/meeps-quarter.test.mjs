@@ -20,7 +20,7 @@ import {
   profileOf, displayName, RUNTIME_OVERRIDE, favouriteColour, accentVars, PLACEHOLDER_COLOUR, MEEPLING_DOES,
 } from "../src/lib/meeps-quarter.mjs";
 import { ICONS, iconSvg } from "../src/lib/pixel-icons.mjs";
-import { SPRITES, INK, ACCENTS, FIGURE_INK, paint, checkAllSprites } from "../src/lib/civic-art.mjs";
+import { SPRITES, INK, ACCENTS, FIGURE_INK, DARKO_EYE, paint, checkAllSprites } from "../src/lib/civic-art.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = (f) => JSON.parse(readFileSync(join(ROOT, "src", "data", "postmark", f), "utf8"));
@@ -71,6 +71,8 @@ test("a meep's own inks are hexes the site already wears", () => {
     ...Object.values(ACCENTS).flatMap((a) => Object.values(a)),
     readFileSync(join(ROOT, "src", "styles", "global.css"), "utf8"),
     readFileSync(join(ROOT, "town", "pages", "mail", "with", "[pair].astro"), "utf8"),
+    // the one named exception: DARKO's eyes, the token's own cyan (civic-art § DARKO_EYE)
+    DARKO_EYE,
   ].join(" ").toLowerCase();
   for (const [meep, inks] of Object.entries(FIGURE_INK)) {
     for (const [ch, hex] of Object.entries(inks)) {

@@ -1,0 +1,26 @@
+---
+// PotSprite.astro — a pot's little pixel sprite (Keemin, 2026-10-02: "little
+// pixel art sprites for each pot? to make them cute"). Which pot wears which
+// sprite is civic-art.mjs § POT_SPRITES; a pot with no line there renders
+// nothing here, so a new pot is never broken by a missing drawing.
+//
+// Inlined at build time like every sprite on the site; nothing is fetched.
+// Decoration only: the pot's title beside it says what it is.
+import { potSprite, SPRITE_W, SPRITE_H } from "@/lib/civic-art.mjs";
+
+// `size` is CSS pixels and an integer scale of the 24-pixel map (24, 48, 72),
+// so every pixel of the drawing lands on whole screen pixels.
+const { pot, size = 48, class: cls } = Astro.props;
+const rects = potSprite(pot);
+---
+{rects && (
+  <svg class:list={["pot-sprite", cls]} width={size} height={size}
+       viewBox={`0 0 ${SPRITE_W} ${SPRITE_H}`} shape-rendering="crispEdges"
+       aria-hidden="true" focusable="false">
+    {rects.map((r) => <rect x={r.x} y={r.y} width={r.w} height="1" fill={r.fill} />)}
+  </svg>
+)}
+
+<style>
+  .pot-sprite { display: block; flex: none; image-rendering: pixelated; }
+</style>
