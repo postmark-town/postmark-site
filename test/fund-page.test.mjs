@@ -130,7 +130,13 @@ test("the consent line sits ABOVE the address, and the full terms below it", () 
   // say". It now says the stamps stake, vote and pay, and that money's share of
   // a household is capped. The ORDER this test exists for is untouched; only
   // the sentence inside it moved.
-  const law = PAGE.indexOf('class="f-law-line"');
+  //
+  // MOVED 2026-10-02 (POS-317, Keemin: the page gets shorter): the sentence left
+  // its own section above the rails and now sits directly UNDER the three rails
+  // as their one line, "Recorded in your name on the town's public ledger" plus
+  // the same honest clauses. It is still above the address, which is the order
+  // this test exists for.
+  const law = PAGE.indexOf('class="f-ledger-line"');
   const addr = PAGE.indexOf('<code class="f-code"');
   const fine = PAGE.indexOf('id="fineprint"');
   assert.ok(law > 0 && addr > 0 && fine > 0);
@@ -138,7 +144,8 @@ test("the consent line sits ABOVE the address, and the full terms below it", () 
   assert.ok(fine > addr, "the fine print hangs below the money moment");
   assert.ok(PAGE.indexOf("This buys stamps that do everything a stamp does", fine) > fine,
     "the full what-this-buys sentence lives in the fine print, verbatim");
-  const consent = PAGE.slice(law, PAGE.indexOf("</section>", law));
+  const consent = PAGE.slice(law, PAGE.indexOf("</p>", law));
+  assert.ok(consent.includes("Recorded in your name on the town's public ledger"), "the line says whose name it is written in");
   assert.ok(consent.includes("stake, vote and pay"),
     "the consent line says what the stamps a gift mints actually do");
   assert.ok(consent.includes("is capped"),

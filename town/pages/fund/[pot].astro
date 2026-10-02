@@ -340,81 +340,66 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
       </p>
     </section>
 
-    {/* THE CONSENT LINE — one sentence, still ABOVE the address (§10's second
-        consent gate holds), but ONE sentence. The full disclosures live in the
-        fine print below the rails at the founder's word (2026-08-26): a reader
-        who clicked "Fund →" wants to know what this is for, what they get, and
-        how to pay — in that order — and the deeper terms are theirs to open,
-        not a wall to climb before the money moment. */}
-    <section class="f-law" aria-label="What funding does and does not buy">
-      <p class="f-law-line">
-        A gift here pays this bill and is <strong>written down in your name</strong> — the
-        town's permanent, public record of it. The stamps it mints you are ordinary stamps — they
-        <em>stake, vote and pay</em> — and money's share of a household is capped. It promises no return.
-        <a class="f-law-more" href="#fineprint"> The fine print ↓</a>
-      </p>
-    </section>
+    {/* THE CONSENT LINE MOVED (POS-317, Keemin 2026-10-02: the page gets shorter).
+        §10's second consent gate holds in its new place: one honest sentence,
+        written down in your name, what the stamps do, what bounds them, no
+        promised return, a link to the full terms, sits directly under the three
+        rails and still ABOVE the first copyable character (the USDC address).
+        The full disclosures stay in the fine print. */}
 
     {open && (<>
     <div class="f-acts">
-    {/* ── 3 · PAY — the card button is the hero; USDC behind one click ────── */}
+    {/* ── 3 · PAY — one "for" row, three rails (POS-317, Keemin 2026-10-02) ──
+        "A signed-in payer sees their household's name and types nothing; a
+        signed-out payer is an outside gift." The row is painted by
+        src/lib/fund-for.mjs from GET /me's fund_holder (the office's own
+        resolver), and it mints the account into every rail's reference:
+        card client_reference_id <pot>_g<id>, PayPal custom_id <pot>|g<id>, the
+        USDC form's household g<id>. Signed out, the rails carry the bare pot. */}
     <section class="f-pay" aria-label="How to send">
       <div class="f-pay-hero">
         <h2>Fund it</h2>
-        <p class="f-pay-lead">
-          {PAYPAL_CLIENT_ID ? "Three" : "Two"} ways to send. Each one lands the same dollar on the same pot and is recorded the
-          same way.
+        <p class="f-for" data-fund-for data-stripe={STRIPE} data-state="signed-out">
+          <span data-for-when="household" hidden>for <strong data-for-name></strong></span>
+          <span data-for-when="no-household" hidden>Your account keeps no household in town yet, so this is an outside gift.</span>
+          <span data-for-when="signed-out">Sign in to put it in your household's name. <button type="button" class="f-for-signin" data-for-signin>Sign in</button></span>
         </p>
-        {/* client_reference_id lands on the Stripe checkout session, so a card
-            payment names its pot in the dashboard — the shared link stopped
-            carrying intent the day a second pot opened (2026-08-25, the first
-            real $10 found it). */}
-        <a class="f-card" href={`${STRIPE}?client_reference_id=${pot.pot}`} target="_blank" rel="noopener">Pay by card ↗</a>
+        <div class="f-rails">
+          <a class="f-card f-rail-btn" data-card data-pot={pot.pot} href={`${STRIPE}?client_reference_id=${pot.pot}`} target="_blank" rel="noopener">Card ↗</a>
+          {PAYPAL_CLIENT_ID && <a class="f-card f-rail-btn" href="#pay-paypal" data-open="pay-paypal">PayPal</a>}
+          <a class="f-card f-rail-btn" href="#usdc" data-open="usdc">USDC</a>
+        </div>
+        <p class="f-ledger-line">
+          <span data-ledger-when="household" hidden>Recorded in your name on the town's public ledger.</span>
+          <span data-ledger-when="outside">Recorded on the town's public ledger, as an outside gift.</span>
+          The stamps it mints <em>stake, vote and pay</em>; money's share of a household is capped, and it promises no return.
+          <a class="f-law-more" href="#fineprint">The fine print ↓</a>
+        </p>
         <p class="f-card-note">
-          Taken by Stripe; the town never sees your card. <strong>Say which handle it is for</strong> while
-          you pay — nothing further. <strong>A card payment is witnessed by the office's own hand:</strong> it
-          lands on the ledger like any other dollar and is recorded the same way, but a person does the
-          witnessing, so it is not instant. A payment the office cannot attach to a hand can still be a
-          gift, but it cannot be written down in your name.
+          Card is taken by Stripe and PayPal by PayPal; the town never sees your card or your account. The
+          office's own watchers witness each payment on their timer once one crossing's grace has passed
+          (PayPal lists a payment within about three hours). Whole dollars only.
         </p>
       </div>
 
-      {/* THE THIRD RAIL (POS-183 part 2): for a giver whose bank balks at a card
-          charge from abroad. Nothing from PayPal loads until the button below is
-          pressed; the order carries custom_id "<pot>|<handle>", which the
-          office's paypal-watch reads back to name the pot and the hand. The id is
-          NOT "paypal": an element id becomes a window property, and window.paypal
-          is the SDK's own global, so that id shadowed the SDK and the buttons
-          never rendered (caught in the lane's own render). */}
       {PAYPAL_CLIENT_ID && (
       <details class="f-usdc f-paypal" id="pay-paypal" data-pp-client={PAYPAL_CLIENT_ID} data-pp-pot={pot.pot} data-pp-title={pot.title ?? pot.pot}>
-        <summary><span class="f-usdc-sum">or pay with PayPal</span><span class="f-dim"> — if your bank balks at a card charge from abroad</span></summary>
+        <summary><span class="f-usdc-sum">PayPal</span><span class="f-dim"> — if your bank balks at a card charge from abroad</span></summary>
         <div class="f-rail">
           <div class="f-pp-form">
             <label class="f-pp-field">amount, in whole US dollars
               <input name="pp-usd" type="number" min="1" step="1" inputmode="numeric" value="10" />
             </label>
-            <label class="f-pp-field">your Postmark handle, if you keep house here
-              <input name="pp-handle" placeholder="the name you keep house under" spellcheck="false" autocomplete="off" />
-            </label>
           </div>
           <button type="button" class="f-card f-pp-go" data-pp-go>Pay with PayPal</button>
           <div class="f-pp-buttons" data-pp-buttons></div>
           <p class="f-card-note" data-pp-out aria-live="polite"></p>
-          <p class="f-card-note">
-            Taken by PayPal; the town never sees your account, and nothing from PayPal loads on this page
-            until you press the button. <strong>The pot and your handle ride the payment</strong>, so there
-            is nothing further to do. <strong>It is witnessed by the office's own watcher:</strong> once PayPal
-            lists it (up to three hours) and one crossing has passed, it lands on the ledger like any other
-            dollar. Whole dollars only. A payment the office cannot attach to a handle can still be a gift,
-            but it cannot be written down in your name.
-          </p>
         </div>
       </details>
       )}
 
       <details class="f-usdc" id="usdc">
-        <summary><span class="f-usdc-sum">or send USDC on Base</span><span class="f-dim"> — the address, the QR, and the form that witnesses it</span></summary>
+        <summary><span class="f-usdc-sum">USDC on Base</span><span class="f-dim"> — the address, the QR, and the form that witnesses it</span></summary>
         <div class="f-rail">
           <p class="f-step">Step 1 — send</p>
           <div class="f-payrow">
@@ -437,17 +422,19 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           <div class="f-verify">
             <p class="f-step">Step 2 — tell the town <span class="f-only">(USDC only)</span></p>
             <p class="f-verify-lead">
-              Paste the transaction hash and your handle. The town reads Base itself and checks
-              the payment really landed on the address above — nothing is taken on your word.
-              The hash form belongs to this rail: it reads Base directly and <strong>cannot see a card payment</strong>.
+              Paste the transaction hash. The town reads Base itself and checks the payment really
+              landed on the address above — nothing is taken on your word.
             </p>
-            <form class="f-form" id="pm-fund-form" novalidate>
+            <p class="f-dim" data-usdc-when="signed-out">
+              Sign in to witness it in your household's name. A transfer that is not witnessed here still
+              reaches the town, and is recorded by hand as an outside gift.
+            </p>
+            <form class="f-form" id="pm-fund-form" novalidate data-usdc-when="household" hidden>
               <label>transaction hash
                 <input name="txhash" placeholder="0x…" spellcheck="false" autocomplete="off" required />
               </label>
-              <label>your handle in town
-                <input name="handle" placeholder="the name you keep house under" spellcheck="false" autocomplete="off" required />
-              </label>
+              {/* the household, minted by the "for" row (src/lib/fund-for.mjs) — never typed */}
+              <input type="hidden" name="household" value="" data-usdc-household />
               <input type="hidden" name="pot" value={pot.pot} />
               {/* The pot rides this form invisibly (the hidden field above) — say so
                   out loud. It mattered most when one address served every pot and the
@@ -460,43 +447,6 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             </form>
             <div class="f-out" id="pm-fund-out" hidden aria-live="polite"></div>
           </div>
-        </div>
-      </details>
-
-      <details class="f-how-fold">
-        <summary><span class="f-dim">which is which — the two rails in three steps each</span></summary>
-        {/* THE ORDER, BEFORE THE MECHANICS. A patron used to meet an address, a
-            card button and a hash form with nothing telling them which of the
-            three were theirs. This strip is the map. It names steps and nothing
-            else — no economy vocabulary beyond `handle`, which the law block
-            above has already used in plain words. */}
-        <div class="f-how">
-          <div class="f-how-rail">
-            <p class="f-how-name">If you pay by card</p>
-            <ol>
-              <li>Follow the card button and pay there.</li>
-              <li>Say which handle it is for while you pay.</li>
-              <li>Nothing further — a person here does the rest by hand.</li>
-            </ol>
-          </div>
-          <div class="f-how-rail">
-            <p class="f-how-name">If you send USDC</p>
-            <ol>
-              <li>Send USDC on Base to this pot's address, above.</li>
-              <li>Copy the transaction hash your wallet hands back.</li>
-              <li>Paste that hash and your handle into the form beside the address.</li>
-            </ol>
-          </div>
-          {/* THE ONE THING BOTH RAILS SHARE, so it sits under both rather than
-              inside either: a patron reading this early in a month needs to know
-              that an early dollar is not a lost one. */}
-          {pot.firstCloseLabel && (
-            <p class="f-how-note">
-              Either way, dollars arriving now belong to the <strong data-first-close={pot.firstClose} data-say="epoch">{closeAt(pot.firstClose).epochLabel}</strong> epoch —
-              this pot closes at the <strong data-first-close={pot.firstClose}>{closeAt(pot.firstClose).closeLabel}</strong>. Money sent today
-              loses nothing by arriving early; it waits for that close with the rest.
-            </p>
-          )}
         </div>
       </details>
     </section>
@@ -519,9 +469,8 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
       <div class="f-stake-head">
         <h2>Stake stamps on it</h2>
         <p class="f-stake-lead">
-          A stake says <em>fund this</em>: it sizes what the givers are minted at the close, and
-          <strong> it comes home whole</strong> — nothing burns. Stamps are earned by corresponding,
-          never bought; <a href="/docs/stamps/#staking">the teaching</a> has the rest.
+          A stake says <em>fund this</em>: it sizes what the givers are minted at the close, and it
+          <strong>comes home whole</strong> (<a href="/docs/stamps/#staking">the teaching</a>).
         </p>
       </div>
       <div class="f-stake-box" data-stake data-pot={pot.pot} data-title={pot.title ?? pot.pot}>
@@ -708,7 +657,14 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   // THE PAYPAL CHOICE, bundled so it can share src/lib/paypal.mjs with its test.
   // It does nothing on a page that offers no PayPal, and loads no SDK until pressed.
   import { mountPaypal } from "@/lib/paypal.mjs";
+  import { mountFundFor } from "@/lib/fund-for.mjs";
   mountPaypal(document);
+  mountFundFor(document);
+  // a rail button opens its own fold
+  for (const b of document.querySelectorAll("[data-open]")) b.addEventListener("click", () => {
+    const d = document.getElementById(b.getAttribute("data-open"));
+    if (d) d.open = true;
+  });
 </script>
 
 <script>
@@ -759,7 +715,8 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
       form.addEventListener("submit", function (e) {
         e.preventDefault();
         var fd = new FormData(form);
-        var body = { txhash: (fd.get("txhash") || "").trim(), handle: (fd.get("handle") || "").trim(), pot: fd.get("pot") };
+        // POS-317: the household the "for" row minted (g<id>), never a typed handle
+        var body = { txhash: (fd.get("txhash") || "").trim(), household: (fd.get("household") || "").trim(), pot: fd.get("pot") };
         say("pending", "reading Base…", "checking the transaction, the recipient, the amount, and how deep it is buried.");
         fetch(API + "/fund/verify", {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
@@ -771,7 +728,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
               say("refused", j.defect || "refused", j.hint || "");
               return;
             }
-            var line = "$" + j.usd_recorded + " witnessed for " + j.handle + " → " + j.pot + ".";
+            var line = "$" + j.usd_recorded + " witnessed for " + (j.household_name || j.handle) + " → " + j.pot + ".";
             if (j.cents_note) line += " " + j.cents_note;
             if (j.headroom_after !== null && j.headroom_after !== undefined) line += " This pot can still take $" + j.headroom_after + " this epoch.";
             // the what-this-buys line gets its own paragraph rather than being
@@ -1004,6 +961,12 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   .f-pp-field { display: flex; flex-direction: column; gap: .3rem; font-size: .82rem; opacity: .9; flex: 1 1 14rem; min-width: 0; }
   .f-pp-field input { font: inherit; padding: .5rem .6rem; border-radius: 6px; border: 1px solid rgba(232, 196, 139, .35); background: rgba(0, 0, 0, .15); color: inherit; min-width: 0; }
   .f-pp-go { cursor: pointer; border: 0; font: inherit; }
+  .f-for { margin: .2rem 0 1rem; font-size: 1rem; }
+  .f-for strong { font-weight: 600; }
+  .f-for-signin { font: inherit; background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; }
+  .f-rails { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .6rem; }
+  .f-rail-btn { text-align: center; }
+  .f-ledger-line { font-size: .86rem; line-height: 1.55; margin: .9rem 0 0; }
   .f-pp-go[hidden] { display: none; }
   .f-pp-buttons { max-width: 28rem; }
   .f-pp-buttons:empty { display: none; }
