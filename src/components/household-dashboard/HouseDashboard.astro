@@ -28,6 +28,7 @@ import ResidentCard from "./ResidentCard.astro";
 import KeysCard from "./KeysCard.astro";
 import media from "@/data/postmark/media.json";
 import { residentFace } from "@/lib/household-dashboard/faces.mjs";
+import { homePictureOf } from "@/lib/home-picture.mjs";
 import { fmtDate } from "@/lib/pm.mjs";
 import { HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
 
@@ -38,7 +39,7 @@ interface Props {
   arriving?: string[];
 }
 const { house, members, plate, arriving = [] } = Astro.props;
-const faces = members.map((r) => residentFace(r, media));
+const faces = members.map((r) => residentFace(r, media, homePictureOf(r.handle)));
 const handles = faces.map((f) => f.handle);
 const slug = house.path ?? house.slug ?? "";
 // a resident's seat on the house's own page, where the rail keeps them

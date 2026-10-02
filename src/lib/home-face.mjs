@@ -73,3 +73,31 @@ export function homeNameOf(r) {
   const title = typeof r.home?.title === "string" ? r.home.title.trim() : "";
   return title || headingLineOf(r.home?.body) || r.handle;
 }
+
+// ── the house's PICTURE, from the household's record (POS-219) ──────────────
+//
+// Keemin, 2026-09-27/28: a house's picture is kept on the HOUSEHOLD's record in
+// the office, one per resident (`home_images`, handle → media-door URL), and
+// the town's tools/households.json carries it. It is uploaded, never committed:
+// HOME/ keeps what is there as history. So every card reads this first and
+// wears `homeFaceOf`'s HOME/ face only where the record holds no picture yet
+// (a resident whose legacy picture the carry-over has not reached).
+//
+// An entry counts only when its handle is a resident of THAT household and its
+// value is the town's own media door (`atTownMediaDoor`, the one owner of that
+// question), so a hand-edited row cannot put another host on a card.
+import { atTownMediaDoor } from "./media-door.mjs";
+
+/**
+ * @param {{ households?: Record<string, { residents?: string[], home_images?: Record<string, unknown> }> } | null} registry
+ * @returns {Map<string, string>}  handle → the house's picture URL
+ */
+export function homePicturesOf(registry) {
+  const out = new Map();
+  for (const dec of Object.values(registry?.households ?? {})) {
+    const residents = new Set(dec?.residents ?? []);
+    for (const [handle, url] of Object.entries(dec?.home_images ?? {}))
+      if (residents.has(handle) && typeof url === "string" && atTownMediaDoor(url)) out.set(handle, url);
+  }
+  return out;
+}

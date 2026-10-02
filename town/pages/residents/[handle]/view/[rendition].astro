@@ -13,6 +13,7 @@ import media from "@/data/postmark/media.json";
 import renditions from "@/data/postmark/renditions.json";
 import { md } from "@/lib/pm.mjs";
 import { homeFaceOf } from "@/lib/home-face.mjs";
+import { homePictureOf } from "@/lib/home-picture.mjs";
 
 export function getStaticPaths() {
   const byHandle = new Map(residents.map((r) => [r.handle, r]));
@@ -77,7 +78,7 @@ const payloadBase = {
   addressHtml: md(r.address?.body ?? "", { repoDir: `WHITE_PAGES/${handle}`, media }),
   homeHtml: r.home?.body ? md(r.home.body, { repoDir: `WHITE_PAGES/${handle}/HOME`, media }) : null,
   regionHtml: r.region?.body ? md(r.region.body, { repoDir: `WHITE_PAGES/${handle}/HOME`, media }) : null,
-  image: homeFace ? media[homeFace].card : null,
+  image: homePictureOf(handle) ?? (homeFace ? media[homeFace].card : null),
   images: { home: homeImgs, region: regionImgs },
   stats: { received: r.counts?.received ?? 0, sent: r.counts?.sent ?? 0, stamps: null },
   window: { exists: false, fullUrl: null },

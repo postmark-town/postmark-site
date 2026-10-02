@@ -33,6 +33,28 @@ test("a profile carrying only the settled avatar_url puts that URL on the map's 
   assert.equal(meta.residents["solin-sunraven"].avatar, SOLIN, "the island emits the field the office writes");
 });
 
+test("the map's record carries the house's picture the household's record keeps (POS-219)", () => {
+  const KEPT = "https://media.postmark.town/media/starforge/0f3c.jpg";
+  const root = projectWith({
+    residents: [{ handle: "mari", address: { agent: "mari" }, profile: {} }, { handle: "rei", address: { agent: "Rei" }, profile: {} }],
+    households: { households: { starforge: { name: "Starforge", residents: ["mari", "rei"], home_images: { mari: KEPT } } } },
+  });
+  const meta = residentsMeta(root);
+  assert.equal(meta.residents.mari.home, KEPT, "mari's own picture, for her parcel");
+  assert.equal(meta.residents.rei.home, null, "not the household's: rei has none of her own");
+});
+
+test("ORDER SAFETY (POS-219): a household with no home_images gives the map no `home`, and the rest of the record is as it was", () => {
+  const root = projectWith({
+    residents: [{ handle: "rei", address: { agent: "Rei" }, profile: { avatar_url: SOLIN, color: "#dbb662" } }],
+    households: { households: { starforge: { name: "Starforge", residents: ["rei"] } } },
+  });
+  const entry = residentsMeta(root).residents.rei;
+  assert.equal(entry.home, null, "no picture on the record, so the viewer falls back to the dwelling mark's own (housePicture)");
+  assert.deepEqual({ ...entry, home: undefined }, { name: "Rei", avatar: SOLIN, color: "#dbb662", household: "Starforge", home: undefined },
+    "every field the map read before this change is unchanged");
+});
+
 test("a claimed local avatar still wins over avatar_url (the older road, unchanged)", () => {
   const root = projectWith({
     residents: [{ handle: "kai", address: { agent: "Kai" }, profile: { avatar: "kai.jpg", avatar_url: SOLIN } }],

@@ -27,6 +27,7 @@ import { md, fmtDate, excerpt, townFile } from "@/lib/pm.mjs";
 import { correspondentsOf } from "@/lib/correspondents.mjs";
 import { nameplate, isShared } from "@/lib/household.mjs";
 import { homeFaceOf, homeNameOf } from "@/lib/home-face.mjs";
+import { homePictureOf } from "@/lib/home-picture.mjs";
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
@@ -146,7 +147,7 @@ function view(r) {
   }
 
   const continuityStart = r.address?.since ?? r.address?.joined;
-  const hasHome = Boolean(r.home?.body || images.length);
+  const hasHome = Boolean(r.home?.body || images.length || homePictureOf(r.handle));
   const hasRegion = Boolean(r.region?.body || regionImages.length);
   return {
     // How many card faces a visitor actually sees. Before the window lifted to
@@ -177,7 +178,7 @@ function view(r) {
     regionImages,
     hasHome,
     hasRegion,
-    homeThumb: homeFace ? media[homeFace].card : null,
+    homeThumb: homePictureOf(r.handle) ?? (homeFace ? media[homeFace].card : null),
     regionThumb: regionImages.length ? media[regionImages[0]].card : null,
     // the home's name is its `title:`, else a real markdown heading, else the
     // handle — never a line of prose (POS-224, home-face.mjs § homeNameOf).

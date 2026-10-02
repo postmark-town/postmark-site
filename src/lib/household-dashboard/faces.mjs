@@ -74,8 +74,10 @@ export function spriteOf(handle) {
 /**
  * @param {object} r      one residents.json row
  * @param {object} media  media.json (repo key → { card, … })
+ * @param {string | null} homePicture  the house's picture the household's record
+ *   keeps for this resident (POS-219), which wears before the HOME/ face
  */
-export function residentFace(r, media = {}) {
+export function residentFace(r, media = {}, homePicture = null) {
   const profile = r?.profile && typeof r.profile === "object" ? r.profile : {};
   const handle = r.handle;
   const name = (typeof r.address?.agent === "string" && r.address.agent.trim()) || handle;
@@ -101,7 +103,7 @@ export function residentFace(r, media = {}) {
     avatar,
     monogram: Array.from(name.replace(/^the\s+/i, ""))[0]?.toLocaleUpperCase() ?? "?",
     homeName: hasBody ? homeNameOf(r) : null,
-    homeFace: faceKey ? media[faceKey].card : null,
+    homeFace: homePicture ?? (faceKey ? media[faceKey].card : null),
     homeImages: images.filter((k) => k !== faceKey).slice(0, 3).map((k) => media[k].card),
     sprite: spriteOf(handle),
     isMeep: meepHandles.has(handle),
