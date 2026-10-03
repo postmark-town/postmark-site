@@ -36,6 +36,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { readTown } from "./lib/town.mjs";
 import { emitSeam } from "./extract-seam.mjs";
 import { threadTitle } from "./lib/ids.mjs";
+import { letterAddresses, letterHref } from "../src/lib/mail.mjs";
 import { PRESETS, assetName, processImage, ownDir } from "./lib/images.mjs";
 import {
   excerptOf, ferryHeadline, stakePositions, splitArrivals, isBounceNotice,
@@ -553,6 +554,8 @@ emit("stats.json", {
   mkdirSync(DOORSTEP_DIR, { recursive: true });
   const doorstepWanted = new Set();
   let dWrote = 0, dKept = 0, dStale = 0;
+  // every thread row's link lands on the page that holds the letter (POS-320)
+  const letterBook = letterAddresses(town.threads, town.letters);
 
   for (const r of town.residents) {
     // A handle whose file we cannot refresh keeps BOTH its files, untouched and
@@ -671,7 +674,7 @@ emit("stats.json", {
       },
     });
 
-    const md = renderDoorstepMarkdown(bundle, { townBase: TOWN_BASE, titleOf: threadTitle });
+    const md = renderDoorstepMarkdown(bundle, { townBase: TOWN_BASE, titleOf: threadTitle, mailHref: (id) => letterHref(id, letterBook) });
 
     for (const [name, text] of [
       [`${r.handle}.json`, JSON.stringify(bundle, null, 1) + "\n"],
