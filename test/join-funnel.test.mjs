@@ -337,16 +337,18 @@ test("move-in feeds the generator the reader's fields and names the keeper's hou
 test("look it over edits IN PLACE: the row's edit moves the generator's own node in, and never walks back to its screen", () => {
   // CAN FAIL: route the edit through go()/stepOfField (the old "sending you
   // back"), or draw a second box in the row that the send would never read.
-  const review = MOVEIN.match(/function paintReview\(\) \{[\s\S]*?\n    \}\n/)[0];
+  // \r?\n: the site's sources check out CRLF on Windows and LF in CI
+  // (home-pick.test.mjs's convention); an LF-only \n matched nothing here.
+  const review = MOVEIN.match(/function paintReview\(\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
   assert.match(review, /edit\.addEventListener\("click", \(\) => openEdit\(row\.name, wrap\)\);/);
   assert.ok(!/go\(|stepOfField/.test(review), "the review's edit still sends the reader back to a screen");
-  const open = MOVEIN.match(/function openEdit\(name, wrap\) \{[\s\S]*?\n    \}\n/)[0];
+  const open = MOVEIN.match(/function openEdit\(name, wrap\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
   assert.match(open, /const node = form\.fields\[name\]\.node;/);
   assert.match(open, /slot\.appendChild\(node\);/, "the row must hold the generator's own node");
   assert.ok(!/go\(|history\.|createElement\("(input|textarea|select)"\)/.test(open), "an in-place edit navigated, or drew its own box");
   assert.match(open, /textContent = "Save"/);
   assert.match(open, /textContent = "cancel"/);
-  const close = MOVEIN.match(/function closeEdit\(saving\) \{[\s\S]*?\n    \}\n/)[0];
+  const close = MOVEIN.match(/function closeEdit\(saving\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
   assert.match(close, /home\.insertBefore\(node, next\);/, "the node must go home to its screen");
   assert.match(close, /missingHere\(form, declared, name\)/, "a save must keep the office's required rule");
   assert.match(close, /c\.value = before;/, "cancel must restore what the box held");
@@ -381,7 +383,7 @@ test("a PROVISIONAL house is the one keeper still asked its name, and the box sa
   const me = { handles: ["dearest-ai"], households: { "dearest-ai": { slug: "dearest-ai" } } };
   assert.equal(houseOfMe(me, { "dearest-ai": { name: "dearest-ai", provisional: true } }).provisional, true);
   assert.equal(houseOfMe(me, {}).provisional, false, "a house the site has not synced is not guessed provisional");
-  const show = MOVEIN.match(/function showHouse\(house, asked\) \{[\s\S]*?\n    \}\n/)[0];
+  const show = MOVEIN.match(/function showHouse\(house, asked\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
   assert.match(show, /if \(!house \|\| !house\.provisional\) return;/);
   assert.match(show, /for \(const n of houseGroupNames\(asked\)\)/);
   assert.match(show, /names it, once\./);
