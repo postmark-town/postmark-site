@@ -32,7 +32,7 @@ const deliveredOn = deliveredOnOf(ledger);
 // field may point mid-chain (the letter it answers), not at the root — 264 of
 // 401 raw refs do. threads.json already followed the chains; trust it.
 export function getStaticPaths() {
-  return [...pairViews(letters, threads).values()].map((view) => ({ params: { pair: view.key }, props: { view } }));
+  return [...pairViews(letters, threads, ledger).values()].map((view) => ({ params: { pair: view.key }, props: { view } }));
 }
 
 const { view } = Astro.props;
@@ -106,7 +106,7 @@ const railItems = pairLetters.map((l) => ({
 const composeHref = `/mail/compose/?to=${otherOf(lastSender)}&thread=${encodeURIComponent(last.id)}`;
 
 // thread options for the in-page composer, most recently touched first. Each
-// carries its letters (newest first) so the composer can name the one the
+// carries its letters in the page's order (oldest first, POS-318) so the composer can name the one the
 // signed-in viewer is answering once it knows who that is.
 const threadLast = new Map();
 const threadLetters = new Map();

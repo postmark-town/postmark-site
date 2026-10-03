@@ -9,7 +9,7 @@ import { pairViews, deliveredOnOf, pairLettersHtml } from "@/lib/mail-letter.mjs
 
 export function getStaticPaths() {
   const deliveredOn = deliveredOnOf(ledger);
-  return [...pairViews(letters, threads).values()].flatMap((view) =>
+  return [...pairViews(letters, threads, ledger).values()].flatMap((view) =>
     view.parts.slice(1).map((ls, i) => ({
       params: { pair: view.key, part: String(i + 2) },
       props: {

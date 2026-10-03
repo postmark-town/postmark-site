@@ -74,7 +74,7 @@ function checkParts(base, parts, label) {
 
 test("every correspondence renders its newest part; every older letter is on one part page and in its chunk",
   { skip: !built("mail") }, () => {
-  const views = [...pairViews(DATA("letters.json"), DATA("threads.json")).values()];
+  const views = [...pairViews(DATA("letters.json"), DATA("threads.json"), DATA("ledger.json")).values()];
   let parted = 0;
   for (const v of views) {
     if (v.parts.length > 1) parted++;
@@ -92,7 +92,7 @@ test("every conversation renders its newest part; every older letter is on one p
 });
 
 test("a pair page's rail and calendar name the part that holds an older letter", { skip: !built("mail") }, () => {
-  const v = [...pairViews(DATA("letters.json"), DATA("threads.json")).values()].find((x) => x.parts.length > 2);
+  const v = [...pairViews(DATA("letters.json"), DATA("threads.json"), DATA("ledger.json")).values()].find((x) => x.parts.length > 2);
   const base = `/mail/with/${v.key}/`;
   const page = html(...segsOf(base));
   const rail = new Map([...page.matchAll(/<a class="rail-item" href="([^"]*)#([^"]+)"/g)].map((m) => [m[2], m[1]]));
@@ -105,7 +105,7 @@ test("a pair page's rail and calendar name the part that holds an older letter",
 });
 
 test("without JavaScript the older-letters control is a link to a built part page", { skip: !built("mail") }, () => {
-  const v = [...pairViews(DATA("letters.json"), DATA("threads.json")).values()].find((x) => x.parts.length > 1);
+  const v = [...pairViews(DATA("letters.json"), DATA("threads.json"), DATA("ledger.json")).values()].find((x) => x.parts.length > 1);
   const page = html(...segsOf(`/mail/with/${v.key}/`));
   const href = page.match(/<a class="pm-btn ghost" href="([^"]+)" data-older-next/)?.[1];
   assert.equal(href, letterPartHref(2, `/mail/with/${v.key}/`));

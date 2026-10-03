@@ -5,6 +5,8 @@
 // (test/mail.test.mjs). The office API and the static build agree because both
 // derive from the same shapes.
 
+import { conversationOrder, ledgerPlaces } from "./letter-order.mjs";
+
 // ── office classification (is_office roster from step 2) ─────────────────────
 // residents.json carries is_office per resident. A letter/thread is
 // "office-involved" if any participant is a town office. Until town PR #224
@@ -266,7 +268,11 @@ export function letterPartJson(part, base) {
 
 // every two residents who have exchanged a letter: "a--b" (sorted) -> their
 // letters, oldest first. A letter to several counts once toward each pair.
-export function lettersByPair(letters) {
+// "Oldest first" is the conversation's reading order (POS-318): the crossing
+// (the ledger's line order), then a reply after the letter it names, then id.
+// See letter-order.mjs. Without `ledger`, the written date stands in.
+export function lettersByPair(letters, ledger = null) {
+  const places = ledgerPlaces(ledger);
   const pairs = new Map();
   for (const l of letters ?? []) {
     const tos = (l.toList && l.toList.length ? l.toList : [l.to]).filter(Boolean);
@@ -278,7 +284,7 @@ export function lettersByPair(letters) {
       if (!bucket.some((x) => x.id === l.id)) bucket.push(l);
     }
   }
-  for (const ls of pairs.values()) ls.sort((x, y) => x.date.localeCompare(y.date) || x.id.localeCompare(y.id));
+  for (const [key, ls] of pairs) pairs.set(key, conversationOrder(ls, places));
   return pairs;
 }
 
