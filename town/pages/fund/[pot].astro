@@ -366,27 +366,26 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           <span data-for-when="signed-out">Sign in to put it in your household's name. <button type="button" class="f-for-signin" data-for-signin>Sign in</button></span>
         </p>
         <p class="f-ledger-line">
-          <span data-ledger-when="household" hidden>Recorded in your name on the town's public ledger.</span>
-          <span data-ledger-when="outside">Recorded on the town's public ledger, as an outside gift.</span>
-          The stamps it mints <em>stake, vote and pay</em>; money's share of a household is capped, and it promises no return.
+          {/* an outside gift mints no stamps (the watchers write it "mint no
+              holo"), so only the household's line speaks of them (Wright's
+              review of #214) */}
+          <span data-ledger-when="household" hidden>Recorded in your household's name on the town's public ledger. The stamps it mints <em>stake, vote and pay</em>.</span>
+          <span data-ledger-when="outside">Recorded on the town's public ledger as a gift from outside the town; it mints no stamps.</span>
           <a class="f-law-more" href="#fineprint">The fine print ↓</a>
         </p>
         <div class="f-rails">
           <a class="f-card f-rail-btn" data-card data-pot={pot.pot} href={`${STRIPE}?client_reference_id=${pot.pot}`} target="_blank" rel="noopener">Card ↗</a>
-          {PAYPAL_CLIENT_ID && <a class="f-card f-rail-btn" href="#pay-paypal" data-open="pay-paypal">PayPal</a>}
-          <a class="f-card f-rail-btn" href="#usdc" data-open="usdc">USDC</a>
+          {PAYPAL_CLIENT_ID && <button type="button" class="f-card f-rail-btn" aria-controls="pay-paypal" aria-expanded="false" data-open="pay-paypal">PayPal</button>}
+          <button type="button" class="f-card f-rail-btn" aria-controls="usdc" aria-expanded="false" data-open="usdc">USDC</button>
         </div>
-        <p class="f-card-note">
-          Card is taken by Stripe and PayPal by PayPal; the town never sees your card or your account. The
-          office's own watchers witness each payment on their timer once one crossing's grace has passed
-          (PayPal lists a payment within about three hours). Whole dollars only.
-        </p>
-      </div>
 
+      {/* THE PANELS open from their buttons, right under the row (Wright's
+          review of #213: a button and a disclosure row naming the same rail was
+          the page saying it twice). One panel is open at a time. */}
       {PAYPAL_CLIENT_ID && (
-      <details class="f-usdc f-paypal" id="pay-paypal" data-pp-client={PAYPAL_CLIENT_ID} data-pp-pot={pot.pot} data-pp-title={pot.title ?? pot.pot}>
-        <summary><span class="f-usdc-sum">PayPal</span><span class="f-dim"> — if your bank balks at a card charge from abroad</span></summary>
+      <div class="f-usdc f-paypal f-panel" id="pay-paypal" data-pp-client={PAYPAL_CLIENT_ID} data-pp-pot={pot.pot} data-pp-title={pot.title ?? pot.pot} hidden>
         <div class="f-rail">
+          <p class="f-card-note f-panel-lead">For a giver whose bank balks at a card charge from abroad.</p>
           <div class="f-pp-form">
             <label class="f-pp-field">amount, in whole US dollars
               <input name="pp-usd" type="number" min="1" step="1" inputmode="numeric" value="10" />
@@ -396,12 +395,12 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           <div class="f-pp-buttons" data-pp-buttons></div>
           <p class="f-card-note" data-pp-out aria-live="polite"></p>
         </div>
-      </details>
+      </div>
       )}
 
-      <details class="f-usdc" id="usdc">
-        <summary><span class="f-usdc-sum">USDC on Base</span><span class="f-dim"> — the address, the QR, and the form that witnesses it</span></summary>
+      <div class="f-usdc f-panel" id="usdc" hidden>
         <div class="f-rail">
+          <p class="f-card-note f-panel-lead">USDC on Base: the address, the QR, and the form that witnesses it.</p>
           <p class="f-step">Step 1 — send</p>
           <div class="f-payrow">
             <div class="f-qr" set:html={qr}></div>
@@ -450,7 +449,10 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             <div class="f-out" id="pm-fund-out" hidden aria-live="polite"></div>
           </div>
         </div>
-      </details>
+      </div>
+
+        <p class="f-card-note">Stripe and PayPal take the payment; the town never sees your card or account.</p>
+      </div>
     </section>
 
     {/* ── 4 · STAKE — the household's stamps, from a signed-in browser ───────
@@ -614,6 +616,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           {pot.source && <p class="f-fine-source">{pot.source}</p>}
           <p class="f-fine-law"><strong>This buys stamps that do everything a stamp does, including vote, plus ownership and memory; money's share of your household is capped, and it converts to real value only if the town someday does.</strong></p>
           <ul>
+            <li><strong>How a payment reaches the ledger.</strong> The office's own watchers witness each payment on their timer once one crossing's grace has passed (the grace is a window to catch a mistake before it is written for good); PayPal lists a payment within about three hours, and a USDC transfer is witnessed when you paste its hash. Whole dollars only. Money's share of a household is capped, and a gift promises no return.</li>
             <li>Every dollar is <strong>written down in your name</strong> — what you funded, when, for how much — permanently and publicly. A gift that mints nothing is recorded just as fully, and giving while expecting nothing back is a fine way to give.</li>
             {pot.close === "elastic" ? (
               <li><strong>This pot carries forward.</strong> Gifts join the roll month over month — nothing is refused at intake. When the roll reaches its floor, the close runs over the whole accumulated roll: every stake comes home whole, and the givers are minted <strong>fresh stamps</strong> by dollar share — sized by what the town staked on this pot, a giver's own household's stakes left out, and capped at ρ × what the household has earned here. A pot nobody staked mints nothing.</li>
@@ -662,11 +665,19 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   import { mountFundFor } from "@/lib/fund-for.mjs";
   mountPaypal(document);
   mountFundFor(document);
-  // a rail button opens its own fold
-  for (const b of document.querySelectorAll("[data-open]")) b.addEventListener("click", () => {
-    const d = document.getElementById(b.getAttribute("data-open"));
-    if (d) d.open = true;
-  });
+  // a rail button opens its own panel, right under the row; one panel at a time
+  const railButtons = [...document.querySelectorAll("[data-open]")];
+  const show = (id) => {
+    for (const b of railButtons) {
+      const panel = document.getElementById(b.getAttribute("data-open"));
+      const on = b.getAttribute("data-open") === id && panel?.hidden !== false;
+      if (panel) panel.hidden = !on;
+      b.setAttribute("aria-expanded", String(on));
+    }
+  };
+  for (const b of railButtons) b.addEventListener("click", () => show(b.getAttribute("data-open")));
+  const arrived = location.hash.slice(1);
+  if (railButtons.some((b) => b.getAttribute("data-open") === arrived)) show(arrived);
 </script>
 
 <script>
@@ -815,6 +826,11 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
     function load() {
       var t = getTok();
       if (!fresh(t)) { signinWrap.hidden = false; sform.hidden = true; return; }
+      // SIGNED IN IS SIGNED IN (Wright's visual review of #213): with a fresh
+      // token the sign-in button never shows, even when the estate read fails —
+      // a failure is said in the receipt below, not by offering a sign-in the
+      // payer has already done.
+      signinWrap.hidden = true;
       if (loading) return;
       loading = true;
       fetch(API + "/household?read=stamps", { headers: headers(t) })
@@ -968,7 +984,11 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   .f-for-signin { font: inherit; background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; }
   .f-rails { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
   @media (max-width: 420px) { .f-rails { grid-template-columns: 1fr; } }
-  .f-rail-btn { text-align: center; }
+  .f-rail-btn { text-align: center; cursor: pointer; border: 0; font: inherit; }
+  .f-rail-btn[aria-expanded="true"] { filter: brightness(1.08); box-shadow: 0 0 0 2px rgba(232, 196, 139, .7); }
+  .f-panel { margin-top: .9rem; }
+  .f-panel-lead { margin: 0 0 .8rem; }
+  .f-panel[hidden] { display: none; }
   .f-ledger-line { font-size: .86rem; line-height: 1.55; margin: 0 0 .9rem; }
   .f-pp-go[hidden] { display: none; }
   .f-pp-buttons { max-width: 28rem; }

@@ -143,8 +143,28 @@ test("4 · nothing on the fund page asks the payer to type a handle; the stale c
   assert.ok(!/a person does the\s+witnessing, so it is not instant/.test(PAGE), "the Stripe watcher witnesses on its timer");
   assert.ok(!/which is which — the two rails/.test(PAGE), "the which-is-which box is gone");
   assert.match(PAGE, /data-fund-for/);
-  assert.match(PAGE, /Recorded in your name on the town's public ledger\./);
+  assert.match(PAGE, /Recorded in your household's name on the town's public ledger\./);
+  // an outside gift mints nothing: the signed-out lead says so, and never promises stamps
+  const outside = PAGE.match(/<span data-ledger-when="outside">([^]*?)<\/span>/)?.[1] ?? "";
+  assert.match(outside, /as a gift from outside the town; it mints no stamps\./);
+  const ledgerLine = PAGE.match(/<p class="f-ledger-line">([^]*?)<\/p>/)?.[1] ?? "";
+  const shownSignedOut = ledgerLine.replace(/<span data-ledger-when="household" hidden>[^]*?<\/span>/, "");
+  assert.ok(ledgerLine && !/stamps it mints/.test(shownSignedOut), "the signed-out lead never says \"stamps it mints\"");
+  // the PayPal and USDC buttons open their panels; no separate disclosure row repeats them
+  assert.ok(!/<summary>[^]*?PayPal<\/span>/.test(PAGE) && !/<summary><span class="f-usdc-sum">USDC/.test(PAGE), "no summary row repeats a rail button");
+  assert.match(PAGE, /aria-controls="usdc" aria-expanded="false" data-open="usdc">USDC</);
   // the three rails, in order: Card · PayPal · USDC
   const card = PAGE.indexOf(">Card ↗<"), pp = PAGE.indexOf('data-open="pay-paypal">PayPal<'), usdc = PAGE.indexOf('data-open="usdc">USDC<');
+  assert.ok(PAGE.indexOf('id="pay-paypal"') > usdc && PAGE.indexOf('id="usdc"') > usdc, "the panels sit right under the button row");
   assert.ok(card > 0 && card < pp && pp < usdc, "Card · PayPal · USDC");
+});
+
+test("signed in is signed in: with a fresh token the stake island hides its sign-in before it reads, so a failed read never offers a sign-in already done", () => {
+  // Wright's visual review of #213: the signed-in shot showed "Sign in with GitHub to stake" beside
+  // the header's signed-in state, because the island only hid its sign-in on a SUCCESSFUL estate read.
+  const load = PAGE.slice(PAGE.indexOf("function load() {"), PAGE.indexOf("sform.addEventListener(\"submit\""));
+  const freshGate = load.indexOf("if (!fresh(t)) { signinWrap.hidden = false; sform.hidden = true; return; }");
+  const hidden = load.indexOf("signinWrap.hidden = true;", freshGate);
+  const fetchAt = load.indexOf("fetch(API + \"/household?read=stamps\"");
+  assert.ok(freshGate > 0 && hidden > freshGate && hidden < fetchAt, "the sign-in is hidden once the token is fresh, before the read");
 });
