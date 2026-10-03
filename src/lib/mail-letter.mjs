@@ -43,12 +43,12 @@ export function letterHtml(l, { media = {}, thread = null, delivered = null } = 
 // every correspondence: "a--b" -> { a, b, pairLetters (oldest first),
 // threadOrder, markOf, hueOf, tkeyOf, parts }. The thread of a letter is threads.json's root, never
 // the letter's own `thread:` field, which may point mid-chain.
-export function pairViews(letters, threads) {
+export function pairViews(letters, threads, ledger = null) {
   const rootOf = new Map();
   for (const t of threads ?? []) for (const id of t.letterIds) rootOf.set(id, t.key);
   const tkeyOf = (l) => rootOf.get(l.id) ?? l.thread ?? l.id;
   const views = new Map();
-  for (const [key, pairLetters] of lettersByPair(letters)) {
+  for (const [key, pairLetters] of lettersByPair(letters, ledger)) {
     const [a, b] = key.split("--");
     const { order, marks, hueOf } = pairThreadMarks(pairLetters, tkeyOf);
     const markOf = new Map(pairLetters.map((l, i) => [l.id, marks[i]]));

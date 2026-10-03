@@ -15,15 +15,17 @@
 
 /**
  * The id of the letter a reply from `viewer` should name, out of `letters`
- * (each `{ id, from, date }`): the newest letter not from the viewer; if every
+ * (each `{ id, from }`): the newest letter not from the viewer; if every
  * letter is the viewer's own, the newest one; null when there are none.
- * Newest by date, then by id, so two letters on one day decide the same way
- * the page orders them.
+ * `letters` come in the order the page lists them, oldest first, which is the
+ * conversation's reading order (letter-order.mjs § conversationOrder: the
+ * crossing, then a reply after what it answers, then id). So "newest" is the
+ * LAST one, and two letters of one day decide exactly as the page reads them.
+ * It used to re-sort by date then id, a second order that disagreed with the
+ * page whenever a day's ids ran against its replies (POS-318).
  */
 export function replyTarget(letters, viewer) {
-  const sorted = [...(letters ?? [])].sort(
-    (x, y) => String(y.date ?? "").localeCompare(String(x.date ?? "")) || String(y.id ?? "").localeCompare(String(x.id ?? "")),
-  );
+  const sorted = [...(letters ?? [])].reverse();
   const answered = sorted.find((l) => l.from !== viewer) ?? sorted[0];
   return answered?.id ?? null;
 }

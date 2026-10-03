@@ -20,6 +20,9 @@ import { FAILSAFE_SCHEMA, load as parseYaml } from "js-yaml";
 // lives in a pure module both can import (src/lib/media-door.mjs). This reader
 // applies it at build time; the cockpit applies it at runtime.
 import { atTownMediaDoor } from "../../src/lib/media-door.mjs";
+// A conversation's reading order is shared with the pages' own libraries
+// (src/lib/mail.mjs), so it lives in a pure module both can import (POS-318).
+import { conversationOrder, ledgerPlaces } from "../../src/lib/letter-order.mjs";
 
 const IMAGE_RE = /\.(png|jpe?g|webp|gif)$/i;
 
@@ -351,7 +354,22 @@ export function parseLedger(text) {
 // stay in the record as the history they are, and only the READING changes.
 //
 // Falsifiers: test/threads.test.mjs.
-export function buildThreads(letters) {
+//
+// ── A CONVERSATION READS IN THE ORDER IT CROSSED (POS-318, 2026-10-02) ──────
+// `letterIds` is the order the conversation page, its older parts and every
+// letter's own address read. It was "date, then id", so two letters of one day
+// read alphabetically whatever answered what. It is now src/lib/letter-order.mjs
+// § conversationOrder: the crossing (the ledger's line order), then a reply
+// after the letter it names, then id. Pass the ledger (its entries in file
+// order) to get crossings. Without it, the written date stands in and the
+// reply rule still holds inside a day.
+//
+// What does NOT move: `key` (the thread's URL) is still the earliest letter
+// by date, then id, and `firstDate`/`lastDate` are still the earliest and
+// latest written dates. A thread whose first-crossed letter differs from its
+// earliest-dated one keeps its address. Falsifiers: test/letter-order.test.mjs.
+export function buildThreads(letters, ledger = null) {
+  const places = ledgerPlaces(ledger);
   const byId = new Map();
   for (const l of letters) if (l.id) byId.set(l.id, l);
 
@@ -385,18 +403,20 @@ export function buildThreads(letters) {
 
   const threads = [];
   for (const members of groups.values()) {
-    // chronological by date, then id for a stable order
-    members.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "") || (a.id ?? "").localeCompare(b.id ?? ""));
-    const first = members[0];
+    // the thread's name and dates: by date, then id, exactly as before POS-318
+    const byDate = [...members].sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "") || (a.id ?? "").localeCompare(b.id ?? ""));
+    const first = byDate[0];
+    // the reading order: crossing, then reply order, then id
+    const ordered = conversationOrder(members, places);
     const participants = [...new Set(members.flatMap((l) => [l.from, ...(l.toList.length ? l.toList : [l.to])]))]
       .filter(Boolean).sort();
     threads.push({
       // the earliest letter's id names the thread — stable across regenerations
       key: first.id,
       participants,
-      letterIds: members.map((l) => l.id),
+      letterIds: ordered.map((l) => l.id),
       firstDate: first.date ?? null,
-      lastDate: members[members.length - 1].date ?? null,
+      lastDate: byDate[byDate.length - 1].date ?? null,
       size: members.length,
     });
   }
@@ -462,7 +482,7 @@ export function readTown(townRoot) {
   const ledger = existsSync(ledgerPath) ? parseLedger(readText(ledgerPath)) : [];
   if (!ledger.length) problems.push("mail-ledger.md missing or parsed to zero entries");
 
-  const threads = buildThreads(letters);
+  const threads = buildThreads(letters, ledger);
 
   // meeps
   const meepDir = join(townRoot, "MEEPS");

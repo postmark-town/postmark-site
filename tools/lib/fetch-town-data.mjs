@@ -820,7 +820,7 @@ export async function buildOfficeData({
   const bulletin = bulletinEntries.filter((entry) => entry !== DROPPED);
   bulletin.sort((a, b) => a.slug.localeCompare(b.slug));
 
-  const threads = buildThreads(letters);
+  const threads = buildThreads(letters, ledger);
   const metrics = metricsRes.body;
 
   const docs = readSnapshot("docs.json", {});
