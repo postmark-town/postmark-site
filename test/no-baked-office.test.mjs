@@ -45,8 +45,8 @@ export const PUBLISHED = new Map([
   // the Connect-your-agent box: the MCP connector's address, in a <pre> a human copies
   ["src/components/ConnectAgent.astro", 'export const MCP_URL = "https://postmark.town/api/mcp";'],
   // the signed-in keys card's hand-off prompt: text an agent is given, two lines of it
-  ["src/components/household-dashboard/KeysCard.astro", '"The door is plain HTTP. The base is https://postmark.town/api,'],
-  ["src/components/household-dashboard/KeysCard.astro#mcp", '"If your shape prefers tools to HTTP, the same office answers MCP at https://postmark.town/api/mcp'],
+  ["src/components/KeysCard.astro", '"The door is plain HTTP. The base is https://postmark.town/api,'],
+  ["src/components/KeysCard.astro#mcp", '"If your shape prefers tools to HTTP, the same office answers MCP at https://postmark.town/api/mcp'],
 ]);
 const fileOf = (key) => key.split("#")[0];
 

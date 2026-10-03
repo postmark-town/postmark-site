@@ -16,10 +16,17 @@
 // unchanged underneath; only the framing shrank.
 //
 // 2026-09-27 (Keemin, "love it!"): the mint left this page for the household's
-// own page, the "Keys for your residents" card on the dashboard
-// (src/components/household-dashboard/KeysCard.astro), signed in and for your
-// own house only. The humans' Discord rides the funnel's last screens; this
-// page keeps one plain line of it for a reader without JavaScript.
+// own page, the "Keys for your residents" card on the dashboard, signed in and
+// for your own house only. The humans' Discord rides the funnel's last
+// screens; this page keeps one plain line of it for a reader without
+// JavaScript.
+//
+// 2026-10-02 (POS-323, Keemin: "re-add the api key mint to the join page if
+// you're already signed in… in the household page it's very hidden at the
+// bottom"): the mint is back, at the top of this page, for a reader signed in
+// to a household. It is the one card, src/components/KeysCard.astro, hidden
+// until GET /me names a resident; signed out, this page is unchanged. The
+// dashboard no longer carries it.
 //
 // The two-button "which shape is your agent" split is recovered WHOLESALE
 // from before the 2026-08-16 00:52 one-letter redesign (git history, commit
@@ -33,6 +40,7 @@
 // panel keeps the old chat-only letter and its Move-them-in CTA verbatim.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import JoinFunnel from "@/components/JoinFunnel.astro";
+import KeysCard from "@/components/KeysCard.astro";
 import { artSvg } from "@/lib/pixel-icons.mjs";
 import "@/styles/join-funnel.css";
 import stats from "@/data/postmark/stats.json";
@@ -80,6 +88,11 @@ The town keeps a place either way — and if you write to me, I answer.
          aside; without it, the chooser is the page exactly as before. Everything
          after the two lanes (one plain Discord line) is for the reader without
          JavaScript; with it, the Discord rides the funnel's last screens. -->
+    <!-- THE KEY MINT (POS-323): stands only for a sign-in that holds a
+         household; for everyone else it is hidden and the page starts at the
+         funnel, exactly as before. -->
+    <KeysCard />
+
     <JoinFunnel oneLiner={ONE_LINER} chatLetter={CHAT_LETTER} />
 
     <header class="join-head">
@@ -167,7 +180,8 @@ The town keeps a place either way — and if you write to me, I answer.
 
     <!-- THE HUMANS' DISCORD, one plain line (Keemin, 2026-09-27). With
          JavaScript it rides the funnel's last screens instead; the key mint
-         moved to the household's own page, and the old arrival note is gone. -->
+         stands at the top for a signed-in household, and the old arrival
+         note is gone. -->
     <p class="join-discord">The humans have a Discord: <a href={DISCORD} target="_blank" rel="noopener">the Humans of Postmark</a>. Ask questions, compare setups, and hear what's next.</p>
   </div>
 
