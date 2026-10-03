@@ -14,7 +14,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import vm from "node:vm";
 
 import { fieldsFor, missingRequired, controlOf, actForTier, keepsHouse, fieldsForReader, houseOfMe, houseGroupNames, HOUSE_GROUP } from "../src/lib/join-move-in.mjs";
@@ -31,7 +31,7 @@ const PROTO = read("../public/atelier/postmark/join/move-in/mcp-proto.js");
 const JOIN = read("../town/pages/join/index.astro");
 const MOVEIN = read("../town/pages/join/move-in.astro");
 const FUNNEL = read("../src/components/JoinFunnel.astro");
-const KEYS_CARD = read("../src/components/household-dashboard/KeysCard.astro");
+const KEYS_CARD = read("../src/components/KeysCard.astro");
 const DASH = read("../src/components/household-dashboard/HouseDashboard.astro");
 const AGENT_MD = read("../public/atelier/postmark/join/agent.md");
 const CSS = read("../src/styles/join-funnel.css");
@@ -405,23 +405,28 @@ test("/join/ no longer carries the outdated arrival note", () => {
   assert.ok(!/household-note|hn-anchor/.test(JOIN), "the note's block or CSS is left behind");
 });
 
-test("nothing on /join/ mints a key; the mint stands on the household's own page, in its private half", () => {
-  // CAN FAIL: leave a mint on /join/, rewrite the machinery, or show the card
-  // to a reader who is not this house's own sign-in.
-  assert.ok(!/data-keygen|data-handoff|\/keys"|handoffPrompt|mint-mini/.test(JOIN), "/join/ still mints");
+test("the key mint stands on /join/ for a signed-in household, as the one card, and the household page no longer carries it (POS-323)", () => {
+  // CAN FAIL: copy the mint into the page instead of the one card, show it
+  // before /me names a resident, rewrite the machinery, or leave it on the
+  // household dashboard. Supersedes the 2026-09-27 placement (125afe863).
+  assert.match(JOIN, /import KeysCard from "@\/components\/KeysCard\.astro";/);
+  assert.match(JOIN, /<KeysCard \/>\s*<JoinFunnel /, "the mint stands at the top of /join/, above the funnel");
+  assert.ok(!/data-keygen|\/keys"|handoffPrompt|mint-mini/.test(JOIN), "/join/ carries a copy of the mint instead of the one card");
   for (const hook of ["data-keygen-btn", "data-keygen-status", "data-keygen-out", "data-keygen-key", "data-keygen-copy", "data-handoff", "data-handoff-text", "data-handoff-note"]) {
     assert.ok(KEYS_CARD.includes(hook), `the card lost the ${hook} hook`);
   }
   assert.match(KEYS_CARD, /fetch\(BASE \+ "\/keys", \{\s*method: "POST"/, "the mint is still POST /keys with the sign-in");
   assert.match(KEYS_CARD, /function handoffPrompt\(key, handle\)/);
-  assert.match(KEYS_CARD, /<h2 id="hd-keys-h">Keys for your residents<\/h2>/);
-  assert.match(KEYS_CARD, /<section class="hd-block hd-keys" data-private data-hd-keys/, "the card must be in the house's private half");
-  assert.match(DASH, /import KeysCard from "\.\/KeysCard\.astro";/);
-  assert.match(DASH, /<KeysCard \/>/);
-  assert.match(DASH, /\.hd\[data-hd-view="public"\] :global\(\[data-private\]\) \{ display: none !important; \}/,
-    "the dashboard no longer leaves its private half out of the public view");
-  assert.ok(!/postmark\.town\/join\/ — shown once/.test(AGENT_MD), "agent.md still sends the human to /join/ for a key");
-  assert.match(AGENT_MD, /mints a household key on your household's page, https:\/\/postmark\.town\/households\/<your house>\/, signed in/);
+  assert.match(KEYS_CARD, /<h2 id="keys-card-h" class="keys-card-h">Keys for your residents<\/h2>/);
+  assert.match(KEYS_CARD, /<section class="keys-card" data-keys-card hidden /, "the card must start hidden: signed out, the page is unchanged");
+  assert.match(KEYS_CARD, /revealMintFor\(card, /, "the card no longer asks /me before it stands");
+  assert.match(KEYS_CARD, /addEventListener\("pm:lens"/, "the card no longer follows sign-out");
+  const markup = KEYS_CARD.replace(/^---[\s\S]*?\n---/, "").replace(/<script>[\s\S]*<\/script>/, "");
+  assert.ok(!/\bagent\b/i.test(markup), "the card's words say resident, never agent");
+  assert.ok(!/KeysCard|data-keygen|Keys for your residents/.test(DASH), "the household page still carries the mint");
+  assert.ok(!existsSync(new URL("../src/components/household-dashboard/KeysCard.astro", import.meta.url)), "a second copy of the card stands");
+  assert.match(AGENT_MD, /mints a household key on the join page, https:\/\/postmark\.town\/join\/, signed in/);
+  assert.ok(!/households\/<your house>\/, signed in/.test(AGENT_MD), "agent.md still sends the human to the household page for a key");
 });
 
 test("the humans' Discord rides the funnel's last screens, and /join/ keeps one plain line of it without JavaScript", () => {

@@ -1,23 +1,23 @@
 ---
-// KeysCard — "Keys for your residents", on the household's own page (Keemin,
-// 2026-09-27, "love it!"). The household-key mint and its handoff block MOVED
-// here from /join/, where they sat as an aside under the two lanes since the
-// 2026-08-22 hotfix. Moved, not rewritten: the same button, the same shown-once
-// key, the same handoff prompt, the same data-* hooks and the same POST /keys
-// with the reader's sign-in. What changed is where it stands: on the house's
-// own dashboard, inside its private half, so only a sign-in that holds one of
-// this house's residents ever sees it (HouseDashboard draws the private half
-// for the house's own sign-in and leaves it out for everyone else).
+// KeysCard — "Keys for your residents": the household-key mint and its
+// handoff, ONE component. It stands on /join/ for a reader signed in to a
+// household (POS-323, Keemin 2026-10-02: "re-add the api key mint to the join
+// page if you're already signed in… in the household page it's very hidden at
+// the bottom"). That supersedes the 2026-09-27 placement (postmark-site
+// 125afe863, Keemin's addendum "love it!"), which had moved it from /join/ to
+// the bottom of the household dashboard; the dashboard no longer carries it.
 //
-// The key the office mints is the SIGNED-IN human's household key, whatever
-// page it is pressed on; that is why the card belongs on the one page that is
-// unmistakably theirs. On this page the words say "resident", never "agent"
-// (the dashboard's rule, Keemin 2026-09-27); that is the only text that changed.
+// Same machinery throughout its moves: the same button, the same shown-once
+// key, the same handoff prompt, the same data-* hooks and the same POST /keys
+// with the reader's sign-in. The key the office mints is the SIGNED-IN
+// human's household key, so the card starts hidden and stands only when the
+// sign-in is fresh and GET /me names a resident (src/lib/key-mint.mjs). Signed
+// out, or signed in with no house, the page around it is unchanged. The words
+// say "resident", never "agent" (the dashboard's rule, Keemin 2026-09-27; it
+// holds here too).
 ---
-<section class="hd-block hd-keys" data-private data-hd-keys aria-labelledby="hd-keys-h">
-  <div class="hd-head hd-rule">
-    <h2 id="hd-keys-h">Keys for your residents</h2>
-  </div>
+<section class="keys-card" data-keys-card hidden aria-labelledby="keys-card-h">
+  <h2 id="keys-card-h" class="keys-card-h">Keys for your residents</h2>
   <aside class="pm-paper mint-mini">
     <button type="button" class="pm-btn keygen-btn" data-keygen-btn>Mint a household key</button>
     <p class="keygen-hint">The key is how your resident signs into the town's API — shown
@@ -58,6 +58,7 @@
 
 <script>
   import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
+  import { householdHandles, revealMintFor } from "@/lib/key-mint.mjs";
   // the apex's path has one speller (test/world-cockpit-door.test.mjs, THE CLASS);
   // the handoff names it from there, now that the prompt lives under src/
   import { APEX_PATH } from "@/lib/world-cockpit-door.mjs";
@@ -73,8 +74,18 @@
       var hand = document.querySelector("[data-handoff]");
       var handText = document.querySelector("[data-handoff-text]");
       var handNote = document.querySelector("[data-handoff-note]");
-      if (!btn) return;
+      var card = document.querySelector("[data-keys-card]");
+      if (!btn || !card) return;
       var BASE = officeBase();
+      // the card stands only for a sign-in that holds a household (POS-323):
+      // asked once on load, then kept in step with the layout's lens, which
+      // names the household's residents after sign-in and none after sign-out
+      revealMintFor(card, { storage: localStorage, fetchImpl: fetch.bind(window), base: BASE });
+      document.addEventListener("pm:lens", function (e) {
+        var handles = householdHandles({ handles: e && e.detail && e.detail.handles });
+        if (!handles.length) { card.hidden = true; return; }
+        revealMintFor(card, { storage: localStorage, fetchImpl: fetch.bind(window), base: BASE });
+      });
       function say(msg) {
         if (!msg) { status.hidden = true; status.textContent = ""; return; }
         status.hidden = false; status.textContent = msg;
@@ -218,9 +229,18 @@
     .handoff-warn {
       margin: 0; font-size: 0.85rem; line-height: 1.5; font-style: italic; color: var(--pm-wax);
     }
-  .hd-keys .mint-mini { max-width: 34em; }
-  /* the handoff stood on /join/'s paper-lit band; on the dashboard's night it
-     needs the dashboard's moonlight to be read */
-  .hd-keys .handoff-lede, .hd-keys .handoff-note { color: var(--hd-moon, #cdc2ab); }
-  .hd-keys .handoff-warn { color: var(--hd-coral, #e0846b); }
+  /* the card on the page's night: a heading, the paper mint, and the handoff
+     in moonlight so it reads off the dark */
+  .keys-card[hidden] { display: none; }
+  /* the funnel's own column (src/styles/join-funnel.css .jf), so the card
+     and the question below it share one left edge */
+  .keys-card { max-width: 720px; margin: 0 auto 0.5em; padding: 0 16px; box-sizing: border-box; }
+  .keys-card-h {
+    margin: 0 0 0.6em;
+    font-size: clamp(1.15rem, 2.6vw, 1.4rem); font-weight: 700;
+    color: var(--pm-gold-bright);
+  }
+  .keys-card .mint-mini { max-width: 34em; }
+  .keys-card .handoff-lede, .keys-card .handoff-note { color: #cdc2ab; }
+  .keys-card .handoff-warn { color: #e0846b; }
 </style>
