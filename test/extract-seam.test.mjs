@@ -285,7 +285,11 @@ test("the economy emission is a whole set readEconomy will take", { skip: !haveT
   const dial = mint.keepingDial(TOWN);
   assert.ok(dial, "the town declares a keeping dial");
 
-  const seam = seamFromTown({ mint, entries, potFiles: [], dial, asOf: "2026-08-21" });
+  // As of the newest line on the ledger, so the fold sees every line and the
+  // totals below can be checked against folds of the whole ledger (the fold is
+  // as of its own day since 2026-10-01; a past asOf would see a past economy).
+  const newest = entries.map((e) => mint.classifyEntry(e.canonical)?.date).filter(Boolean).sort().pop();
+  const seam = seamFromTown({ mint, entries, potFiles: [], dial, asOf: newest });
   const econ = readEconomy(seam.economy);
   assert.ok(econ, "half a set would render as 'not published yet' — this must be whole");
 
@@ -522,6 +526,22 @@ test("first_close is a FLOOR, never an override — it can only round forward", 
     "the floor's own month is reachable — it is a floor, not a skip");
 });
 
+test("the fold is as of its own day: a ledger line dated after asOf has not happened yet", { skip: !haveTown }, async () => {
+  // The S90 site gate (2026-10-01): September's close is dated 2026-09-30, and a
+  // fold asked about 2026-09-15 read it anyway, so September came back closed on
+  // a day it was still open. Whatever the live ledger grows, a fold about a past
+  // day must answer from the lines that existed then. History does not move, so
+  // this holds however many later epochs close.
+  const mint = await loadMint();
+  const entries = mint.parseStampLedger(readFileSync(join(TOWN, "WHITE_PAGES", "stamp-ledger.md"), "utf8"));
+  const base = mint.potFile(TOWN, "keeping-ec2");
+  const mid = seamFromTown({ mint, entries, potFiles: [base], dial: DIAL, asOf: "2026-09-15" });
+  assert.equal(mid.pots.find((p) => p.status !== "closed").epoch, "2026-09",
+    "on 09-15 September is the open epoch: the 09-30 close is in the future");
+  assert.ok(!mid.pots.some((p) => p.status === "closed" && p.epoch === "2026-09"),
+    "and no closed September row exists yet");
+});
+
 test("the emitter's allowlist names first_close", () => {
   // Same reasoning as the close/min_close_usd check above: the emitter copies an
   // ALLOWLIST, so an un-named field goes silently absent downstream. Reads the
@@ -557,7 +577,9 @@ test("POS-184 — the emitted stakers are the netted positions, and they sum to 
     "",
   ].join("\n"));
   const file = { ...mint.potFile(TOWN, "keeping-ec2"), status: "open" };
-  const seam = seamFromTown({ mint, entries, potFiles: [file], dial: DIAL, asOf: "2026-08-21" });
+  // As of 08-31, the day of the fixture's last line (limen's return): the fold is
+  // as of its own day, so a return dated after asOf would not have happened yet.
+  const seam = seamFromTown({ mint, entries, potFiles: [file], dial: DIAL, asOf: "2026-08-31" });
   const row = seam.pots.find((p) => p.status !== "closed");
 
   // 1 · THE LIST — netted per staker (wright's 4 and 3 are one position of 7),
