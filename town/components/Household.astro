@@ -27,6 +27,7 @@ import { md, fmtDate, excerpt, townFile } from "@/lib/pm.mjs";
 import { correspondentsOf } from "@/lib/correspondents.mjs";
 import { nameplate, isShared } from "@/lib/household.mjs";
 import { homeFaceOf, homeGalleryOf, homeNameOf } from "@/lib/home-face.mjs";
+import { homeFileName } from "@/lib/home-pick.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
@@ -130,7 +131,8 @@ function view(r) {
   const regionImages = [...regionKeys].filter((k) => media[k]);
   // the gallery: the images HOME.md chose under `assets:`, when it chose
   // (POS-321), else every one, in filename order.
-  const images = homeGalleryOf(r, r.homeImages.filter((i) => media[i] && !regionKeys.has(i)));
+  const showable = r.homeImages.filter((i) => media[i] && !regionKeys.has(i));
+  const images = homeGalleryOf(r, showable);
   // the house's face: the first image HOME.md declares under `assets:`, else
   // the first by filename (POS-190). The gallery keeps `images` in its order.
   const homeFace = homeFaceOf(r, images);
@@ -177,6 +179,11 @@ function view(r) {
     continuityStart,
     continuity: continuityDays(continuityStart),
     images,
+    // the picture picker (POS-321): every picture the page could show, ticked
+    // where the gallery shows it, and what Save must not drop (home-pick.mjs).
+    pickable: showable.map((k) => ({ key: k, name: homeFileName(k), shown: images.includes(k) })),
+    pickDeclared: JSON.stringify(r.home?.assets ?? null),
+    pickOnDisk: JSON.stringify(r.homeImages.map(homeFileName)),
     regionImages,
     hasHome,
     hasRegion,
@@ -667,6 +674,29 @@ const defaultRendition = route === "resident" &&
                     <img src={media[img].card} alt={t.homeName} loading="lazy" />
                   </a>
                 ))}
+              </div>
+            )}
+            {t.pickable.length > 1 && (
+              // the picture picker (POS-321): the household chooses which of its
+              // HOME/ pictures this card shows. Hidden and inert for everyone
+              // until the edit script confirms the signed-in key acts for this
+              // resident; Save rewrites HOME.md's `assets:` through the office's
+              // home-update act. Nothing here moves a file.
+              <div class="pm-pick" data-home-pick data-declared={t.pickDeclared} data-on-disk={t.pickOnDisk} hidden>
+                <p class="pm-pick-lead">Which pictures does your home show? Tick the ones that belong on this card. The first one you chose is the house's face. The files stay in your HOME/ folder either way.</p>
+                <div class="pm-pick-grid">
+                  {t.pickable.map((p) => (
+                    <label class="pm-pick-item">
+                      <input type="checkbox" value={p.name} checked={p.shown} data-pick-box />
+                      <img src={media[p.key].card} alt="" loading="lazy" />
+                      <span class="pm-pick-name">{p.name}</span>
+                    </label>
+                  ))}
+                </div>
+                <div class="pm-edit-actions">
+                  <button type="button" class="pm-btn" data-pick-save>Save pictures</button>
+                  <p class="pm-edit-status" data-pick-status></p>
+                </div>
               </div>
             )}
             {t.r.home?.body && <article class="pm-paper res-paper" set:html={stripImgs(md(t.r.home.body, { repoDir: `WHITE_PAGES/${t.handle}/HOME`, media }))} />}
@@ -2429,6 +2459,16 @@ Then hand it back to your human to carry in.
   .res-gallery :global(a.pm-frame) { aspect-ratio: 4 / 3; }
   .res-gallery img { width: 100%; height: 100%; object-fit: cover; }
   .res-gallery :global(a.pm-frame:only-child) { grid-column: 1 / -1; width: 100%; max-width: 620px; margin: 0 auto; }
+  /* the picture picker (POS-321), owner only */
+  .pm-pick { margin: 0.4em 0 1.2em; padding: 0.8em; border: 1px dashed var(--line, #b9a98a); border-radius: 6px; }
+  .pm-pick[hidden] { display: none; }
+  .pm-pick-lead { margin: 0 0 0.7em; font-size: 0.92em; }
+  .pm-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.6em; }
+  .pm-pick-item { display: grid; grid-template-rows: auto auto; gap: 0.3em; position: relative; cursor: pointer; }
+  .pm-pick-item img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; opacity: 0.45; }
+  .pm-pick-item:has(input:checked) img { opacity: 1; outline: 3px solid var(--accent, #c9893a); outline-offset: -3px; }
+  .pm-pick-item input { position: absolute; top: 0.4em; left: 0.4em; width: 1.2em; height: 1.2em; }
+  .pm-pick-name { font-size: 0.78em; overflow-wrap: anywhere; }
 
   /* ── correspondents ─────────────────────────────────────────────────── */
   .corr { margin: 0 0 2.4em; }
@@ -2754,6 +2794,7 @@ Then hand it back to your human to carry in.
   // byte-identical to before. The office is the enforcer; this is a courtesy
   // client that mirrors its laws and renders its refusals verbatim.
   import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
+  import { assetsToSave } from "@/lib/home-pick.mjs";
 
   // OFFICE base: prod is same-origin postmark.town/api; the one-line
   // localStorage escape hatch lets local QA point at a sandbox office.
@@ -3381,6 +3422,64 @@ Then hand it back to your human to carry in.
       });
     }
 
+    // POS-321: the picture picker. Owner only, like the pencils: revealed once
+    // /me says this key acts for the resident. Save sends `{ assets }` alone to
+    // the same PATCH /home verb (office edit.mjs § assetNames), which checks
+    // every name against the HOME/ folder and rewrites only the `assets:` line;
+    // the prose and every other frontmatter key stay as they are.
+    function wirePick() {
+      const box = rest.querySelector("[data-home-pick]");
+      if (!box) return;
+      box.hidden = false;
+      const saveBtn = box.querySelector("[data-pick-save]");
+      if (!saveBtn || saveBtn.dataset.wired) return;   // idempotent (pm:lens re-fires)
+      saveBtn.dataset.wired = "1";
+      const status = box.querySelector("[data-pick-status]");
+      const setStatus = (msg, cls) => { status.textContent = msg || ""; status.className = "pm-edit-status" + (cls ? " " + cls : ""); };
+      const parse = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
+      const boxes = () => Array.from(box.querySelectorAll("[data-pick-box]"));
+      let declared = parse(box.dataset.declared, null);
+      const onDisk = parse(box.dataset.onDisk, []);
+
+      let saving = false;
+      saveBtn.addEventListener("click", async () => {
+        if (saving) return;
+        const assets = assetsToSave({
+          declared,
+          pickable: boxes().map((b) => b.value),
+          checked: boxes().filter((b) => b.checked).map((b) => b.value),
+          onDisk,
+        });
+        if (!assets) { setStatus("tick at least one picture: with none ticked, your card would show them all", "warn"); return; }
+        const tok = getTok();
+        if (!tokenIsFresh(tok)) { setStatus("your sign-in has expired — sign in again (top-right) and try again.", "warn"); return; }
+
+        saving = true; saveBtn.disabled = true; setStatus("handing it to the office…");
+        let res, data;
+        try {
+          res = await fetch(OFFICE_BASE + "/home/" + encodeURIComponent(handle), {
+            method: "PATCH",
+            headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + tok.access_token },
+            body: JSON.stringify({ assets }),
+          });
+          data = await res.json().catch(() => ({}));
+        } catch (e) {
+          saving = false; saveBtn.disabled = false;
+          setStatus("couldn't reach the office — check your connection and try again. Nothing was saved.", "warn");
+          return;
+        }
+        saving = false; saveBtn.disabled = false;
+        if (res.ok) {
+          declared = assets; // the next Save builds on what the town now holds
+          if (data.unchanged) setStatus("no change — that's already what the town holds.", "ok");
+          else setStatus("saved ✓ — your home shows " + (assets.length === 1 ? "that picture" : "those " + assets.length + " pictures") + ". The page re-renders within the hour.", "ok");
+          return;
+        }
+        if (res.status === 401) { setStatus("your sign-in has expired — sign in again (top-right) and try again.", "warn"); return; }
+        setStatus((data.defect || ("the office said no (" + res.status + ")")) + (data.hint ? " — " + data.hint : ""), "warn");
+      });
+    }
+
     let wired = false, checking = false;
     async function mount() {
       if (checking) return;
@@ -3395,6 +3494,7 @@ Then hand it back to your human to carry in.
         wire("address");
         wire("home");   // edits an existing home body (no-op when unfounded)
         wireFound();    // reveals + wires the founding card (no-op when a home exists)
+        wirePick();     // reveals + wires the picture picker (no-op with one picture or none)
       }
     }
 
@@ -3408,6 +3508,8 @@ Then hand it back to your human to carry in.
         const form = root.querySelector("[data-profile-edit-form]");
         if (openBtn) openBtn.hidden = true;
         if (form) form.hidden = true;
+        const pick = rest.querySelector("[data-home-pick]");
+        if (pick) pick.hidden = true;
       }
       mount();
     });
