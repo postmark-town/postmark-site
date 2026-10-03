@@ -42,6 +42,35 @@ export function homeFaceOf(r, images) {
   return images[0] ?? null;
 }
 
+// ── which of a house's images it SHOWS (POS-321) ────────────────────────────
+//
+// Kev (Lyra, wayward-archivist), 2026-10-02: her HOME.md says
+// `assets: ["shared-parcel.png"]`, and her page showed all four files in HOME/,
+// "like a zillow page". Files in HOME/ are kept there for other projects too,
+// so moving them is not the answer: `assets:` is the household's choice. The
+// rule, whole:
+//   - when `home.assets` names images this page can show (of `images`), only
+//     those are shown, in `images`' own order (first by filename);
+//   - with no `assets:`, every image, as before;
+//   - when `assets:` names nothing showable (a typo, or only the region's
+//     image), every image too: a typo costs the house its choice, never its
+//     pictures, the same as the face above.
+// Call it before `homeFaceOf`, over the same list, so the face is always one of
+// the pictures shown.
+
+/**
+ * @param {{ handle: string, home?: { assets?: unknown } | null }} r  the resident record
+ * @param {string[]} images  repo-relative keys this page can show, in gallery order
+ * @returns {string[]}  the keys the house shows, in the same order
+ */
+export function homeGalleryOf(r, images) {
+  const chosen = new Set(declared(r.home?.assets)
+    .filter((a) => typeof a === "string" && a)
+    .map((a) => `WHITE_PAGES/${r.handle}/HOME/${a}`));
+  const shown = images.filter((k) => chosen.has(k));
+  return shown.length ? shown : images;
+}
+
 // ── the house's NAME on a card (POS-224) ────────────────────────────────────
 //
 // The card used to take the body's first non-empty line as the house's name,
