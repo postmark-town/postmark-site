@@ -903,6 +903,28 @@ export function questBoardFrom(questPosts) {
   };
 }
 
+// WHOSE BAR IS IT (POS-327, Little Bird 10-04: "I see that often as a point of
+// contest"). The daily Reach out / Be reached rows are the HOUSEHOLD's — one
+// shared cap of 5 sends and 5 receives a day across all its handles. Budding
+// friendship is per pair of handles, across households, and the daily cap
+// never touches it. The words are the town's own (postmark tools/
+// quest-progress.mjs KIND_LABEL / PAIR_RULE, the Quest Board's labels); the
+// household board's inline driver in town/components/Household.astro carries
+// the same two strings, since it cannot import this module.
+//
+// Every daily row is the household's by the cap's own rule, so cadence decides
+// it. The pair is named by title because that is the join every Guild card
+// already makes (the office's quest posts carry title, not id). "A first idea"
+// is a milestone but once per HOUSEHOLD, not a pair, so it gets no pair label.
+export const QUEST_KIND = Object.freeze({ daily: "Household · daily", pair: "Just you · pair" });
+export const PAIR_RULE = "A full household bar doesn't block anyone's pair quests.";
+const PAIR_TITLES = new Set(["Budding friendship"]);
+export function questKind(q, cadence) {
+  if (cadence === "daily") return QUEST_KIND.daily;
+  if (PAIR_TITLES.has(q?.title)) return QUEST_KIND.pair;
+  return null;
+}
+
 // The Guild's cards, JOINED BY TITLE to the mirror's own columns.
 //
 // THE ROSTER IS NOT WRITTEN DOWN HERE. The cards are whatever the registry
@@ -914,8 +936,8 @@ export function questBoardFrom(questPosts) {
 export function questCards(standings, registry = QUEST_REGISTRY) {
   const done = standings?.completedBy ?? {};
   const rows = [
-    ...(registry.daily ?? []).map((q) => ({ ...q, cadence: "every day" })),
-    ...(registry.milestone ?? []).map((q) => ({ ...q, cadence: "once, and kept" })),
+    ...(registry.daily ?? []).map((q) => ({ ...q, cadence: questKind(q, "daily") })),
+    ...(registry.milestone ?? []).map((q) => ({ ...q, cadence: questKind(q, "milestone") ?? "once, and kept" })),
   ];
   return rows.map((q) => ({
     ...q,

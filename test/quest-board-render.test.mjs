@@ -220,7 +220,7 @@ test("a counted card renders exactly what it rendered before the partition", () 
   const { buildQuestCard } = runLaw();
 
   const shared = buildQuestCard(WRIGHT[0]);
-  assert.equal(text(cls(shared.card, "quest-kind")[0]), "daily quest · household");
+  assert.equal(text(cls(shared.card, "quest-kind")[0]), "Household · daily", "POS-327: the daily bar names whose it is");
   assert.equal(text(cls(shared.card, "quest-title")[0]), "Reach out");
   assert.equal(text(cls(shared.card, "quest-count")[0]), "house 2 / 5 today");
   assert.equal(text(cls(shared.card, "quest-reward")[0]), "1 stamp each");
@@ -617,8 +617,8 @@ test("a milestone card in a five-member house reads its own reach, not the empty
   assert.doesNotMatch(text(built.card), /NaN|\bnull\b|\bundefined\b/, `the card printed: ${JSON.stringify(text(built.card))}`);
   assert.equal(text(cls(built.card, "quest-count")[0]), "3 / 5",
     "and it does not say 'today' — the friendship ladder counts forward from the day the law was sealed in August");
-  assert.equal(text(cls(built.card, "quest-kind")[0]), "milestone quest",
-    "nor is it labelled a household quest, which is what sharedQ would have made it");
+  assert.equal(text(cls(built.card, "quest-kind")[0]), "Just you · pair",
+    "nor is it labelled a household quest, which is what sharedQ would have made it (POS-327: it is the pair's)");
 });
 
 test("an open standing row carries a state word where it used to carry silence", () => {
@@ -994,4 +994,20 @@ test("the built page carries the day rule's fix and the arrived line's delivery"
     assert.ok(html.includes(needle), `${what} is not in the shipped page: ${needle}`);
   }
   assert.equal(html.includes(">Uncounted<"), false, "the old heading still ships");
+});
+
+// ── POS-327: whose bar is it ─────────────────────────────────────────────────
+// Little Bird, 10-04: "I see that often as a point of contest." The daily pair
+// is the household's (one shared cap); Budding friendship is per pair of
+// handles and the daily cap never touches it. Labels only.
+test("POS-327: the friendship reads 'Just you · pair' on every shape the board draws it in", () => {
+  const { buildQuestCard, buildUncountedRow, buildNotReadRow } = runLaw();
+  const depth = SETTLED_ROWS.find((q) => q.id === "correspond-depth");
+  assert.equal(text(cls(buildQuestCard({ ...depth, progress: 3, complete: false }).card, "quest-kind")[0]), "Just you · pair");
+  assert.equal(text(cls(buildUncountedRow(depth), "quest-un-kind")[0]), "Just you · pair");
+  assert.equal(text(cls(buildNotReadRow({ ...depth, note: "n" }), "quest-nr-kind")[0]), "Just you · pair");
+  // and a milestone that is NOT a pair keeps its cadence word: a first idea is
+  // once per household, not one person's pair
+  const idea = SETTLED_ROWS.find((q) => q.id === "first-idea");
+  assert.equal(text(cls(buildUncountedRow(idea), "quest-un-kind")[0]), "milestone");
 });

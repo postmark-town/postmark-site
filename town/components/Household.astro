@@ -1370,6 +1370,22 @@ Then hand it back to your human to carry in.
     // hard-codes which rows are countable is the allow-list again wearing a
     // different name. The FIELD says it — a number is measured, anything else
     // (null, undefined, a string from a future door) is not.
+    // WHOSE BAR IS IT (POS-327, Little Bird 10-04: "I see that often as a
+    // point of contest"). The daily pair is the HOUSEHOLD's — one shared cap
+    // of 5 sends and 5 receives across its handles — and Budding friendship is
+    // per pair of handles, across households, untouched by the daily cap. The
+    // two strings are the town's own (tools/quest-progress.mjs KIND_LABEL) and
+    // src/lib/civic.mjs QUEST_KIND's; this inline driver cannot import either.
+    // A solo house's daily card keeps "daily quest": a house of one is not told
+    // it is a household (the test that guards it, and decision 7's clause).
+    var QUEST_KIND = { daily: "Household · daily", pair: "Just you · pair" };
+    var PAIR_IDS = { "correspond-depth": true };
+    function questCardKind(q, sharedQ) {
+      if (PAIR_IDS[q.id]) return QUEST_KIND.pair;
+      if (q.cadence === "daily" && sharedQ) return QUEST_KIND.daily;
+      return (q.cadence || "daily") + " quest" + (sharedQ ? " · household" : "");
+    }
+    function questRowKind(q) { return PAIR_IDS[q.id] ? QUEST_KIND.pair : (q.cadence || ""); }
     function questIsCounted(q) { return typeof q.progress === "number"; }
 
     // ── 2026-09-08: three shapes, because the door learned to answer ─────────
@@ -1588,7 +1604,7 @@ Then hand it back to your human to carry in.
       card.className = "quest-card" + (done ? " done" : "") + (sharedQ ? "" : " is-own");
       var top = document.createElement("div"); top.className = "quest-top";
       var kind = document.createElement("span"); kind.className = "quest-kind";
-      kind.textContent = (q.cadence || "daily") + " quest" + (sharedQ ? " · household" : "");
+      kind.textContent = questCardKind(q, sharedQ);
       var title = document.createElement("span"); title.className = "quest-title";
       title.textContent = q.title + (done ? " ✓" : "");
       top.appendChild(kind); top.appendChild(title);
@@ -1650,7 +1666,7 @@ Then hand it back to your human to carry in.
       var name = document.createElement("span"); name.className = "quest-un-title";
       name.textContent = q.title;
       var kind = document.createElement("span"); kind.className = "quest-un-kind";
-      kind.textContent = q.cadence || "";
+      kind.textContent = questRowKind(q);
       row.appendChild(mark); row.appendChild(name); row.appendChild(kind);
       if (state) {
         var st = document.createElement("span"); st.className = "quest-un-state";
@@ -1683,7 +1699,7 @@ Then hand it back to your human to carry in.
       var name = document.createElement("span"); name.className = "quest-nr-title";
       name.textContent = q.title;
       var kind = document.createElement("span"); kind.className = "quest-nr-kind";
-      kind.textContent = q.cadence || "";
+      kind.textContent = questRowKind(q);
       var note = document.createElement("span"); note.className = "quest-nr-note";
       note.textContent = q.note || "";
       row.appendChild(name); row.appendChild(kind); row.appendChild(note);
