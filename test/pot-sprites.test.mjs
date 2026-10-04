@@ -53,6 +53,22 @@ test("DARKO's eyes are the token's cyan, and they are painted", () => {
   assert.ok(fills.has(DARKO_EYE), "the eyes are not drawn in the token's cyan");
 });
 
+// Keemin, 2026-10-04: "just my base avatar of just the black circle with cyan
+// eyes instead of the dressed one with the hat". The DARKO fund wears the base
+// token: a disc of night ink with the eyes in it, and nothing else on it.
+test("darko-fund wears the base token: a black circle and cyan eyes, no cap, hood or jacket", () => {
+  const rows = SPRITES[POT_SPRITES["darko-fund"]];
+  const inks = new Set(rows.join("").replace(/\./g, ""));
+  // only the night ink, the eyes' two cyans and the catchlight's paper
+  assert.deepEqual([...inks].sort(), ["C", "c", "k", "p"], `inks ${[...inks].sort().join("")}`);
+  // a round disc: every row is one unbroken run, symmetric about the middle
+  for (const [i, r] of rows.entries()) {
+    assert.match(r, /^\.*[^.]+\.*$/, `row ${i} is not one run`);
+    assert.equal(r.match(/^\.*/)[0].length, r.match(/\.*$/)[0].length, `row ${i} is lopsided`);
+  }
+  assert.ok(rows[0].includes("k") && rows[23].includes("k"), "the disc does not fill the frame top to bottom");
+});
+
 test("the sprite rides the cards, the pot's heading and its tabs, hidden from readers", () => {
   const cards = readFileSync(join(ROOT, "src", "components", "PotCards.astro"), "utf8");
   const page = readFileSync(join(ROOT, "town", "pages", "fund", "[pot].astro"), "utf8");
