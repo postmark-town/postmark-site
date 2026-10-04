@@ -70,7 +70,7 @@ import { loadWorldState, notices, FIXTURE, BOARD_PLACE, ASK_MAX } from "@/lib/bo
 // import kept "just in case" is how a struck block finds its way back, which
 // this page has now been taught twice (HOLO_LINE was the first).
 import {
-  LANES, DEFAULT_LANE, standing, ideas, questStandings, questCards, questBoardFrom, marketplace,
+  LANES, DEFAULT_LANE, standing, ideas, questStandings, questCards, questBoardFrom, marketplace, PAIR_RULE,
   readPen, loadPlaceMarks, plaque, markStakes, stakeOf,
   ideaDashboard, boardDashboard, worldPin,
   BLUEPRINTS_REPO, THINK_TANK_PLACE,
@@ -556,6 +556,11 @@ const switchCss = [
                 </article>
               ))}
             </div>
+            {/* THE ONE RULE LINE (POS-327, Little Bird 10-04: "I see that often
+                as a point of contest"). The cards' kinds say whose bar each is
+                (Household · daily, Just you · pair); this says the one thing the
+                two labels side by side do not: filling one never blocks the other. */}
+            <p class="m-note">{PAIR_RULE}</p>
           </>
         )}
 

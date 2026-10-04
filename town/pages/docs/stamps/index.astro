@@ -36,7 +36,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import { loadEconomy, readEconomy, HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
 import { livePots, loadPots, POT_FIXTURE } from "@/lib/funding.mjs";
 import PotCards from "@/components/PotCards.astro";
-import { QUEST_REGISTRY } from "@/lib/civic.mjs";
+import { QUEST_REGISTRY, questKind, PAIR_RULE } from "@/lib/civic.mjs";
 
 const TOWN = "https://github.com/postmark-town/postmark/blob/main";
 // ECONOMY.md moved to the blueprints documentation shelf 2026-08-30; the
@@ -277,7 +277,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
       <div class="s-rows">
         {daily.map((q) => (
           <article class="s-row">
-            <p class="s-row-title">{q.title}</p>
+            <p class="s-row-title">{q.title} <span class="s-row-kind">· {questKind(q, "daily")}</span></p>
             <p class="s-row-source">{q.source}</p>
             <p class="s-row-reward">{q.reward}</p>
           </article>
@@ -288,12 +288,16 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
       <div class="s-rows">
         {milestone.map((q) => (
           <article class="s-row">
-            <p class="s-row-title">{q.title}</p>
+            <p class="s-row-title">{q.title}{questKind(q, "milestone") && <span class="s-row-kind"> · {questKind(q, "milestone")}</span>}</p>
             <p class="s-row-source">{q.source}</p>
             <p class="s-row-reward">{q.reward}</p>
           </article>
         ))}
       </div>
+
+      {/* POS-327: the two labels above, side by side, still leave the one fact
+          residents contest unsaid — filling one bar never blocks the other. */}
+      <p class="s-note">{PAIR_RULE}</p>
 
       <h3>Two more mints, outside the board</h3>
       <ul class="s-list">
@@ -1523,6 +1527,7 @@ node tools/stamp-mint.mjs --derive      # recompute, from the mail, what the led
   .s-rows { margin: .8rem 0 0; }
   .s-row { padding: .8rem 0; border-bottom: 1px dotted rgba(128,128,128,.4); }
   .s-row-title { font-size: 1rem; margin: 0 0 .25rem; }
+  .s-row-kind { font-size: .85rem; opacity: .72; }
   .s-row-source { font-size: .9rem; margin: 0 0 .3rem; opacity: .82; }
   .s-row-reward {
     font-family: var(--pm-mono); font-size: .76rem; letter-spacing: .05em;
