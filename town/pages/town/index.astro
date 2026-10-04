@@ -70,7 +70,7 @@ import { loadWorldState, notices, FIXTURE, BOARD_PLACE, ASK_MAX } from "@/lib/bo
 // import kept "just in case" is how a struck block finds its way back, which
 // this page has now been taught twice (HOLO_LINE was the first).
 import {
-  LANES, DEFAULT_LANE, standing, ideas, questStandings, questCards, marketplace,
+  LANES, DEFAULT_LANE, standing, ideas, questStandings, questCards, questBoardFrom, marketplace,
   readPen, loadPlaceMarks, plaque, markStakes, stakeOf,
   ideaDashboard, boardDashboard, worldPin,
   BLUEPRINTS_REPO, THINK_TANK_PLACE,
@@ -83,6 +83,7 @@ import LaneTutorial from "@/components/LaneTutorial.astro";
 import houseRegistry from "@/data/postmark/households.json";
 import meeps from "@/data/postmark/meeps.json";
 import bulletin from "@/data/postmark/bulletin.json";
+import questPosts from "@/data/postmark/quest-posts.json";
 
 const TOWN = "https://github.com/postmark-town/postmark/blob/main";
 const WORLD = "https://github.com/keeminlee/postmark-world/blob/main";
@@ -164,7 +165,9 @@ const chest = blueprintIndex(loadBlueprints());
 const thinkTank = ideas(worldState, { places: placeMarks, stakes, chest });
 const tankStages = byStage(thinkTank.ideas);
 const quests = questStandings(bulletin);
-const questRows = questCards(quests);
+// The cards are the town's quest posts (POS-294): the office's GET
+// /posts?class=quest, baked as quest-posts.json.
+const questRows = questCards(quests, questBoardFrom(questPosts));
 const market = marketplace(bulletin);
 
 // THE FIVE PLAQUES, per lane, read from the record. No sentence below is typed

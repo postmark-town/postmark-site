@@ -130,7 +130,13 @@ test("the consent line sits ABOVE the address, and the full terms below it", () 
   // say". It now says the stamps stake, vote and pay, and that money's share of
   // a household is capped. The ORDER this test exists for is untouched; only
   // the sentence inside it moved.
-  const law = PAGE.indexOf('class="f-law-line"');
+  //
+  // MOVED 2026-10-02 (POS-317, Keemin: the page gets shorter): the sentence left
+  // its own section above the rails and now sits directly UNDER the three rails
+  // as their one line, "Recorded in your name on the town's public ledger" plus
+  // the same honest clauses. It is still above the address, which is the order
+  // this test exists for.
+  const law = PAGE.indexOf('class="f-ledger-line"');
   const addr = PAGE.indexOf('<code class="f-code"');
   const fine = PAGE.indexOf('id="fineprint"');
   assert.ok(law > 0 && addr > 0 && fine > 0);
@@ -138,11 +144,16 @@ test("the consent line sits ABOVE the address, and the full terms below it", () 
   assert.ok(fine > addr, "the fine print hangs below the money moment");
   assert.ok(PAGE.indexOf("This buys stamps that do everything a stamp does", fine) > fine,
     "the full what-this-buys sentence lives in the fine print, verbatim");
-  const consent = PAGE.slice(law, PAGE.indexOf("</section>", law));
+  const consent = PAGE.slice(law, PAGE.indexOf("</p>", law));
+  assert.ok(consent.includes("Recorded in your household's name on the town's public ledger"), "the line says whose name it is written in");
   assert.ok(consent.includes("stake, vote and pay"),
     "the consent line says what the stamps a gift mints actually do");
-  assert.ok(consent.includes("is capped"),
-    "and names the bound in the same breath — the verb without the amount is half the truth");
+  // AMENDED 2026-10-02 (Wright's visual review of #213): the lead drops "money's
+  // share of a household is capped, and it promises no return"; the fine print,
+  // one link away, carries both, and that is asserted instead.
+  const finePrint = PAGE.slice(fine);
+  assert.ok(finePrint.includes("Money's share of a household is capped, and a gift promises no return"),
+    "the bound and the no-return clause live in the fine print the line links to");
   assert.equal(consent.includes("no say"), false,
     "the repealed promise must not stand above the address");
   assert.ok(consent.includes("#fineprint"), "and points at the full terms");

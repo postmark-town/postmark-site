@@ -25,9 +25,9 @@
 // house-wide read POS-276 is building swaps in with one change); the
 // arithmetic is fold.mjs; the drawing is paint.mjs.
 import ResidentCard from "./ResidentCard.astro";
-import KeysCard from "./KeysCard.astro";
 import media from "@/data/postmark/media.json";
 import { residentFace } from "@/lib/household-dashboard/faces.mjs";
+import { homePictureOf } from "@/lib/home-picture.mjs";
 import { fmtDate } from "@/lib/pm.mjs";
 import { HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
 
@@ -38,7 +38,7 @@ interface Props {
   arriving?: string[];
 }
 const { house, members, plate, arriving = [] } = Astro.props;
-const faces = members.map((r) => residentFace(r, media));
+const faces = members.map((r) => residentFace(r, media, homePictureOf(r.handle)));
 const handles = faces.map((f) => f.handle);
 const slug = house.path ?? house.slug ?? "";
 // a resident's seat on the house's own page, where the rail keeps them
@@ -110,6 +110,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
         <li class="hd-empty" data-hd-loading>reading the house’s record…</li>
       </ol>
       <button type="button" class="hd-more" data-hd-more hidden></button>
+      <p class="hd-boat" data-private data-hd-boat hidden></p>
       <noscript><p class="hd-empty">The house’s record is read live from the town; this part of the page needs scripts. Each resident’s own page below carries their letters.</p></noscript>
     </section>
 
@@ -156,10 +157,6 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
       </>
     )}
   </section>
-
-  {/* ═════════ KEYS FOR YOUR RESIDENTS (the house's own sign-in only) ═════════
-       The household-key mint, moved here from /join/ (Keemin, 2026-09-27). */}
-  <KeysCard />
 
   {/* ═════════ COMING UP — only when the calendar answers ═════════ */}
   <section class="hd-block" data-hd-coming hidden aria-labelledby="hd-coming-h">
@@ -336,6 +333,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   .hd-feed :global(.hd-sep) { list-style: none; font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(232, 196, 139, 0.55); padding: 0.8em 0 0.2em; border-top: 1px solid var(--hd-hair); }
   .hd-feed :global(.is-old) { opacity: 0.62; }
   .hd :global(.hd-empty) { list-style: none; font-style: italic; color: rgba(205, 194, 171, 0.7); padding: 0.6em 0; margin: 0; }
+  .hd-boat { margin: 0.7em 0 0; padding-top: 0.6em; border-top: 1px dashed var(--hd-hair); font-size: 0.85rem; color: var(--hd-moon); }
   .hd-more { display: block; margin: 0.3em auto 0; font-family: var(--pm-mono); font-size: 0.68rem; background: none; border: 0; color: var(--pm-gold); cursor: pointer; }
 
   /* a resident, named: their face and their colour, wherever a line names them */
@@ -351,7 +349,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   .hd-needs :global(li) { padding: 0.65em 0; border-top: 1px dashed var(--pm-line); }
   .hd-needs :global(li:first-child) { border-top: 0; }
   .hd-needs :global(.k) { font-family: var(--pm-mono); font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--pm-wax); }
-  .hd-needs :global(.k.calm) { color: #3a7d3a; }
+  .hd-needs :global(.hd-calm) { color: #3a7d3a; }
   .hd-needs :global(p) { margin: 0.15em 0 0.25em; font-size: 0.93rem; }
   .hd-needs :global(a) { color: var(--pm-accent); font-size: 0.85rem; }
   .hd-needs :global(.hd-who) { color: var(--pm-ink); }

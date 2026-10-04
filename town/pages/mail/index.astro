@@ -175,6 +175,7 @@ const runs = mailRuns(threads, office);
       filterLetters, newestLettersFirst, queryToState, stateToQuery, officeHandles, regionOfFn, previewLines,
       letterAddresses, letterHref,
     } from "@/lib/mail.mjs";
+    import { officeBase } from "@/lib/auth.mjs";
 
     // ── elements ──────────────────────────────────────────────────────────
     const officeBox = document.querySelector("[data-office-toggle]");
@@ -350,7 +351,7 @@ const runs = mailRuns(threads, office);
       const todayEl = document.querySelector("[data-metric-today]");
       const asofEl = document.querySelector("[data-metrics-asof]");
       if (!todayEl) return;
-      fetch("https://postmark.town/api/metrics/mail", { headers: { accept: "application/json" } })
+      fetch(officeBase() + "/metrics/mail", { headers: { accept: "application/json" } })
         .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
         .then((m) => {
           if (!m || !m.as_of || !Array.isArray(m.days)) return;

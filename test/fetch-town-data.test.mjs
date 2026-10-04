@@ -112,6 +112,13 @@ function fixtureFetch({ door = true, stamp = null, roster = "array" } = {}) {
     // a 404 here costs no test its retries; the tests at the foot of this file
     // drive the before-the-door 404 on purpose.
     ["/calendar", { as_of: "2026-07-02T00:00:00.000Z", now: [], coming: [], ended: [], total: 0 }],
+    // The posts door answering the town's quests (POS-294), served by default
+    // for the calendar's reason; the quest tests drive its other answers.
+    ["/posts", { as_of: "2026-07-02T00:00:00.000Z", class: "quest", finished: ["closed"], total: 1, posts: [
+      { class: "quest", id: "postmark-pen/correspond-send", title: "Reach out", author: "postmark-pen", household: "hh:the-town",
+        state: "open", latest: null, responses: 0, fields: { quest: "correspond-send" },
+        terms: { title: "Reach out", source: "Send a letter to 5 different residents. Resets daily.", reward: "1 stamp each", cadence: "daily", target: 5 } },
+    ] }],
     // Keyed on the bare path so ANY /letters?... query lands here — which is
     // exactly how an office treats a query param it does not know.
     ["/letters", door

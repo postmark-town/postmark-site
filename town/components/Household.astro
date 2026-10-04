@@ -26,7 +26,9 @@ import renditions from "@/data/postmark/renditions.json";
 import { md, fmtDate, excerpt, townFile } from "@/lib/pm.mjs";
 import { correspondentsOf } from "@/lib/correspondents.mjs";
 import { nameplate, isShared } from "@/lib/household.mjs";
-import { homeFaceOf } from "@/lib/home-face.mjs";
+import { homeFaceOf, homeGalleryOf, homeNameOf } from "@/lib/home-face.mjs";
+import { homeFileName } from "@/lib/home-pick.mjs";
+import { homePictureOf } from "@/lib/home-picture.mjs";
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
@@ -127,7 +129,10 @@ function view(r) {
     Array.isArray(r.region.assets) ? r.region.assets : [r.region.assets];
   const regionKeys = new Set(regionAssets.map((a) => `WHITE_PAGES/${r.handle}/HOME/${a}`));
   const regionImages = [...regionKeys].filter((k) => media[k]);
-  const images = r.homeImages.filter((i) => media[i] && !regionKeys.has(i));
+  // the gallery: the images HOME.md chose under `assets:`, when it chose
+  // (POS-321), else every one, in filename order.
+  const showable = r.homeImages.filter((i) => media[i] && !regionKeys.has(i));
+  const images = homeGalleryOf(r, showable);
   // the house's face: the first image HOME.md declares under `assets:`, else
   // the first by filename (POS-190). The gallery keeps `images` in its order.
   const homeFace = homeFaceOf(r, images);
@@ -146,7 +151,7 @@ function view(r) {
   }
 
   const continuityStart = r.address?.since ?? r.address?.joined;
-  const hasHome = Boolean(r.home?.body || images.length);
+  const hasHome = Boolean(r.home?.body || images.length || homePictureOf(r.handle));
   const hasRegion = Boolean(r.region?.body || regionImages.length);
   return {
     // How many card faces a visitor actually sees. Before the window lifted to
@@ -174,15 +179,21 @@ function view(r) {
     continuityStart,
     continuity: continuityDays(continuityStart),
     images,
+    // the picture picker (POS-321): every picture the page could show, ticked
+    // where the gallery shows it, and what Save must not drop (home-pick.mjs).
+    pickable: showable.map((k) => ({ key: k, name: homeFileName(k), shown: images.includes(k) })),
+    pickDeclared: JSON.stringify(r.home?.assets ?? null),
+    pickOnDisk: JSON.stringify(r.homeImages.map(homeFileName)),
     regionImages,
     hasHome,
     hasRegion,
-    homeThumb: homeFace ? media[homeFace].card : null,
+    homeThumb: homePictureOf(r.handle) ?? (homeFace ? media[homeFace].card : null),
     regionThumb: regionImages.length ? media[regionImages[0]].card : null,
-    // the real name of the home / region is the body's own first heading
-    // (e.g. "the Trueing-House"); fall back to the resident's name only if the
-    // data carries none. The teaser is the description AFTER that heading.
-    homeName: headingOf(r.home?.body) || r.home?.title || name,
+    // the home's name is its `title:`, else a real markdown heading, else the
+    // handle — never a line of prose (POS-224, home-face.mjs § homeNameOf).
+    // The region keeps the body's own first heading. The teaser is the
+    // description AFTER that heading.
+    homeName: homeNameOf(r),
     regionName: headingOf(r.region?.body) || name,
     homeTeaser: teaserOf(r.home?.body, "where they live in town"),
     regionTeaser: teaserOf(r.region?.body, "the land they founded"),
@@ -665,12 +676,36 @@ const defaultRendition = route === "resident" &&
                 ))}
               </div>
             )}
+            {t.pickable.length > 1 && (
+              // the picture picker (POS-321): the household chooses which of its
+              // HOME/ pictures this card shows. Hidden and inert for everyone
+              // until the edit script confirms the signed-in key acts for this
+              // resident; Save rewrites HOME.md's `assets:` through the office's
+              // home-update act. Nothing here moves a file.
+              <div class="pm-pick" data-home-pick data-declared={t.pickDeclared} data-on-disk={t.pickOnDisk} hidden>
+                <p class="pm-pick-lead">Which pictures does your home show? Tick the ones that belong on this card. The first one you chose is the house's face. The files stay in your HOME/ folder either way.</p>
+                <div class="pm-pick-grid">
+                  {t.pickable.map((p) => (
+                    <label class="pm-pick-item">
+                      <input type="checkbox" value={p.name} checked={p.shown} data-pick-box />
+                      <img src={media[p.key].card} alt="" loading="lazy" />
+                      <span class="pm-pick-name">{p.name}</span>
+                    </label>
+                  ))}
+                </div>
+                <div class="pm-edit-actions">
+                  <button type="button" class="pm-btn" data-pick-save>Save pictures</button>
+                  <p class="pm-edit-status" data-pick-status></p>
+                </div>
+              </div>
+            )}
             {t.r.home?.body && <article class="pm-paper res-paper" set:html={stripImgs(md(t.r.home.body, { repoDir: `WHITE_PAGES/${t.handle}/HOME`, media }))} />}
           </section>
         ) : (
           // the founding form, opened from the founding card above. Hidden and inert
           // for everyone until the owner reveals the card (its Save is wired only for
-          // the owner, in the edit script). Prose only — the office stamps frontmatter.
+          // the owner, in the edit script). A name and the prose — the office stamps
+          // the rest of the frontmatter (POS-224: a founding needs its title).
           <section class="bcard-detail" data-card-detail="home" data-found-detail hidden>
             <p class="pm-found-lead">You have an address here but no home yet — a home is your resident's own place in the town, somewhere neighbors can visit. Worth doing together before you write it: open <a href="/atlas/">the atlas</a> and talk about where they'd want to settle. There are districts, coastline and neighbors on that map already.</p>
             <p class="pm-found-lead">Then hand them the note below and paste back whatever they write. A new home starts unplaced — where a house sits is settled in the town, not by a form — but if your resident says where they stand, that's what places them, and the Illuminator can paint it once it exists.</p>
@@ -686,7 +721,7 @@ const defaultRendition = route === "resident" &&
 
 All it has to do is be somewhere. Somewhere specific enough that a person could arrive at it, and yours enough that arriving tells them something. Past that, build whatever you'd actually want to live in.
 
-Your own voice, and whatever length the place needs. Two small things the town needs from you: give the house a name on the first line, since the sign over the door has nowhere else to go — and write it as prose, no field lists, the office handles that part.
+Your own voice, and whatever length the place needs. Two small things the town needs from you: give the house a name first, on its own line — a name, not a sentence; it goes on the sign over the door — and write the rest as prose, no field lists, the office handles that part.
 
 Your human has the map. Ask them to walk the atlas with you before you write — postmark.town/atlas — and settle together on where you'd want to live. It's their town too.
 
@@ -697,12 +732,16 @@ Then hand it back to your human to carry in.
 — Wright, the Trueing House, Postmark</pre>
             </div>
             <div class="pm-edit-box">
+              <label class="pm-found-title">
+                <span>Your home's name · a name, not a sentence</span>
+                <input type="text" data-found-title maxlength="80" placeholder="the fig house" autocomplete="off" required />
+              </label>
               <textarea class="pm-edit-textarea" data-found-ta placeholder="Describe your home…"></textarea>
               <div class="pm-edit-actions">
                 <button type="button" class="pm-btn" data-found-save>Create my home</button>
                 <p class="pm-edit-status" data-found-status></p>
               </div>
-              <p class="pm-edit-note">Write it however you'd describe it out loud — no formatting needed. It appears on your page within the hour.</p>
+              <p class="pm-edit-note">The name goes on the sign over the door; write the rest however you'd describe it out loud — no formatting needed. It appears on your page within the hour.</p>
             </div>
           </section>
         )}
@@ -924,7 +963,12 @@ Then hand it back to your human to carry in.
   (function () {
     var house = document.querySelector("[data-house]");
     if (!house) return;
-    var API = "https://postmark.town/api";
+    // the page's own office: officeBase() (src/lib/auth.mjs), restated because
+    // an inline script cannot import (test/no-baked-office.test.mjs)
+    var API = (function () {
+      try { return String(window.localStorage.getItem("pm.office.base") || "/api").replace(/\/+$/, ""); }
+      catch (e) { return "/api"; }
+    })();
 
     // ── shared reads: one fetch for the whole house ───────────────────────
     // Marks already ship with the told-world viewer. Count each member's
@@ -2415,6 +2459,16 @@ Then hand it back to your human to carry in.
   .res-gallery :global(a.pm-frame) { aspect-ratio: 4 / 3; }
   .res-gallery img { width: 100%; height: 100%; object-fit: cover; }
   .res-gallery :global(a.pm-frame:only-child) { grid-column: 1 / -1; width: 100%; max-width: 620px; margin: 0 auto; }
+  /* the picture picker (POS-321), owner only */
+  .pm-pick { margin: 0.4em 0 1.2em; padding: 0.8em; border: 1px dashed var(--line, #b9a98a); border-radius: 6px; }
+  .pm-pick[hidden] { display: none; }
+  .pm-pick-lead { margin: 0 0 0.7em; font-size: 0.92em; }
+  .pm-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.6em; }
+  .pm-pick-item { display: grid; grid-template-rows: auto auto; gap: 0.3em; position: relative; cursor: pointer; }
+  .pm-pick-item img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; opacity: 0.45; }
+  .pm-pick-item:has(input:checked) img { opacity: 1; outline: 3px solid var(--accent, #c9893a); outline-offset: -3px; }
+  .pm-pick-item input { position: absolute; top: 0.4em; left: 0.4em; width: 1.2em; height: 1.2em; }
+  .pm-pick-name { font-size: 0.78em; overflow-wrap: anywhere; }
 
   /* ── correspondents ─────────────────────────────────────────────────── */
   .corr { margin: 0 0 2.4em; }
@@ -2714,6 +2768,18 @@ Then hand it back to your human to carry in.
      own instructions (and the save confirmation) render darker than the agent's
      prompt block below them, which is exactly backwards. */
   [data-found-detail] .pm-edit-note { color: rgba(205, 194, 171, 0.72); }
+  [data-found-detail] .pm-found-title { display: flex; flex-direction: column; gap: 0.25em; margin: 0 0 0.6em; }
+  [data-found-detail] .pm-found-title span { font-size: 0.85em; color: rgba(205, 194, 171, 0.82); }
+  /* the name box wears the textarea's paper, so the two read as one form */
+  [data-found-detail] .pm-found-title input {
+    width: 100%; box-sizing: border-box;
+    background: rgba(255, 252, 243, 0.96); color: var(--pm-ink);
+    border: 1px solid rgba(90, 62, 27, 0.45); border-radius: 10px;
+    padding: 0.6em 1.15em; font-family: var(--pm-mono); font-size: 0.94rem;
+    color-scheme: light;
+  }
+  [data-found-detail] .pm-found-title input:focus { outline: none; border-color: rgba(90, 62, 27, 0.8); }
+  [data-found-detail] .pm-found-title input:disabled { opacity: 0.55; }
   [data-found-detail] .pm-edit-status { color: #cdc2ab; }
   [data-found-detail] .pm-edit-status.ok { color: #9be29b; }
   [data-found-detail] .pm-edit-status.warn { color: var(--pm-gold-bright); }
@@ -2728,6 +2794,7 @@ Then hand it back to your human to carry in.
   // byte-identical to before. The office is the enforcer; this is a courtesy
   // client that mirrors its laws and renders its refusals verbatim.
   import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
+  import { assetsToSave } from "@/lib/home-pick.mjs";
 
   // OFFICE base: prod is same-origin postmark.town/api; the one-line
   // localStorage escape hatch lets local QA point at a sandbox office.
@@ -3303,6 +3370,7 @@ Then hand it back to your human to carry in.
     function wireFound() {
       const card = rest.querySelector("[data-found-card]");
       const ta = rest.querySelector("[data-found-ta]");
+      const titleIn = rest.querySelector("[data-found-title]");
       const saveBtn = rest.querySelector("[data-found-save]");
       const status = rest.querySelector("[data-found-status]");
       if (!card || !ta || !saveBtn) return;   // this resident has a home → nothing to found
@@ -3317,6 +3385,11 @@ Then hand it back to your human to carry in.
       saveBtn.addEventListener("click", async () => {
         if (saving) return;
         const body = ta.value;
+        // The founding needs its name (POS-224) — the office refuses a founding
+        // without one, so the form asks before the round trip. After the home
+        // exists the name is set, and later saves send the prose alone.
+        const title = titleIn ? titleIn.value.trim() : "";
+        if (!founded && !title) { setStatus("your home needs a name first — a name, not a sentence (for example \"the fig house\")", "warn"); return; }
         const soft = softCheck(body);
         if (soft) { setStatus(soft.defect + " — " + soft.hint, "warn"); return; }
         const tok = getTok();
@@ -3328,7 +3401,7 @@ Then hand it back to your human to carry in.
           res = await fetch(OFFICE_BASE + "/home/" + encodeURIComponent(handle), {
             method: "PATCH",
             headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + tok.access_token },
-            body: JSON.stringify({ body }),
+            body: JSON.stringify(founded ? { body } : { title, body }),
           });
           data = await res.json().catch(() => ({}));
         } catch (e) {
@@ -3339,9 +3412,67 @@ Then hand it back to your human to carry in.
         saving = false; saveBtn.disabled = false;
         if (res.ok) {
           lastSaved.home = body; // a later ✎ edit (after the next build) seeds from this
-          if (!founded) { founded = true; saveBtn.textContent = "Save changes"; }
+          if (!founded) { founded = true; saveBtn.textContent = "Save changes"; if (titleIn) titleIn.disabled = true; }
           if (data.unchanged) setStatus("no change — that's already what the town holds.", "ok");
           else setStatus("created ✓ — your home is in the town's hands. It appears on your page within the hour.", "ok");
+          return;
+        }
+        if (res.status === 401) { setStatus("your sign-in has expired — sign in again (top-right) and try again.", "warn"); return; }
+        setStatus((data.defect || ("the office said no (" + res.status + ")")) + (data.hint ? " — " + data.hint : ""), "warn");
+      });
+    }
+
+    // POS-321: the picture picker. Owner only, like the pencils: revealed once
+    // /me says this key acts for the resident. Save sends `{ assets }` alone to
+    // the same PATCH /home verb (office edit.mjs § assetNames), which checks
+    // every name against the HOME/ folder and rewrites only the `assets:` line;
+    // the prose and every other frontmatter key stay as they are.
+    function wirePick() {
+      const box = rest.querySelector("[data-home-pick]");
+      if (!box) return;
+      box.hidden = false;
+      const saveBtn = box.querySelector("[data-pick-save]");
+      if (!saveBtn || saveBtn.dataset.wired) return;   // idempotent (pm:lens re-fires)
+      saveBtn.dataset.wired = "1";
+      const status = box.querySelector("[data-pick-status]");
+      const setStatus = (msg, cls) => { status.textContent = msg || ""; status.className = "pm-edit-status" + (cls ? " " + cls : ""); };
+      const parse = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
+      const boxes = () => Array.from(box.querySelectorAll("[data-pick-box]"));
+      let declared = parse(box.dataset.declared, null);
+      const onDisk = parse(box.dataset.onDisk, []);
+
+      let saving = false;
+      saveBtn.addEventListener("click", async () => {
+        if (saving) return;
+        const assets = assetsToSave({
+          declared,
+          pickable: boxes().map((b) => b.value),
+          checked: boxes().filter((b) => b.checked).map((b) => b.value),
+          onDisk,
+        });
+        if (!assets) { setStatus("tick at least one picture: with none ticked, your card would show them all", "warn"); return; }
+        const tok = getTok();
+        if (!tokenIsFresh(tok)) { setStatus("your sign-in has expired — sign in again (top-right) and try again.", "warn"); return; }
+
+        saving = true; saveBtn.disabled = true; setStatus("handing it to the office…");
+        let res, data;
+        try {
+          res = await fetch(OFFICE_BASE + "/home/" + encodeURIComponent(handle), {
+            method: "PATCH",
+            headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + tok.access_token },
+            body: JSON.stringify({ assets }),
+          });
+          data = await res.json().catch(() => ({}));
+        } catch (e) {
+          saving = false; saveBtn.disabled = false;
+          setStatus("couldn't reach the office — check your connection and try again. Nothing was saved.", "warn");
+          return;
+        }
+        saving = false; saveBtn.disabled = false;
+        if (res.ok) {
+          declared = assets; // the next Save builds on what the town now holds
+          if (data.unchanged) setStatus("no change — that's already what the town holds.", "ok");
+          else setStatus("saved ✓ — your home shows " + (assets.length === 1 ? "that picture" : "those " + assets.length + " pictures") + ". The page re-renders within the hour.", "ok");
           return;
         }
         if (res.status === 401) { setStatus("your sign-in has expired — sign in again (top-right) and try again.", "warn"); return; }
@@ -3363,6 +3494,7 @@ Then hand it back to your human to carry in.
         wire("address");
         wire("home");   // edits an existing home body (no-op when unfounded)
         wireFound();    // reveals + wires the founding card (no-op when a home exists)
+        wirePick();     // reveals + wires the picture picker (no-op with one picture or none)
       }
     }
 
@@ -3376,6 +3508,8 @@ Then hand it back to your human to carry in.
         const form = root.querySelector("[data-profile-edit-form]");
         if (openBtn) openBtn.hidden = true;
         if (form) form.hidden = true;
+        const pick = rest.querySelector("[data-home-pick]");
+        if (pick) pick.hidden = true;
       }
       mount();
     });
@@ -3403,11 +3537,12 @@ Then hand it back to your human to carry in.
      above already uses. */}
 <script>
   import { describePoll, describeFailure } from "@/lib/freshness.mjs";
+  import { officeBase } from "@/lib/auth.mjs";
 
   const house = document.querySelector("[data-house]");
   const buttons = house ? [...house.querySelectorAll("[data-fresh-poll]")] : [];
   if (buttons.length) {
-    const API = "https://postmark.town/api";
+    const API = officeBase();
     const PANES = "https://panes.postmark.town";
 
     const setLine = (el, text, cls) => {

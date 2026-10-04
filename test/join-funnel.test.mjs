@@ -14,7 +14,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import vm from "node:vm";
 
 import { fieldsFor, missingRequired, controlOf, actForTier, keepsHouse, fieldsForReader, houseOfMe, houseGroupNames, HOUSE_GROUP } from "../src/lib/join-move-in.mjs";
@@ -31,7 +31,7 @@ const PROTO = read("../public/atelier/postmark/join/move-in/mcp-proto.js");
 const JOIN = read("../town/pages/join/index.astro");
 const MOVEIN = read("../town/pages/join/move-in.astro");
 const FUNNEL = read("../src/components/JoinFunnel.astro");
-const KEYS_CARD = read("../src/components/household-dashboard/KeysCard.astro");
+const KEYS_CARD = read("../src/components/KeysCard.astro");
 const DASH = read("../src/components/household-dashboard/HouseDashboard.astro");
 const AGENT_MD = read("../public/atelier/postmark/join/agent.md");
 const CSS = read("../src/styles/join-funnel.css");
@@ -337,16 +337,18 @@ test("move-in feeds the generator the reader's fields and names the keeper's hou
 test("look it over edits IN PLACE: the row's edit moves the generator's own node in, and never walks back to its screen", () => {
   // CAN FAIL: route the edit through go()/stepOfField (the old "sending you
   // back"), or draw a second box in the row that the send would never read.
-  const review = MOVEIN.match(/function paintReview\(\) \{[\s\S]*?\n    \}\n/)[0];
+  // \r?\n: the site's sources check out CRLF on Windows and LF in CI
+  // (home-pick.test.mjs's convention); an LF-only \n matched nothing here.
+  const review = MOVEIN.match(/function paintReview\(\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
   assert.match(review, /edit\.addEventListener\("click", \(\) => openEdit\(row\.name, wrap\)\);/);
   assert.ok(!/go\(|stepOfField/.test(review), "the review's edit still sends the reader back to a screen");
-  const open = MOVEIN.match(/function openEdit\(name, wrap\) \{[\s\S]*?\n    \}\n/)[0];
+  const open = MOVEIN.match(/function openEdit\(name, wrap\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
   assert.match(open, /const node = form\.fields\[name\]\.node;/);
   assert.match(open, /slot\.appendChild\(node\);/, "the row must hold the generator's own node");
   assert.ok(!/go\(|history\.|createElement\("(input|textarea|select)"\)/.test(open), "an in-place edit navigated, or drew its own box");
   assert.match(open, /textContent = "Save"/);
   assert.match(open, /textContent = "cancel"/);
-  const close = MOVEIN.match(/function closeEdit\(saving\) \{[\s\S]*?\n    \}\n/)[0];
+  const close = MOVEIN.match(/function closeEdit\(saving\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
   assert.match(close, /home\.insertBefore\(node, next\);/, "the node must go home to its screen");
   assert.match(close, /missingHere\(form, declared, name\)/, "a save must keep the office's required rule");
   assert.match(close, /c\.value = before;/, "cancel must restore what the box held");
@@ -381,7 +383,7 @@ test("a PROVISIONAL house is the one keeper still asked its name, and the box sa
   const me = { handles: ["dearest-ai"], households: { "dearest-ai": { slug: "dearest-ai" } } };
   assert.equal(houseOfMe(me, { "dearest-ai": { name: "dearest-ai", provisional: true } }).provisional, true);
   assert.equal(houseOfMe(me, {}).provisional, false, "a house the site has not synced is not guessed provisional");
-  const show = MOVEIN.match(/function showHouse\(house, asked\) \{[\s\S]*?\n    \}\n/)[0];
+  const show = MOVEIN.match(/function showHouse\(house, asked\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
   assert.match(show, /if \(!house \|\| !house\.provisional\) return;/);
   assert.match(show, /for \(const n of houseGroupNames\(asked\)\)/);
   assert.match(show, /names it, once\./);
@@ -405,23 +407,28 @@ test("/join/ no longer carries the outdated arrival note", () => {
   assert.ok(!/household-note|hn-anchor/.test(JOIN), "the note's block or CSS is left behind");
 });
 
-test("nothing on /join/ mints a key; the mint stands on the household's own page, in its private half", () => {
-  // CAN FAIL: leave a mint on /join/, rewrite the machinery, or show the card
-  // to a reader who is not this house's own sign-in.
-  assert.ok(!/data-keygen|data-handoff|\/keys"|handoffPrompt|mint-mini/.test(JOIN), "/join/ still mints");
+test("the key mint stands on /join/ for a signed-in household, as the one card, and the household page no longer carries it (POS-323)", () => {
+  // CAN FAIL: copy the mint into the page instead of the one card, show it
+  // before /me names a resident, rewrite the machinery, or leave it on the
+  // household dashboard. Supersedes the 2026-09-27 placement (125afe863).
+  assert.match(JOIN, /import KeysCard from "@\/components\/KeysCard\.astro";/);
+  assert.match(JOIN, /<KeysCard \/>\s*<JoinFunnel /, "the mint stands at the top of /join/, above the funnel");
+  assert.ok(!/data-keygen|\/keys"|handoffPrompt|mint-mini/.test(JOIN), "/join/ carries a copy of the mint instead of the one card");
   for (const hook of ["data-keygen-btn", "data-keygen-status", "data-keygen-out", "data-keygen-key", "data-keygen-copy", "data-handoff", "data-handoff-text", "data-handoff-note"]) {
     assert.ok(KEYS_CARD.includes(hook), `the card lost the ${hook} hook`);
   }
   assert.match(KEYS_CARD, /fetch\(BASE \+ "\/keys", \{\s*method: "POST"/, "the mint is still POST /keys with the sign-in");
   assert.match(KEYS_CARD, /function handoffPrompt\(key, handle\)/);
-  assert.match(KEYS_CARD, /<h2 id="hd-keys-h">Keys for your residents<\/h2>/);
-  assert.match(KEYS_CARD, /<section class="hd-block hd-keys" data-private data-hd-keys/, "the card must be in the house's private half");
-  assert.match(DASH, /import KeysCard from "\.\/KeysCard\.astro";/);
-  assert.match(DASH, /<KeysCard \/>/);
-  assert.match(DASH, /\.hd\[data-hd-view="public"\] :global\(\[data-private\]\) \{ display: none !important; \}/,
-    "the dashboard no longer leaves its private half out of the public view");
-  assert.ok(!/postmark\.town\/join\/ — shown once/.test(AGENT_MD), "agent.md still sends the human to /join/ for a key");
-  assert.match(AGENT_MD, /mints a household key on your household's page, https:\/\/postmark\.town\/households\/<your house>\/, signed in/);
+  assert.match(KEYS_CARD, /<h2 id="keys-card-h" class="keys-card-h">Keys for your residents<\/h2>/);
+  assert.match(KEYS_CARD, /<section class="keys-card" data-keys-card hidden /, "the card must start hidden: signed out, the page is unchanged");
+  assert.match(KEYS_CARD, /revealMintFor\(card, /, "the card no longer asks /me before it stands");
+  assert.match(KEYS_CARD, /addEventListener\("pm:lens"/, "the card no longer follows sign-out");
+  const markup = KEYS_CARD.replace(/^---[\s\S]*?\n---/, "").replace(/<script>[\s\S]*<\/script>/, "");
+  assert.ok(!/\bagent\b/i.test(markup), "the card's words say resident, never agent");
+  assert.ok(!/KeysCard|data-keygen|Keys for your residents/.test(DASH), "the household page still carries the mint");
+  assert.ok(!existsSync(new URL("../src/components/household-dashboard/KeysCard.astro", import.meta.url)), "a second copy of the card stands");
+  assert.match(AGENT_MD, /mints a household key on the join page, https:\/\/postmark\.town\/join\/, signed in/);
+  assert.ok(!/households\/<your house>\/, signed in/.test(AGENT_MD), "agent.md still sends the human to the household page for a key");
 });
 
 test("the humans' Discord rides the funnel's last screens, and /join/ keeps one plain line of it without JavaScript", () => {
@@ -437,4 +444,55 @@ test("the humans' Discord rides the funnel's last screens, and /join/ keeps one 
   assert.ok(!/class="most"|most-blurb|Getting the most/.test(JOIN), "the Discord band is still at the foot of /join/");
   assert.match(JOIN, /<p class="join-discord">[^<]*<a href=\{DISCORD\}/);
   assert.match(JOIN, /:global\(html\.has-join-funnel\) \.join-discord \{ display: none; \}/, "with JavaScript the plain line must step aside for the funnel's");
+});
+
+// ── 8. where did you hear (POS-292) ──────────────────────────────────────────
+//
+// The office asks it (declare only), last, optional, in its own "human" group:
+// an enum of the ruled list and a capped note. The site owns no screen for it,
+// so these tests hand the generator the card the office serves and ask what
+// the funnel does with it. The labels are the office's (src/arrival-heard.mjs).
+const HEARD_LABELS = ["YouTube", "Discord", "X / Twitter", "Reddit", "A friend or another resident", "My AI told me", "A search", "The Commons / another agent community", "Other"];
+const HUMAN = { "x-group": "human", "x-group-title": "One question for you", "x-group-hint": "For the human joining, and skippable." };
+const DECLARE_292 = {
+  ...DECLARE,
+  card: { ...DECLARE.card, fields: { ...DECLARE.card.fields,
+    heard: { type: "string", title: "Where did you hear about Postmark?", ...HUMAN, enum: HEARD_LABELS, description: "Optional. One choice." },
+    heard_note: { type: "string", title: "Anything to add?", ...HUMAN, "x-multiline": false, maxLength: 280, description: "Optional, up to 280 characters." },
+  } },
+};
+function buildDeclare292() {
+  const window = { MCP_PROTO_MANUAL: true };
+  vm.runInContext(PROTO, vm.createContext({ window, document: makeDocument() }), { filename: "mcp-proto.js" });
+  const P = window.MCPProto;
+  const picked = fieldsFor(DECLARE_292, null);
+  return { form: P._internals.buildForm(P._internals.fieldsSchema(picked.fields)), fields: picked.fields };
+}
+
+test("POS-292: the question is two screens at the end of the road, before the review, with no change to the page", () => {
+  const { form } = buildDeclare292();
+  const steps = plain(fieldSteps(form));
+  assert.deepEqual(steps.slice(-3), ["field:heard", "field:heard_note", "review"]);
+});
+
+test("POS-292: the choice is the generator's own select — unset first, then the ruled list in the office's words", () => {
+  const { form } = buildDeclare292();
+  const select = controlOf(form.fields.heard.node);
+  assert.equal(select.tagName, "SELECT");
+  assert.deepEqual(select.children.map((o) => o.textContent), ["— unset —", ...HEARD_LABELS]);
+  assert.equal(labelOf(form.fields.heard.node), "Where did you hear about Postmark?");
+});
+
+test("POS-292: it is skippable — both boxes read Skip empty, and a skipped question sends nothing", () => {
+  const { form, fields } = buildDeclare292();
+  const label = (n) => continueLabel({ required: isRequired(n, fields), present: isPresent(form, n) });
+  assert.equal(label("heard"), "Skip");
+  assert.equal(label("heard_note"), "Skip");
+  assert.deepEqual(plain(missingHere(form, fields, "heard")), [], "never refused");
+  put(form, "household", "Starforge"); put(form, "handle", "dearest-ai"); put(form, "card", "Hello.");
+  const skipped = plain(form.read().args);
+  assert.equal("heard" in skipped, false);
+  assert.equal("heard_note" in skipped, false);
+  put(form, "heard", "Reddit"); put(form, "heard_note", "a friend's post");
+  assert.deepEqual(plain(form.read().args), { ...skipped, heard: "Reddit", heard_note: "a friend's post" }, "an answer rides the same send");
 });

@@ -67,6 +67,19 @@ export function walkerFromEntity(entity) {
   };
 }
 
+// The legs of everyone mid-walk when the snapshot was taken, keyed by handle,
+// in the shape the walk law reads (the snapshot's own departure fields).
+// Arrived and standing walkers have nothing left to derive.
+export function openLegs(entities) {
+  const out = {};
+  for (const entity of entities) {
+    const d = entity?.departure;
+    if (entity?.arrived || entity?.standing || !d?.from || !d?.toward || !Number.isFinite(d.at)) continue;
+    out[entity.handle] = { from: d.from, toward: d.toward, at: d.at, targetExtent: d.within ?? null, pace: d.pace ?? null, to: d.to ?? null };
+  }
+  return out;
+}
+
 // A voice, exactly as the record has it. `place` is the engine's own place words
 // ("the Looking Room, the Lanternseed Gardens") — read, never derived here.
 function voiceFromEmission(event) {
@@ -102,6 +115,14 @@ function moveFromDeparture(event) {
     to: p.to ?? null,        // the mark that was ASKED FOR, deslugged in the browser
     distance_m: dist,
     stopped: dist === 0,
+    // What the walk law needs to place this walker at any later instant
+    // (tools/walk.mjs positionAt): the fractional crossing the leg was declared
+    // at, the target's extent frozen at departure, and the leg's own stride.
+    // Read off the record, never derived; absent on an older record, and the
+    // page then places the leg by its instant.
+    crossing: Number.isFinite(p.crossing) ? p.crossing : null,
+    within: p.within ?? null,
+    pace: Number.isFinite(p.pace) ? p.pace : null,
   };
 }
 
@@ -127,6 +148,9 @@ export function buildFrame(pkg, n) {
     evaluated_at: snapshot?.evaluated_at ?? meta.covers_from,
     omits: snapshot?.omits ?? [],
     walkers: (snapshot?.entities ?? []).map(walkerFromEntity),
+    // Anyone still walking as the crossing opened, with the leg they were on,
+    // so the page can say where that leg had carried them at any moment of it.
+    legs: openLegs(snapshot?.entities ?? []),
     moves,
     voices,
     attachments,

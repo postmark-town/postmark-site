@@ -32,7 +32,7 @@ const deliveredOn = deliveredOnOf(ledger);
 // field may point mid-chain (the letter it answers), not at the root — 264 of
 // 401 raw refs do. threads.json already followed the chains; trust it.
 export function getStaticPaths() {
-  return [...pairViews(letters, threads).values()].map((view) => ({ params: { pair: view.key }, props: { view } }));
+  return [...pairViews(letters, threads, ledger).values()].map((view) => ({ params: { pair: view.key }, props: { view } }));
 }
 
 const { view } = Astro.props;
@@ -106,7 +106,7 @@ const railItems = pairLetters.map((l) => ({
 const composeHref = `/mail/compose/?to=${otherOf(lastSender)}&thread=${encodeURIComponent(last.id)}`;
 
 // thread options for the in-page composer, most recently touched first. Each
-// carries its letters (newest first) so the composer can name the one the
+// carries its letters in the page's order (oldest first, POS-318) so the composer can name the one the
 // signed-in viewer is answering once it knows who that is.
 const threadLast = new Map();
 const threadLetters = new Map();
@@ -313,12 +313,10 @@ const pct = (n, t) => Math.max(0, Math.min(100, Math.round((n / t) * 100)));
     // validates, the office bounces, this island only relays. One extra grace:
     // this page KNOWS the correspondence, so the thread field is a named menu
     // instead of an id you have to go find.
-    import { KEYS, OFFICE, tokenIsFresh } from "@/lib/auth.mjs";
+    import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import { replyTarget } from "@/lib/mail-reply.mjs";
 
-    const OFFICE_BASE = (() => {
-      try { return localStorage.getItem("pm.office.base") || OFFICE; } catch { return OFFICE; }
-    })();
+    const OFFICE_BASE = officeBase();
     const $ = (s) => document.querySelector(s);
     const getTok = () => { try { return JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch { return null; } };
 

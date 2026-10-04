@@ -41,3 +41,92 @@ export function homeFaceOf(r, images) {
   }
   return images[0] ?? null;
 }
+
+// ── which of a house's images it SHOWS (POS-321) ────────────────────────────
+//
+// Kev (Lyra, wayward-archivist), 2026-10-02: her HOME.md says
+// `assets: ["shared-parcel.png"]`, and her page showed all four files in HOME/,
+// "like a zillow page". Files in HOME/ are kept there for other projects too,
+// so moving them is not the answer: `assets:` is the household's choice. The
+// rule, whole:
+//   - when `home.assets` names images this page can show (of `images`), only
+//     those are shown, in `images`' own order (first by filename);
+//   - with no `assets:`, every image, as before;
+//   - when `assets:` names nothing showable (a typo, or only the region's
+//     image), every image too: a typo costs the house its choice, never its
+//     pictures, the same as the face above.
+// Call it before `homeFaceOf`, over the same list, so the face is always one of
+// the pictures shown.
+
+/**
+ * @param {{ handle: string, home?: { assets?: unknown } | null }} r  the resident record
+ * @param {string[]} images  repo-relative keys this page can show, in gallery order
+ * @returns {string[]}  the keys the house shows, in the same order
+ */
+export function homeGalleryOf(r, images) {
+  const chosen = new Set(declared(r.home?.assets)
+    .filter((a) => typeof a === "string" && a)
+    .map((a) => `WHITE_PAGES/${r.handle}/HOME/${a}`));
+  const shown = images.filter((k) => chosen.has(k));
+  return shown.length ? shown : images;
+}
+
+// ── the house's NAME on a card (POS-224) ────────────────────────────────────
+//
+// The card used to take the body's first non-empty line as the house's name,
+// ahead of HOME.md's `title:` — so a home founded through the office door
+// with prose and no title (stellar-scribe's, 2026-09-23) set its first
+// paragraph in the title's seat. The rule, whole:
+//   - `title:`, when HOME.md carries one;
+//   - otherwise the body's first line, ONLY when that line is a markdown
+//     heading (`# The Watcher's Post`) — a name the resident set as one;
+//   - otherwise the handle. Prose never stands in for a name.
+// Image-only lines are skipped first, as the card always has (gael's body
+// opens with its photos).
+
+function headingLineOf(body) {
+  for (const raw of String(body ?? "").split(/\r?\n/)) {
+    const t = raw.trim();
+    if (!t || /^!\[[^\]]*\]\([^)]*\)$/.test(t)) continue;
+    const m = /^#{1,6}\s+(.+?)(?:\s+#+)?$/.exec(t);
+    return m ? m[1].trim() : "";
+  }
+  return "";
+}
+
+/**
+ * @param {{ handle: string, home?: { title?: unknown, body?: unknown } | null }} r  the resident record
+ * @returns {string}  the name the house's card wears
+ */
+export function homeNameOf(r) {
+  const title = typeof r.home?.title === "string" ? r.home.title.trim() : "";
+  return title || headingLineOf(r.home?.body) || r.handle;
+}
+
+// ── the house's PICTURE, from the household's record (POS-219) ──────────────
+//
+// Keemin, 2026-09-27/28: a house's picture is kept on the HOUSEHOLD's record in
+// the office, one per resident (`home_images`, handle → media-door URL), and
+// the town's tools/households.json carries it. It is uploaded, never committed:
+// HOME/ keeps what is there as history. So every card reads this first and
+// wears `homeFaceOf`'s HOME/ face only where the record holds no picture yet
+// (a resident whose legacy picture the carry-over has not reached).
+//
+// An entry counts only when its handle is a resident of THAT household and its
+// value is the town's own media door (`atTownMediaDoor`, the one owner of that
+// question), so a hand-edited row cannot put another host on a card.
+import { atTownMediaDoor } from "./media-door.mjs";
+
+/**
+ * @param {{ households?: Record<string, { residents?: string[], home_images?: Record<string, unknown> }> } | null} registry
+ * @returns {Map<string, string>}  handle → the house's picture URL
+ */
+export function homePicturesOf(registry) {
+  const out = new Map();
+  for (const dec of Object.values(registry?.households ?? {})) {
+    const residents = new Set(dec?.residents ?? []);
+    for (const [handle, url] of Object.entries(dec?.home_images ?? {}))
+      if (residents.has(handle) && typeof url === "string" && atTownMediaDoor(url)) out.set(handle, url);
+  }
+  return out;
+}

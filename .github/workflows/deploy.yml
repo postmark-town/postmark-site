@@ -261,6 +261,11 @@ jobs:
           PUBLIC_CHANNEL: ${{ steps.lane.outputs.channel }}
           PUBLIC_BUILD_SHA: ${{ github.sha }}
           PUBLIC_WORLD_SETTLEMENT: ${{ steps.worldpin.outputs.settlement }}
+          # The PayPal choice on the fund page (POS-183 part 2): the app's PUBLIC
+          # client ID — the sandbox app's on the snapshot (dev) lane, the live
+          # app's on release. Repository variables, set by Wright; unset, the page
+          # simply offers no PayPal. Never the secret, which only the office holds.
+          PUBLIC_PAYPAL_CLIENT_ID: ${{ steps.lane.outputs.channel == 'release' && vars.PAYPAL_CLIENT_ID_LIVE || vars.PAYPAL_CLIENT_ID_SANDBOX }}
         run: npm run build            # town -> dist-town/
 
       # The deployed site says what it was built from, so a watcher can ask

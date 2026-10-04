@@ -137,7 +137,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       var dials = document.querySelector("[data-dials]");
       if (!liveBox || !closedBox) return;
 
-      var API = "https://postmark.town/api/world/conversations";
+      // the page's own office: officeBase() (src/lib/auth.mjs), restated because
+      // an inline script cannot import (test/no-baked-office.test.mjs)
+      var API = (function () {
+        try { return String(window.localStorage.getItem("pm.office.base") || "/api").replace(/\/+$/, ""); }
+        catch (e) { return "/api"; }
+      })() + "/world/conversations";
       var POLL_MS = 7000;
 
       // Everything a resident authored goes in with textContent. This page
@@ -442,7 +447,19 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           head.appendChild(el("h3", "c-pin-title", String(n.title || "notice")));
           card.appendChild(head);
           if (n.place) card.appendChild(el("p", "c-pin-place", String(n.place)));
-          card.appendChild(el("p", "c-pin-text", String(n.text || "")));
+          if (n.text) card.appendChild(el("p", "c-pin-text", String(n.text)));
+          // An event's pin carries its host's announcements, newest first
+          // (office POS-281): each is the host's own words, as text.
+          if (Array.isArray(n.announcements) && n.announcements.length) {
+            var ann = el("ul", "c-pin-ann");
+            n.announcements.forEach(function (a) {
+              var li = el("li", "c-pin-ann-item");
+              li.appendChild(el("time", "c-pin-ann-at", String(a.at || "").slice(11, 16) + "Z"));
+              li.appendChild(el("span", "c-pin-ann-text", " " + String(a.text || "")));
+              ann.appendChild(li);
+            });
+            card.appendChild(ann);
+          }
           pinnedBox.appendChild(card);
         });
         pinnedBox.hidden = false;
@@ -804,6 +821,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       color: rgba(232, 196, 139, 0.55); text-transform: uppercase;
     }
     .convo .c-pin-text { margin: 0.6em 0 0; font-size: 0.93rem; line-height: 1.65; color: #e8dfc9; }
+    .convo .c-pin-ann { list-style: none; margin: 0.6em 0 0; padding: 0; font-size: 0.9rem; line-height: 1.55; color: #e8dfc9; }
+    .convo .c-pin-ann-item { padding: 0.25em 0; overflow-wrap: anywhere; white-space: pre-line; }
+    .convo .c-pin-ann-at { font-family: var(--pm-mono); font-size: 0.76rem; color: rgba(232, 196, 139, 0.8); }
 
     .convo .c-rule {
       display: flex; align-items: center; gap: 0.9em;

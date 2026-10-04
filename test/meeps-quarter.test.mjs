@@ -1,6 +1,6 @@
-// meeps-quarter.test.mjs — the Meeps quarter: five meeps with rooms, never a
-// sixth; each card simple enough for a reader, its words as text; the
-// meeplings' coop from the box's roll-call.
+// meeps-quarter.test.mjs — the Meeps quarter: six meeps with rooms (the Bug
+// Catcher the sixth, 2026-09-29), never a seventh; each card simple enough for
+// a reader, its words as text; the meeplings' coop from the box's roll-call.
 //
 //   node --test test/meeps-quarter.test.mjs
 //
@@ -20,20 +20,22 @@ import {
   profileOf, displayName, RUNTIME_OVERRIDE, favouriteColour, accentVars, PLACEHOLDER_COLOUR, MEEPLING_DOES,
 } from "../src/lib/meeps-quarter.mjs";
 import { ICONS, iconSvg } from "../src/lib/pixel-icons.mjs";
+import { PANELS } from "../src/lib/bug-strip.mjs";
 import { SPRITES, INK, ACCENTS, FIGURE_INK, DARKO_EYE, paint, checkAllSprites } from "../src/lib/civic-art.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = (f) => JSON.parse(readFileSync(join(ROOT, "src", "data", "postmark", f), "utf8"));
 const DIST = join(ROOT, "dist-town");
+const PANELS_N = PANELS.length;
 
 // ── WHO ─────────────────────────────────────────────────────────────────────
 
-test("five meeps, the five with rooms, in the quarter's order — never a sixth", () => {
-  assert.deepEqual(MEEPS.map((m) => m.key), ["postmaster", "illuminator", "registrar", "worldkeeper", "architect"]);
-  assert.equal(new Set(MEEPS.map((m) => m.handle)).size, 5);
+test("six meeps, the six with rooms, in the quarter's order — never a seventh", () => {
+  assert.deepEqual(MEEPS.map((m) => m.key), ["postmaster", "illuminator", "registrar", "worldkeeper", "architect", "bugcatcher"]);
+  assert.equal(new Set(MEEPS.map((m) => m.handle)).size, 6);
   // The notary is machinery, not a meep (Keemin: "the notary is a meep now?").
   assert.equal(MEEPS.some((m) => /notary/i.test(`${m.key} ${m.name} ${m.office}`)), false);
-  // Every meep the site's own meeps extract names is one of the five: a room
+  // Every meep the site's own meeps extract names is one of the six: a room
   // the extract knows and the quarter does not would be a meep left outside.
   for (const m of DATA("meeps.json")) {
     assert.ok(MEEPS.some((x) => x.handle === m.name), `meeps.json names ${m.name}, who has no building`);
@@ -59,10 +61,12 @@ test("a sprite on the quay is a well-formed map; the retired buildings are gone"
   }
 });
 
-test("Ferry is drawn, and only Ferry: the others' faces wait for their own word", () => {
+test("Ferry and the Bug Catcher are drawn, and only they: the others' faces wait for their own word", () => {
   // Wright's ruling, 2026-09-26: a sprite from the portrait seven gave the
-  // office; no invented likeness for a meep that has given no face.
-  assert.deepEqual(MEEPS.filter((m) => SPRITES[m.key]).map((m) => m.key), ["postmaster"]);
+  // office; no invented likeness for a meep that has given no face. The Bug
+  // Catcher's face is the one the bug video gave him (Keemin, 2026-09-29).
+  assert.deepEqual(MEEPS.filter((m) => SPRITES[m.key]).map((m) => m.key), ["postmaster", "bugcatcher"]);
+  assert.deepEqual(checkAllSprites(), {});
 });
 
 test("a meep's own inks are hexes the site already wears", () => {
@@ -75,12 +79,28 @@ test("a meep's own inks are hexes the site already wears", () => {
     DARKO_EYE,
   ].join(" ").toLowerCase();
   for (const [meep, inks] of Object.entries(FIGURE_INK)) {
+    if (meep === "bugcatcher") continue; // the one exception, held just below
     for (const [ch, hex] of Object.entries(inks)) {
       assert.ok(worn.includes(hex.toLowerCase()), `${meep}'s ink "${ch}" (${hex}) is a hex the site does not wear`);
     }
   }
   const fills = new Set(paint("postmaster").map((r) => r.fill));
   for (const hex of Object.values(FIGURE_INK.postmaster)) assert.ok(fills.has(hex), `Ferry's ink ${hex} is declared and never painted`);
+});
+
+test("the Bug Catcher's inks are the video kit's, so the page and the video draw the same frog", () => {
+  // The one exception to the rule above (civic-art § A MEEP'S OWN INKS): his
+  // inks are the shorts kit's, G:/content-creation/shorts/_kit/kit.js § BC2_INK
+  // (outside this repo, so copied here by hand, Keemin 2026-09-29), with the
+  // kit's `m` hat band as `v` and its `w` eye-whites as `o`. The band is the
+  // site's own stamp purple.
+  const BC2_INK = { F: "#7cc05a", f: "#4f8f3f", y: "#eef5c4", c: "#f3a6a0", h: "#c9a36a", H: "#9a7a48", m: "#aa8fd8", w: "#ffffff" };
+  const { v, o, ...rest } = FIGURE_INK.bugcatcher;
+  assert.deepEqual({ ...rest, m: v, w: o }, BC2_INK);
+  assert.match(readFileSync(join(ROOT, "src", "styles", "postmark.css"), "utf8"), new RegExp(`--pm-stamp:\\s*${v}`, "i"), "his hat band is not the site's stamp purple");
+  const fills = new Set(paint("bugcatcher").map((r) => r.fill));
+  for (const hex of Object.values(FIGURE_INK.bugcatcher)) assert.ok(fills.has(hex), `his ink ${hex} is declared and never painted`);
+  assert.ok(fills.has(INK.d), "his pupils are not the town's night ink");
 });
 
 test("each meep's given name is the one on its own resident record", () => {
@@ -113,6 +133,24 @@ test("profileOf: the profile's bio first, else the address; the portrait through
   assert.equal(profileOf(meep, noBio, {}).portrait, null, "no avatar on record is no portrait");
   assert.equal(profileOf(meep, undefined, media).inRoll, false);
   assert.equal(profileOf(meep, undefined, media).words, null);
+});
+
+test("the Bug Catcher's card stands before his resident record does: the typed fields, and nothing the record would say", () => {
+  // The page builds before Sunday's bind (2026-10-04), so the committed roll
+  // carries no `bugcatcher`. His card is then what the site types — office,
+  // job, round, colour placeholder, monogram — and says plainly why there is
+  // no bio; no resident page is linked, because none is built.
+  const bc = MEEPS.find((m) => m.key === "bugcatcher");
+  assert.deepEqual(
+    { name: bc.name, office: bc.office, pronoun: bc.pronoun, round: bc.round, daily: bc.daily },
+    { name: null, office: "the Bug Catcher", pronoun: "his", round: "MEEPS/SKILLS/bugcatcher-round.md", daily: null });
+  assert.equal(bc.job, "He catches the bugs residents report, confirms them, and makes sure whoever found each one is credited.");
+  assert.deepEqual(bc.door, { mcp: 'town { read: "posts", args: { class: "bug" } }', get: "/api/posts?class=bug" });
+  assert.equal(displayName(bc), "The Bug Catcher");
+  assert.deepEqual(profileOf(bc, undefined, DATA("media.json")),
+    { inRoll: false, words: null, from: null, portrait: null, runtime: "Letta, flexible model selection" });
+  assert.deepEqual(meepLinks(bc, { inRoll: false }).map((l) => l.label), ["the Full Job Description"]);
+  assert.equal(favouriteColour(undefined), null, "no record wears the placeholder");
 });
 
 test("profileOf holds avatar_url to the town's media door", () => {
@@ -178,7 +216,7 @@ test("each meep carries its job in one plain sentence, and only Ferry keeps a Da
   assert.deepEqual(MEEPS.filter((m) => m.daily).map((m) => [m.key, m.daily.href, m.daily.label]), [["postmaster", "/daily/", "Ferry's Daily"]]);
 });
 
-test("the runtime line: Letta for all five, from one temporary table", () => {
+test("the runtime line: Letta for all six, from one temporary table", () => {
   assert.deepEqual(Object.keys(RUNTIME_OVERRIDE).sort(), MEEPS.map((m) => m.handle).sort());
   for (const m of MEEPS) assert.equal(profileOf(m, { handle: m.handle, profile: { runtime: "Claude Code" } }).runtime, "Letta, flexible model selection");
   const src = readFileSync(join(ROOT, "src", "lib", "meeps-quarter.mjs"), "utf8");
@@ -269,7 +307,7 @@ test("a live beat only where the sentinel watches the unit by name", () => {
 const builtMeeps = join(DIST, "meeps", "index.html");
 const KEYS = [...MEEPS.map((m) => m.key), "meeplings"];
 
-test("the built Meeps page: five meeps and the meeplings on the quay, six panels, and the coop from the manifest",
+test("the built Meeps page: six meeps and the meeplings on the quay, seven panels, and the coop from the manifest",
   { skip: !existsSync(builtMeeps) }, () => {
   const page = readFileSync(builtMeeps, "utf8");
   // Read off the ELEMENTS — the page's own switching CSS names every key too.
@@ -280,6 +318,22 @@ test("the built Meeps page: five meeps and the meeplings on the quay, six panels
   const units = [...page.matchAll(/<li\b[^>]*\bdata-unit="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(units, DATA("rollcall.json").units.map((u) => u.unit));
   assert.ok(page.includes(DATA("rollcall.json").tag), "the coop does not say which release it was read at");
+});
+
+test("the meeplings stand on a row of their own, so the six meeps keep a whole quay at phone width",
+  { skip: !existsSync(builtMeeps) }, () => {
+  // Wright's ruling, 2026-09-29: a seventh lot crowded the names at 390px.
+  const page = readFileSync(builtMeeps, "utf8");
+  const fig = page.indexOf('<a class="cq-b" href="#meeplings"');
+  assert.ok(fig > 0, "no meeplings figure");
+  assert.match(page.slice(page.lastIndexOf("<li ", fig), fig), /class="cq-lot cq-apart"/, "the meeplings' lot is not set apart");
+  for (const m of MEEPS) {
+    const f = page.indexOf(`<a class="cq-b" href="#${m.key}"`);
+    assert.doesNotMatch(page.slice(page.lastIndexOf("<li ", f), f), /cq-apart/, `${m.key} is set apart like a meepling`);
+  }
+  const css = readFileSync(join(ROOT, "town", "pages", "meeps", "index.astro"), "utf8");
+  assert.ok(css.includes(".cq-apart { flex: 0 0 100%; display: flex; justify-content: center; }"), "the meeplings' row is not a whole row at every width");
+  assert.match(css, /\.cq-lot \{ flex: 0 1 calc\(100% \/ 6\); min-width: 0; \}/, "on a phone a meep's lot is not a sixth of the quay");
 });
 
 test("the coop is named the coop and lives only in the meeplings' panel",
@@ -356,7 +410,9 @@ test("the built page prints what the meeps wrote as text — no markup rides in 
   const panels = page.slice(page.indexOf('class="mq-panels"'), page.indexOf("<script", page.indexOf('class="mq-panels"')));
   // The panels' own markup is a fixed vocabulary; anything else arrived from content.
   const tags = new Set([...panels.matchAll(/<([a-z][a-z0-9-]*)\b/gi)].map((m) => m[1].toLowerCase()));
-  const allowed = new Set(["div", "section", "article", "svg", "rect", "path", "img", "h2", "p", "span", "a", "b", "code", "ul", "li"]);
+  const allowed = new Set(["div", "section", "article", "svg", "rect", "path", "img", "h2", "p", "span", "a", "b", "code", "ul", "li",
+    // the bug strip's own markup (POS-236): its headings, its panels, its bubbles
+    "h3", "ol", "details", "summary"]);
   assert.deepEqual([...tags].filter((t) => !allowed.has(t)), [], "a tag the page does not write is inside the cards");
 });
 
@@ -413,7 +469,12 @@ test("the built page: the Postmaster by that name, nothing behind \"more\", noth
   assert.ok(naming.length >= MEEPS.length * 3, `only ${naming.length} naming lines were read`);
   assert.equal(naming.filter((t) => /post office/i.test(t)).length, 0, "the site still calls a meep the Post Office");
   assert.ok(naming.some((t) => t.includes("the Postmaster")), "the Postmaster is not named on the page");
-  assert.doesNotMatch(body, /<details\b/, "an expand is on the Meeps page");
+  // The one expand this page allows: the bug strip's speech bubbles, by
+  // Keemin's own later word (2026-09-29: "clickable bubbles for more detailed
+  // info"). Only those; test/bug-strip.test.mjs holds them.
+  const unbubbled = body.replace(/<details class="bs-bubble"[\s\S]*?<\/details>/g, "");
+  assert.equal(body.split('<details class="bs-bubble"').length - 1, PANELS_N, "the bug strip's bubbles are not all here to carve out");
+  assert.doesNotMatch(unbubbled, /<details\b/, "an expand is on the Meeps page");
   assert.doesNotMatch(body, /\btitle="/, "a hover carries text on the Meeps page");
   assert.doesNotMatch(body, /class="[^"]*\bpm-sr\b/, "text is tucked for screen readers only");
 });

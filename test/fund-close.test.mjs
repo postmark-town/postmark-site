@@ -89,7 +89,9 @@ test("the pages say the close through closeAt, marked for the reader's clock; ne
   }
   assert.doesNotMatch(POT, /first close is at the/, "the pot page still speaks of a FIRST close, which will have passed");
   assert.doesNotMatch(POT, /belong to the <strong>\{pot\.epochLabel\}<\/strong> epoch/, "the pot page still names the file's fixed epoch");
-  assert.match(POT, /data-first-close=\{pot\.firstClose\} data-say="epoch">\{closeAt\(pot\.firstClose\)\.epochLabel\}/);
+  // The epoch paragraph ("dollars arriving now belong to the … epoch") left the
+  // page on 2026-10-02 (POS-317, Keemin: the page gets shorter); the header's
+  // close, above, is still closeAt's and still marked.
 });
 
 test("an elastic pot keeps its own words about the floor", () => {

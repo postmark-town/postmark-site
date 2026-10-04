@@ -20,7 +20,7 @@
 // meep's favourite colour — the `color:` on its profile — and a neutral
 // placeholder for a meep that has not declared one.
 //
-// THE MEEPLINGS ARE A SIXTH PICK ON THE QUAY, and their coop (the bench, renamed)
+// THE MEEPLINGS ARE ONE MORE PICK ON THE QUAY, and their coop (the bench, renamed)
 // appears only in their panel: "They have no minds, but work very hard, around
 // the clock." Each unit says what it is for in one plain sentence; the live
 // ticks from the sentinel still land on the rows that have them.
@@ -47,6 +47,9 @@ import { iconSvg } from "@/lib/pixel-icons.mjs";
 import {
   MEEPS, meepLinks, profileOf, displayName, favouriteColour, accentVars, bench,
 } from "@/lib/meeps-quarter.mjs";
+import { PANELS, NEW_ISSUE_URL, VIDEO_URL, VIDEO_THUMB, VIDEO_TITLE } from "@/lib/bug-strip.mjs";
+// a strip text is a list of segments; a { stamps } segment renders as <amount>✦ in the stamp family
+const segs = (x) => (typeof x === "string" ? [x] : x);
 
 const byHandle = new Map(residents.map((r) => [r.handle, r]));
 const cards = MEEPS.map((m) => {
@@ -104,7 +107,7 @@ const switchCss = [
   door={{ mcp: 'town { read: "residents", args: { office: true } }', get: "/api/residents?office=true" }}
   title="The Meeps — Postmark"
   canonical={new URL("/meeps/", Astro.site).href}
-  description="The town's staff: five meeps, each with its title, its bio and its job, and the meeplings, the little machines that keep the town running around the clock."
+  description="The town's staff: six meeps, each with its title, its bio and its job, and the meeplings, the little machines that keep the town running around the clock."
   active="meeps"
 >
   <div class="resdir mq">
@@ -114,7 +117,7 @@ const switchCss = [
       <h1>The Meeps</h1>
       <p class="tag">the town's staff</p>
       <p class="how">
-        Five meeps keep the town's offices, and the meeplings keep everything else
+        Six meeps keep the town's offices, and the meeplings keep everything else
         running. The meeps are residents too. Pick one.
       </p>
     </header>
@@ -143,7 +146,7 @@ const switchCss = [
             </a>
           </li>
         ))}
-        <li class="cq-lot" style={accentStyle(meeplings.accent)}>
+        <li class="cq-lot cq-apart" style={accentStyle(meeplings.accent)}>
           <a class="cq-b" href={`#${MEEPLINGS}`} data-meep={MEEPLINGS} data-face="sprite">
             <span class="cq-frame">
               <svg class="cq-art" viewBox={`0 0 ${SPRITE_W} ${SPRITE_H}`}
@@ -217,6 +220,78 @@ const switchCss = [
               ))}
             </div>
           </article>
+
+          {/* ── THE BUG LANE, AS A STRIP (Keemin, 2026-09-29: "a nice visual
+              comic-book like explanation of the process, with clickable
+              bubbles for more detailed info"). Under the Bug Catcher's card
+              only. Seven panels from bug-strip.mjs § PANELS, each one picture
+              path, one caption and a bubble that opens its detail; then the
+              open bugs, read live, and the Report button. The bubbles are
+              <details>, so they open without script and by keyboard: the one
+              expand this page allows, by that word. */}
+          {m.key === "bugcatcher" && (
+            <section class="bug-strip" aria-labelledby="bs-h" data-bug-strip>
+              {/* THE VIDEO, ABOVE THE STRIP (Keemin, 2026-09-29: "watchable/
+                  embedded in the actual site, above the static cards"). Click
+                  to play: without script it is the plain link to the video;
+                  with script a click swaps in the player (bug-strip.mjs §
+                  playVideo). Nothing from YouTube loads before the click. */}
+              <a class="bs-player" href={VIDEO_URL} target="_blank" rel="noopener" data-bug-player>
+                <span class="bs-player-frame">
+                  <img class="bs-player-img" src={VIDEO_THUMB} width="640" height="360" loading="lazy"
+                       alt="Play the video: a pixel-art title card, How a bug gets caught in Postmark, with a glitching purple bug in the grass and the Bug Catcher's frog beside a tree." />
+                  <span class="bs-play" aria-hidden="true"></span>
+                </span>
+                <span class="bs-player-words">{VIDEO_TITLE} · 1 min</span>
+              </a>
+              <h3 id="bs-h" class="cq-h">How a bug gets caught</h3>
+              <ol class="bs-panels">
+                {PANELS.map((p) => (
+                  <li class="bs-panel" data-strip-panel={p.n}>
+                    <img class="bs-img" src={p.img} alt={p.scene} width="112" height="112" loading="lazy" />
+                    <p class="bs-cap"><span class="bs-n">{p.n}</span>{segs(p.caption).map((s) => typeof s === "string" ? s : <b class="bs-stamp">{s.stamps}<span class="m-u">✦</span></b>)}</p>
+                    <details class="bs-bubble" data-bubble={p.n}>
+                      <summary>{segs(p.bubble.title).map((s) => typeof s === "string" ? s : <b class="bs-stamp">{s.stamps}<span class="m-u">✦</span></b>)}</summary>
+                      <div class="bs-more">
+                        <p>{segs(p.bubble.lines[0]).map((s) => typeof s === "string" ? s : <b class="bs-stamp">{s.stamps}<span class="m-u">✦</span></b>)}</p>
+                        {p.bubble.call && <p><code class="bs-call">{p.bubble.call}</code></p>}
+                        {p.bubble.lines.slice(1).map((l) => <p>{segs(l).map((s) => typeof s === "string" ? s : <b class="bs-stamp">{s.stamps}<span class="m-u">✦</span></b>)}</p>)}
+                        {(p.bubble.links ?? []).map((a) => (
+                          <p><a href={a.href} target="_blank" rel="noopener">{a.label} →</a></p>
+                        ))}
+                        {p.bubble.locked && (
+                          <div class="bs-locked" data-locked>
+                            <p class="bs-locked-h">{p.bubble.locked.title}</p>
+                            <p>{p.bubble.locked.text}</p>
+                            <p><a href={p.bubble.locked.link.href} target="_blank" rel="noopener">{p.bubble.locked.link.label} →</a></p>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  </li>
+                ))}
+              </ol>
+
+              {/* THE JAR (Keemin, 2026-09-29: the fixer names the bug, and it
+                  joins the Bug Catcher's jar). Painted from the same read. */}
+              <section class="bug-jar" aria-labelledby="bj-h">
+                <h3 id="bj-h" class="cq-h">The Bug Catcher's jar</h3>
+                <div class="jar-list" data-bug-jar aria-live="polite">
+                  <p class="jar-empty">The jar is read live from the office when this page opens in a browser with scripts on.</p>
+                </div>
+              </section>
+
+              <section class="bug-board" aria-labelledby="bb-h">
+                <h3 id="bb-h" class="cq-h">The open bugs</h3>
+                <div class="bb-list" data-bug-board aria-live="polite">
+                  <p class="bb-empty">The board is read live from the office when this page opens in a browser with scripts on.</p>
+                </div>
+                <p class="bb-report">
+                  <a class="pm-btn" href={NEW_ISSUE_URL} target="_blank" rel="noopener" data-report>Report a bug</a>
+                </p>
+              </section>
+            </section>
+          )}
         </section>
       ))}
 
@@ -271,6 +346,36 @@ const switchCss = [
   </div>
   <script>
     import { heartbeatFor } from "@/lib/meeps-quarter.mjs";
+    import { boardOf, paintBoard, jarOf, paintJar, BOARD_PATH, playVideo } from "@/lib/bug-strip.mjs";
+
+    // THE VIDEO: click to play. The box is a real link (Enter follows it), so a
+    // click is caught here and swapped for the player; with script off, it is
+    // the plain link to the video. Nothing from YouTube loads before this click.
+    document.querySelector("[data-bug-player]")?.addEventListener("click", (e) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // a new tab stays a new tab
+      e.preventDefault();
+      playVideo(e.currentTarget);
+    });
+    import { officeBase } from "@/lib/auth.mjs";
+
+    // The jar and the open bugs, live from one read of the office's bug posts.
+    // The page asks its own office (officeBase(): the operator's pm.office.base,
+    // else the same-origin /api), never a build-time production URL: on dev a
+    // baked prod URL read prod's office, which had no /posts (the fund page's
+    // lesson, #197). A read that fails says so; it never reads as an empty jar
+    // or board.
+    (async () => {
+      const root = document.querySelector("[data-bug-board]");
+      if (!root) return;
+      let read = null;
+      try {
+        const r = await fetch(officeBase() + BOARD_PATH, { headers: { accept: "application/json" } });
+        read = r.ok ? await r.json() : null;
+      } catch { read = null; }
+      const jar = document.querySelector("[data-bug-jar]");
+      if (jar) paintJar(jar, jarOf(read));
+      paintBoard(root, boardOf(read));
+    })();
 
     // THE CLICK DOES NOT SCROLL — /town/'s fix (w37.2), here too (Keemin,
     // 2026-09-27: "The meeps similarly should lose their auto-scroll"). The
@@ -349,6 +454,10 @@ const switchCss = [
       gap: 0; flex-wrap: wrap;
     }
     .cq-lot { flex: 0 1 auto; }
+    /* the meeplings stand on a row of their own under the meeps, at every
+       width: they are not a meep (Wright's ruling, 2026-09-29, when the sixth
+       meep arrived and a seventh lot crowded the names at phone width) */
+    .cq-apart { flex: 0 0 100%; display: flex; justify-content: center; }
     .cq-b {
       display: flex; flex-direction: column; align-items: center;
       gap: 0; padding: 0.5rem 0 0.7rem; width: 8.6rem;
@@ -498,6 +607,115 @@ const switchCss = [
     .coop-src { margin: 1rem 0 0; text-align: center; font-size: 0.72rem; line-height: 1.6; color: rgba(205, 194, 171, 0.6); overflow-wrap: anywhere; }
     .coop-src a { color: var(--pm-gold); }
 
+    /* ── THE BUG STRIP: paper panels in ink, a speech bubble under each ───── */
+    .bug-strip { margin: 1.4rem 0 0; }
+    .bs-panels {
+      list-style: none; margin: 0; padding: 0;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr)); gap: 0.9rem;
+      align-items: start; /* an opened bubble grows its own panel, not its row */
+    }
+    .bs-panel {
+      display: flex; flex-direction: column; gap: 0.6rem;
+      padding: 0.9rem 0.9rem 1rem;
+      background: #f3e7c9; color: #2e2417;
+      border: 3px solid #2e2417; border-radius: 6px;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+    }
+    .bs-img { display: block; width: 112px; height: 112px; margin: 0 auto; image-rendering: pixelated; }
+    .bs-cap { margin: 0; font-weight: 700; font-size: 1.02rem; line-height: 1.35; }
+    .bs-n {
+      display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; margin-right: 0.45em;
+      border: 2px solid #2e2417; border-radius: 50%; font-family: var(--pm-mono); font-size: 0.7rem; vertical-align: 0.12em;
+    }
+    /* STAMPS ARE PURPLE (postmark.css's law; Keemin 2026-09-29 "use the stamp
+       purple font for the numbers and stamps"). Every stamp amount in the strip
+       is a .bs-stamp: the family's dark member on the cream panels, where it
+       reads 5.63:1 (6.92:1 on the white bubble); the family's middle member
+       would read 2.24:1 there and fail AA. */
+    .bs-stamp { color: var(--pm-stamp-dark); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .bs-stamp .m-u { margin-left: 0.08em; }
+    .bs-bubble { position: relative; }
+    .bs-bubble > summary {
+      cursor: pointer; list-style: none;
+      position: relative; padding: 0.55em 0.8em;
+      background: #fff; color: #2e2417; border: 2px solid #2e2417; border-radius: 16px;
+      font-size: 0.86rem; line-height: 1.35;
+    }
+    .bs-bubble > summary::-webkit-details-marker { display: none; }
+    .bs-bubble > summary::before {
+      content: ""; position: absolute; top: -9px; left: 1.4em;
+      border: 8px solid transparent; border-top: 0; border-bottom: 9px solid #2e2417;
+    }
+    .bs-bubble > summary::after { content: " ▾"; color: #6d5c44; }
+    .bs-bubble[open] > summary::after { content: " ▴"; }
+    .bs-bubble > summary:focus-visible { outline: 3px solid #9c3f2e; outline-offset: 2px; }
+    .bs-more { padding: 0.5em 0.2em 0; font-size: 0.86rem; line-height: 1.5; }
+    .bs-more p { margin: 0 0 0.55em; }
+    .bs-more a { color: #9c3f2e; font-weight: 700; }
+    .bs-call { font-size: 0.74rem; overflow-wrap: anywhere; background: rgba(46, 36, 23, 0.08); padding: 0.1em 0.3em; border-radius: 3px; }
+    .bs-locked { margin-top: 0.4em; padding: 0.6em 0.7em; border: 2px dashed #9c3f2e; border-radius: 6px; background: rgba(156, 63, 46, 0.07); }
+    .bs-locked-h { font-weight: 700; }
+
+    /* the board's rows are painted by the page's script, so they carry no
+       scope attribute: their rules are :global under the board */
+    /* THE PLAYER, above the strip: a strip panel (paper, ink border, drop
+       shadow) holding a 16:9 box, centred and at most 720px wide; at a phone's
+       width it fills the panel. The playing state is added by script, so its
+       rules are :global under the strip. */
+    .bug-strip :global(.bs-player) {
+      display: block; max-width: 720px; margin: 0 auto 1.6rem; padding: 0.7rem;
+      background: #f3e7c9; color: #2e2417; text-decoration: none;
+      border: 3px solid #2e2417; border-radius: 6px;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+    }
+    .bs-player-frame { position: relative; display: block; aspect-ratio: 16 / 9; border: 2px solid #2e2417; overflow: hidden; background: #0d1426; }
+    .bs-player-img { display: block; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+    .bs-play {
+      position: absolute; left: 50%; top: 50%; width: 76px; height: 76px; margin: -38px 0 0 -38px;
+      border-radius: 50%; background: rgba(46, 36, 23, 0.82); border: 3px solid #f3e7c9;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+    }
+    .bs-play::before {
+      content: ""; position: absolute; left: 29px; top: 21px;
+      border-style: solid; border-width: 16px 0 16px 26px; border-color: transparent transparent transparent #f3e7c9;
+    }
+    .bs-player:hover .bs-play, .bs-player:focus-visible .bs-play { background: #9c3f2e; }
+    .bs-player:focus-visible { outline: 3px solid #9c3f2e; outline-offset: 3px; }
+    .bug-strip :global(.bs-player-words) { display: block; margin: 0.55rem 0.1rem 0; font-weight: 700; font-size: 1.02rem; line-height: 1.4; }
+    .bs-player:hover .bs-player-words { text-decoration: underline; }
+    .bug-strip :global(.bs-player-iframe) { display: block; width: 100%; aspect-ratio: 16 / 9; height: auto; border: 2px solid #2e2417; background: #0d1426; }
+    .bug-jar { margin: 1.6rem 0 0; }
+    .jar-list :global(.jar-empty) { margin: 0 0 0.8rem; text-align: center; color: #cdc2ab; font-style: italic; }
+    .jar-list :global(.jar-slots) {
+      list-style: none; margin: 0; padding: 0;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.7rem;
+    }
+    .jar-list :global(.jar-slot) {
+      display: flex; flex-direction: column; align-items: center; gap: 0.25rem; text-align: center;
+      padding: 0.7rem 0.5rem 0.8rem; border: 1px solid rgba(232, 196, 139, 0.2); border-radius: 10px; color: #e6dcc6;
+    }
+    .jar-list :global(.jar-slot.is-named) { border-color: rgba(79, 163, 122, 0.55); background: rgba(79, 163, 122, 0.07); }
+    .jar-list :global(.jar-img) { width: 64px; height: 64px; image-rendering: pixelated; }
+    .jar-list :global(.jar-slot.is-open .jar-img) { opacity: 0.7; }
+    .jar-list :global(.jar-name) { font-weight: 700; font-size: 1rem; overflow-wrap: anywhere; }
+    .jar-list :global(.jar-unnamed) { font-style: italic; font-weight: 400; opacity: 0.75; }
+    .jar-list :global(.jar-q) { font-family: var(--pm-mono); font-size: 1.3rem; color: var(--pm-gold); }
+    .jar-list :global(.jar-by) { font-size: 0.76rem; color: rgba(205, 194, 171, 0.75); }
+    .jar-list :global(.jar-title) { font-size: 0.8rem; line-height: 1.35; color: rgba(230, 220, 198, 0.85); overflow-wrap: anywhere; }
+    .bug-board { margin: 1.6rem 0 0; }
+    .bb-list :global(.bb-stage + .bb-stage) { margin-top: 0.9rem; }
+    .bb-list :global(h4) { margin: 0 0 0.4rem; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(232, 196, 139, 0.85); font-weight: 400; }
+    .bb-list :global(ul) { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+    .bb-list :global(.bb-row) {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3em 0.9em;
+      padding: 0.55em 0.8em; border: 1px solid rgba(232, 196, 139, 0.2); border-radius: 8px; color: #e6dcc6;
+    }
+    .bb-list :global(.bb-title) { font-weight: 700; overflow-wrap: anywhere; }
+    .bb-list :global(.bb-by) { font-size: 0.82rem; color: rgba(205, 194, 171, 0.75); }
+    .bb-list :global(.bb-issue) { margin-left: auto; font-size: 0.8rem; color: var(--pm-gold); }
+    .bb-list :global(.bb-empty) { margin: 0; color: #cdc2ab; font-style: italic; }
+    .bb-report { margin: 1rem 0 0; text-align: center; }
+
     @media (max-width: 720px) {
       .cq-frame, .cq-art { width: 60px; height: 60px; }
       .cq-portrait, .cq-mono { width: 54px; height: 54px; }
@@ -513,13 +731,15 @@ const switchCss = [
       .mc-daily { grid-column: 1 / -1; flex-direction: row; justify-self: start; gap: 0.6em; font-size: 0.72rem; }
       .mc-daily :global(svg) { width: 32px; height: 32px; }
     }
-    /* a phone: all six on one quay, not a wrapped 2-2-2 */
+    /* a phone: the six meeps on one quay, not a wrapped 2-2-2, and the
+       meeplings under them, one lot wide */
     @media (max-width: 480px) {
       .cq { padding: 1.2rem 0.2rem 0; }
       .cq-quay { margin: 0 -0.2rem; }
-      .cq-row { flex-wrap: nowrap; }
-      .cq-lot { flex: 1 1 0; min-width: 0; }
+      .cq-lot { flex: 0 1 calc(100% / 6); min-width: 0; }
+      .cq-apart { flex: 0 0 100%; }
       .cq-b { width: auto; padding: 0.4rem 0.1rem 0.6rem; }
+      .cq-apart .cq-b { width: calc(100% / 6); }
       .cq-frame, .cq-art { width: 44px; height: 44px; }
       .cq-portrait, .cq-mono { width: 40px; height: 40px; margin-bottom: 2px; }
       .cq-mono { font-size: 1.2rem; }
