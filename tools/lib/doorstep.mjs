@@ -427,8 +427,13 @@ function moreRow(hidden, door) {
  * it prints it was handed. That is what lets a fixture office object drive it
  * in a test.
  */
-export function renderDoorstepMarkdown(bundle, { townBase, titleOf = (k) => k } = {}) {
+export function renderDoorstepMarkdown(bundle, { townBase, titleOf = (k) => k, mailHref = (id) => `/mail/${id}/` } = {}) {
   const b = bundle ?? {};
+  // A THREAD KEY IS A LETTER ID, and only a conversation's FIRST letter has a
+  // page of its own (POS-320). The caller hands the site's one letter-address
+  // map (letterHref in src/lib/mail.mjs) so every row lands on the page that
+  // holds the letter, at its anchor; the default is the bare path.
+  const mailUrl = (id) => `${townBase}${mailHref(id)}`;
   const site = b.site ?? {};
   const asOfDate = site.doorstep_fetched_at ?? null;
   const api = `${townBase}/api/doorstep/${b.handle}`;
@@ -525,7 +530,7 @@ export function renderDoorstepMarkdown(bundle, { townBase, titleOf = (k) => k } 
           const line = firstLineOf.get(t.last_id);
           const quote = line ? ` · "${line}"` : "";
           const first = t.state === "new_inbound" ? " · first contact" : "";
-          return `- ${t.last_from} · **${titleOf(t.thread_of)}**${quote} · [thread](${townBase}/mail/${t.thread_of}/) · ${ageLabel(ageInDays(t.last_date, asOfDate))}${first}`;
+          return `- ${t.last_from} · **${titleOf(t.thread_of)}**${quote} · [thread](${mailUrl(t.thread_of)}) · ${ageLabel(ageInDays(t.last_date, asOfDate))}${first}`;
         })
       : ["- nothing new — every conversation rests with your word or theirs by your choice"]),
     ...moreRow(threadsHidden, `\`household { read: "mail", view: "awaiting", handle: "${b.handle}" }\` walks them all`),
@@ -540,7 +545,7 @@ export function renderDoorstepMarkdown(bundle, { townBase, titleOf = (k) => k } 
     // nobody anything, and the door that walks it.
     ...(wordOutShown.length
       ? [
-          ...wordOutShown.map((c) => `- ${(c.others ?? []).join(", ") || "—"} · **${titleOf(c.conversation)}** · [thread](${townBase}/mail/${c.conversation}/) · ${ageLabel(ageInDays(c.latest_event?.date ?? null, asOfDate))}`),
+          ...wordOutShown.map((c) => `- ${(c.others ?? []).join(", ") || "—"} · **${titleOf(c.conversation)}** · [thread](${mailUrl(c.conversation)}) · ${ageLabel(ageInDays(c.latest_event?.date ?? null, asOfDate))}`),
           ...moreRow(Math.max(0, wordOutTotal - wordOutShown.length),
             `these rest with your last word and owe nobody anything · \`household { read: "mail", view: "awaiting" }\` walks them`),
         ]
@@ -563,7 +568,7 @@ export function renderDoorstepMarkdown(bundle, { townBase, titleOf = (k) => k } 
         const listed = new Set((aw.threads ?? []).map((t) => t.thread_of));
         return (b.mail.letters ?? []).filter((l) => !listed.has(l.thread)).slice(0, 4)
           .map((l) => {
-            const url = l.thread ? `${townBase}/mail/${l.thread}/` : `${townBase}/mail/`;
+            const url = l.thread ? mailUrl(l.thread) : `${townBase}/mail/`;
             const quote = l.first_line ? ` — "${l.first_line}"` : "";
             return `- ${l.date ?? "—"} · from ${l.from}${quote} → ${url}`;
           });

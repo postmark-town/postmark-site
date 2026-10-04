@@ -63,6 +63,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import { livePots, loadPots, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel } from "@/lib/funding.mjs";
 import { qrSvg } from "@/lib/qr.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
+import PotSprite from "@/components/PotSprite.astro";
 
 // THE ADDRESS IS NO LONGER ONE STRING. Since 2026-08-25 a pot may have an
 // intake address of its own (keeping-ec2 was the first), and a pot with one
@@ -134,10 +135,15 @@ export function getStaticPaths() {
     pot: p.pot, title: p.title ?? p.pot,
     received: p.received ?? 0, target: p.target ?? null, staked: p.staked ?? 0,
   }));
-  return all.map((pot) => ({ params: { pot: pot.pot }, props: { pot, tabs } }));
+  // PAST MONTHS (2026-10-01): every closed epoch of this pot, newest first. The
+  // board drops them (PotCards.astro); this page is where a sealed month is read.
+  const pastOf = (slug) => board.pots
+    .filter((p) => p.pot === slug && p.status === "closed")
+    .sort((a, b) => String(b.epoch).localeCompare(String(a.epoch)));
+  return all.map((pot) => ({ params: { pot: pot.pot }, props: { pot, tabs, past: pastOf(pot.pot) } }));
 }
 
-const { pot, tabs } = Astro.props;
+const { pot, tabs, past = [] } = Astro.props;
 // THE ONE GATE ON THE MONEY MOMENT. Everything that could take a dollar hangs
 // off this: the disclosures, the address, the QR, the witness form — and the
 // stake control, because a stake is a credentialed act on an OPEN pot. A pot
@@ -228,7 +234,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
     <nav class="f-tabs" aria-label="The town's open pots">
       {tabs.map((t) => (
         <a class:list={["f-tab", t.pot === pot.pot && "is-here"]} href={`/fund/${t.pot}/`} aria-current={t.pot === pot.pot ? "page" : undefined}>
-          <span class="f-tab-title">{t.title}</span>
+          <span class="f-tab-title"><PotSprite pot={t.pot} size={24} />{t.title}</span>
           <span class="f-tab-meta">
             <b>{usd(t.received)}</b>{t.target != null && <span class="f-dim"> of {usd(t.target)}</span>}
             <span class="f-tab-sep">·</span>
@@ -238,7 +244,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
       ))}
       {!open && (
         <span class="f-tab is-here is-draft" aria-current="page">
-          <span class="f-tab-title">{pot.title ?? pot.id}</span>
+          <span class="f-tab-title"><PotSprite pot={pot.pot} size={24} />{pot.title ?? pot.id}</span>
           <span class="f-tab-meta f-dim">draft · not open</span>
         </span>
       )}
@@ -255,7 +261,13 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           {pot.firstCloseLabel ? <>closes <span data-first-close={pot.firstClose}>{closeAt(pot.firstClose).closeLabel}</span></> : pot.epoch}
           {pot.beneficiaryLabel ? <> · for {pot.beneficiaryLabel}</> : <> · <em>no beneficiary named yet</em></>}
         </p>
-        <h1>{pot.title ?? pot.id}</h1>
+        {/* THE POT'S SPRITE beside its name (2026-10-02), the cards' drawing
+            at half again their size; none for a pot with no line in
+            civic-art.mjs § POT_SPRITES. */}
+        <div class="f-titled">
+          <PotSprite pot={pot.pot} size={72} />
+          <h1>{pot.title ?? pot.id}</h1>
+        </div>
         {/* WHAT THIS IS, in one breath — the pot file's own first sentence. The
             full paragraph lives in the fine print below the rails: the founder's
             page law (2026-08-26) is that this page DIRECTS TO WHERE YOU CAN PAY
@@ -609,6 +621,39 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
         even while the town is only considering it. The close arms still key on
         the pot file's own WORD, never on the boolean alone — the Hal finding
         (2026-08-25) stands wherever the sentences live. */}
+    {past.length > 0 && (
+      <section class="f-past" id="past" aria-label="Past months of this pot">
+        <details class="f-fold">
+          <summary>
+            <span class="f-fold-sum">Past months</span>
+            <span class="f-fold-meta">{past.length === 1 ? "one closed month" : `${past.length} closed months`}</span>
+          </summary>
+          <div class="f-fold-body">
+            <ul class="f-past-list">
+              {past.map((m) => {
+                const mroll = (m.patrons ?? []).map((p) => ({ ...patronLabel(p.patron), usd: p.usd }));
+                const mtotal = mroll.reduce((n, r) => n + r.usd, 0);
+                return (
+                  <li class="f-past-row">
+                    <p class="f-past-head">
+                      <b>{m.epochLabel ?? m.epoch}</b>
+                      <span class="f-dim"> · closed · </span>
+                      <span>{usd(m.received ?? mtotal)}{m.target != null && <span class="f-dim"> of {usd(m.target)}</span>}</span>
+                    </p>
+                    {mroll.length > 0 && (
+                      <p class="f-past-roll f-dim">
+                        {mroll.map((r, i) => <>{i > 0 && ", "}{r.href ? <a href={r.href}>{r.label}</a> : r.label}{" "}{usd(r.usd)}</>)}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </details>
+      </section>
+    )}
+
     <section class="f-fine" id="fineprint" aria-label="The fine print">
       <details class="f-fold f-fine-fold">
         <summary><span class="f-fold-sum">the fine print</span><span class="f-fold-meta">what this is in full, and what a dollar does and doesn't get you</span></summary>
@@ -892,6 +937,9 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
 </script>
 
 <style>
+  .f-past-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; }
+  .f-past-head { margin: 0; }
+  .f-past-roll { margin: .2rem 0 0; font-size: .92em; }
   .fund { max-width: 46rem; }
   .f-crumb { font-size: .7rem; letter-spacing: .18em; opacity: .6; margin: 0 0 .9rem; }
   .f-dim { opacity: .66; }
@@ -908,7 +956,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   .f-tab:hover { border-color: rgba(232, 196, 139, .45); background: rgba(232, 196, 139, .07); transform: translateY(-1px); }
   .f-tab.is-here { border-color: var(--pm-gold); background: rgba(232, 196, 139, .1); box-shadow: 0 0 0 1px rgba(232, 196, 139, .25) inset; }
   .f-tab.is-draft { border-style: dashed; }
-  .f-tab-title { font-size: .92rem; color: var(--pm-gold-bright); line-height: 1.3; }
+  .f-tab-title { font-size: .92rem; color: var(--pm-gold-bright); line-height: 1.3; display: flex; align-items: center; gap: .5rem; }
   .f-tab-meta { font-family: var(--pm-mono); font-size: .72rem; font-variant-numeric: tabular-nums; opacity: .85; display: flex; flex-wrap: wrap; gap: .35em; align-items: baseline; }
   .f-tab-sep { opacity: .45; }
   .f-tab-stamp { color: var(--pm-stamp-bright); }
@@ -923,7 +971,8 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
     box-shadow: 0 12px 40px -24px rgba(0, 0, 0, .9), 0 0 0 1px rgba(232, 196, 139, .06) inset;
   }
   .f-kind { font-family: var(--pm-mono); font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; opacity: .62; margin: 0 0 .3rem; }
-  .f-head h1 { margin: 0 0 .5rem; font-size: clamp(1.6rem, 4.2vw, 2.3rem); line-height: 1.12; }
+  .f-head h1 { margin: 0; font-size: clamp(1.6rem, 4.2vw, 2.3rem); line-height: 1.12; }
+  .f-titled { display: flex; align-items: center; gap: 1rem; margin: 0 0 .5rem; }
   .f-source { margin: 0; opacity: .85; line-height: 1.6; }
   .f-need { margin-top: 1.15rem; }
   .f-big { font-family: var(--pm-mono); font-size: 1.55rem; color: var(--pm-gold-bright); margin: 0 0 .55rem; font-variant-numeric: tabular-nums; }

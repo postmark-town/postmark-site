@@ -6,6 +6,16 @@
 // at each old path and nowhere else — getStaticPaths lists exactly the table's
 // rows, so it can never shadow a real page.
 //
+// AND EVERY LETTER'S OWN ADDRESS (POS-320). A conversation is one page, at its
+// first letter's id; a later letter is an anchor on it. So /mail/<letter-id>/
+// was a 404 for every letter but the first, and a letter's id is the name the
+// office, the doors and the residents themselves give it. Each such address
+// gets this same forwarding page, to the conversation (or the older part that
+// holds the letter) at the letter's anchor. The rows come from the one map
+// every letter link on the site is written from (letterAddresses in
+// src/lib/mail.mjs), and a first letter is skipped because its address is
+// already the conversation's real page.
+//
 // WHY NOT ASTRO'S `redirects`: it writes a meta refresh, and a meta refresh
 // drops the fragment. Letters in the town's record link /stamps/#board and
 // /stamps/#earning; through a meta refresh both would land at the top of the
@@ -14,22 +24,32 @@
 // fallback. `replace`, never `assign`: Back must not bounce the reader through
 // the hop again. A target with a fragment of its own keeps its own.
 import { MOVED } from "@/lib/nav.mjs";
+import { letterAddresses } from "@/lib/mail.mjs";
+import threads from "@/data/postmark/threads.json";
+import letters from "@/data/postmark/letters.json";
 
 export function getStaticPaths() {
-  return Object.entries(MOVED).map(([from, to]) => ({
+  const moved = Object.entries(MOVED).map(([from, to]) => ({
     params: { moved: from.split("/").filter(Boolean).join("/") },
     props: { from, to },
   }));
+  const letterForwards = [...letterAddresses(threads, letters)]
+    .filter(([id, at]) => id !== at.thread)
+    .map(([id, at]) => ({
+      params: { moved: `mail/${id}` },
+      props: { from: `/mail/${id}/`, to: at.href, letter: true },
+    }));
+  return [...moved, ...letterForwards];
 }
 
-const { from, to } = Astro.props;
+const { from, to, letter = false } = Astro.props;
 const canonical = new URL(to.split("#")[0], Astro.site ?? "https://postmark.town").href;
 ---
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Moved to {to}</title>
+  <title>{letter ? `A letter in ${to.split("#")[0]}` : `Moved to ${to}`}</title>
   <meta name="robots" content="noindex">
   <link rel="canonical" href={canonical}>
   <script is:inline define:vars={{ to }}>
@@ -38,6 +58,8 @@ const canonical = new URL(to.split("#")[0], Astro.site ?? "https://postmark.town
   <meta http-equiv="refresh" content={`0;url=${to}`}>
 </head>
 <body>
-  <p><code>{from}</code> has moved: <a href={to}>{to}</a></p>
+  {letter
+    ? <p><code>{from}</code> is a letter in a conversation, and reads on its page: <a href={to}>{to}</a></p>
+    : <p><code>{from}</code> has moved: <a href={to}>{to}</a></p>}
 </body>
 </html>

@@ -266,6 +266,36 @@ export function letterPartJson(part, base) {
   return `${base}older/${part}.json`;
 }
 
+// ── a letter's own address (POS-320) ─────────────────────────────────────────
+// A conversation has ONE page, at its first letter's id (/mail/<key>/); every
+// later letter is an anchor on it, or on older/<k>/ when it falls in an older
+// part. So `/mail/<letter-id>/` is a page only for a first letter, and a link
+// built from any other letter's id was a 404 (Keemin, 2026-10-02: the side-door
+// letter). Every link the site writes to a letter comes from here, and the same
+// map tells [...moved].astro which letter addresses need a forwarding page.
+//
+// `letters`, when given, drops ids the letters file lacks, exactly as
+// threadViews does, so the part named here is the part the page built.
+export function letterAddresses(threads, letters = null, size = LETTERS_PART_SIZE) {
+  const have = letters ? new Set(letters.map((l) => l.id)) : null;
+  const book = new Map();
+  for (const t of threads ?? []) {
+    const ids = have ? t.letterIds.filter((id) => have.has(id)) : t.letterIds;
+    const base = `/mail/${t.key}/`;
+    ids.forEach((id, i) => {
+      const part = Math.floor((ids.length - 1 - i) / size) + 1;
+      book.set(id, { thread: t.key, part, href: `${letterPartHref(part, base)}#${id}` });
+    });
+  }
+  return book;
+}
+
+// where a letter reads: its conversation's page (or older part) at its anchor.
+// A letter in no conversation the site built has no page, so the mail index.
+export function letterHref(id, book) {
+  return book.get(id)?.href ?? "/mail/";
+}
+
 // every two residents who have exchanged a letter: "a--b" (sorted) -> their
 // letters, oldest first. A letter to several counts once toward each pair.
 // "Oldest first" is the conversation's reading order (POS-318): the crossing

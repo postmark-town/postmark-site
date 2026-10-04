@@ -21,8 +21,14 @@
 // (/town/) and fall back to the same numbers where it does not (/stamps/).
 import { potGist, patronLabel } from "@/lib/funding.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
+import PotSprite from "@/components/PotSprite.astro";
 
-const { potBoard } = Astro.props;
+const { potBoard: given } = Astro.props;
+// THIS MONTH'S POTS ONLY (Keemin, 2026-10-01): a closed epoch is history, not an
+// ask, so it leaves the board and lives under its own fund as a past month
+// (/fund/<pot>/ § Past months). One filter here covers every page that draws
+// the cards, so the Guild, /fund/ and /stamps/ can never disagree about it.
+const potBoard = { ...given, pots: (given?.pots ?? []).filter((p) => p.status !== "closed") };
 const PATRONS_SHOWN = 3;
 const usd = (n) => "$" + Number(n).toLocaleString("en-US");
 const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
@@ -40,8 +46,15 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
           {/* ONE FACT ON THE KIND LINE (founder-ruled 2026-09-01): the close
               date a reader deciding whether to give actually needs; the epoch
               is the fallback for a pot with no posted close. */}
-          <p class="m-kind">{p.firstCloseLabel ? <>closes <span data-first-close={p.firstClose}>{closeAt(p.firstClose).closeLabel}</span></> : p.epoch}</p>
-          <h3 class="m-title">{p.title}</h3>
+          {/* THE POT'S SPRITE beside its name (2026-10-02); none for a pot
+              with no line in civic-art.mjs § POT_SPRITES. */}
+          <div class="m-top">
+            <PotSprite pot={p.pot} size={48} />
+            <div class="m-named">
+              <p class="m-kind">{p.firstCloseLabel ? <>closes <span data-first-close={p.firstClose}>{closeAt(p.firstClose).closeLabel}</span></> : p.epoch}</p>
+              <h3 class="m-title">{p.title}</h3>
+            </div>
+          </div>
           {/* WHAT THIS POT IS, before any number — the pot file's own first
               sentence, quoted, never invented. */}
           {potGist(p.source) && <p class="m-what">{potGist(p.source)}</p>}
@@ -137,6 +150,8 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
     background: rgba(232, 196, 139, .028);
   }
   .m-card.is-settled { opacity: .7; }
+  .m-top { display: flex; align-items: center; gap: .85rem; }
+  .m-named { display: flex; flex-direction: column; gap: .6rem; min-width: 0; }
   .m-kind { font-family: var(--pm-mono); font-size: var(--civic-label, .7rem); letter-spacing: .12em; text-transform: uppercase; opacity: .62; margin: 0; }
   .m-title { font-size: var(--civic-body, .9rem); line-height: 1.45; margin: 0; color: var(--pm-gold-bright); font-weight: 400; }
   .m-what { font-size: var(--civic-body, .9rem); line-height: 1.6; opacity: .82; margin: 0; }
