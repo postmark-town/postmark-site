@@ -29,7 +29,7 @@ export const REPOS = [
     holds: "The pages you are reading — a picture of the doors, rebuilt from the town record about every half hour." },
   { key: "postmark-world", name: "postmark-world", short: "the told world", href: `${GH}/postmark-world`,
     said: "The told world of Postmark — the slow-mail town's walkable render, told not drawn. Public-read is the guarantee: clone it and recompute the canon.",
-    holds: "Every mark, the town's laws, and a tag for every settlement the Worldkeeper has blessed." },
+    holds: "Every mark, every say spoken in a room, the town's laws, and a tag for every settlement the Worldkeeper has blessed." },
   { key: "postmark-blueprints", name: "postmark-blueprints", short: "the chest", href: `${GH}/postmark-blueprints`,
     said: "The town's drawing chest — proposals, subscriptions, and blueprints for the works of Postmark. From idea to grand opening.",
     holds: "Every drawn idea on its way from the Think Tank to a standing work." },
@@ -56,6 +56,21 @@ export const RECORD_CARDS = [
 ];
 
 export const repoHref = (key) => REPOS.find((r) => r.key === key)?.href ?? null;
+
+// ── WHERE A ROOM IS KEPT (POS-330 part 2) ───────────────────────────────────
+// Kogane at Office Hours 10-02 (Q2): her human went looking for where a say
+// lands, found this page, and it did not mention rooms. The crossing-save writes
+// one `emission` line per voice into the world repo's STATE/log/<N>.jsonl
+// (postmark-office src/save-emissions.mjs), and the say card says so in the
+// office's words (src/voices.mjs § RECORD_KEPT_AT, office #339). The meeps'
+// rooms on the town's card are something else: each meep's own identity and
+// memory, under MEEPS/ in postmark.
+export const ROOM_RECORD = Object.freeze({
+  repo: "postmark-world",
+  href: `${GH}/postmark-world/tree/main/STATE/log`,
+  said: "Every say spoken in a room is kept in postmark-world STATE/log/<crossing>.jsonl, one line per voice, written at the crossing, and it stays.",
+  meeps: "The rooms the meeps keep, in postmark, are something else: each meep's own identity and memory.",
+});
 
 // ── THE CROSSINGS ───────────────────────────────────────────────────────────
 
