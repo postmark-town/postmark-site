@@ -716,8 +716,12 @@ export async function buildOfficeData({
       : `resident cards all settled across ${stamped.length} residents: the office's index was level with the record at fetch time`);
   }
 
-  const ledger = readSnapshot("ledger.json", []);
-  endpointGaps.push("ledger.json preserved from committed snapshot: office has metrics but no event-level ledger endpoint yet");
+  // THE LEDGER IS THE OFFICE'S (POS-351): GET /town/ledger, the town index's
+  // own mail ledger, every event in ledger order. A 404 is an office that does
+  // not have the door yet, and only then is the committed snapshot kept.
+  const ledgerRead = await fetchLedger({ apiBase, fetchImpl, retries, gate });
+  const ledger = ledgerRead.missing ? readSnapshot("ledger.json", []) : ledgerRead.entries;
+  if (ledgerRead.missing) endpointGaps.push(LEDGER_GAP);
 
   // Resident profiles: a checkout refresh wins. Without one (the ordinary
   // deploy), the office's own profile on the resident card (GET /residents/{h}
@@ -823,8 +827,11 @@ export async function buildOfficeData({
   const threads = buildThreads(letters, ledger);
   const metrics = metricsRes.body;
 
-  const docs = readSnapshot("docs.json", {});
-  endpointGaps.push("docs.json preserved from committed snapshot: office has no docs endpoint yet");
+  // THE TOWN'S DOCS ARE THE OFFICE'S (POS-351): GET /town/docs, the town
+  // index's copy of README / JOINING / TOWN-RULES / MAIL / CONTRIBUTING.
+  const docsRead = await fetchDocs({ apiBase, fetchImpl, retries, gate });
+  const docs = docsRead.missing ? readSnapshot("docs.json", {}) : docsRead.docs;
+  if (docsRead.missing) endpointGaps.push(DOCS_GAP);
 
   const calendarRead = await fetchCalendar({ apiBase, fetchImpl, retries, gate });
   const calendar = calendarRead.missing ? readSnapshot("calendar.json", EMPTY_CALENDAR) : calendarRead.calendar;
@@ -858,6 +865,46 @@ export async function buildOfficeData({
       "quest-posts.json": questPosts,
     },
   };
+}
+
+// ── THE LEDGER AND THE DOCS (POS-351, 2026-10-04) ───────────────────────────
+// Darko ruled that the store is the record and every reader reads it. These
+// two files were the last of the structured data the site took from a town
+// CHECKOUT (tools/extract-town.mjs emitted them on every run); the office now
+// serves both from its town index:
+//
+//   GET /town/ledger   { as_of, total, entries: [ { kind, date, id, from, to, … } ] }
+//   GET /town/docs     { as_of, docs: { README: { body, path }, JOINING: …, … } }
+//
+// Read the calendar's way: a 404 is a door this office does not have yet, an
+// endpoint gap, and the committed snapshot is kept; anything else failing
+// throws like every other read. extract-town no longer writes either file.
+export const LEDGER_GAP = "ledger.json preserved from committed snapshot: the office answered 404 at GET /town/ledger, so its ledger door is not live yet";
+export const DOCS_GAP = "docs.json preserved from committed snapshot: the office answered 404 at GET /town/docs, so its docs door is not live yet";
+
+export async function fetchLedger({ apiBase, fetchImpl = fetch, retries = 3, gate = null } = {}) {
+  let body;
+  try {
+    ({ body } = await apiGet("/town/ledger", { apiBase, fetchImpl, retries, gate }));
+  } catch (error) {
+    if (error?.status === 404) return { missing: true, entries: null };
+    throw error;
+  }
+  if (!Array.isArray(body?.entries)) throw new Error(`/town/ledger: "entries" is not an array, so this is not the ledger the door names`);
+  return { missing: false, entries: body.entries };
+}
+
+export async function fetchDocs({ apiBase, fetchImpl = fetch, retries = 3, gate = null } = {}) {
+  let body;
+  try {
+    ({ body } = await apiGet("/town/docs", { apiBase, fetchImpl, retries, gate }));
+  } catch (error) {
+    if (error?.status === 404) return { missing: true, docs: null };
+    throw error;
+  }
+  if (!body?.docs || typeof body.docs !== "object" || Array.isArray(body.docs))
+    throw new Error(`/town/docs: "docs" is not an object, so this is not the docs the door names`);
+  return { missing: false, docs: body.docs };
 }
 
 // ── THE CALENDAR (POS-211, 2026-09-24) ──────────────────────────────────────

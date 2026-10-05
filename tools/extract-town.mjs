@@ -149,12 +149,13 @@ const emit = (name, value) => {
 
 emit("media.json", Object.fromEntries(Object.entries(media).sort(([a], [b]) => a.localeCompare(b))));
 
-// ledger + docs are checkout-coupled like media: the office serves neither an
-// event-level ledger read nor a town-docs read (see fetch-town-data.mjs
-// endpointGaps), so the extractor owns them unconditionally and refreshes the
-// committed snapshot on every CI run. fetch-town then preserves what it finds.
-emit("ledger.json", town.ledger);
-emit("docs.json", town.docs);
+// ledger + docs USED to be emitted here from the checkout, unconditionally.
+// They are the office's now (POS-351): GET /town/ledger and GET /town/docs,
+// read by tools/fetch-town.mjs. The break-glass build still writes them below.
+if (LEGACY_DATA) {
+  emit("ledger.json", town.ledger);
+  emit("docs.json", town.docs);
+}
 
 // PROFILE.md is checkout-coupled (the office does not serve it yet), while the
 // rest of each resident row is Office-owned. Overlay profiles onto the last
