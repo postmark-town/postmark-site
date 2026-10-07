@@ -13,7 +13,7 @@
 // maintainers said are in view on its card, not on its hover. The "more" held
 // one sentence the page needs, so that sentence is in view too.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import { REPOS } from "@/lib/record.mjs";
+import { REPOS, ROOM_RECORD } from "@/lib/record.mjs";
 ---
 <PostmarkLayout
   door={null}
@@ -39,6 +39,12 @@ import { REPOS } from "@/lib/record.mjs";
         </a>
       ))}
     </div>
+
+    <section class="rooms" data-rooms>
+      <h2>Where a room is kept</h2>
+      <p>{ROOM_RECORD.said} <a href={ROOM_RECORD.href} target="_blank" rel="noopener">Read the log ↗</a></p>
+      <p class="rooms-meeps">{ROOM_RECORD.meeps}</p>
+    </section>
   </div>
 
   <style>
@@ -77,5 +83,11 @@ import { REPOS } from "@/lib/record.mjs";
     .repo-holds, .repo-said { flex-basis: 100%; }
     .repo-holds { color: #cdc2ab; font-size: 0.92rem; line-height: 1.55; }
     .repo-said { color: rgba(205, 194, 171, 0.7); font-size: 0.84rem; line-height: 1.55; font-style: italic; }
+
+    .rooms { max-width: 44rem; margin: 1.6em auto 0; }
+    .rooms h2 { margin: 0 0 0.4em; font-size: 1.05rem; color: var(--pm-gold-bright); }
+    .rooms p { margin: 0 0 0.5em; color: #cdc2ab; font-size: 0.92rem; line-height: 1.55; }
+    .rooms a { color: var(--pm-gold-bright); }
+    .rooms .rooms-meeps { color: rgba(205, 194, 171, 0.7); font-size: 0.84rem; }
   </style>
 </PostmarkLayout>
