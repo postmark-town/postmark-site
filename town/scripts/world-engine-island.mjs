@@ -27,6 +27,7 @@ import {
 } from "../../tools/lib/world-preload.mjs";
 import { settlementStamp, stampedExportText, STAMPED_RECORD } from "../../tools/lib/world-stamp.mjs";
 import { worldPin } from "../../tools/lib/world-pin-publish.mjs";
+import { readBakedWorld, stampOfBaked, worldFilePath } from "../../tools/lib/world-settlement.mjs";
 
 const META_PATH = "/world-engine/residents-meta.json";
 const STAMPED_PATH = `/${STAMPED_RECORD}`;
@@ -242,9 +243,14 @@ function stagingWalk(pkg, projectRoot) {
   // what the viewer references; staging the rest is inert public source.
   for (const f of readdirSync(join(pkg, "tools")).filter((f) => f.endsWith(".mjs") && !f.endsWith(".test.mjs")))
     files.push({ source: join(pkg, "tools", f), publicPath: `/world-engine/tools/${f}` });
-  // and every record some reader asks this origin for — derived, not listed
+  // and every record some reader asks this origin for — derived, not listed.
+  // The ONE record that is not the package's: the World is the office's
+  // settlement, baked by tools/fetch-town.mjs (POS-360, R3: "the postmark-world
+  // package stays for engine code only"). The package's fold is staged only
+  // while no settlement has been baked into this tree, and its stamp says so.
+  const baked = worldFilePath(projectRoot);
   for (const { record } of recordsToStage(recordReaders(pkg, projectRoot))) {
-    const source = join(pkg, ...record.split("/"));
+    const source = `/${record}` === STAMPED_PATH && existsSync(baked) ? baked : join(pkg, ...record.split("/"));
     if (existsSync(source)) files.push({ source, publicPath: `/${record}` });
   }
   return files;
@@ -252,7 +258,10 @@ function stagingWalk(pkg, projectRoot) {
 
 export function stage(pkg, dest, projectRoot, env = process.env) {
   const files = stagingWalk(pkg, projectRoot);
-  const stamp = exportStamp(projectRoot, env);
+  // The baked settlement names itself (its meta.as_of, from the office); only
+  // the package's fold needs the resolver and the settlements record to be named.
+  const bakedWorld = readBakedWorld(projectRoot);
+  const stamp = bakedWorld ? stampOfBaked(bakedWorld) : exportStamp(projectRoot, env);
   for (const file of files) {
     const output = join(dest, ...file.publicPath.slice(1).split("/"));
     mkdirSync(dirname(output), { recursive: true });

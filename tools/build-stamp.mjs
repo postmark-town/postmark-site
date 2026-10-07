@@ -102,7 +102,7 @@ export const SCHEMA = 1;
  * wrong is worse than one that admits it cannot say, because the watcher
  * downstream believes it.
  */
-export function composeStamp({ channel, codeSha, codeRef, townDataSha, townSha, crossing, builtAt, world = null, worldRef = null, problems = null }) {
+export function composeStamp({ channel, codeSha, codeRef, townDataSha, townSha, crossing, builtAt, world = null, worldRef = null, problems = null, settlement = null }) {
   const notes = [];
   const lane = channel === "release" || channel === "snapshot" ? channel : null;
   if (!lane) notes.push("PUBLIC_CHANNEL was not release or snapshot, so the lane is unknown");
@@ -167,6 +167,16 @@ export function composeStamp({ channel, codeSha, codeRef, townDataSha, townSha, 
   const worldFrom = worldSha ? (world?.from ?? null) : null;
   if (!worldSha) notes.push(`this build did not report which postmark-world it compiled${world?.note ? ` (${world.note})` : ""} — the world served at /world/ cannot be told from another world's by this stamp`);
   const ref = String(worldRef ?? "").trim();
+  // ── THE WORLD'S SETTLEMENT (POS-360, R3: "build.json names the settlement and
+  // its digest") ─────────────────────────────────────────────────────────────
+  // The World this build baked is the office's settlement (tools/lib/
+  // world-settlement.mjs), so it is named by the settlement and the snapshot's
+  // digest, read off the baked file's own stamp. Null with a note when this tree
+  // holds none: the /world/ export is then the package's fold, which no
+  // settlement names.
+  // (`settlement` omitted is a caller that did not read the tree; gather always reads it.)
+  const settled = settlement?.settlement && settlement?.digest ? settlement : null;
+  if (settlement && !settled) notes.push(`this build baked no settlement's World${settlement?.note ? ` (${settlement.note})` : ""} — the World it serves is the pinned package's fold, not a settlement`);
   if (!Array.isArray(problems)) notes.push("this build could not read the town manifest's `problems` list (public/atelier/postmark/data/index.json), so the stamp cannot say what the fetch failed to get — a reader must treat that as unread, never as clean");
 
   return {
@@ -185,6 +195,10 @@ export function composeStamp({ channel, codeSha, codeRef, townDataSha, townSha, 
     world_sha: worldSha,
     world_from: worldFrom,
     world_ref: ref || null,
+    // The settlement the baked World is, and its snapshot's digest: compare with
+    // the office's GET /world/state `meta.as_of` for the same two values.
+    world_settlement: settled?.settlement ?? null,
+    world_digest: settled?.digest ?? null,
     // Said on every stamp, not only when the two differ. The whole reason this
     // file exists is that one number could not hold both tenses, and a reader
     // meeting the stamp for the first time should meet that fact here.
@@ -254,6 +268,23 @@ export function readProblems({ root = process.cwd(), read = (p) => readFileSync(
   } catch { return null; }
 }
 
+/**
+ * The settlement this tree baked, from its own World file
+ * (src/data/postmark/world-state.json, written by fetch-town.mjs). On the box
+ * the build tree's src/data/postmark is the extract tree's, overlaid, so this is
+ * the World the build compiled. `{ settlement, digest }`, or `{ note }`.
+ */
+export function readSettlement({ root = process.cwd(), read = (p) => readFileSync(p, "utf8") } = {}) {
+  let text;
+  try { text = read(join(root, "src", "data", "postmark", "world-state.json")); }
+  catch { return { settlement: null, digest: null, note: "src/data/postmark/world-state.json is absent" }; }
+  try {
+    const a = JSON.parse(text)?.meta?.as_of ?? {};
+    const ok = /^S\d+$/.test(String(a.settlement ?? "")) && /^[0-9a-f]{64}$/.test(String(a.digest ?? ""));
+    return ok ? { settlement: a.settlement, digest: a.digest } : { settlement: null, digest: null, note: "the baked World's meta.as_of names no settlement and digest" };
+  } catch { return { settlement: null, digest: null, note: "the baked World could not be read" }; }
+}
+
 /** Read what the build knows, tolerating every failure as a null-plus-note. */
 export function gather({ env = process.env, exec = execFileSync, now = () => new Date(), root = process.cwd(), read } = {}) {
   let codeSha = null;
@@ -276,6 +307,7 @@ export function gather({ env = process.env, exec = execFileSync, now = () => new
     world: readWorldSha(read ? { root, read } : { root }),
     worldRef: env.BUILD_WORLD_REF ?? null,
     problems: readProblems(read ? { root, read } : { root }),
+    settlement: readSettlement(read ? { root, read } : { root }),
   });
 }
 
@@ -285,7 +317,7 @@ export function main(argv = process.argv, deps = {}) {
   const stamp = gather(deps);
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(stamp, null, 2) + "\n");
-  console.log(`build-stamp: ${out} — ${stamp.channel ?? "unknown lane"}, code ${String(stamp.code_sha).slice(0, 8)} (${stamp.code_ref ?? "?"}), town data ${String(stamp.town_data_sha).slice(0, 8)}, world ${String(stamp.world_sha).slice(0, 8)} (${stamp.world_ref ?? "no tag named"}), problems ${stamp.problems === null ? "unread" : stamp.problems.length}`);
+  console.log(`build-stamp: ${out} — ${stamp.channel ?? "unknown lane"}, code ${String(stamp.code_sha).slice(0, 8)} (${stamp.code_ref ?? "?"}), town data ${String(stamp.town_data_sha).slice(0, 8)}, world ${String(stamp.world_sha).slice(0, 8)} (${stamp.world_ref ?? "no tag named"}), settlement ${stamp.world_settlement ?? "none baked"}, problems ${stamp.problems === null ? "unread" : stamp.problems.length}`);
   for (const p of stamp.problems ?? []) console.log(`  problem: ${p}`);
   for (const n of stamp.notes) console.log(`  note: ${n}`);
   return stamp;
