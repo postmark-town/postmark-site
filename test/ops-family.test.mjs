@@ -27,6 +27,7 @@ const LINKS = [
   /href\s*=\s*["']([^"']+)["']/g,
   /\]\((\/[^)\s]*)\)/g,
   /(https?:\/\/(?:www\.)?postmark\.town\/ops[^\s"'<>)\\]*)/g,
+  /["'`](\/ops(?:\/[^"'`\s]*)?)["'`]/g, // a path held in code, as the old strip held its list
 ];
 const linksIn = (text) => LINKS.flatMap((re) => [...text.matchAll(re)].map((m) => m[1]));
 
