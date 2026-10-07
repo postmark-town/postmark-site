@@ -297,7 +297,8 @@ const BALLOT_HOUSE = [
 //
 // THE OTHER NAMED EXCEPTION: DARKO's eyes. Keemin's token
 // (public/birthday/darko-token.png, worn as his token in the world cockpit's
-// HUMAN_TOKENS) has cyan eyes that no stylesheet types, so the hex is the one
+// HUMAN_TOKENS; his base avatar is the same eyes on a black circle) has cyan
+// eyes that no stylesheet types, so the hex is the one
 // the token's own trace fills them with (content-creation, ep01
 // art/darko/darko-eyes.svg, 2026-10-01). The eyes ARE the token; a nearer
 // colour the site already wears would draw somebody else.
@@ -332,9 +333,6 @@ export const FIGURE_INK = {
   darko: {
     c: DARKO_EYE, // the eyes — the token's own cyan (see DARKO_EYE)
     C: "#5fc9d0", // the eyes' edge — global.css --teal, "eye-glow"
-    h: "#cdbda4", // the hood's lining — global.css, the parchment
-    o: "#4d7d54", // the jacket — the mail pair page's check green
-    O: "#97a266", // the jacket, lit — global.css --moss, the banner green
   },
 };
 
@@ -436,37 +434,39 @@ const BUGCATCHER = [
   "........................",
 ];
 
-// DARKO — the founder's token, drawn as Keemin asked on 2026-10-02: "my DARKO
-// token in pixel art for the cyan eyes". The token is a face in shadow under a
-// cap with a gold star, a hood lined pale over a green jacket, and two cyan eyes
-// in the dark; at 24 pixels the eyes carry it, so they are drawn first and
-// everything else is there to hold them. Each eye is split by a slit pupil and
-// pointed at its outer tip, as in the token.
+// DARKO — the founder's base token: a black circle and two cyan eyes, nothing
+// else (Keemin, 2026-10-04: "just my base avatar of just the black circle with
+// cyan eyes instead of the dressed one with the hat"). Drawn from
+// content-creation, ep01 art/darko/token_1 (24).png. The disc is the night
+// ink, the darkest the site wears. Each eye is split by its slit pupil, the
+// larger half pointed at the outer tip and edged below in the darker cyan; the
+// one paper pixel at the top of each pupil is the token's white catchlight.
+// The 2026-10-02 drawing (cap, gold star, hood, jacket) is retired with it.
 const DARKO = [
-  "........................",
   ".........kkkkkk.........",
-  ".......kSdddddddk.......",
-  "......kSddddddgdddk.....",
-  ".....kSddddddgGgdddk....",
-  ".....kddddddddgdddk.....",
-  "...kddddddddddddddddk...",
-  "....SSSSSSSSSSSSSSSS....",
-  "....dkdkkkkkkkkkkdkd....",
-  "....dCckCkkkkkkCkcCd....",
-  "....dkkcccCkkCccckkd....",
-  "....dkkkCkkkkkkCkkkd....",
-  "....dkkkkkkkkkkkkkkd....",
-  ".....dkkkkkkkkkkkkd.....",
-  "...hh.kkkkkkkkkkkk.hh...",
-  "..hhho..kkkkkkkk..ohhh..",
-  "..hhoo...kkkkkk...oohh..",
-  ".hhhoooookkkkkkooooohhh.",
-  ".hhoooooOkkkkkkOooooohh.",
-  "hhhoooooOOkkkkOOoooooohh",
-  "hhooooooooOkkOoooooooohh",
-  "hhooooooooOOOOoooooooohh",
-  "........................",
-  "........................",
+  "......kkkkkkkkkkkk......",
+  ".....kkkkkkkkkkkkkk.....",
+  "....kkkkkkkkkkkkkkkk....",
+  "...kkkkkkkkkkkkkkkkkk...",
+  "..kkkkkkkkkkkkkkkkkkkk..",
+  ".kkkkkkkkkkkkkkkkkkkkkk.",
+  ".kkkkkkkkkkkkkkkkkkkkkk.",
+  ".kkkkkkkkkkkkkkkkkkkkkk.",
+  "kkkkkcckpkkkkkkckpckkkkk",
+  "kkkcccckcckkkkcckcccckkk",
+  "kkccccckccckkccckccccckk",
+  "kkkCCCckcCkkkkCckcCCCkkk",
+  "kkkkkkkkkkkkkkkkkkkkkkkk",
+  "kkkkkkkkkkkkkkkkkkkkkkkk",
+  ".kkkkkkkkkkkkkkkkkkkkkk.",
+  ".kkkkkkkkkkkkkkkkkkkkkk.",
+  ".kkkkkkkkkkkkkkkkkkkkkk.",
+  "..kkkkkkkkkkkkkkkkkkkk..",
+  "...kkkkkkkkkkkkkkkkkk...",
+  "....kkkkkkkkkkkkkkkk....",
+  ".....kkkkkkkkkkkkkk.....",
+  "......kkkkkkkkkkkk......",
+  ".........kkkkkk.........",
 ];
 
 export const SPRITES = {
@@ -488,7 +488,7 @@ export const SPRITES = {
 // art sprites for each pot"). Pot slug → sprite name. A pot with no line here
 // wears no sprite and nothing else changes; a new pot gets one by adding a line.
 export const POT_SPRITES = {
-  "darko-fund": "darko",       // the DARKO fund: his token's eyes
+  "darko-fund": "darko",       // the DARKO fund: his base token, the black circle and cyan eyes
   "keeping-ec2": "meeplings",  // the town box: the box's machinery
   "meeps-fund": "postmaster",  // the meeps: Ferry, the one meep drawn
 };

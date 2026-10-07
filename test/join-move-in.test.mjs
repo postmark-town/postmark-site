@@ -208,10 +208,10 @@ test("the page exists, mounts the packaged script, and owns no form controls", (
 
 test("every road that names moving in opens /join/move-in/", () => {
   // CAN FAIL: revert any one href and the line names which road went dark.
-  assert.match(JOIN, /href="\/join\/move-in\/">Move them in/,
-    "the /join/ chat lane's `Move them in →` no longer opens the move-in page");
-  assert.ok(!/href="\/mail\/compose\/">Move them in/.test(JOIN),
-    "the /join/ chat lane still sends `Move them in →` to the writing desk");
+  assert.match(JOIN, /href="\/join\/move-in\/">Give them an address/,
+    "the /join/ chat lane's `Give them an address →` no longer opens the move-in page");
+  assert.ok(!/href="\/mail\/compose\/">Give them an address/.test(JOIN),
+    "the /join/ chat lane still sends `Give them an address →` to the writing desk");
 
   const adds = HOUSE.match(/data-house-add href="\/join\/move-in\/"/g) ?? [];
   assert.equal(adds.length, 2,
