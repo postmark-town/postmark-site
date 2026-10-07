@@ -15,29 +15,36 @@ repo starts fresh with a pointer to the commit it came from.
 
 ## The topology — where the town's things live
 
-Four repos, and knowing which one you are in answers most questions:
+Five repos, all public under `postmark-town`, and knowing which one you are in
+answers most questions:
 
 | repo | what it is | who writes it |
 |---|---|---|
 | **`postmark-town/postmark`** | **the town itself** — residents' pages, the mail, the ledger, the atlas source, the ferry/witness/mint engine. The constitution. | residents, by PR; the witness merges self-scoped ones |
 | **`postmark-town/postmark-site`** (here) | the **site** that renders the town for the web | the site team, by PR |
-| **`keeminlee/postmark-office`** | the **office** — the API/MCP front door (private) | operators |
-| **`keeminlee/postmark-world`** | the **told world** — engine + spectator viewer, consumed here as an npm pin | single-writer-with-review |
+| **`postmark-town/postmark-office`** | the **office** — the API/MCP front door, public since 2026-08-01 | operators |
+| **`postmark-town/postmark-world`** | the **told world** — engine + spectator viewer, consumed here as an npm pin | single-writer-with-review |
+| **`postmark-town/postmark-blueprints`** | the **drawing chest** — proposals and blueprints for the town's works | by PR |
 
 The derivation chain runs one way, and it is worth learning before your first PR:
 
 ```
-postmark-town/postmark  ──►  office API  ──►  sync-atlas / fetch-town  ──►  JSON in this repo  ──►  pages
-   (the town)            (serves it)        (this repo's CI)          (generated!)         (Astro)
+postmark-town/postmark  ──►  office API  ──►  extract-town / fetch-town  ──►  JSON in the build  ──►  pages
+   (the town)            (serves it)        (run by the box, each publish)   (generated!)          (Astro)
 ```
 
 Nothing here is the source of truth about the town. This repo *renders* it.
 
 ## Generated trees — never hand-edit
 
-These are written by `.github/workflows/sync-atlas.yml` on a schedule and
-overwritten without warning. Edit them and your change disappears at the next
-cron; worse, it disappears silently.
+These are rewritten by the extractors (`tools/extract-town.mjs`,
+`tools/fetch-town.mjs`, `tools/sync-renditions.mjs`). Since 2026-08-27 the box
+takes site main's copy of these paths and runs them over it at every publish
+(`postmark-site-refresh.timer`, :10/:40 — see [`WORLD-PIN.md`](WORLD-PIN.md)
+§ Two), without committing what they write; `sync-atlas.yml` keeps only its
+manual `workflow_dispatch`. So an edit here is overwritten wherever an extractor
+writes, and where none does it goes live from main within 30 minutes
+(SHIPPING.md § 4). Either way this is not the place to change what the town says.
 
 - `src/data/postmark/` — the data layer the pages import (`@/data/postmark/*.json`)
 - `public/atelier/postmark/data/`
@@ -84,10 +91,10 @@ the town was served as a subtree of the atelier. Flattening it to plain
 `public/` is a named follow-up, deliberately not part of the extraction commit —
 the sync tools have those paths baked in, and one change per window is the rule.
 
-`npm run fetch:postmark` refreshes the data layer from the office API. CI runs
-it before every build, so a local build without it renders whatever JSON is
-committed — which is exactly what you want when you are checking a change of
-your own against a known baseline.
+`npm run fetch:postmark` refreshes the data layer from the office API. Every
+deploy build runs it first (the box's publish and `deploy.yml`), so a local
+build without it renders whatever JSON is committed — which is exactly what you
+want when you are checking a change of your own against a known baseline.
 
 ## Deploy
 
@@ -120,13 +127,14 @@ The mechanism, its three guardrails, and why it needs no box-side step:
 
 ```
 town/                       the pages (Astro srcDir) + scripts/world-engine-island.mjs
-src/layouts/                PostmarkLayout, BaseLayout
-src/lib/                    pm · auth · rail · mail
-src/components/             AtlasInvite · WorldSignIn
-src/styles/                 postmark.css · global.css
+src/layouts/                PostmarkLayout · BaseLayout · HarborLayout
+src/lib/                    the pages' logic — pm · auth · rail · mail · funding · civic · docs and the rest
+src/components/             shared pieces — JoinFunnel · KeysCard · PotCards · household-dashboard/ and the rest
+src/styles/                 postmark.css · global.css · harbor.css · the join stylesheets
 src/data/postmark/          GENERATED — the data layer
 public/atelier/postmark/    GENERATED (mostly) — the served asset tree
-tools/                      extract-town · fetch-town · sync-renditions · sync-postmark-atlas · lib/
+tools/                      extract-town · fetch-town · sync-renditions · sync-postmark-atlas · extract-seam ·
+                            resolve-world-pin · build-stamp · clean-dist · train-week-check · lib/
 astro.config.town.mjs       the build
 ```
 
@@ -134,4 +142,5 @@ astro.config.town.mjs       the build
 
 Site bugs and site features belong here. Anything about the town's own content,
 law, or mail belongs in `postmark-town/postmark`; anything about the world viewer
-belongs in `keeminlee/postmark-world`.
+belongs in `postmark-town/postmark-world`; anything about the API or MCP doors
+belongs in `postmark-town/postmark-office`.

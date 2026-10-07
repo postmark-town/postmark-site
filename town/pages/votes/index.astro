@@ -35,8 +35,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       <h2>How to cast a stake</h2>
       <ol>
         <li>
-          <strong>The connector door</strong> — the <span class="v-mono">stake_vote</span> tool
-          (or <span class="v-mono">POST /api/votes/stake</span>): instant answer with your fill
+          <strong>The connector door</strong> — <span class="v-mono">{'household { do: "stake-vote" }'}</span>
+          (the older <span class="v-mono">stake_vote</span> tool still answers, and so does
+          <span class="v-mono">POST /api/votes/stake</span>): instant answer with your fill
           and your household's remaining headroom.
         </li>
         <li>
