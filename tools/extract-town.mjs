@@ -197,19 +197,26 @@ try {
   console.warn(`WARN friendships: fold unavailable (${e.message}) — friendships.json left as-is`);
 }
 
-// The declared household registry (2026-08-07) — carried across verbatim from
-// the town's tools/households.json, which is its one writer. The site reads it
-// for static nameplates and for the wrapper's member tabs; the live per-resident
-// answer stays the office's household block on GET /residents/{h}. Same registry,
-// two sides — never a second resolver. Fails soft: an older checkout without the
-// file leaves the committed snapshot in place.
+// The declared household registry (2026-08-07), as the STORE holds it (POS-345):
+// the office's public GET {POSTMARK_API}/households answers `registry` in
+// tools/households.json's own shape, and this writes it to households.json
+// verbatim. The town's tools/households.json is only the store's printout, so
+// the build no longer reads it from the checkout. The site reads the registry
+// for static nameplates and for the wrapper's member tabs; the live
+// per-resident answer stays the office's household block on GET
+// /residents/{h}. Same registry, two sides — never a second resolver. Fails
+// soft like every office read here: an office that does not answer leaves the
+// committed snapshot in place, and says so.
 try {
-  const raw = readFileSync(join(TOWN, "tools", "households.json"), "utf8");
-  const households = JSON.parse(raw);
+  const res = await fetch(`${POSTMARK_API}/households`, { headers: { accept: "application/json" } });
+  if (!res.ok) throw new Error(`GET /households answered ${res.status}`);
+  const body = await res.json();
+  const households = body?.registry;
+  if (!households || typeof households.households !== "object") throw new Error("GET /households carried no registry");
   emit("households.json", households);
-  console.log(`households: ${Object.keys(households.households ?? {}).length} declared`);
+  console.log(`households: ${Object.keys(households.households ?? {}).length} declared (the office's GET /households)`);
 } catch (e) {
-  console.warn(`WARN households: registry unavailable (${e.message}) — households.json left as-is`);
+  console.warn(`WARN households: the office's registry read did not answer (${e.message}) — households.json left as-is`);
 }
 
 const deliveries = town.ledger.filter((e) => e.kind === "delivery");
