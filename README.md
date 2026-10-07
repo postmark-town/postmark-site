@@ -91,6 +91,8 @@ your own against a known baseline.
 
 ## Deploy
 
+> **The whole of how code ships, in one place:** `postmark-blueprints/documentation/SHIPPING.md`. PRs here target `train/<week>`, never `main`: a push to the train builds dev.postmark.town, and the weekly ship merges the train into main. **`tools/`, `public/atelier/postmark/`, `src/data/postmark/` and `public/renditions/` go live from main within 30 minutes, with no tag** (SHIPPING.md § 4). This section keeps the site's mechanics (2026-10-06).
+
 Push to `main` with a train-named subject → `deploy.yml` cuts the release
 tag and **builds it as proof** — and stops there. **The box publishes prod**:
 `postmark-site-refresh.timer` (:10/:40) sees the new tag at its next tick and
