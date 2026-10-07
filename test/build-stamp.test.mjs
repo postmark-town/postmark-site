@@ -21,6 +21,10 @@ function writeManifestAt(root, problems = []) {
   const dir = join(root, "public", "atelier", "postmark", "data");
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "index.json"), JSON.stringify({ as_of: "abc123", endpoint_gaps: [], problems }));
+  // ...and a complete fetch baked the office's settlement (POS-360), which the stamp names.
+  const data = join(root, "src", "data", "postmark");
+  mkdirSync(data, { recursive: true });
+  writeFileSync(join(data, "world-state.json"), JSON.stringify({ marks: [], meta: { source: "settlement", as_of: { settlement: "S95", digest: "9".repeat(64) } } }));
   return root;
 }
 

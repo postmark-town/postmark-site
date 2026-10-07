@@ -12,6 +12,7 @@ import { buildOfficeData, fetchBlueprints, fetchRollcall, fetchCrossings, jsonTe
 import { worldPin } from "./lib/world-pin-publish.mjs";
 import { readProjectsFromCheckout } from "./lib/town-projects.mjs";
 import { writeIfChanged } from "./lib/mirror.mjs";
+import { bakeWorld } from "./lib/world-settlement.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SITE_ROOT = resolve(HERE, "..");
@@ -179,6 +180,19 @@ try {
     writeBuildInput("settlements.json", await fetchSettlements());
   } catch (error) {
     console.warn(`WARN fetch-town: the settlements record could not be read; keeping the committed snapshot (${error.message})`);
+  }
+  // ── THE WORLD, FROM THE OFFICE'S SETTLEMENT (POS-360, R3) ─────────────────
+  // GET /world/state?settlement= — the newest settlement's World minus every
+  // opposed mark — baked as a build input beside the town's data. A build
+  // input, not a mirror: its public copy is the staged /WORLD/world-state.json
+  // export (world-engine-island.mjs), and two public copies would be one too
+  // many. Fail-soft like the chest: an office that does not answer a
+  // settlement writes nothing, and the World already baked builds (the last
+  // good World). Never backwards: an older settlement does not replace a newer.
+  {
+    const world = await bakeWorld({ apiBase: API, root: SITE_ROOT, write: (body) => writeBuildInput("world-state.json", body) });
+    if (world.baked) console.log(`data/world-state.json: ${world.line}`);
+    else console.warn(`WARN fetch-town: data/world-state.json: ${world.line}`);
   }
   // ── THE SITE SAYS WHAT WORLD IT IS PINNED TO (Lane A's A8, 2026-09-07) ────
   // The office's focus receipt carries `site_pin` and cannot fill it: it holds

@@ -29,7 +29,7 @@
 // fold. The board shows what residents have put behind a notice; it does not
 // pretend to be the world's verdict on it.
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
@@ -41,18 +41,41 @@ export const BOUNTY_CLASS = "bounty";
 export const ASK_MAX = 150;
 
 // ── the store ────────────────────────────────────────────────────────────────
-// Same source the /world viewer is served from: the pinned postmark-world
-// package. Build-time freshness is the pin's freshness, which is the same
-// freshness the world page has — no second pipeline, no second truth.
-export function loadWorldState({ path = null, require: req = createRequire(import.meta.url) } = {}) {
+// THE OFFICE'S SETTLEMENT (POS-360, R3): the World tools/fetch-town.mjs baked
+// from GET /world/state, the newest settlement minus every opposed mark — the
+// same World the /world viewer reads from the office first. When the office did
+// not answer, the World baked before it is still there, so the board keeps the
+// last good World rather than reading empty.
+//
+// The pinned postmark-world package's own fold is read ONLY when no settlement
+// has ever been baked into this tree (the first build after this change, before
+// the office serves one), and the answer carries `meta.source: "package"` so
+// that floor is never mistaken for a settlement. The package is for engine code.
+//
+// Both places are tried for the baked file, funding.mjs § readEmission's reason:
+// under `astro build` this module is bundled and its URL no longer sits beside
+// src/data/, so the project root the build runs from is the second candidate.
+const BAKED_WORLD = [new URL("../data/postmark/world-state.json", import.meta.url),
+  join(process.cwd(), "src", "data", "postmark", "world-state.json")];
+
+export function loadWorldState({ path = null, baked = BAKED_WORLD, require: req = createRequire(import.meta.url) } = {}) {
+  if (path) {
+    try { return JSON.parse(readFileSync(path, "utf8")); } catch { return null; }
+  }
+  for (const candidate of baked ?? []) {
+    if (!existsSync(candidate)) continue;
+    try { return JSON.parse(readFileSync(candidate, "utf8")); }
+    catch { /* a torn bake falls to the next, then to the floor below, and says so */ }
+  }
   try {
     // Resolve through an EXPORTED specifier. `postmark-world/package.json` is not
     // in the package's exports map, so resolving it throws
     // ERR_PACKAGE_PATH_NOT_EXPORTED and the board silently reads empty — which is
     // exactly how this was caught: the first build rendered "the world store
     // could not be read" against a world that was sitting right there.
-    const file = path ?? join(dirname(req.resolve("postmark-world/geometry")), "..", "WORLD", "world-state.json");
-    return JSON.parse(readFileSync(file, "utf8"));
+    const file = join(dirname(req.resolve("postmark-world/geometry")), "..", "WORLD", "world-state.json");
+    const state = JSON.parse(readFileSync(file, "utf8"));
+    return { ...state, meta: { source: "package", note: "no settlement has been baked into this tree yet (tools/fetch-town.mjs bakes the office's)" } };
   } catch {
     // Fail-soft, exactly like fetch-town.mjs: a missing or unreadable store must
     // not take the site down. An empty board is honest; a build failure is not.
