@@ -101,7 +101,7 @@ A prod build is assembled from **four sources moving at four speeds**:
 | Source | Where it comes from | Pace |
 |---|---|---|
 | **Code** | the newest `release/*` tag (`--sort=-creatordate`) | a founder Approve |
-| **Town data** | site main's extractors, run on the box against the town's `origin/main` and never committed — `public/atelier/postmark` (renditions included) and `src/data/postmark` | every crossing |
+| **Town data** | site main — `public/atelier/postmark`, `src/data/postmark`, `public/renditions` — with main's extractors run over it on the box against the town's `origin/main`; what they write is never committed | every crossing |
 | **Deploy machinery** | site main — `tools/resolve-world-pin.mjs`, `tools/lib/world-pin.mjs`, `tools/build-stamp.mjs`, checked out over the tag | every tick |
 | **The world** | the keeper's newest `settlement/S<n>` tag, resolved at rebuild time | every blessing |
 

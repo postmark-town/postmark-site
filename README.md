@@ -39,11 +39,12 @@ Nothing here is the source of truth about the town. This repo *renders* it.
 
 These are rewritten by the extractors (`tools/extract-town.mjs`,
 `tools/fetch-town.mjs`, `tools/sync-renditions.mjs`). Since 2026-08-27 the box
-runs them at every publish (`postmark-site-refresh.timer`, :10/:40 — see
-[`WORLD-PIN.md`](WORLD-PIN.md) § Two) and builds prod from their output without
-committing it; `sync-atlas.yml` keeps only its manual `workflow_dispatch`. So
-the copies committed here are a baseline for local builds, not what prod
-serves. Edit them and your change never reaches prod; worse, nothing tells you.
+takes site main's copy of these paths and runs them over it at every publish
+(`postmark-site-refresh.timer`, :10/:40 — see [`WORLD-PIN.md`](WORLD-PIN.md)
+§ Two), without committing what they write; `sync-atlas.yml` keeps only its
+manual `workflow_dispatch`. So an edit here is overwritten wherever an extractor
+writes, and where none does it goes live from main within 30 minutes
+(SHIPPING.md § 4). Either way this is not the place to change what the town says.
 
 - `src/data/postmark/` — the data layer the pages import (`@/data/postmark/*.json`)
 - `public/atelier/postmark/data/`
