@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 import { GUIDES, TO_WRITE } from "../src/lib/docs.mjs";
 import { RAIL } from "../src/lib/nav.mjs";
-import { REPOS } from "../src/lib/record.mjs";
+import { REPOS, ROOM_RECORD } from "../src/lib/record.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist-town");
@@ -102,4 +102,21 @@ test("the built repos page: what each repo holds and what its maintainers said, 
     const card = inView(page.slice(start, page.indexOf("</a>", start)));
     for (const s of [r.holds, ...(r.said ? [r.said] : [])]) assert.ok(card.includes(plain(s)), `not in view on ${r.key}: "${s}"`);
   }
+});
+
+// POS-330 part 2 (Kogane, Office Hours 10-02): her human went looking for where
+// a say lands, found this page, and it did not mention rooms.
+test("the room's record is named by a repo on this page, and the file is the world's log", () => {
+  assert.ok(REPOS.some((r) => r.key === ROOM_RECORD.repo), `${ROOM_RECORD.repo} is not one of the five`);
+  assert.equal(ROOM_RECORD.href, "https://github.com/postmark-town/postmark-world/tree/main/STATE/log");
+  assert.ok(ROOM_RECORD.said.includes("postmark-world STATE/log/<crossing>.jsonl"));
+});
+
+test("the built repos page names rooms and where they are kept, in view", { skip: !built("docs", "repos") }, () => {
+  const page = own(html("docs", "repos"), "recdir");
+  const view = inView(page);
+  assert.ok(view.includes("Where a room is kept"), "the repos page has no word for rooms");
+  // Compared as written: plain() would read the "<crossing>" placeholder as a tag.
+  for (const s of [ROOM_RECORD.said, ROOM_RECORD.meeps]) assert.ok(view.includes(s), `not in view: "${s}"`);
+  assert.match(page, new RegExp(`<a\\b[^>]*href="${ROOM_RECORD.href}"`), "the room's record is named but not linked");
 });
