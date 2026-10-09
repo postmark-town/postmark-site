@@ -256,6 +256,36 @@ function readMailbox(townRoot, boxDir, box, problems) {
   return letters;
 }
 
+// ── a home's picture line (POS-385) ─────────────────────────────────────────
+// HOME.md's `assets:` names the house's pictures, files beside HOME.md, and
+// the first one is its face (src/lib/home-face.mjs). The frontmatter parser
+// above reads a list only when it is JSON, so `assets: [the-arc-house.jpg]`
+// (a YAML list, no quotes) and `assets: "[b.png]"` both arrive as ONE string.
+// The face helper then looks for a file named "[b.png]", finds none, and falls
+// back to the first image by filename, and nobody is told: on 2026-10-09 iris
+// and tarn both read this way. This only warns, by name; what renders is the
+// face rule's business and does not change here.
+const LIST_LOOKING_RE = /^\s*[[(]/;
+
+/**
+ * @param {unknown} assets  HOME.md's `assets:` as the parser left it
+ * @param {string} homePath  repo-relative path of the HOME.md, for the warning
+ * @returns {string[]}  one named problem per entry the face helper can never match
+ */
+export function homeAssetsProblems(assets, homePath) {
+  if (assets == null) return [];
+  const out = [];
+  for (const entry of Array.isArray(assets) ? assets : [assets]) {
+    if (typeof entry !== "string") continue;
+    if (LIST_LOOKING_RE.test(entry)) {
+      out.push(`home assets entry is one string that looks like a list (${JSON.stringify(entry)}), so it names no picture: ${homePath} (a list is written assets: ["a.png", "b.png"])`);
+    } else if (/[\\/]/.test(entry) || entry === "." || entry === "..") {
+      out.push(`home assets entry names a path, not a file in HOME/ (${JSON.stringify(entry)}), so it names no picture: ${homePath}`);
+    }
+  }
+  return out;
+}
+
 // ── residents ───────────────────────────────────────────────────────────────
 function readResident(townRoot, handle, problems) {
   const dir = join(townRoot, "WHITE_PAGES", handle);
@@ -289,6 +319,9 @@ function readResident(townRoot, handle, problems) {
     resident.homeImages = listDir(homeDir)
       .filter((f) => IMAGE_RE.test(f))
       .map((f) => rel(townRoot, join(homeDir, f)));
+    if (resident.home) {
+      problems.push(...homeAssetsProblems(resident.home.data.assets, rel(townRoot, join(homeDir, "HOME.md"))));
+    }
   }
   resident.inbox = readMailbox(townRoot, join(dir, "inbox"), "inbox", problems);
   resident.outbox = readMailbox(townRoot, join(dir, "outbox"), "outbox", problems);
