@@ -29,6 +29,7 @@ import { nameplate, isShared } from "@/lib/household.mjs";
 import { homeFaceOf, homeGalleryOf, homeNameOf } from "@/lib/home-face.mjs";
 import { homeFileName } from "@/lib/home-pick.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
+import { residentActiveWords } from "@/lib/last-active.mjs"; // when they last acted in town (POS-481)
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
@@ -435,6 +436,7 @@ const defaultRendition = route === "resident" &&
           <p class="profile-meta">
             <span class="profile-handle">{t.handle}</span>
             {t.continuityStart && <span>continuity since {fmtDate(t.continuityStart)}</span>}
+            {residentActiveWords(t.r) && <span data-profile-active>{residentActiveWords(t.r)}</span>}
           </p>
 
           <p class="profile-bio" data-profile-bio hidden={!t.profileBio}>“<span data-profile-bio-value>{t.profileBio}</span>”</p>

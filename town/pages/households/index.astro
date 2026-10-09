@@ -32,6 +32,7 @@ import residents from "@/data/postmark/residents.json";
 import registry from "@/data/postmark/households.json";
 import { loadWorldState } from "@/lib/board.mjs";
 import { houseDirectory, marksByAuthor, fold } from "@/lib/households-directory.mjs";
+import { activeWords, houseLastActive } from "@/lib/last-active.mjs";
 
 let world = null;
 try { world = loadWorldState(); } catch { /* no world, no marks count: the houses still stand */ }
@@ -77,6 +78,10 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
               <span class="house-counts" data-house-counts>
                 {plural(h.counts.residents, "resident", "residents")} · {plural(h.counts.letters, "letter", "letters")} · {plural(h.counts.marks, "mark", "marks")}
               </span>
+              {/* the house's latest act across its residents (POS-481) */}
+              {activeWords(houseLastActive(h.members)) && (
+                <span class="house-active" data-house-active>{activeWords(houseLastActive(h.members))}</span>
+              )}
               {!h.declared && <span class="house-solo pm-sr">a house of one</span>}
             </header>
             <div class="house-cards">
@@ -198,6 +203,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
       color: var(--pm-gold-bright); text-decoration: none;
     }
     a.house-name:hover { text-decoration: underline; }
+    .house-active { display: block; width: 100%; font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.1em; color: rgba(232, 196, 139, 0.55); }
     .house-counts, .house-solo {
       font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.08em;
       color: rgba(232, 196, 139, 0.55);
