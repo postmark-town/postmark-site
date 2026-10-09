@@ -6,7 +6,7 @@
 // the resident's newest act of their own, and `last_active_crossing`). The
 // build carries the two into residents.json only when the office said them
 // (fetch-town-data.mjs § lastActiveFields), and the pages print plain words:
-// "active 3 days ago · crossing 281", "no acts yet", or nothing when the
+// "active Oct 6 · crossing 236", "no acts yet", or nothing when the
 // office did not say.
 //
 // Falsifier (POS-481): point lastActiveFields at the wrong field (the card's
@@ -19,7 +19,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { lastActiveFields, mapResident } from "../tools/lib/fetch-town-data.mjs";
-import { activeWords, agoWords, houseLastActive, lastActiveOf, residentActiveWords } from "../src/lib/last-active.mjs";
+import { activeWords, dayWords, houseLastActive, lastActiveOf, residentActiveWords } from "../src/lib/last-active.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const NOW = Date.parse("2026-10-09T13:00:00Z");
@@ -45,20 +45,22 @@ test("a resident with no act is said as null; an office that did not say carries
   assert.equal("last_active" in row, false);
 });
 
-test("the words: active N ago with its crossing, no acts yet, or nothing", () => {
-  assert.equal(residentActiveWords({ last_active: "2026-10-06T08:00:00.000Z", last_active_crossing: 236 }, NOW), "active 3 days ago · crossing 236");
-  assert.equal(residentActiveWords({ last_active: "2026-10-09T01:00:00.000Z", last_active_crossing: 238 }, NOW), "active today · crossing 238");
+test("the words: active on a day with its crossing, no acts yet, or nothing", () => {
+  assert.equal(residentActiveWords({ last_active: "2026-10-06T08:00:00.000Z", last_active_crossing: 236 }, NOW), "active Oct 6 · crossing 236");
+  // 01:00Z on Oct 9 is 21:00 EDT on Oct 8: the town's own day
+  assert.equal(residentActiveWords({ last_active: "2026-10-09T01:00:00.000Z", last_active_crossing: 238 }, NOW), "active Oct 8 · crossing 238");
   assert.equal(residentActiveWords({ last_active: null, last_active_crossing: null }, NOW), "no acts yet");
   assert.equal(residentActiveWords({ handle: "old" }, NOW), null);
   assert.equal(lastActiveOf({ handle: "old" }), undefined);
 });
 
-test("ago: whole UTC days, then months, then years", () => {
-  assert.equal(agoWords("2026-10-08T23:59:00Z", NOW), "yesterday");
-  assert.equal(agoWords("2026-08-11T00:00:00Z", NOW), "59 days ago");
-  assert.equal(agoWords("2026-08-10T00:00:00Z", NOW), "2 months ago");
-  assert.equal(agoWords("2025-10-01T00:00:00Z", NOW), "1 year ago");
-  assert.equal(agoWords("2026-10-10T00:00:00Z", NOW), "today", "a clock a little ahead never reads as the future");
+test("the day: Eastern, never relative, the year only when it is not the build's", () => {
+  assert.equal(dayWords("2026-10-09T03:59:00Z", NOW), "Oct 8", "23:59 EDT is still the 8th");
+  assert.equal(dayWords("2026-10-09T04:00:00Z", NOW), "Oct 9");
+  assert.equal(dayWords("2026-12-01T05:30:00Z", NOW), "Dec 1", "EST after Nov 1: 00:30 EST");
+  assert.equal(dayWords("2025-10-01T12:00:00Z", NOW), "Oct 1, 2025");
+  // the same act reads the same words however long the page stands
+  assert.equal(dayWords("2026-10-06T08:00:00Z", NOW), dayWords("2026-10-06T08:00:00Z", NOW + 30 * 24 * 3600 * 1000));
 });
 
 test("a house reads the latest across its residents", () => {
@@ -66,7 +68,7 @@ test("a house reads the latest across its residents", () => {
   const b = { last_active: "2026-10-06T08:00:00.000Z", last_active_crossing: 236 };
   const none = { last_active: null, last_active_crossing: null };
   assert.deepEqual(houseLastActive([a, none, b]), { at: "2026-10-06T08:00:00.000Z", crossing: 236 });
-  assert.equal(activeWords(houseLastActive([a, b]), NOW), "active 3 days ago · crossing 236");
+  assert.equal(activeWords(houseLastActive([a, b]), NOW), "active Oct 6 · crossing 236");
   assert.equal(houseLastActive([none, none]), null, "every resident said, none acted");
   assert.equal(houseLastActive([none, { handle: "old" }]), undefined, "one not said: the house is not said either");
   assert.deepEqual(houseLastActive([{ handle: "old" }, a]), { at: a.last_active, crossing: 162 }, "an act anywhere in the house is said");

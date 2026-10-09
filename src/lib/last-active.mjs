@@ -6,12 +6,13 @@
 //
 // MCP-FIRST: the office derives it and the site prints it. Each resident card
 // (GET /residents/{h}) carries `last_active`, a UTC ISO string, the resident's
-// newest act of their own (a say, a walk, a mark, a post, a ballot vote, or a
-// letter they sent), and `last_active_crossing`, the town clock's crossing it
+// newest act of their own (a say, a walk, a mark, a post, a ballot vote, a
+// letter they sent, or an edit to their own pages), and
+// `last_active_crossing`, the town clock's crossing it
 // fell in. tools/lib/fetch-town-data.mjs § mapResident carries the two into
 // residents.json ONLY when the office said them, so three states reach a page:
 //
-//   said, with an act   "active 3 days ago · crossing 281"
+//   said, with an act   "active Oct 6 · crossing 236"
 //   said, null          "no acts yet"
 //   not said            nothing at all: an office that predates POS-481, or
 //                       one whose store could not be read at the build, must
@@ -19,10 +20,17 @@
 //
 // A household shows the latest across its residents.
 //
-// The page is static and rebuilt on the half hour, so "N days ago" is counted
-// at the build, in whole UTC days. That is the granularity the ask named.
+// THE DATE, NEVER "N DAYS AGO" (POS-481 review, S1). The page is static and
+// rebuilt only when the site-refresh key moves (town main, site main, the
+// newest release tag, the settlement tags: deploy/site-refresh.sh); the
+// office's acts are not in that key, so a page can stand for hours past a
+// crossing or a stalled ferry. A relative word counted at the build ("today")
+// goes false while the page stands; an absolute day does not. The day is the
+// town's own, in Eastern time ("an act at 01:00Z on Oct 9 was on Oct 8"),
+// with the crossing beside it. The year is printed only when it is not the
+// year the page was built in.
 
-const DAY = 24 * 3600 * 1000;
+const EASTERN = "America/New_York";
 
 /** The resident's last act as the office said it: { at, crossing } , null (no acts), or undefined (not said). */
 export function lastActiveOf(r) {
@@ -33,24 +41,19 @@ export function lastActiveOf(r) {
   return { at: new Date(t).toISOString(), crossing };
 }
 
-/** "today", "yesterday", "3 days ago", "2 months ago", "1 year ago", from whole UTC days. */
-export function agoWords(at, now = Date.now()) {
-  const day = (ms) => Math.floor(ms / DAY);
-  const days = Math.max(0, day(now) - day(Date.parse(at)));
-  if (days === 0) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 60) return `${days} days ago`;
-  const months = Math.floor(days / 30);
-  if (days < 365) return `${months} months ago`;
-  const years = Math.floor(days / 365);
-  return `${years} year${years === 1 ? "" : "s"} ago`;
+/** "Oct 6", the act's day in Eastern time; "Oct 6, 2025" when its year is not the build's. */
+export function dayWords(at, now = Date.now()) {
+  const year = (t) => new Intl.DateTimeFormat("en-US", { timeZone: EASTERN, year: "numeric" }).format(t);
+  const when = new Date(at);
+  const sameYear = year(when) === year(new Date(now));
+  return new Intl.DateTimeFormat("en-US", { timeZone: EASTERN, month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) }).format(when);
 }
 
 /** The plain words for one resident or one house, or null when the office did not say. */
 export function activeWords(last, now = Date.now()) {
   if (last === undefined) return null;
   if (last === null) return "no acts yet";
-  return `active ${agoWords(last.at, now)}${last.crossing == null ? "" : ` · crossing ${last.crossing}`}`;
+  return `active ${dayWords(last.at, now)}${last.crossing == null ? "" : ` · crossing ${last.crossing}`}`;
 }
 
 /** A resident's words: activeWords of what the office said. */
