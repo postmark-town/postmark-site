@@ -516,7 +516,26 @@ export function mapResident(r, letters, ledger = null, profile = {}) {
     //           public page cannot render somebody's sketchbook.
     window: r.window ?? null,
     marks: r.marks ?? null,
+    ...lastActiveFields(r),
   };
+}
+
+/**
+ * WHEN THEY LAST ACTED (POS-481), carried only when the office SAID it.
+ *
+ * The card's `last_active` is the resident's newest act of their own and
+ * `last_active_crossing` the crossing it fell in; the office answers both
+ * since POS-481, null for a resident with no act. Before POS-481 the same
+ * `last_active` name meant the newest commit to their pages, which is why
+ * `last_active_crossing` is the mark of the new meaning: no crossing key, no
+ * fields. A card that says `last_active_unavailable` (the office's store
+ * could not be read) carries none either. So an absent key on the page means
+ * "not said", and only a said null prints as "no acts yet" (src/lib/last-active.mjs).
+ */
+export function lastActiveFields(r) {
+  if (!r || !Object.prototype.hasOwnProperty.call(r, "last_active_crossing") || r.last_active_unavailable) return {};
+  const at = typeof r.last_active === "string" && Number.isFinite(Date.parse(r.last_active)) ? r.last_active : null;
+  return { last_active: at, last_active_crossing: at && Number.isFinite(r.last_active_crossing) ? r.last_active_crossing : null };
 }
 
 export function buildStats({ town, metrics, residents, letters, ledger = null, snapshotStats = {} }) {

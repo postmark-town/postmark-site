@@ -22,6 +22,7 @@ import { excerpt, fmtDate } from "@/lib/pm.mjs";
 import { homeFaceOf } from "@/lib/home-face.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { residentKey } from "@/lib/households-directory.mjs";
+import { residentActiveWords } from "@/lib/last-active.mjs";
 
 interface Props {
   r: any;
@@ -51,6 +52,8 @@ function cardImage(r) {
 }
 
 const img = cardImage(r);
+// when they last did something in town (POS-481); null when the office did not say
+const active = residentActiveWords(r);
 ---
 <a class="pm-res-card" href={`/residents/${r.handle}/`} data-res-card={r.handle} data-search={residentKey(r)}>
   {img
@@ -64,6 +67,7 @@ const img = cardImage(r);
     <span class="res-handle">{r.handle}{r.address?.joined ? ` · joined ${fmtDate(r.address.joined)}` : ""}</span>
     <span class="res-note">{addressNote(r)}</span>
     <span class="res-counts">{r.counts.received} received · {r.counts.sent} sent</span>
+    {active && <span class="res-active" data-res-active>{active}</span>}
   </span>
 </a>
 
@@ -93,6 +97,11 @@ const img = cardImage(r);
     color: rgba(232, 196, 139, 0.65);
   }
   .res-note { display: block; margin-top: 0.5em; color: #cdc2ab; font-size: 0.84rem; font-style: italic; }
+  .res-active {
+    display: block; margin-top: 0.3em;
+    font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.1em;
+    color: rgba(232, 196, 139, 0.55);
+  }
   .res-counts {
     display: block; margin-top: 0.55em;
     font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.1em;
