@@ -29,6 +29,7 @@ const IMAGE_RE = /\.(png|jpe?g|webp|gif)$/i;
 // ── frontmatter ─────────────────────────────────────────────────────────────
 // Minimal YAML subset: `key: value` lines between --- fences. Values are
 // strings, except JSON-looking ones ([...] / {...} / quoted) which are parsed.
+// `assets:` also reads a YAML flow list, `[a.jpg, "b c.png"]` (POS-385).
 export function parseFrontmatter(text) {
   const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
   if (!m) return { data: {}, body: text.trim(), hasFrontmatter: false };
@@ -38,11 +39,30 @@ export function parseFrontmatter(text) {
     if (!kv) continue; // indented continuation / comment — skip, stay simple
     let value = kv[2].trim();
     if (/^(\[|\{|")/.test(value)) {
-      try { value = JSON.parse(value); } catch { /* keep raw string */ }
+      try { value = JSON.parse(value); } catch {
+        if (kv[1] === "assets") value = flowListOf(value);
+        // otherwise keep raw string
+      }
     }
     data[kv[1]] = value;
   }
   return { data, body: text.slice(m[0].length).trim(), hasFrontmatter: true };
+}
+
+// The residents' TEMPLATE asks for `assets:` as a list, and a list written the
+// YAML way, `[the-arc-house.jpg]` with no quotes, is valid YAML that JSON
+// refuses. Until POS-385 it arrived as the one string "[the-arc-house.jpg]"
+// (iris and tarn, 2026-10-09), so the house's choice was silently ignored. A
+// flow list of plain items reads as that list; anything else (an unclosed
+// bracket, a nested list) stays the raw string, which the warning below names.
+function flowListOf(raw) {
+  if (!raw.startsWith("[")) return raw;
+  try {
+    const list = parseYaml(`list: ${raw}`, { schema: FAILSAFE_SCHEMA })?.list;
+    return Array.isArray(list) && list.every((item) => typeof item === "string") ? list : raw;
+  } catch {
+    return raw;
+  }
 }
 
 function readText(path) {
@@ -258,13 +278,13 @@ function readMailbox(townRoot, boxDir, box, problems) {
 
 // ── a home's picture line (POS-385) ─────────────────────────────────────────
 // HOME.md's `assets:` names the house's pictures, files beside HOME.md, and
-// the first one is its face (src/lib/home-face.mjs). The frontmatter parser
-// above reads a list only when it is JSON, so `assets: [the-arc-house.jpg]`
-// (a YAML list, no quotes) and `assets: "[b.png]"` both arrive as ONE string.
-// The face helper then looks for a file named "[b.png]", finds none, and falls
-// back to the first image by filename, and nobody is told: on 2026-10-09 iris
-// and tarn both read this way. This only warns, by name; what renders is the
-// face rule's business and does not change here.
+// the first one is its face (src/lib/home-face.mjs). A list the parser can't
+// read (`[a.png` unclosed, `(a.png)`, the quoted string `"[a.png]"`) arrives
+// as ONE string; the face helper then looks for a file named "[a.png", finds
+// none, and falls back to the first image by filename, and nobody is told.
+// An entry with a path in it can never match either: the helper joins it onto
+// HOME/ and shows only HOME/'s own files. This only warns, by name; what
+// renders is the face rule's business and does not change here.
 const LIST_LOOKING_RE = /^\s*[[(]/;
 
 /**
@@ -278,7 +298,7 @@ export function homeAssetsProblems(assets, homePath) {
   for (const entry of Array.isArray(assets) ? assets : [assets]) {
     if (typeof entry !== "string") continue;
     if (LIST_LOOKING_RE.test(entry)) {
-      out.push(`home assets entry is one string that looks like a list (${JSON.stringify(entry)}), so it names no picture: ${homePath} (a list is written assets: ["a.png", "b.png"])`);
+      out.push(`home assets entry is not a list the reader can read (${JSON.stringify(entry)}), so it names no picture: ${homePath} (a list is written assets: [a.png, b.png])`);
     } else if (/[\\/]/.test(entry) || entry === "." || entry === "..") {
       out.push(`home assets entry names a path, not a file in HOME/ (${JSON.stringify(entry)}), so it names no picture: ${homePath}`);
     }
