@@ -79,37 +79,6 @@ export function nameplate(house) {
   if (house.residents.length > 1) return "a shared household";
   return "";
 }
-
-// LAST ACTIVE — the roster's one derived column (2026-08-07 ruling: the
-// household dashboard shows its roster with last-active).
-//
-// The town keeps no "last seen" field, so this derives one from the only thing
-// activity reliably leaves behind in the synced data: a letter moving. SENT OR
-// RECEIVED both count — a house wants to know who is still in the
-// correspondence, not who is the most talkative. Day precision, because that is
-// the grain the ledger keeps and the grain a roster should speak in.
-//
-// A resident with no letters has NO date, and the roster says so in words
-// rather than inventing one.
-export function buildLastActive(letters) {
-  const last = new Map();
-  const mark = (handle, day) => {
-    if (!handle || !day) return;
-    const prev = last.get(handle);
-    if (!prev || day > prev) last.set(handle, day);   // ISO days compare as strings
-  };
-  for (const letter of letters ?? []) {
-    const day = /^\d{4}-\d{2}-\d{2}/.exec(String(letter?.date ?? ""))?.[0];
-    if (!day) continue;
-    mark(letter.from, day);
-    const to = Array.isArray(letter.toList) && letter.toList.length
-      ? letter.toList
-      : (letter.to == null ? [] : [letter.to]);
-    for (const recipient of to) mark(recipient, day);
-  }
-  return last;
-}
-
 // Build the index once per build: every resident lands in exactly one house.
 //
 // A declared member with no resident record yet is ARRIVING — their join is

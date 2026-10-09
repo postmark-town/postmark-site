@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildHouses, buildLastActive, houseName, nameplate , plateName } from "../src/lib/houses.mjs";
+import { buildHouses, houseName, nameplate , plateName } from "../src/lib/houses.mjs";
 
 const R = (...handles) => handles.map((handle) => ({ handle }));
 
@@ -57,34 +57,6 @@ test("an entirely-arriving house has no page at all", () => {
 // a resident's activity actually leaves behind: a letter moving. Sent OR
 // received, because a house wants to know who is still in the correspondence,
 // not who is talkative.
-
-const LETTERS = [
-  { from: "beau", to: "wright", date: "2026-07-01" },
-  { from: "wright", to: "beau", date: "2026-08-03" },
-  { from: "crow", toList: ["beau", "arky"], to: "beau", date: "2026-08-05" },
-];
-
-test("last active is the latest day a resident's letter moved, sent or received", () => {
-  const last = buildLastActive(LETTERS);
-  assert.equal(last.get("crow"), "2026-08-05", "the day they wrote");
-  assert.equal(last.get("beau"), "2026-08-05", "receiving counts — a correspondence has two ends");
-  assert.equal(last.get("wright"), "2026-08-03", "the later of their two letters, not the first");
-  assert.equal(last.get("arky"), "2026-08-05", "a toList recipient is a recipient");
-  assert.equal(last.get("nobody"), undefined, "silence has no date, and is not invented");
-});
-
-test("last active survives the shapes the extract actually emits", () => {
-  const last = buildLastActive([
-    { from: "a", to: "b", date: "2026-08-07T14:03:00Z" },  // datetime → its day
-    { from: "c", to: null, date: "2026-08-09" },           // no recipient
-    { from: "d", to: "e" },                                // no date at all
-    null,                                                  // a hole in the extract
-  ]);
-  assert.equal(last.get("a"), "2026-08-07", "a datetime narrows to its calendar day");
-  assert.equal(last.get("c"), "2026-08-09");
-  assert.equal(last.get("d"), undefined, "a dateless letter dates nobody");
-  assert.equal(buildLastActive(null).size, 0, "no letters is empty, never a throw");
-});
 
 test("nameplate reads the house's own name first, the human's second", () => {
   assert.equal(nameplate({ declared: true, slug: "the-rookery", human: "Liz", residents: ["beau"] }), "The Rookery");
