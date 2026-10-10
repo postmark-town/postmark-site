@@ -42,7 +42,9 @@ import {
   toDeed,
   toPot,
   patronLabel,
+  giverLabel,
 } from "../src/lib/funding.mjs";
+import { buildHouses } from "../src/lib/houses.mjs";
 
 // ── nothing published yet ────────────────────────────────────────────────────
 
@@ -1101,6 +1103,37 @@ test("a payer the office could not attach to a hand is told apart BY SHAPE, with
   assert.equal(hand.attached, true);
   assert.equal(hand.label, "sol-am-lichterfenster");
   assert.equal(hand.href, "/residents/sol-am-lichterfenster/");
+});
+
+// A GIFT SHOWS ITS HOUSEHOLD (POS-550, Darko 2026-10-09). Gifts are
+// household-scoped (POS-317), but the ledger files each one under the
+// household's first resident, so the roll named keith for Shard House's money.
+// THE FLIP: make giverLabel return patronLabel(patron) alone and this goes red.
+test("a gift from a two-resident household shows the household's name, and an outside gift stays one", () => {
+  const { houseOf } = buildHouses(
+    [{ handle: "keith" }, { handle: "quill" }, { handle: "lone" }],
+    { households: { "shard-house": { name: "shard-house", residents: ["keith", "quill"] } } },
+  );
+  const keith = giverLabel("keith", (h) => houseOf.get(h));
+  assert.equal(keith.label, "Shard House", "the house's nameplate, not the first resident's handle");
+  assert.equal(keith.household, "Shard House");
+  assert.equal(keith.href, "/households/shard-house/", "and it links the house's page");
+  assert.equal(keith.handle, "keith", "the handle the ledger filed it under is kept beside it");
+  assert.equal(keith.patron, "keith", "display only: the recorded payer is unchanged");
+  assert.equal(giverLabel("quill", (h) => houseOf.get(h)).label, "Shard House", "either resident names the same house");
+  const out = giverLabel("outside:stripe", (h) => houseOf.get(h));
+  assert.equal(out.label, "an outside gift");
+  assert.equal(out.href, null);
+  assert.equal(giverLabel("lone", (h) => houseOf.get(h)).label, "lone", "a handle no house names keeps its own label");
+  assert.equal(giverLabel("keith").label, "keith", "no resolver: the handle, as before");
+});
+
+test("every pot surface that names a giver routes it through giverLabel (POS-550)", () => {
+  for (const rel of ["../town/pages/fund/[pot].astro", "../src/components/PotCards.astro"]) {
+    const src = readFileSync(new URL(rel, import.meta.url), "utf8");
+    assert.doesNotMatch(src, /patronLabel\((?:c|p)\.patron\)/, `${rel} names a giver by the ledger's handle alone`);
+    assert.match(src, /giverLabel\((?:c|p)\.patron, houseOf\)/, `${rel} asks the household resolver`);
+  }
 });
 
 test("the fund page reads the roll the seam has always emitted", () => {

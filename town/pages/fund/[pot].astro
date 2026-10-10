@@ -60,7 +60,8 @@
 // no image service: a strict CSP would block it, and handing a third party the
 // ability to change what an intake QR encodes is handing them the money.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import { livePots, loadPots, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel } from "@/lib/funding.mjs";
+import { livePots, loadPots, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel, giverLabel } from "@/lib/funding.mjs";
+import { houseOf } from "@/lib/household.mjs";
 import { qrSvg } from "@/lib/qr.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
 import PotSprite from "@/components/PotSprite.astro";
@@ -190,7 +191,9 @@ const estimate = mintPerDollar(pot);
 // door itself excludes from the count), and the page simply never read the
 // field. So nothing about the ECONOMY moves here. What moves is that the money
 // the town was already holding is now shown.
-const roll = (pot.patrons ?? []).map((p) => ({ ...patronLabel(p.patron), usd: p.usd, holo: p.holo }));
+// A gift shows its HOUSEHOLD, not the first resident the ledger filed it under
+// (POS-550): giverLabel, over the site's one household resolver.
+const roll = (pot.patrons ?? []).map((p) => ({ ...giverLabel(p.patron, houseOf), usd: p.usd, holo: p.holo }));
 const rollTotal = roll.reduce((n, r) => n + r.usd, 0);
 const anyOutside = roll.some((r) => !r.attached);
 const staked = Number(pot.staked ?? 0);
@@ -631,7 +634,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           <div class="f-fold-body">
             <ul class="f-past-list">
               {past.map((m) => {
-                const mroll = (m.patrons ?? []).map((p) => ({ ...patronLabel(p.patron), usd: p.usd }));
+                const mroll = (m.patrons ?? []).map((p) => ({ ...giverLabel(p.patron, houseOf), usd: p.usd }));
                 const mtotal = mroll.reduce((n, r) => n + r.usd, 0);
                 return (
                   <li class="f-past-row">
