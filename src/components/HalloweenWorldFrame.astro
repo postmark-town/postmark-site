@@ -5,7 +5,7 @@
 // The map is not touched; the Mists are the map's own.
 import { siteMists } from "@/lib/mists-season.mjs";
 import { VARIANTS, worldFrameCSS } from "@/lib/halloween-skin.mjs";
-const SKIN_MAX = 0.5;   // as HalloweenSkin's, this release
+const SKIN_MAX = 1;     // as HalloweenSkin's, this release
 const mists = siteMists();
 const k = mists ? Math.min(SKIN_MAX, 0.25 + 0.75 * mists.t) : 0;
 const HTML = !mists ? "" : `<style>${worldFrameCSS(VARIANTS[2], k)}</style>`;

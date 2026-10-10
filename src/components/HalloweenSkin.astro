@@ -13,8 +13,8 @@
 import { siteMists } from "@/lib/mists-season.mjs";
 import { VARIANTS, siteSkinCSS, mix } from "@/lib/halloween-skin.mjs";
 import { navyOverrides } from "@/lib/halloween-navy.mjs";
-import { BAT } from "@/lib/halloween-motifs.mjs";
-const SKIN_MAX = 0.5;   // how far the palette goes this release (1 is the whole skin)
+import { BAT, WOLF_MOON, WAX_SEAL } from "@/lib/halloween-motifs.mjs";
+const SKIN_MAX = 1;     // how far the palette goes this release (1 is the whole skin)
 const mists = siteMists();
 const v = VARIANTS[2];
 const t = mists ? mists.t : 0;
@@ -26,7 +26,15 @@ const BAT_SCRIPT = `(function(){try{if(matchMedia("(prefers-reduced-motion: redu
 const HTML = !mists ? "" : [
   `<div class="pm-hw-bats" aria-hidden="true"><span class="pm-hw-bat">${BAT}</span></div>`,
   `<script>${BAT_SCRIPT}</script>`,
+  // the wolf against the moon, at the foot of every page
+  `<div class="pm-hw-wolf" aria-hidden="true" style="--moon:${v.ink}">${WOLF_MOON}</div>`,
   `<style>${siteSkinCSS(v, k)}${navyOverrides({ base: rgbOf(mix("#070b15", v.base, k)), panel: rgbOf(panelK), panel2: rgbOf(mix("#1c2c4f", mix(v.panel, v.violet, 0.25), k)) })}
+  /* the town's seal in the header becomes wax */
+  .pm .pm-townmark .seal { position: relative; display: inline-grid; place-items: center; width: 1.7em; height: 1.7em; color: transparent; }
+  .pm .pm-townmark .seal::before { content: ""; position: absolute; inset: 0; background: center / contain no-repeat; background-image: var(--pm-hw-seal); }
+  .pm-shell { --pm-hw-seal: url("data:image/svg+xml,${encodeURIComponent(WAX_SEAL.replace("var(--seal, #9b1f2a)", v.blood))}"); }
+  .pm-hw-wolf { width: 76px; margin: 6px auto 28px; color: ${mix(v.base, "#000000", 0.35)}; }
+  .pm-hw-wolf svg { display: block; width: 100%; }
   .pm-hw-bats { position: absolute; left: 0; right: 0; top: 0; height: 100px; overflow: hidden; pointer-events: none; z-index: 6000; }
   .pm-hw-bat { position: absolute; left: -70px; top: 22px; width: 38px; color: ${v.base}; opacity: 0; filter: drop-shadow(0 0 2px ${v.violet}); }
   .pm-hw-bat.go { animation: pm-hw-bat 8s cubic-bezier(.45,.05,.55,.95) 1 both; }

@@ -1,0 +1,27 @@
+---
+// HeroFog — fog over the home page's hero picture that rises with the season
+// (POS-553): a fifth of the picture at the Mists' first crossing, about half by
+// 284, in slow drifting layers of the skin's own grey (variant 2). The title and
+// tagline keep AA over it (measured from the rendered pixels: 6.1 or better
+// for the tagline). Still under reduced motion; nothing before the Mists.
+import { siteMists } from "@/lib/mists-season.mjs";
+import { VARIANTS, mix } from "@/lib/halloween-skin.mjs";
+const mists = siteMists();
+const v = VARIANTS[2];
+const k = mists ? 0.25 + 0.75 * mists.t : 0;
+const n3 = (x) => x.toFixed(3);
+const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(", ");
+const ink = rgb(mix(v.base, v.quiet, 0.35)), hi = rgb(mix(v.base, v.quiet, 0.55));
+const HTML = !mists ? "" : `<div class="pm-hero-fog" aria-hidden="true" style="height:${n3(20 + 34 * k)}%"><i></i><i></i><i></i></div><style>
+  .pm-hero-fog { position: absolute; left: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; }
+  .pm-hero-fog i { position: absolute; left: -25%; right: -25%; bottom: 0; display: block; height: 100%;
+    background: linear-gradient(0deg, rgba(${ink}, ${n3(0.85 * k)}) 0%, rgba(${ink}, ${n3(0.5 * k)}) 45%, rgba(${ink}, 0) 100%);
+    filter: blur(10px); animation: pm-hero-fog 38s ease-in-out infinite alternate; }
+  .pm-hero-fog i:nth-child(2) { height: 72%; background: radial-gradient(60% 80% at 30% 100%, rgba(${hi}, ${n3(0.45 * k)}), rgba(${hi}, 0)); animation-duration: 53s; animation-direction: alternate-reverse; }
+  .pm-hero-fog i:nth-child(3) { height: 55%; background: radial-gradient(55% 80% at 75% 100%, rgba(${hi}, ${n3(0.4 * k)}), rgba(${hi}, 0)); animation-duration: 71s; }
+  @keyframes pm-hero-fog { from { transform: translateX(-7%); } to { transform: translateX(7%); } }
+  .hero-copy h1, .hero-copy .under, .hero-copy .over { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 18px rgba(0, 0, 0, 0.85); }
+  @media (prefers-reduced-motion: reduce) { .pm-hero-fog i { animation: none; } }
+</style>`;
+---
+{HTML && <Fragment set:html={HTML} />}
