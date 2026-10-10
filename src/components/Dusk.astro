@@ -1,0 +1,61 @@
+---
+// Dusk — the site at dusk while the Mists stand.
+//
+// The palette dims with the veil the world is under (0.10 at the Mists' first
+// crossing, 0.50 at their deepest; mists-season.mjs reads it from the engine
+// for the crossing this build reflects), the pictures dim and grey with it, and
+// a thin mist gathers at the edges of the viewport. Paper takes on the mist's
+// grey, the dark grounds lift toward it, and the soft ink deepens with
+// it, so text keeps WCAG AA contrast at the deepest veil
+// (tools/dusk-contrast.mjs prints the pairs). The edge mist breathes slowly,
+// and stands still for a reader who asks for reduced motion.
+//
+// `palette={false}` draws the edge mist alone: the World page, whose own map
+// already carries the veil.
+//
+// Before the Mists this renders nothing, and the page is the page it was.
+import { siteMists } from "@/lib/mists-season.mjs";
+const { palette = true } = Astro.props;
+const mists = siteMists();
+const veil = mists ? Math.max(0, Math.min(1, mists.veil)) : 0;
+// how far each token walks toward the mist, in percent, at this veil
+const pct = (k) => `${Math.round(veil * k)}%`;
+const edge = (0.12 + 0.6 * veil).toFixed(3);
+// the pictures dim and grey with it: brightness and saturation at this veil
+const dimImg = `brightness(${(1 - 0.3 * veil).toFixed(3)}) saturate(${(1 - 0.5 * veil).toFixed(3)})`;
+// Raw markup, not an Astro <style>: Astro bundles every <style> it compiles,
+// rendered or not, and before the Mists the page must be byte for byte what it was.
+const EDGE_STYLE = `
+      .pm-dusk-edge {
+        position: fixed; inset: 0; z-index: 6000; pointer-events: none;
+        background:
+          radial-gradient(ellipse 120% 95% at 50% 50%, transparent 55%, rgba(183, 190, 200, var(--pm-dusk-edge)) 100%),
+          linear-gradient(180deg, rgba(183, 190, 200, calc(var(--pm-dusk-edge) * 0.6)), transparent 12%, transparent 88%, rgba(183, 190, 200, calc(var(--pm-dusk-edge) * 0.6)));
+        animation: pm-dusk-breathe 26s ease-in-out infinite;
+      }
+      @keyframes pm-dusk-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
+      @media (prefers-reduced-motion: reduce) { .pm-dusk-edge { animation: none; } }
+`;
+---
+{mists && (
+  <>
+    <div class="pm-dusk-edge" aria-hidden="true" style={`--pm-dusk-edge:${edge}`}></div>
+    {palette && (
+      <Fragment set:html={`<style>
+        body .pm {
+          --pm-paper: color-mix(in srgb, #f7efdc, #6b7686 ${pct(52)});
+          --pm-paper-deep: color-mix(in srgb, #efe3c8, #6b7686 ${pct(52)});
+          --pm-line: color-mix(in srgb, #e3d4b8, #6b7686 ${pct(56)});
+          --pm-ink-soft: color-mix(in srgb, #6d5c44, #2e2417 ${pct(100)});
+          --pm-accent: color-mix(in srgb, #a4632a, #4f2a0c ${pct(100)});
+          --pm-wax: color-mix(in srgb, #9c3f2e, #5e2016 ${pct(80)});
+          --pm-night: color-mix(in srgb, #070b15, #1a222e ${pct(60)});
+          --pm-harbor: color-mix(in srgb, #0d1426, #263040 ${pct(70)});
+          --pm-gold: color-mix(in srgb, #e8c48b, #b7bec8 ${pct(40)});
+        }
+        body .pm.pm-shell img { filter: ${dimImg}; }
+      </style>`} />
+    )}
+    <Fragment set:html={`<style>${EDGE_STYLE}</style>`} />
+  </>
+)}
