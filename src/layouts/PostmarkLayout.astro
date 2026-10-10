@@ -11,6 +11,7 @@ import "../styles/postmark.css";
 import { RAIL, rowFor, sectionOf, navFlags } from "@/lib/nav.mjs";
 import ChipRow from "@/components/ChipRow.astro";
 import DoorLine from "@/components/DoorLine.astro";
+import MistLamp from "@/components/MistLamp.astro";
 
 const {
   title, description, active = "", image = "/banner.png", noindex = false,
@@ -157,7 +158,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
             href={railHref(n)}
             class={n.lantern ? "pm-nav-join" : undefined}
             aria-current={here?.key === n.key ? "page" : undefined}
-          >{n.label}{n.beta && <span class="pm-nav-beta">beta</span>}</a>
+          >{n.label}{n.beta && <span class="pm-nav-beta">beta</span>}{n.key === "world" && <MistLamp />}</a>
         ))}
       </nav>
       <div class="pm-auth" data-auth hidden>

@@ -19,6 +19,15 @@ import { fmtDate, threadTitle, emph, postingTitle, postingTeaser } from "@/lib/p
 import { letterAddresses, letterHref } from "@/lib/mail.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { householdHref, YOUR_HOUSEHOLD } from "@/lib/home.mjs";
+import { siteMists } from "@/lib/mists-season.mjs";
+import { MIST_AT_THE_EDGES } from "postmark-world/world-verbs";
+
+// ONE LINE OF THE SEASON under the ferry clock while the Mists stand, in the
+// words every telling uses (world-verbs.mjs § MIST_AT_THE_EDGES); before them,
+// nothing.
+const mistNote = siteMists() ? MIST_AT_THE_EDGES : null;
+// its style rides with it, raw, so a page without the line bundles nothing new
+const MIST_NOTE_STYLE = `<style>.fc-mist { margin: 0.5em 0 0; text-align: center; text-wrap: balance; font-family: var(--pm-serif); font-style: italic; font-size: 0.95rem; line-height: 1.4; color: rgba(214, 220, 228, 0.9); text-shadow: 0 1px 14px rgba(0, 0, 0, 0.9); } @media (max-width: 700px) { .fc-mist { font-size: 0.8rem; } }</style>`;
 
 // firefly letters over the hero — deterministic spread, no runtime JS
 const flies = [
@@ -187,7 +196,7 @@ const works = [
           <span class="fc-boat" data-ferry-boat><span class="fc-hull">⛴︎</span></span>
           <span class="fc-dock fc-b">⌂</span>
         </div>
-        <p class="fc-text"><span data-ferry-text>the ferry crosses at 00:00 &amp; 12:00 utc</span></p>
+        <p class="fc-text"><span data-ferry-text>the ferry crosses at 00:00 &amp; 12:00 utc</span></p>{mistNote && <><p class="fc-mist">{mistNote}</p><Fragment set:html={MIST_NOTE_STYLE} /></>}
       </div>
       <div class="hero-copy">
         <p class="over">Starforge presents · a live town, est. June 2026</p>

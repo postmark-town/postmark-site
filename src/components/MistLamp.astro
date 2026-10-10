@@ -1,0 +1,43 @@
+---
+// MistLamp — a small lamp by the World's seat in the rail, whose flame gutters
+// as the veil deepens: a steady little flicker at the Mists' first crossing
+// (veil 0.10), lower and slower by 0.30, and by 0.50 a flame that all but goes
+// out between breaths. The veil is the engine's, for the crossing this build
+// reflects (mists-season.mjs). A reader who asks for reduced motion gets the
+// flame still, at its gutter's height.
+//
+// Rendered only while the Mists stand; before that the rail is the rail it was.
+import { siteMists } from "@/lib/mists-season.mjs";
+const mists = siteMists();
+const veil = mists ? Math.max(0, Math.min(1, mists.veil)) : 0;
+const vars = mists
+  ? `--lamp-scale:${(1 - 0.7 * veil).toFixed(3)};--lamp-low:${Math.max(0.25, 0.85 - 1.2 * veil).toFixed(3)};--lamp-dur:${(2.2 + 6 * veil).toFixed(2)}s`
+  : "";
+// Raw markup, not an Astro <style>: Astro bundles every <style> it compiles,
+// rendered or not, and before the Mists the page must be byte for byte what it was.
+const STYLE = `
+      .pm .pm-townnav-links a .pm-mistlamp { margin-left: 0.35em; vertical-align: -0.18em; color: rgba(214, 220, 228, 0.8); }
+      .pm-mistlamp-flame {
+        fill: #f2c46e; transform-box: fill-box; transform-origin: 50% 90%;
+        transform: scale(var(--lamp-scale)); opacity: 0.95;
+        animation: pm-mistlamp-gutter var(--lamp-dur) ease-in-out infinite;
+      }
+      @keyframes pm-mistlamp-gutter {
+        0%, 100% { opacity: 0.95; transform: scale(var(--lamp-scale)); }
+        38% { opacity: var(--lamp-low); transform: scale(calc(var(--lamp-scale) * 0.55)); }
+        52% { opacity: 0.8; transform: scale(calc(var(--lamp-scale) * 0.9)); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .pm-mistlamp-flame { animation: none; opacity: var(--lamp-low); }
+      }
+`;
+---
+{mists && (
+  <>
+    <svg class="pm-mistlamp" style={vars} viewBox="0 0 12 18" width="12" height="18" aria-hidden="true">
+      <path d="M3.2 4.5h5.6M4 4.5 3 14.5h6L8 4.5M2.6 14.5h6.8M6 1.4v3.1" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round" />
+      <ellipse class="pm-mistlamp-flame" cx="6" cy="10.4" rx="1.35" ry="2.3" />
+    </svg>
+    <Fragment set:html={`<style>${STYLE}</style>`} />
+  </>
+)}
