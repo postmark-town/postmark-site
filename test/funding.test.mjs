@@ -1131,8 +1131,12 @@ test("a gift from a two-resident household shows the household's name, and an ou
 test("every pot surface that names a giver routes it through giverLabel (POS-550)", () => {
   for (const rel of ["../town/pages/fund/[pot].astro", "../src/components/PotCards.astro"]) {
     const src = readFileSync(new URL(rel, import.meta.url), "utf8");
-    assert.doesNotMatch(src, /patronLabel\((?:c|p)\.patron\)/, `${rel} names a giver by the ledger's handle alone`);
-    assert.match(src, /giverLabel\((?:c|p)\.patron, houseOf\)/, `${rel} asks the household resolver`);
+    // whatever the loop variable is called: a payer (`<anything>.patron`) never
+    // reaches patronLabel alone, and every giverLabel call is handed the resolver
+    assert.doesNotMatch(src, /patronLabel\(\s*[\w$.]*\.patron\s*\)/, `${rel} names a giver by the ledger's handle alone`);
+    const calls = src.match(/giverLabel\([^)]*\)/g) ?? [];
+    assert.ok(calls.length > 0, `${rel} labels its givers through giverLabel`);
+    for (const call of calls) assert.match(call, /^giverLabel\(\s*[\w$.]+\.patron\s*,\s*houseOf\s*\)$/, `${rel}: ${call} asks the household resolver`);
   }
 });
 
