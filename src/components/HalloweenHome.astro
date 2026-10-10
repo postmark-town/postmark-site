@@ -1,0 +1,18 @@
+---
+// HalloweenHome — one crow on the post office's roofline in the home page's
+// hero, from 272 on (a MOCKUP for Darko's board, POS-553). It sits; it does not
+// fly. Placed against the hero picture's roof at desktop widths, and left off
+// on a phone, where the picture is cropped and the roof moves.
+import { siteMists } from "@/lib/mists-season.mjs";
+import { VARIANTS, mix } from "@/lib/halloween-skin.mjs";
+import { CROW } from "@/lib/halloween-motifs.mjs";
+const mists = siteMists();
+const v = VARIANTS[process.env.SKIN_VARIANT === "2" ? 2 : 1];
+const HTML = !mists || mists.t < 0.7 ? "" : `<div class="pm-hw-crow" aria-hidden="true">${CROW}</div><style>
+  .pm-hw-crow { position: absolute; left: 14.5%; top: 9.2%; width: 4.2%; min-width: 40px; color: ${mix(v.base, v.quiet, 0.22)}; pointer-events: none;
+    filter: drop-shadow(0 0 1.5px ${v.violet}) drop-shadow(0 0 2.5px ${v.violet}) drop-shadow(0 0 10px rgba(0,0,0,.8)); transform: scaleX(-1); }
+  .pm-hw-crow svg { display: block; width: 100%; }
+  @media (max-width: 700px) { .pm-hw-crow { display: none; } }
+</style>`;
+---
+{HTML && <Fragment set:html={HTML} />}

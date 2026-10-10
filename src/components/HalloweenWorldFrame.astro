@@ -1,0 +1,13 @@
+---
+// HalloweenWorldFrame — the World page's frame in the season's skin (a MOCKUP
+// for Darko's board, POS-553): the rail, the telling and the controls take the
+// palette through the viewer's own .wv tokens. The map is not touched; the
+// Mists are the map's own.
+import { siteMists } from "@/lib/mists-season.mjs";
+import { VARIANTS, worldFrameCSS } from "@/lib/halloween-skin.mjs";
+const mists = siteMists();
+const v = VARIANTS[process.env.SKIN_VARIANT === "2" ? 2 : 1];
+const k = mists ? 0.25 + 0.75 * mists.t : 0;
+const HTML = !mists ? "" : `<style>${worldFrameCSS(v, k)}</style>`;
+---
+{HTML && <Fragment set:html={HTML} />}

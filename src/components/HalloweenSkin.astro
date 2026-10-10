@@ -1,0 +1,44 @@
+---
+// HalloweenSkin — the season's skin over the whole site (a MOCKUP for Darko's
+// board, POS-553): Barovia night with a hint of classic Halloween, keyed to the
+// crossing this build reflects and ramped from the Mists' first crossing (a
+// hint) to 284 (the full skin), mists-season.mjs § seasonRamp.
+//
+// The palette is halloween-skin.mjs's variant SKIN_VARIANT (1 or 2; the board
+// shows both). The motifs arrive with the ramp, one placement each:
+//   from the first crossing  the town's seal in the header becomes wax;
+//   from 272                 three bats cross the header once per page load;
+//   from 284                 a wolf against the moon at the foot of the page.
+// Under reduced motion the bats stay home. Before the Mists this renders
+// nothing, and the page is the page it was.
+import { siteMists } from "@/lib/mists-season.mjs";
+import { VARIANTS, siteSkinCSS, mix } from "@/lib/halloween-skin.mjs";
+import { navyOverrides } from "@/lib/halloween-navy.mjs";
+import { BAT, WOLF_MOON, WAX_SEAL } from "@/lib/halloween-motifs.mjs";
+const mists = siteMists();
+const v = VARIANTS[process.env.SKIN_VARIANT === "2" ? 2 : 1];
+const t = mists ? mists.t : 0;
+const k = 0.25 + 0.75 * t;
+const bats = mists && t >= 0.7;
+const wolf = mists && t >= 1;
+const panelK = mix("#0d1426", v.panel, k), rgbOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(", ");
+const HTML = !mists ? "" : [
+  bats ? `<div class="pm-hw-bats" aria-hidden="true">${[0, 1, 2].map((i) => `<span style="--i:${i}">${BAT}</span>`).join("")}</div>` : "",
+  wolf ? `<div class="pm-hw-wolf" aria-hidden="true" style="--moon:${v.ink}">${WOLF_MOON}</div>` : "",
+  `<style>${siteSkinCSS(v, k)}${navyOverrides({ base: rgbOf(mix("#070b15", v.base, k)), panel: rgbOf(panelK), panel2: rgbOf(mix("#1c2c4f", mix(v.panel, v.violet, 0.25), k)) })}
+  .pm .pm-townmark .seal { position: relative; display: inline-grid; place-items: center; width: 1.7em; height: 1.7em; color: transparent; }
+  .pm .pm-townmark .seal::before { content: ""; position: absolute; inset: 0; background: center / contain no-repeat; background-image: var(--pm-hw-seal); }
+  .pm-shell { --pm-hw-seal: url("data:image/svg+xml,${encodeURIComponent(WAX_SEAL.replace("var(--seal, #9b1f2a)", v.blood))}"); }
+  .pm-hw-bats { position: absolute; left: 0; right: 0; top: 0; height: 110px; overflow: hidden; pointer-events: none; z-index: 6000; }
+  .pm-hw-bats span { position: absolute; left: -80px; top: calc(14px + var(--i) * 22px); width: calc(46px - var(--i) * 8px); color: ${v.base};
+    filter: drop-shadow(0 0 2px ${v.violet}); animation: pm-hw-bat 7s cubic-bezier(.45,.05,.55,.95) calc(0.6s + var(--i) * 0.9s) 1 both; }
+  .pm-hw-bats span svg { display: block; width: 100%; animation: pm-hw-flap .3s ease-in-out infinite alternate; }
+  @keyframes pm-hw-bat { 0% { transform: translate(0, 0); } 35% { transform: translate(38vw, -10px); } 70% { transform: translate(72vw, 12px); } 100% { transform: translate(calc(100vw + 120px), -6px); } }
+  @keyframes pm-hw-flap { from { transform: scaleY(1); } to { transform: scaleY(.35); } }
+  .pm-hw-wolf { width: 72px; margin: 6px auto 28px; color: ${v.base}; opacity: .9; }
+  .pm-hw-wolf svg { display: block; width: 100%; }
+  @media (prefers-reduced-motion: reduce) { .pm-hw-bats { display: none; } }
+  </style>`,
+].join("");
+---
+{HTML && <Fragment set:html={HTML} />}
