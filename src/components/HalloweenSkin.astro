@@ -1,0 +1,40 @@
+---
+// HalloweenSkin — the season's skin over the whole site (POS-553): Barovia
+// night with a hint of classic Halloween, in the palette's variant 2 (Darko
+// 2026-10-10 10:56), keyed to the crossing this build reflects and ramped from
+// the Mists' first crossing to 284 (mists-season.mjs § seasonRamp).
+//
+// It arrives by release, so nothing later ships early:
+//   w43  the palette at up to half strength (SKIN_MAX), and now and then one
+//        bat crossing the header;
+//   w44  the full palette, the wax seal, the wolf at the foot of the page.
+// Under reduced motion the bat stays home. Before the Mists this renders
+// nothing, and the page is the page it was.
+import { siteMists } from "@/lib/mists-season.mjs";
+import { VARIANTS, siteSkinCSS, mix } from "@/lib/halloween-skin.mjs";
+import { navyOverrides } from "@/lib/halloween-navy.mjs";
+import { BAT } from "@/lib/halloween-motifs.mjs";
+const SKIN_MAX = 0.5;   // how far the palette goes this release (1 is the whole skin)
+const mists = siteMists();
+const v = VARIANTS[2];
+const t = mists ? mists.t : 0;
+const k = Math.min(SKIN_MAX, 0.25 + 0.75 * t);
+const rgbOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(", ");
+const panelK = mix("#0d1426", v.panel, k);
+// the bat: one, crossing the header once, after a while, on about one load in three
+const BAT_SCRIPT = `(function(){try{if(matchMedia("(prefers-reduced-motion: reduce)").matches||Math.random()>0.34)return;var b=document.querySelector(".pm-hw-bat");if(!b)return;b.style.animationDelay=(6+Math.random()*14).toFixed(1)+"s";b.classList.add("go");}catch(e){}})();`;
+const HTML = !mists ? "" : [
+  `<div class="pm-hw-bats" aria-hidden="true"><span class="pm-hw-bat">${BAT}</span></div>`,
+  `<script>${BAT_SCRIPT}</script>`,
+  `<style>${siteSkinCSS(v, k)}${navyOverrides({ base: rgbOf(mix("#070b15", v.base, k)), panel: rgbOf(panelK), panel2: rgbOf(mix("#1c2c4f", mix(v.panel, v.violet, 0.25), k)) })}
+  .pm-hw-bats { position: absolute; left: 0; right: 0; top: 0; height: 100px; overflow: hidden; pointer-events: none; z-index: 6000; }
+  .pm-hw-bat { position: absolute; left: -70px; top: 22px; width: 38px; color: ${v.base}; opacity: 0; filter: drop-shadow(0 0 2px ${v.violet}); }
+  .pm-hw-bat.go { animation: pm-hw-bat 8s cubic-bezier(.45,.05,.55,.95) 1 both; }
+  .pm-hw-bat svg { display: block; width: 100%; animation: pm-hw-flap .28s ease-in-out infinite alternate; }
+  @keyframes pm-hw-bat { 0% { opacity: 1; transform: translate(0, 0); } 35% { transform: translate(38vw, -12px); } 70% { transform: translate(72vw, 10px); } 99% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(100vw + 120px), -6px); } }
+  @keyframes pm-hw-flap { from { transform: scaleY(1); } to { transform: scaleY(.35); } }
+  @media (prefers-reduced-motion: reduce) { .pm-hw-bats { display: none; } }
+  </style>`,
+].join("");
+---
+{HTML && <Fragment set:html={HTML} />}

@@ -1,7 +1,8 @@
 ---
 // HalloweenHome — crows on the hero picture's rooflines while the Mists stand
 // (POS-553). From the Mists' first crossing, ONE small crow sits on the post
-// office's roofline: a thing someone might find, not a costume. It sits; it does
+// office's roofline: a thing someone might find, not a costume. From w43 two
+// more keep it company on other rooftops. It sits; it does
 // not fly. Placed against the picture's roofs at desktop widths, and left off on
 // a phone, where the picture is cropped and the roofs move.
 //
@@ -12,7 +13,7 @@ import { CROW } from "@/lib/halloween-motifs.mjs";
 const mists = siteMists();
 const v = VARIANTS[2];   // the season's skin is variant 2 (Darko 2026-10-10 10:56)
 // where a crow perches, as a share of the hero picture: [left, top, width, flip]
-const PERCHES = [[14.6, 9.4, 3.0, true]];
+const PERCHES = [[14.6, 9.4, 3.0, true], [62.5, 4.6, 2.6, false], [83.2, 12.8, 2.4, true]];
 const crows = PERCHES.map(([l, t, w, flip]) => `<div class="pm-hw-crow" style="left:${l}%;top:${t}%;width:${w}%${flip ? ";transform:scaleX(-1)" : ""}">${CROW}</div>`).join("");
 const HTML = !mists ? "" : `<div aria-hidden="true">${crows}</div><style>
   .pm-hw-crow { position: absolute; min-width: 30px; color: ${mix(v.base, v.quiet, 0.15)}; pointer-events: none;
