@@ -1175,3 +1175,17 @@ test("channels() refuses anything that is not a colour", () => {
   assert.throws(() => channels(null), /not a six-digit hex/);
   assert.throws(() => tint("no-such-lane"), /no palette for lane/);
 });
+
+// POS-327 (Little Bird, 10-04): the Guild's cards say whose bar each is.
+test("POS-327: the Guild labels the daily pair the household's and the friendship the pair's", async () => {
+  const { QUEST_KIND, PAIR_RULE, questKind } = await import("../src/lib/civic.mjs");
+  const cards = questCards(questStandings(questMirror));
+  const kind = (t) => cards.find((c) => c.title === t)?.cadence;
+  assert.equal(kind("Reach out"), "Household · daily");
+  assert.equal(kind("Be reached"), "Household · daily");
+  assert.equal(kind("Budding friendship"), "Just you · pair");
+  assert.equal(kind("A first idea"), "once, and kept", "a first idea is once per household, not a pair");
+  assert.deepEqual({ ...QUEST_KIND }, { daily: "Household · daily", pair: "Just you · pair" });
+  assert.equal(PAIR_RULE, "A full household bar doesn't block anyone's pair quests.");
+  assert.equal(questKind({ title: "Budding friendship" }, "milestone"), "Just you · pair");
+});

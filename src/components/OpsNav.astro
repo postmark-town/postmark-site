@@ -2,33 +2,55 @@
 // OpsNav.astro — the ops family's shared nav strip, site half.
 //
 // The ops surface is one family served by two builders: the box GENERATES the
-// hub and the four dashboards (office tools/*-report.mjs + ops-index.mjs), and
-// the site BUILDS the two consoles (/ops/graph/, /ops/desk/). Before this
-// strip, the generated half chromed itself with ops-viz's `nav()` pills and the
-// site half wore only the town header — the same family, dressed as two.
+// hub and the dashboards (office tools/*-report.mjs + ops-index.mjs), and the
+// site BUILDS the two consoles (/ops/graph/, /ops/desk/). Before this strip,
+// the generated half chromed itself with ops-viz's `nav()` pills and the site
+// half wore only the town header — the same family, dressed as two.
 //
-// SOURCE-OF-TRUTH NOTE: the family list below has an office-side twin in
-// `office/tools/lib/ops-viz.mjs` (NAV), which chromes the box-generated pages.
-// The two repos share no import path, so this is a NAMED copy with a carrier:
-// change one, change the other in the same act. (the-copy-without-a-channel —
-// the channel is this comment and its twin.)
+// THE GENERATED HALF IS NEVER IN THIS MARKUP (POS-395). Those pages answer only
+// to the operators, so a signed-out reader of the graph is not sent to them:
+// the strip renders the site-built half, and the browser adds the generated
+// half only when the office's GET /me says `principal: true`. The family lists
+// live in src/lib/ops-family.mjs, which carries the office-twin note.
+import { OPS_PUBLIC } from "@/lib/ops-family.mjs";
+
 const { here = "" } = Astro.props;
-const NAV = [
-  ["/ops/", "hub"],
-  ["/ops/traffic/", "traffic"],
-  ["/ops/git/", "git"],
-  ["/ops/economy/", "economy"],
-  ["/ops/world/", "world"],
-  ["/ops/activity/", "activity"],
-  ["/ops/graph/", "graph"],
-  ["/ops/desk/", "desk"],
-];
 ---
-<nav class="pm-opsnav">
-  {NAV.map(([href, name]) => (
+<nav class="pm-opsnav" data-opsnav>
+  {OPS_PUBLIC.map(([href, name]) => (
     <a href={href} aria-current={href === here ? "page" : undefined}>{name}</a>
   ))}
 </nav>
+<script>
+  import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
+  import { OPS_GATED } from "@/lib/ops-family.mjs";
+
+  // The principal's half of the strip, added in the browser and only for them.
+  // Any failure leaves the public strip as it is: quiet, never an error.
+  (async () => {
+    const strips = document.querySelectorAll("[data-opsnav]");
+    if (!strips.length) return;
+    let tok = null;
+    try { tok = JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch {}
+    if (!tokenIsFresh(tok)) return;
+    let me;
+    try {
+      const r = await fetch(officeBase() + "/me", { headers: { accept: "application/json", authorization: "Bearer " + tok.access_token } });
+      if (!r.ok) return;
+      me = await r.json();
+    } catch { return; }
+    if (me?.principal !== true) return;
+    for (const strip of strips) {
+      const first = strip.firstChild;
+      for (const [href, name] of OPS_GATED) {
+        const a = document.createElement("a");
+        a.href = href;
+        a.textContent = name;
+        strip.insertBefore(a, first);
+      }
+    }
+  })();
+</script>
 <style>
   /* the same pill grammar ops-viz's `.opsnav` draws on the generated pages,
      in the site's own tokens — one family, one strip */

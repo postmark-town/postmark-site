@@ -18,7 +18,7 @@ import { execFileSync } from "node:child_process";
 
 import {
   LADDER, CONFIRMED_CAP, STAGES, FINISHED, PANELS, ADVISORY_URL, NEW_ISSUE_URL, POST_CALL,
-  boardOf, paintBoard, jarOf, paintJar, JAR_ART, JAR_EMPTY, plainOf, VIDEO_URL, VIDEO_THUMB, VIDEO_EMBED, playVideo,
+  JAR_ART, plainOf, VIDEO_URL, VIDEO_THUMB, VIDEO_EMBED, playVideo,
 } from "../src/lib/bug-strip.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -104,39 +104,11 @@ test("the security road is the private advisory: never the mail, never an issue"
   assert.match(two.lines.join(" "), /letter to bugcatcher/);
 });
 
-// ── THE BOARD ────────────────────────────────────────────────────────────────
+// ── THE STUB DOCUMENT ───────────────────────────────────────────────────────
 
-const READ = {
-  as_of: "2026-09-29T20:00:00.000Z", class: "bug", finished: ["shipped", "duplicate", "not-a-bug"], total: 5,
-  posts: [
-    { class: "bug", id: "mari/the-map-forgets", title: "The map forgets my pin", author: "mari", state: "confirmed", fields: { issue: "https://github.com/postmark-town/postmark/issues/3300" } },
-    { class: "bug", id: "vermillion/<b>bold</b>", title: "<img src=x onerror=alert(1)> letters vanish", author: "vermillion", state: "reported", fields: { issue: "javascript:alert(1)" } },
-    { class: "bug", id: "sage/old", title: "Fixed long ago", author: "sage", state: "shipped", fields: {} },
-    { class: "bug", id: "sage/dupe", title: "A duplicate", author: "sage", state: "duplicate", fields: { of: "mari/the-map-forgets" } },
-    { class: "bug", id: "odd/state", title: "An unknown state", author: "odd", state: "exploded", fields: {} },
-  ],
-};
-
-test("boardOf: the open bugs grouped by stage in the lifecycle's order; finished and unknown states left off", () => {
-  const b = boardOf(READ);
-  assert.equal(b.ok, true);
-  assert.equal(b.open, 2);
-  assert.deepEqual(b.groups.map((g) => [g.stage, g.rows.map((r) => r.id)]), [
-    ["reported", ["vermillion/<b>bold</b>"]],
-    ["confirmed", ["mari/the-map-forgets"]],
-  ]);
-  const mari = b.groups[1].rows[0];
-  assert.deepEqual(mari, { id: "mari/the-map-forgets", title: "The map forgets my pin", reporter: "mari", stage: "confirmed", issue: "https://github.com/postmark-town/postmark/issues/3300" });
-  assert.equal(b.groups[0].rows[0].issue, null, "a non-issue URL became a link");
-});
-
-test("boardOf: an empty board is empty; a failed read is a failed read, never an empty board", () => {
-  assert.deepEqual(boardOf({ ...READ, posts: [] }), { ok: true, groups: [], open: 0 });
-  for (const bad of [null, undefined, {}, { posts: "no" }, "<html>"]) assert.equal(boardOf(bad).ok, false, `${JSON.stringify(bad)} read as a board`);
-});
-
-// A document just big enough for paintBoard, whose innerHTML refuses: the
-// painter must build with elements and textContent only.
+// A document just big enough for playVideo, whose innerHTML refuses: the
+// painter must build with elements and textContent only. (The jar's and the
+// board's folds, and their tests, gave way to the cards: test/bug-cards.test.mjs.)
 function stubDoc() {
   const make = (tag) => {
     const el = {
@@ -152,95 +124,6 @@ function stubDoc() {
 }
 const textOf = (el) => (el.children.length ? el.children.map(textOf).join(" ") : el.textContent);
 const find = (el, pred) => (pred(el) ? [el] : []).concat(...el.children.map((c) => find(c, pred)));
-
-test("paintBoard: stages, titles and reporters as text; a title's markup stays text", () => {
-  const doc = stubDoc();
-  paintBoard(doc.root, boardOf(READ), doc);
-  const text = textOf(doc.root);
-  assert.match(text, /Reported · 1/);
-  assert.match(text, /Spotted · 1/);
-  assert.doesNotMatch(text, /Caught ·/, "a confirmed bug is spotted; caught is the jar's word, at the fix");
-  assert.match(text, /<img src=x onerror=alert\(1\)> letters vanish/, "the title was not kept as text");
-  assert.match(text, /reported by mari/);
-  const links = find(doc.root, (e) => e.tagName === "A");
-  assert.deepEqual(links.map((a) => [a.href, a.textContent]), [["https://github.com/postmark-town/postmark/issues/3300", "issue #3300"]]);
-  assert.doesNotMatch(SRC.slice(SRC.indexOf("export function paintBoard")), /innerHTML|insertAdjacentHTML|outerHTML/);
-});
-
-test("paintBoard: says 'No open bugs right now.' for an empty board, and something else for a failed read", () => {
-  const empty = stubDoc();
-  paintBoard(empty.root, boardOf({ ...READ, posts: [] }), empty);
-  assert.equal(textOf(empty.root), "No open bugs right now.");
-  const failed = stubDoc();
-  paintBoard(failed.root, boardOf(null), failed);
-  assert.match(textOf(failed.root), /can't be read right now/);
-  assert.doesNotMatch(textOf(failed.root), /No open bugs/);
-});
-
-// ── THE JAR ──────────────────────────────────────────────────────────────────
-
-const POSTS = JSON.parse(readFileSync(join(ROOT, "test", "fixtures", "office-bug-posts.json"), "utf8"));
-
-test("jarOf: a slot for every bug, named by fields.critter and fields.named_by (fixture: office #260); side exits get none", () => {
-  const j = jarOf(POSTS);
-  assert.equal(j.ok, true);
-  assert.deepEqual(j.slots.map((s) => [s.id, s.finished, s.critter]), [
-    ["mari/the-map-forgets-my-pin", true, "Pinwhistle"],
-    ["vermillion/letters-vanish", false, null],
-    ["sage/old-crack", true, "<b>Crackle</b>"],
-    ["odd/fixed-before-names", true, null],
-  ]);
-  assert.equal(j.finished, 3);
-  assert.deepEqual(j.slots[0], { id: "mari/the-map-forgets-my-pin", title: "The map forgets my pin after a crossing", finished: true, critter: "Pinwhistle", namedBy: "lupi" });
-  assert.deepEqual(j.slots[1], { id: "vermillion/letters-vanish", title: "Letters vanish from my outbox", finished: false, critter: null, namedBy: null });
-  // the field names are the office's: rename either and the names fall silent
-  const renamed = { ...POSTS, posts: POSTS.posts.map((p) => ({ ...p, fields: Object.fromEntries(Object.entries(p.fields).map(([k, v]) => [k === "critter" ? "name" : k, v])) })) };
-  assert.equal(jarOf(renamed).slots.filter((s) => s.critter).length, 0);
-});
-
-test("jarOf: an empty jar is empty; a failed read is a failed read", () => {
-  assert.deepEqual(jarOf({ ...POSTS, posts: [] }), { ok: true, slots: [], finished: 0 });
-  for (const bad of [null, {}, { posts: 3 }]) assert.equal(jarOf(bad).ok, false);
-});
-
-test("paintJar: the critter, 'named by', and the title as text; an open bug is '?'; a critter's markup stays text", () => {
-  const doc = stubDoc();
-  paintJar(doc.root, jarOf(POSTS), doc);
-  const slots = find(doc.root, (e) => e.tagName === "LI");
-  assert.equal(slots.length, 4);
-  assert.equal(textOf(slots[0]), " Pinwhistle named by lupi The map forgets my pin after a crossing");
-  assert.equal(textOf(slots[1]), " ? Letters vanish from my outbox");
-  assert.match(textOf(slots[2]), /<b>Crackle<\/b> named by sage/, "the critter's name was not kept as text");
-  assert.doesNotMatch(textOf(doc.root), /The jar is empty|still being caught/, "a jar with fixed bugs says none is fixed");
-  assert.doesNotMatch(SRC.slice(SRC.indexOf("export function paintJar"), SRC.indexOf("// ── THE BOARD")), /innerHTML|insertAdjacentHTML|outerHTML/);
-});
-
-test("paintJar: only an open bug is '?'; a finished bug with no name gets the lit jar and 'unnamed' (Wright's review, 2026-09-29)", () => {
-  const doc = stubDoc();
-  paintJar(doc.root, jarOf(POSTS), doc);
-  const slots = find(doc.root, (e) => e.tagName === "LI");
-  assert.equal(textOf(slots[3]), " unnamed Fixed before the jar", "a finished bug without a name reads as open");
-  assert.deepEqual(find(doc.root, (e) => e.tagName === "IMG").map((i) => i.src),
-    [JAR_ART.finished, JAR_ART.open, JAR_ART.finished, JAR_ART.finished], "only the open bug wears the silhouette");
-  assert.deepEqual(slots.filter((li) => /\?/.test(textOf(li))).map((li) => li.dataset.post), ["vermillion/letters-vanish"], "a '?' stands on a bug that is not open");
-});
-
-test("paintJar: the empty line only with no slot at all; slots with none fixed say they are still being caught", () => {
-  const empty = stubDoc();
-  paintJar(empty.root, jarOf({ ...POSTS, posts: [] }), empty);
-  assert.equal(textOf(empty.root), JAR_EMPTY);
-  assert.equal(JAR_EMPTY, "The jar is empty: no bug has been fixed yet.");
-  const openOnly = stubDoc();
-  paintJar(openOnly.root, jarOf({ ...POSTS, posts: [POSTS.posts[1]] }), openOnly);
-  assert.match(textOf(openOnly.root), /^No bug has been fixed yet\. These are still being caught\. .*\?/);
-  assert.doesNotMatch(textOf(openOnly.root), /The jar is empty/, "the jar says it is empty above its own slots");
-  const unnamedOnly = stubDoc();
-  paintJar(unnamedOnly.root, jarOf({ ...POSTS, posts: [POSTS.posts[3]] }), unnamedOnly);
-  assert.doesNotMatch(textOf(unnamedOnly.root), /still being caught|The jar is empty/, "a fixed bug without a name reads as none fixed");
-  const failed = stubDoc();
-  paintJar(failed.root, jarOf(null), failed);
-  assert.equal(textOf(failed.root), "The jar can't be read right now.");
-});
 
 // ── THE BUILT PAGE (skipped until it is built, as POS-177 rules) ────────────
 
@@ -288,7 +171,7 @@ test("THE LAW: stamps are purple — every ✦ on the Meeps page wears the one f
 test("the built strip: every ✦ sits in a .bs-stamp, one per stamp amount",
   { skip: !existsSync(builtMeeps) }, () => {
   const bc = panelOf(readFileSync(builtMeeps, "utf8"), "bugcatcher");
-  const strip = bc.slice(bc.indexOf("data-bug-strip"), bc.indexOf("data-bug-jar"));
+  const strip = bc.slice(bc.indexOf("data-bug-strip"), bc.indexOf("data-bug-cards"));
   const stars = [...strip.matchAll(/✦/g)].map((m) => m.index);
   for (const at of stars) {
     const before = strip.slice(0, at);
@@ -373,16 +256,15 @@ test("the built security panel opens onto the advisory page, and never the mail 
   assert.doesNotMatch(locked, /mailto:|\/issues\b/);
 });
 
-test("the built board: read live from the office's bug posts, a placeholder that says so, and the Report button",
+test("the built jar: one list of cards read live from the office's bug posts, after the strip, a placeholder that says so, and the Report button (POS-547)",
   { skip: !existsSync(builtMeeps) }, () => {
   const bc = panelOf(readFileSync(builtMeeps, "utf8"), "bugcatcher");
-  // the board names no office: the script asks officeBase() (test/meeps-page-office.test.mjs)
-  assert.match(bc, /<div class="bb-list" data-bug-board aria-live="polite"/);
+  // the cards name no office: the script asks officeBase() (test/meeps-page-office.test.mjs)
+  assert.match(bc, /<div class="bc-root[^"]*" data-bug-cards aria-live="polite"/);
   assert.doesNotMatch(bc, /postmark\.town\/api/);
-  assert.match(bc, /class="bb-empty"[^>]*>The board is read live from the office/);
-  // the jar stands between the strip and the open bugs
-  const jar = bc.indexOf("data-bug-jar");
-  assert.ok(jar > bc.lastIndexOf("data-strip-panel=") && jar < bc.indexOf("data-bug-board"), "the jar is not between the strip and the board");
-  assert.match(bc, /class="jar-empty"[^>]*>The jar is read live from the office/);
+  assert.match(bc, /class="bc-empty"[^>]*>The bugs are read live from the office/);
+  assert.ok(bc.indexOf("data-bug-cards") > bc.lastIndexOf("data-strip-panel="), "the cards are not after the strip");
+  // the jar and the board are one list now, not two
+  assert.doesNotMatch(bc, /data-bug-jar|data-bug-board/);
   assert.match(bc, new RegExp(`<a class="pm-btn" href="${NEW_ISSUE_URL}"[^>]*\\bdata-report\\b[^>]*>Report a bug</a>`));
 });

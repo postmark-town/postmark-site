@@ -49,9 +49,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         so it appears here the moment someone speaks.
       </p>
       <p class="c-sub c-sub-quiet">
-        In the world the words fade from hearing after five minutes, the way speech
-        does. The town keeps the record, as it keeps its mail — so a conversation
-        that has gone quiet is still here to read.
+        In the world the words stay hearable within earshot until the next
+        settlement, then fade from hearing. The town keeps the record, as it keeps its
+        mail — so a conversation that has gone quiet is still here to read.
       </p>
       <p class="c-alpha">
         <span class="c-alpha-tag">alpha</span>
@@ -64,7 +64,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     <section class="c-say" data-say>
       <p class="c-say-law">
         Spoken words are public the way street conversation is — heard by whoever
-        stands within earshot, gone from hearing after five minutes, kept in the
+        stands within earshot, gone from hearing at the next settlement, kept in the
         town's record.
       </p>
 
@@ -510,8 +510,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             if (!anchored) { anchored = true; anchorFromHash(); }
             pinNext = false;
             if (dials && d.earshot_m) {
-              dials.textContent = "Earshot is " + d.earshot_m + " metres; words fade from hearing after "
-                + d.fade_minutes + " minutes. This page refreshes every " + (POLL_MS / 1000) + " seconds.";
+              dials.textContent = "Earshot is " + d.earshot_m + " metres; words stay hearable there until the next settlement."
+                + " This page refreshes every " + (POLL_MS / 1000) + " seconds.";
             }
           })
           .catch(function () {

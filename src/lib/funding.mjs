@@ -290,6 +290,27 @@ export function patronLabel(patron) {
   };
 }
 
+/**
+ * A GIFT SHOWS ITS HOUSEHOLD (POS-550, Darko 2026-10-09). Gifts are
+ * household-scoped (POS-317), but the ledger files each one under the
+ * household's first resident (`from: keith`), so the roll named one resident
+ * for the whole house's money. Display only: the ledger line is unchanged, and
+ * so is `patron`.
+ *
+ * `houseOf` is the site's one household resolver (household.mjs § houseOf, the
+ * office's registry as GET /households printed it), handed in so this file
+ * stays loadable without the build's data aliases. A declared house prints its
+ * nameplate and links its page; a handle no house names keeps its own label,
+ * and an outside gift stays an outside gift.
+ */
+export function giverLabel(patron, houseOf = () => null) {
+  const who = patronLabel(patron);
+  if (!who.attached) return who;
+  const house = houseOf(who.patron);
+  const name = house?.declared ? nameplate(house) : "";
+  return name ? { ...who, household: name, handle: who.patron, label: name, href: houseHref(house) } : who;
+}
+
 // POT_ID_CLASS / EPOCH_CLASS, from the seam's own regexes.
 const POT_ID_RE = /^[a-z0-9][a-z0-9-]*$/;
 const EPOCH_RE = /^\d{4}-\d{2}$/;
@@ -299,6 +320,7 @@ const FIRST_CLOSE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // browser can load too (this file reads node:fs); re-exported here so there is
 // still ONE formatter and every importer keeps its import (POS-231, 2026-09-29).
 import { firstCloseLabel, epochLabel } from "./fund-close.mjs";
+import { nameplate, houseHref } from "./houses.mjs"; // a gift's household (POS-550), pure: no data aliases
 export { firstCloseLabel, epochLabel };
 
 // The pot file's `status`. A pot is not live until the founder opens it — see

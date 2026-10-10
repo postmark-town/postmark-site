@@ -42,6 +42,8 @@ export const DATA_FILES = [
   "stats.json",
   "calendar.json",
   "quest-posts.json",
+  "idea-posts.json",
+  "renames.json",
 ];
 
 // -- ON THE BOX, SHORT IS FAILED (2026-09-17, postmark#2884) -----------------
@@ -516,7 +518,26 @@ export function mapResident(r, letters, ledger = null, profile = {}) {
     //           public page cannot render somebody's sketchbook.
     window: r.window ?? null,
     marks: r.marks ?? null,
+    ...lastActiveFields(r),
   };
+}
+
+/**
+ * WHEN THEY LAST ACTED (POS-481), carried only when the office SAID it.
+ *
+ * The card's `last_active` is the resident's newest act of their own and
+ * `last_active_crossing` the crossing it fell in; the office answers both
+ * since POS-481, null for a resident with no act. Before POS-481 the same
+ * `last_active` name meant the newest commit to their pages, which is why
+ * `last_active_crossing` is the mark of the new meaning: no crossing key, no
+ * fields. A card that says `last_active_unavailable` (the office's store
+ * could not be read) carries none either. So an absent key on the page means
+ * "not said", and only a said null prints as "no acts yet" (src/lib/last-active.mjs).
+ */
+export function lastActiveFields(r) {
+  if (!r || !Object.prototype.hasOwnProperty.call(r, "last_active_crossing") || r.last_active_unavailable) return {};
+  const at = typeof r.last_active === "string" && Number.isFinite(Date.parse(r.last_active)) ? r.last_active : null;
+  return { last_active: at, last_active_crossing: at && Number.isFinite(r.last_active_crossing) ? r.last_active_crossing : null };
 }
 
 export function buildStats({ town, metrics, residents, letters, ledger = null, snapshotStats = {} }) {
@@ -716,8 +737,12 @@ export async function buildOfficeData({
       : `resident cards all settled across ${stamped.length} residents: the office's index was level with the record at fetch time`);
   }
 
-  const ledger = readSnapshot("ledger.json", []);
-  endpointGaps.push("ledger.json preserved from committed snapshot: office has metrics but no event-level ledger endpoint yet");
+  // THE LEDGER IS THE OFFICE'S (POS-351): GET /town/ledger, the town index's
+  // own mail ledger, every event in ledger order. A 404 is an office that does
+  // not have the door yet, and only then is the committed snapshot kept.
+  const ledgerRead = await fetchLedger({ apiBase, fetchImpl, retries, gate });
+  const ledger = ledgerRead.missing ? readSnapshot("ledger.json", []) : ledgerRead.entries;
+  if (ledgerRead.missing) endpointGaps.push(LEDGER_GAP);
 
   // Resident profiles: a checkout refresh wins. Without one (the ordinary
   // deploy), the office's own profile on the resident card (GET /residents/{h}
@@ -823,8 +848,11 @@ export async function buildOfficeData({
   const threads = buildThreads(letters, ledger);
   const metrics = metricsRes.body;
 
-  const docs = readSnapshot("docs.json", {});
-  endpointGaps.push("docs.json preserved from committed snapshot: office has no docs endpoint yet");
+  // THE TOWN'S DOCS ARE THE OFFICE'S (POS-351): GET /town/docs, the town
+  // index's copy of README / JOINING / TOWN-RULES / MAIL / CONTRIBUTING.
+  const docsRead = await fetchDocs({ apiBase, fetchImpl, retries, gate });
+  const docs = docsRead.missing ? readSnapshot("docs.json", {}) : docsRead.docs;
+  if (docsRead.missing) endpointGaps.push(DOCS_GAP);
 
   const calendarRead = await fetchCalendar({ apiBase, fetchImpl, retries, gate });
   const calendar = calendarRead.missing ? readSnapshot("calendar.json", EMPTY_CALENDAR) : calendarRead.calendar;
@@ -833,6 +861,14 @@ export async function buildOfficeData({
   const questRead = await fetchQuestPosts({ apiBase, fetchImpl, retries, gate });
   const questPosts = questRead.missing ? readSnapshot("quest-posts.json", EMPTY_QUEST_POSTS) : questRead.questPosts;
   if (questRead.missing) endpointGaps.push(questRead.gap);
+
+  const ideaRead = await fetchIdeaPosts({ apiBase, fetchImpl, retries, gate });
+  const ideaPosts = ideaRead.missing ? readSnapshot("idea-posts.json", EMPTY_IDEA_POSTS) : ideaRead.ideaPosts;
+  if (ideaRead.missing) endpointGaps.push(ideaRead.gap);
+
+  const renamesRead = await fetchRenames({ apiBase, fetchImpl, retries, gate });
+  const renames = renamesRead.missing ? readSnapshot("renames.json", {}) : renamesRead.renames;
+  if (renamesRead.missing) endpointGaps.push(RENAMES_GAP);
 
   let meeps = null;
   if (townRoot) meeps = readMeepsFromCheckout(townRoot);
@@ -856,8 +892,50 @@ export async function buildOfficeData({
       "stats.json": buildStats({ town, metrics, residents, letters, ledger, snapshotStats }),
       "calendar.json": calendar,
       "quest-posts.json": questPosts,
+      "idea-posts.json": ideaPosts,
+      "renames.json": renames,
     },
   };
+}
+
+// ── THE LEDGER AND THE DOCS (POS-351, 2026-10-04) ───────────────────────────
+// Darko ruled that the store is the record and every reader reads it. These
+// two files were the last of the structured data the site took from a town
+// CHECKOUT (tools/extract-town.mjs emitted them on every run); the office now
+// serves both from its town index:
+//
+//   GET /town/ledger   { as_of, total, entries: [ { kind, date, id, from, to, … } ] }
+//   GET /town/docs     { as_of, docs: { README: { body, path }, JOINING: …, … } }
+//
+// Read the calendar's way: a 404 is a door this office does not have yet, an
+// endpoint gap, and the committed snapshot is kept; anything else failing
+// throws like every other read. extract-town no longer writes either file.
+export const LEDGER_GAP = "ledger.json preserved from committed snapshot: the office answered 404 at GET /town/ledger, so its ledger door is not live yet";
+export const DOCS_GAP = "docs.json preserved from committed snapshot: the office answered 404 at GET /town/docs, so its docs door is not live yet";
+
+export async function fetchLedger({ apiBase, fetchImpl = fetch, retries = 3, gate = null } = {}) {
+  let body;
+  try {
+    ({ body } = await apiGet("/town/ledger", { apiBase, fetchImpl, retries, gate }));
+  } catch (error) {
+    if (error?.status === 404) return { missing: true, entries: null };
+    throw error;
+  }
+  if (!Array.isArray(body?.entries)) throw new Error(`/town/ledger: "entries" is not an array, so this is not the ledger the door names`);
+  return { missing: false, entries: body.entries };
+}
+
+export async function fetchDocs({ apiBase, fetchImpl = fetch, retries = 3, gate = null } = {}) {
+  let body;
+  try {
+    ({ body } = await apiGet("/town/docs", { apiBase, fetchImpl, retries, gate }));
+  } catch (error) {
+    if (error?.status === 404) return { missing: true, docs: null };
+    throw error;
+  }
+  if (!body?.docs || typeof body.docs !== "object" || Array.isArray(body.docs))
+    throw new Error(`/town/docs: "docs" is not an object, so this is not the docs the door names`);
+  return { missing: false, docs: body.docs };
 }
 
 // ── THE CALENDAR (POS-211, 2026-09-24) ──────────────────────────────────────
@@ -922,6 +1000,74 @@ export async function fetchQuestPosts({ apiBase, fetchImpl = fetch, retries = 3,
     throw new Error(`/posts?class=quest: not the quest class's posts the contract names (class "quest", a posts array)`);
   if (!body.posts.length) return { missing: true, gap: QUEST_POSTS_UNSEEDED_GAP, questPosts: null };
   return { missing: false, questPosts: body };
+}
+
+// ── THE IDEA POSTS (POS-290, 2026-10-09) ────────────────────────────────────
+// Ideas become posts (Darko's re-scope), and the Think Tank draws them beside
+// the legacy idea marks: `GET /posts?class=idea`, the same posts read, baked as
+// idea-posts.json. Read the quest posts' way, with one more answer that keeps
+// the snapshot: an office that does not carry the idea class yet refuses it
+// with a 422 ("ideas are not posts yet", the w42 train before the idea class
+// merges, and prod until it ships). That is a door that is not open yet, not an
+// office failing, so the committed snapshot stands and the gap says which.
+//
+// AN EMPTY ANSWER IS WRITTEN, unlike the quests'. Quests are put up by the
+// town at the ship, so zero quest posts means not seeded yet. Idea posts are
+// written by residents, so zero is simply a town where nobody has posted one.
+export const EMPTY_IDEA_POSTS = Object.freeze({ as_of: null, class: "idea", finished: ["shipped", "declined", "duplicate"], total: 0, posts: [] });
+export const IDEA_POSTS_GAP = "idea-posts.json preserved from committed snapshot: the office answered 404 at GET /posts?class=idea, so its posts door is not live yet";
+export const IDEA_POSTS_NOT_YET_GAP = "idea-posts.json preserved from committed snapshot: the office answered 422 at GET /posts?class=idea, so ideas are not posts on that office yet";
+
+export async function fetchIdeaPosts({ apiBase, fetchImpl = fetch, retries = 3, gate = null } = {}) {
+  let body;
+  try {
+    ({ body } = await apiGet("/posts?class=idea", { apiBase, fetchImpl, retries, gate }));
+  } catch (error) {
+    if (error?.status === 404) return { missing: true, gap: IDEA_POSTS_GAP, ideaPosts: null };
+    if (error?.status === 422) return { missing: true, gap: IDEA_POSTS_NOT_YET_GAP, ideaPosts: null };
+    throw error;
+  }
+  if (body?.class !== "idea" || !Array.isArray(body?.posts))
+    throw new Error(`/posts?class=idea: not the idea class's posts the contract names (class "idea", a posts array)`);
+  return { missing: false, ideaPosts: body };
+}
+
+// ── THE RENAME RECORD (POS-530, 2026-10-09) ─────────────────────────────────
+// A letter names its author by the handle written on it, and a resident who
+// has since renamed has a page only under the new handle. The record of that
+// is the store's pins: a renamed handle stays, marked `retired` and
+// `renamed_to` (the town's tools/rename-handle.mjs; tools/github-ids.json is
+// the printout). GET /households is the office's read of it (POS-345), and the
+// site's build is one of the readers its contract names. Only the renames are
+// baked: renames.json is { <old handle>: <new handle> }, and
+// src/lib/resident-link.mjs walks it before a page links a resident.
+//
+// Read the calendar's way: a 404 is a door this office does not have yet (prod
+// before the w42 office ships), so the committed renames.json is kept and the
+// gap says why; anything else failing throws like every other read.
+export const RENAMES_GAP = "renames.json preserved from committed snapshot: the office answered 404 at GET /households, so its registry door is not live yet";
+
+export function renamesFromPins(pins) {
+  const renames = {};
+  for (const handle of Object.keys(pins).sort()) {
+    const to = pins[handle]?.renamed_to;
+    if (typeof to === "string" && to && to !== handle) renames[handle] = to;
+  }
+  return renames;
+}
+
+export async function fetchRenames({ apiBase, fetchImpl = fetch, retries = 3, gate = null } = {}) {
+  let body;
+  try {
+    ({ body } = await apiGet("/households", { apiBase, fetchImpl, retries, gate }));
+  } catch (error) {
+    if (error?.status === 404) return { missing: true, renames: null };
+    throw error;
+  }
+  const pins = body?.pins;
+  if (body?.read !== "households" || !pins || typeof pins !== "object" || Array.isArray(pins))
+    throw new Error(`/households: not the registry read the contract names (read "households", a pins object)`);
+  return { missing: false, renames: renamesFromPins(pins) };
 }
 
 export function parseMaybeFrontmatter(text) {

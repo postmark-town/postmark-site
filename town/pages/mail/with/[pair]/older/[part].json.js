@@ -6,6 +6,7 @@ import threads from "@/data/postmark/threads.json";
 import media from "@/data/postmark/media.json";
 import ledger from "@/data/postmark/ledger.json";
 import { pairViews, deliveredOnOf, pairLettersHtml } from "@/lib/mail-letter.mjs";
+import { residentHref } from "@/lib/resident-pages.mjs";
 
 export function getStaticPaths() {
   const deliveredOn = deliveredOnOf(ledger);
@@ -16,7 +17,7 @@ export function getStaticPaths() {
         part: i + 2,
         parts: view.parts.length,
         ids: ls.map((l) => l.id),
-        html: pairLettersHtml(view, ls, { media, deliveredOn }),
+        html: pairLettersHtml(view, ls, { media, deliveredOn, hrefOf: residentHref }),
       },
     })));
 }

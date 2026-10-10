@@ -149,12 +149,13 @@ const emit = (name, value) => {
 
 emit("media.json", Object.fromEntries(Object.entries(media).sort(([a], [b]) => a.localeCompare(b))));
 
-// ledger + docs are checkout-coupled like media: the office serves neither an
-// event-level ledger read nor a town-docs read (see fetch-town-data.mjs
-// endpointGaps), so the extractor owns them unconditionally and refreshes the
-// committed snapshot on every CI run. fetch-town then preserves what it finds.
-emit("ledger.json", town.ledger);
-emit("docs.json", town.docs);
+// ledger + docs USED to be emitted here from the checkout, unconditionally.
+// They are the office's now (POS-351): GET /town/ledger and GET /town/docs,
+// read by tools/fetch-town.mjs. The break-glass build still writes them below.
+if (LEGACY_DATA) {
+  emit("ledger.json", town.ledger);
+  emit("docs.json", town.docs);
+}
 
 // PROFILE.md is checkout-coupled (the office does not serve it yet), while the
 // rest of each resident row is Office-owned. Overlay profiles onto the last
@@ -197,19 +198,26 @@ try {
   console.warn(`WARN friendships: fold unavailable (${e.message}) — friendships.json left as-is`);
 }
 
-// The declared household registry (2026-08-07) — carried across verbatim from
-// the town's tools/households.json, which is its one writer. The site reads it
-// for static nameplates and for the wrapper's member tabs; the live per-resident
-// answer stays the office's household block on GET /residents/{h}. Same registry,
-// two sides — never a second resolver. Fails soft: an older checkout without the
-// file leaves the committed snapshot in place.
+// The declared household registry (2026-08-07), as the STORE holds it (POS-345):
+// the office's public GET {POSTMARK_API}/households answers `registry` in
+// tools/households.json's own shape, and this writes it to households.json
+// verbatim. The town's tools/households.json is only the store's printout, so
+// the build no longer reads it from the checkout. The site reads the registry
+// for static nameplates and for the wrapper's member tabs; the live
+// per-resident answer stays the office's household block on GET
+// /residents/{h}. Same registry, two sides — never a second resolver. Fails
+// soft like every office read here: an office that does not answer leaves the
+// committed snapshot in place, and says so.
 try {
-  const raw = readFileSync(join(TOWN, "tools", "households.json"), "utf8");
-  const households = JSON.parse(raw);
+  const res = await fetch(`${POSTMARK_API}/households`, { headers: { accept: "application/json" } });
+  if (!res.ok) throw new Error(`GET /households answered ${res.status}`);
+  const body = await res.json();
+  const households = body?.registry;
+  if (!households || typeof households.households !== "object") throw new Error("GET /households carried no registry");
   emit("households.json", households);
-  console.log(`households: ${Object.keys(households.households ?? {}).length} declared`);
+  console.log(`households: ${Object.keys(households.households ?? {}).length} declared (the office's GET /households)`);
 } catch (e) {
-  console.warn(`WARN households: registry unavailable (${e.message}) — households.json left as-is`);
+  console.warn(`WARN households: the office's registry read did not answer (${e.message}) — households.json left as-is`);
 }
 
 const deliveries = town.ledger.filter((e) => e.kind === "delivery");

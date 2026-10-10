@@ -60,7 +60,8 @@
 // no image service: a strict CSP would block it, and handing a third party the
 // ability to change what an intake QR encodes is handing them the money.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import { livePots, loadPots, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel } from "@/lib/funding.mjs";
+import { livePots, loadPots, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel, giverLabel } from "@/lib/funding.mjs";
+import { houseOf } from "@/lib/household.mjs";
 import { qrSvg } from "@/lib/qr.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
 import PotSprite from "@/components/PotSprite.astro";
@@ -190,7 +191,9 @@ const estimate = mintPerDollar(pot);
 // door itself excludes from the count), and the page simply never read the
 // field. So nothing about the ECONOMY moves here. What moves is that the money
 // the town was already holding is now shown.
-const roll = (pot.patrons ?? []).map((p) => ({ ...patronLabel(p.patron), usd: p.usd, holo: p.holo }));
+// A gift shows its HOUSEHOLD, not the first resident the ledger filed it under
+// (POS-550): giverLabel, over the site's one household resolver.
+const roll = (pot.patrons ?? []).map((p) => ({ ...giverLabel(p.patron, houseOf), usd: p.usd, holo: p.holo }));
 const rollTotal = roll.reduce((n, r) => n + r.usd, 0);
 const anyOutside = roll.some((r) => !r.attached);
 const staked = Number(pot.staked ?? 0);
@@ -631,7 +634,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           <div class="f-fold-body">
             <ul class="f-past-list">
               {past.map((m) => {
-                const mroll = (m.patrons ?? []).map((p) => ({ ...patronLabel(p.patron), usd: p.usd }));
+                const mroll = (m.patrons ?? []).map((p) => ({ ...giverLabel(p.patron, houseOf), usd: p.usd }));
                 const mtotal = mroll.reduce((n, r) => n + r.usd, 0);
                 return (
                   <li class="f-past-row">
@@ -664,9 +667,9 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             <li><strong>How a payment reaches the ledger.</strong> The office's own watchers witness each payment on their timer once one crossing's grace has passed (the grace is a window to catch a mistake before it is written for good); PayPal lists a payment within about three hours, and a USDC transfer is witnessed when you paste its hash. Whole dollars only. Money's share of a household is capped, and a gift promises no return.</li>
             <li>Every dollar is <strong>written down in your name</strong> — what you funded, when, for how much — permanently and publicly. A gift that mints nothing is recorded just as fully, and giving while expecting nothing back is a fine way to give.</li>
             {pot.close === "elastic" ? (
-              <li><strong>This pot carries forward.</strong> Gifts join the roll month over month — nothing is refused at intake. When the roll reaches its floor, the close runs over the whole accumulated roll: every stake comes home whole, and the givers are minted <strong>fresh stamps</strong> by dollar share — sized by what the town staked on this pot, a giver's own household's stakes left out, and capped at ρ × what the household has earned here. A pot nobody staked mints nothing.</li>
+              <li><strong>This pot carries forward.</strong> Gifts join the roll month over month — nothing is refused at intake. When the roll reaches its floor, the close runs over the whole accumulated roll: every stake comes home whole, and the givers are minted <strong>fresh stamps</strong> by dollar share — sized by what the town staked on this pot, a giver's own household's stakes left out, and capped so the household's holo never passes ρ × everything it has minted. A pot nobody staked mints nothing.</li>
             ) : pot.closes ? (
-              <li><strong>This pot closes at the epoch.</strong> If residents staked stamps on it, the close mints you <strong>fresh stamps</strong> by dollar share — sized by the funded share of those stakes, your own household's left out, capped at ρ × what your household has earned here; the stakes themselves come home whole. If nobody staked, your dollars still pay the bill, are still written down in your name, and mint nothing — money cannot manufacture ownership out of something nobody wanted.</li>
+              <li><strong>This pot closes at the epoch.</strong> If residents staked stamps on it, the close mints you <strong>fresh stamps</strong> by dollar share — sized by the funded share of those stakes, your own household's left out, capped so your household's holo never passes ρ × everything it has minted; the stakes themselves come home whole. If nobody staked, your dollars still pay the bill, are still written down in your name, and mint nothing — money cannot manufacture ownership out of something nobody wanted.</li>
             ) : pot.close === "none" ? (
               <li><strong>This one never closes.</strong> A gift is witnessed and left at that: nothing burns, nothing converts, and <strong>nothing mints back</strong> — to you or to anyone.</li>
             ) : (

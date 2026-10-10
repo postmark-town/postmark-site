@@ -12,7 +12,8 @@ deploy lane, and has not been since 2026-08-30.
 **The pin is a world commit, and the site carries two of them.**
 
 - **The floor** is frozen in `package.json` → `dependencies.postmark-world`, a
-  40-hex `github:keeminlee/postmark-world#<sha>`. The keeper bumps it on site
+  40-hex `github:keeminlee/postmark-world#<sha>` (the old owner's name; GitHub
+  redirects it to `postmark-town/postmark-world`). The keeper bumps it on site
   main at each blessing. It is READ by everything here and written by nobody
   here.
 - **The resolved pin** is what the rebuild actually installs on top of the
@@ -100,7 +101,7 @@ A prod build is assembled from **four sources moving at four speeds**:
 | Source | Where it comes from | Pace |
 |---|---|---|
 | **Code** | the newest `release/*` tag (`--sort=-creatordate`) | a founder Approve |
-| **Town data** | site main — `public/atelier/postmark`, `src/data/postmark`, `public/renditions` | every crossing |
+| **Town data** | site main — `public/atelier/postmark`, `src/data/postmark`, `public/renditions` — with main's extractors run over it on the box against the town's `origin/main`; what they write is never committed | every crossing |
 | **Deploy machinery** | site main — `tools/resolve-world-pin.mjs`, `tools/lib/world-pin.mjs`, `tools/build-stamp.mjs`, checked out over the tag | every tick |
 | **The world** | the keeper's newest `settlement/S<n>` tag, resolved at rebuild time | every blessing |
 
@@ -136,10 +137,12 @@ run — check the timer, not the resolver.
 
 ### One flag on the publish side
 
-The box skips the world install when the lockfile is unchanged, so a resolver
-decision of `hold` does not reinstall the floor over whatever is already in the
-build tree. Found 2026-09-10; the fix is on the office branch
-`wright/site-refresh-hold-installs-the-floor`, awaiting review.
+The box used to skip the world install when the lockfile was unchanged, so a
+resolver decision of `hold` did not reinstall the floor over whatever was
+already in the build tree. Found 2026-09-10 and fixed on office main the same
+day (`3118e5b`, "a HOLD is an install, not a no-op"; refined `117f343`,
+2026-09-11): both decisions now install the world they chose and check it
+against what npm actually put on disk.
 
 ---
 

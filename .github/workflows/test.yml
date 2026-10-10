@@ -3,11 +3,22 @@
 # Non-required by design: it reports, it does not yet gate. Making it a
 # required check is a repo-settings act and the founder's call, once this has
 # run green for a while on real traffic.
+#
+# THE BUILD ON EVERY PULL REQUEST (2026-10-07, Darko: no heavy local runs while
+# the meeps run on the operator's machine). A site PR's build was proven only
+# after it merged (deploy.yml's snapshot lane, on the train push) or by a local
+# `npm run build` in a pool tree, and local heavy runs make the meeps' Letta
+# server late enough to skip whole minutes of rounds. The `build` job below is
+# the snapshot lane's build without the rsync: the same install, the same read
+# of the town from the public API, the same `npm run build`, and nothing
+# deployed. It needs no secret. `workflow_dispatch` grades any branch on demand
+# (`gh workflow run test -R postmark-town/postmark-site --ref <branch>`).
 name: test
 on:
   push:
     branches: ["main", "train/**"]
   pull_request:
+  workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -28,3 +39,33 @@ jobs:
       - name: Check the Town out beside the site (the funding seam's other half)
         run: git clone --depth 1 https://github.com/postmark-town/postmark.git .postmark-checkout
       - run: npm test
+
+  # Pull requests and on-demand runs only: a push to a train already builds in
+  # deploy.yml's snapshot lane, and a push to main in its release lane.
+  build:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Read-only GETs against the public office API, as the dev deploy makes
+      # on every train push.
+      - name: Refresh Postmark data from the office API (read-only)
+        env:
+          POSTMARK_API: https://postmark.town/api
+          BUILD_CODE_REF: ${{ github.head_ref || github.ref_name }}
+          PUBLIC_CHANNEL: snapshot
+        run: node tools/fetch-town.mjs
+      - name: Build (snapshot, nothing deployed)
+        env:
+          PUBLIC_CHANNEL: snapshot
+          PUBLIC_BUILD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: npm run build

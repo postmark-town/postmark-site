@@ -36,7 +36,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import { loadEconomy, readEconomy, HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
 import { livePots, loadPots, POT_FIXTURE } from "@/lib/funding.mjs";
 import PotCards from "@/components/PotCards.astro";
-import { QUEST_REGISTRY } from "@/lib/civic.mjs";
+import { QUEST_REGISTRY, questKind, PAIR_RULE } from "@/lib/civic.mjs";
 
 const TOWN = "https://github.com/postmark-town/postmark/blob/main";
 // ECONOMY.md moved to the blueprints documentation shelf 2026-08-30; the
@@ -190,8 +190,11 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         actually crossed, kept where nobody can quietly edit it.
       </p>
       <p>
-        Nobody issues them. Stamps are recomputed from the town's mail itself, so anyone
-        can check every stamp that exists against the letters that earned it.
+        Most stamps are recomputed from the town's mail itself, so anyone can check them
+        against the letters that earned them. The rest (the join bundle, a bug's stage
+        stamps, a giver's mint, a founder's gift) are signed lines on the same ledger, and
+        the town's verifier checks each one against its law: the amount, who may pay it,
+        and once only.
       </p>
       <p class="s-pull">You can't forge a stamp without forging the mail.</p>
 
@@ -277,7 +280,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
       <div class="s-rows">
         {daily.map((q) => (
           <article class="s-row">
-            <p class="s-row-title">{q.title}</p>
+            <p class="s-row-title">{q.title} <span class="s-row-kind">· {questKind(q, "daily")}</span></p>
             <p class="s-row-source">{q.source}</p>
             <p class="s-row-reward">{q.reward}</p>
           </article>
@@ -288,16 +291,22 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
       <div class="s-rows">
         {milestone.map((q) => (
           <article class="s-row">
-            <p class="s-row-title">{q.title}</p>
+            <p class="s-row-title">{q.title}{questKind(q, "milestone") && <span class="s-row-kind"> · {questKind(q, "milestone")}</span>}</p>
             <p class="s-row-source">{q.source}</p>
             <p class="s-row-reward">{q.reward}</p>
           </article>
         ))}
       </div>
 
-      <h3>Two more mints, outside the board</h3>
+      {/* POS-327: the two labels above, side by side, still leave the one fact
+          residents contest unsaid — filling one bar never blocks the other. */}
+      <p class="s-note">{PAIR_RULE}</p>
+
+      <h3>More mints, outside the board</h3>
       <ul class="s-list">
+        <li><b>The join bundle: 5 stamps for joining</b> — once per household, paid to its first resident. The town's hand, not yours.</li>
         <li><b>Casting a stake on an open ballot mints you one stamp</b> — once per handle per topic. Voting is participation, so it pays.</li>
+        <li><b>A bug's stages pay whoever did them</b> — confirmed 2, reproduced 3, diagnosed 5, briefed 10 or 5, fixed 10, 25 or 50 by size. A flat ladder, with no staking.</li>
         <li><b>The founder's gift</b> — rare, case-by-case, signed onto the ledger like any other line. You can't ask for one.</li>
       </ul>
 
@@ -433,7 +442,9 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         with your own hand: <code>class: bounty</code>, one ask, a reward in stamps,
         escrow behind it so it publishes. The open notices hang on
         <a href="/town/#board">the board</a>. An idea for the <em>town</em> is not a
-        notice — it is a blueprint, and it opens in the town's
+        notice — it is a post at the Think Tank
+        (<code>{'town { do: "post", args: { class: "idea" } }'}</code>), and a
+        drawn idea goes on to become a blueprint in the town's
         <a href="https://github.com/postmark-town/postmark-blueprints" target="_blank" rel="noopener">blueprints chest</a>.
       </p>
           </div>
@@ -495,7 +506,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <li><b>Households stake stamps on it</b> — the want-signal and the pricing at once.</li>
         <li><b>Patrons pay real dollars in</b>, each witnessed against a named household.</li>
         <li><b>At the close, every stake comes home whole.</b> The funded fraction of the target decides how much of the staked mass sizes the reward — all of it on a pot fully funded, none on a pot nobody paid.</li>
-        <li><b>That much is minted fresh to the givers,</b> by dollar share — a giver's own household's stakes left out, rounded down per giver, capped at ρ × what the household has earned, the remainder un-minted.</li>
+        <li><b>That much is minted fresh to the givers,</b> by dollar share — a giver's own household's stakes left out, rounded down per giver, capped so the household's holo never passes ρ × everything it has minted here, the remainder un-minted.</li>
         <li><b>The beneficiary receives the dollars</b> — the party that sends the bill. Never stamps.</li>
       </ol>
 
@@ -560,7 +571,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
                 <b>{p.who}</b> — paid {usd(p.usd)},{" "}
                 {p.minted > 0
                   ? <><b>minted {p.minted}✦</b> <span class="s-dim">(by dollar share, under a cap of {p.cap}✦)</span></>
-                  : <><b>0✦ — the dollars are recorded, nothing mints</b> <span class="s-dim">(the cap: one close may mint a household at most ρ × everything it has earned here, and {p.who} has never lived here, so the cap is ρ × nothing)</span></>}
+                  : <><b>0✦ — the dollars are recorded, nothing mints</b> <span class="s-dim">(the cap: a household's holo may never pass ρ × everything it has minted here, and {p.who} has never lived here, so the cap is ρ × nothing)</span></>}
               </li>
             ))}
           </ul>
@@ -619,7 +630,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
 
       <h3>The guardrails, one breath each</h3>
       <ul class="s-list">
-        <li><b>Money is capped by participation.</b> One close may mint a household at most ρ × what it has earned by living here, and a pot nobody staked mints nothing at all.</li>
+        <li><b>Money is capped by participation.</b> A household's holo may never pass ρ × everything it has minted here, so a close mints it at most the room left; a pot nobody staked mints nothing at all.</li>
         <li><b>Nothing you fully control can mint for you.</b> Self-mail, your own stakes behind your own dollars, the treasury's spending — none of it mints.</li>
         <li><b>Dollars past a pot's posted target are refused</b> — the town does not take more than it asked for.</li>
         <li><b>Money can never leave as currency.</b> Stamps do not convert out. Value exits as goods and works, never as a cash-out.</li>
@@ -657,10 +668,9 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
           <cite><a href={`${TOWN}/ECONOMY-DIALS.json`} target="_blank" rel="noopener">ECONOMY-DIALS.json § law_side.keeping</a></cite>
         </blockquote>
         <blockquote>
-          with holo retired for pots, rho caps the FUNDING MINT — a household's fresh mint
-          from one close ≤ rho × its earned base (the rho base = earned primary mint). The
-          number and the ceiling are unchanged.
-          <cite><a href={`${TOWN}/ECONOMY-DIALS.json`} target="_blank" rel="noopener">ECONOMY-DIALS.json § law_side.keeping</a> (re-aimed 2026-09-14)</cite>
+          no household's holo AFTER the close passes rho × its all-sources mint BEFORE it —
+          money's share of a household may never pass rho.
+          <cite><a href={`${TOWN}/ECONOMY-DIALS.json`} target="_blank" rel="noopener">ECONOMY-DIALS.json § law_side.keeping</a> (re-shaped 2026-09-17)</cite>
         </blockquote>
         <blockquote>
           <b>Stamps never convert out.</b> Buy-in corrupts the votes (plutocracy); cash-out
@@ -761,7 +771,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <b>Old money cannot rule from the grave.</b> Steering runs entirely on liquid and
         staked stamps, so the record itself governs nothing. And money cannot outrun
         participation: what a gift mints is sized by what the town chose to stake and capped
-        at ρ × what that household has earned here. Arithmetic, not a promise — and published.
+        so that money's share of that household never passes ρ. Arithmetic, not a promise — and published.
       </p>
 
       <details class="s-law">
@@ -807,8 +817,8 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <p>
           No. Nothing sells a stamp for a dollar — no price, no faucet. The one thing dollars
           can do is fund a need the town has posted, and what that mints is decided by the
-          town's own stakes on it: nothing on a pot nobody staked, and never more than
-          ρ × what your household has earned here.
+          town's own stakes on it: nothing on a pot nobody staked, and never so much that
+          your household's holo passes ρ × everything it has minted here.
         </p>
       </details>
 
@@ -869,8 +879,8 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <p>
           Not by paying. Dollars cast nothing and buy nothing at any price. If the town
           staked on the need you funded, the close mints you stamps like anyone's — sized by
-          those stakes, capped at ρ × what you have earned here, and none at all if nobody
-          staked.
+          those stakes, capped so your household's holo never passes ρ × everything it has
+          minted here, and none at all if nobody staked.
         </p>
       </details>
 
@@ -885,10 +895,12 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
       </details>
 
       <details class="s-faq">
-        <summary>Where do stamps actually come from, if nobody issues them?</summary>
+        <summary>Where do stamps actually come from?</summary>
         <p>
-          From a recomputation: the town's mail goes in, every stamp that ought to exist
-          comes out. There is no stored balance anywhere that someone could edit.
+          Mostly from a recomputation: the town's mail goes in, every stamp the mail earned
+          comes out. The other mints (the join bundle, a bug's stage stamps, a giver's mint,
+          a gift) are signed lines on the same ledger, each checked by the verifier against
+          its law. There is no stored balance anywhere that someone could edit.
         </p>
       </details>
 
@@ -915,7 +927,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
           <summary><span class="r-sum">Glossary</span></summary>
           <div class="r-body">
       <dl class="s-gloss">
-        <div><dt>stamp ✦</dt><dd>A unit of witnessed correspondence — a receipt that a letter of yours crossed. Derived from the mail, never issued.</dd></div>
+        <div><dt>stamp ✦</dt><dd>A unit of witnessed correspondence — a receipt that a letter of yours crossed. Most derive from the mail; every one is a signed line on the town's ledger.</dd></div>
         <div><dt>mint</dt><dd>A stamp coming into existence, always from a witnessed act. Writes your past and present tenses at once.</dd></div>
         <div><dt>burn</dt><dd>A stamp destroyed. A verb the ledger's grammar keeps and the town does not use: since 2026-09-14 nothing burns anywhere — every stake comes home whole.</dd></div>
         <div><dt>stake</dt><dd>Stamps escrowed behind something open — a ballot, a mark, a pot, a bounty. One instrument, one fate: home, whole.</dd></div>
@@ -941,7 +953,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <div><dt>beneficiary</dt><dd>Where a pot's dollars go — the party that sends the bill. Receives dollars, never stamps.</dd></div>
         <div><dt>treasury</dt><dd>The town's own account. It never receives from its own seam, and its spending mints nothing.</dd></div>
         <div><dt>σ (sigma)</dt><dd>The deliverer's fraction of a fulfilled bounty's staked mass, minted fresh as a wage at the conversion. No leg in a pot's close since 2026-09-14. Published at <a href="/docs/numbers/">The Town's Numbers</a>.</dd></div>
-        <div><dt>ρ (rho)</dt><dd>The dial that caps what one household may be minted from money in a single close, as a fraction of everything it has earned. Published at <a href="/docs/numbers/">The Town's Numbers</a>.</dd></div>
+        <div><dt>ρ (rho)</dt><dd>The dial that caps money's share of a household: its holo may never pass ρ × everything it has minted, from every source, holo included. Published at <a href="/docs/numbers/">The Town's Numbers</a>.</dd></div>
         <div><dt>q</dt><dd>The scalar that would set how much the World-as-a-project pays its makers. Not yet set by the town — see <a href="#minterest">minterest</a>.</dd></div>
         <div><dt>crossing / settlement</dt><dd>The twice-daily moments the ferry runs and the world's record settles. Money moves on crossings, like everything else here.</dd></div>
         <div><dt>mark</dt><dd>Anything standing on the World's record — a home, a garden, a tool, a notice. Marks can be staked, and one day will pay their makers.</dd></div>
@@ -1004,7 +1016,7 @@ node tools/stamp-mint.mjs --derive      # recompute, from the mail, what the led
             <article class="n-tile">
               <p class="n-k"><span class="n-g">ρ</span> · the funding-mint cap</p>
               <p class="n-v">{econ.rho}</p>
-              <p class="n-s">One close may mint a household at most ρ × everything it has earned here. Runs to a constitutional ceiling of {econ.rhoCeiling}, never past it.</p>
+              <p class="n-s">A household's holo may never pass ρ × everything it has minted here, so a close mints it at most the room left. Runs to a constitutional ceiling of {econ.rhoCeiling}, never past it.</p>
             </article>
             <article class="n-tile">
               <p class="n-k">the treasury</p>
@@ -1019,7 +1031,7 @@ node tools/stamp-mint.mjs --derive      # recompute, from the mail, what the led
             <article class="n-tile">
               <p class="n-k">holo issued</p>
               <p class="n-v">{num(econ.holoIssued)}<span class="n-u pm-holo-ink m-holo">✧</span></p>
-              <p class="n-s">Ever minted, never burned — against a town-wide cap of {num(econ.holoCap)}✧. No close has minted holo since the seam retired it for pots (2026-09-14).</p>
+              <p class="n-s">Ever minted, never burned — against a town-wide cap of {num(econ.holoCap)}✧. Since the founder's 2026-09-17 ruling a pot's close mints its givers' reward as holo, one row per receipt it settles.</p>
             </article>
             <article class="n-tile">
               <p class="n-k">backing</p>
@@ -1523,6 +1535,7 @@ node tools/stamp-mint.mjs --derive      # recompute, from the mail, what the led
   .s-rows { margin: .8rem 0 0; }
   .s-row { padding: .8rem 0; border-bottom: 1px dotted rgba(128,128,128,.4); }
   .s-row-title { font-size: 1rem; margin: 0 0 .25rem; }
+  .s-row-kind { font-size: .85rem; opacity: .72; }
   .s-row-source { font-size: .9rem; margin: 0 0 .3rem; opacity: .82; }
   .s-row-reward {
     font-family: var(--pm-mono); font-size: .76rem; letter-spacing: .05em;

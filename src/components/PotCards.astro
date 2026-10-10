@@ -19,7 +19,8 @@
 // scoped rules never reach a component's elements. The civic scale variables
 // (--civic-body, --civic-label) are inherited where the page defines them
 // (/town/) and fall back to the same numbers where it does not (/stamps/).
-import { potGist, patronLabel } from "@/lib/funding.mjs";
+import { potGist, giverLabel } from "@/lib/funding.mjs";
+import { houseOf } from "@/lib/household.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
 import PotSprite from "@/components/PotSprite.astro";
 
@@ -105,12 +106,12 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
           {/* THE STAMPS BEHIND IT, beside the money: the other half of "how
               full" (POS-258). */}
           <p class="m-staked"><span class="m-chip is-stamp">{p.staked}<span class="m-u">✦</span> staked</span></p>
-          {/* EVERY PATRON, the unattached ones told apart: patronLabel links a
-              hand and names a gift (funding.mjs). The separator lives BETWEEN
+          {/* EVERY PATRON, the unattached ones told apart: giverLabel names the
+              giving household and links its page, and names a gift (funding.mjs, POS-550). The separator lives BETWEEN
               the nowrap spans so a long roll wraps instead of spilling. */}
           <p class="m-roll">
             {p.patrons.length > 0
-              ? <>{p.patrons.slice(0, PATRONS_SHOWN).map((c, i) => { const who = patronLabel(c.patron); return (
+              ? <>{p.patrons.slice(0, PATRONS_SHOWN).map((c, i) => { const who = giverLabel(c.patron, houseOf); return (
                   <>{i > 0 && " · "}<span class="m-patron">{who.href ? <a href={who.href}>{who.label}</a> : <span class="m-gift">{who.label}</span>} <span class="m-dim">{usd(c.usd)}</span></span></>
                 ); })}{p.patrons.length > PATRONS_SHOWN && <> · <span class="m-patron m-dim">and <a href={`/fund/${p.pot}/`}>{p.patrons.length - PATRONS_SHOWN} more</a></span></>}</>
               : <span class="m-dim">the roll is open — nobody has fed this pot yet</span>}

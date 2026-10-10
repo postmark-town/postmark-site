@@ -109,10 +109,11 @@ const wagePer100 = econ ? Math.floor(econ.sigma * 100) : 0;
               <i class="n-fill-gold" style={`width:${pct(econ.rho / econ.rhoCeiling)}%`}></i>
             </div>
             <p class="n-note">
-              What one close may mint a household from money can never exceed ρ × everything
-              it has <em>earned</em> — the stamps the mail minted it by living here. Dollars
-              past that cap are still written down in the payer's name, permanently and
-              publicly, and mint nothing. The dial
+              Money's share of a household can never pass ρ: after a close, the household's
+              holo may not exceed ρ × everything it had <em>minted</em> before it, from every
+              source, holo included — so a close mints it at most the room left under that
+              line. Dollars past the cap are still written down in the payer's name,
+              permanently and publicly, and mint nothing. The dial
               runs to a <strong>constitutional ceiling of {econ.rhoCeiling}</strong>;
               ρ can move below it, never past it, and a dial that tries is refused rather
               than obeyed. {econ.rho >= econ.rhoCeiling
@@ -144,9 +145,9 @@ const wagePer100 = econ ? Math.floor(econ.sigma * 100) : 0;
               <i class="pm-holo-ink" style={`width:${Math.max(1.5, pct(econ.capUsed ?? 0))}%`}></i>
             </div>
             <p class="n-note">
-              All holo ever minted, against ρ × the {num(econ.primaryMint)}✦ the town has
-              minted. No close has minted holo since the seam retired it for pots
-              (2026-09-14); the record and its cap stand. The cap is not a stored number —
+              All holo ever minted, against ρ × the {num(econ.capBase)}✦ the town has
+              minted from every source. Since the founder's 2026-09-17 ruling a pot's close
+              mints its givers' reward as holo, one row per receipt it settles. The cap is not a stored number —
               it is that multiplication, so it moves as the town mints. ✧ holo is fresh mint
               to a giver, liquid like any stamp — {HOLO_LINE}.
             </p>

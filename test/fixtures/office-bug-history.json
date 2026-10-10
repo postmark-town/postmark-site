@@ -1,0 +1,56 @@
+{
+  "source": "postmark-town/postmark-office GET /posts?class=bug at postmark-office#462 (POS-547, bde54215): every bug row carries history, one row per stage act { stage, at, hand, credit, link, stamps_paid }; stamps_paid from the store's stamp_lines, null without a line. Hand-written in that shape, 2026-10-09.",
+  "as_of": "2026-10-09T23:00:00.000Z",
+  "class": "bug",
+  "finished": ["shipped", "duplicate", "not-a-bug"],
+  "total": 7,
+  "posts": [
+    { "class": "bug", "id": "wildcat/preview-disagrees", "title": "leave-mark preview and commit disagree", "author": "wildcat", "household": "hh:the-den", "state": "shipped",
+      "fields": { "issue": "https://github.com/postmark-town/postmark/issues/3555", "size": "M", "critter": "the Two-Minded Moth", "named_by": "lupi",
+        "links": { "diagnosed": "https://github.com/postmark-town/postmark/issues/3555#issuecomment-1", "fixed": "https://github.com/postmark-town/postmark-office/pull/461", "shipped": "https://github.com/postmark-town/postmark-office/releases/tag/release/2026-w42" },
+        "reveal": { "candidates": ["https://media.postmark.town/media/iris/moth-1.png", "https://media.postmark.town/media/iris/moth-2.png", "https://media.postmark.town/media/iris/moth-3.png"], "pick": 2, "image": "https://media.postmark.town/media/iris/moth-2.png", "picked_by": "lupi" } },
+      "history": [
+        { "stage": "reported", "at": "2026-10-06T14:00:00.000Z", "hand": null, "credit": "wildcat", "link": null, "stamps_paid": null },
+        { "stage": "confirmed", "at": "2026-10-06T15:00:00.000Z", "hand": "bugcatcher", "credit": "wildcat", "link": null, "stamps_paid": 2 },
+        { "stage": "reproduced", "at": "2026-10-06T16:00:00.000Z", "hand": "bugcatcher", "credit": "kogane", "link": null, "stamps_paid": 3 },
+        { "stage": "diagnosed", "at": "2026-10-07T12:00:00.000Z", "hand": "wright", "credit": "kogane", "link": "https://github.com/postmark-town/postmark/issues/3555#issuecomment-1", "stamps_paid": 5 },
+        { "stage": "fixed", "at": "2026-10-09T23:30:00.000Z", "hand": "wright", "credit": "lupi", "link": "https://github.com/postmark-town/postmark-office/pull/461", "stamps_paid": 25 },
+        { "stage": "shipped", "at": "2026-10-11T18:00:00.000Z", "hand": "keemin", "credit": null, "link": "https://github.com/postmark-town/postmark-office/releases/tag/release/2026-w42", "stamps_paid": null }
+      ] },
+    { "class": "bug", "id": "mari/letters-vanish", "title": "<img src=x onerror=alert(1)> letters vanish", "author": "mari", "household": "hh:mari", "state": "reported",
+      "fields": { "issue": "javascript:alert(1)" },
+      "history": [ { "stage": "reported", "at": "2026-10-09T20:00:00.000Z", "hand": "bugcatcher", "credit": "mari", "link": null, "stamps_paid": null } ] },
+    { "class": "bug", "id": "kinofire/stamps-overlap", "title": "Quest standings overlap at mobile width", "author": "kinofire", "household": "hh:kino", "state": "reproduced",
+      "fields": { "issue": "https://github.com/postmark-town/postmark/issues/3570" },
+      "history": [
+        { "stage": "reported", "at": "2026-10-08T10:00:00.000Z", "hand": null, "credit": "kinofire", "link": null, "stamps_paid": null },
+        { "stage": "confirmed", "at": "2026-10-08T11:00:00.000Z", "hand": "bugcatcher", "credit": "kinofire", "link": null, "stamps_paid": null },
+        { "stage": "reproduced", "at": "2026-10-08T12:00:00.000Z", "hand": "bugcatcher", "credit": "seven", "link": null, "stamps_paid": 3 }
+      ] },
+    { "class": "bug", "id": "sage/old-crack", "title": "The harbor map had a crack", "author": "sage", "household": "hh:sage", "state": "fixed",
+      "fields": { "size": "S", "critter": "<b>Crackle</b>", "named_by": "sage" },
+      "history": [
+        { "stage": "reported", "at": "2026-10-01T10:00:00.000Z", "hand": null, "credit": "sage", "link": null, "stamps_paid": null },
+        { "stage": "fixed", "at": "2026-10-02T10:00:00.000Z", "hand": "wright", "credit": "sage", "link": null, "stamps_paid": 10 }
+      ] },
+    { "class": "bug", "id": "sage/dupe", "title": "A duplicate", "author": "sage", "household": "hh:sage", "state": "duplicate",
+      "fields": { "of": "sage/old-crack" },
+      "history": [
+        { "stage": "reported", "at": "2026-10-01T11:00:00.000Z", "hand": null, "credit": "sage", "link": null, "stamps_paid": null },
+        { "stage": "confirmed", "at": "2026-10-01T12:00:00.000Z", "hand": "bugcatcher", "credit": "sage", "link": null, "stamps_paid": 2 },
+        { "stage": "duplicate", "at": "2026-10-01T13:00:00.000Z", "hand": "bugcatcher", "credit": null, "link": null, "stamps_paid": null }
+      ] },
+    { "class": "bug", "id": "odd/not-one", "title": "Not a bug", "author": "odd", "household": null, "state": "not-a-bug",
+      "fields": {},
+      "history": [
+        { "stage": "reported", "at": "2026-10-03T10:00:00.000Z", "hand": null, "credit": "odd", "link": null, "stamps_paid": null },
+        { "stage": "not-a-bug", "at": "2026-10-03T11:00:00.000Z", "hand": "bugcatcher", "credit": null, "link": null, "stamps_paid": null }
+      ] },
+    { "class": "bug", "id": "vermillion/spotted", "title": "The bell rings twice", "author": "vermillion", "household": "hh:v", "state": "confirmed",
+      "fields": {},
+      "history": [
+        { "stage": "reported", "at": "2026-10-09T09:00:00.000Z", "hand": null, "credit": "vermillion", "link": "javascript:alert(1)", "stamps_paid": null },
+        { "stage": "confirmed", "at": "2026-10-09T10:00:00.000Z", "hand": "bugcatcher", "credit": "vermillion", "link": "https://evil.example/postmark-town/x", "stamps_paid": 2 }
+      ] }
+  ]
+}

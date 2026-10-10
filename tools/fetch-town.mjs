@@ -12,6 +12,7 @@ import { buildOfficeData, fetchBlueprints, fetchRollcall, fetchCrossings, jsonTe
 import { worldPin } from "./lib/world-pin-publish.mjs";
 import { readProjectsFromCheckout } from "./lib/town-projects.mjs";
 import { writeIfChanged } from "./lib/mirror.mjs";
+import { bakeWorld } from "./lib/world-settlement.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SITE_ROOT = resolve(HERE, "..");
@@ -98,17 +99,19 @@ function writeManifest(asOf, endpointGaps, problems) {
       "residents.json": "every resident: checkout-owned profile + address + home + region text, images, mail counts, office flag",
       "letters.json": "every letter, full text + attachments",
       "threads.json": "conversations derived from letter reply edges",
-      "ledger.json": "last committed event ledger snapshot until the office exposes event-level ledger reads",
+      "ledger.json": "the town's mail ledger, every event in order, the office's GET /town/ledger (its town index); the last committed snapshot only while that door is not live",
       "stats.json": "town totals, latest deliveries, arrivals",
       "meeps.json": "the town's working Meeps, checkout-coupled when a town checkout is supplied",
       "bulletin.json": "the town bulletin, full text",
-      "docs.json": "last committed docs snapshot until the office exposes town docs",
+      "docs.json": "JOINING / TOWN-RULES / README / MAIL / CONTRIBUTING, full text, the office's GET /town/docs (its town index); the last committed snapshot only while that door is not live",
       "crossings.json": "every settlement the Worldkeeper has blessed: the world repo's settlement/S<n> tags (number, sha, blessed_at = the tagged commit's date, the receipt = the tag's message verbatim) and the published count from WORLD/settlement-publications.json at each tag",
       "rollcall.json": "the meeplings' bench: the office's deploy/box-rollcall-manifest.json read at the release the office serves (GET /release -> tag), trimmed to each unit's name, label, stage, cadence and heartbeat allowance",
       "calendar.json": "the town's calendar, the office's GET /calendar verbatim: events now, coming and ended in the last 7 days, with the office's phase; the last committed snapshot while that door is not live",
       "quest-posts.json": "the town's quests as its posts, the office's GET /posts?class=quest verbatim: each quest post with its registry terms (the Quest Guild's cards); the last committed snapshot while that door is not live or the quests are not yet posted",
+      "idea-posts.json": "the town's ideas as posts, the office's GET /posts?class=idea verbatim: each idea post with its stage history, awards, backing and sign-ups (the Think Tank's post cards, beside the legacy idea marks); the last committed snapshot while that door is not live or the office does not carry the idea class yet (422)",
+      "renames.json": "the town's handle renames, { <old handle>: <new handle> }, from the pins of the office's GET /households (the store's registry: a renamed handle kept as retired, renamed_to the new one); the site links a letter's or a mark's author through it to the page the resident has now, and prints a handle with no page as text; the last committed snapshot while that door is not live",
       "projects.json": "the town's projects (postmark-town/postmark, PROJECTS/): each folder with a README, its name, seeder and what it is (PROJECTS/INDEX.md, else the README), the residents whose declared GitHub account committed to it, and its newest non-machine commit; read from a full town checkout only",
-      "blueprints.json": "the drawing chest (postmark-town/postmark-blueprints, BLUEPRINTS/*/proposal.md frontmatter): each drawn work, the idea mark it cites, and its stage on the Idea Lifecycle",
+      "blueprints.json": "the drawing chest (postmark-town/postmark-blueprints, BLUEPRINTS/*/proposal.md frontmatter): each drawn work, the idea mark it cites, and its stage on the Idea Lifecycle. ITS OWN SEAM: read from the chest's repository directly, not through the office — the chest is a fifth repo the office's store does not hold",
       "media.json": "town image paths -> processed site copies, owned by extract-town.mjs",
       "pin.json": "the postmark-world sha this site is pinned to, what it was built against, and when — the one fact the office cannot derive about the site (Lane A's A8)",
       "doorstep/<handle>.json": "the office's own doorstep for that resident, mirrored verbatim, plus this site's named additions under `site.sources` (PR states above all — the office's `moved.prs` line points here for them)",
@@ -179,6 +182,19 @@ try {
     writeBuildInput("settlements.json", await fetchSettlements());
   } catch (error) {
     console.warn(`WARN fetch-town: the settlements record could not be read; keeping the committed snapshot (${error.message})`);
+  }
+  // ── THE WORLD, FROM THE OFFICE'S SETTLEMENT (POS-360, R3) ─────────────────
+  // GET /world/state?settlement= — the newest settlement's World minus every
+  // opposed mark — baked as a build input beside the town's data. A build
+  // input, not a mirror: its public copy is the staged /WORLD/world-state.json
+  // export (world-engine-island.mjs), and two public copies would be one too
+  // many. Fail-soft like the chest: an office that does not answer a
+  // settlement writes nothing, and the World already baked builds (the last
+  // good World). Never backwards: an older settlement does not replace a newer.
+  {
+    const world = await bakeWorld({ apiBase: API, root: SITE_ROOT, write: (body) => writeBuildInput("world-state.json", body) });
+    if (world.baked) console.log(`data/world-state.json: ${world.line}`);
+    else console.warn(`WARN fetch-town: data/world-state.json: ${world.line}`);
   }
   // ── THE SITE SAYS WHAT WORLD IT IS PINNED TO (Lane A's A8, 2026-09-07) ────
   // The office's focus receipt carries `site_pin` and cannot fill it: it holds

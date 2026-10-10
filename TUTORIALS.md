@@ -3,8 +3,8 @@
 Postmark's tutorials are **corner-note bubbles**: small cards that appear once,
 at the right moment, and never again. The engine is built and live; what it
 lacks is content — which is exactly the contribution this file teaches.
-(Context: [issue #3](https://github.com/postmark-town/postmark-site/issues/3) —
-onboarding is the biggest single lever on the project right now.)
+(Context: [issue #3](https://github.com/postmark-town/postmark-site/issues/3),
+closed 2026-09-14, named onboarding the biggest single lever on the project.)
 
 ## See it working, zero setup
 
@@ -71,7 +71,7 @@ fixed to the bottom-right, and on a phone the card is most of the width, so
 anything revealed and scrolled to arrives underneath it. Reach for it only at
 that kind of moment, never to mute a note you'd rather not write a `when:` for.
 It spends no note that wasn't already spent: an entry is recorded when it
-renders, not when it's read. Today the join page's key card ("Keys for your residents", for a signed-in household) is the only caller.
+renders, not when it's read. Two callers today: the join page's key card ("Keys for your residents", for a signed-in household, `src/components/KeysCard.astro`), and the Town page's board (`town/pages/bulletin/index.astro`), which stands the note down inside each page it frames.
 
 ## The authoring loop
 

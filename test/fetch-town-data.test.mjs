@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
-import { apiGet, buildOfficeData, CALENDAR_GAP, createRateGate, EMPTY_CALENDAR, DEFAULT_FETCH_TOWN_DEADLINE_MS, fetchResidentRoll, fetchTownDeadlineMs, jsonText, mapLimit, MAX_NAMED_404S, RESIDENT_CARD_LANES, shortFetchPlan } from "../tools/lib/fetch-town-data.mjs";
+import { apiGet, buildOfficeData, CALENDAR_GAP, LEDGER_GAP, DOCS_GAP, createRateGate, EMPTY_CALENDAR, DEFAULT_FETCH_TOWN_DEADLINE_MS, fetchResidentRoll, fetchTownDeadlineMs, jsonText, mapLimit, MAX_NAMED_404S, RESIDENT_CARD_LANES, shortFetchPlan } from "../tools/lib/fetch-town-data.mjs";
 import { readFileSync } from "node:fs";
 
 function writeJson(dir, name, value) {
@@ -119,6 +119,10 @@ function fixtureFetch({ door = true, stamp = null, roster = "array" } = {}) {
         state: "open", latest: null, responses: 0, fields: { quest: "correspond-send" },
         terms: { title: "Reach out", source: "Send a letter to 5 different residents. Resets daily.", reward: "1 stamp each", cadence: "daily", target: 5 } },
     ] }],
+    // The posts door answering the idea class with nobody's idea posted yet
+    // (POS-290). Keyed on the full query, so the quest answer above still
+    // answers every other /posts read; the idea tests drive its other answers.
+    ["/posts?class=idea", { as_of: "2026-07-02T00:00:00.000Z", class: "idea", finished: ["shipped", "declined", "duplicate"], total: 0, posts: [] }],
     // Keyed on the bare path so ANY /letters?... query lands here — which is
     // exactly how an office treats a query param it does not know.
     ["/letters", door
@@ -1210,4 +1214,59 @@ test("a calendar door that answers the wrong shape stops the build rather than p
   await assert.rejects(
     () => buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl: withCalendar(() => answer(200, { events: [] })), retries: 1 }),
     /\/calendar: "now" is not an array/);
+});
+
+// ── THE LEDGER AND THE DOCS COME THROUGH THE OFFICE (POS-351, 2026-10-04) ────
+//
+// The store is the record and every reader reads it. ledger.json and docs.json
+// were the last structured files the site took from a town checkout; the
+// office serves both from its town index (GET /town/ledger, GET /town/docs).
+// A 404 is a door that is not live yet (the snapshot is kept and the gap
+// named); anything else that fails stops the build like every other read.
+const LEDGER = [
+  { kind: "delivery", date: "2026-06-12", id: "wright-2026-06-12-first-post", from: "wright", to: "postmaster", thread: null },
+  { kind: "bounce", date: "2026-06-13", id: "x-2026-06-13-lost", from: "x", to: "nobody", thread: null },
+];
+const DOCS = { README: { body: "# Postmark\n", path: "README.md" }, JOINING: { body: "# Joining\n", path: "JOINING.md" } };
+const withTownDoors = ({ ledger, docs }) => {
+  const inner = fixtureFetch();
+  return async (url) => {
+    const p = new URL(url).pathname;
+    if (p === "/town/ledger" && ledger) return ledger();
+    if (p === "/town/docs" && docs) return docs();
+    return inner(url);
+  };
+};
+
+test("THE LEDGER AND THE DOCS: the office's answers are written as served, and no gap is named", async () => {
+  const { data, town } = fixtureSnapshot();
+  writeJson(data, "ledger.json", [{ kind: "delivery", id: "stale" }]);
+  writeJson(data, "docs.json", { README: { body: "stale", path: "README.md" } });
+  const r = await buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, retries: 1,
+    fetchImpl: withTownDoors({ ledger: () => answer(200, { as_of: "x", total: 2, entries: LEDGER }), docs: () => answer(200, { as_of: "x", docs: DOCS }) }) });
+  assert.deepEqual(r.files["ledger.json"], LEDGER, "the ledger is the office's, not the committed snapshot");
+  assert.deepEqual(r.files["docs.json"], DOCS, "and so are the docs");
+  assert.equal(r.endpointGaps.includes(LEDGER_GAP), false);
+  assert.equal(r.endpointGaps.includes(DOCS_GAP), false);
+});
+
+test("THE LEDGER AND THE DOCS, BEFORE THE DOOR: a 404 keeps each committed snapshot and names its gap", async () => {
+  const { data, town } = fixtureSnapshot();
+  writeJson(data, "ledger.json", LEDGER);
+  writeJson(data, "docs.json", DOCS);
+  const nope = () => answer(404, { error: "bounce", defect: "no such door" });
+  const r = await buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, retries: 1,
+    fetchImpl: withTownDoors({ ledger: nope, docs: nope }) });
+  assert.deepEqual(r.files["ledger.json"], LEDGER);
+  assert.deepEqual(r.files["docs.json"], DOCS);
+  assert.equal(r.endpointGaps.includes(LEDGER_GAP), true);
+  assert.equal(r.endpointGaps.includes(DOCS_GAP), true);
+});
+
+test("a ledger or docs door that answers the wrong shape stops the build rather than publishing it", async () => {
+  const { data, town } = fixtureSnapshot();
+  await assert.rejects(() => buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, retries: 1,
+    fetchImpl: withTownDoors({ ledger: () => answer(200, { events: [] }) }) }), /\/town\/ledger: "entries" is not an array/);
+  await assert.rejects(() => buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, retries: 1,
+    fetchImpl: withTownDoors({ docs: () => answer(200, { docs: [] }) }) }), /\/town\/docs: "docs" is not an object/);
 });
