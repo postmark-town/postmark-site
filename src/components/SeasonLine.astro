@@ -1,0 +1,21 @@
+---
+// SeasonLine — the season's line under the home page's ferry clock, in small
+// italics, in the world's own words (postmark-world world-verbs § seasonLine,
+// read from its SEASON_LADDER: a rung per stretch of the season, the crossing
+// picking the line). The site holds no copy of a line. Keyed to the crossing
+// this build reflects; nothing before the Mists, and nothing on a pinned world
+// that tells no season.
+import { siteMists, pinnedSkeleton } from "@/lib/mists-season.mjs";
+import { seasonLine } from "postmark-world/world-verbs";
+import { mistsAt } from "postmark-world/world-engine";
+const mists = siteMists();
+const line = mists ? seasonLine(mistsAt(mists.crossing, pinnedSkeleton()?.mists), mists.crossing) : null;
+const lines = line ? [line] : [];
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const HTML = !lines.length ? "" : lines.map((l) => `<p class="fc-season">${esc(l)}</p>`).join("") + `<style>
+  .fc-season { margin: 0.35em auto 0; max-width: 34em; text-align: center; text-wrap: balance; font-family: var(--pm-serif); font-style: italic;
+    font-size: 0.8rem; line-height: 1.4; color: rgba(233, 226, 214, 0.86); text-shadow: 0 1px 3px #000, 0 0 14px rgba(0, 0, 0, 0.95); }
+  @media (max-width: 700px) { .fc-season { font-size: 0.72rem; } }
+</style>`;
+---
+{HTML && <Fragment set:html={HTML} />}
