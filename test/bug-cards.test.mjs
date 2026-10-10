@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { cardsOf, paintCards, CARD_GROUPS, CARDS_FAILED, CARDS_EMPTY, JAR_ART } from "../src/lib/bug-strip.mjs";
+import { cardsOf, paintCards, CARD_GROUPS, CARDS_FAILED, CARDS_EMPTY, JAR_ART, NOT_YET_PAID, NO_HISTORY } from "../src/lib/bug-strip.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const READ = JSON.parse(readFileSync(join(ROOT, "test", "fixtures", "office-bug-history.json"), "utf8"));
@@ -68,7 +68,7 @@ test("cardsOf: the shipped bug's ladder names who did each stage, when, what it 
     ["diagnosed", "kogane", 5, true, false, "Oct 7"],
     ["briefed", null, null, true, true, ""],
     ["fixed", "lupi", 25, true, false, "Oct 9"],        // 23:30Z is 19:30 in the town's time
-    ["shipped", "keemin", null, true, false, "Oct 11"],  // credits no one: the hand that shipped it
+    ["shipped", "Darko", null, true, false, "Oct 11"],   // credits no one: the hand that shipped it, keemin, who is Darko in town
   ]);
   assert.equal(c.ladder[3].link, "https://github.com/postmark-town/postmark/issues/3555#issuecomment-1");
 });
@@ -142,7 +142,7 @@ test("paintCards: the expanded card lists every stage's credit, day, stamps and 
     "Diagnosed kogane Oct 7 +5 ✦ the cause →",
     "Briefed skipped",
     "Fixed lupi Oct 9 +25 ✦ the PR →",
-    "Shipped keemin Oct 11 the release →",
+    "Shipped Darko Oct 11 the release →",
   ]);
   assert.ok(steps.at(-1).className.includes("is-now"));
   assert.deepEqual(find(w, (e) => e.tagName === "A").map((a) => [a.textContent, a.href]).slice(-3), [
@@ -153,7 +153,7 @@ test("paintCards: the expanded card lists every stage's credit, day, stamps and 
   assert.match(textOf(w), /named by lupi, who fixed it/);
   const k = find(doc.root, (e) => e.tagName === "DETAILS" && e.dataset.post === "kinofire/stamps-overlap")[0];
   assert.deepEqual(find(k, cls("bc-step")).map((s) => textOf(s).replace(/\s+/g, " ")).slice(1), [
-    "Spotted kinofire Oct 8 not paid", "Reproduced seven Oct 8 +3 ✦", "Diagnosed not yet", "Briefed not yet", "Fixed not yet", "Shipped not yet"]);
+    "Spotted kinofire Oct 8 not yet paid", "Reproduced seven Oct 8 +3 ✦", "Diagnosed not yet", "Briefed not yet", "Fixed not yet", "Shipped not yet"]);
   const m = find(doc.root, (e) => e.tagName === "DETAILS" && e.dataset.post === "mari/letters-vanish")[0];
   assert.match(textOf(m), /mari\s+· put up by bugcatcher/);
   // every ✦ sits in a stamp element
@@ -177,4 +177,53 @@ test("cardsOf: a bug fixed before names is lit and 'unnamed'; only a loose bug i
   assert.equal(textOf(find(doc.root, cls("bc-name"))[0]), "unnamed");
   assert.equal(find(doc.root, cls("bc-img"))[0].src, JAR_ART.finished);
   assert.equal(find(doc.root, cls("bc-q")).length, 0);
+});
+
+// ── Wright's review of #462 (2026-10-09) ─────────────────────────────────────
+
+test("Darko's hand reads Darko: 'keemin' is printed nowhere on the cards, as hand, credit, reporter or namer", () => {
+  const read = { ...READ, posts: [
+    ...READ.posts,
+    { class: "bug", id: "keemin/founders-own", title: "The founder's own bug", author: "keemin", state: "fixed",
+      fields: { size: "S", critter: "Ledger Louse", named_by: "keemin" },
+      history: [
+        { stage: "reported", at: "2026-10-09T10:00:00.000Z", hand: "keemin", credit: "keemin", link: null, stamps_paid: null },
+        { stage: "fixed", at: "2026-10-09T11:00:00.000Z", hand: "keemin", credit: "keemin", link: null, stamps_paid: null },
+      ] },
+  ] };
+  const doc = stubDoc();
+  paintCards(doc.root, cardsOf(read), doc);
+  const all = textOf(doc.root);
+  assert.doesNotMatch(all, /keemin/i, "the page prints 'keemin'");
+  const k = find(doc.root, (e) => e.tagName === "DETAILS" && e.dataset.post === "keemin/founders-own")[0];
+  assert.match(textOf(k), /reported by Darko/);
+  assert.match(textOf(k), /named by Darko, who fixed it/);
+  assert.match(textOf(k), /Fixed Darko Oct 9 not yet paid/);
+});
+
+test("a null stamps_paid is never 0: a credited paying stage reads 'not yet paid', a stage that pays nothing reads nothing", () => {
+  assert.equal(NOT_YET_PAID, "not yet paid");
+  const doc = stubDoc();
+  paintCards(doc.root, cardsOf(READ), doc);
+  const stamps = find(doc.root, cls("bc-stamps")).map(textOf);
+  assert.ok(!stamps.some((t) => /(^|\D)0(\D|$)/.test(t)), `a stamp cell reads 0: ${stamps.join(" | ")}`);
+  const ship = find(doc.root, (e) => e.tagName === "DETAILS" && e.dataset.post === "wildcat/preview-disagrees")[0];
+  assert.equal(textOf(find(ship, (e) => cls("bc-step")(e) && e.dataset.stage === "shipped")[0].children[3]), "", "shipped pays nothing, so it says nothing");
+});
+
+test("a card whose read carries no history (or an empty one) says so once, and claims no skips and no names", () => {
+  for (const history of [undefined, []]) {
+    const read = { ...READ, posts: READ.posts.map((p) => ({ ...p, history })) };
+    const doc = stubDoc();
+    paintCards(doc.root, cardsOf(read), doc);
+    const w = find(doc.root, (e) => e.tagName === "DETAILS" && e.dataset.post === "wildcat/preview-disagrees")[0];
+    assert.equal(find(w, cls("bc-note")).length, 1);
+    assert.equal(textOf(find(w, cls("bc-note"))[0]), NO_HISTORY);
+    assert.doesNotMatch(textOf(w), /skipped|not yet paid/);
+    assert.equal(find(w, cls("bc-handle")).length, 0, "a name with no history behind it");
+    assert.ok(find(w, cls("bc-step")).every((r) => r.className.includes("is-reached")), "a shipped bug's stages all read reached");
+  }
+  const doc = stubDoc();
+  paintCards(doc.root, cardsOf(READ), doc);
+  assert.equal(find(doc.root, cls("bc-note")).length, 0, "a card with history says it has none");
 });

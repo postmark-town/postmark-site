@@ -316,16 +316,25 @@ const dayOf = (iso) => {
     : "";
 };
 const linkOf = (v) => (typeof v === "string" && LINK_RE.test(v) ? v : null);
+/**
+ * A handle as the town knows its person. The founder's hand records as
+ * `keemin` (office bugs.mjs § BUG_HANDS), and in town he is DARKO: the page
+ * never prints the other name (Wright's review of #462, 2026-10-09).
+ */
+export const TOWN_NAMES = Object.freeze({ keemin: "Darko" });
+const named = (h) => { const t = text(h, 40); return TOWN_NAMES[t] ?? t; };
 const paidOf = (v) => (Number.isInteger(v) && v > 0 ? v : null);
 
 /**
  * One post's ladder: the main line, or the stages a side exit left from and
  * its exit. A reached stage is one with a history row, or one before the
  * bug's stage; one before it with no row was skipped, which only a read that
- * carries history can say (an office before POS-547 sends none).
+ * carries history can say. An office before POS-547 sends none, and every
+ * bug's history holds at least its post, so an empty one is also unknown.
  */
+const historyOf = (p) => (Array.isArray(p.history) && p.history.length ? p.history : null);
 function ladderOf(p) {
-  const known = Array.isArray(p.history);
+  const known = Boolean(historyOf(p));
   const hist = new Map();
   for (const h of known ? p.history : []) {
     if (h && typeof h === "object" && LADDER_LABEL[h.stage] && !hist.has(h.stage)) hist.set(h.stage, h);
@@ -341,8 +350,8 @@ function ladderOf(p) {
       label: LADDER_LABEL[stage],
       reached: Boolean(h) || i <= now,
       skipped: known && !h && i < now && stage !== "reported",
-      who: h ? text(h.credit ?? h.hand, 40) || null : null,
-      hand: h && stage === "reported" && h.hand && h.hand !== h.credit ? text(h.hand, 40) : null,
+      who: h ? named(h.credit ?? h.hand) || null : null,
+      hand: h && stage === "reported" && h.hand && h.hand !== h.credit ? named(h.hand) : null,
       day: h ? dayOf(h.at) : "",
       at: h && typeof h.at === "string" ? h.at : null,
       pays: Boolean(LADDER[stage]),
@@ -368,17 +377,18 @@ export function cardsOf(read) {
       return {
         id: text(p.id, 120),
         title: text(p.title) || "(untitled)",
-        reporter: text(p.author, 40),
+        reporter: named(p.author),
         stage: p.state,
         stageLabel: LADDER_LABEL[p.state],
         caught,
         aside: SIDE_EXITS.has(p.state),
         critter,
-        namedBy: critter ? text(f.named_by, 40) || null : null,
+        namedBy: critter ? named(f.named_by) || null : null,
         picture: caught && typeof f.reveal?.image === "string" && MEDIA_RE.test(f.reveal.image) ? f.reveal.image : null,
         issue: typeof f.issue === "string" && ISSUE_RE.test(f.issue) ? f.issue : null,
         pr: linkOf(links.fixed),
         release: linkOf(links.shipped),
+        known: Boolean(historyOf(p)),
         ladder: ladderOf(p),
       };
     });
@@ -387,6 +397,11 @@ export function cardsOf(read) {
     .filter((g) => g.cards.length);
   return { ok: true, groups, total: cards.length, caught: cards.filter((c) => c.caught).length };
 }
+
+/** What a credited, paying stage with no ledger line says: the tick pays within about fifteen minutes, or a cap held it. */
+export const NOT_YET_PAID = "not yet paid";
+/** What an opened card says when the read carries no history for it. */
+export const NO_HISTORY = "Who did each stage isn't in the office's answer right now, so the ladder shows only how far this bug has come.";
 
 /** The cards' two lines: a read that failed, and a town with no bugs. */
 export const CARDS_FAILED = "The bugs can't be read right now. They are still being caught; try again shortly.";
@@ -428,6 +443,7 @@ export function paintCards(root, board, doc = globalThis.document) {
       // expanded: the ladder, then where the work is
       const body = el("div", "bc-body");
       if (c.namedBy) body.append(el("p", "bc-named", `named by ${c.namedBy}, who fixed it`));
+      if (!c.known) body.append(el("p", "bc-note", NO_HISTORY));
       const ol = el("ol", "bc-ladder");
       for (const r of c.ladder) {
         const row = el("li", ["bc-step", r.reached && "is-reached", r.skipped && "is-skipped", r.stage === c.stage && "is-now"].filter(Boolean).join(" "));
@@ -441,7 +457,7 @@ export function paintCards(root, board, doc = globalThis.document) {
         if (r.at) day.dateTime = r.at;
         const st = el("span", "bc-stamps");
         if (r.paid) { const b = el("b", "bc-stamp", `+${r.paid}`); b.append(el("span", "m-u", "✦")); st.append(b); }
-        else if (r.pays && r.who) st.textContent = "not paid";
+        else if (r.pays && r.who) st.textContent = NOT_YET_PAID;
         const lk = el("span", "bc-link");
         if (r.link) lk.append(out(r.link, "", `${LINK_LABEL[r.stage] ?? "the work"} →`));
         row.append(el("span", "bc-step-name", r.label), who, day, st, lk);
