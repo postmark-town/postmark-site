@@ -28,6 +28,7 @@ import rawHtml from 'postmark-world/spectator/index.html?raw';
 import WorldSignIn from '@/components/WorldSignIn.astro';
 import WorldTourHold from '@/components/WorldTourHold.astro';
 import WorldCockpit from '@/components/WorldCockpit.astro';
+import ClassicWorld from '@/components/ClassicWorld.astro';
 
 // Early identity bridge: adopt the site's OAuth session into the viewer's Bearer
 // slot (localStorage['pm_key']) BEFORE the viewer boots, so a signed-in visitor's
@@ -89,7 +90,7 @@ const html = rawHtml.replace(/<head>/i,
     door where the reader is standing and renders the answer; when the door does
     not say "inside a portal" — which is every standpoint in the town today — it
     mounts nothing and the page is the page it has always been. */}
-<WorldCockpit />
+<WorldCockpit /><ClassicWorld />
 
 <!-- ARRIVING AT A PLACE (2026-08-14). The world had no way to be linked INTO:
      every other page could name a place in words but not show it, so the

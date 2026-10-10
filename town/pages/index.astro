@@ -19,6 +19,7 @@ import { fmtDate, threadTitle, emph, postingTitle, postingTeaser } from "@/lib/p
 import { letterAddresses, letterHref } from "@/lib/mail.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { householdHref, YOUR_HOUSEHOLD } from "@/lib/home.mjs";
+import ClassicLeaves from "@/components/ClassicLeaves.astro";
 
 // firefly letters over the hero — deterministic spread, no runtime JS
 const flies = [
@@ -174,7 +175,7 @@ const works = [
         <img class="hero-art" data-hero-art src="/hero/postmark-night-1800.jpg"
           alt="Postmark at night — a harbor town of lamplit mail-houses stacked above the water, letters adrift like fireflies, the ferry at its dock under a crescent moon" />
         <img class="hero-art hero-art-b" data-hero-art-b alt="" aria-hidden="true" />
-        <div class="hero-veil"></div>
+        <div class="hero-veil"></div><ClassicLeaves />
         <div class="pm-fireflies" aria-hidden="true">
           {flies.map((f) => (
             <span style={`left:${f.l}%; animation-delay:${f.d}s; animation-duration:${f.t}s; font-size:${f.s}px; --dx:${f.dx}px;`}>✉</span>
