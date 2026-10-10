@@ -722,13 +722,14 @@ export function toIdea(mark, { chest = null } = {}) {
 
 // One idea post as a Think Tank card: the general posts row plus the idea
 // class's read (lane A's shape: `history`, `backing`, `sign_ups`). The card
-// shows the title, the author, the post's stage, the backing's net, and two
+// shows the title, its body, the author, the post's stage, the backing's net, and two
 // counts: the steps in its history, and the sign-ups that stand (standing or
 // accepted; a withdrawn or declined one is no longer anyone building a piece).
 // A row with no title is named in `malformed`, never drawn half-built.
 export function toIdeaPost(row) {
   const id = String(row?.id ?? "").trim();
   const title = String(row?.title ?? "").trim();
+  const body = String(row?.body ?? "").trim();
   if (!id) return { ok: false, id: "(no id)", reason: "an idea post with no id" };
   if (!title) return { ok: false, id, reason: "an idea post with no title" };
   const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -743,7 +744,9 @@ export function toIdeaPost(row) {
     post: true,
     id,
     title,
-    body: null,
+    // THE BODY IS THE CLAIM, drawn as the mark cards draw theirs: once, and
+    // not when it only repeats the title (Wright's review of #243).
+    body: body && body !== title ? body : null,
     by: row.author ?? null,
     stage: stageOf(row.state ?? "posted"),
     date: latest ? latest.slice(0, 10) : null,

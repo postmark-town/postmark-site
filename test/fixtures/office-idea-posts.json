@@ -39,7 +39,7 @@
    "state": "posted",
    "latest": { "act": "post", "at": "2026-10-09T22:00:00.000Z", "by": "brook" },
    "responses": 0,
-   "body": "So the late ferry can find the pier.",
+   "body": "So the late ferry can find the pier. <script>alert(2)</script> <a href=\"https://example.test\">a link</a> & a light",
    "fields": { "links": [], "of": null, "notes": [] },
    "history": [
     { "stage": "posted", "at": "2026-10-09T22:00:00.000Z", "hand": null, "credit": null, "link": null, "note": null }

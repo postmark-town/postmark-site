@@ -72,6 +72,10 @@ test("1 · a post's card: its stage, its net, its steps, and the sign-ups that s
   assert.equal(toIdeaPost({ ...FIXTURE.posts[0], backing: { for: 4, against: 7 } }).backing.net, -3);
   // a row with no title is named, never drawn half-built
   assert.deepEqual(toIdeaPost({ id: "x/y", title: "  " }), { ok: false, id: "x/y", reason: "an idea post with no title" });
+  // the body is the claim, drawn once: a body that only repeats the title is not drawn twice
+  assert.equal(p.body, "Somewhere to sit and watch the ferry come in.");
+  assert.equal(toIdeaPost({ ...FIXTURE.posts[0], body: "A bench by the quay" }).body, null);
+  assert.equal(toIdeaPost({ ...FIXTURE.posts[0], body: undefined }).body, null);
 });
 
 test("1 · the dashboard counts both", () => {
@@ -160,11 +164,21 @@ test("3 · the page holds one Think Tank card per idea mark and one per idea pos
   for (const p of FIXTURE.posts) assert.ok(tank.includes(`data-idea-post="${p.id}"`), p.id);
   assert.match(tank, /5<span class="m-u">✦<\/span><\/b>\s*<span class="m-dim"> net backing · 6 for · 1 against<\/span>/);
   assert.match(tank, /3 steps · 2 signed up/);
+  // each post's body is drawn, as a mark card's is
+  for (const p of FIXTURE.posts) {
+    const card = tank.slice(tank.indexOf(`data-idea-post="${p.id}"`)).split("</article>")[0];
+    assert.match(card, /<p class="m-body">/, `${p.id} draws its body`);
+  }
+  assert.ok(tank.includes('<p class="m-body">Somewhere to sit and watch the ferry come in.</p>'));
 });
 
-test("3 · a post's title is text: markup in it renders escaped, never as an element", async () => {
+test("3 · a post's title and body are text: markup in them renders escaped, never as an element", async () => {
   const tank = tankOf(await renderPage());
   assert.ok(tank.includes("&lt;img src=x onerror=alert(1)&gt; a &lt;b&gt;lantern&lt;/b&gt; &amp; a pier"), "the title is shown as its own characters");
   assert.ok(!/<img src=x/i.test(tank), "the title's markup became an element");
   assert.ok(!tank.includes("<b>lantern</b>"));
+  assert.ok(tank.includes("So the late ferry can find the pier. &lt;script&gt;alert(2)&lt;/script&gt; &lt;a href=&quot;https://example.test&quot;&gt;a link&lt;/a&gt; &amp; a light"),
+    "the body is shown as its own characters");
+  assert.ok(!tank.includes("<script>alert(2)"), "the body's script became an element");
+  assert.ok(!/<a href="https:\/\/example\.test"/.test(tank), "the body's link became an element");
 });
