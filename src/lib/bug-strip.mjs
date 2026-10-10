@@ -18,12 +18,13 @@
 // a copy and test/bug-strip.test.mjs pins it against a fixture of that file.
 // Captions and bubbles read their amounts from LADDER, never from a literal.
 //
-// THE BOARD IS LIVE. The browser reads the office's bug posts
+// THE BUGS ARE LIVE. The browser reads the office's bug posts
 // (GET /api/posts?class=bug, public and keyless: server.mjs § "GET /posts?
-// class=…", "public and keyless") and `boardOf` folds the answer. What a
-// resident wrote (a title) is returned as a string for textContent, never
-// markup (the reading law). A board the browser could not read says so; it
-// never says "No open bugs" about a read that failed.
+// class=…", "public and keyless") and `cardsOf` folds the answer into one
+// card per bug (§ THE CARDS; until POS-547 a jar and a board, folded apart).
+// What a resident wrote (a title, a critter's name) is returned as a string
+// for textContent, never markup (the reading law). A read that failed says
+// so; it never reads as an empty jar.
 
 /** The flat ladder, a copy of the office's BUG_LADDER. */
 export const LADDER = Object.freeze({
@@ -229,13 +230,13 @@ export const PANELS = Object.freeze([
 // ── THE JAR ──────────────────────────────────────────────────────────────────
 //
 // Keemin, 2026-09-29: the fixer names the bug, and it joins the Bug Catcher's
-// jar. Every bug gets a slot. An OPEN one (not yet fixed) is a silhouette with
-// "?". A FINISHED one (fixed or shipped) is the lit jar with the name its fixer
-// gave it (fields.critter) and who named it (fields.named_by: the resident
-// credited with the fix, office events-store.mjs), or "unnamed" when it
-// finished before names (Wright's review, 2026-09-29: only open bugs are "?").
-// The side exits (duplicate, not-a-bug) were never bugs to catch, so they get
-// no slot.
+// jar. An OPEN bug (not yet fixed) is a silhouette with "?". A FINISHED one
+// (fixed or shipped) is the lit jar with the name its fixer gave it
+// (fields.critter) and who named it (fields.named_by: the resident credited
+// with the fix, office events-store.mjs), or "unnamed" when it finished before
+// names (Wright's review, 2026-09-29: only open bugs are "?"). Since POS-547
+// every bug in the read is a card (§ THE CARDS), the side exits too, set aside
+// under their own heading.
 
 /** The jar's two pictures: a bug still loose, and a caught, finished one. */
 export const JAR_ART = Object.freeze({
@@ -245,60 +246,7 @@ export const JAR_ART = Object.freeze({
 const FINISHED_STATES = new Set(["fixed", "shipped"]);
 const SIDE_EXITS = new Set(["duplicate", "not-a-bug"]);
 
-/** The jar's two lines: no slot at all, or slots with none fixed yet. */
-export const JAR_EMPTY = "The jar is empty: no bug has been fixed yet.";
-export const JAR_NONE_FIXED = "No bug has been fixed yet. These are still being caught.";
-
-/**
- * The jar, from the same `GET /posts?class=bug` answer as the board. A slot is
- * `{ id, title, finished, critter, namedBy }`: `finished` for a fixed or
- * shipped bug; `critter` its name when its fixer gave one, else null.
- */
-export function jarOf(read) {
-  if (!read || typeof read !== "object" || !Array.isArray(read.posts)) return { ok: false, slots: [], finished: 0 };
-  const slots = read.posts
-    .filter((p) => p && typeof p === "object" && STAGES.includes(p.state) && !SIDE_EXITS.has(p.state))
-    .map((p) => {
-      const finished = FINISHED_STATES.has(p.state);
-      const critter = finished ? text(p.fields?.critter, 40) || null : null;
-      return {
-        id: text(p.id, 120),
-        title: text(p.title) || "(untitled)",
-        finished,
-        critter,
-        namedBy: critter ? text(p.fields?.named_by, 40) || null : null,
-      };
-    });
-  return { ok: true, slots, finished: slots.filter((s) => s.finished).length };
-}
-
-/** Paints `jarOf`'s answer into `root`: createElement and textContent only. */
-export function paintJar(root, jar, doc = globalThis.document) {
-  root.replaceChildren();
-  const el = (tag, cls, s) => { const e = doc.createElement(tag); e.className = cls; if (s !== undefined) e.textContent = s; return e; };
-  if (!jar.ok) { root.append(el("p", "jar-empty", "The jar can't be read right now.")); return; }
-  if (!jar.slots.length) { root.append(el("p", "jar-empty", JAR_EMPTY)); return; }
-  if (!jar.finished) root.append(el("p", "jar-empty", JAR_NONE_FIXED));
-  const ul = el("ul", "jar-slots");
-  for (const s of jar.slots) {
-    const li = el("li", s.finished ? "jar-slot is-named" : "jar-slot is-open");
-    li.dataset.post = s.id;
-    const img = doc.createElement("img");
-    img.className = "jar-img"; img.src = s.finished ? JAR_ART.finished : JAR_ART.open; img.alt = ""; img.width = 64; img.height = 64;
-    li.append(img);
-    if (s.finished) {
-      li.append(el("span", s.critter ? "jar-name" : "jar-name jar-unnamed", s.critter ?? "unnamed"));
-      if (s.namedBy) li.append(el("span", "jar-by", `named by ${s.namedBy}`));
-    } else {
-      li.append(el("span", "jar-name jar-q", "?"));
-    }
-    li.append(el("span", "jar-title", s.title));
-    ul.append(li);
-  }
-  root.append(ul);
-}
-
-// ── THE BOARD ────────────────────────────────────────────────────────────────
+// ── THE STAGES' NAMES ───────────────────────────────────────────────────────
 
 const ISSUE_RE = /^https:\/\/github\.com\/postmark-town\/[A-Za-z0-9._-]+\/issues\/\d+$/;
 const text = (v, max = 160) => {
@@ -307,7 +255,7 @@ const text = (v, max = 160) => {
 };
 
 /**
- * What each stage is called on the board. A confirmed bug is SPOTTED, never
+ * What each open stage is called on the cards' headings. A confirmed bug is SPOTTED, never
  * "caught" (Keemin, 2026-09-29): a bug is caught when it is fixed and goes into
  * the jar. The strip's third panel says the same.
  */
@@ -320,67 +268,197 @@ export const STAGE_LABEL = Object.freeze({
   fixed: "Fixed, shipping soon",
 });
 
+// ── THE CARDS (POS-547, Darko 2026-10-09) ────────────────────────────────────
+//
+// "One expandable card per bug. Clicking a bug shows what stage it's at, who
+// contributed each earlier stage, and where the links lead." The cards take
+// the place of the jar and the board, from the same read, which now carries
+// each bug's `history` (postmark-office town-posts.mjs § A BUG CARRIES ITS
+// HISTORY): one row per stage act, { stage, at, hand, credit, link,
+// stamps_paid }.
+//
+// COLLAPSED, a card is the jar's slot: the critter (its picked picture once
+// revealed, the lit jar with the name its fixer gave it, or the "?" silhouette
+// while it is loose), the title, the reporter and the stage. EXPANDED, it is
+// the ladder: every stage of the main line, each reached one with who did it,
+// when, its stamps and its link, the unreached ones dim; then the issue, the
+// PR and the release. A side exit's ladder ends at its exit.
+//
+// THE ORDER: open bugs first, by stage in the lifecycle's order; then the ones
+// set aside (duplicate, not a bug); shipped bugs last. Every post in the read
+// is one card.
+//
+// Everything a resident wrote reaches the page as text (textContent), and an
+// href is only ever a URL on the town's own GitHub org.
+
+/** The stage names on the ladder. A confirmed bug is Spotted (STAGE_LABEL's word). */
+export const LADDER_LABEL = Object.freeze({
+  reported: "Reported", confirmed: "Spotted", reproduced: "Reproduced", diagnosed: "Diagnosed",
+  briefed: "Briefed", fixed: "Fixed", shipped: "Shipped", duplicate: "Duplicate", "not-a-bug": "Not a bug",
+});
+/** What a stage's link points at (office bugs.mjs § LINK_WHAT). */
+export const LINK_LABEL = Object.freeze({ diagnosed: "the cause", briefed: "the brief", fixed: "the PR", shipped: "the release" });
+const LINK_RE = /^https:\/\/github\.com\/postmark-town\/[A-Za-z0-9._-]+\/\S+$/;
+/** A revealed critter's picture: the town's own media (office media.mjs). */
+const MEDIA_RE = /^https:\/\/media\.postmark\.town\/\S+$/;
+
+/** The card groups, in the page's order. */
+export const CARD_GROUPS = Object.freeze([
+  ...STAGES.filter((s) => s !== "shipped").map((s) => Object.freeze({ key: s, label: STAGE_LABEL[s], states: [s] })),
+  Object.freeze({ key: "set-aside", label: "Set aside", states: ["duplicate", "not-a-bug"] }),
+  Object.freeze({ key: "shipped", label: "Shipped", states: ["shipped"] }),
+]);
+
+const dayOf = (iso) => {
+  const t = Date.parse(iso);
+  return Number.isFinite(t)
+    ? new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" }).format(t)
+    : "";
+};
+const linkOf = (v) => (typeof v === "string" && LINK_RE.test(v) ? v : null);
+const paidOf = (v) => (Number.isInteger(v) && v > 0 ? v : null);
+
 /**
- * The open bugs, grouped by stage in the lifecycle's order, from the office's
- * `GET /posts?class=bug` answer. `null` (or anything that is not the read's
- * shape) is a board that could not be read: `{ ok: false }`. A row is
- * `{ id, title, reporter, stage, issue }`, all plain strings (issue only when
- * it is a GitHub issue on the town's org, else null).
- *
- * The read carries no credits: who was credited at each stage is on the
- * advance acts (office town-posts.mjs), so the board shows the stage reached,
- * not who has been paid.
+ * One post's ladder: the main line, or the stages a side exit left from and
+ * its exit. A reached stage is one with a history row, or one before the
+ * bug's stage; one before it with no row was skipped, which only a read that
+ * carries history can say (an office before POS-547 sends none).
  */
-export function boardOf(read) {
-  if (!read || typeof read !== "object" || !Array.isArray(read.posts)) return { ok: false, groups: [], open: 0 };
-  const finished = new Set(Array.isArray(read.finished) ? read.finished : FINISHED);
-  const rows = read.posts
-    .filter((p) => p && typeof p === "object" && typeof p.state === "string" && !finished.has(p.state) && STAGE_LABEL[p.state])
-    .map((p) => ({
-      id: text(p.id, 120),
-      title: text(p.title) || "(untitled)",
-      reporter: text(p.author, 40),
-      stage: p.state,
-      issue: typeof p.fields?.issue === "string" && ISSUE_RE.test(p.fields.issue) ? p.fields.issue : null,
-    }));
-  const groups = STAGES.filter((s) => STAGE_LABEL[s])
-    .map((s) => ({ stage: s, label: STAGE_LABEL[s], rows: rows.filter((r) => r.stage === s) }))
-    .filter((g) => g.rows.length);
-  return { ok: true, groups, open: rows.length };
+function ladderOf(p) {
+  const known = Array.isArray(p.history);
+  const hist = new Map();
+  for (const h of known ? p.history : []) {
+    if (h && typeof h === "object" && LADDER_LABEL[h.stage] && !hist.has(h.stage)) hist.set(h.stage, h);
+  }
+  const line = SIDE_EXITS.has(p.state)
+    ? [...STAGES.slice(0, hist.has("confirmed") ? 2 : 1), p.state]
+    : STAGES;
+  const now = line.indexOf(p.state);
+  return line.map((stage, i) => {
+    const h = hist.get(stage) ?? null;
+    return {
+      stage,
+      label: LADDER_LABEL[stage],
+      reached: Boolean(h) || i <= now,
+      skipped: known && !h && i < now && stage !== "reported",
+      who: h ? text(h.credit ?? h.hand, 40) || null : null,
+      hand: h && stage === "reported" && h.hand && h.hand !== h.credit ? text(h.hand, 40) : null,
+      day: h ? dayOf(h.at) : "",
+      at: h && typeof h.at === "string" ? h.at : null,
+      pays: Boolean(LADDER[stage]),
+      paid: h && LADDER[stage] ? paidOf(h.stamps_paid) : null,
+      link: h ? linkOf(h.link) : null,
+    };
+  });
 }
 
 /**
- * Paints `boardOf`'s answer into `root` with createElement and textContent
- * only: nothing a resident wrote can become markup.
+ * The cards, from the office's `GET /posts?class=bug` answer. `null` (or
+ * anything that is not the read's shape) is a read that failed: `{ ok: false }`.
  */
-export function paintBoard(root, board, doc = globalThis.document) {
+export function cardsOf(read) {
+  if (!read || typeof read !== "object" || !Array.isArray(read.posts)) return { ok: false, groups: [], total: 0 };
+  const cards = read.posts
+    .filter((p) => p && typeof p === "object" && typeof p.id === "string" && LADDER_LABEL[p.state])
+    .map((p) => {
+      const f = p.fields && typeof p.fields === "object" ? p.fields : {};
+      const caught = FINISHED_STATES.has(p.state);
+      const critter = caught ? text(f.critter, 40) || null : null;
+      const links = f.links && typeof f.links === "object" ? f.links : {};
+      return {
+        id: text(p.id, 120),
+        title: text(p.title) || "(untitled)",
+        reporter: text(p.author, 40),
+        stage: p.state,
+        stageLabel: LADDER_LABEL[p.state],
+        caught,
+        aside: SIDE_EXITS.has(p.state),
+        critter,
+        namedBy: critter ? text(f.named_by, 40) || null : null,
+        picture: caught && typeof f.reveal?.image === "string" && MEDIA_RE.test(f.reveal.image) ? f.reveal.image : null,
+        issue: typeof f.issue === "string" && ISSUE_RE.test(f.issue) ? f.issue : null,
+        pr: linkOf(links.fixed),
+        release: linkOf(links.shipped),
+        ladder: ladderOf(p),
+      };
+    });
+  const groups = CARD_GROUPS
+    .map((g) => ({ key: g.key, label: g.label, cards: cards.filter((c) => g.states.includes(c.stage)) }))
+    .filter((g) => g.cards.length);
+  return { ok: true, groups, total: cards.length, caught: cards.filter((c) => c.caught).length };
+}
+
+/** The cards' two lines: a read that failed, and a town with no bugs. */
+export const CARDS_FAILED = "The bugs can't be read right now. They are still being caught; try again shortly.";
+export const CARDS_EMPTY = "No bugs have been reported yet.";
+
+/** Paints `cardsOf`'s answer into `root` with createElement and textContent only; each card is a <details>. */
+export function paintCards(root, board, doc = globalThis.document) {
   root.replaceChildren();
-  const p = (cls, s) => { const el = doc.createElement("p"); el.className = cls; el.textContent = s; return el; };
-  if (!board.ok) { root.append(p("bb-empty", "The board can't be read right now. The bugs are still being caught; try again shortly.")); return; }
-  if (!board.open) { root.append(p("bb-empty", "No open bugs right now.")); return; }
+  const el = (tag, cls, s) => { const e = doc.createElement(tag); if (cls) e.className = cls; if (s !== undefined) e.textContent = s; return e; };
+  const out = (href, cls, s) => { const e = el("a", cls, s); e.href = href; e.target = "_blank"; e.rel = "noopener"; return e; };
+  if (!board.ok) { root.append(el("p", "bc-empty", CARDS_FAILED)); return; }
+  if (!board.total) { root.append(el("p", "bc-empty", CARDS_EMPTY)); return; }
   for (const g of board.groups) {
-    const sec = doc.createElement("section");
-    sec.className = "bb-stage";
-    sec.dataset.stage = g.stage;
-    const h = doc.createElement("h4");
-    h.textContent = `${g.label} · ${g.rows.length}`;
-    const ul = doc.createElement("ul");
-    for (const r of g.rows) {
-      const li = doc.createElement("li");
-      li.className = "bb-row";
-      li.dataset.post = r.id;
-      const t = doc.createElement("span"); t.className = "bb-title"; t.textContent = r.title;
-      const by = doc.createElement("span"); by.className = "bb-by"; by.textContent = r.reporter ? `reported by ${r.reporter}` : "";
-      li.append(t, by);
-      if (r.issue) {
-        const a = doc.createElement("a");
-        a.className = "bb-issue"; a.href = r.issue; a.rel = "noopener"; a.target = "_blank";
-        a.textContent = `issue #${r.issue.split("/").pop()}`;
-        li.append(a);
+    const sec = el("section", "bc-group");
+    sec.dataset.group = g.key;
+    sec.append(el("h4", "bc-group-h", `${g.label} · ${g.cards.length}`));
+    const ul = el("ul", "bc-list");
+    for (const c of g.cards) {
+      const card = el("details", `bc-card is-${c.caught ? "caught" : c.aside ? "aside" : "loose"}`);
+      card.dataset.post = c.id;
+      card.dataset.stage = c.stage;
+
+      // collapsed: the jar's slot, the title and reporter, the stage
+      const sum = el("summary", "bc-sum");
+      const img = el("img", "bc-img");
+      img.src = c.picture ?? (c.caught ? JAR_ART.finished : JAR_ART.open);
+      img.alt = ""; img.width = 48; img.height = 48;
+      const jar = el("span", "bc-jar");
+      jar.append(img);
+      const head = el("span", "bc-head");
+      // a loose bug is the jar's "?"; a caught one is its name, above the title
+      if (c.caught) head.append(el("span", c.critter ? "bc-name" : "bc-name bc-unnamed", c.critter ?? "unnamed"));
+      else jar.append(el("span", "bc-name bc-q", "?"));
+      head.append(el("span", "bc-title", c.title));
+      if (c.reporter) head.append(el("span", "bc-by", `reported by ${c.reporter}`));
+      sum.append(jar, head, el("span", `bc-stage is-${c.stage}`, c.stageLabel));
+      card.append(sum);
+
+      // expanded: the ladder, then where the work is
+      const body = el("div", "bc-body");
+      if (c.namedBy) body.append(el("p", "bc-named", `named by ${c.namedBy}, who fixed it`));
+      const ol = el("ol", "bc-ladder");
+      for (const r of c.ladder) {
+        const row = el("li", ["bc-step", r.reached && "is-reached", r.skipped && "is-skipped", r.stage === c.stage && "is-now"].filter(Boolean).join(" "));
+        row.dataset.stage = r.stage;
+        const who = el("span", "bc-who");
+        if (r.who) {
+          who.append(el("b", "bc-handle", r.who));
+          if (r.hand) who.append(el("span", "bc-hand", ` · put up by ${r.hand}`));
+        } else who.textContent = r.skipped ? "skipped" : r.reached ? "" : "not yet";
+        const day = el("time", "bc-day", r.day);
+        if (r.at) day.dateTime = r.at;
+        const st = el("span", "bc-stamps");
+        if (r.paid) { const b = el("b", "bc-stamp", `+${r.paid}`); b.append(el("span", "m-u", "✦")); st.append(b); }
+        else if (r.pays && r.who) st.textContent = "not paid";
+        const lk = el("span", "bc-link");
+        if (r.link) lk.append(out(r.link, "", `${LINK_LABEL[r.stage] ?? "the work"} →`));
+        row.append(el("span", "bc-step-name", r.label), who, day, st, lk);
+        ol.append(row);
       }
+      body.append(ol);
+      const go = el("p", "bc-out");
+      if (c.issue) go.append(out(c.issue, "bc-issue", `issue #${c.issue.split("/").pop()} →`));
+      if (c.pr) go.append(out(c.pr, "bc-pr", "the PR →"));
+      if (c.release) go.append(out(c.release, "bc-release", "the release →"));
+      if (c.issue || c.pr || c.release) body.append(go);
+      card.append(body);
+      const li = el("li", "bc-item");
+      li.append(card);
       ul.append(li);
     }
-    sec.append(h, ul);
+    sec.append(ul);
     root.append(sec);
   }
 }
