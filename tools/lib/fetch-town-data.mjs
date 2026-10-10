@@ -42,6 +42,7 @@ export const DATA_FILES = [
   "stats.json",
   "calendar.json",
   "quest-posts.json",
+  "idea-posts.json",
 ];
 
 // -- ON THE BOX, SHORT IS FAILED (2026-09-17, postmark#2884) -----------------
@@ -860,6 +861,10 @@ export async function buildOfficeData({
   const questPosts = questRead.missing ? readSnapshot("quest-posts.json", EMPTY_QUEST_POSTS) : questRead.questPosts;
   if (questRead.missing) endpointGaps.push(questRead.gap);
 
+  const ideaRead = await fetchIdeaPosts({ apiBase, fetchImpl, retries, gate });
+  const ideaPosts = ideaRead.missing ? readSnapshot("idea-posts.json", EMPTY_IDEA_POSTS) : ideaRead.ideaPosts;
+  if (ideaRead.missing) endpointGaps.push(ideaRead.gap);
+
   let meeps = null;
   if (townRoot) meeps = readMeepsFromCheckout(townRoot);
   if (!meeps) {
@@ -882,6 +887,7 @@ export async function buildOfficeData({
       "stats.json": buildStats({ town, metrics, residents, letters, ledger, snapshotStats }),
       "calendar.json": calendar,
       "quest-posts.json": questPosts,
+      "idea-posts.json": ideaPosts,
     },
   };
 }
@@ -988,6 +994,36 @@ export async function fetchQuestPosts({ apiBase, fetchImpl = fetch, retries = 3,
     throw new Error(`/posts?class=quest: not the quest class's posts the contract names (class "quest", a posts array)`);
   if (!body.posts.length) return { missing: true, gap: QUEST_POSTS_UNSEEDED_GAP, questPosts: null };
   return { missing: false, questPosts: body };
+}
+
+// ── THE IDEA POSTS (POS-290, 2026-10-09) ────────────────────────────────────
+// Ideas become posts (Darko's re-scope), and the Think Tank draws them beside
+// the legacy idea marks: `GET /posts?class=idea`, the same posts read, baked as
+// idea-posts.json. Read the quest posts' way, with one more answer that keeps
+// the snapshot: an office that does not carry the idea class yet refuses it
+// with a 422 ("ideas are not posts yet", the w42 train before the idea class
+// merges, and prod until it ships). That is a door that is not open yet, not an
+// office failing, so the committed snapshot stands and the gap says which.
+//
+// AN EMPTY ANSWER IS WRITTEN, unlike the quests'. Quests are put up by the
+// town at the ship, so zero quest posts means not seeded yet. Idea posts are
+// written by residents, so zero is simply a town where nobody has posted one.
+export const EMPTY_IDEA_POSTS = Object.freeze({ as_of: null, class: "idea", finished: ["shipped", "declined", "duplicate"], total: 0, posts: [] });
+export const IDEA_POSTS_GAP = "idea-posts.json preserved from committed snapshot: the office answered 404 at GET /posts?class=idea, so its posts door is not live yet";
+export const IDEA_POSTS_NOT_YET_GAP = "idea-posts.json preserved from committed snapshot: the office answered 422 at GET /posts?class=idea, so ideas are not posts on that office yet";
+
+export async function fetchIdeaPosts({ apiBase, fetchImpl = fetch, retries = 3, gate = null } = {}) {
+  let body;
+  try {
+    ({ body } = await apiGet("/posts?class=idea", { apiBase, fetchImpl, retries, gate }));
+  } catch (error) {
+    if (error?.status === 404) return { missing: true, gap: IDEA_POSTS_GAP, ideaPosts: null };
+    if (error?.status === 422) return { missing: true, gap: IDEA_POSTS_NOT_YET_GAP, ideaPosts: null };
+    throw error;
+  }
+  if (body?.class !== "idea" || !Array.isArray(body?.posts))
+    throw new Error(`/posts?class=idea: not the idea class's posts the contract names (class "idea", a posts array)`);
+  return { missing: false, ideaPosts: body };
 }
 
 export function parseMaybeFrontmatter(text) {

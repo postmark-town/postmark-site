@@ -84,6 +84,7 @@ import houseRegistry from "@/data/postmark/households.json";
 import meeps from "@/data/postmark/meeps.json";
 import bulletin from "@/data/postmark/bulletin.json";
 import questPosts from "@/data/postmark/quest-posts.json";
+import ideaPosts from "@/data/postmark/idea-posts.json";
 
 const TOWN = "https://github.com/postmark-town/postmark/blob/main";
 const WORLD = "https://github.com/keeminlee/postmark-world/blob/main";
@@ -162,7 +163,9 @@ const stakes = markStakes(worldState);
 // blueprints chest this build fetched, never a field on the idea mark. A chest
 // this build could not read leaves every idea proposed, and says nothing false.
 const chest = blueprintIndex(loadBlueprints());
-const thinkTank = ideas(worldState, { places: placeMarks, stakes, chest });
+// THE IDEA POSTS STAND BESIDE THE MARKS (POS-290): the office's GET
+// /posts?class=idea, baked as idea-posts.json, one card each.
+const thinkTank = ideas(worldState, { places: placeMarks, stakes, chest, posts: ideaPosts });
 const tankStages = byStage(thinkTank.ideas);
 const quests = questStandings(bulletin);
 // The cards are the town's quest posts (POS-294): the office's GET
@@ -742,10 +745,24 @@ const switchCss = [
                 <p class="m-lab" title={`${g.ideas.length} ${g.ideas.length === 1 ? "idea" : "ideas"} · most-backed first`}>{g.stage}</p>
                 <div class="m-grid">
                   {g.ideas.map((i) => (
-                <article class="m-card is-idea">
+                <article class:list={["m-card", "is-idea", { "is-post": i.post }]} data-idea-post={i.post ? i.id : undefined}>
                   <p class="m-kind">{i.by ?? "the town"}</p>
                   <h3 class="m-title">{i.title}</h3>
                   {i.body && <p class="m-body">{i.body}</p>}
+                  {/* AN IDEA POST'S LINES (POS-290). Its ✦ line is the backing
+                      the office read from its stakes, for and against, with the
+                      net first; its foot is two counts, the steps on its road
+                      and the residents building a piece of it. No escrow line,
+                      no "standing at", no chest link: a post has none of those. */}
+                  {i.post && (
+                    <>
+                      <p class="m-stake">
+                        <b class="m-stamp">{i.backing.net}<span class="m-u">✦</span></b>
+                        <span class="m-dim"> net backing · {i.backing.for} for · {i.backing.against} against</span>
+                      </p>
+                      <p class="m-foot m-dim">{i.steps} {i.steps === 1 ? "step" : "steps"} · {i.signUps} signed up</p>
+                    </>
+                  )}
                   {/* THE STAKE, ON THE CARD. The founder, 2026-08-31: "right
                       now you can't even see how many stamps are staked on an
                       idea mark via the site." Both numbers come from
@@ -757,6 +774,7 @@ const switchCss = [
                       build that could not read the ledger says so, because an
                       idea shown at 0✦ when the number simply was not read is
                       the page telling a reader nobody cares. */}
+                  {!i.post && (
                   <p class="m-stake">
                     {i.staked == null
                       ? <span class="m-dim">uncounted — the escrow ledger could not be read on this build</span>
@@ -765,6 +783,7 @@ const switchCss = [
                           <span class="m-dim"> staked · {i.households} {i.households === 1 ? "household" : "households"} backing</span>
                         </>}
                   </p>
+                  )}
                   {/* WHERE IT STANDS, when that is not the Tank. Founder-ruled
                       2026-09-01 with the by-class reading: an idea may stand
                       anywhere, so a card whose mark is somewhere else owes the

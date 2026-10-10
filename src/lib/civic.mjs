@@ -542,6 +542,13 @@ export const BLUEPRINTS_REPO = "https://github.com/postmark-town/postmark-bluepr
 // words are the chest's `status:` words, lower-cased. A stage word the chest
 // has not taught this list yet still groups — under its own word, after these.
 export const STAGES = ["proposed", "drawn up", "subscribed", "declared", "ground broken", "topped out", "passed inspection", "open"];
+// AN IDEA POST HAS ITS OWN ROAD (POS-290, Darko 2026-10-09): the stages a hand
+// moves it through, in any order, as the office's idea class names them
+// (`in-conversation` reads "in conversation" through stageOf, like the chest's
+// words). A legacy idea mark keeps the chest's road; a post shows its own. The
+// two roads share no word, so a group is always one kind of card, and the
+// post road's groups follow the chest's.
+export const IDEA_POST_STAGES = ["posted", "in conversation", "ruled in", "building", "built", "shipped", "declined", "duplicate"];
 export function stageOf(word) {
   const w = String(word ?? "").trim().toLowerCase().replace(/[\s_-]+/g, " ");
   return w || "proposed";
@@ -584,7 +591,8 @@ export function byStage(rows) {
     if (!groups.has(s)) groups.set(s, []);
     groups.get(s).push(i);
   }
-  const rank = (s) => { const k = STAGES.indexOf(s); return k === -1 ? STAGES.length : k; };
+  const road = [...STAGES, ...IDEA_POST_STAGES];
+  const rank = (s) => { const k = road.indexOf(s); return k === -1 ? road.length : k; };
   return [...groups.entries()]
     .sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]))
     .map(([stage, ideas]) => ({ stage, ideas }));
@@ -712,6 +720,47 @@ export function toIdea(mark, { chest = null } = {}) {
   };
 }
 
+// One idea post as a Think Tank card: the general posts row plus the idea
+// class's read (lane A's shape: `history`, `backing`, `sign_ups`). The card
+// shows the title, its body, the author, the post's stage, the backing's net, and two
+// counts: the steps in its history, and the sign-ups that stand (standing or
+// accepted; a withdrawn or declined one is no longer anyone building a piece).
+// A row with no title is named in `malformed`, never drawn half-built.
+export function toIdeaPost(row) {
+  const id = String(row?.id ?? "").trim();
+  const title = String(row?.title ?? "").trim();
+  const body = String(row?.body ?? "").trim();
+  if (!id) return { ok: false, id: "(no id)", reason: "an idea post with no id" };
+  if (!title) return { ok: false, id, reason: "an idea post with no title" };
+  const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  const backing = { for: n(row.backing?.for), against: n(row.backing?.against) };
+  backing.net = row.backing?.net != null ? n(row.backing.net) : backing.for - backing.against;
+  const history = Array.isArray(row.history) ? row.history : [];
+  const signUps = (Array.isArray(row.sign_ups) ? row.sign_ups : [])
+    .filter((s) => s?.state === "standing" || s?.state === "accepted").length;
+  const latest = history.map((h) => String(h?.at ?? "")).filter(Boolean).sort().pop() ?? null;
+  return {
+    ok: true,
+    post: true,
+    id,
+    title,
+    // THE BODY IS THE CLAIM, drawn as the mark cards draw theirs: once, and
+    // not when it only repeats the title (Wright's review of #243).
+    body: body && body !== title ? body : null,
+    by: row.author ?? null,
+    stage: stageOf(row.state ?? "posted"),
+    date: latest ? latest.slice(0, 10) : null,
+    slug: null,
+    href: null,
+    standingAt: null,
+    staked: null,
+    households: null,
+    backing,
+    steps: history.length,
+    signUps,
+  };
+}
+
 // THE ORDER IS STAMP-BACKED, founder-ruled 2026-09-01: "the actual state (as in
 // the items on the board), in stamp-backed order". Most ✦ first, then newest,
 // then the id — a total order, so two ideas with the same stake and the same
@@ -737,7 +786,14 @@ export function toIdea(mark, { chest = null } = {}) {
 // change: `placementParent ?? parent` is the mark it is an idea OF, and that is
 // the same question "where does this stand" asks of a sited one. Same line,
 // same wording, by construction rather than by a second branch.
-export function ideas(state, { place = THINK_TANK_PLACE, places = null, stakes = null, chest = null } = {}) {
+// IDEA POSTS STAND BESIDE THE MARKS (POS-290, Darko 2026-10-09: "New ideas are
+// posts … The legacy idea marks keep being read alongside the posts"). `posts`
+// is the office's GET /posts?class=idea as fetch-town baked it
+// (idea-posts.json); each row is one card, beside the marks. A post's ✦ line is
+// its backing (for, against and the net, from the office's stake responses) and
+// never a mark's escrow, so a post row carries `staked: null` and its own
+// `backing`; the order inside a stage is the net, as the marks' is their ✦.
+export function ideas(state, { place = THINK_TANK_PLACE, places = null, stakes = null, chest = null, posts = null } = {}) {
   const marks = Array.isArray(state?.marks) ? state.marks : [];
   const ok = [], malformed = [];
   for (const m of marks.filter(isIdea)) {
@@ -746,8 +802,13 @@ export function ideas(state, { place = THINK_TANK_PLACE, places = null, stakes =
     const standingAt = parent && parent !== place ? placeName(parent) : null;
     if (i.ok) ok.push({ ...i, standingAt, ...stakeOf(i.id, stakes) }); else malformed.push(i);
   }
+  for (const row of Array.isArray(posts?.posts) ? posts.posts : []) {
+    const i = toIdeaPost(row);
+    if (i.ok) ok.push(i); else malformed.push(i);
+  }
+  const weight = (i) => Number((i.post ? i.backing.net : i.staked) ?? 0);
   ok.sort((a, b) =>
-    (Number(b.staked ?? 0) - Number(a.staked ?? 0)) ||
+    (weight(b) - weight(a)) ||
     String(b.date ?? "").localeCompare(String(a.date ?? "")) || a.id.localeCompare(b.id));
   return {
     ideas: ok,
@@ -805,9 +866,14 @@ export function ideaDashboard(tank, stakes) {
         .filter((b) => b.ideas > 0 && b.stamps > 0)
         .sort((a, b) => b.stamps - a.stamps || b.ideas - a.ideas || a.household.localeCompare(b.household))
     : [];
+  // IDEAS COUNTS BOTH, the legacy marks and the idea posts (POS-290). The ✦
+  // figures below stay the marks' escrow: a post's backing is the office's
+  // read, not the escrow ledger this block's `counted` speaks for, and no post
+  // carries any until the stake on posts ships (cut to w43).
   return {
     counted,
     ideas: rows.length,
+    posts: rows.filter((i) => i.post).length,
     staked: counted ? staked : null,
     households: counted ? houses.size : null,
     // A DRAWN idea is one with a blueprint slug — the chest's half of the

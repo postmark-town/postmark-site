@@ -119,6 +119,10 @@ function fixtureFetch({ door = true, stamp = null, roster = "array" } = {}) {
         state: "open", latest: null, responses: 0, fields: { quest: "correspond-send" },
         terms: { title: "Reach out", source: "Send a letter to 5 different residents. Resets daily.", reward: "1 stamp each", cadence: "daily", target: 5 } },
     ] }],
+    // The posts door answering the idea class with nobody's idea posted yet
+    // (POS-290). Keyed on the full query, so the quest answer above still
+    // answers every other /posts read; the idea tests drive its other answers.
+    ["/posts?class=idea", { as_of: "2026-07-02T00:00:00.000Z", class: "idea", finished: ["shipped", "declined", "duplicate"], total: 0, posts: [] }],
     // Keyed on the bare path so ANY /letters?... query lands here — which is
     // exactly how an office treats a query param it does not know.
     ["/letters", door
