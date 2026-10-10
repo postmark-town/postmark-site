@@ -136,5 +136,6 @@ test("the page renders one label per stage present and has no 'not drawn yet' le
     assert.ok(s.split(/\s+/).length <= 3 && !/[—·:]/.test(s), `the stage word "${s}" would break RULE 3 as a label`);
   }
   assert.equal(/not drawn yet/.test(src), false, "the card no longer repeats what the group's label says");
-  assert.match(src, /ideas\(worldState, \{ places: placeMarks, stakes, chest \}\)/, "and the reader is handed the chest");
+  // (and, since POS-290, the idea posts beside the marks; test/think-tank-posts.test.mjs)
+  assert.match(src, /ideas\(worldState, \{ places: placeMarks, stakes, chest, posts: ideaPosts \}\)/, "and the reader is handed the chest");
 });
