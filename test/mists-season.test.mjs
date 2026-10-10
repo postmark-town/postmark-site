@@ -35,3 +35,15 @@ test("the skin's variant 2 (Darko 10:56) keeps every text pair at WCAG AA", () =
   for (const p of pairsOf(VARIANTS[2])) assert.ok(p.ratio >= 4.5, `${p.fg} on ${p.bg}: ${p.ratio.toFixed(2)}`);
   assert.ok(contrast("#000000", "#ffffff") > 20);
 });
+
+test("the pinned world tells the season the site shows: seasonLine from its SEASON_LADDER, nothing before the Mists", async () => {
+  const verbs = await import("postmark-world/world-verbs");
+  assert.equal(typeof verbs.seasonLine, "function", "the pinned world exports seasonLine (no silent fallback)");
+  assert.ok(Array.isArray(verbs.SEASON_LADDER) && verbs.SEASON_LADDER[0].from === 244, "its ladder starts at the Mists' first crossing");
+  const { mistsAt } = await import("postmark-world/world-engine");
+  assert.equal(verbs.seasonLine(mistsAt(243, SKELETON.mists), 243), null);
+  const at284 = verbs.seasonLine(mistsAt(284, SKELETON.mists), 284);
+  assert.ok(verbs.SEASON_LADDER.at(-1).lines.includes(at284), "from 284, a line of the last rung");
+  const src = (await import("node:fs")).readFileSync(new URL("../src/components/SeasonLine.astro", import.meta.url), "utf8");
+  assert.ok(src.includes('import { seasonLine } from "postmark-world/world-verbs"'), "the page reads the world's own export");
+});

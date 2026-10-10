@@ -1,16 +1,16 @@
 ---
 // SeasonLine — the season's line under the home page's ferry clock, in small
-// italics, in the world's own words (postmark-world world-verbs § seasonLines:
-// the bell from veil 0.3, and the lines keyed to a crossing). The site holds no
-// copy of a line; an older pinned world without seasonLines still gives its
-// seasonLine. Keyed to the crossing this build reflects; nothing before the
-// Mists, and nothing on a crossing the world has no line for.
+// italics, in the world's own words (postmark-world world-verbs § seasonLine,
+// read from its SEASON_LADDER: a rung per stretch of the season, the crossing
+// picking the line). The site holds no copy of a line. Keyed to the crossing
+// this build reflects; nothing before the Mists, and nothing on a pinned world
+// that tells no season.
 import { siteMists, pinnedSkeleton } from "@/lib/mists-season.mjs";
-import * as verbs from "postmark-world/world-verbs";
+import { seasonLine } from "postmark-world/world-verbs";
 import { mistsAt } from "postmark-world/world-engine";
 const mists = siteMists();
-const linesOf = (m, c) => (verbs.seasonLines ? verbs.seasonLines(m, c) : [verbs.seasonLine?.(m, c)].filter(Boolean));
-const lines = mists ? linesOf(mistsAt(mists.crossing, pinnedSkeleton()?.mists), mists.crossing) : [];
+const line = mists ? seasonLine(mistsAt(mists.crossing, pinnedSkeleton()?.mists), mists.crossing) : null;
+const lines = line ? [line] : [];
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const HTML = !lines.length ? "" : lines.map((l) => `<p class="fc-season">${esc(l)}</p>`).join("") + `<style>
   .fc-season { margin: 0.35em auto 0; max-width: 34em; text-align: center; text-wrap: balance; font-family: var(--pm-serif); font-style: italic;
