@@ -1,0 +1,50 @@
+---
+// BaroviaShell — the town at the season's dread, site-wide.
+//
+// Deep night with candle-amber accents. The page is graded toward a cold
+// grey-violet (a multiply and a colour layer over everything), the gold turns to
+// candlelight, the paper to bone, and fog lies along the foot and the sides of
+// the screen, drifting. All of it is keyed to the crossing this build reflects:
+// noticeable at the Mists' first crossing, full from 284 (mists-season.mjs §
+// seasonRamp). A reader who asks for reduced motion gets it all, standing still.
+// Text keeps WCAG AA (tools/barovia-contrast.mjs).
+//
+// Before the Mists this renders nothing, and the page is the page it was.
+import { siteMists } from "@/lib/mists-season.mjs";
+const mists = siteMists();
+const t = mists ? mists.t : 0;
+const k = 0.35 + 0.65 * t; // 0.35 at the first crossing, 1 at 284
+const pct = (n) => `${Math.round(k * n)}%`;
+const n3 = (v) => v.toFixed(3);
+const STYLE = mists ? `
+  body .pm {
+    --pm-gold: color-mix(in srgb, #e8c48b, #f0a24a ${pct(85)});
+    --pm-gold-bright: color-mix(in srgb, #f6dcae, #ffc77a ${pct(85)});
+    --pm-accent: color-mix(in srgb, #a4632a, #7a3a0e ${Math.round(60 + 40 * k)}%);
+    --pm-wax: color-mix(in srgb, #9c3f2e, #6e1f18 ${pct(80)});
+    --pm-paper: color-mix(in srgb, #f7efdc, #d6d0dc ${pct(70)});
+    --pm-paper-deep: color-mix(in srgb, #efe3c8, #c9c2d1 ${pct(70)});
+    --pm-line: color-mix(in srgb, #e3d4b8, #a9a1b6 ${pct(70)});
+    --pm-ink-soft: color-mix(in srgb, #6d5c44, #2e2417 ${pct(60)});
+    --pm-night: color-mix(in srgb, #070b15, #05040b ${pct(100)});
+    --pm-harbor: color-mix(in srgb, #0d1426, #110d1f ${pct(100)});
+  }
+  .pm-baro-grade, .pm-baro-tint, .pm-baro-fog { position: fixed; inset: 0; pointer-events: none; }
+  .pm-baro-grade { z-index: 5990; background: #2a2340; mix-blend-mode: multiply; opacity: ${n3(0.12 + 0.2 * k)}; }
+  .pm-baro-tint { z-index: 5991; background: #625c7a; mix-blend-mode: color; opacity: ${n3(0.08 + 0.22 * k)}; }
+  .pm-baro-fog { z-index: 5992; overflow: hidden; }
+  .pm-baro-fog i {
+    position: absolute; left: -20%; right: -20%; display: block;
+    background: radial-gradient(closest-side, rgba(196, 192, 214, 0.55), rgba(196, 192, 214, 0));
+    filter: blur(18px); animation: pm-baro-drift 46s ease-in-out infinite alternate;
+  }
+  .pm-baro-fog i:nth-child(1) { bottom: -14vh; height: ${n3(18 + 22 * k)}vh; opacity: ${n3(0.45 * k)}; }
+  .pm-baro-fog i:nth-child(2) { bottom: -8vh; height: ${n3(10 + 16 * k)}vh; opacity: ${n3(0.35 * k)}; animation-duration: 63s; animation-direction: alternate-reverse; }
+  .pm-baro-fog i:nth-child(3) { top: 0; bottom: 0; left: -14vw; right: auto; width: ${n3(10 + 10 * k)}vw; opacity: ${n3(0.3 * k)}; animation-name: pm-baro-sway; }
+  .pm-baro-fog i:nth-child(4) { top: 0; bottom: 0; right: -14vw; left: auto; width: ${n3(10 + 10 * k)}vw; opacity: ${n3(0.3 * k)}; animation-name: pm-baro-sway; animation-duration: 57s; }
+  @keyframes pm-baro-drift { from { transform: translateX(-6%); } to { transform: translateX(6%); } }
+  @keyframes pm-baro-sway { from { transform: translateY(-4%); } to { transform: translateY(4%); } }
+  @media (prefers-reduced-motion: reduce) { .pm-baro-fog i { animation: none; } }
+` : "";
+---
+{mists && (<><div class="pm-baro-grade" aria-hidden="true"></div><div class="pm-baro-tint" aria-hidden="true"></div><div class="pm-baro-fog" aria-hidden="true"><i></i><i></i><i></i><i></i></div><Fragment set:html={`<style>${STYLE}</style>`} /></>)}

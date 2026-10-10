@@ -1,0 +1,151 @@
+---
+// BaroviaWorld — the World page at the season's dread.
+//
+// The Mists' wall becomes a wall of fog: layered banks drift along the inside of
+// the clear ground, thick enough to swallow the edge regions, and the wall
+// itself goes dark. The sun at the north-east pole turns to a moon, pale at the
+// Mists' first crossing and blood-tinged by 284. The map is graded toward a cold
+// grey-violet, and now and then a crow crosses it.
+//
+// Keyed to the crossing the MAP is showing (live, or the time-travel dial), read
+// from the viewer's own caption, and ramped from the skeleton's first Mists
+// crossing to 284. Geometry comes from the viewer's own wall (its clear ground),
+// so the fog stands exactly where the engine says the wall does. Still under
+// reduced motion, and the crows stay home.
+//
+// Emitted only while the Mists stand for the crossing this build reflects; in
+// the page it takes itself down for any crossing with no Mists.
+import { siteMists } from "@/lib/mists-season.mjs";
+const mists = siteMists();
+const STYLE = `<style>
+  #map-svg .wv-mists-wall { fill: #24212f; }
+  .pm-baro-fogbank { pointer-events: none; }
+  .pm-baro-fogbank g { animation: pm-baro-bank 52s ease-in-out infinite alternate; }
+  .pm-baro-fogbank g:nth-child(2) { animation-duration: 71s; animation-direction: alternate-reverse; }
+  .pm-baro-fogbank g:nth-child(3) { animation-duration: 89s; }
+  @keyframes pm-baro-bank { from { transform: translate(calc(var(--d) * -1), calc(var(--d) * -0.5)); } to { transform: translate(var(--d), calc(var(--d) * 0.5)); } }
+  .pm-baro-mapfx { position: fixed; pointer-events: none; z-index: 30; overflow: hidden; }
+  .pm-baro-mapfx .g1 { position: absolute; inset: 0; background: #332c4c; mix-blend-mode: multiply; }
+  .pm-baro-mapfx .g2 { position: absolute; inset: 0; background: #625c7a; mix-blend-mode: color; }
+  .pm-crow { position: absolute; left: -60px; width: 58px; height: 28px; color: #0b0a10; opacity: 0.85;
+    animation: pm-crow-fly var(--fly, 19s) linear infinite; animation-delay: var(--delay, 0s); }
+  .pm-crow path { animation: pm-crow-flap 0.42s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 60%; }
+  @keyframes pm-crow-fly { 0% { transform: translate(0, 0); } 45% { transform: translate(calc(var(--w) + 120px), var(--dy)); } 100% { transform: translate(calc(var(--w) + 120px), var(--dy)); } }
+  @keyframes pm-crow-flap { from { transform: scaleY(1); } to { transform: scaleY(0.25); } }
+  @media (prefers-reduced-motion: reduce) { .pm-baro-fogbank g { animation: none; } .pm-crow { display: none; } }
+  html[data-pmc-dock] .pm-baro-mapfx { display: none; }
+</style>`;
+---
+{mists && (<><Fragment set:html={STYLE} /><script is:inline>
+  (function () {
+    var SVGNS = "http://www.w3.org/2000/svg", FULL = 284;
+    var ready = Promise.all([
+      fetch("/WORLD/skeleton.json").then(function (r) { return r.ok ? r.json() : null; }),
+      import("/world-engine/tools/world-engine.mjs"),
+    ]).catch(function () { return [null, null]; });
+    var shown = null, fx = null;
+    function el(tag, attrs) { var e = document.createElementNS(SVGNS, tag); for (var a in attrs) e.setAttribute(a, attrs[a]); return e; }
+    function mix(a, b, u) { var p = function (h, i) { return parseInt(h.slice(i, i + 2), 16); }; var o = "#"; for (var i = 1; i < 7; i += 2) { var v = Math.round(p(a, i) + (p(b, i) - p(a, i)) * u); o += (v < 16 ? "0" : "") + v.toString(16); } return o; }
+    // deterministic scatter, so a crossing always draws the same banks
+    function rnd(i) { var x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); }
+    function clearOf(svg) {
+      var w = svg.querySelector(".wv-mists-wall"); if (!w) return null;
+      var subs = (w.getAttribute("d") || "").split("M").slice(1); if (subs.length < 2) return null;
+      var n = subs[1].match(/-?\d+(\.\d+)?/g).map(Number); // ax ay H bx V by H ax Z
+      return { x0: Math.min(n[0], n[2]), y0: Math.min(n[1], n[3]), x1: Math.max(n[0], n[2]), y1: Math.max(n[1], n[3]) };
+    }
+    function fogBanks(svg, c, k) {
+      var old = svg.querySelector("#pm-baro-fog"); if (old) old.remove();
+      var D = 40 + 180 * k, g = el("g", { id: "pm-baro-fog", "class": "pm-baro-fogbank", "aria-hidden": "true" });
+      var defs = el("defs", {}), f = el("filter", { id: "pm-baro-blur", x: "-30%", y: "-30%", width: "160%", height: "160%" });
+      f.appendChild(el("feGaussianBlur", { stdDeviation: (D * 0.28).toFixed(1) })); defs.appendChild(f); g.appendChild(defs);
+      var layers = [{ ink: "#cfcbe0", op: 0.9 * k, depth: 0.2 }, { ink: "#b6b0cc", op: 0.6 * k, depth: 0.55 }, { ink: "#9d97b6", op: 0.38 * k, depth: 0.95 }];
+      var sides = [
+        { a: [c.x0, c.y0], b: [c.x1, c.y0], n: [0, 1] }, { a: [c.x0, c.y1], b: [c.x1, c.y1], n: [0, -1] },
+        { a: [c.x0, c.y0], b: [c.x0, c.y1], n: [1, 0] }, { a: [c.x1, c.y0], b: [c.x1, c.y1], n: [-1, 0] },
+      ];
+      layers.forEach(function (L, li) {
+        var lg = el("g", { filter: "url(#pm-baro-blur)", opacity: L.op.toFixed(3), style: "--d:" + (D * 0.1).toFixed(1) + "px" });
+        var seed = li * 1000;
+        sides.forEach(function (s) {
+          var len = Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]), ux = (s.b[0] - s.a[0]) / len, uy = (s.b[1] - s.a[1]) / len, step = D * 0.32;
+          for (var d = -D; d <= len + D; d += step) {
+            var r1 = rnd(++seed), r2 = rnd(++seed), r3 = rnd(++seed);
+            var inward = D * L.depth * (0.5 + 0.7 * r1), r = D * (0.35 + 0.35 * r2);
+            lg.appendChild(el("ellipse", { cx: (s.a[0] + ux * (d + step * r3) + s.n[0] * inward).toFixed(1), cy: (s.a[1] + uy * (d + step * r3) + s.n[1] * inward).toFixed(1),
+              rx: (r * (1.2 + 0.5 * r3)).toFixed(1), ry: r.toFixed(1), fill: L.ink }));
+          }
+        });
+        g.appendChild(lg);
+      });
+      svg.appendChild(g);
+    }
+    function moon(svg, t) {
+      var poles = svg.querySelector(".day-axis-poles"); if (!poles || poles.children.length < 2) return;
+      // the moon rides above the fog banks, so it is drawn last, in the same space as the pole
+      var sun = poles.children[0], rays = poles.children[1];
+      var cx = +sun.getAttribute("cx"), cy = +sun.getAttribute("cy");
+      if (!(cx > 0)) return;
+      sun.style.display = "none"; rays.style.display = "none";
+      var old = svg.querySelector("#pm-baro-moon"); if (old) old.remove();
+      var blood = Math.max(0, Math.min(1, (t - 0.45) / 0.55)), face = mix("#e7e9f2", "#c4523f", blood), halo = mix("#cfd6ea", "#a8302a", blood);
+      var g = el("g", { id: "pm-baro-moon" }), defs = el("defs", {}), rg = el("radialGradient", { id: "pm-baro-halo" });
+      rg.appendChild(el("stop", { offset: "0", "stop-color": halo, "stop-opacity": "0.75" })); rg.appendChild(el("stop", { offset: "1", "stop-color": halo, "stop-opacity": "0" }));
+      defs.appendChild(rg); g.appendChild(defs);
+      g.appendChild(el("circle", { cx: cx, cy: cy, r: 120, fill: "url(#pm-baro-halo)" }));
+      g.appendChild(el("circle", { cx: cx, cy: cy, r: 26, fill: face }));
+      [[-8, -6, 6], [7, 5, 4.5], [-3, 10, 3.5], [9, -9, 3]].forEach(function (p) { g.appendChild(el("circle", { cx: cx + p[0], cy: cy + p[1], r: p[2], fill: "#000", "fill-opacity": "0.12" })); });
+      svg.appendChild(g);
+    }
+    function mapFx(k, t) {
+      var map = document.querySelector(".wv-map"); if (!map) return;
+      if (!fx) {
+        fx = document.createElement("div"); fx.className = "pm-baro-mapfx"; fx.setAttribute("aria-hidden", "true");
+        fx.innerHTML = '<div class="g1"></div><div class="g2"></div>';
+        document.body.appendChild(fx);
+      }
+      fx.querySelector(".g1").style.opacity = (0.1 + 0.22 * k).toFixed(3);
+      fx.querySelector(".g2").style.opacity = (0.1 + 0.25 * k).toFixed(3);
+      var crows = 1 + Math.round(2 * t);
+      fx.querySelectorAll(".pm-crow").forEach(function (c) { c.remove(); });
+      for (var i = 0; i < crows; i++) {
+        var c = document.createElementNS(SVGNS, "svg"); c.setAttribute("class", "pm-crow"); c.setAttribute("viewBox", "0 0 42 20");
+        c.innerHTML = '<path fill="currentColor" d="M21 11c-2-3-6-6-12-7 3 2 5 4 6 6-4-1-9 0-13 2 5 0 9 1 12 3 2 1 4 1 7 0 3-2 7-3 12-3-4-2-9-3-13-2 1-2 3-4 6-6-6 1-10 4-12 7z"/>';
+        c.style.top = (12 + 22 * i + 9 * rnd(i + 7)) + "%";
+        c.style.setProperty("--fly", (17 + 6 * rnd(i + 3)) + "s");
+        c.style.setProperty("--delay", (-4 - 7 * i) + "s");
+        c.style.setProperty("--dy", (rnd(i + 11) * 60 - 30) + "px");
+        fx.appendChild(c);
+      }
+    }
+    function place() {
+      var map = document.querySelector(".wv-map"); if (!fx || !map) return;
+      var r = map.getBoundingClientRect();
+      fx.style.left = r.left + "px"; fx.style.top = r.top + "px"; fx.style.width = r.width + "px"; fx.style.height = r.height + "px";
+      fx.style.setProperty("--w", r.width + "px");
+    }
+    function off(svg) {
+      shown = null;
+      if (svg) { var f = svg.querySelector("#pm-baro-fog"); if (f) f.remove(); var m = svg.querySelector("#pm-baro-moon"); if (m) m.remove();
+        var poles = svg.querySelector(".day-axis-poles"); if (poles && poles.children.length > 1) { poles.children[0].style.display = ""; poles.children[1].style.display = ""; } }
+      if (fx) { fx.remove(); fx = null; }
+    }
+    function tick() {
+      ready.then(function (a) {
+        var sk = a[0], eng = a[1], svg = document.getElementById("map-svg");
+        var b = document.querySelector(".crossnow b"), n = b ? Number(b.textContent) : NaN;
+        if (!sk || !eng || !svg || !Number.isInteger(n)) return;
+        var m = eng.mistsAt(n, sk.mists);
+        if (!m) { if (shown !== null) off(svg); return; }
+        var first = sk.mists.schedule[0].crossing, t = Math.max(0, Math.min(1, (n - first) / (FULL - first))), k = 0.35 + 0.65 * t;
+        var c = clearOf(svg); if (!c) return;
+        var key = n + ":" + [c.x0, c.y0, c.x1, c.y1].map(Math.round).join(",");
+        if (key !== shown || !svg.querySelector("#pm-baro-fog") || !svg.querySelector("#pm-baro-moon")) {
+          shown = key; fogBanks(svg, c, k); moon(svg, t); mapFx(k, t);
+        }
+        place();
+      });
+    }
+    tick(); setInterval(tick, 1000); window.addEventListener("resize", place);
+  })();
+</script></>)}

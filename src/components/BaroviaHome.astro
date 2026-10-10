@@ -1,0 +1,57 @@
+---
+// BaroviaHome — the home page's hero at the season's dread, in three parts the
+// page places itself:
+//   part="fog"      fog over the hero picture that rises with the season
+//                   (a quarter of the hero at the Mists' first crossing, most of
+//                   it from 284), in drifting layers;
+//   part="lantern"  the ferry clock's boat becomes a lantern that flickers;
+//   part="lines"    under the clock, the season's line in the world's words:
+//                   the bell (world-verbs.mjs § seasonLine, from veil 0.3), and
+//                   from 284 the lanterns leaning north.
+// Keyed to the crossing this build reflects; still under reduced motion; before
+// the Mists every part renders nothing.
+import { siteMists, pinnedSkeleton } from "@/lib/mists-season.mjs";
+import { seasonLine } from "postmark-world/world-verbs";
+import { mistsAt } from "postmark-world/world-engine";
+const { part } = Astro.props;
+const mists = siteMists();
+const k = mists ? 0.35 + 0.65 * mists.t : 0;
+const n3 = (v) => v.toFixed(3);
+// The lanterns' line is POS-551's DRAFT for 284 (docs/2026-10-09/rail/
+// plumb-mists-eggs/LINEAR-REPORT.md), not yet in the world's SEASON_LINES; held
+// here for the mockup. If picked, it belongs in the world and is read from there.
+const LANTERNS_FROM = 284;
+const LANTERNS = "Every lantern in town leans a little north, as if the dark there were drawing breath.";
+const lines = mists && part === "lines"
+  ? [seasonLine(mistsAt(mists.crossing, pinnedSkeleton()?.mists), mists.crossing), mists.crossing >= LANTERNS_FROM ? LANTERNS : null].filter(Boolean)
+  : [];
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const FOG = `<div class="pm-hero-fog" aria-hidden="true" style="height:${n3(22 + 40 * k)}%"><i></i><i></i><i></i></div>`;
+const LANTERN = `<svg class="fc-lantern" viewBox="0 0 24 34" aria-hidden="true">`
+  + `<path d="M12 1v4M7 5h10l2 4H5zM6 9h12v18H6zM5 27h14l-2 4H7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>`
+  + `<path class="fc-lantern-glass" d="M7.5 10.5h9v15h-9z"/>`
+  + `<path class="fc-lantern-flame" d="M12 13c2.6 3.4 2.9 6.2 0 9.4-2.9-3.2-2.6-6 0-9.4z"/></svg>`;
+const LINES = lines.map((l) => `<p class="fc-season">${esc(l)}</p>`).join("");
+const STYLE = `<style>
+  .pm-hero-fog { position: absolute; left: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; }
+  .pm-hero-fog i { position: absolute; left: -25%; right: -25%; bottom: 0; display: block; height: 100%;
+    background: linear-gradient(0deg, rgba(122, 116, 146, ${n3(0.8 * k)}) 0%, rgba(104, 98, 128, ${n3(0.5 * k)}) 45%, rgba(104, 98, 128, 0) 100%);
+    filter: blur(10px); animation: pm-hero-fog 38s ease-in-out infinite alternate; }
+  .pm-hero-fog i:nth-child(2) { height: 72%; background: radial-gradient(60% 80% at 30% 100%, rgba(150, 144, 172, ${n3(0.5 * k)}), rgba(150, 144, 172, 0)); animation-duration: 53s; animation-direction: alternate-reverse; }
+  .pm-hero-fog i:nth-child(3) { height: 55%; background: radial-gradient(55% 80% at 75% 100%, rgba(140, 134, 164, ${n3(0.45 * k)}), rgba(140, 134, 164, 0)); animation-duration: 71s; }
+  @keyframes pm-hero-fog { from { transform: translateX(-7%); } to { transform: translateX(7%); } }
+  .ferry-clock .fc-boat .fc-hull { display: none !important; }
+  .hero-copy h1, .hero-copy .under, .hero-copy .over { text-shadow: 0 2px 4px rgba(0, 0, 0, 0.85), 0 0 22px rgba(0, 0, 0, 0.9); }
+  .fc-lantern { display: block; width: 2.3rem; height: 3.2rem; color: #f3c27a; filter: drop-shadow(0 0 14px rgba(255, 170, 70, 0.75)); }
+  .fc-lantern-glass { fill: rgba(255, 196, 110, 0.18); }
+  .fc-lantern-flame { fill: #ffcf6e; transform-box: fill-box; transform-origin: 50% 100%; animation: fc-flicker 1.9s steps(1, end) infinite, fc-sway 3.1s ease-in-out infinite; }
+  @keyframes fc-flicker { 0% { opacity: 1; } 18% { opacity: 0.55; } 22% { opacity: 0.95; } 47% { opacity: 0.7; } 52% { opacity: 1; } 81% { opacity: 0.4; } 84% { opacity: 0.9; } }
+  @keyframes fc-sway { 0%, 100% { transform: scale(1, 1) skewX(0deg); } 50% { transform: scale(0.88, 1.08) skewX(4deg); } }
+  @media (max-width: 700px) { .fc-lantern { width: 1.6rem; height: 2.25rem; } .fc-season { font-size: 0.8rem; } }
+  .fc-season { margin: 0.45em auto 0; max-width: 34em; text-align: center; text-wrap: balance; font-family: var(--pm-serif); font-style: italic;
+    font-size: 0.98rem; line-height: 1.4; color: #e4dff0; text-shadow: 0 1px 3px #000, 0 0 16px rgba(0, 0, 0, 0.95); }
+  @media (prefers-reduced-motion: reduce) { .pm-hero-fog i, .fc-lantern-flame { animation: none; } }
+</style>`;
+const html = !mists ? "" : part === "fog" ? FOG : part === "lantern" ? LANTERN : part === "lines" ? LINES + STYLE : "";
+---
+{html && <Fragment set:html={html} />}

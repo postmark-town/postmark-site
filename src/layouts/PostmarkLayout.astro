@@ -11,6 +11,7 @@ import "../styles/postmark.css";
 import { RAIL, rowFor, sectionOf, navFlags } from "@/lib/nav.mjs";
 import ChipRow from "@/components/ChipRow.astro";
 import DoorLine from "@/components/DoorLine.astro";
+import BaroviaShell from "@/components/BaroviaShell.astro";
 
 const {
   title, description, active = "", image = "/banner.png", noindex = false,
@@ -280,7 +281,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       }
     </style>
     <slot />
-    <DoorLine door={door} />
+    <DoorLine door={door} /><BaroviaShell />
     {import.meta.env.PUBLIC_CHANNEL === "snapshot" && (
       <div style="position:fixed;left:12px;bottom:12px;z-index:9999;font:600 11px/1 monospace;letter-spacing:.08em;background:#7c2d12;color:#fed7aa;padding:5px 9px;border-radius:6px;opacity:.92;pointer-events:none;">
         SNAPSHOT · {(import.meta.env.PUBLIC_BUILD_SHA ?? "local").slice(0, 8)}
