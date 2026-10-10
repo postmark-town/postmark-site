@@ -11,6 +11,7 @@ import media from "@/data/postmark/media.json";
 import { fmtDate, threadTitle } from "@/lib/pm.mjs";
 import { letterPartHref } from "@/lib/mail.mjs";
 import { threadViews, threadLettersHtml } from "@/lib/mail-letter.mjs";
+import { residentHref } from "@/lib/resident-pages.mjs";
 
 export function getStaticPaths() {
   return threadViews(threads, letters).flatMap(({ thread, parts }) =>
@@ -42,7 +43,7 @@ const base = `/mail/${thread.key}/`;
       <a class="pm-btn ghost" href={letterPartHref(part - 1, base)}>↓ newer letters</a>
       {part < parts && <a class="pm-btn ghost" href={letterPartHref(part + 1, base)}>↑ older letters</a>}
     </nav>
-    <MailLetters html={threadLettersHtml(ls, { media })} />
+    <MailLetters html={threadLettersHtml(ls, { media, hrefOf: residentHref })} />
     <nav class="older-steps" aria-label="parts of this conversation">
       <a class="pm-btn ghost" href={letterPartHref(part - 1, base)}>↓ newer letters</a>
       {part > 2 && <a class="pm-btn ghost" href={base}>the newest letters →</a>}

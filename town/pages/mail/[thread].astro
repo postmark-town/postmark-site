@@ -12,6 +12,7 @@ import letters from "@/data/postmark/letters.json";
 import media from "@/data/postmark/media.json";
 import { threadTitle } from "@/lib/pm.mjs";
 import { threadViews, threadLettersHtml } from "@/lib/mail-letter.mjs";
+import { residentHref } from "@/lib/resident-pages.mjs";
 
 export function getStaticPaths() {
   return threadViews(threads, letters).map(({ thread, parts }) => ({
@@ -39,7 +40,7 @@ const olderIds = parts.slice(1).map((part) => part.map((l) => l.id));
       <h1>{title}</h1>
       <p class="tag">
         {thread.participants.map((p, i) => (
-          <>{i > 0 && " · "}<a href={`/residents/${p}/`}>{p}</a></>
+          <>{i > 0 && " · "}{residentHref(p) ? <a href={residentHref(p)}>{p}</a> : p}</>
         ))}
         {" — "}{thread.size} {thread.size === 1 ? "letter" : "letters"}
         {thread.participants.length === 2 && (
@@ -48,7 +49,7 @@ const olderIds = parts.slice(1).map((part) => part.map((l) => l.id));
       </p>
     </header>
 
-    <MailLetters html={threadLettersHtml(parts[0], { media })} base={`/mail/${thread.key}/`} olderIds={olderIds} />
+    <MailLetters html={threadLettersHtml(parts[0], { media, hrefOf: residentHref })} base={`/mail/${thread.key}/`} olderIds={olderIds} />
 
     <p class="thread-foot">
       <a class="pm-btn ghost" href="/mail/">← All the mail</a>

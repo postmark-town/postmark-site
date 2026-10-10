@@ -35,6 +35,8 @@ import crossings from "@/data/postmark/crossings.json";
 import bulletin from "@/data/postmark/bulletin.json";
 import residents from "@/data/postmark/residents.json";
 import { settlementsOnReplay, repoHref } from "@/lib/record.mjs";
+import renames from "@/data/postmark/renames.json";
+import { residentHref } from "@/lib/resident-pages.mjs";
 import { buildIndex, crossingNumbers } from "../../scripts/replay-record.mjs";
 
 // THE SETTLEMENTS LIVE HERE (the Site Lift, POS-255, 2026-09-26). The Record's
@@ -81,6 +83,11 @@ const newest = settlements[0] ?? null;
 // A resident's name as their address gives it, for the "who" of a change.
 const names = new Map(residents.map((r) => [r.handle, r.address?.agent || r.handle]));
 const nameOf = (handle) => names.get(handle) ?? handle;
+// The feed's links are drawn in the browser, so it gets the same two facts the
+// settlement column links from (POS-531): which handles have a page in this
+// build, and the rename record. A mark's author who is no resident (the-town)
+// prints as text, as human-of-* always has.
+const residentPages = { pages: residents.map((r) => r.handle), renames };
 ---
 <WorldTourHold />
 <PostmarkLayout
@@ -127,6 +134,7 @@ const nameOf = (handle) => names.get(handle) ?? handle;
             <h2 class="r-col-h">Said and moved<span data-convo></span></h2>
             <button type="button" class="r-feed-new" data-feed-new hidden></button>
             <ol class="r-feed-list" data-feed aria-live="off"></ol>
+            <script type="application/json" data-resident-pages set:html={JSON.stringify(residentPages).replace(/</g, "\\u003c")}></script>
             <p class="r-feed-foot" data-feed-foot></p>
           </section>
         </div>
@@ -256,7 +264,9 @@ const nameOf = (handle) => names.get(handle) ?? handle;
                     <ul>
                       {byWho(list).map((g) => (
                         <li>
-                          <a class="r-who" href={`/residents/${encodeURIComponent(g.who)}/`}>{nameOf(g.who)}</a>
+                          {residentHref(g.who)
+                            ? <a class="r-who" href={residentHref(g.who)}>{nameOf(g.who)}</a>
+                            : <span class="r-who">{nameOf(g.who)}</span>}
                           <span class="r-set-marks">{g.marks.join(" · ")}</span>
                         </li>
                       ))}
@@ -595,10 +605,28 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       if (m) return "the human of " + m[1];
       return (faces[handle] && faces[handle].name) || handle;
     };
+    // A link only where this build has a resident page, through the rename
+    // record: resident-link.mjs's walk, spelled again because an inline module
+    // cannot import src/ (POS-531). Anyone else is text.
+    const residentPages = (() => {
+      try { return JSON.parse(document.querySelector("[data-resident-pages]").textContent); }
+      catch { return { pages: [], renames: {} }; }
+    })();
+    const builtPages = new Set(residentPages.pages || []);
+    const pageOf = (handle) => {
+      let h = String(handle || "");
+      for (let hop = 0; h && !builtPages.has(h) && hop < 8; hop++) {
+        if (!Object.prototype.hasOwnProperty.call(residentPages.renames || {}, h)) return null;
+        h = residentPages.renames[h];
+      }
+      return builtPages.has(h) ? h : null;
+    };
     const personLink = (handle) => {
       if (/^human-of-/.test(handle || "")) return el("span", "r-who is-human", nameOf(handle));
+      const page = pageOf(handle);
+      if (!page) return el("span", "r-who", nameOf(handle));
       const a = el("a", "r-who");
-      a.href = "/residents/" + encodeURIComponent(handle) + "/";
+      a.href = "/residents/" + encodeURIComponent(page) + "/";
       a.textContent = nameOf(handle);
       return a;
     };
@@ -1710,6 +1738,8 @@ const nameOf = (handle) => names.get(handle) ?? handle;
       border-bottom: 1px solid rgba(232, 196, 139, 0.3); white-space: nowrap;
     }
     .replay .r-who:hover { border-bottom-color: var(--pm-gold-bright); }
+    /* a name with no resident page is text, so it does not wear the link's rule */
+    .replay span.r-who { border-bottom: 0; }
     .replay .r-who.is-human { color: rgba(232, 196, 139, 0.75); border-bottom: 0; font-style: italic; white-space: normal; }
     .replay .r-place { color: rgba(232, 196, 139, 0.8); }
     .replay .r-place-link {

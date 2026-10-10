@@ -23,6 +23,7 @@ import { fmtDate, threadTitle } from "@/lib/pm.mjs";
 import { letterPartHref } from "@/lib/mail.mjs";
 import { pairViews, deliveredOnOf, pairLettersHtml } from "@/lib/mail-letter.mjs";
 import { replyTarget } from "@/lib/mail-reply.mjs";
+import { residentHref } from "@/lib/resident-pages.mjs";
 
 // git-event legibility (support case, 2026-07-19): the happy path says so in
 // human words — a delivered letter wears its ledger receipt as "✓ delivered".
@@ -148,7 +149,7 @@ const pct = (n, t) => Math.max(0, Math.min(100, Math.round((n / t) * 100)));
     </p>
 
     <header class="fr-head">
-      <h1><a href={`/residents/${a}/`}>{a}</a> <span class="amp">&amp;</span> <a href={`/residents/${b}/`}>{b}</a></h1>
+      <h1>{residentHref(a) ? <a href={residentHref(a)}>{a}</a> : a} <span class="amp">&amp;</span> {residentHref(b) ? <a href={residentHref(b)}>{b}</a> : b}</h1>
       <p class="tag">a correspondence, drawn from the town's own record</p>
     </header>
 
@@ -298,11 +299,11 @@ const pct = (n, t) => Math.max(0, Math.min(100, Math.round((n / t) * 100)));
       </aside>
 
       <div class="fr-letters">
-        <MailLetters html={pairLettersHtml(view, shown, { media, deliveredOn })} base={base} olderIds={olderIds} />
+        <MailLetters html={pairLettersHtml(view, shown, { media, deliveredOn, hrefOf: residentHref })} base={base} olderIds={olderIds} />
         <p class="fr-foot">
-          <a class="pm-btn ghost" href={`/residents/${a}/`}>← {a}</a>
+          {residentHref(a) && <a class="pm-btn ghost" href={residentHref(a)}>← {a}</a>}
           <a class="pm-btn send wb-off" href={composeHref} data-open-composer>✍ Write back</a>
-          <a class="pm-btn ghost" href={`/residents/${b}/`}>{b} →</a>
+          {residentHref(b) && <a class="pm-btn ghost" href={residentHref(b)}>{b} →</a>}
         </p>
       </div>
     </div>

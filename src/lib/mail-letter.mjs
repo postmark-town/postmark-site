@@ -10,12 +10,19 @@ import { lettersByPair, letterParts, pairThreadMarks } from "./mail.mjs";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-const resident = (h) => `<a href="/residents/${esc(h)}/">${esc(h)}</a>`;
+// A handle links only where `hrefOf` names a page (resident-link.mjs): through
+// a rename to the page the resident has now, and as plain text where no page
+// stands (POS-530). Without `hrefOf` nothing is linked, never a guessed href.
+const resident = (h, hrefOf) => {
+  const href = hrefOf?.(h);
+  return href ? `<a href="${esc(href)}">${esc(h)}</a>` : esc(h);
+};
 
 // `thread` (a pair page's marks: { tkey, hue, divider }) adds the thread's
 // colour, its name above the letterhead and the rule where the thread changes;
-// `delivered` is the ledger's delivery date, worn as "✓ delivered".
-export function letterHtml(l, { media = {}, thread = null, delivered = null } = {}) {
+// `delivered` is the ledger's delivery date, worn as "✓ delivered"; `hrefOf`
+// is the build's resident links (resident-pages.mjs § residentHref).
+export function letterHtml(l, { media = {}, thread = null, delivered = null, hrefOf = null } = {}) {
   const tos = (l.toList && l.toList.length ? l.toList : [l.to]).filter(Boolean);
   const shown = (l.attachments ?? []).filter((at) => media[at]);
   const hue = thread ? ` style="--h:${thread.hue}"` : "";
@@ -24,7 +31,7 @@ export function letterHtml(l, { media = {}, thread = null, delivered = null } = 
     thread?.divider ? `<div class="fr-newthread"${hue} aria-hidden="true">— ${thread.divider} —</div>` : "",
     `<article class="pm-letter pm-paper${thread ? " fr-letter" : ""}" id="${esc(l.id)}"${hue}${thread ? ` data-tkey="${esc(thread.tkey)}"` : ""}>`,
     thread ? `<div class="fr-threadline">${esc(threadTitle(thread.tkey))}</div>` : "",
-    `<div class="pm-letterhead"><span class="route">${resident(l.from)} → ${tos.map(resident).join(", ")}</span>`,
+    `<div class="pm-letterhead"><span class="route">${resident(l.from, hrefOf)} → ${tos.map((h) => resident(h, hrefOf)).join(", ")}</span>`,
     `<span class="when">${esc(fmtDate(l.date))}`,
     delivered ? `<span class="fr-sailed" title="carried by the ferry, sealed in the town ledger">✓ delivered ${esc(fmtDate(delivered))}</span>` : "",
     `</span></div>`,
@@ -71,10 +78,10 @@ export function deliveredOnOf(ledger) {
   return new Map((ledger ?? []).filter((e) => e.kind === "delivery").map((e) => [e.id, e.date]));
 }
 
-export function pairLettersHtml(view, ls, { media, deliveredOn }) {
-  return ls.map((l) => letterHtml(l, { media, thread: view.markOf.get(l.id), delivered: deliveredOn.get(l.id) })).join("");
+export function pairLettersHtml(view, ls, { media, deliveredOn, hrefOf = null }) {
+  return ls.map((l) => letterHtml(l, { media, thread: view.markOf.get(l.id), delivered: deliveredOn.get(l.id), hrefOf })).join("");
 }
 
-export function threadLettersHtml(ls, { media }) {
-  return ls.map((l) => letterHtml(l, { media })).join("");
+export function threadLettersHtml(ls, { media, hrefOf = null }) {
+  return ls.map((l) => letterHtml(l, { media, hrefOf })).join("");
 }
