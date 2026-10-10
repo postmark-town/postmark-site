@@ -43,6 +43,7 @@ export const DATA_FILES = [
   "calendar.json",
   "quest-posts.json",
   "idea-posts.json",
+  "renames.json",
 ];
 
 // -- ON THE BOX, SHORT IS FAILED (2026-09-17, postmark#2884) -----------------
@@ -865,6 +866,10 @@ export async function buildOfficeData({
   const ideaPosts = ideaRead.missing ? readSnapshot("idea-posts.json", EMPTY_IDEA_POSTS) : ideaRead.ideaPosts;
   if (ideaRead.missing) endpointGaps.push(ideaRead.gap);
 
+  const renamesRead = await fetchRenames({ apiBase, fetchImpl, retries, gate });
+  const renames = renamesRead.missing ? readSnapshot("renames.json", {}) : renamesRead.renames;
+  if (renamesRead.missing) endpointGaps.push(RENAMES_GAP);
+
   let meeps = null;
   if (townRoot) meeps = readMeepsFromCheckout(townRoot);
   if (!meeps) {
@@ -888,6 +893,7 @@ export async function buildOfficeData({
       "calendar.json": calendar,
       "quest-posts.json": questPosts,
       "idea-posts.json": ideaPosts,
+      "renames.json": renames,
     },
   };
 }
@@ -1024,6 +1030,44 @@ export async function fetchIdeaPosts({ apiBase, fetchImpl = fetch, retries = 3, 
   if (body?.class !== "idea" || !Array.isArray(body?.posts))
     throw new Error(`/posts?class=idea: not the idea class's posts the contract names (class "idea", a posts array)`);
   return { missing: false, ideaPosts: body };
+}
+
+// ── THE RENAME RECORD (POS-530, 2026-10-09) ─────────────────────────────────
+// A letter names its author by the handle written on it, and a resident who
+// has since renamed has a page only under the new handle. The record of that
+// is the store's pins: a renamed handle stays, marked `retired` and
+// `renamed_to` (the town's tools/rename-handle.mjs; tools/github-ids.json is
+// the printout). GET /households is the office's read of it (POS-345), and the
+// site's build is one of the readers its contract names. Only the renames are
+// baked: renames.json is { <old handle>: <new handle> }, and
+// src/lib/resident-link.mjs walks it before a page links a resident.
+//
+// Read the calendar's way: a 404 is a door this office does not have yet (prod
+// before the w42 office ships), so the committed renames.json is kept and the
+// gap says why; anything else failing throws like every other read.
+export const RENAMES_GAP = "renames.json preserved from committed snapshot: the office answered 404 at GET /households, so its registry door is not live yet";
+
+export function renamesFromPins(pins) {
+  const renames = {};
+  for (const handle of Object.keys(pins).sort()) {
+    const to = pins[handle]?.renamed_to;
+    if (typeof to === "string" && to && to !== handle) renames[handle] = to;
+  }
+  return renames;
+}
+
+export async function fetchRenames({ apiBase, fetchImpl = fetch, retries = 3, gate = null } = {}) {
+  let body;
+  try {
+    ({ body } = await apiGet("/households", { apiBase, fetchImpl, retries, gate }));
+  } catch (error) {
+    if (error?.status === 404) return { missing: true, renames: null };
+    throw error;
+  }
+  const pins = body?.pins;
+  if (body?.read !== "households" || !pins || typeof pins !== "object" || Array.isArray(pins))
+    throw new Error(`/households: not the registry read the contract names (read "households", a pins object)`);
+  return { missing: false, renames: renamesFromPins(pins) };
 }
 
 export function parseMaybeFrontmatter(text) {
