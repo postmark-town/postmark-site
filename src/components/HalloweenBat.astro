@@ -1,0 +1,10 @@
+---
+// HalloweenBat — now and then, one bat crossing the top of the page while the
+// Mists stand (POS-553): on about one load in three, once, above the nav's line,
+// never under reduced motion (halloween-sprinkle.mjs § navBatHTML). Before the
+// Mists this renders nothing, and the page is the page it was.
+import { siteMists } from "@/lib/mists-season.mjs";
+import { navBatHTML } from "@/lib/halloween-sprinkle.mjs";
+const HTML = navBatHTML(siteMists());
+---
+{HTML && <Fragment set:html={HTML} />}

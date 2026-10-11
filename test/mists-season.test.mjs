@@ -65,3 +65,42 @@ test("the home page's line: the bell rings once from 244, twice from 282, and th
   assert.equal(at(282), twice); assert.equal(at(283), twice);
   for (let n = 284; n < 300; n++) assert.equal(at(n), verbs.seasonLine(mistsAt(n, SKELETON.mists), n), `at ${n}, the ladder as told`);
 });
+
+// THE MOTIFS SPRINKLED AROUND THE SITE (Darko 2026-10-11 11:03: "maybe the site
+// hints are *too* subtle"): nothing at 243, every one at 244; decorative only,
+// still under reduced motion, and motifs only (no palette, no words).
+test("the sprinkled motifs: absent at 243, present at 244, decorative and still under reduced motion", async () => {
+  const { homeCrowsHTML, navBatHTML, motifHTML, SPOTS, PERCHES } = await import("../src/lib/halloween-sprinkle.mjs");
+  const before = siteMists({ crossing: 243, skeleton: SKELETON }), during = siteMists({ crossing: 244, skeleton: SKELETON });
+  assert.equal(before, null);
+  const all = (m) => ({ home: homeCrowsHTML(m), header: navBatHTML(m), ...Object.fromEntries(Object.keys(SPOTS).map((k) => [k, motifHTML(k, m)])) });
+  assert.deepEqual(Object.keys(SPOTS).sort(), ["bulletin", "jar", "resident", "world"]);
+  for (const [k, html] of Object.entries(all(before))) assert.equal(html, "", `${k} at 243`);
+  assert.equal(motifHTML("nowhere", during), "", "an unknown spot is nothing");
+  const on = all(during);
+  for (const [k, html] of Object.entries(on)) {
+    assert.ok(html.length > 0, `${k} at 244`);
+    assert.match(html, /pointer-events: none/, `${k} takes no pointer`);
+    if (/<(span|div)\b/.test(html)) assert.match(html, /<(span|div) [^>]*aria-hidden="true"/, `${k} is hidden from the reader`);
+    if (/animation:/.test(html)) assert.match(html, /@media \(prefers-reduced-motion: reduce\)/, `${k} stops under reduced motion`);
+    assert.doesNotMatch(html, /--pm-|siteSkinCSS|pumpkin|spire|castle|heist|candy|jetto/i, `${k}: motifs only`);
+  }
+  assert.equal((on.home.match(/class="pm-hw-crow"/g) ?? []).length, 3, "three crows on the hero's rooftops");
+  assert.equal(PERCHES.length, 3);
+  assert.match(on.header, /Math\.random\(\)>0\.34/, "the bat crosses on about one load in three");
+  assert.match(on.header, /prefers-reduced-motion: reduce\)"\)\.matches/, "and never under reduced motion");
+  // the bat's strip is the header's top padding: it never reaches the nav's line (26 px and up)
+  const strip = Number(on.header.match(/\.pm-hw-bats \{[^}]*height: (\d+)px/)[1]);
+  assert.ok(strip <= 26 && /\.pm-hw-bats \{[^}]*overflow: hidden/.test(on.header), "the bat flies above the nav's line");
+});
+
+test("the sprinkled motifs are placed: one per page, through the season's components", async () => {
+  const { readFileSync } = await import("node:fs");
+  const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+  assert.match(read("src/layouts/PostmarkLayout.astro"), /<HalloweenBat \/>/);
+  assert.match(read("town/pages/index.astro"), /<HalloweenHome \/>/);
+  for (const [file, spot] of [["town/pages/bulletin/index.astro", "bulletin"], ["town/pages/world.astro", "world"],
+    ["town/components/Household.astro", "resident"], ["town/pages/meeps/index.astro", "jar"]]) {
+    assert.equal((read(file).match(/<HalloweenMotif spot="([a-z]+)" \/>/g) ?? []).join(), `<HalloweenMotif spot="${spot}" />`, file);
+  }
+});

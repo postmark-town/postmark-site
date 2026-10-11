@@ -54,6 +54,7 @@ import { iconSvg } from "@/lib/pixel-icons.mjs";
 import { SOCIALS } from "@/lib/door-line.mjs";
 import { HARBOR } from "@/lib/nav.mjs";
 import households from "@/data/postmark/households.json";
+import HalloweenMotif from "@/components/HalloweenMotif.astro";
 
 const cards = bulletinCards(bulletin);
 // Every posting an address can open: the pinned notices AND the unpinned
@@ -132,7 +133,7 @@ const views = JSON.stringify({
         {/* ── THE BOARD ─────────────────────────────────────────────────── */}
         <div class="pane pane-board" data-pane="board">
           <section class="board" aria-label="The board">
-            <span class="plaque" aria-hidden="true">Postmark · posted at the office</span>
+            <span class="plaque" aria-hidden="true">Postmark · posted at the office</span><HalloweenMotif spot="bulletin" />
 
             {/* 1 · THE CALENDAR, dark like /calendar/; today ringed like a cancelled stamp */}
             <a class="piece cal" href={piece.calendar.page} data-pinned="calendar" data-open={piece.calendar.hash}>

@@ -31,6 +31,7 @@ import { homeFileName } from "@/lib/home-pick.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { residentActiveWords } from "@/lib/last-active.mjs"; // when they last acted in town (POS-481)
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
+import HalloweenMotif from "@/components/HalloweenMotif.astro";
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
 const { house, members, active, route } = Astro.props;
@@ -413,7 +414,7 @@ const defaultRendition = route === "resident" &&
   {/* ── TAB-LEVEL, part one: the member's own face and balances ───────────── */}
   {tabs.map((t, i) => (
     <div class="res" data-profile data-member={t.handle} data-handle={t.handle} hidden={!t.isActive}>
-      <header class="profile-bubble" data-profile-bubble data-default-color="#e8c48b" style={`--profile-color: ${t.profileColor}`}>
+      <HalloweenMotif spot="resident" /><header class="profile-bubble" data-profile-bubble data-default-color="#e8c48b" style={`--profile-color: ${t.profileColor}`}>
         <button type="button" class="profile-edit-pencil" data-profile-edit-open hidden aria-label={`Edit ${t.name}'s profile`}>
           <span aria-hidden="true">✎</span><span>Edit profile</span>
         </button>

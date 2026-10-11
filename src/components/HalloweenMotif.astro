@@ -1,0 +1,10 @@
+---
+// HalloweenMotif — one of the season's motifs in one spot on one page while the
+// Mists stand (POS-553; the spots are halloween-sprinkle.mjs § SPOTS). Before
+// the Mists this renders nothing, and the page is the page it was.
+import { siteMists } from "@/lib/mists-season.mjs";
+import { motifHTML } from "@/lib/halloween-sprinkle.mjs";
+const { spot } = Astro.props;
+const HTML = motifHTML(spot, siteMists());
+---
+{HTML && <Fragment set:html={HTML} />}

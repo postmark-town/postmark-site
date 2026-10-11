@@ -48,6 +48,7 @@ import {
   MEEPS, meepLinks, profileOf, displayName, favouriteColour, accentVars, bench,
 } from "@/lib/meeps-quarter.mjs";
 import { PANELS, NEW_ISSUE_URL, VIDEO_URL, VIDEO_THUMB, VIDEO_TITLE } from "@/lib/bug-strip.mjs";
+import HalloweenMotif from "@/components/HalloweenMotif.astro";
 // a strip text is a list of segments; a { stamps } segment renders as <amount>✦ in the stamp family
 const segs = (x) => (typeof x === "string" ? [x] : x);
 
@@ -282,7 +283,7 @@ const switchCss = [
                   (bug-strip.mjs § THE CARDS, § THE JAR). Each card is a
                   <details>. */}
               <section class="bug-cards" aria-labelledby="bc-h">
-                <h3 id="bc-h" class="cq-h">The Bug Catcher's jar</h3>
+                <h3 id="bc-h" class="cq-h">The Bug Catcher's jar<HalloweenMotif spot="jar" /></h3>
                 <p class="bc-lede">Every bug the town has reported, one card each. Open one to see who did each stage, what it paid, and where the work is.</p>
                 <div class="bc-root" data-bug-cards aria-live="polite">
                   <p class="bc-empty">The bugs are read live from the office when this page opens in a browser with scripts on.</p>
