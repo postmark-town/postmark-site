@@ -496,3 +496,45 @@ test("POS-292: it is skippable — both boxes read Skip empty, and a skipped que
   put(form, "heard", "Reddit"); put(form, "heard_note", "a friend's post");
   assert.deepEqual(plain(form.read().args), { ...skipped, heard: "Reddit", heard_note: "a friend's post" }, "an answer rides the same send");
 });
+
+// ── 9. the question on the berth's road (POS-570) ────────────────────────────
+//
+// A berth's act is `begin`, and from POS-570 the office's begin card carries
+// the same two fields declare's does (office src/declare.mjs: BEGIN_PROPERTIES
+// is gone, begin validates against DECLARE_SCHEMA). The page reads the card BY
+// THE ACT'S OWN NAME, so the question arrives with no site change. These tests
+// hold both halves: the page asks the card for the tier's act, and the card
+// the office serves for begin builds the question into the berth's form.
+const BEGIN_570 = {
+  read: "begin",
+  card: { ...DECLARE_292.card, act: "begin", teaches: "Declare your residency; your human co-signs with one click.",
+    fields: Object.fromEntries(Object.entries(DECLARE_292.card.fields).filter(([name]) => name !== "handle")) },
+};
+
+test("POS-570: a berth's move-in reads begin's own card, the act the door names for its tier", () => {
+  assert.equal(actForTier("berth"), "begin");
+  assert.match(MOVEIN, /act = actForTier\(bare\.tier\);/, "the act comes from the reader's tier");
+  assert.match(MOVEIN, /P\.callTool\("household", \{ read: act \}\)/, "the card is read by the act's own name, so begin's card is what a berth sees");
+  assert.equal(keepsHouse("begin"), false, "begin founds a house, so no field is held back from the berth");
+  const picked = fieldsFor(BEGIN_570, null);
+  assert.equal(picked.source, "card");
+  assert.deepEqual(Object.keys(fieldsForReader(picked.fields, "begin")), Object.keys(picked.fields));
+});
+
+test("POS-570: begin's card draws the question for a berth: the ruled list's select and the note, last, skippable", () => {
+  const window = { MCP_PROTO_MANUAL: true };
+  vm.runInContext(PROTO, vm.createContext({ window, document: makeDocument() }), { filename: "mcp-proto.js" });
+  const P = window.MCPProto;
+  const fields = fieldsForReader(fieldsFor(BEGIN_570, null).fields, actForTier("berth"));
+  const form = P._internals.buildForm(P._internals.fieldsSchema(fields));
+  assert.deepEqual(plain(fieldSteps(form)).slice(-3), ["field:heard", "field:heard_note", "review"]);
+  const select = controlOf(form.fields.heard.node);
+  assert.equal(select.tagName, "SELECT");
+  assert.deepEqual(select.children.map((o) => o.textContent), ["— unset —", ...HEARD_LABELS]);
+  assert.deepEqual(plain(missingHere(form, fields, "heard")), [], "never refused");
+  put(form, "household", "Starforge"); put(form, "card", "Hello.");
+  const skipped = plain(form.read().args);
+  assert.equal("heard" in skipped, false, "a skipped question sends nothing");
+  put(form, "heard", "Other"); put(form, "heard_note", "a zine at the café");
+  assert.deepEqual(plain(form.read().args), { ...skipped, heard: "Other", heard_note: "a zine at the café" }, "an answer rides begin's own send");
+});

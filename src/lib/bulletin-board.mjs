@@ -15,7 +15,7 @@
 // hold it without a build (CI runs `npm test` on a push, unbuilt).
 
 import { ferryHeadline } from "../../tools/lib/doorstep.mjs";
-import { excerpt } from "./pm.mjs";
+import { excerpt, townFile } from "./pm.mjs";
 import { groupsOf, monthGrid, monthKey, referenceInstant } from "./calendar.mjs";
 
 /**
@@ -116,6 +116,110 @@ export function tendedText(ymd) {
   const d = new Date(`${ymd}T12:00:00Z`);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+// ── THE PINNED ITEMS (Darko, 2026-10-10 18:58, POS-566) ─────────────────────
+//
+// "the main town page needs to have a couple more corkboard items … Dom
+// Pidgey's chapbook as a corkboard item on the main corkboard, outside of the
+// town bulletin. And we should also have the Halloween event candy declaration
+// on the main corkboard." Each is pinned on the board itself, and neither is
+// a piece: no view of its own, so nothing here is in BOARD_PIECES.
+//
+// ILLUSTRATED, AND EACH ITS OWN OBJECT (Darko, 19:21: "artistically represent
+// each of the two new main corkboard items instead of just having the raw
+// text"; and keep to the board's DIVERSITY: neither may look like a card
+// already there, or like the other). The board is a collage (a calendar, a
+// torn newspaper, a postcard, a staff strip, stamps, a sea chart), so `form`
+// names what each one is:
+//
+//   book     the chapbook: a little cloth-bound book, stitched at the spine,
+//            its page edges showing, a gold-framed plate on the cover, held
+//            up by washi tape, a ribbon bookmark trailing from it
+//   hanger   Halloween: a door-hanger in plum card stock, hung on a nail
+//            through its punched hole, the doorstep seen through an arched
+//            window cut in it
+//
+// Neither wears the postcard's striped quay band or the harbor's pill: each
+// ends in a plain underlined line, the way into what it pins.
+//
+// `art` names the civic-art.mjs BOARD_ART maps each one's picture shows, side
+// by side on the quay, at the buildings' pixel scale.
+//
+// DOM PIDGEY'S OWN SPRITE (Darko, 2026-10-10 19:48: use his sprite on the
+// chapbook's plate, not one we drew). `sprite` is his: the `idle` frame of the
+// SPRITES his own page draws him with, https://foundoutanyway.github.io/pidgey/
+// pidgeys-pigeonholes.html, a plain 169×184 RGBA PNG (IHDR, IDAT, IEND only),
+// copied byte for byte into public/atelier/postmark/art/residents/dom-pidgey/
+// sprite.png so the board does not hang on his site staying up. It is drawn at
+// its native size (its art is 1×, so any smaller is a lossy cut) and credited
+// on the book.
+//
+// The words are the town's, never new prose: the chapbook's line is its
+// bulletin item's teaser, cut to its first and last clauses
+// (TOWN_BULLETIN/lamp-flower-chapbook.md, posted 2026-10-05; nine pages since town #3623, 10-10), and its weight
+// is from that item's body; the Halloween card's are its bulletin page's
+// (TOWN_BULLETIN/halloween.md, town main 12cde8d71).
+//
+//   href    a pin that leaves the town: the chapbook is Dom Pidgey's own
+//           page, opened in a new tab, like the harbor and the stickers
+//   note    a pin that is a bulletin page: the Halloween card opens its notice
+//           in place at /bulletin/#halloween, the address every doorstep uses
+//           for one (pinLink, below)
+export const BOARD_PINS = Object.freeze([
+  Object.freeze({
+    key: "chapbook",
+    art: Object.freeze(["lampflower"]),
+    sprite: Object.freeze({
+      src: "/art/residents/dom-pidgey/sprite.png",
+      w: 169,
+      h: 184,
+      credit: "sprite by Dom Pidgey",
+      source: "https://foundoutanyway.github.io/pidgey/pidgeys-pigeonholes.html",
+    }),
+    form: "book",
+    kind: null,
+    title: "The Lamp-Flower Chapbook",
+    by: "resident pigeon Dom Pidgey",
+    words: "The pigeon's compendium of postmark.town, for old residents and new arrivals alike.",
+    steps: Object.freeze([]),
+    href: "https://foundoutanyway.github.io/pidgey/lamp-flower-chapbook/",
+    foot: "read the chapbook (nine light pages) ↗",
+  }),
+  Object.freeze({
+    key: "halloween",
+    art: Object.freeze(["door", "pumpkin"]),
+    form: "hanger",
+    kind: "Saturday, October 31st, all day",
+    title: "Halloween: what's on the doorsteps",
+    by: null,
+    words: null,
+    steps: Object.freeze([
+      "**Choose your candy.** One each: every resident can have their own.",
+      "**Write to postmaster** with the candy's name and its line.",
+      "**RSVP to the event** \"Halloween in Postmark\" on the town calendar.",
+    ]),
+    after: "When the time comes, the town will show you how to make your candy, so you have some to give.",
+    href: null,
+    note: "halloween",
+    foot: "how to take part, and the tally →",
+  }),
+]);
+
+/**
+ * Where a pinned item's click goes. A pin that leaves the town goes to its
+ * own page. A bulletin page's pin opens its notice in place, at the address
+ * the notices answer; and while the baked board does not carry that notice
+ * yet (the town merged it after this build fetched), the pin is a link to its
+ * file in the town repo, so a click never opens nothing.
+ * @param {{ href?: string|null, note?: string }} pin  one of BOARD_PINS
+ * @param {Iterable<string>} slugs  every notice slug the page can open
+ * @returns {{ href: string, note: string|null, leaves: boolean }}
+ */
+export function pinLink(pin, slugs = []) {
+  if (!pin?.note) return { href: pin.href, note: null, leaves: true };
+  if (new Set(slugs).has(pin.note)) return { href: `#${pin.note}`, note: pin.note, leaves: false };
+  return { href: townFile(`TOWN_BULLETIN/${pin.note}.md`), note: null, leaves: true };
 }
 
 // The pieces, their views and their addresses live in town-views.mjs, which
