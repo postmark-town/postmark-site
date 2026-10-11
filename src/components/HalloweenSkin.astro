@@ -31,11 +31,14 @@ const HTML = !mists ? "" : [
      navy, and over the skin's lighter plum some fell under 4.5 (measured from the
      rendered pixels, tools/_site-full-contrast.mjs); they read a little firmer */
   html body .pm-doorline-lead, html body .mini th, html body .cal .kick, html body .pm-chip-sub,
-  html body .corr-handle, html body .res-handle { color: rgba(232, 196, 139, 0.9) !important; }
+  html body .corr-handle, html body .res-handle, html body .house-counts, html body .res-counts,
+  html body .pm-freshness-floor, html body .metrics-note, html body [data-metrics-asof], html body .mp-gap,
+  html body .tk-sep, html body .pm .pm-back:not(:hover) { color: rgba(232, 196, 139, 0.9) !important; }
   html body .stamps-detail, html body .profile-stats [data-profile-minted] dt { color: ${mix("#aa8fd8", v.ink, 0.3)} !important; }
-  html body .mini td.today { color: #ffffff !important; }
+  html body .mini td.today, html body .cal-day.is-today .cal-daynum { color: #ffffff !important; }
   html body .ai-copy p { color: ${v.ink} !important; }
-  html body .book-foot, html body .cal-month-step { color: ${mix(v.orange, v.ink, 0.45)} !important; }
+  html body .book-foot, html body .book-by, html body .cal-month-step { color: ${mix(v.orange, v.ink, 0.45)} !important; }
+  html body .pm .pm-btn.dark-ghost { background: transparent !important; }   /* it sits on paper: the navy lift is not its */
   html body .ai-copy p em { color: ${mix(v.orange, v.ink, 0.75)} !important; }
   </style>`,
 ].join("");
