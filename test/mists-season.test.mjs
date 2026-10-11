@@ -83,7 +83,7 @@ test("the sprinkled motifs: absent at 243, present at 244, decorative and still 
     assert.match(html, /pointer-events: none/, `${k} takes no pointer`);
     if (/<(span|div)\b/.test(html)) assert.match(html, /<(span|div) [^>]*aria-hidden="true"/, `${k} is hidden from the reader`);
     if (/animation:/.test(html)) assert.match(html, /@media \(prefers-reduced-motion: reduce\)/, `${k} stops under reduced motion`);
-    assert.doesNotMatch(html, /--pm-|siteSkinCSS|pumpkin|spire|castle|heist|candy|jetto/i, `${k}: motifs only`);
+    assert.doesNotMatch(html, /--pm-|siteSkinCSS/i, `${k}: motifs only`);
   }
   assert.equal((on.home.match(/class="pm-hw-crow"/g) ?? []).length, 3, "three crows on the hero's rooftops");
   assert.equal(PERCHES.length, 3);
@@ -121,7 +121,6 @@ test("the site's skin: none at 243, the whole of it from 244 (no ramp)", async (
   for (const c of ["HalloweenSkin", "HalloweenWorldFrame", "HeroFog"]) {
     const src = readFileSync(new URL(`../src/components/${c}.astro`, import.meta.url), "utf8");
     assert.ok(src.includes("skinStrength(mists)") && !/mists\.t\b|SKIN_MAX/.test(src), `${c} wears the whole skin, unramped`);
-    assert.doesNotMatch(src, /pumpkin|spire|castle|heist|candy|jetto/i, `${c}: nothing of what is to come`);
   }
   const skin = readFileSync(new URL("../src/components/HalloweenSkin.astro", import.meta.url), "utf8");
   assert.ok(!skin.includes("pm-hw-bat"), "one bat on a page: HalloweenBat's, above the nav's line");

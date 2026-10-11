@@ -54,7 +54,8 @@ export function navBatHTML(mists) {
   .pm-hw-bats { position: absolute; left: 0; right: 0; top: 0; height: 26px; overflow: hidden; pointer-events: none; z-index: 6000; }
   .pm-hw-bat { position: absolute; left: -60px; top: 4px; width: 25px; color: ${v.base}; opacity: 0; filter: drop-shadow(0 0 2px ${v.violet}); }
   .pm-hw-bat.go { animation: pm-hw-bat 8s cubic-bezier(.45,.05,.55,.95) 1 both; }
-  .pm-hw-bat svg { display: block; width: 100%; animation: pm-hw-flap .28s ease-in-out infinite alternate; }
+  .pm-hw-bat svg { display: block; width: 100%; }
+  .pm-hw-bat.go svg { animation: pm-hw-flap .28s ease-in-out infinite alternate; }
   @keyframes pm-hw-bat { 0% { opacity: 1; transform: translate(0, 0); } 35% { transform: translate(38vw, -3px); } 70% { transform: translate(72vw, 2px); } 99% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(100vw + 100px), -2px); } }
   @keyframes pm-hw-flap { from { transform: scaleY(1); } to { transform: scaleY(.35); } }
   ${REDUCED} { .pm-hw-bats { display: none; } }

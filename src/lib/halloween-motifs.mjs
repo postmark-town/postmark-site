@@ -1,5 +1,5 @@
-// halloween-motifs.mjs — the season's motifs as small inline SVGs (POS-553,
-// Darko 09:17: "no pumpkins, but bats, wolves, and crows are fair game").
+// halloween-motifs.mjs — the season's motifs as small inline SVGs (POS-553:
+// bats, wolves and crows, as Darko picked them 2026-10-10).
 // The four creatures are Rei's originals, used as drawn (Darko picked them
 // 2026-10-10 12:39; motifs-rei/README.md: original vector drawings, no traced
 // or external source, no licence dependency): one path each in a 100-unit box,

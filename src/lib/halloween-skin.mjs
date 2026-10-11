@@ -1,8 +1,7 @@
 // halloween-skin.mjs — the season's skin as tokens (POS-553, Darko's ruling
 // 2026-10-10 09:17: "the gray-purple instead of deep blue of the site, ... some
-// violet and orange and rare blood red as accents ... the barovia night with a
-// hint of classic halloween"). A MOCKUP for the board; two variants of one
-// palette, and the CSS that lays a variant over the site's own tokens at a
+// violet and orange and rare blood red as accents"). Two variants of one
+// palette (variant 2 ships), and the CSS that lays a variant over the site's own tokens at a
 // ramp `k` (0 = the site as it is, 1 = the full skin).
 //
 // Pure: the board's swatches and contrast table import this file too, so the

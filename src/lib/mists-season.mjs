@@ -58,6 +58,6 @@ export function homeSeasonLine(m, crossing, { SEASON_LADDER: ladder, seasonLine 
   const bell = (r) => r.lines.find((l) => /north edge/.test(l) && /\bbell\b/i.test(l));
   const [once, twice] = (ladder ?? []).filter(bell);
   const after = twice && ladder.find((r) => r.from > twice.from);
-  if (!once || !twice || !after || crossing >= after.from) return seasonLine(m, crossing);
+  if (!once || !twice || !after || crossing >= after.from) return typeof seasonLine === "function" ? seasonLine(m, crossing) : null;
   return bell(crossing >= twice.from ? twice : once);
 }
