@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { officeBase } from "../src/lib/auth.mjs";
-import { BOARD_PATH } from "../src/lib/bug-strip.mjs";
+import { BOARD_PATH, pagePath } from "../src/lib/bug-strip.mjs";
 
 const ROOT = new URL("..", import.meta.url);
 const PAGE = readFileSync(new URL("town/pages/meeps/index.astro", ROOT), "utf8");
@@ -21,8 +21,10 @@ const SCRIPT = PAGE.slice(PAGE.indexOf("<script>"), PAGE.indexOf("</script>"));
 
 test("the board's read is officeBase() + the bug posts path, from the page's own script", () => {
   assert.match(SCRIPT, /import \{ officeBase \} from "@\/lib\/auth\.mjs";/);
-  assert.match(SCRIPT, /fetch\(officeBase\(\) \+ BOARD_PATH,/);
+  // since POS-558 a page of it: BOARD_PATH with the paged read's limit and offset
+  assert.match(SCRIPT, /fetch\(officeBase\(\) \+ pagePath\(offset, limit\),/);
   assert.equal(BOARD_PATH, "/posts?class=bug");
+  assert.ok(pagePath(24).startsWith(BOARD_PATH + "&"), "a page is not the bug posts path");
 });
 
 test("officeBase() answers the same-origin /api unset, and the operator's base when set", () => {

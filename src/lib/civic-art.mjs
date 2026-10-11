@@ -536,7 +536,10 @@ export function paint(name) {
   const bad = checkSprite(name, rows);
   if (bad.length) throw new Error(`civic-art: sprite "${name}" is malformed — ${bad.join("; ")}`);
   const ink = { ...INK, ...(ACCENTS[name] ?? {}), ...(FIGURE_INK[name] ?? {}) };
+  return runs(`sprite "${name}"`, rows, ink);
+}
 
+function runs(label, rows, ink) {
   const rects = [];
   rows.forEach((row, y) => {
     let x = 0;
@@ -548,11 +551,138 @@ export function paint(name) {
       // '.' is transparent by design; an UNKNOWN character is a typo in a map
       // and must not paint silently as a hole in a wall.
       if (ch !== "." && !fill) {
-        throw new Error(`civic-art: sprite "${name}" row ${y} uses ink "${ch}", which has no colour`);
+        throw new Error(`civic-art: ${label} row ${y} uses ink "${ch}", which has no colour`);
       }
       if (fill) rects.push({ x, y, w: run, fill });
       x += run;
     }
   });
   return rects;
+}
+
+// ── the board's pinned pictures (Darko, 2026-10-10 19:21, POS-566) ───────────
+//
+// "it would be nice if we could artistically represent each of the two new
+// main corkboard items instead of just having the raw text." So the two notes
+// pinned on the Town page's board (bulletin-board.mjs, BOARD_PINS) each carry
+// a small scene of these maps, as the postcard carries its
+// buildings: the same 24×24 grid, the same quay row, the same painter.
+//
+//   lampflower           the Lamp-Flower Chapbook: the lamp-flower glowing on
+//                        the book's plate, beside Dom Pidgey's own sprite (his
+//                        art, vendored and credited: bulletin-board.mjs,
+//                        BOARD_PINS). The board's own pigeon was retired
+//                        for his on Darko's word, 2026-10-10 19:48.
+//   door, pumpkin        Halloween: a house door at dusk with its windows lit,
+//                        and on the step a jack-o'-lantern smiling (not
+//                        leering) beside a bowl of candy. An event notice, warm,
+//                        not the season's skin, which the site drips in apart.
+//
+// THEIR OWN TABLE, NOT SPRITES. SPRITES answers for the quarter and for faces
+// (household-dashboard's spriteOf hands a meep its sprite by handle), and a
+// pumpkin is nobody's face. The ink rule is the table's: every hex is one the
+// site already wears, named where it is worn.
+export const BOARD_INK = {
+  e: "#edba68", // the flower's heart, a candy: global.css --amber
+  r: "#c4553f", // the bowl's pattern: the Marketplace's lit red
+  c: "#9c3f2e", // the bowl: the Marketplace's red, --pm-wax
+  m: "#97a266", // the flower's stem: global.css --moss
+  M: "#4d7d54", // its shade, the pumpkin's stem: the mail pair page's check green
+  h: "#f4d6a0", // the glow around the lamp-flower: global.css --amber-soft
+  o: "#c9823d", // the pumpkin: the Ballot House's lit copper
+  O: "#a4632a", // its ribs: the Ballot House's copper, --pm-accent
+  x: "#6d4220", // its underside: the Ballot House's mid tone
+  q: "#aa8fd8", // a candy: --pm-stamp
+  z: "#93d6c4", // a candy: the holo mint (a post-it's paper)
+  f: "#f3b9a6", // a candy: the pale coral (a post-it's paper)
+};
+
+export const BOARD_ART = {
+  lampflower: [
+    "........................",
+    ".........h..h...........",
+    "......h..........h......",
+    "........kkkkkk..........",
+    "....h..kgGGGGgk..h......",
+    ".......kGGGGGGk.........",
+    "...h...keGGGGek...h.....",
+    "........kegGek..........",
+    ".....h...kmmk......h....",
+    "..........mM............",
+    "..........mM............",
+    "......mm..mM............",
+    ".....mMMm.mM..mm........",
+    "......mMMmmM.mMMm.......",
+    ".......mmmmMmMMm........",
+    "..........mMmm..........",
+    "..........mM.....kkk....",
+    "..........mM....kgGgk...",
+    "..........mM....kememk..",
+    ".........mMMm....kmk....",
+    "........mMmmMm...mM.....",
+    "..sSssssSsssssSssssSss..",
+    "........................",
+    "........................",
+  ],
+  door: [
+    "........................",
+    "..........kkkk..........",
+    "........kkWWWWkk........",
+    "......kkWWWWWWWWkk......",
+    "....kkWWWWWWWWWWWWkk....",
+    "..kkttttttttttttttttkk..",
+    "..kwwwwwwwwwwwwwwwwwwk..",
+    "..kwkkkkwwwwwwwwkkkkwk..",
+    "..kwkGgkwkkkkkkwkgGkwk..",
+    "..kwkggkwkttttkwkggkwk..",
+    "..kwkkkkwktWWtkwkkkkwk..",
+    "..kwwwwwwkttttkwwwwwwk..",
+    "..kwwwwwwktWWtkwwwwwwk..",
+    "..kwwwwwwkttttkwwwwwwk..",
+    "..kwwwwwwkttteGwwwwwwk..",
+    "..kwwwwwwktWWtkwwwwwwk..",
+    "..kwwwwwwkttttkwwwwwwk..",
+    "..kwwwwwwkttttkwwwwwwk..",
+    "..kkkkkkkkkkkkkkkkkkkk..",
+    ".......kSSSSSSSSk.......",
+    "......kSssssssssSk......",
+    "..sSssssSsssssSssssSss..",
+    "........................",
+    "........................",
+  ],
+  pumpkin: [
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    "........Mm..............",
+    ".........m..............",
+    "....kkkkkMkkkk..........",
+    "...kooOooooOook.........",
+    "..koooOooooOoook........",
+    "..kooGooooooGook........",
+    "..koGGgooooGGgok........",
+    "..kooooooGoooook........",
+    "..koGooooooooGok........",
+    "..koGGGGGGGGGGok...q....",
+    "..kooGGoGGoGGook.fqze.q.",
+    "...kxooooooooxk.zeqfzqf.",
+    "....kkkkkkkkkk..kcccccck",
+    "................kccrcrck",
+    ".................kcccck.",
+    "..................kkkk..",
+    "..sSssssSsssssSssssSss..",
+    "........................",
+    "........................",
+  ],
+};
+
+/** One of the board's pinned pictures as rects, painted as the sprites are. */
+export function paintArt(name) {
+  const rows = BOARD_ART[name];
+  if (!rows) throw new Error(`civic-art: no board picture named "${name}"`);
+  const bad = checkSprite(name, rows);
+  if (bad.length) throw new Error(`civic-art: board picture "${name}" is malformed — ${bad.join("; ")}`);
+  return runs(`board picture "${name}"`, rows, { ...INK, ...BOARD_INK });
 }

@@ -267,4 +267,13 @@ test("the built jar: one list of cards read live from the office's bug posts, af
   // the jar and the board are one list now, not two
   assert.doesNotMatch(bc, /data-bug-jar|data-bug-board/);
   assert.match(bc, new RegExp(`<a class="pm-btn" href="${NEW_ISSUE_URL}"[^>]*\\bdata-report\\b[^>]*>Report a bug</a>`));
+  // POS-558: the pager under the cards and the Hall of Fame after the jar, each hidden until the read paints it;
+  // the legacy shelf is the pages' last group, painted with the cards
+  const pager = bc.indexOf("data-bug-pager"), hall = bc.indexOf("data-bug-fame-hall");
+  assert.ok(pager > bc.indexOf("data-bug-cards") && hall > pager, "the pager and the Hall are not after the cards, in that order");
+  assert.match(bc, /<nav class="bc-pager[^"]*"[^>]*data-bug-pager[^>]*\bhidden\b/);
+  assert.match(bc, /<section class="bug-fame[^"]*"[^>]*\bhidden\b[^>]*data-bug-fame-hall/);
+  assert.doesNotMatch(bc, /data-bug-legacy/);
+  assert.match(bc, /The Bug Catchers(?:'|&#39;) Hall of Fame/);
+  assert.doesNotMatch(bc, /unnamed/i);
 });

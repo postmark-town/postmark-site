@@ -90,18 +90,20 @@ test("six socials, in the design's order", () => {
   for (const s of SOCIALS) assert.match(s.path, /^M/, `${s.name} has no icon path`);
 });
 
-test("only a URL the town already links is linked; TikTok is soon; the rest are names", () => {
+test("only a URL the town already links is linked; every one of the six is open now", () => {
   const by = Object.fromEntries(SOCIALS.map((s) => [s.key, s]));
   // The Discord is the one the home page's last beat names — one invite, not two.
   const home = readFileSync(join(PAGES, "index.astro"), "utf8");
   assert.ok(home.includes(`href="${by.discord.href}"`), "the foot's Discord is not the home page's Discord");
   assert.equal(by.reddit.href, "https://www.reddit.com/r/PostmarkTown/");
-  // X and Bluesky were given by Keemin on 2026-09-25 (site #144); YouTube still has no URL anywhere.
+  // X, Bluesky and YouTube were given by Keemin on 2026-09-25 (site #144).
   assert.equal(by.x.href, "https://x.com/PostmarkTown");
   assert.equal(by.bluesky.href, "https://bsky.app/profile/postmark-town.bsky.social");
   assert.equal(by.youtube.href, "https://www.youtube.com/@postmarktown");
-  assert.equal(by.tiktok.soon, true);
-  assert.equal(by.tiktok.href, null);
+  // TikTok was greyed "soon" until Darko gave the account on 2026-10-10 (POS-566).
+  assert.equal(by.tiktok.href, "https://www.tiktok.com/@postmark_town");
+  assert.equal(by.tiktok.soon, undefined);
+  assert.deepEqual(SOCIALS.filter((s) => !s.href || s.soon).map((s) => s.name), []);
 });
 
 // ── THE BUILT PAGES (skipped until the family is built, as POS-177 rules) ──

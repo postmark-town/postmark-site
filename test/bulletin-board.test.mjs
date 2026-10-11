@@ -18,12 +18,13 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  BOARD_PIECES, FRAMED, NOSCRIPT_NOTICES, POSTIT_PAPERS, TILTS, boardIds, dailyFront, pinnedMonth, postitLook, tendedText, viewOf,
+  BOARD_PIECES, BOARD_PINS, FRAMED, NOSCRIPT_NOTICES, POSTIT_PAPERS, TILTS, boardIds, dailyFront, pinLink, pinnedMonth, postitLook, tendedText, viewOf,
 } from "../src/lib/bulletin-board.mjs";
 import { bulletinCards, bulletinPostings } from "../src/lib/bulletin-cards.mjs";
 import { LANES } from "../src/lib/civic.mjs";
 import { MEEPS } from "../src/lib/meeps-quarter.mjs";
 import { SOCIALS } from "../src/lib/door-line.mjs";
+import { ACCENTS, BOARD_ART, BOARD_INK, INK, SPRITES, checkSprite, paintArt } from "../src/lib/civic-art.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const BULLETIN = JSON.parse(readFileSync(join(ROOT, "src", "data", "postmark", "bulletin.json"), "utf8"));
@@ -329,6 +330,98 @@ test("the board keeps no 'more' behind an expand (POS-250's rule)", { skip: !exi
   assert.equal(/class="pm-more"/.test(main), false);
 });
 
+// ── THE PINNED ITEMS (Darko, 2026-10-10 18:58, POS-566) ─────────────────────
+// "Dom Pidgey's chapbook as a corkboard item on the main corkboard, outside of
+// the town bulletin. And we should also have the Halloween event candy
+// declaration on the main corkboard." The words are the town's own.
+
+const CHAPBOOK_TEASER = "The pigeon's compendium of postmark.town: a preface on how it came to be, poems in call-and-response, the Notice Wall's thirteen posters, a gazetteer of notable doors with storybook plates, and a traveler's guide. For old residents and new arrivals alike.";
+
+test("THE PINS: the chapbook credits Dom Pidgey in its bulletin teaser's words; Halloween is its page's title", () => {
+  const by = Object.fromEntries(BOARD_PINS.map((p) => [p.key, p]));
+  assert.deepEqual(BOARD_PINS.map((p) => p.key), ["chapbook", "halloween"]);
+  // the teaser of TOWN_BULLETIN/lamp-flower-chapbook.md (town main, posted
+  // 2026-10-05), cut to its first and last clauses for the card (Darko, 19:21:
+  // a picture "instead of just having the raw text")
+  const [first, last] = by.chapbook.words.replace(/\.$/, "").split(", for ");
+  assert.ok(CHAPBOOK_TEASER.startsWith(`${first}:`), "the chapbook's line does not open with its teaser's");
+  assert.ok(CHAPBOOK_TEASER.endsWith(`For ${last}.`), "the chapbook's line does not close with its teaser's");
+  assert.match(by.chapbook.by, /\bDom Pidgey$/);
+  assert.equal(by.chapbook.href, "https://foundoutanyway.github.io/pidgey/lamp-flower-chapbook.html");
+  assert.equal(by.chapbook.note, undefined);
+  // TOWN_BULLETIN/halloween.md's own title, and its three steps in order
+  assert.equal(by.halloween.title, "Halloween: what's on the doorsteps");
+  assert.equal(by.halloween.note, "halloween");
+  assert.deepEqual(by.halloween.steps.map((s) => /^\*\*(.+?)\*\*/.exec(s)?.[1]),
+    ["Choose your candy.", "Write to postmaster", "RSVP to the event"]);
+  assert.match(by.halloween.steps[2], /"Halloween in Postmark"/);
+  // ONE CANDY PER RESIDENT (Darko's 18:58 amendment): "one each", never a household's one
+  assert.match(by.halloween.steps[0], /One each: every resident can have their own\./);
+  assert.match(by.halloween.after, /so you have some to give\.$/);
+  assert.equal(/household/i.test(JSON.stringify(by.halloween)), false, "the Halloween note speaks of a household's candy");
+  // each card is illustrated: two of the board's own pictures, on a sky
+  assert.deepEqual(by.chapbook.art, ["lampflower"]);
+  // DOM PIDGEY'S OWN SPRITE (Darko 19:48), vendored byte for byte and credited
+  assert.equal(by.chapbook.sprite.credit, "sprite by Dom Pidgey");
+  assert.equal(by.chapbook.sprite.source, "https://foundoutanyway.github.io/pidgey/pidgeys-pigeonholes.html");
+  const png = readFileSync(join(ROOT, "public", "atelier", "postmark", ...by.chapbook.sprite.src.split("/").filter(Boolean)));
+  assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", "the vendored sprite is not a PNG");
+  assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [by.chapbook.sprite.w, by.chapbook.sprite.h]);
+  assert.deepEqual(by.halloween.art, ["door", "pumpkin"]);
+  assert.deepEqual(BOARD_PINS.map((p) => p.form), ["book", "hanger"]);
+  // neither is a piece: no view, no address of the board's own
+  for (const p of BOARD_PINS) assert.equal(BOARD_PIECES.some((x) => x.key === p.key), false, `${p.key} is a piece`);
+  assert.equal(boardIds().includes("halloween"), false);
+});
+
+test("THE PINS' LINKS: the chapbook leaves the town; Halloween opens its notice once the board carries it, its file until then", () => {
+  const by = Object.fromEntries(BOARD_PINS.map((p) => [p.key, p]));
+  assert.deepEqual(pinLink(by.chapbook, ["halloween"]), { href: by.chapbook.href, note: null, leaves: true });
+  assert.deepEqual(pinLink(by.halloween, ["settling-in", "halloween"]), { href: "#halloween", note: "halloween", leaves: false });
+  // and that address opens the notice over the notices, the page's own reader says so
+  assert.deepEqual(viewOf("#halloween", ["halloween"]), { view: "notices", inner: null, note: "halloween" });
+  assert.deepEqual(pinLink(by.halloween, ["settling-in"]),
+    { href: "https://github.com/postmark-town/postmark/blob/main/TOWN_BULLETIN/halloween.md", note: null, leaves: true });
+});
+
+test("THE PINS are on the built board: the chapbook a new-tab link crediting Dom Pidgey, Halloween a link with its steps",
+  { skip: !existsSync(bulletinHtml) }, () => {
+  const page = readFileSync(bulletinHtml, "utf8");
+  const board = page.slice(page.indexOf('aria-label="The board"'), page.indexOf('class="sill"'));
+  const pin = (key) => new RegExp(`<a[^>]*data-pin="${key}"[^>]*>([\\s\\S]*?)</a>`).exec(board);
+  const chap = pin("chapbook");
+  assert.ok(chap, "the chapbook is not pinned on the board");
+  assert.match(chap[0], /href="https:\/\/foundoutanyway\.github\.io\/pidgey\/lamp-flower-chapbook\.html"/);
+  assert.match(chap[0], /target="_blank"/);
+  assert.match(chap[1], /by resident pigeon Dom Pidgey/);
+  assert.ok(chap[1].replace(/&#39;/g, "'").includes("The pigeon's compendium of postmark.town, for old residents and new arrivals alike."));
+  // each carries its picture: two pixel maps on the quay, drawn as the postcard's buildings are,
+  // in an object of its own (the book's plate, the hanger's window), neither one a card already there
+  for (const [key, form, m] of [["chapbook", "book", chap], ["halloween", "hanger", pin("halloween")]]) {
+    assert.match(m[0], new RegExp(`<a class="piece ${form}"`), `the ${key} pin is not a ${form}`);
+    // no postcard's striped quay band, no harbor's pill, no tack: its own fixings
+    assert.equal(/class="(quay|beyond|tack)\b/.test(m[1]), false, `the ${key} pin wears another card's parts`);
+    const pic = new RegExp(`<span class="pic pin-pic ${form}-[a-z]+"[^>]*>([\\s\\S]*?)</span>`).exec(m[1])?.[1] ?? "";
+    const pinned = BOARD_PINS.find((p) => p.key === key);
+    assert.equal((pic.match(/<svg class="px"/g) ?? []).length, pinned.art.length, `the ${key} card's scene is missing a picture`);
+    assert.ok((pic.match(/<rect\b/g) ?? []).length > 20, `the ${key} card's scene is empty`);
+    if (pinned.sprite) {
+      assert.match(pic, new RegExp(`<img class="book-sprite" src="${pinned.sprite.src}" width="169" height="184"`), "Dom Pidgey's sprite is not on the plate");
+      assert.ok(m[1].includes(">sprite by Dom Pidgey<"), "the sprite is not credited on the book");
+    }
+  }
+  const hal = pin("halloween");
+  assert.ok(hal, "the Halloween notice is not pinned on the board");
+  assert.ok(hal[1].replace(/&#39;/g, "'").includes("Halloween: what's on the doorsteps"));
+  assert.equal((hal[1].match(/<li\b/g) ?? []).length, 3, "the Halloween note does not carry its three steps");
+  assert.ok(hal[1].includes("One each: every resident can have their own."));
+  assert.ok(hal[1].includes("so you have some to give."));
+  const slugs = bulletinPostings(BULLETIN).map((p) => p.slug);
+  assert.match(hal[0], slugs.includes("halloween")
+    ? /href="#halloween"[^>]*data-note-open="halloween"/
+    : /href="https:\/\/github\.com\/postmark-town\/postmark\/blob\/main\/TOWN_BULLETIN\/halloween\.md"/);
+});
+
 // Keemin, 2026-09-27: "can we add the Harbor to the corkboard?" It lives on its
 // own domain, so its piece is a plain link that says it leaves the town, and
 // never a view on this page.
@@ -372,3 +465,28 @@ for (const [name, segs] of [["the calendar", ["calendar"]], ["Ferry's Daily", ["
     assert.match(page, /data-board-back[^>]*>\s*<a href="\/bulletin\/"/, `${name} has no way back to the Town`);
   });
 }
+
+// ── THE PINS' PICTURES (civic-art.mjs § the board's pinned pictures) ────────
+
+test("the pinned cards' pictures are well-formed maps, inked only in hexes the site wears, every ink used", () => {
+  const worn = [
+    ...Object.values(INK),
+    ...Object.values(ACCENTS).flatMap((a) => Object.values(a)),
+    ...POSTIT_PAPERS.map((p) => p.bg),
+    readFileSync(join(ROOT, "src", "styles", "global.css"), "utf8"),
+    readFileSync(join(ROOT, "src", "styles", "postmark.css"), "utf8"),
+    readFileSync(join(ROOT, "town", "pages", "mail", "with", "[pair].astro"), "utf8"),
+  ].join(" ").toLowerCase();
+  for (const [ch, hex] of Object.entries(BOARD_INK)) {
+    assert.ok(worn.includes(hex.toLowerCase()), `the board's ink "${ch}" (${hex}) is a hex the site does not wear`);
+  }
+  const used = new Set();
+  for (const name of BOARD_PINS.flatMap((p) => p.art)) {
+    assert.deepEqual(checkSprite(name, BOARD_ART[name]), [], `${name} is not a 24×24 map`);
+    for (const r of paintArt(name)) used.add(r.fill);
+  }
+  for (const [ch, hex] of Object.entries(BOARD_INK)) assert.ok(used.has(hex), `the board's ink "${ch}" is declared and never painted`);
+  // a pumpkin is nobody's face: the pictures stay out of SPRITES
+  for (const name of Object.keys(BOARD_ART)) assert.equal(Object.hasOwn(SPRITES, name), false, `${name} is in SPRITES`);
+  assert.throws(() => paintArt("no-such-picture"), /no board picture named/);
+});
