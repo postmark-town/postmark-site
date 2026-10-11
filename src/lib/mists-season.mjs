@@ -45,3 +45,19 @@ export function siteMists({ crossing = buildCrossing(), skeleton = pinnedSkeleto
   const m = mistsAt(crossing, skeleton.mists);
   return m ? { crossing, veil: m.veil, density: m.density, t: seasonRamp(crossing, skeleton.mists.schedule?.[0]?.crossing) } : null;
 }
+
+/** THE BELL UNDER THE FERRY CLOCK (Darko 2026-10-10 11:47). The home page's
+ *  season line is the bell past the north edge, the world's own words: it rings
+ *  once (the first rung that tells it) from the Mists' first crossing, twice
+ *  (the next rung that tells it) from that rung's crossing, and from the rung
+ *  after, the ladder's line as the world tells it. Every line is read from the
+ *  pinned world's SEASON_LADDER (`verbs` is postmark-world/world-verbs); the
+ *  agents' telling is untouched. Null before the Mists. */
+export function homeSeasonLine(m, crossing, { SEASON_LADDER: ladder, seasonLine }) {
+  if (!m) return null;
+  const bell = (r) => r.lines.find((l) => /north edge/.test(l) && /\bbell\b/i.test(l));
+  const [once, twice] = (ladder ?? []).filter(bell);
+  const after = twice && ladder.find((r) => r.from > twice.from);
+  if (!once || !twice || !after || crossing >= after.from) return seasonLine(m, crossing);
+  return bell(crossing >= twice.from ? twice : once);
+}
