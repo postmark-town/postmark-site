@@ -1,0 +1,43 @@
+---
+// HalloweenSkin — the season's skin over the whole site (POS-553): Barovia
+// night with a hint of classic Halloween, in the palette's variant 2 (Darko
+// 2026-10-10 10:56), keyed to the crossing this build reflects. The whole of it
+// from the Mists' first crossing (Darko 2026-10-11 11:04: "let's kick things off
+// with a bang. On the site, let's go all out with the seasonal theme, while
+// keeping the gradual mist of the world"): the full palette, the World page's
+// frame too, the wax seal on the header's mark and the wolf against the moon
+// at the foot of every page. The bat is HalloweenBat's. Before the Mists this
+// renders nothing, and the page is the page it was.
+import { siteMists } from "@/lib/mists-season.mjs";
+import { VARIANTS, siteSkinCSS, mix, skinStrength } from "@/lib/halloween-skin.mjs";
+import { navyOverrides } from "@/lib/halloween-navy.mjs";
+import { WOLF_MOON, WAX_SEAL } from "@/lib/halloween-motifs.mjs";
+const mists = siteMists();
+const v = VARIANTS[2];
+const k = skinStrength(mists);
+const rgbOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(", ");
+const panelK = mix("#0d1426", v.panel, k);
+const HTML = !mists ? "" : [
+  // the wolf against the moon, at the foot of every page
+  `<div class="pm-hw-wolf" aria-hidden="true" style="--moon:${v.ink}">${WOLF_MOON}</div>`,
+  `<style>${siteSkinCSS(v, k)}${navyOverrides({ base: rgbOf(mix("#070b15", v.base, k)), panel: rgbOf(panelK), panel2: rgbOf(mix("#1c2c4f", mix(v.panel, v.violet, 0.25), k)) })}
+  /* the town's seal in the header becomes wax */
+  .pm .pm-townmark .seal { position: relative; display: inline-grid; place-items: center; width: 1.7em; height: 1.7em; color: transparent; }
+  .pm .pm-townmark .seal::before { content: ""; position: absolute; inset: 0; background: center / contain no-repeat; background-image: var(--pm-hw-seal); }
+  .pm-shell { --pm-hw-seal: url("data:image/svg+xml,${encodeURIComponent(WAX_SEAL.replace("var(--seal, #9b1f2a)", v.blood))}"); }
+  .pm-hw-wolf { width: 76px; margin: 6px auto 28px; color: ${mix(v.base, "#000000", 0.35)}; }
+  .pm-hw-wolf svg { display: block; width: 100%; }
+  /* AA on the skin: the site's quiet golds and violets are see-through over its
+     navy, and over the skin's lighter plum some fell under 4.5 (measured from the
+     rendered pixels, tools/_site-full-contrast.mjs); they read a little firmer */
+  html body .pm-doorline-lead, html body .mini th, html body .cal .kick, html body .pm-chip-sub,
+  html body .corr-handle, html body .res-handle { color: rgba(232, 196, 139, 0.9) !important; }
+  html body .stamps-detail, html body .profile-stats [data-profile-minted] dt { color: ${mix("#aa8fd8", v.ink, 0.3)} !important; }
+  html body .mini td.today { color: #ffffff !important; }
+  html body .ai-copy p { color: ${v.ink} !important; }
+  html body .book-foot, html body .cal-month-step { color: ${mix(v.orange, v.ink, 0.45)} !important; }
+  html body .ai-copy p em { color: ${mix(v.orange, v.ink, 0.75)} !important; }
+  </style>`,
+].join("");
+---
+{HTML && <Fragment set:html={HTML} />}

@@ -104,3 +104,25 @@ test("the sprinkled motifs are placed: one per page, through the season's compon
     assert.equal((read(file).match(/<HalloweenMotif spot="([a-z]+)" \/>/g) ?? []).join(), `<HalloweenMotif spot="${spot}" />`, file);
   }
 });
+
+// THE WHOLE SKIN FROM 244 (Darko 2026-10-11 11:04: "let's kick things off with a
+// bang. On the site, let's go all out with the seasonal theme, while keeping the
+// gradual mist of the world"): no skin at 243, the whole of it at 244 and after,
+// with no ramp across the season.
+test("the site's skin: none at 243, the whole of it from 244 (no ramp)", async () => {
+  const { skinStrength, siteSkinCSS, worldFrameCSS } = await import("../src/lib/halloween-skin.mjs");
+  assert.equal(skinStrength(siteMists({ crossing: 243, skeleton: SKELETON })), 0);
+  for (const n of [244, 250, 272, 283, 284, 300]) assert.equal(skinStrength(siteMists({ crossing: n, skeleton: SKELETON })), 1, `at ${n}`);
+  const v = VARIANTS[2];
+  const css = siteSkinCSS(v, 1), frame = worldFrameCSS(v, 1);
+  for (const want of [`--pm-night: ${v.base}`, `--pm-harbor: ${v.panel}`, `--pm-gold: ${v.orange}`, `--pm-paper: ${v.paper}`, `--pm-ink: ${v.paperInk}`, `--pm-wax: ${v.blood}`]) assert.ok(css.includes(want), want);
+  for (const want of [`--night: ${v.base}`, `--panel: ${v.panel}`, `--paper: ${v.ink}`, `--amber: ${v.orange}`]) assert.ok(frame.includes(want), want);
+  const { readFileSync } = await import("node:fs");
+  for (const c of ["HalloweenSkin", "HalloweenWorldFrame", "HeroFog"]) {
+    const src = readFileSync(new URL(`../src/components/${c}.astro`, import.meta.url), "utf8");
+    assert.ok(src.includes("skinStrength(mists)") && !/mists\.t\b|SKIN_MAX/.test(src), `${c} wears the whole skin, unramped`);
+    assert.doesNotMatch(src, /pumpkin|spire|castle|heist|candy|jetto/i, `${c}: nothing of what is to come`);
+  }
+  const skin = readFileSync(new URL("../src/components/HalloweenSkin.astro", import.meta.url), "utf8");
+  assert.ok(!skin.includes("pm-hw-bat"), "one bat on a page: HalloweenBat's, above the nav's line");
+});

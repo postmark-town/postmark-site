@@ -1,8 +1,10 @@
 // halloween-sprinkle.mjs — the season's motifs sprinkled around the site while
 // the Mists stand (POS-553; Darko 2026-10-11 11:03: "maybe the site hints are
 // *too* subtle. Could we add a couple more of the motifs sprinkled around the
-// site?"). Motifs only: no palette, nothing the page's text or controls sit
-// under, each one small, in a corner or a margin, one per page:
+// site?"), and they stayed when the whole skin came in w42 (Darko 11:04; the
+// palette, the seal, the wolf and the hero fog are HalloweenSkin's and
+// HeroFog's). Nothing the page's text or controls sit under, each one small,
+// in a corner or a margin, one per page:
 //
 //   home      three crows on the hero picture's rooftops (the post office's,
 //             and two more), left off on a phone where the picture is cropped
@@ -22,7 +24,7 @@
 import { VARIANTS, mix } from "./halloween-skin.mjs";
 import { BAT, CROW, CROW_FLY } from "./halloween-motifs.mjs";
 
-const v = VARIANTS[2];   // the motifs' ink only; the site keeps its own palette this release
+const v = VARIANTS[2];   // the motifs' ink, from the season's skin
 const INK = mix(v.base, v.quiet, 0.15);
 const GLOW = `drop-shadow(0 0 1px ${mix(v.violet, v.base, 0.4)}) drop-shadow(0 0 8px rgba(0,0,0,.75))`;
 const REDUCED = "@media (prefers-reduced-motion: reduce)";

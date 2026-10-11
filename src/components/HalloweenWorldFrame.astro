@@ -1,0 +1,16 @@
+---
+// HalloweenWorldFrame — the World page's frame in the season's skin (POS-553):
+// the rail, the telling and the controls take the palette through the viewer's
+// own .wv tokens, at the same strength as the rest of the site this release.
+// The map is not touched; the Mists are the map's own.
+import { siteMists } from "@/lib/mists-season.mjs";
+import { VARIANTS, worldFrameCSS, skinStrength, mix } from "@/lib/halloween-skin.mjs";
+const mists = siteMists();
+const k = skinStrength(mists);
+const v = VARIANTS[2];
+// two of the rail's hard-coded inks, lifted to AA on the skin's panel
+const HTML = !mists ? "" : `<style>${worldFrameCSS(v, k)}
+  .wv .wv-beta-chip { color: ${mix(v.quiet, v.ink, 0.5)}; }
+  .wv .wv-nav .handleopt.on { color: ${mix("#e0654a", v.ink, 0.3)}; }</style>`;
+---
+{HTML && <Fragment set:html={HTML} />}

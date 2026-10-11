@@ -55,6 +55,12 @@ export function pairsOf(v) {
   ].map(([fg, bg, use]) => ({ fg, bg, use, ratio: contrast(v[fg], v[bg]) }));
 }
 
+/** How much of the skin a build wears: none before the Mists, the whole of it
+ *  from their first crossing. No ramp across the season for the site (Darko
+ *  2026-10-11 11:04: "go all out with the seasonal theme, while keeping the
+ *  gradual mist of the world"); the World map's mist stays the world's own. */
+export const skinStrength = (mists) => (mists ? 1 : 0);
+
 /** The site's token overrides for a variant at ramp k (0..1). */
 export function siteSkinCSS(v, k) {
   const m = (a, b) => mix(a, b, k);
