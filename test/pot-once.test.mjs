@@ -20,15 +20,15 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
-import { toPot, livePots, loadPots, thankYouOf, loadThankYou } from "../src/lib/funding.mjs";
+import { toPot, livePots, loadPots, thankYouOf, loadThankYou, thanksFor } from "../src/lib/funding.mjs";
 import { seamFromTown, thankYouFromTown } from "../tools/extract-seam.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 const THANKS = {
-  min_usd: 20, how_url: null, art: null,
-  card: "Give $20 or more in a month, to any pot, and the Core Team will mail you Postmark stickers as a thank-you, never a purchase (US addresses for now).",
-  line: "As a thank-you, never a purchase: when your household's gifts across the town's pots total $20 in a month, the town's Core Team mails its human custom Postmark stickers (US addresses for now). They ask where through a private form, and no address ever enters the town.",
+  pot: "meeps-home", min_usd: 10, how_url: null, art: null,
+  card: "Fill this pot, and every household that gave $10 or more gets a Postmark sticker (a thank-you, never a purchase).",
+  line: "As a thank-you, never a purchase: if this pot fills, every household whose gifts here total $10 or more gets a Postmark sticker, made by the town's Core Team. They'll ask where to send it through a private form, and no address ever enters the town.",
 };
 const BUYS = { name: "Beelink SER8 (8745HS) mini PC", url: "https://us.bee-link.com/products/beelink-ser8-8745hs?variant=52636411855130" };
 
@@ -69,7 +69,9 @@ test("1b · the funding box's thank-you is read whole or not at all; a torn link
   assert.equal(thankYouOf({ ...THANKS, how_url: "https://postmark.town/stickers/" }).how_url, "https://postmark.town/stickers/");
   assert.equal(thankYouOf({ ...THANKS, art: "//evil.example/a.png" }).art, null, "a protocol-relative image is dropped");
   assert.equal(thankYouOf({ ...THANKS, art: "/art/sticker.png" }).art, "/art/sticker.png");
-  assert.equal("thankYou" in toPot(ROW({ thank_you: THANKS })), false, "no pot carries its own thank-you: it is the box's (Darko, 12:47)");
+  assert.equal(thankYouOf({ ...THANKS, pot: undefined }), null, "a thank-you names the one pot it belongs to (Darko, 13:41)");
+  assert.equal(thanksFor(THANKS, { pot: "meeps-home" }), THANKS);
+  assert.equal(thanksFor(THANKS, { pot: "keeping-ec2" }), null, "no other pot says it");
 });
 
 // ── 2 · the emitter carries both fields by name ────────────────────────────
@@ -106,13 +108,13 @@ test("2b · extract-seam reads the funding box's thank-you from the town, once",
   const t = thankYouFromTown(TOWN);
   if (!existsSync(join(TOWN, "WHITE_PAGES", "fund-thank-you.json"))) { assert.equal(t, null); return; }
   assert.ok(t, "the town's record reads whole");
-  assert.equal(t.min_usd, 20);
-  assert.match(t.line, /US addresses for now/);
-  assert.match(t.card, /US addresses for now/);
+  assert.equal(t.min_usd, 10);
+  assert.equal(t.pot, "meeps-home");
+  assert.match(t.line, /if this pot fills/);
+  assert.doesNotMatch(t.line + t.card, /US addresses/, "international is fine (Darko, 13:41)");
   assert.match(t.line, /never a purchase/);
   assert.match(t.line, /no address ever enters the town/);
-  assert.match(t.line, /Core Team/, "the Core Team mails them (Darko, 12:56)");
-  assert.doesNotMatch(t.line, /US-Eastern/, "the clock is the record's rule, not the page's sentence");
+  assert.match(t.line, /Core Team/, "the Core Team makes them (Darko, 13:41)");
   assert.equal(thankYouFromTown(join(TOWN, "no-such-town")), null);
 });
 
@@ -128,9 +130,9 @@ test("3 · the card and the page wear the sticker, name the fill and link what t
   }
   assert.ok(PAGE.includes(`{!pot.closesAtFill && <span class="f-dim">this epoch</span>}`), "the page's money line drops \"this epoch\"");
   assert.ok(!CARDS.includes("p.thankYou"), "no card carries a thank-you of its own");
-  assert.ok(CARDS.includes("{thanks && anyOpen && ("), "the board says the box's thank-you once, while a pot is open");
-  assert.ok(PAGE.includes("{thanks && open && ("), "every open pot's page says it");
-  for (const src of [CARDS, PAGE]) assert.ok(src.includes("{thanks.line}"), "in the record's own words");
+  assert.ok(CARDS.includes("{thanksFor(thanks, p) && ("), "only the pot the thank-you names says it on its card");
+  assert.ok(PAGE.includes("const thanks = thanksFor(loadThankYou(), pot);") && PAGE.includes("{thanks && open && ("), "and on its own page, while open");
+  assert.ok(CARDS.includes("{thanks.card}") && PAGE.includes("{thanks.line}"), "in the record's own words");
   for (const src of [CARDS, PAGE]) assert.ok(src.includes("data-thanks-art"), "and each keeps the sticker image's slot");
 });
 
@@ -155,8 +157,10 @@ test("4 · every built pot surface wears one sticker per open one-time pot, and 
     assert.equal(count(text(page).toLowerCase(), "closes when it fills"), openOnce.length, `/${rel.join("/")}/ says "closes when it fills" once per one-time card`);
     const plain = visible(page).replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
     const thanks = loadThankYou();
-    if (thanks && board.pots.some((q) => q.status === "open")) {
-      assert.equal(count(plain, thanks.line), 1, `/${rel.join("/")}/ says the box's thank-you once`);
+    if (thanks) {
+      const on = board.pots.some((q) => q.status === "open" && q.pot === thanks.pot);
+      assert.equal(count(plain, thanks.card), on ? 1 : 0, `/${rel.join("/")}/ says the thank-you on its pot's card only`);
+      assert.equal(count(plain, thanks.line), 0, `/${rel.join("/")}/ carries no board-wide line`);
     }
     for (const p of openOnce.filter((q) => q.buys)) {
       assert.ok(page.includes(`href="${p.buys.url.replace(/&/g, "&amp;")}" target="_blank" rel="noopener"`) || page.includes(`href="${p.buys.url}" target="_blank" rel="noopener"`),
@@ -172,7 +176,7 @@ test("4 · every built pot surface wears one sticker per open one-time pot, and 
     const thanks = loadThankYou();
     if (thanks) {
       const plain = visible(page).replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
-      assert.equal(count(plain, thanks.line), p.status === "open" ? 1 : 0, `/fund/${slug}/ says the box's thank-you iff it is open`);
+      assert.equal(count(plain, thanks.line), p.status === "open" && p.pot === thanks.pot ? 1 : 0, `/fund/${slug}/ says the thank-you iff it is the open pot it names`);
     }
     if (p.closesAtFill) {
       assert.ok(!visible(page).includes("this epoch"), `/fund/${slug}/ says no "this epoch"`);

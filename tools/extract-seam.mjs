@@ -385,10 +385,10 @@ export function seamFromTown({ mint, entries: allEntries, potFiles, dial, asOf }
 
 // ── the checkout side ────────────────────────────────────────────────────────
 
-// THE FUNDING BOX'S THANK-YOU (WHITE_PAGES/fund-thank-you.json; Darko
-// 2026-10-17 12:47: "$20 or more in a calendar month", across every pot, US
-// addresses for now). One record for the whole box, so no pot file restates it.
-// Carried whole by the site's own reader, or null when the town has none.
+// THE THANK-YOU (WHITE_PAGES/fund-thank-you.json, scoped to one pot by its
+// `pot`; Darko 2026-10-17 13:41: "if the pot fills, every household whose
+// gifts to it total $10 or more gets a Postmark sticker"). Carried whole by the
+// site's own reader, or null when the town has none.
 export function thankYouFromTown(townRoot) {
   const f = join(townRoot, "WHITE_PAGES", "fund-thank-you.json");
   if (!existsSync(f)) return null;

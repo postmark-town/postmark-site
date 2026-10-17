@@ -115,11 +115,11 @@ export const HOLO_NAME_LINE =
 // ruling on the market's cards: "THE MAIN PAGE CARDS EXPLAIN WHAT THE THING
 // IS" — and the cards were leading with close mechanics instead. The full
 // paragraph stays on the pot's own fund page; a card owes a reader only this.
-// THE THANK-YOU, the funding box's and no one pot's (the town's
-// WHITE_PAGES/fund-thank-you.json; Darko 2026-10-17 12:47: stickers to any US
-// household whose gifts across ALL pots total $20 or more in a calendar month,
+// THE THANK-YOU, one pot's (the town's WHITE_PAGES/fund-thank-you.json, scoped
+// by its `pot`; Darko 2026-10-17 13:41, Kickstarter-style: "if the pot fills,
+// every household whose gifts to it total $10 or more gets a Postmark sticker",
 // said where a giver looks, not buried in the fine print). Carried only whole:
-// a whole-dollar threshold and both sentences, else null. how_url is the private address route, null until it
+// the pot it belongs to, a whole-dollar threshold and both sentences, else null. how_url is the private address route, null until it
 // exists (and https only); art is the sticker image's slot, null until the
 // design sitting (a site-relative path or https only). A torn link or image
 // drops itself, never the thank-you.
@@ -127,11 +127,11 @@ export function thankYouOf(raw) {
   const t = raw && typeof raw === "object" ? raw : null;
   const str = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
   const min = Number(t?.min_usd);
-  if (!t || !Number.isInteger(min) || min < 1 || !str(t.card) || !str(t.line)) return null;
+  if (!t || !POT_ID_RE.test(String(t.pot ?? "")) || !Number.isInteger(min) || min < 1 || !str(t.card) || !str(t.line)) return null;
   const how = str(t.how_url);
   const art = str(t.art);
   return {
-    min_usd: min, card: str(t.card), line: str(t.line),
+    pot: String(t.pot), min_usd: min, card: str(t.card), line: str(t.line),
     how_url: how && /^https:\/\/\S+$/.test(how) ? how : null,
     art: art && (/^https:\/\/\S+$/.test(art) || /^\/[^/\s]\S*$/.test(art)) ? art : null,
   };
@@ -692,10 +692,15 @@ export function livePots(rows) {
   };
 }
 
-// The funding box's thank-you, as tools/extract-seam.mjs emitted it, or null
-// (no emission yet, or a torn one): a surface says nothing rather than half.
+// The thank-you, as tools/extract-seam.mjs emitted it, or null (no emission
+// yet, or a torn one): a surface says nothing rather than half. Only the pot it
+// names shows it (thanksFor).
 export function loadThankYou({ path = null } = {}) {
   return thankYouOf(readEmission("fund-thank-you.json", path));
+}
+
+export function thanksFor(thanks, pot) {
+  return thanks && pot && thanks.pot === pot.pot ? thanks : null;
 }
 
 export function loadPots({ path = null } = {}) {

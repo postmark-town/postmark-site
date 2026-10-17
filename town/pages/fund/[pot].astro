@@ -60,7 +60,7 @@
 // no image service: a strict CSP would block it, and handing a third party the
 // ability to change what an intake QR encodes is handing them the money.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import { livePots, loadPots, loadThankYou, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel, giverLabel, fundCapOf } from "@/lib/funding.mjs";
+import { livePots, loadPots, loadThankYou, thanksFor, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel, giverLabel, fundCapOf } from "@/lib/funding.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { qrSvg } from "@/lib/qr.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
@@ -153,10 +153,10 @@ const { pot, tabs, past = [] } = Astro.props;
 // the founder has not opened cannot pass it, and neither can anything else that
 // is not, right now, open.
 const open = pot.status === "open";
-// THE FUNDING BOX'S THANK-YOU (Darko, 2026-10-17 12:47), the same record on
-// every pot's page: gifts to any pot count toward it. Said only where a gift
-// can be given, so a draft page carries none.
-const thanks = loadThankYou();
+// THE POT'S THANK-YOU (Darko, 2026-10-17 13:41): one pot's, Kickstarter-style,
+// on that pot's page only. Said only where a gift can be given, so a draft
+// page carries none.
+const thanks = thanksFor(loadThankYou(), pot);
 // THE PAYPAL CHOICE (POS-183 part 2): offered only when the build carries the
 // app's public client ID (the sandbox app's on dev, the live app's on prod),
 // and its SDK loads only when the giver presses the button (src/lib/paypal.mjs).
@@ -299,9 +299,8 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           <p class="f-buys"><a href={pot.buys.url} target="_blank" rel="noopener">What we're buying →</a> <span class="f-dim">{pot.buys.name}</span></p>
         )}
         {/* THE THANK-YOU, said where a giver looks and not only in the fine
-            print (Darko, 2026-10-17 12:08 and 12:47): the funding box's record
-            (the town's WHITE_PAGES/fund-thank-you.json), the same on every
-            open pot. The image slot and the address route fill from it (art,
+            print (Darko, 2026-10-17 12:08 and 13:41): the town's record
+            (WHITE_PAGES/fund-thank-you.json), on the one pot it names. The image slot and the address route fill from it (art,
             how_url) when they exist. */}
         {thanks && open && (
           <p class="f-thanks">

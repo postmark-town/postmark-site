@@ -19,7 +19,7 @@
 // scoped rules never reach a component's elements. The civic scale variables
 // (--civic-body, --civic-label) are inherited where the page defines them
 // (/town/) and fall back to the same numbers where it does not (/stamps/).
-import { potGist, giverLabel, loadThankYou } from "@/lib/funding.mjs";
+import { potGist, giverLabel, loadThankYou, thanksFor } from "@/lib/funding.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
 import PotSprite from "@/components/PotSprite.astro";
@@ -32,11 +32,9 @@ const { potBoard: given } = Astro.props;
 // the cards, so the Guild, /fund/ and /stamps/ can never disagree about it.
 const potBoard = { ...given, pots: (given?.pots ?? []).filter((p) => p.status !== "closed") };
 const PATRONS_SHOWN = 3;
-// THE FUNDING BOX'S THANK-YOU (Darko, 2026-10-17 12:47): stickers for $20 in a
-// month across every pot, said ONCE under the board rather than on every card,
-// and only while some pot is open to give to.
+// THE THANK-YOU (Darko, 2026-10-17 13:41): one pot's, Kickstarter-style, said
+// on that pot's card only.
 const thanks = loadThankYou();
-const anyOpen = potBoard.pots.some((p) => p.status === "open");
 const usd = (n) => "$" + Number(n).toLocaleString("en-US");
 const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
 ---
@@ -74,6 +72,15 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
           {/* WHAT THE DOLLARS BUY, a link a giver can open (Darko, 2026-10-17). */}
           {p.buys && (
             <p class="m-buys"><a href={p.buys.url} target="_blank" rel="noopener">What we're buying →</a> <span class="m-dim">{p.buys.name}</span></p>
+          )}
+          {/* THE POT'S THANK-YOU, its short form, on its own card only (Darko,
+              2026-10-17 13:41). The slot holds the sticker's image once it is
+              drawn (art); empty, it takes no room. */}
+          {thanksFor(thanks, p) && (
+            <p class="m-thanks">
+              <span class="m-thanks-art" data-thanks-art>{thanks.art && <img src={thanks.art} alt="" width="48" height="48" />}</span>
+              <span>{thanks.card}</span>
+            </p>
           )}
           {/* WHO IT IS FOR finishes "what it is for", so it sits under the gist
               rather than in the foot (POS-258). */}
@@ -146,13 +153,6 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
       ))}
     </div>
   )}
-  {thanks && anyOpen && (
-    <p class="m-thanks">
-      {/* the sticker's image once the design sitting draws it (art); empty, it takes no room */}
-      <span class="m-thanks-art" data-thanks-art>{thanks.art && <img src={thanks.art} alt="" width="48" height="48" />}</span>
-      <span>{thanks.line}{thanks.how_url && <> <a href={thanks.how_url} target="_blank" rel="noopener">How we ask for your address →</a></>}</span>
-    </p>
-  )}
   {potBoard.malformed.length > 0 && (
     <div class="m-none is-warn">
       <b>{potBoard.malformed.length} pot{potBoard.malformed.length === 1 ? "" : "s"} could not be read.</b>
@@ -178,11 +178,7 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
   .m-card.is-once { position: relative; border-color: rgba(232, 196, 139, .42); padding-top: 2.6rem; }
   .m-sticker { position: absolute; top: -.55rem; right: .8rem; z-index: 1; }
   .m-buys { font-size: var(--civic-body, .9rem); margin: 0; }
-  .m-thanks {
-    display: flex; align-items: center; gap: .8rem; margin: 1.1rem 0 0; padding: .7rem .9rem;
-    border-left: 3px solid var(--pm-gold); border-radius: .3rem; background: rgba(232, 196, 139, .07);
-    font-size: var(--civic-body, .9rem); line-height: 1.55; color: var(--pm-gold-bright);
-  }
+  .m-thanks { display: flex; align-items: center; gap: .7rem; margin: 0; font-size: var(--civic-body, .9rem); line-height: 1.55; color: var(--pm-gold-bright); }
   .m-thanks-art:empty { display: none; }
   .m-thanks-art img { display: block; width: 48px; height: 48px; }
   .m-thanks a { color: inherit; }
