@@ -104,7 +104,30 @@ test("a key the table does not place is mapping DEBT, never quietly bucketed", (
 
 test("the map is a way station and says so, so nobody mistakes it for the destination", () => {
   assert.match(SERIALIZATION_MAP.destination, /class-nodes/);
-  assert.ok(SERIALIZATION_MAP.cites.includes("LOGOS/kinds.md"));
+  assert.ok(SERIALIZATION_MAP.cites.includes("LOGOS/lifetimes.md"));
+});
+
+// WLD-39 (Wright, 2026-10-13T08:57:47.829Z): the World's lifetime doctrine moved
+// from LOGOS/kinds.md to LOGOS/lifetimes.md. The map cites the new home, and
+// nothing else in it moved: every key and value but `cites` is fingerprinted as
+// it stood before the rename.
+test("the map cites the lifetime doctrine at its new home, and is otherwise exactly the map it was", async () => {
+  assert.equal(SERIALIZATION_MAP.cites, "LOGOS/lifetimes.md § the node · LOGOS/the-north-star.md § the placement discipline");
+  assert.doesNotMatch(SERIALIZATION_MAP.cites, /kinds\.md/);
+  const { createHash } = await import("node:crypto");
+  // S1 (2026-10-17) added one scope, `property`, for W1's property nodes; it is
+  // held exactly below, and everything else keeps the fingerprint it had
+  const { cites, property, ...rest } = SERIALIZATION_MAP;
+  const canon = (v) => Array.isArray(v) ? v.map(canon) : (v && typeof v === "object") ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v;
+  assert.equal(createHash("sha256").update(JSON.stringify(canon(rest))).digest("hex"),
+    "316d6a2aae19f38de365ba281a4a6dd0ca34d6aac0741f947dc2f7ffa118b0e5",
+    "version, entries, keys and classifications unchanged — only the citation moved, and the property scope was added");
+  // keyed on the keys W1 (world #235 at 6c301955) actually writes on its 194 property records
+  assert.deepEqual(Object.keys(property.predicate), ["name", "tier", "default", "values-tier"], "the property's fixed fields");
+  assert.deepEqual(Object.keys(property.relational), ["of"]);
+  assert.equal(property.relational.of[0], "of", "a child property's of: is the edge to its parent property");
+  assert.deepEqual(Object.keys(property.property), ["version"]);
+  assert.deepEqual(Object.keys(property).sort(), ["predicate", "property", "relational"], "and nothing else in the new scope");
 });
 
 // ── one node, through the law's glasses ──────────────────────────────────────
@@ -166,10 +189,12 @@ test("declaring a class and naming one are counted APART", () => {
   // one node carries `class:` — it IS the registry, not a citation of it
   assert.equal(r.classNodes, 1);
   assert.deepEqual(r.registered, ["parcel"]);
-  // the parcel names `parcel`, and the class-node itself carries `class:` — two
-  assert.equal(r.citing, 2);
-  assert.equal(r.marks, 6);
+  // the parcel names `parcel`. The class-node itself is a declaration, so it is
+  // the registry and not one of the marks the meter counts (S1, 2026-10-17)
+  assert.equal(r.citing, 1);
+  assert.equal(r.marks, 5);
   assert.equal(r.unaddressable, 4);
+  assert.equal(r.propertyNodes, 0);
   // the rest speak the older four-word vocabulary, named with their counts
   assert.deepEqual(r.unregisteredKinds, [["sited", 3], ["predicated", 1]]);
 });
@@ -184,12 +209,13 @@ test("a store with no class-nodes reports nothing addressable, not everything", 
 
 // ── the law's own measures ───────────────────────────────────────────────────
 
-test("the law's six measures each carry a denominator and a target", () => {
+test("the law's measures each carry a denominator and a target", () => {
   const m = lawMeasures(NODES);
-  assert.deepEqual(m.map((x) => x.key), ["class-nodes", "citing", "predicates", "relations", "residue", "debt"]);
+  assert.deepEqual(m.map((x) => x.key), ["class-nodes", "property-nodes", "citing", "predicates", "relations", "residue", "debt"]);
   const by = Object.fromEntries(m.map((x) => [x.key, x]));
-  assert.equal(by.citing.now, 2);
-  assert.equal(by.citing.of, 6);
+  assert.equal(by.citing.now, 1);
+  assert.equal(by.citing.of, 5);
+  assert.equal(by["property-nodes"].now, 0);
   assert.equal(by.residue.now, 4);
   assert.equal(by.residue.target, 0);
   assert.equal(by.debt.now, 1);

@@ -208,7 +208,7 @@ test("main writes valid JSON the sentinel can parse, at the path it was given", 
 // named a world the page was not running. The field the night was missing is
 // the build tree's own lockfile, read from the build tree.
 
-const LOCK = (sha) => JSON.stringify({ packages: { "node_modules/postmark-world": { version: "0.1.0", resolved: `git+ssh://git@github.com/keeminlee/postmark-world.git#${sha}` } } });
+const LOCK = (sha) => JSON.stringify({ packages: { "node_modules/postmark-world": { version: "0.1.0", resolved: `git+ssh://git@github.com/postmark-town/postmark-world.git#${sha}` } } });
 const S63 = "256db2fe02b4c786f4f6182629d896c38cd2b442";
 const TRAIN = "91536f7600000000000000000000000000000000";
 
@@ -232,7 +232,7 @@ test("THE FALSIFIER: flip the lockfile's resolved sha and the stamp follows — 
   // package.json still names the floor (the keeper's ceremony bumps it on site
   // main); the lockfile is what the resolver's advance re-locked. The stamp
   // must name the LOCK's sha — the compiled one — and never the spec's.
-  writeFileSync(join(root, "package.json"), JSON.stringify({ dependencies: { "postmark-world": `github:keeminlee/postmark-world#${S63}` } }));
+  writeFileSync(join(root, "package.json"), JSON.stringify({ dependencies: { "postmark-world": `github:postmark-town/postmark-world#${S63}` } }));
   writeFileSync(join(root, "package-lock.json"), LOCK(S63));
   const read = () => gather({ env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "1" }, exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root });
   assert.equal(read().world_sha, S63);

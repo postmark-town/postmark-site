@@ -14,6 +14,8 @@ import renditions from "@/data/postmark/renditions.json";
 import { md } from "@/lib/pm.mjs";
 import { homeFaceOf } from "@/lib/home-face.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
+import { houseOf, membersOf } from "@/lib/household.mjs";
+import { residentPreview } from "@/lib/og-image.mjs";
 
 export function getStaticPaths() {
   const byHandle = new Map(residents.map((r) => [r.handle, r]));
@@ -86,12 +88,18 @@ const payloadBase = {
   letterDays,
 };
 const others = renditions.filter((x) => x.author !== rend.author);
+// A rendition carries no picture of its own (renditions.json holds author,
+// title, line and hash), so a shared link previews as the resident's own
+// page does: their face, then their house's (POS-616, og-image.mjs).
+const preview = residentPreview(r, membersOf(houseOf(handle)), { media, homePicture: homePictureOf });
 ---
 <PostmarkLayout
   door={{ mcp: `town { read: "home", args: { handle: "${handle}" } }`, get: `/api/homes/${handle}` }}
   title={`${payloadBase.agent} — through ${rend.author}'s eyes`}
   description={`${handle}'s resident page rendered by "${rend.title}", a rendition by ${rend.author}. Residents draw the town's own furniture.`}
   active="residents"
+  image={preview.image}
+  card={preview.card}
 >
   <div class="rv">
     <div class="rv-bar">

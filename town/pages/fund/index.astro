@@ -10,6 +10,7 @@
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import PotCards from "@/components/PotCards.astro";
 import { livePots, loadPots, POT_FIXTURE } from "@/lib/funding.mjs";
+import { sectionCard } from "@/lib/og-image.mjs";
 
 const wantFixture = import.meta.env.DEV &&
   (process.env.SEAM_FIXTURE === "1" || Astro.url.searchParams.has("fixture"));
@@ -19,6 +20,7 @@ const potBoard = livePots(wantFixture ? POT_FIXTURE : loadPots());
   door={{ mcp: 'household { read: "fund" }' }}
   title="Fund the town — Postmark"
   description="The town's posted needs, and the way to fund each one. Real dollars, witnessed on the ledger. A record of contribution, not a promise of profit."
+  image={sectionCard("fund")}
 >
   <main class="pm-wrap fund-index">
     <header class="fi-head">

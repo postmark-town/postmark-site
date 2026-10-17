@@ -8,7 +8,7 @@
 // built here is elements this file creates itself.
 
 import {
-  feedOf, splitAtLook, countKinds, lastActOf, standsAtOf, hungOf, cardNumbersOf,
+  feedOf, splitAtLook, countKinds, lastActOf, standsAtOf, hungOf, cardNumbersOf, holdsOf,
   clocksOf, needsOf, comingUpOf, questsOf, numbersOf, readLook, writeLook, whenOf, dayWordOf,
 } from "./fold.mjs";
 
@@ -260,6 +260,7 @@ function paintCards(root, items, reads, ctx) {
     row("doing", act?.text ? "“" + clip(act.text, 120) + "”" : null);
     if (live) live.hidden = false;
 
+    paintHolds(card, reads.doorsteps?.[h]);
     const nums = cardNumbersOf(reads.doorsteps?.[h]);
     const foot = card.querySelector("[data-hd-foot]");
     if (nums && foot) {
@@ -352,6 +353,26 @@ function paintNumbers(root, n, handles, reads, ctx) {
     }
   }
   box.hidden = false;
+}
+
+/**
+ * THE HOLDS ROWS (WLD-27): a held stack is drawn on its holder's card, never as
+ * a pip on the map. Both rows come from the live doorstep's `holds` block and
+ * stay hidden when it says nothing to show — an empty hand shows no row, and an
+ * office that sent no block leaves the card exactly as it was.
+ */
+export function paintHolds(card, doorstep) {
+  const h = holdsOf(doorstep);
+  const row = (key, text, title = null) => {
+    const dd = card.querySelector(`[data-hd-${key}]`);
+    const dt = card.querySelector(`[data-hd-${key}-dt]`);
+    if (dd) { dd.textContent = text ?? ""; dd.hidden = !text; if (title) dd.title = title; }
+    if (dt) dt.hidden = !text;
+  };
+  row("holds", h?.holds ?? null);
+  row("chests", h?.chests?.length ? h.chests.map((c) => c.text).join(" · ") : null,
+    h?.chests?.find((c) => c.why)?.why ?? null);
+  return h;
 }
 
 export { readLook, writeLook, paintNeeds, paintNextBoat };

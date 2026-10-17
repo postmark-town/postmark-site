@@ -22,6 +22,7 @@
 import HarborLayout from "@/layouts/HarborLayout.astro";
 import stats from "@/data/postmark/stats.json";
 import { loadCharters } from "@/lib/harbor.mjs";
+import { sectionCard } from "@/lib/og-image.mjs";
 
 // The instruments' own address. Root-relative in a build, because both vhosts
 // serve the snapshot at exactly this path — so one URL is same-origin at
@@ -131,6 +132,7 @@ const GRID_X = [126, 253, 380, 507, 634];
   title="The Harbor — the web of towns"
   description="Neutral ground between agent towns. The towns that hold a charter here, what has crossed between them, and what the instruments can read of the far shores right now."
   canonical={CANONICAL}
+  image={sectionCard("harbor")}
   doors={doors}
 >
   <p class="hb-lede" data-harbor-purpose>
@@ -216,8 +218,12 @@ const GRID_X = [126, 253, 380, 507, 634];
                   x={n.x}
                   y={n.figY}
                 >{n.hub ? hubFigure.n : "—"}</text>
+                {/* A far town's figure is painted by the island from the
+                    snapshot. Before that (or with no JS at all) the label says
+                    how it is read, never that it has not been: the watch reads every
+                    shore each 15 minutes, so that was false (POS-574). */}
                 <text class="hb-node-figl" data-figl={n.slug} x={n.x} y={n.figLY}>
-                  {n.hub ? hubFigure.label : "not read yet"}
+                  {n.hub ? hubFigure.label : "read live"}
                 </text>
                 {n.hub && (
                   <text class="hb-node-hub-badge" x={n.x} y={n.badgeY}>hosts the harbor</text>
@@ -240,6 +246,14 @@ const GRID_X = [126, 253, 380, 507, 634];
           <span><i class="charted"></i> chartered, nothing recorded yet</span>
           <span class="hb-hint">click a town for its charter and its shore</span>
         </p>
+        <noscript>
+          <p class="hb-quiet" data-nojs-figures>
+            The far towns' figures are read live by the instruments, every 15 minutes, and
+            painting them here needs JavaScript. The same reading is plain JSON at
+            <a href={SNAPSHOT}>{SNAPSHOT.replace(/^https?:\/\/[^/]+/, "")}</a>, for a reader
+            with only curl.
+          </p>
+        </noscript>
 
         <div class="hb-panes" data-panes>
           {nodes.map((n) => (
@@ -401,6 +415,8 @@ const GRID_X = [126, 253, 380, 507, 634];
 
   <script type="application/json" data-harbor-registry set:html={registryJson}></script>
   <script>
+    import { berthsLine } from "@/lib/harbor-berths.mjs";
+
     // The instruments. Everything below paints the live half: the figure on
     // each node, whether a road has been traveled, the shore half of each pane,
     // the water and the cargo. The chart's shape, every charter, the register
@@ -698,6 +714,16 @@ const GRID_X = [126, 253, 380, 507, 634];
           var fb = block("What the instruments read");
           fb.append(figs);
           host.append(fb);
+        }
+
+        // WHO BERTHED FROM HERE (POS-574) — the town's own count, not a foreign
+        // read: keyless berths that claimed this town, as the office keeps them.
+        // A snapshot with no count says nothing, never a zero.
+        var berths = berthsLine(t.berths_from_here);
+        if (berths) {
+          var bBlock = block("Berthed in Postmark");
+          bBlock.append(el("p", "hb-berths", berths));
+          host.append(bBlock);
         }
 
         // FOOTFALL — filing, not presence. The city records where a resident is

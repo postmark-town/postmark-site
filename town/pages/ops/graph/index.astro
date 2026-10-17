@@ -107,11 +107,12 @@ const IDEAL = [
   { cls: "unread", label: "outside the reading", line: "code, doctrine and classes — and any mark whose key list this office did not send" },
 ];
 
-// THE REGISTRY'S TWO POPULATIONS. A class-node DECLARES a class; every other
-// node NAMES one, today through `kind:`. Counted apart, because conflating them
+// THE REGISTRY'S TWO POPULATIONS. A class-node DECLARES a class, and a property
+// node (W1) declares one of its properties; every other node, every instance,
+// NAMES a class, today through `kind:`. Counted apart, because conflating them
 // would report the registry as its own membership.
 const REGISTRY = [
-  { cls: "declares", label: "declares a class", line: "carries `class:` — these ARE the registry, not citations of it" },
+  { cls: "declares", label: "declares", line: "a class-node or a property node — these ARE the registry, not citations of it" },
   { cls: "names", label: "names one", line: "addressable: the law has a class-node to reach this node through" },
   { cls: "unaddressable", label: "names none", line: "speaks the older four-word vocabulary; a class not in the graph cannot be addressed" },
   { cls: "spine", label: "the convergence spine", line: "classes, code and doctrine — the layer the traversal runs over" },
@@ -305,7 +306,7 @@ const REGISTRY = [
       SERIALIZATION_MAP, STORE_BOUNDARY, serializationOf, idealClassOf, fieldCensus,
       classRegistry, lawMeasures, standingLattice, standingTierOf, isRecordNode, recordTree,
       isMachinery, wearsRegistryBadge, isContinuation, classFilters, filterBucketOf,
-      keepingWorks, isDeclaringClassMark,
+      keepingWorks, isDeclaringClassMark, registryPaintOf,
     } from "@/lib/world-lenses.mjs";
 
     const root = document.querySelector("[data-graph]");
@@ -548,12 +549,10 @@ const REGISTRY = [
           if (isDeclaringClassMark(d)) cls.push("works-mark");
           if (askIds.has(d.id)) cls.push("works-ask");
           cls.push("ideal-" + idealClassOf(d));
-          // declares = the store's own fact (step-1, 2026-08-18); an instance
-          // carrying `class:` NAMES its class — it does not declare it
-          cls.push("reg-" + (d.kind !== "mark"
-            ? (payload.convergence_kinds.includes(d.kind) ? "spine" : "off")
-            : d.declares === true ? "declares"
-            : d.class != null || reg.has(String(d.subkind ?? "")) ? "names" : "unaddressable"));
+          // declares = a declaration (a class-node or a property node); an
+          // instance carrying `class:` NAMES its class — it does not declare it.
+          // One lens function, the meter's own rule (world-lenses § registryPaintOf).
+          cls.push("reg-" + registryPaintOf(d, reg, payload.convergence_kinds));
           if (isRecordNode(d)) cls.push("rec", d.tier === "constitution" ? "rec-law" : "rec-mechanic");
           // THE THREE WEARINGS. Facts about the node, put on once — the shape
           // rules that used to say "this is a different kind of thing" are gone.
@@ -1158,11 +1157,12 @@ const REGISTRY = [
       function paintRegistryLens(box) {
         box.appendChild(lede(
           "Closure is a property of ADDRESSING: a class not in the graph cannot be addressed, and a node naming no class-node cannot be "
-          + "reached by the law at all. A class-node DECLARES a class; every other node NAMES one, today through `kind:`. The two are counted apart."));
+          + "reached by the law at all. A class-node DECLARES a class, and a property node declares one of its properties; every other node, every instance, NAMES a class, today through `kind:`. Declarations and instances are counted apart."));
 
         box.appendChild(numbers([
           ["class-nodes in the registry", registry.classNodes, null,
             registry.registered.length ? registry.registered.join(", ") : "none in this store"],
+          ["property nodes", registry.propertyNodes, null, "the class side's properties: declarations, never counted as marks"],
           ["nodes naming a registered class", registry.citing, registry.marks, "addressable — the law has a way to reach these"],
           ["nodes naming none", registry.unaddressable, registry.marks,
             registry.unregisteredKinds.length
@@ -1171,7 +1171,7 @@ const REGISTRY = [
         ]));
         if (registry.unaddressable) {
           box.appendChild(showButton("show what the law cannot address",
-            () => showIds(idsWhere((d) => d.kind === "mark" && !registry.citing_ids.includes(d.id)), "grid")));
+            () => showIds(registry.unaddressable_ids, "grid")));
         }
 
         box.appendChild(sectionHead("The convergence spine"));

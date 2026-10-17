@@ -82,8 +82,8 @@ jobs:
           while git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; do
             N=$((N+1)); TAG="$BASE.$N"
           done
-          # A TRAIN IS A WEEK'S SHIP, NAMED FOR THE WEEK IT SHIPS IN (OPERATIONS.md
-          # § Release Day). This refuses a tag named for a week that has not begun
+          # A TRAIN IS A WEEK'S SHIP, NAMED FOR THE WEEK IT SHIPS IN (postmark-telemetry
+          # docs/SHIPPING.md § 2). This refuses a tag named for a week that has not begun
           # — the 2026-09-03 class: w37 merged and tagged on a Thursday of week 36.
           # The founder flexes single instances by name in tools/train-week-check.mjs.
           TZ=America/New_York node tools/train-week-check.mjs "$TAG"
@@ -93,9 +93,85 @@ jobs:
           git push origin "refs/tags/$TAG"
           echo "cut $TAG at $(git rev-parse --short HEAD)"
 
+  # THE SNAPSHOT LANE READS THE TOWN'S POTS FRESH (2026-10-17). The funding
+  # seam (pots.json · deeds.json · economy.json) is checkout-coupled: only
+  # tools/extract-seam.mjs over a Town checkout can fold it, and the office API
+  # serves none of it. Prod's box refresh re-extracts it; this lane never did,
+  # so dev built whatever the train had committed. On 2026-10-17 that was the
+  # hand extraction of 09-23: two pots on the September epoch, while prod
+  # showed three on October's. A pot opened in the town could not be seen on
+  # dev without a hand-committed data file (POS-653, the meeps-home preview).
+  #
+  # Its own job, with no secret and a read-only token, because it RUNS TOWN
+  # CODE: extract-seam imports the checkout's tools/stamp-mint.mjs. The deploy
+  # job holds the EC2 key, so town code never runs in it; only the three JSON
+  # files cross over, as an artifact. Snapshot lane only, by the same test the
+  # concurrency group uses: the release lane's data is the box's to refresh.
+  town-seam:
+    if: ${{ !(startsWith(github.ref, 'refs/tags/release/') || github.ref == 'refs/heads/main' || github.event_name == 'schedule' || inputs.channel == 'release') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The Town is public; the same shallow clone into the same path as
+      # test.yml's funding-seam controls (".postmark-checkout").
+      - name: Check the Town's main out beside the site
+        run: git clone --depth 1 https://github.com/postmark-town/postmark.git .postmark-checkout
+      # extract-seam leaves a file AS IT WAS when it cannot fold, and only
+      # warns: pots.json and deeds.json with no ledger or mint module,
+      # economy.json with no keeping dial or no HEAD date. Here that would ship
+      # the committed copy under a fresh-looking run, the very staleness this
+      # job retires. So the step fails unless every pots.json row was emitted
+      # by this run (deeds.json is written in the same act) and economy.json
+      # is as of the Town HEAD's own date.
+      #
+      # No job output: this job runs town code, and anything it handed the
+      # deploy job as an expression would reach a shell that holds the EC2
+      # key. The Town sha is logged here and nowhere else.
+      - name: Fold the funding seam from the Town
+        run: |
+          START=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+          TOWN_DATE=$(git -C .postmark-checkout log -1 --format=%cs)
+          node tools/extract-seam.mjs --town .postmark-checkout
+          START="$START" TOWN_DATE="$TOWN_DATE" node -e '
+            const { readFileSync } = require("node:fs");
+            const read = (name) => JSON.parse(readFileSync("src/data/postmark/" + name, "utf8"));
+            const rows = read("pots.json");
+            const fresh = (r) => typeof r?.generated_at === "string" && Date.parse(r.generated_at) >= Date.parse(process.env.START);
+            if (!Array.isArray(rows) || rows.length === 0 || !rows.every(fresh)) {
+              console.error("pots.json was not emitted by this run: dev would show the committed copy");
+              process.exit(1);
+            }
+            const asOf = read("economy.json")?.as_of;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(process.env.TOWN_DATE) || asOf !== process.env.TOWN_DATE) {
+              console.error(`economy.json is as of ${asOf}, the Town HEAD is ${process.env.TOWN_DATE}: dev would show the committed copy`);
+              process.exit(1);
+            }
+            console.log(`pots.json: ${rows.length} pot-epoch rows from this run; economy.json as of ${asOf}`);
+          '
+          echo "the seam folded from postmark-town/postmark main at $(git -C .postmark-checkout rev-parse HEAD)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: town-seam
+          path: |
+            src/data/postmark/pots.json
+            src/data/postmark/deeds.json
+            src/data/postmark/economy.json
+          if-no-files-found: error
+          retention-days: 3
+
   deploy:
-    needs: cut-release-tag
-    if: ${{ !cancelled() && (needs.cut-release-tag.result == 'success' || needs.cut-release-tag.result == 'skipped') }}
+    needs: [cut-release-tag, town-seam]
+    # town-seam is skipped on the release lane and must succeed on the
+    # snapshot lane: a failed fold stops the dev deploy rather than shipping
+    # the committed seam.
+    if: ${{ !cancelled() && (needs.cut-release-tag.result == 'success' || needs.cut-release-tag.result == 'skipped') && (needs.town-seam.result == 'success' || needs.town-seam.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - name: Decide the lane
@@ -241,6 +317,38 @@ jobs:
           BUILD_CODE_REF: ${{ steps.pin.outputs.tag || github.ref_name }}
           PUBLIC_CHANNEL: ${{ steps.lane.outputs.channel }}
         run: node tools/fetch-town.mjs
+
+      # The town-seam job's fold, over the train's committed copy (see that
+      # job). Snapshot lane only; the release lane keeps its overlay from main.
+      # The artifact was written by a job that ran town code, so it lands
+      # outside the tree, and only the three named files cross into it: each a
+      # regular file (never a link) that parses as JSON, or the deploy stops.
+      - name: Download the funding seam the town-seam job folded (snapshot lane)
+        if: steps.lane.outputs.channel == 'snapshot' && steps.pin.outputs.skip != 'true'
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: town-seam
+          path: ${{ runner.temp }}/town-seam
+      - name: Take the funding seam into the build (snapshot lane)
+        if: steps.lane.outputs.channel == 'snapshot' && steps.pin.outputs.skip != 'true'
+        env:
+          SEAM_DIR: ${{ runner.temp }}/town-seam
+        run: |
+          # every file is checked before any is copied, so a refusal leaves the
+          # committed seam whole
+          for f in pots.json deeds.json economy.json; do
+            src="$SEAM_DIR/$f"
+            if [ ! -f "$src" ] || [ -L "$src" ]; then
+              echo "::error::the town-seam artifact has no regular file $f"
+              exit 1
+            fi
+            SRC="$src" node -e 'JSON.parse(require("node:fs").readFileSync(process.env.SRC, "utf8"))' \
+              || { echo "::error::the town-seam artifact's $f is not JSON"; exit 1; }
+          done
+          for f in pots.json deeds.json economy.json; do
+            cp "$SEAM_DIR/$f" "src/data/postmark/$f"
+          done
+          echo "funding seam taken from the town-seam artifact (its log names the Town sha)"
 
       # THE SETTLEMENT NUMBER ONLY EXISTS UP HERE (postmark#2923). The staged
       # world-state export is stamped with the settlement it reflects, and the

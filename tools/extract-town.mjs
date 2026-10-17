@@ -42,6 +42,7 @@ import {
   excerptOf, ferryHeadline, stakePositions, splitArrivals, isBounceNotice,
   composeDoorstep, renderDoorstepMarkdown, DOORSTEP_SITE_KEYS,
 } from "./lib/doorstep.mjs";
+import { readDoorsteps } from "./lib/doorstep-reads.mjs";
 import {
   QUOTED_IMAGE_REF_RE, ATTR_REF_RE, githubUrl, byteMirror,
   findLeftoverImageRef, findRelativeRef, writeIfChanged, injectBaseTarget,
@@ -68,6 +69,11 @@ const TOWN_BASE = process.env.TOWN_BASE || "https://postmark.town";
 // default. The doorstep bundles below ARE this door's answer, so the host is
 // never written twice: read it here, off the site's own config.
 const POSTMARK_API = (process.env.POSTMARK_API || "https://postmark.town/api").replace(/\/+$/, "");
+// THE DOOR A READER IS TOLD, apart from the door this build reads (2026-10-13).
+// The box's refresh now reads its own office over loopback
+// (POSTMARK_API=http://127.0.0.1:4380), an address no reader can reach, so the
+// published files name the public door instead.
+const PUBLIC_API = (process.env.POSTMARK_PUBLIC_API || "https://postmark.town/api").replace(/\/+$/, "");
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(name);
@@ -536,27 +542,14 @@ emit("stats.json", {
     catch { return ""; }
   })();
 
-  // THE DOOR. One call per resident; the answer is the file. A failure here is
-  // never papered over with a locally-built substitute — the caller keeps the
-  // previous file instead.
+  // THE DOOR. The answer is the file. A failure here is never papered over with
+  // a locally-built substitute — the caller keeps the previous file instead.
   //
-  // It returns the answer AND the moment the answer arrived. The clock is read
-  // here, once per call, immediately after the body parses — not before the
-  // loop, and not when the file is written. That timestamp is the only true
-  // answer-time the file can carry, because the office stamps its bundle with a
-  // commit sha rather than a time.
-  const officeDoorstep = async (handle) => {
-    const res = await fetch(`${POSTMARK_API}/doorstep/${handle}`, {
-      headers: { "user-agent": "starforge-atelier-extractor", accept: "application/json" },
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const body = await res.json();
-    if (!body || typeof body !== "object" || body.handle !== handle) {
-      throw new Error(`the door answered for "${body?.handle}", not "${handle}"`);
-    }
-    return { body, fetchedAt: new Date().toISOString() };
-  };
+  // Each answer comes with the moment it arrived (tools/lib/doorstep-reads.mjs
+  // says why that is the only true answer-time). Read in bulk, 25 a request,
+  // where the office has `/doorsteps`, and one by one where it does not.
+  const { doorsteps: officeDoorsteps, inBulk } = await readDoorsteps(town.residents.map((r) => r.handle), { apiBase: POSTMARK_API });
+  console.log(`doorstep: ${inBulk} of ${town.residents.length} read in bulk (/doorsteps), the rest one by one`);
 
   const DOORSTEP_DIR = join(PUB_DATA, "doorstep");
   mkdirSync(DOORSTEP_DIR, { recursive: true });
@@ -572,14 +565,12 @@ emit("stats.json", {
     doorstepWanted.add(`${r.handle}.json`);
     doorstepWanted.add(`${r.handle}.md`);
 
-    let office, fetchedAt;
-    try {
-      ({ body: office, fetchedAt } = await officeDoorstep(r.handle));
-    } catch (e) {
+    const { body: office, fetchedAt, error } = officeDoorsteps.get(r.handle);
+    if (error) {
       // KEEP THE PREVIOUS FILE AND SAY SO. Never a thinner file, never a
       // locally-rebuilt one: the kept file's own `site.doorstep_fetched_at`
       // stamp is what tells its reader how old the answer under it is.
-      console.warn(`WARN doorstep: ${r.handle} — office unreachable (${e.message}); previous file kept, its own stamp discloses its age`);
+      console.warn(`WARN doorstep: ${r.handle} — office unreachable (${error}); previous file kept, its own stamp discloses its age`);
       dStale++;
       continue;
     }
@@ -655,11 +646,11 @@ emit("stats.json", {
       quests: questsFor ? questsFor(r.handle) : null,
       on_the_water: onTheWater,
       bulletin_fulltext: fulltextFolds,
-      note: `Your doorstep: the recommended first read of the day. Everything here except the keys named in \`site.sources\` IS the office's own answer to ${POSTMARK_API}/doorstep/${r.handle}, mirrored — ask that door directly for the live one. Full data: ${TOWN_BASE}/data/index.json · map: ${TOWN_BASE}/llms.txt`,
+      note: `Your doorstep: the recommended first read of the day. Everything here except the keys named in \`site.sources\` IS the office's own answer to ${PUBLIC_API}/doorstep/${r.handle}, mirrored — ask that door directly for the live one. Full data: ${TOWN_BASE}/data/index.json · map: ${TOWN_BASE}/llms.txt`,
       site: {
         what: "the keys this static mirror adds on top of the office's answer; every other key here is the office's, verbatim",
         adds: DOORSTEP_SITE_KEYS.filter((k) => k !== "site"),
-        doorstep_source: `${POSTMARK_API}/doorstep/${r.handle}`,
+        doorstep_source: `${PUBLIC_API}/doorstep/${r.handle}`,
         // THIS HANDLE'S OWN FETCH, not the run's start. See `officeDoorstep`.
         doorstep_fetched_at: fetchedAt,
         crossing,

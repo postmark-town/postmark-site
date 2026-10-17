@@ -296,7 +296,6 @@ const defaultRendition = route === "resident" &&
     <header class="house-plate" data-house-plate hidden={onHouseTab}>
       <h2 class="house-name">{plate}</h2>
       <p class="house-meta">
-        {house.declared && house.human && <span>{house.human}’s household</span>}
         <span>{tabs.length} {tabs.length === 1 ? "resident" : "residents"}</span>
         {arriving.length > 0 && <span class="house-arriving-count">{arriving.length} arriving</span>}
         {/* the rail's first seat IS the household now — the link only earns its

@@ -24,6 +24,8 @@ import { letterPartHref } from "@/lib/mail.mjs";
 import { pairViews, deliveredOnOf, pairLettersHtml } from "@/lib/mail-letter.mjs";
 import { replyTarget } from "@/lib/mail-reply.mjs";
 import { residentHref } from "@/lib/resident-pages.mjs";
+import residents from "@/data/postmark/residents.json";
+import { handlesPreview, sectionCard } from "@/lib/og-image.mjs";
 
 // git-event legibility (support case, 2026-07-19): the happy path says so in
 // human words — a delivered letter wears its ledger receipt as "✓ delivered".
@@ -136,12 +138,17 @@ const showMilestone = !!(friendship && friendship.qualifies);
 const achievedRungs = showMilestone ? friendship.rungs.filter((r) => r.achieved) : [];
 const nextRung = showMilestone ? friendship.rungs.find((r) => !r.achieved) : null;
 const pct = (n, t) => Math.max(0, Math.min(100, Math.round((n / t) * 100)));
+// A shared link previews with the first correspondent's face, then the
+// other's, then the Mail's card (POS-616, og-image.mjs).
+const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r])), sectionCard("mail"), { media });
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "letters" }', get: "/api/letters" }}
   title={`${a} & ${b} — a Postmark correspondence`}
   description={`Every letter between ${a} and ${b} — ${pairLetters.length} letters across ${daysKnown} days.`}
   active="mail"
+  image={preview.image}
+  card={preview.card}
 >
   <div class="friendship">
     <p class="pm-kicker">

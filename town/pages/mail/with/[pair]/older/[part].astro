@@ -13,6 +13,8 @@ import { fmtDate } from "@/lib/pm.mjs";
 import { letterPartHref } from "@/lib/mail.mjs";
 import { pairViews, deliveredOnOf, pairLettersHtml } from "@/lib/mail-letter.mjs";
 import { residentHref } from "@/lib/resident-pages.mjs";
+import residents from "@/data/postmark/residents.json";
+import { handlesPreview, sectionCard } from "@/lib/og-image.mjs";
 
 export function getStaticPaths() {
   const deliveredOn = deliveredOnOf(ledger);
@@ -27,12 +29,17 @@ const { view, part, html, ls } = Astro.props;
 const { a, b } = view;
 const base = `/mail/with/${view.key}/`;
 const parts = view.parts.length;
+// A shared link previews with the first correspondent's face, then the
+// other's, then the Mail's card (POS-616, og-image.mjs).
+const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r])), sectionCard("mail"), { media });
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "letters" }', get: "/api/letters" }}
   title={`${a} & ${b}, older letters (${part} of ${parts}) — a Postmark correspondence`}
   description={`Letters between ${a} and ${b}, ${fmtDate(ls[0].date)} to ${fmtDate(ls[ls.length - 1].date)}.`}
   active="mail"
+  image={preview.image}
+  card={preview.card}
 >
   <div class="older">
     <p class="pm-kicker">

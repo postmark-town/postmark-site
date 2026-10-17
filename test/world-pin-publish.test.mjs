@@ -25,9 +25,18 @@ const reader = (files) => (p) => {
   const e = new Error(`ENOENT ${key}`); e.code = "ENOENT"; throw e;
 };
 
-test("the spec's sha is the pin, and anything that is not a pinned sha is refused as one", () => {
+// THE LEGACY FIXTURE (POS-499): the floor was re-spelled to postmark-town in the
+// S102 carry, but older release tags' package.json and lockfiles still carry the
+// old owner's spelling, and a hold reads the tag's own floor. The readers are
+// owner-agnostic, and this keeps them so. Named in test/no-old-owner.test.mjs.
+test("an older release tag's floor, in the old owner's spelling, still reads", () => {
   assert.equal(shaFromSpec(`github:keeminlee/postmark-world#${SHA}`), SHA);
-  assert.equal(shaFromSpec("github:keeminlee/postmark-world#main"), null, "a branch is a moving target, not a pin");
+  assert.equal(shaFromResolved(`git+ssh://git@github.com/keeminlee/postmark-world.git#${SHA}`), SHA);
+});
+
+test("the spec's sha is the pin, and anything that is not a pinned sha is refused as one", () => {
+  assert.equal(shaFromSpec(`github:postmark-town/postmark-world#${SHA}`), SHA);
+  assert.equal(shaFromSpec("github:postmark-town/postmark-world#main"), null, "a branch is a moving target, not a pin");
   assert.equal(shaFromSpec("^1.2.3"), null);
   assert.equal(shaFromSpec(undefined), null);
 });
@@ -41,9 +50,9 @@ test("the ordinary build reads the resolved sha out of the LOCKFILE, and says wh
   const p = worldPin({
     builtAt: "2026-09-07T09:00:00.000Z",
     readJson: reader({
-      "package-lock.json": { packages: { "node_modules/postmark-world": { resolved: `git+ssh://git@github.com/keeminlee/postmark-world.git#${SHA}` } } },
+      "package-lock.json": { packages: { "node_modules/postmark-world": { resolved: `git+ssh://git@github.com/postmark-town/postmark-world.git#${SHA}` } } },
       "node_modules/postmark-world/package.json": { name: "postmark-world" },
-      "package.json": { dependencies: { "postmark-world": `github:keeminlee/postmark-world#${SHA}` } },
+      "package.json": { dependencies: { "postmark-world": `github:postmark-town/postmark-world#${SHA}` } },
     }),
   });
   assert.equal(p.world_pin, SHA);
@@ -61,9 +70,9 @@ test("A PIN AND A LOCK THAT DISAGREE: both are named and the note fires — the 
   const B = "1111111111111111111111111111111111111111";
   const p = worldPin({
     readJson: reader({
-      "package-lock.json": { packages: { "node_modules/postmark-world": { resolved: `git+https://github.com/keeminlee/postmark-world.git#${B}` } } },
+      "package-lock.json": { packages: { "node_modules/postmark-world": { resolved: `git+https://github.com/postmark-town/postmark-world.git#${B}` } } },
       "node_modules/postmark-world/package.json": {},
-      "package.json": { dependencies: { "postmark-world": `github:keeminlee/postmark-world#${SHA}` } },
+      "package.json": { dependencies: { "postmark-world": `github:postmark-town/postmark-world#${SHA}` } },
     }),
   });
   assert.equal(p.world_pin, SHA, "what the repo asks for");
@@ -76,9 +85,9 @@ test("the lockfile's URL scheme does not decide whether the field can speak", ()
   // added. Pinning the reader to one of those would make the field go quiet the
   // next time somebody re-added it another way — the same never-speaks failure.
   for (const url of [
-    `git+ssh://git@github.com/keeminlee/postmark-world.git#${SHA}`,
-    `git+https://github.com/keeminlee/postmark-world.git#${SHA}`,
-    `https://github.com/keeminlee/postmark-world.git#${SHA}`,
+    `git+ssh://git@github.com/postmark-town/postmark-world.git#${SHA}`,
+    `git+https://github.com/postmark-town/postmark-world.git#${SHA}`,
+    `https://github.com/postmark-town/postmark-world.git#${SHA}`,
   ]) assert.equal(shaFromResolved(url), SHA, url);
   // A registry tarball has no sha, and null there is a real state.
   assert.equal(shaFromResolved("https://registry.npmjs.org/x/-/x-1.0.0.tgz"), null);
@@ -88,8 +97,8 @@ test("the lockfile's URL scheme does not decide whether the field can speak", ()
 test("no lockfile falls back to the installed package, and says which source answered", () => {
   const p = worldPin({
     readJson: reader({
-      "node_modules/postmark-world/package.json": { _resolved: `github:keeminlee/postmark-world#${SHA}` },
-      "package.json": { dependencies: { "postmark-world": `github:keeminlee/postmark-world#${SHA}` } },
+      "node_modules/postmark-world/package.json": { _resolved: `github:postmark-town/postmark-world#${SHA}` },
+      "package.json": { dependencies: { "postmark-world": `github:postmark-town/postmark-world#${SHA}` } },
     }),
   });
   assert.equal(p.world_installed, SHA);
@@ -101,7 +110,7 @@ test("neither source can answer: null with reasons, never an invented sha", () =
   const p = worldPin({
     readJson: reader({
       "node_modules/postmark-world/package.json": { name: "postmark-world" },
-      "package.json": { dependencies: { "postmark-world": `github:keeminlee/postmark-world#${SHA}` } },
+      "package.json": { dependencies: { "postmark-world": `github:postmark-town/postmark-world#${SHA}` } },
     }),
   });
   assert.equal(p.world_installed, null);
@@ -121,7 +130,7 @@ test("a dependency that names a branch is called out as a moving target", () => 
   const p = worldPin({
     readJson: reader({
       "node_modules/postmark-world/package.json": {},
-      "package.json": { dependencies: { "postmark-world": "github:keeminlee/postmark-world#main" } },
+      "package.json": { dependencies: { "postmark-world": "github:postmark-town/postmark-world#main" } },
     }),
   });
   assert.equal(p.world_pin, null, "a branch is not a pin, and null says so");
@@ -133,7 +142,7 @@ test("code_ref comes from the SAME env var build.json takes it from, and is null
   // stamps on one page must not disagree about which ref built the site.
   const files = {
     "node_modules/postmark-world/package.json": {},
-    "package.json": { dependencies: { "postmark-world": `github:keeminlee/postmark-world#${SHA}` } },
+    "package.json": { dependencies: { "postmark-world": `github:postmark-town/postmark-world#${SHA}` } },
   };
   const shipped = worldPin({ readJson: reader(files), env: { BUILD_CODE_REF: "release/2026-w37.4" } });
   assert.equal(shipped.code_ref, "release/2026-w37.4");
@@ -153,7 +162,7 @@ test("THE CHANNEL SAYS WHETHER THE PIN IS A BLESSING, because a sha alone cannot
   // the branch's lockfile pins. So the lane is the answer, and it is published.
   const files = {
     "node_modules/postmark-world/package.json": {},
-    "package.json": { dependencies: { "postmark-world": `github:keeminlee/postmark-world#${SHA}` } },
+    "package.json": { dependencies: { "postmark-world": `github:postmark-town/postmark-world#${SHA}` } },
   };
   const dev = worldPin({ readJson: reader(files), env: { PUBLIC_CHANNEL: "snapshot", BUILD_CODE_REF: "jetto/atlas-build" } });
   assert.equal(dev.channel, "snapshot");

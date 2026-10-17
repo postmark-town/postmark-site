@@ -30,6 +30,7 @@ import WorldTourHold from '@/components/WorldTourHold.astro';
 import WorldCockpit from '@/components/WorldCockpit.astro';
 import HalloweenWorldFrame from '@/components/HalloweenWorldFrame.astro';
 import HalloweenMotif from '@/components/HalloweenMotif.astro';
+import { sectionCard, LARGE } from '@/lib/og-image.mjs';
 
 // Early identity bridge: adopt the site's OAuth session into the viewer's Bearer
 // slot (localStorage['pm_key']) BEFORE the viewer boots, so a signed-in visitor's
@@ -77,8 +78,34 @@ const BRIDGE = `<script>(function(){try{var t=JSON.parse(localStorage.getItem("p
 const LANDING = `<script>(function(){try{var k="pm_world_painting_only";` +
   `if(localStorage.getItem(k)===null)localStorage.setItem(k,"0");}catch(e){}})();</script>`;
 
+// THE SHARE CARD (POS-616). The viewer's shell carries a <title> and nothing a
+// link preview reads, so a /world link shared on Discord, Reddit or X previewed
+// with no picture at all. The tags are BaseLayout's, written here because this
+// page emits its own document: the title is the viewer's own (one source), the
+// description the town's own line, and the picture the World's section card
+// (og-image.mjs; the banner until one is drawn — no settlement publishes a
+// snapshot image, only STATE/snapshot/<n>/entities.json). Preview scrapers do
+// not read the robots meta, so `noindex` stays as it is.
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+const shareTitle = (/<title>([^<]*)<\/title>/i.exec(rawHtml)?.[1] ?? "The World — Postmark").trim();
+const shareText = "The living map of Postmark, a town where humans and AI build a world together.";
+const shareImage = new URL(sectionCard("world"), Astro.site).href;
+const shareUrl = new URL(Astro.url.pathname, Astro.site).href;
+const SHARE = [
+  `<meta name="description" content="${esc(shareText)}">`,
+  `<meta property="og:type" content="website">`,
+  `<meta property="og:url" content="${esc(shareUrl)}">`,
+  `<meta property="og:title" content="${esc(shareTitle)}">`,
+  `<meta property="og:description" content="${esc(shareText)}">`,
+  `<meta property="og:image" content="${esc(shareImage)}">`,
+  `<meta name="twitter:card" content="${LARGE}">`,
+  `<meta name="twitter:title" content="${esc(shareTitle)}">`,
+  `<meta name="twitter:description" content="${esc(shareText)}">`,
+  `<meta name="twitter:image" content="${esc(shareImage)}">`,
+].join("\n");
+
 const html = rawHtml.replace(/<head>/i,
-  `<head>\n<meta name="robots" content="noindex,nofollow">\n${BRIDGE}\n${LANDING}`);
+  `<head>\n<meta name="robots" content="noindex,nofollow">\n${SHARE}\n${BRIDGE}\n${LANDING}`);
 ---
 <Fragment set:html={html} />
 <WorldSignIn />
@@ -184,7 +211,7 @@ const html = rawHtml.replace(/<head>/i,
      restored by being loaded rather than by unwinding a lens. -->
 <script is:inline>
   (function () {
-    var RAW = "https://raw.githubusercontent.com/keeminlee/postmark-world";
+    var RAW = "https://raw.githubusercontent.com/postmark-town/postmark-world";
     var asked = new URLSearchParams(location.search).get("crossing");
     var at = asked == null ? null : Number(asked);
     var armed = at != null && isFinite(at);
@@ -333,9 +360,20 @@ const html = rawHtml.replace(/<head>/i,
         s.right = "auto"; s.bottom = "14px"; s.top = "auto";
         s.alignItems = "flex-start";
       } else {
-        var wa = document.getElementById("pm-world-auth");
-        var waBox = wa && wa.getClientRects().length ? wa.getBoundingClientRect() : null;
-        s.top = Math.round(waBox ? waBox.bottom + 10 : 92) + "px";
+        // Under BOTH the map's control row and the site's folded pill (WLD-47),
+        // whichever reaches lower. The pill, not the whole cluster: an open list
+        // is a moment, and the pill is where the cluster lives. The control row
+        // is measured too because the pill may sit BESIDE it, not under it.
+        var low = 0;
+        ["#pm-world-auth [data-wa-menu]", ".wv-mapctl"].forEach(function (sel) {
+          var el = document.querySelector(sel);
+          if (el && el.getClientRects().length) low = Math.max(low, el.getBoundingClientRect().bottom);
+        });
+        if (!low) {
+          var wa = document.getElementById("pm-world-auth");
+          if (wa && wa.getClientRects().length) low = wa.getBoundingClientRect().bottom;
+        }
+        s.top = Math.round(low ? low + 10 : 92) + "px";
         s.bottom = "auto"; s.left = "10px"; s.right = "10px";
         s.alignItems = "flex-end";
       }
@@ -361,6 +399,9 @@ const html = rawHtml.replace(/<head>/i,
       document.body.appendChild(panel);
       place();
       window.addEventListener("resize", place);
+      // the site cluster says when it has moved (it re-measures as the viewer's
+      // control row arrives and changes size), and this hangs under it again
+      window.addEventListener("pm-world-auth:placed", place);
       openEl = panel.querySelector(".pm-tt-open");
       whenEl = panel.querySelector(".pm-tt-when");
       backEl = panel.querySelector(".pm-tt-back");
@@ -446,7 +487,16 @@ const html = rawHtml.replace(/<head>/i,
     font-family: var(--pm-mono, ui-monospace, monospace);
     display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
     max-width: min(20rem, calc(100vw - 28px));
+    /* THE BOX IS NOT A CONTROL (WLD-49, 2026-10-14). On a phone place() pins it
+       left AND right, so it is as wide as its max-width while the pill sits at
+       its end: measured on prod at 390 and 360, a 320×29 box round a 118×29
+       pill, and every tap on the 202 px beside the pill landed on the box
+       instead of the map under it. A desk with the panel open had the same
+       strip beside the pill (188×29). So the box lets taps through, and only
+       what it holds (the pill, the open body) takes them. */
+    pointer-events: none;
   }
+  .pm-tt > * { pointer-events: auto; }
   .pm-tt-open {
     display: inline-flex; align-items: center; gap: 0.5em; cursor: pointer;
     padding: 0.55em 0.9em; border-radius: 999px;
@@ -496,6 +546,22 @@ const html = rawHtml.replace(/<head>/i,
   @media (max-width: 30rem) {
     .pm-tt-body { width: auto; }
     .pm-tt-open { align-self: flex-end; }
+  }
+
+  /* AN OPEN LIST OF THE MAP'S IS ON TOP (WLD-47; Darko, 2026-10-14). On a phone
+     the site's floating chrome (the folded nav, time travel) is fixed at z-index
+     9000 and 8000, over everything the viewer draws, so an open search list's
+     first rows tapped "← Postmark" or "Time travel" instead of the house
+     (measured 2026-10-14 at 390 px: rows 1 and 2). While the viewer shows a list
+     (search results, the bell's phone menu), that chrome steps aside, and it
+     comes back the moment the list closes. Phone only: above 720 px the cluster
+     sits in the rail and time travel bottom-left, clear of both lists, and the
+     desktop page stays as it was. The 720 is the viewer's (world-nav-seat.mjs). */
+  @media (max-width: 720px) {
+    body:has(.wv-search-results:not([hidden]), .wv-bell-menu:not([hidden])) #pm-world-auth:not(.wa-slotted),
+    body:has(.wv-search-results:not([hidden]), .wv-bell-menu:not([hidden])) .pm-tt {
+      visibility: hidden;
+    }
   }
 
   /* ── THE PILL STANDS DOWN INSIDE THE COCKPIT (2026-08-28, founder-ruled) ──

@@ -391,7 +391,8 @@ test("THE PINS are on the built board: the chapbook a new-tab link crediting Dom
   const pin = (key) => new RegExp(`<a[^>]*data-pin="${key}"[^>]*>([\\s\\S]*?)</a>`).exec(board);
   const chap = pin("chapbook");
   assert.ok(chap, "the chapbook is not pinned on the board");
-  assert.match(chap[0], /href="https:\/\/foundoutanyway\.github\.io\/pidgey\/lamp-flower-chapbook\.html"/);
+  // the chapbook's own folder on Dom Pidgey's site (81fda8ff0), no longer its old .html page
+  assert.match(chap[0], /href="https:\/\/foundoutanyway\.github\.io\/pidgey\/lamp-flower-chapbook\/"/);
   assert.match(chap[0], /target="_blank"/);
   assert.match(chap[1], /by resident pigeon Dom Pidgey/);
   assert.ok(chap[1].replace(/&#39;/g, "'").includes("The pigeon's compendium of postmark.town, for old residents and new arrivals alike."));

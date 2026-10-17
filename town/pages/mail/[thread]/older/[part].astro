@@ -12,6 +12,8 @@ import { fmtDate, threadTitle } from "@/lib/pm.mjs";
 import { letterPartHref } from "@/lib/mail.mjs";
 import { threadViews, threadLettersHtml } from "@/lib/mail-letter.mjs";
 import { residentHref } from "@/lib/resident-pages.mjs";
+import residents from "@/data/postmark/residents.json";
+import { handlesPreview, openerFirst, sectionCard } from "@/lib/og-image.mjs";
 
 export function getStaticPaths() {
   return threadViews(threads, letters).flatMap(({ thread, parts }) =>
@@ -24,12 +26,19 @@ export function getStaticPaths() {
 const { thread, part, parts, ls } = Astro.props;
 const title = threadTitle(thread.key);
 const base = `/mail/${thread.key}/`;
+// A shared link previews with the opener's face, then the other
+// correspondent's, then the Mail's card (POS-616, og-image.mjs).
+const opener = letters.find((l) => l.id === thread.letterIds[0])?.from;
+const preview = handlesPreview(openerFirst(thread.participants, opener),
+  new Map(residents.map((r) => [r.handle, r])), sectionCard("mail"), { media });
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "letter" }', get: "/api/letters/{id}" }}
   title={`“${title}”, older letters (${part} of ${parts}) — a Postmark conversation`}
   description={`${thread.participants.join(", ")} — letters ${fmtDate(ls[0].date)} to ${fmtDate(ls[ls.length - 1].date)}.`}
   active="mail"
+  image={preview.image}
+  card={preview.card}
 >
   <div class="older">
     <p class="pm-kicker">

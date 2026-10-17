@@ -115,6 +115,28 @@ export const HOLO_NAME_LINE =
 // ruling on the market's cards: "THE MAIN PAGE CARDS EXPLAIN WHAT THE THING
 // IS" — and the cards were leading with close mechanics instead. The full
 // paragraph stays on the pot's own fund page; a card owes a reader only this.
+// THE THANK-YOU, one pot's (the town's WHITE_PAGES/fund-thank-you.json, scoped
+// by its `pot`; Darko 2026-10-17 13:41, Kickstarter-style: "if the pot fills,
+// every household whose gifts to it total $10 or more gets a Postmark sticker",
+// said where a giver looks, not buried in the fine print). Carried only whole:
+// the pot it belongs to, a whole-dollar threshold and both sentences, else null. how_url is the private address route, null until it
+// exists (and https only); art is the sticker image's slot, null until the
+// design sitting (a site-relative path or https only). A torn link or image
+// drops itself, never the thank-you.
+export function thankYouOf(raw) {
+  const t = raw && typeof raw === "object" ? raw : null;
+  const str = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const min = Number(t?.min_usd);
+  if (!t || !POT_ID_RE.test(String(t.pot ?? "")) || !Number.isInteger(min) || min < 1 || !str(t.card) || !str(t.line)) return null;
+  const how = str(t.how_url);
+  const art = str(t.art);
+  return {
+    pot: String(t.pot), min_usd: min, card: str(t.card), line: str(t.line),
+    how_url: how && /^https:\/\/\S+$/.test(how) ? how : null,
+    art: art && (/^https:\/\/\S+$/.test(art) || /^\/[^/\s]\S*$/.test(art)) ? art : null,
+  };
+}
+
 export function potGist(source) {
   const s = String(source ?? "").trim();
   if (!s) return "";
@@ -184,6 +206,28 @@ export const INTAKE_BY_POT = {
  * decide where a stranger's money went, which is the one judgement this whole
  * lane refuses to make."
  */
+/**
+ * THE CAP ON ONE GIFT (POS-661, settled A): what one gift to this pot may be,
+ * for the fund page. D5 refuses a gift past a capped pot's posted need whole,
+ * and no rail hands a payment back by itself, so the page asks for no more
+ * than the pot can take. Answers `{ cap, full, once }`:
+ *   cap   the headroom in whole dollars for a capped open pot, else null
+ *         (uncapped, targetless, or not open: no cap to hold)
+ *   full  an open capped pot with nothing left: the page offers no way to pay
+ *   once  a pot that closes when it fills (POS-653): it has no next epoch
+ * The headroom is the row's (pots.json, as of the site's last data refresh);
+ * a gift since can only make it smaller, and the office's intake refuses past
+ * the true one either way.
+ */
+export function fundCapOf(pot) {
+  const open = pot?.status === "open";
+  const target = pot?.target ?? null;
+  const uncapped = pot?.uncapped === true || target == null;
+  const headroom = target == null ? null : Math.max(0, target - (pot?.received ?? 0));
+  const cap = open && !uncapped ? headroom : null;
+  return { cap, full: cap === 0, once: pot?.cadence === "once" };
+}
+
 export function intakeFor(pot) {
   return INTAKE_BY_POT[String(pot)] ?? INTAKE;
 }
@@ -463,6 +507,7 @@ export function toPot(raw) {
   if (received < 0) return bad("received_usd is negative");
 
   const close = typeof raw.close === "string" && raw.close.trim() ? raw.close.trim() : null;
+  const closesAtFill = raw.closes_at_fill === true;
 
   // null is a REAL state, not a missing field: deriveEpochClose refuses to
   // close a pot with no beneficiary, so an unnamed beneficiary is a thing the
@@ -497,6 +542,17 @@ export function toPot(raw) {
     // the routing truth and is never rewritten — this is the label beside it.
     beneficiaryLabel: beneficiaryLabel(beneficiary),
     cadence: String(raw.epoch_cadence ?? "").trim() || null,
+    // A ONE-TIME POT: no close date, it closes when it fills (the pot file's
+    // closes_at_fill, Darko 2026-10-16). Every surface that would name a month
+    // for it names the fill instead, and wears the one-time sticker
+    // (OneTimeSticker.astro), because the epoch row it rides on is the
+    // emitter's bookkeeping, not a month the pot closes in.
+    closesAtFill,
+    // WHAT THE DOLLARS BUY, a name and an https link, or null (the pot file's
+    // `buys`, Darko 2026-10-17). A torn one is dropped, not the pot.
+    buys: typeof raw.buys?.name === "string" && raw.buys.name.trim()
+      && typeof raw.buys?.url === "string" && /^https:\/\/\S+$/.test(raw.buys.url.trim())
+      ? { name: raw.buys.name.trim(), url: raw.buys.url.trim() } : null,
     uncapped,
     // ── WHAT A CLOSE DOES HERE ───────────────────────────────────────────
     // The pot file's own word, and the thing every money surface branches on.
@@ -549,7 +605,8 @@ export function toPot(raw) {
     firstClose: FIRST_CLOSE_RE.test(String(raw.first_close ?? "").trim())
       ? String(raw.first_close).trim() : null,
     firstCloseLabel: firstCloseLabel(raw.first_close),
-    epochLabel: epochLabel(epoch),
+    // null on a one-time pot: "October 2026" beside it read as a monthly pot.
+    epochLabel: closesAtFill ? null : epochLabel(epoch),
     // DERIVED, and deliberately not stored: whether a close can ever run on
     // this pot. THE EXPLICIT WORD IS PRIMARY, both ways — "elastic" and
     // "epoch" close, and "none" does not close even if a target were posted.
@@ -633,6 +690,17 @@ export function livePots(rows) {
     drafts: all.filter((p) => p.status === "draft"),
     malformed,
   };
+}
+
+// The thank-you, as tools/extract-seam.mjs emitted it, or null (no emission
+// yet, or a torn one): a surface says nothing rather than half. Only the pot it
+// names shows it (thanksFor).
+export function loadThankYou({ path = null } = {}) {
+  return thankYouOf(readEmission("fund-thank-you.json", path));
+}
+
+export function thanksFor(thanks, pot) {
+  return thanks && pot && thanks.pot === pot.pot ? thanks : null;
 }
 
 export function loadPots({ path = null } = {}) {

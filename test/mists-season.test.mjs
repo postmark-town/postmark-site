@@ -85,6 +85,8 @@ test("the sprinkled motifs: absent at 243, present at 244, decorative and still 
     if (/animation:/.test(html)) assert.match(html, /@media \(prefers-reduced-motion: reduce\)/, `${k} stops under reduced motion`);
     assert.doesNotMatch(html, /--pm-|siteSkinCSS/i, `${k}: motifs only`);
   }
+  // the World page's lite mode (WLD-43): the viewer marks <html> with wv-lite, and the bat holds still
+  assert.match(on.world, /html\.wv-lite \.wv-worldline::after \{ animation: none; \}/, "the World page's bat holds still in lite mode");
   assert.equal((on.home.match(/class="pm-hw-crow"/g) ?? []).length, 3, "three crows on the hero's rooftops");
   assert.equal(PERCHES.length, 3);
   assert.match(on.header, /Math\.random\(\)>0\.34/, "the bat crosses on about one load in three");

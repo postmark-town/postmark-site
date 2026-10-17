@@ -29,6 +29,14 @@
 // the script to paint the signed-in/out state, so nothing flickers.
 ---
 <div id="pm-world-auth" class="wa">
+  {/* THE FOLD (WLD-47; Darko, 2026-10-14 11:44 EDT: "B, the fold"). On a phone
+      the links below stand down behind this one pill, and the pill is measured
+      into the patch the map's circles leave free (src/lib/world-nav-seat.mjs).
+      Everywhere else the pill is not shown and the list is display:contents, so
+      the seated rail and the desktop pill are exactly what they were. */}
+  <button type="button" class="wa-btn wa-menu" data-wa-menu aria-expanded="false"
+    aria-controls="pm-world-auth-list" title="Postmark: the town, the replay, conversations, the atlas, sign in">☰ Postmark</button>
+  <div class="wa-list" id="pm-world-auth-list">
   <a class="wa-btn wa-back" href="/" title="Back to Postmark — the town">← Postmark</a>
   {/* THE LENS STRIP, CARRIED IN. Every other page in the World family — the
       replay, the conversations record, the atlas — renders a strip naming all
@@ -46,6 +54,7 @@
   <a class="wa-btn wa-lens" href="/atlas/" title="The Atlas — the town in its holders' own words">the atlas</a>
   <button type="button" class="wa-btn" data-wa-signin hidden>Sign in with GitHub</button>
   <button type="button" class="wa-btn wa-out" data-wa-signout hidden>sign out</button>
+  </div>
 </div>
 
 <script>
@@ -53,6 +62,7 @@
   // mirrors the layout's login island — the kickoff half only, since the code
   // exchange happens on "/" and we return here with the token already stored.
   import { AS, KEYS, buildAuthorizeUrl, tokenIsFresh } from "@/lib/auth.mjs";
+  import { PHONE_QUERY, seatFold } from "@/lib/world-nav-seat.mjs";
 
   const root = document.getElementById("pm-world-auth");
   if (root) (function () {
@@ -141,11 +151,68 @@
       if (root.parentElement !== slot) { slot.appendChild(root); root.classList.add("wa-slotted"); }
       return true;
     };
+    // THE FOLD, ON A PHONE (WLD-47). Floating below 720 px, the cluster is one
+    // "☰ Postmark" pill that opens the list, and the pill is measured into a free
+    // patch beside the map's circles (seatFold). Re-measured whenever the viewer's
+    // control row changes size, so a seventh circle moves the pill instead of
+    // hiding under it. Time travel hangs under whatever this decides, so it is
+    // told each time ("pm-world-auth:placed").
+    const menuBtn = root.querySelector("[data-wa-menu]");
+    const phone = window.matchMedia(PHONE_QUERY);
+    const folded = () => !seated() && phone.matches;
+    const close = () => { root.classList.remove("wa-open"); menuBtn.setAttribute("aria-expanded", "false"); };
+    menuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = !root.classList.contains("wa-open");
+      root.classList.toggle("wa-open", open);
+      menuBtn.setAttribute("aria-expanded", String(open));
+    });
+    // a tap anywhere else, or Escape, puts the list away
+    document.addEventListener("pointerdown", (e) => { if (!root.contains(e.target)) close(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && root.classList.contains("wa-open")) { close(); menuBtn.focus(); } });
+
+    const box = (sel) => { const el = document.querySelector(sel); return el && el.getClientRects().length ? el.getBoundingClientRect() : null; };
+    const place = () => {
+      if (!folded()) {
+        root.style.top = root.style.left = "";
+        close();
+      } else {
+        const row = box(".wv-mapctl-tools");
+        // no row yet (or an older viewer without one): the stylesheet's fallback seat stands
+        if (row) {
+          const pill = menuBtn.getBoundingClientRect();
+          const at = seatFold({ pill, obstacles: [box(".wv-worldmark"), box(".wv-search"), row], rowTop: row.top });
+          root.style.top = at.top + "px";
+          root.style.left = at.left + "px";
+        }
+      }
+      window.dispatchEvent(new Event("pm-world-auth:placed"));
+    };
+    const settle = () => { seat(); place(); };
+
     // the viewer mounts from its own module script; if ours wins the race, wait
     // one frame rather than concluding there is no slot
-    if (!seat()) requestAnimationFrame(seat);
+    if (!seat()) requestAnimationFrame(settle);
+    place();
     // a rotation or a resize can cross the breakpoint in either direction
-    window.addEventListener("resize", seat);
+    window.addEventListener("resize", settle);
+    // the control row arrives with the viewer and changes size with it (the bell
+    // appears with the Mists, a font lands late): watch it, and the pill itself
+    let watching = null;
+    const watch = () => {
+      const row = document.querySelector(".wv-mapctl");
+      if (!row || row === watching || typeof ResizeObserver !== "function") return !!row;
+      watching = row;
+      const ro = new ResizeObserver(() => place());
+      ro.observe(row); ro.observe(menuBtn);
+      const tools = row.querySelector(".wv-mapctl-tools");
+      if (tools) ro.observe(tools);
+      return true;
+    };
+    if (!watch()) {
+      const mo = new MutationObserver(() => { if (watch()) { mo.disconnect(); settle(); } });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
   })();
 </script>
 
@@ -192,26 +259,57 @@
     padding: 4px 6px; text-decoration: none;
   }
   .wa-lens:hover { color: #f6dcae; background: none; border: none; }
-  /* Small screens: the header wants its full width, so the fixed pill drops out
-     of the header row to the bottom-right corner instead of covering the title
-     (Wright's P2 QA, 2026-07-24 — at 375px the top-right pill sat over "TOLD
-     WORLD"; the title is a non-reflowing desktop h1, so the pill must move, not
-     the title). Handle text stays hidden so the floating pill is a light touch
-     over the viewer's content. */
-  /* Where the floating cluster goes on a phone. The viewer hides its rail below
-     720 px, so this is the world page's only sign-in from here down — and every
-     other corner of the painting is spoken for: its controls sit top-right, the
-     walk desk bottom-right, the coordinate chip bottom-centre. Under the
-     world-root's glyph at top-left is the one clear patch, so it goes there and
-     wraps rather than pushing past the screen. Matched to the viewer's own
-     breakpoint deliberately: two numbers here would drift. */
+  /* THE FOLD'S TWO PIECES, OFF A PHONE: the pill is not shown and the list is
+     no box at all (display:contents), so its children are this cluster's own
+     flex items exactly as they were, seated in the rail or floating top-right. */
+  .wa-menu { display: none; }
+  .wa-list { display: contents; }
+  /* ON A PHONE: THE FOLD (WLD-47; Darko, 2026-10-14 11:44 EDT). The viewer hides
+     its rail below 720 px, so this cluster floats over the painting and is the
+     page's only way to sign in or leave. It used to park its five links at a
+     fixed top:50px, "under the world-root's glyph, the one clear patch", and
+     that patch stopped being clear when the search pill (2026-09-13) wrapped the
+     map's circles onto a second line: every circle on a 390 px screen then
+     tapped "replay" or "conversations". Now the links fold behind one
+     "☰ Postmark" pill, and the island measures the pill into a free patch
+     (seatFold, src/lib/world-nav-seat.mjs); the top:50px here is only the
+     seat until the viewer's row exists to measure. right:auto matters: a box
+     stretched to the right edge would lie over the circles even where the pill
+     doesn't. The 720 is the viewer's own breakpoint, held equal by
+     test/world-nav-seat.test.mjs: two numbers here would drift. */
   @media (max-width: 720px) {
-    /* only the FLOATING pill needs to dodge; a seated one is already in the
-       rail's flow and has nothing to cover */
+    /* only the FLOATING cluster folds; a seated one is in the rail's flow */
     .wa:not(.wa-slotted) {
-      top: 50px; left: 10px; right: 10px;
-      flex-wrap: wrap; justify-content: flex-start;
+      top: 50px; left: 10px; right: auto;
+      flex-direction: column; align-items: flex-start; gap: 6px;
     }
-    .wa:not(.wa-slotted) .wa-btn { font-size: 0.66rem; padding: 5px 10px; }
+    /* the pill matches the circles' height, so it reads as part of their row; its
+       width is held to 97 px so it still fits beside the row on a 360 px screen (the
+       patch there is 100 px with the clear space; at 13 px of padding it was 101) */
+    .wa:not(.wa-slotted) .wa-menu {
+      display: inline-flex; align-items: center; height: 2.15rem; box-sizing: border-box;
+      padding: 0 11px; font-size: 0.72rem; white-space: nowrap;
+    }
+    .wa:not(.wa-slotted) .wa-list { display: none; }
+    .wa.wa-open:not(.wa-slotted) .wa-list {
+      display: flex; flex-direction: column; align-items: stretch; gap: 2px;
+      min-width: 12rem; padding: 5px;
+      background: rgba(13, 15, 19, 0.94); border: 1px solid rgba(232, 197, 106, 0.34);
+      border-radius: 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    }
+    /* in the list each link is a row, not a pill */
+    .wa-open:not(.wa-slotted) .wa-list .wa-btn {
+      border: none; background: none; backdrop-filter: none; border-radius: 8px;
+      padding: 9px 12px; font-size: 0.8rem; text-align: left; text-decoration: none;
+    }
+    .wa-open:not(.wa-slotted) .wa-list .wa-btn:hover { background: rgba(232, 197, 106, 0.16); }
+    .wa-open:not(.wa-slotted) .wa-list .wa-lens { font-size: 0.68rem; letter-spacing: 0.14em; }
+    /* sign in is last, and gold: the one action in a list of places */
+    .wa-open:not(.wa-slotted) .wa-list [data-wa-signin],
+    .wa-open:not(.wa-slotted) .wa-list [data-wa-signout] {
+      margin-top: 4px; text-align: center; border-radius: 999px;
+    }
+    .wa-open:not(.wa-slotted) .wa-list [data-wa-signin] { color: #f6dcae; border: 1px solid rgba(232, 196, 139, 0.5); }
+    .wa-open:not(.wa-slotted) .wa-list [data-wa-signout] { border: 1px solid rgba(185, 177, 156, 0.4); }
   }
 </style>

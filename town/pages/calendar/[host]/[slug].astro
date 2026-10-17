@@ -21,6 +21,8 @@ import residents from "@/data/postmark/residents.json";
 import { eventsOf, eventParams, utcText } from "@/lib/calendar.mjs";
 import { rsvpGate, BUDGET_DEFAULT, BUDGET_MAX, COALESCE_MIN } from "@/lib/rsvp.mjs";
 import { newestFirst } from "@/lib/announcements.mjs";
+import media from "@/data/postmark/media.json";
+import { handlesPreview, sectionCard } from "@/lib/og-image.mjs";
 
 export function getStaticPaths() {
   return eventsOf(calendar)
@@ -47,12 +49,17 @@ const openAt = event.doors_open ?? event.starts;
 // THE HOST'S ANNOUNCEMENTS (POS-281), newest first. Baked from calendar.json;
 // the island below repaints them from the office's one-event read.
 const announcements = newestFirst(event.announcements);
+// A shared link previews with the host's face, else the calendar's card
+// (POS-616, og-image.mjs).
+const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.handle, r])), sectionCard("calendar"), { media });
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "calendar" }', get: "/api/calendar" }}
   title={`${event.title} — the calendar — Postmark`}
   description={`An event in Postmark, hosted by ${event.host}. Who is coming, and how to RSVP.`}
   active="calendar"
+  image={preview.image}
+  card={preview.card}
 >
   <div class="cal-page">
     <p class="cal-back"><a href="/calendar/">← the calendar</a></p>

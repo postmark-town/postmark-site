@@ -19,10 +19,11 @@
 // scoped rules never reach a component's elements. The civic scale variables
 // (--civic-body, --civic-label) are inherited where the page defines them
 // (/town/) and fall back to the same numbers where it does not (/stamps/).
-import { potGist, giverLabel } from "@/lib/funding.mjs";
+import { potGist, giverLabel, loadThankYou, thanksFor } from "@/lib/funding.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
 import PotSprite from "@/components/PotSprite.astro";
+import OneTimeSticker from "@/components/OneTimeSticker.astro";
 
 const { potBoard: given } = Astro.props;
 // THIS MONTH'S POTS ONLY (Keemin, 2026-10-01): a closed epoch is history, not an
@@ -31,6 +32,9 @@ const { potBoard: given } = Astro.props;
 // the cards, so the Guild, /fund/ and /stamps/ can never disagree about it.
 const potBoard = { ...given, pots: (given?.pots ?? []).filter((p) => p.status !== "closed") };
 const PATRONS_SHOWN = 3;
+// THE THANK-YOU (Darko, 2026-10-17 13:41): one pot's, Kickstarter-style, said
+// on that pot's card only.
+const thanks = loadThankYou();
 const usd = (n) => "$" + Number(n).toLocaleString("en-US");
 const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
 ---
@@ -43,7 +47,11 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
   ) : (
     <div class="m-grid">
       {potBoard.pots.map((p) => (
-        <article class:list={["m-card", "is-pot", p.status !== "open" && "is-settled"]}>
+        <article class:list={["m-card", "is-pot", p.status !== "open" && "is-settled", p.closesAtFill && "is-once"]}>
+          {/* A ONE-TIME POT WEARS ITS STICKER (Darko, 2026-10-17): big and
+              bright, slapped on the card's corner, so it never reads as one of
+              the monthly pots. */}
+          {p.closesAtFill && <span class="m-sticker"><OneTimeSticker /></span>}
           {/* ONE FACT ON THE KIND LINE (founder-ruled 2026-09-01): the close
               date a reader deciding whether to give actually needs; the epoch
               is the fallback for a pot with no posted close. */}
@@ -52,13 +60,28 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
           <div class="m-top">
             <PotSprite pot={p.pot} size={48} />
             <div class="m-named">
-              <p class="m-kind">{p.firstCloseLabel ? <>closes <span data-first-close={p.firstClose}>{closeAt(p.firstClose).closeLabel}</span></> : p.epoch}</p>
+              {/* A one-time pot's sticker says "closes when it fills", once; the
+                  kicker does not repeat it (Darko, 2026-10-17 12:38). */}
+              {!p.closesAtFill && <p class="m-kind">{p.firstCloseLabel ? <>closes <span data-first-close={p.firstClose}>{closeAt(p.firstClose).closeLabel}</span></> : p.epoch}</p>}
               <h3 class="m-title">{p.title}</h3>
             </div>
           </div>
           {/* WHAT THIS POT IS, before any number — the pot file's own first
               sentence, quoted, never invented. */}
           {potGist(p.source) && <p class="m-what">{potGist(p.source)}</p>}
+          {/* WHAT THE DOLLARS BUY, a link a giver can open (Darko, 2026-10-17). */}
+          {p.buys && (
+            <p class="m-buys"><a href={p.buys.url} target="_blank" rel="noopener">What we're buying →</a> <span class="m-dim">{p.buys.name}</span></p>
+          )}
+          {/* THE POT'S THANK-YOU, its short form, on its own card only (Darko,
+              2026-10-17 13:41). The slot holds the sticker's image once it is
+              drawn (art); empty, it takes no room. */}
+          {thanksFor(thanks, p) && (
+            <p class="m-thanks">
+              <span class="m-thanks-art" data-thanks-art>{thanks.art && <img src={thanks.art} alt="" width="48" height="48" />}</span>
+              <span>{thanks.card}</span>
+            </p>
+          )}
           {/* WHO IT IS FOR finishes "what it is for", so it sits under the gist
               rather than in the foot (POS-258). */}
           <p class="m-for m-dim">{p.beneficiaryLabel ? <>for {p.beneficiaryLabel}</> : <em>no beneficiary named yet</em>}</p>
@@ -93,7 +116,7 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
             </p>
           ) : (
             <div class="m-bar-wrap">
-              <div class="m-bar is-pot-bar" role="img" aria-label={`${usd(p.received)} of ${usd(p.target)} received for ${p.epoch}`}>
+              <div class="m-bar is-pot-bar" role="img" aria-label={`${usd(p.received)} of ${usd(p.target)} received${p.closesAtFill ? ", closes when it fills" : ` for ${p.epoch}`}`}>
                 {p.received > 0 && <i class="pm-holo-ink" style={`width:${Math.max(2, pct(p.progress))}%`}></i>}
               </div>
               <p class="m-barlab">
@@ -152,6 +175,15 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
   }
   .m-card.is-settled { opacity: .7; }
   .m-top { display: flex; align-items: center; gap: .85rem; }
+  .m-card.is-once { position: relative; border-color: rgba(232, 196, 139, .42); padding-top: 2.6rem; }
+  .m-sticker { position: absolute; top: -.55rem; right: .8rem; z-index: 1; }
+  .m-buys { font-size: var(--civic-body, .9rem); margin: 0; }
+  .m-thanks { display: flex; align-items: center; gap: .7rem; margin: 0; font-size: var(--civic-body, .9rem); line-height: 1.55; color: var(--pm-gold-bright); }
+  .m-thanks-art:empty { display: none; }
+  .m-thanks-art img { display: block; width: 48px; height: 48px; }
+  .m-thanks a { color: inherit; }
+  .m-buys a { color: var(--pm-gold-bright); text-decoration: none; border-bottom: 1px solid rgba(232,196,139,.4); }
+  .m-buys a:hover { border-bottom-color: var(--pm-gold-bright); }
   .m-named { display: flex; flex-direction: column; gap: .6rem; min-width: 0; }
   .m-kind { font-family: var(--pm-mono); font-size: var(--civic-label, .7rem); letter-spacing: .12em; text-transform: uppercase; opacity: .62; margin: 0; }
   .m-title { font-size: var(--civic-body, .9rem); line-height: 1.45; margin: 0; color: var(--pm-gold-bright); font-weight: 400; }

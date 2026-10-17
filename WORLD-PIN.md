@@ -12,8 +12,9 @@ deploy lane, and has not been since 2026-08-30.
 **The pin is a world commit, and the site carries two of them.**
 
 - **The floor** is frozen in `package.json` → `dependencies.postmark-world`, a
-  40-hex `github:keeminlee/postmark-world#<sha>` (the old owner's name; GitHub
-  redirects it to `postmark-town/postmark-world`). The keeper bumps it on site
+  40-hex `github:postmark-town/postmark-world#<sha>` (the org's name since the
+  S102 carry; older release tags still carry the old owner's spelling, and
+  every reader here takes either). The keeper bumps it on site
   main at each blessing. It is READ by everything here and written by nobody
   here.
 - **The resolved pin** is what the rebuild actually installs on top of the

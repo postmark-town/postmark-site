@@ -35,6 +35,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { isA, isPredicate } from "./mark-class.mjs"; // S1: a mark's class from either form
 
 // Where the charters stand in the world.
 export const REGISTRY_PLACE = "the-harbor-reach/the-long-run-harbor";
@@ -128,7 +129,7 @@ export function loadCharters(opts = {}) {
     if (!entry.isDirectory()) continue;
     const slug = entry.name;
     const charter = readMark(join(dir, slug));
-    if (!charter || charter.data.class !== TOWN_CLASS) continue;
+    if (!charter || !isA(charter.data, TOWN_CLASS)) continue;
 
     const predicates = [];
     let children = [];
@@ -138,7 +139,7 @@ export function loadCharters(opts = {}) {
     for (const child of children) {
       if (!child.isDirectory()) continue;
       const mark = readMark(join(dir, slug, child.name));
-      if (!mark || mark.data.kind !== "predicated" || !mark.data.slot) continue;
+      if (!mark || !isPredicate(mark.data) || !mark.data.slot) continue;
       predicates.push({ slot: mark.data.slot, value: mark.data.value ?? "", body: mark.body });
     }
     predicates.sort((a, b) => {

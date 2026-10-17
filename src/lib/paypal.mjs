@@ -55,6 +55,22 @@ export function wholeUsd(v) {
   return n >= 1 && n <= 100_000 ? n : null;
 }
 
+/**
+ * The pot's cap on one gift (POS-661): its headroom when the page carries
+ * `data-pp-max`, else null (an uncapped pot). D5 refuses a gift past a pot's
+ * posted need whole, and PayPal cannot hand a payment back by itself, so the
+ * page never asks PayPal for more than the pot can take.
+ */
+export function capOf(box) {
+  const raw = box?.getAttribute?.("data-pp-max");
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+/** The sentence for a gift past the cap. */
+export const overCap = (max) => `This pot can take at most $${max} — the town refuses a gift past what it asked for, so choose $${max} or less.`;
+
 /** The order the giver's approval creates. */
 export function orderFor({ pot, title, account, usd }) {
   return {
@@ -99,10 +115,13 @@ export function mountPaypal(doc, { win = globalThis } = {}) {
   const target = box.querySelector("[data-pp-buttons]");
   const out = box.querySelector("[data-pp-out]");
   const say = (text) => { if (out) out.textContent = text; };
+  const max = capOf(box);
   let rendered = false;
+  let overcap = false;   // the last order was refused for the cap, and said so
   go?.addEventListener("click", async () => {
     const usd = wholeUsd(usdIn?.value);
     if (usd == null) { say("Choose a whole number of dollars, at least one — the ledger records whole dollars."); return; }
+    if (max != null && usd > max) { say(overCap(max)); return; }
     if (rendered) return;
     go.disabled = true;
     say("Opening PayPal…");
@@ -110,11 +129,17 @@ export function mountPaypal(doc, { win = globalThis } = {}) {
       const paypal = await loadSdk(doc, clientId, win);
       await paypal.Buttons({
         // read at the moment of payment: the amount as typed, the account as the "for" row set it
-        createOrder: (_data, actions) => actions.order.create(orderFor({ pot, title, account: box.getAttribute("data-pp-account"), usd: wholeUsd(usdIn?.value) ?? usd })),
+        // ...and the cap is held there too: an amount raised after the buttons drew is refused, never sent
+        createOrder: (_data, actions) => {
+          const now = wholeUsd(usdIn?.value) ?? usd;
+          if (max != null && now > max) { overcap = true; say(overCap(max)); throw new Error(overCap(max)); }
+          overcap = false;
+          return actions.order.create(orderFor({ pot, title, account: box.getAttribute("data-pp-account"), usd: now }));
+        },
         onApprove: (_data, actions) => actions.order.capture().then(() => say(
           "Paid, thank you. PayPal has it; the office's watcher writes it on the ledger once PayPal lists it (up to three hours) and one crossing's grace has passed.")),
         onCancel: () => say("Cancelled — nothing was taken."),
-        onError: () => say("PayPal could not take this payment. Nothing was recorded; try again, or pay by card."),
+        onError: () => { if (!overcap) say("PayPal could not take this payment. Nothing was recorded; try again, or pay by card."); },
       }).render(target);
       rendered = true;
       go.hidden = true;

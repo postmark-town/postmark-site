@@ -191,20 +191,27 @@ test("on any tag-resolution failure, fall back to the frozen pin file: a healthy
 
 test("the floor is the release's frozen pin file, read and never written", () => {
   const pkg = JSON.stringify({
-    dependencies: { "postmark-world": "github:keeminlee/postmark-world#272ed4bb47bb0ce4cf5aa89fe746a3e3a1926d89" },
+    dependencies: { "postmark-world": "github:postmark-town/postmark-world#272ed4bb47bb0ce4cf5aa89fe746a3e3a1926d89" },
   });
   assert.deepEqual(floorPinFrom(pkg), {
     sha: "272ed4bb47bb0ce4cf5aa89fe746a3e3a1926d89",
-    spec: "github:keeminlee/postmark-world#272ed4bb47bb0ce4cf5aa89fe746a3e3a1926d89",
-    owner: "keeminlee",
+    spec: "github:postmark-town/postmark-world#272ed4bb47bb0ce4cf5aa89fe746a3e3a1926d89",
+    owner: "postmark-town",
     repo: "postmark-world",
   });
+});
+
+// THE LEGACY FIXTURE (POS-499): older release tags still carry the old owner's
+// spelling, and a hold reads the tag's own floor. Named in test/no-old-owner.test.mjs.
+test("an older release tag's floor, in the old owner's spelling, is still a floor", () => {
+  const pkg = JSON.stringify({ dependencies: { "postmark-world": "github:keeminlee/postmark-world#272ed4bb47bb0ce4cf5aa89fe746a3e3a1926d89" } });
+  assert.equal(floorPinFrom(pkg).sha, "272ed4bb47bb0ce4cf5aa89fe746a3e3a1926d89");
 });
 
 test("a pin that is not a 40-hex commit is not a floor", () => {
   // A branch-shaped pin ("#main") would make the whole mechanism meaningless:
   // there would be no floor to fall back to and no number to be monotonic in.
-  for (const spec of ["github:keeminlee/postmark-world#main", "github:keeminlee/postmark-world", "^0.1.0"]) {
+  for (const spec of ["github:postmark-town/postmark-world#main", "github:postmark-town/postmark-world", "^0.1.0"]) {
     assert.throws(() => floorPinFrom(JSON.stringify({ dependencies: { "postmark-world": spec } })), /not pinned|no postmark-world/);
   }
   assert.throws(() => floorPinFrom(JSON.stringify({ dependencies: {} })), /no postmark-world dependency/);

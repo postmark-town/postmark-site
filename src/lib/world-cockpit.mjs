@@ -44,6 +44,7 @@ import { leafName } from "./world-feed.mjs";
 // (tools/lib/town.mjs) so the rule has one owner. Pure on purpose — this file
 // ships inside a client <script>.
 import { atTownMediaDoor } from "./media-door.mjs";
+import { isA } from "./mark-class.mjs"; // S1: a mark's class from either form
 
 // ── the fixed slots ─────────────────────────────────────────────────────────
 //
@@ -594,7 +595,7 @@ export function ownParcelIn(answer, handles) {
 }
 
 function isParcel(w) {
-  if (w?.kind === "parcel") return true;
+  if (isA(w, "parcel")) return true;
   return typeof w?.id === "string" && /(^|\/)[^/]*parcel[^/]*$/.test(w.id);
 }
 

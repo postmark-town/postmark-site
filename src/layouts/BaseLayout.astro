@@ -6,6 +6,10 @@ const {
   bgm = "/assets/audio/starforge-bgm.mp3",
   chrome = "full", // "none" = no site header/footer (a section brings its own, e.g. Postmark)
   image = "/assets/site/t1c-og-card.jpg", // og/twitter card, resolved against `site`
+  // The twitter card's shape: a wide image takes the large card, and a square
+  // portrait asks for "summary", because the large card crops a square to 2:1
+  // (POS-616; the town's pages pick it in src/lib/og-image.mjs).
+  card = "summary_large_image",
   noindex = false, // internal surfaces (e.g. the ops hub) opt in to keep crawlers off
   // A page served from a DIFFERENT domain than `site` names its own address here
   // (the harbor, built into this tree but served at 1f4ee.town's root). Only such
@@ -37,7 +41,7 @@ const ogUrl = canonical || new URL(Astro.url.pathname, Astro.site).href;
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={ogImage} />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:card" content={card} />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} /><slot name="head" />

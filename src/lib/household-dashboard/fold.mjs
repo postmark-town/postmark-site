@@ -135,6 +135,34 @@ export function hungOf(doorstep, built) {
   return typeof live === "boolean" ? live : built ?? null;
 }
 
+/**
+ * WHAT THEY HOLD (WLD-27): the office doorstep's `holds` block, as the card
+ * reads it — the holding's own sentence ("Pocket Comets: 2", "101 candies") and
+ * each chest they made with its live count, or the office's reason it is empty.
+ * Every word is the office's, read live; the card keeps no count of its own.
+ * null when the doorstep carried no block (an office before WLD-27) — absent is
+ * not "holds nothing", and the row stays hidden rather than saying so.
+ */
+export function holdsOf(doorstep) {
+  const b = doorstep?.holds;
+  if (!b || typeof b !== "object" || b.unavailable) return null;
+  const count = num(b.holds?.count ?? b.count) ?? 0;
+  const holds = count > 0 && typeof b.holds?.shows === "string" ? b.holds.shows : null;
+  const me = b.args?.handle ?? doorstep?.handle ?? null;
+  // A CHEST ON THIS CARD IS ONE THEY MADE OR ONE THEY ARE CARRYING (office:
+  // residentHolds). Whose it is, and who carries it, ride the name.
+  const whose = (c) => leaf(c.chest)
+    + (c.by && me && c.by !== me ? ` (${c.by}'s)` : "")
+    + (c.held_by && me && c.held_by !== me ? `, carried by ${c.held_by}` : "");
+  const chests = asArray(b.chests).filter((c) => c && typeof c.chest === "string").map((c) => ({
+    chest: c.chest,
+    text: c.count > 0 && typeof c.shows === "string" ? `${whose(c)} — ${c.shows}`
+      : c.empty_because ? `${whose(c)} — empty: no candy registered yet` : `${whose(c)} — empty`,
+    why: c.empty_because ?? null,
+  }));
+  return { holds, chests };
+}
+
 export function cardNumbersOf(doorstep) {
   if (!doorstep) return null;
   const s = doorstep.stamps ?? {};

@@ -1039,8 +1039,9 @@ test("THE LAW: a plaque's predicated children render as slot · value, or not at
     assert.equal(typeof row.slot, "string");
   }
   // the child is found by its PARENT, which is the mark it is filed under —
-  // not by a slug prefix, which is a convention nobody is bound by
-  const child = Object.values(pen).find((m) => m.kind === "predicated" && m.parent === THINK_TANK_PLACE);
+  // not by a slug prefix, which is a convention nobody is bound by. Either
+  // form: W2 writes `kind: predicate` where the old form wrote `predicated`.
+  const child = Object.values(pen).find((m) => ["predicated", "predicate"].includes(m.kind) && m.parent === THINK_TANK_PLACE);
   assert.ok(child, "no predicated child names the tank as its parent");
   assert.equal(child.parent, THINK_TANK_PLACE);
 

@@ -37,14 +37,21 @@
 // point of these readings is to watch figures move; a literal baked in as a
 // comparison would be a claim about a store nobody is looking at.
 
+import { isClassNode, isPredicate, recordKind } from "./mark-class.mjs"; // S1: a mark's class from either form
+
 // ═══════════════════════════════════════════════════════════════════════════
 // THE SERIALIZATION MAP — the machine-readable form of the trichotomy that
-// LOGOS/kinds.md § the node holds as prose.
+// LOGOS/lifetimes.md § the node holds as prose.
 //
-// PORTED VERBATIM from tools/graph-views.mjs (world repo, branch
-// jetto/graph-views), where it landed as a tracked artifact under founder ruling
-// 2026-08-12 (WRITE-REGISTRY.md row "the serialization mapping (field →
-// predicate star)").
+// PORTED from tools/graph-views.mjs (world repo, commit 013c0c7e on
+// wright/hub-pin; the jetto/graph-views branch it was written on is gone), where
+// it landed as a tracked artifact under founder ruling 2026-08-12, and RE-HOMED
+// HERE on 2026-08-13 when the tier-gap viewer retired: WRITE-REGISTRY.md row
+// "the serialization mapping (field → predicate star)" names this lens as the
+// map's live home, so this copy is the table and the world file its history.
+// Changed here since: `cites:` names LOGOS/lifetimes.md (the doc's rename), and
+// the `property` scope was added 2026-10-17 for LOGOS v2 part 2 (W1), whose
+// class-side properties are `kind: property` nodes.
 //
 // IT IS A TABLE, NOT A READING, which is why it may live in the site's tree at
 // all: this page bakes no world data, and a founder-authored table of what a
@@ -56,11 +63,11 @@
 // literal is deleted and the map is read from the graph like everything else.
 //
 // Read it per class: for each node class, what its frontmatter keys serialize.
-//   identity   — an identity atom (kinds.md: "identity is two atoms, a slug and
+//   identity   — an identity atom (lifetimes.md: "identity is two atoms, a slug and
 //                a class"); the slug is the directory name, so on disk identity
 //                is one key.
 //   relational — NOT a property. Each entry names THE EDGE IT SERIALIZES, as
-//                `[edge-type, what the edge relates]` (kinds.md: "`by:` is the
+//                `[edge-type, what the edge relates]` (lifetimes.md: "`by:` is the
 //                create-edge, not a field").
 //   derived    — belongs NOWHERE (the-north-star.md § the placement discipline).
 //                A key here on disk is TRUE RESIDUE: the map deliberately maps
@@ -76,7 +83,7 @@
 export const SERIALIZATION_MAP = {
   version: "0.1.0",
   authored: "2026-08-12",
-  cites: "LOGOS/kinds.md § the node · LOGOS/the-north-star.md § the placement discipline",
+  cites: "LOGOS/lifetimes.md § the node · LOGOS/the-north-star.md § the placement discipline",
   destination: "payload schemas on class-nodes (LOGOS/classes.md § params)",
 
   // EVERY CLASS
@@ -140,7 +147,7 @@ export const SERIALIZATION_MAP = {
   },
 
   // A PREDICATED MARK — already a predicate. Its (slot, value) pair IS its
-  // identity payload: "predicates are the atoms of authorship" (kinds.md). The
+  // identity payload: "predicates are the atoms of authorship" (lifetimes.md). The
   // only two keys on disk already in lawful shape.
   predicated: {
     predicate: { slot: "the predicate's slot", value: "the predicate's value" },
@@ -156,6 +163,24 @@ export const SERIALIZATION_MAP = {
     predicate: { value: "the name given" },
     relational: { parent: ["containment", "the node this names"] },
   },
+  // A PROPERTY NODE — the class side (LOGOS/classes.md § Property and predicate,
+  // 2026-10-16): "the four fields of a property are fixed … a name, a tier, a
+  // default and a body", the body riding as every node's does. Keyed on what W1
+  // (world #235 at 6c301955) actually writes on its 194 property records: every
+  // one carries name and tier, 188 a default, 9 child properties an `of:` (the
+  // property they belong to), 5 a values-tier, 4 a version, 12 a source (`*`).
+  // Here `tier` is the property's own fixed field, whose word decides its value,
+  // never the standing `*` calls residue.
+  property: {
+    predicate: {
+      name: "the property's name, a fixed field",
+      tier: "whose word decides the value (constitution or sovereign), a fixed field",
+      default: "the property's default (its locked value at constitution tier), a fixed field",
+      "values-tier": "the tier the values under this property take, where it differs from the property's own",
+    },
+    relational: { of: ["of", "child property → the property it belongs to"] },
+    property: { version: ["version", "the property's revision"] },
+  },
 };
 
 const ROWS = ["identity", "relational", "derived", "log", "predicate", "property"];
@@ -166,6 +191,23 @@ const ROWS = ["identity", "relational", "derived", "log", "predicate", "property
  * `unmapped` is the honest answer for a key the table does not place, and the
  * lens renders it as this table's own debt rather than as a property.
  */
+/**
+ * The map's scope for one node (S1, review-600 on site #275). The map is keyed
+ * on the old standings, and after the kind migration a mark's kind names its
+ * class (`kind: thing`, `kind: predicate`), so the scope is resolved through the
+ * class helper: a kind the map names is its own scope; a predicate the map does
+ * not name reads as `predicated`; any other mark subclass is sited (sited and
+ * predicate are mark's two subclasses, classes.md § Property and predicate). A
+ * declaration (a class or property node) has no standing scope, so only `*`
+ * applies, as before.
+ */
+export function mapScopeOf(d) {
+  const r = recordKind(d);
+  if (r != null && Object.hasOwn(SERIALIZATION_MAP, r)) return r;
+  if (r == null || isClassNode(d)) return r;
+  return isPredicate(d) ? "predicated" : "sited";
+}
+
 export function serializes(kind, key) {
   for (const scope of [SERIALIZATION_MAP[kind], SERIALIZATION_MAP["*"]]) {
     if (!scope) continue;
@@ -209,10 +251,10 @@ export function serializationOf(d) {
   if (!d || d.kind !== "mark" || !Array.isArray(d.keys)) return out;
   out.read = true;
   // A predicated mark's (slot, value) pair is already lawful on disk — it IS a
-  // predicate's identity payload (kinds.md), so it is named as a predicate the
+  // predicate's identity payload (lifetimes.md), so it is named as a predicate the
   // record already keeps rather than one it owes.
   for (const k of d.keys) {
-    const s = serializes(d.subkind, k);
+    const s = serializes(mapScopeOf(d), k);
     if (s.row === "edge") out.edges.push({ key: k, edge: s.edge, note: s.note });
     else if (s.row === "property") out.predicates.push({ key: k, slot: s.slot, note: s.note, lawful: false });
     else if (s.row === "predicate") out.predicates.push({ key: k, slot: k, note: s.note, lawful: true });
@@ -261,7 +303,7 @@ export function fieldCensus(nodes) {
     if (d.kind !== "mark" || !Array.isArray(d.keys)) continue;
     read++;
     for (const k of d.keys) {
-      const { row } = serializes(d.subkind, k);
+      const { row } = serializes(mapScopeOf(d), k);
       rows[row]++; total++;
       if (row === "unmapped") bump(unmappedKeys, `${d.subkind}.${k}`);
       if (row === "derived") bump(residueKeys, k);
@@ -287,11 +329,22 @@ const sortedPairs = (m) => [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompa
 // and a node naming no class-node is not addressable at all.
 //
 // A class-node DECLARES a class — it carries `class:`, and with it the version,
-// dials and implements that make a class a class. Every other node NAMES one,
-// today through `kind:`, whose four words are the older vocabulary and only one
+// dials and implements that make a class a class. A property node (W1) declares
+// too: it is the class side's property, filed under its class. Every other node,
+// every instance, NAMES a class, today through `kind:`, whose four words are the older vocabulary and only one
 // of which (`parcel`) has a class-node behind it. The two are counted APART:
 // conflating them would report the registry as its own membership and make the
 // closure look far healthier than it is.
+//
+// DECLARATIONS ARE NOT MARKS TO COUNT (S1, 2026-10-17). LOGOS v2 part 2 (W1)
+// writes the class side's properties as `kind: property` nodes under their
+// classes: no `class:`, a kind no class-node registers, and roughly a hundred
+// of them. Counted as marks they would land in the older vocabulary and the
+// meter would read the cutover as going backwards the day it lands. So the
+// meter counts instances only. A declaration (a class-node or a property node,
+// mark-class.mjs § isClassNode) is skipped; class-nodes are already the
+// registry, the meter's own denominator, and property nodes are reported on
+// their own line ("property nodes: N").
 
 export function classRegistry(nodes) {
   // Declarations only (the store's own fact): an instance carrying `class:`
@@ -299,20 +352,39 @@ export function classRegistry(nodes) {
   const classNodes = nodes.filter(isDeclaringClassMark);
   const registered = [...new Set(classNodes.map((d) => String(d.class)))].sort();
   const reg = new Set(registered);
-  const marks = nodes.filter((d) => d.kind === "mark");
+  const marks = nodes.filter((d) => d.kind === "mark" && !isClassNode(d));
+  const propertyNodes = nodes.filter((d) => d.kind === "mark" && recordKind(d) === "property").length;
   const names = (d) => d.class != null || reg.has(String(d.subkind ?? ""));
   const citing = marks.filter(names);
   const unreg = new Map();
   for (const d of marks) if (!names(d)) bump(unreg, d.subkind ?? "(none)");
   return {
     classNodes: classNodes.length,
+    propertyNodes,
     registered,
     marks: marks.length,
     citing: citing.length,
     unaddressable: marks.length - citing.length,
     unregisteredKinds: sortedPairs(unreg),
     citing_ids: citing.map((d) => d.id),
+    // the drill's own set: the marks the meter counts that name no class
+    // (never "every node not citing", which would light the declarations too)
+    unaddressable_ids: marks.filter((d) => !names(d)).map((d) => d.id),
   };
+}
+
+/**
+ * The registry paint for one node: `spine` or `off` for the machinery the
+ * convergence spine runs over (or not), `declares` for a declaration (the same
+ * rule the meter counts by, mark-class § isClassNode: a class-node or a
+ * property node), and for an instance `names` or `unaddressable`, as the meter
+ * counts it. One function, so the page's colours and the meter cannot disagree.
+ */
+export function registryPaintOf(d, registeredSet, convergenceKinds = []) {
+  if (!d) return null;
+  if (d.kind !== "mark") return convergenceKinds.includes(d.kind) ? "spine" : "off";
+  if (isClassNode(d)) return "declares";
+  return d.class != null || registeredSet.has(String(d.subkind ?? "")) ? "names" : "unaddressable";
 }
 
 /** Does this node name a class-node — i.e. can the law address it at all? */
@@ -417,7 +489,8 @@ export const wearsRegistryBadge = (d) => isDeclaringClassMark(d);
  * parent's extent whole rather than sitting inside it, which is the continuation
  * law this drawing is made of.
  */
-export const isContinuation = (d) => !!d && d.kind === "mark" && (d.subkind === "predicated" || d.subkind === "naming");
+// S1: through the class helper, so `kind: predicate` (v2) continues as `predicated` did.
+export const isContinuation = (d) => !!d && d.kind === "mark" && isPredicate(d);
 
 // ── the filter row, derived from the registry ────────────────────────────────
 //
@@ -444,6 +517,7 @@ export function filterBucketOf(d, registeredSet) {
   if (d.unresolved === true || d.kind === "unknown") return UNRESOLVED;   // before machinery; see isMachinery
   if (MACHINERY_KINDS.includes(d.kind)) return MACHINERY;
   if (d.kind !== "mark") return REGISTRY_OWN;    // the synthesized class-nodes the law addresses through
+  if (recordKind(d) === "property") return REGISTRY_OWN;   // S1: a property node is the registry's own, a declaration
   if (d.class != null && registeredSet.has(String(d.class))) return String(d.class);
   if (registeredSet.has(String(d.subkind ?? ""))) return String(d.subkind);
   return OLDER_VOCABULARY;
@@ -478,19 +552,31 @@ export function classFilters(nodes) {
 //
 // The hub's `lawMeasures`: the rows that answer to the law rather than to any
 // single WRITE-REGISTRY row, which is why the hub gave them their own block
-// instead of forcing them into one. Every one of the six is derivable from the
+// instead of forcing them into one. Every one of the seven is derivable from the
 // payload, which is why the ideal view could come across whole.
 
 export function lawMeasures(nodes) {
   const reg = classRegistry(nodes);
   const fields = fieldCensus(nodes);
-  const predicateNodes = nodes.filter((d) => d.kind === "mark" && d.subkind === "predicated").length;
-  const denom = fields.rows.property + predicateNodes;
+  // S1: properties expressed as NODES, of either shape: a predicate node (either
+  // spelling of its record kind, never a naming: the slot-and-value records) or a
+  // property node (W1's class side, which took 98 of them over). Properties are
+  // nodes by the ruled law, so a row W1 converts stays counted rather than
+  // reading the measure backwards.
+  const predicateNodes = nodes.filter((d) => d.kind === "mark" && ["predicated", "predicate"].includes(recordKind(d))).length;
+  const asNodes = predicateNodes + reg.propertyNodes;
+  const denom = fields.rows.property + asNodes;
   const top = fields.propertyKeys.slice(0, 5).map(([k, n]) => `${k} (${n})`).join(", ");
   return [
     {
       key: "class-nodes", label: "class-nodes in the registry", now: reg.classNodes, of: null, target: null,
       note: reg.registered.length ? `${reg.registered.join(", ")} — these ARE the registry, not citations of it` : "none in this store",
+    },
+    {
+      key: "property-nodes", label: "property nodes", now: reg.propertyNodes, of: null, target: null,
+      note: reg.propertyNodes
+        ? "the class side's properties (kind: property), declarations like the class-nodes, never counted as marks"
+        : "none in this store: the class side's properties are still dials and predicate children",
     },
     {
       key: "citing", label: "nodes naming a registered class", now: reg.citing, of: reg.marks, target: reg.marks,
@@ -499,7 +585,7 @@ export function lawMeasures(nodes) {
         : "every node names a class-node",
     },
     {
-      key: "predicates", label: "properties expressed as predicate nodes", now: predicateNodes, of: denom, target: denom,
+      key: "predicates", label: "properties expressed as nodes", now: asNodes, of: denom, target: denom,
       note: `${fields.rows.property} genuine properties are still frontmatter fields${top ? ` — commonest: ${top}` : ""}`,
     },
     {

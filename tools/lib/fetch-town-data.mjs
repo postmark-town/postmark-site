@@ -1,8 +1,8 @@
 // fetch-town-data.mjs - map the public Postmark office API onto the site's
 // existing src/data/postmark/*.json contracts.
 
-import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, readdirSync, existsSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { buildThreads, normalizeProfile, parseFrontmatter, readResidentProfiles } from "./town.mjs";
 
 export const RESIDENT_CARD_LANES = 6;
@@ -369,6 +369,7 @@ export function mapLetter(l) {
  */
 export async function fetchLetterCorpus({ apiBase, fetchImpl, retries, gate = null, limit = 200 } = {}) {
   const letters = [];
+  const rows = []; // the office's rows as they came, for fetchLettersSince to keep
   for (let offset = 0; ; offset += limit) {
     const { body } = await apiGet(`/letters?full=1&limit=${limit}&offset=${offset}`, { apiBase, fetchImpl, retries, gate });
     const batch = ensureArray(body.letters, "/letters.letters");
@@ -383,6 +384,7 @@ export async function fetchLetterCorpus({ apiBase, fetchImpl, retries, gate = nu
       // known-good route and say so.
       if (withBody !== batch.length) return { mixed: true, withBody, of: batch.length };
     }
+    rows.push(...batch);
     letters.push(...batch.map(mapLetter));
     // Paged on the page's own length rather than on `complete`/`next_offset`,
     // because those fields are the new door's and this loop has to survive the
@@ -391,7 +393,101 @@ export async function fetchLetterCorpus({ apiBase, fetchImpl, retries, gate = nu
   }
   // Same dedupe rule as the resident route, applied to the same ids, so the two
   // paths cannot disagree about which copy of a letter wins.
-  return { letters: dedupeLetters(letters) };
+  return { letters: dedupeLetters(letters), rows };
+}
+
+// ── THE LETTERS SINCE LAST PASS (2026-10-13) ────────────────────────────────
+//
+// The whole corpus with bodies is ~27 pages and ~13 MB, and the box re-read it
+// every pass. The office now answers `/letters?digests=1`: every letter as
+// { id, digest }, where the digest covers every column its full answer is built
+// from, so an unchanged digest is an unchanged `/letters?full=1` row. This pass
+// keeps the rows it read in a file beside the run (the cache), and next pass
+// asks `/letters?full=1&ids=` only for the letters that are new or whose digest
+// moved. The cursor is the cache: the digests it holds are the last pass's.
+//
+// Not a date cursor: the ferry MOVES a letter outbox → inbox at delivery (its
+// path, box and delivered_at change), and a letter merged late carries an
+// older date than letters already read. A digest sees both.
+//
+// THE WHOLE READ STAYS THE FALLBACK, and is taken when there is no cache (the
+// first pass, or a cache that does not parse), when the office has no digest
+// door (an older office answers excerpts), when it refuses the ids, when more
+// letters moved than the whole read would cost, or when an ids answer is not
+// exactly the rows asked for. The digests are read FIRST, then the rows: a
+// letter that moves between the two is kept with the older digest, and so is
+// read again next pass, never kept stale under the newer one.
+export const LETTER_DIGEST_PAGE = 5000;
+export const LETTER_IDS_PER_READ = 100;
+
+export function readLetterCache(path) {
+  try {
+    const cache = JSON.parse(readFileSync(path, "utf8"));
+    return cache?.version === 1 && cache.letters && typeof cache.letters === "object" ? cache : null;
+  } catch { return null; }
+}
+
+function writeLetterCache(path, rows, digestOf) {
+  const letters = {};
+  for (const row of rows) {
+    const digest = digestOf.get(row.id);
+    if (row.id && digest) letters[row.id] = { digest, row };
+  }
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(`${path}.tmp`, JSON.stringify({ version: 1, letters }));
+  renameSync(`${path}.tmp`, path);
+}
+
+async function fetchLetterDigests({ apiBase, fetchImpl, retries, gate }) {
+  const rows = [];
+  for (let offset = 0; ; offset += LETTER_DIGEST_PAGE) {
+    const { body } = await apiGet(`/letters?digests=1&limit=${LETTER_DIGEST_PAGE}&offset=${offset}`, { apiBase, fetchImpl, retries, gate });
+    if (body?.digests !== true) return null; // an office without the door answers excerpts
+    const batch = ensureArray(body.letters, "/letters.letters");
+    rows.push(...batch);
+    if (batch.length < LETTER_DIGEST_PAGE) break;
+  }
+  return rows;
+}
+
+export async function fetchLettersSince({ apiBase, fetchImpl, retries, gate = null, cachePath }) {
+  const digests = await fetchLetterDigests({ apiBase, fetchImpl, retries, gate });
+  if (!digests) return fetchLetterCorpus({ apiBase, fetchImpl, retries, gate });
+  const digestOf = new Map(digests.map((d) => [d.id, d.digest]));
+  const known = readLetterCache(cachePath)?.letters ?? null;
+
+  const whole = async () => {
+    const corpus = await fetchLetterCorpus({ apiBase, fetchImpl, retries, gate });
+    if (corpus?.rows) writeLetterCache(cachePath, corpus.rows, digestOf);
+    return corpus;
+  };
+  if (!known) return whole();
+  const want = digests.filter((d) => known[d.id]?.digest !== d.digest).map((d) => d.id);
+  // Read whole when the moved letters would cost more reads than the corpus.
+  if (Math.ceil(want.length / LETTER_IDS_PER_READ) > Math.ceil(digests.length / 200)) return whole();
+
+  const fresh = new Map();
+  for (let i = 0; i < want.length; i += LETTER_IDS_PER_READ) {
+    const ids = want.slice(i, i + LETTER_IDS_PER_READ);
+    let body;
+    try {
+      ({ body } = await apiGet(`/letters?full=1&limit=${LETTER_IDS_PER_READ}&ids=${ids.map(encodeURIComponent).join(",")}`, { apiBase, fetchImpl, retries, gate }));
+    } catch (error) {
+      if (error?.status === 400) return whole(); // the ids refused
+      throw error;
+    }
+    const batch = ensureArray(body?.letters, "/letters.letters");
+    // Exactly the rows asked for, whole, or the answer is not this door's.
+    const asked = new Set(ids);
+    if (batch.some((l) => !asked.has(l.id) || !Object.hasOwn(l, "body"))) return whole();
+    for (const l of batch) fresh.set(l.id, l);
+  }
+  // A letter named in the digests and gone from the ids answer left the town
+  // between the two reads; it leaves the corpus with it.
+  const moved = new Set(want);
+  const rows = digests.map((d) => fresh.get(d.id) ?? (moved.has(d.id) ? null : known[d.id].row)).filter(Boolean);
+  writeLetterCache(cachePath, rows, digestOf);
+  return { letters: dedupeLetters(rows.map(mapLetter)), rows, since: { fetched: fresh.size } };
 }
 
 /**
@@ -415,25 +511,41 @@ export async function fetchLetterCorpus({ apiBase, fetchImpl, retries, gate = nu
  * error anywhere. When the door names a `total`, the assembled roll is checked
  * against it and the build refuses if they disagree.
  */
-export async function fetchResidentRoll({ apiBase, fetchImpl, retries, gate = null, limit = 200 } = {}) {
+//
+// THE CARDS RIDE WITH THE ROLL (2026-10-13). With `cards`, each page is asked
+// with `?cards=1`, and an office that has the bulk read answers the page's
+// cards beside its rows, each exactly what `/residents/<handle>` answers (null
+// where that door says 404). `cards` comes back as a Map handle → card, or null
+// when any page came back without them: an older office ignores the parameter,
+// and the caller then reads the cards one by one, as it always has.
+export const CARD_PAGE = 100;
+export async function fetchResidentRoll({ apiBase, fetchImpl, retries, gate = null, limit = 200, cards = false } = {}) {
   const roll = [];
+  const cardByHandle = new Map();
+  let withCards = cards;
   let total = null;
-  for (let offset = 0; ; offset += limit) {
-    const { body } = await apiGet(`/residents?limit=${limit}&offset=${offset}`, { apiBase, fetchImpl, retries, gate });
+  let pages = 0;
+  const size = cards ? CARD_PAGE : limit;
+  for (let offset = 0; ; offset += size) {
+    const { body } = await apiGet(`/residents?limit=${size}&offset=${offset}${cards ? "&cards=1" : ""}`, { apiBase, fetchImpl, retries, gate, timeoutMs: cards ? 60_000 : undefined });
+    pages += 1;
     // The pre-2026-09-10 office: one array, the whole roll, the limit ignored.
-    if (Array.isArray(body)) return { roll: ensureArray(body, "/residents"), paged: false, total: body.length };
+    if (Array.isArray(body)) return { roll: ensureArray(body, "/residents"), paged: false, total: body.length, pages, cards: null };
     const batch = ensureArray(body?.residents, "/residents.residents");
     if (offset === 0 && Number.isInteger(body.total)) total = body.total;
     roll.push(...batch);
+    if (withCards && Array.isArray(body.cards) && body.cards.length === batch.length)
+      batch.forEach((row, i) => cardByHandle.set(row.handle, body.cards[i] ?? null));
+    else withCards = false;
     // Paged on the page's own length rather than on `complete`, the same idiom
     // fetchLetterCorpus uses — and with the same reason to distrust a flag this
     // loop may be reading from a door that does not have it.
-    if (batch.length < limit) break;
+    if (batch.length < size) break;
   }
   if (total !== null && roll.length !== total) {
     throw new Error(`/residents: walked ${roll.length} of ${total} residents — a partial roll would publish a town with pages missing`);
   }
-  return { roll, paged: true, total: total ?? roll.length };
+  return { roll, paged: true, total: total ?? roll.length, pages, cards: withCards ? cardByHandle : null };
 }
 
 /** Newest-first union by id; the inbox copy wins over an outbox one. */
@@ -605,6 +717,9 @@ export async function buildOfficeData({
   // because the thing it is pacing against is one shared queue per caller
   // address: a gate per call would be six lanes each learning the same refusal.
   gate = createRateGate(),
+  // Where the last pass's letters are kept (fetchLettersSince); null reads the
+  // whole corpus every time, as every run without a home for it always has.
+  letterCachePath = null,
 } = {}) {
   const readSnapshot = snapshotReader(dataDir);
   const endpointGaps = [];
@@ -612,7 +727,7 @@ export async function buildOfficeData({
 
   const [{ body: town, asOf }, rollRes, metricsRes, bulletinListRes] = await Promise.all([
     apiGet("/town", { apiBase, fetchImpl, retries, gate }),
-    fetchResidentRoll({ apiBase, fetchImpl, retries, gate }),
+    fetchResidentRoll({ apiBase, fetchImpl, retries, gate, cards: true }),
     apiGet("/metrics/mail", { apiBase, fetchImpl, retries, gate }),
     apiGet("/bulletin", { apiBase, fetchImpl, retries, gate }),
   ]);
@@ -623,8 +738,11 @@ export async function buildOfficeData({
   // visible in the log rather than only in a resident-page count nobody is
   // watching.
   endpointGaps.push(rollRes.paged
-    ? `roll read from the paged roster door (/residents?limit=&offset=): ${residentHandles.length} residents in ${Math.ceil(residentHandles.length / 200) || 1} page(s)`
+    ? `roll read from the paged roster door (/residents?limit=&offset=): ${residentHandles.length} residents in ${rollRes.pages} page(s)`
     : `roll read from the pre-2026-09-10 roster door, which served the whole town in one bare array: ${residentHandles.length} residents`);
+  endpointGaps.push(rollRes.cards
+    ? `resident cards read in bulk beside the roll (/residents?cards=1): ${rollRes.cards.size} cards`
+    : "resident cards read one by one (/residents/<handle>): this office serves no bulk card read");
   // A FEW AT A TIME, NOT ALL AT ONCE (2026-09-13, postmark#2730). `Promise.all`
   // over the whole roll asked the office for every card in the same instant;
   // past ~240 the keyless bucket refused the rest, the build kept the committed
@@ -650,7 +768,13 @@ export async function buildOfficeData({
   // than a shadow.
   const DROPPED_CARD = Symbol("resident the roll named and the card door 404'd");
   const dropped404 = [];
-  const cards = await mapLimit(residentHandles, RESIDENT_CARD_LANES, async (handle) => {
+  // The bulk read's null is the single door's 404, and is read as one.
+  const cards = rollRes.cards ? residentHandles.map((handle) => {
+    const card = rollRes.cards.get(handle) ?? null;
+    if (card) return card;
+    dropped404.push(handle);
+    return DROPPED_CARD;
+  }) : await mapLimit(residentHandles, RESIDENT_CARD_LANES, async (handle) => {
     try {
       return (await apiGet(`/residents/${encodeURIComponent(handle)}`, { apiBase, fetchImpl, retries, gate })).body;
     } catch (error) {
@@ -683,7 +807,9 @@ export async function buildOfficeData({
   let letters;
   let corpus = null;
   try {
-    corpus = await fetchLetterCorpus({ apiBase, fetchImpl, retries, gate });
+    corpus = letterCachePath
+      ? await fetchLettersSince({ apiBase, fetchImpl, retries, gate, cachePath: letterCachePath })
+      : await fetchLetterCorpus({ apiBase, fetchImpl, retries, gate });
   } catch (error) {
     // A door that errors is a door that is not there, for our purposes. The
     // fallback is the known-good route and the build goes on; the reason is
@@ -696,7 +822,9 @@ export async function buildOfficeData({
   }
   if (corpus) {
     letters = corpus.letters;
-    endpointGaps.push(`letters.json built from the office's bulk letter door (/letters?full=1): ${letters.length} letters`);
+    endpointGaps.push(corpus.since
+      ? `letters.json built from the last pass's letters and the office's digests (/letters?digests=1): ${letters.length} letters, ${corpus.since.fetched} read whole (/letters?full=1&ids=)`
+      : `letters.json built from the office's bulk letter door (/letters?full=1): ${letters.length} letters`);
   } else {
     letters = lettersFromResidents(fullResidents);
     endpointGaps.push(`letters.json built from the resident cards: this office serves no bulk letter door (/letters?full=1 carried no bodies), which is the pre-2026-08-25 office. ${letters.length} letters`);
@@ -830,13 +958,27 @@ export async function buildOfficeData({
   // fail-soft: it forgives one named thing being absent, never the office
   // being unreachable.
   const DROPPED = Symbol("bulletin entry the list named and the door 404'd");
-  const bulletinEntries = await Promise.all(ensureArray(bulletinListRes.body, "/bulletin").map(async (b) => {
+  const listed = ensureArray(bulletinListRes.body, "/bulletin");
+  // THE ENTRIES IN ONE READ (2026-10-13): `/bulletin?full=1` answers every
+  // entry whole, leaving out one the entry door would 404. An older office
+  // ignores `full` and answers the listing again (no `body` on any row), and
+  // the entries are then read one by one, as below.
+  const whole = listed.length ? ensureArray((await apiGet("/bulletin?full=1", { apiBase, fetchImpl, retries, gate })).body, "/bulletin?full=1") : [];
+  const bySlug = whole.length && whole.every((e) => Object.hasOwn(e, "body")) ? new Map(whole.map((e) => [e.slug, e])) : null;
+  if (listed.length) endpointGaps.push(bySlug
+    ? `bulletin entries read whole in one read (/bulletin?full=1): ${bySlug.size} entries`
+    : "bulletin entries read one by one (/bulletin/<slug>): this office serves no whole-bulletin read");
+  const shed = (slug) => {
+    problems.push(`bulletin: the list named "${slug}" and the entry door answered 404 — the office's index still carries an entry the town has shed; dropped from bulletin.json and the rest of the board published`);
+    return DROPPED;
+  };
+  const bulletinEntries = await Promise.all(listed.map(async (b) => {
+    if (bySlug) return bySlug.get(b.slug) ?? shed(b.slug);
     try {
       return (await apiGet(`/bulletin/${encodeURIComponent(b.slug)}`, { apiBase, fetchImpl, retries, gate })).body;
     } catch (error) {
       if (error?.status !== 404) throw error;
-      problems.push(`bulletin: the list named "${b.slug}" and the entry door answered 404 — the office's index still carries an entry the town has shed; dropped from bulletin.json and the rest of the board published`);
-      return DROPPED;
+      return shed(b.slug);
     }
   }));
   // A SENTINEL, not a null check: `null` is a body the office could one day

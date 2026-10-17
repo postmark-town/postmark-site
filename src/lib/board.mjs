@@ -32,6 +32,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { isInstanceOf } from "./mark-class.mjs"; // S1: a mark's class from either form
 
 // The board place mark. A notice is a bounty-class mark whose placement parent
 // is this mark; changing the board's home is a one-line change here, and no
@@ -91,7 +92,7 @@ const isNum = (v) => Number.isFinite(Number(v)) && String(v).trim() !== "";
 // placed elsewhere in the world, and place alone would sweep in whatever else
 // stands on the board.
 export function isNotice(mark, { boardPlace = BOARD_PLACE } = {}) {
-  if (!mark || mark.class !== BOUNTY_CLASS) return false;
+  if (!isInstanceOf(mark, BOUNTY_CLASS)) return false;
   const parent = mark.placementParent ?? mark.parent ?? null;
   return parent === boardPlace;
 }

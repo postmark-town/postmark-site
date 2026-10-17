@@ -65,7 +65,6 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
       <p class="hd-label">a household in Postmark{house.since && <> · since {fmtDate(house.since)}</>}</p>
       <h1>{plate || "a shared household"}</h1>
       <p class="hd-sub">
-        {house.human && <><b>{house.human}’s</b> household · </>}
         <b>{faces.length} {faces.length === 1 ? "resident" : "residents"}</b>
         {arriving.length > 0 && <> · {arriving.length} arriving</>}
         <span data-hd-share-sub hidden></span>

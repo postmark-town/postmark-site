@@ -20,7 +20,8 @@
 // Pure: every answer is "" when `mists` is null (before the Mists' first
 // crossing, a local build, CI), so each page is byte for byte the page it was.
 // Decorative only: aria-hidden, pointer-events none; every motion stops under
-// prefers-reduced-motion.
+// prefers-reduced-motion, and the World page's bat also under the viewer's
+// lite mode (WLD-43: the viewer marks <html> with wv-lite).
 import { VARIANTS, mix } from "./halloween-skin.mjs";
 import { BAT, CROW, CROW_FLY } from "./halloween-motifs.mjs";
 
@@ -85,6 +86,7 @@ export const SPOTS = {
     filter: drop-shadow(0 0 2px ${mix(v.violet, v.base, 0.3)}); animation: pm-hw-sway 4.5s ease-in-out infinite alternate; }
   @keyframes pm-hw-sway { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
   ${REDUCED} { .wv-worldline::after { animation: none; } }
+  html.wv-lite .wv-worldline::after { animation: none; }
 </style>`,
   // lifting off the top edge of the card, at its right, in the margin above it
   resident: () => `<div class="pm-hw-perch" aria-hidden="true"><span class="pm-hw-spot pm-hw-card-crow" data-hw-motif="resident">${CROW_FLY}</span></div><style>

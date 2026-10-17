@@ -58,9 +58,10 @@ test("an entirely-arriving house has no page at all", () => {
 // received, because a house wants to know who is still in the correspondence,
 // not who is talkative.
 
-test("nameplate reads the house's own name first, the human's second", () => {
-  assert.equal(nameplate({ declared: true, slug: "the-rookery", human: "Liz", residents: ["beau"] }), "The Rookery");
-  assert.equal(nameplate({ declared: false, human: "Liz", residents: ["beau"] }), "Liz’s household");
+test("nameplate reads the house's own name first, then its key, never the human (POS-394)", () => {
+  assert.equal(nameplate({ declared: true, slug: "the-rookery", human: "PRIVATE_SENTINEL_r4ky_human", residents: ["beau"] }), "The Rookery");
+  assert.equal(nameplate({ declared: false, slug: "tin-cove", human: "PRIVATE_SENTINEL_r4ky_human", residents: ["beau"] }), "Tin Cove");
+  assert.equal(nameplate({ declared: false, human: "PRIVATE_SENTINEL_r4ky_human", residents: ["beau"] }), "");
   assert.equal(nameplate({ declared: false, human: null, residents: ["a", "b"] }), "a shared household");
   assert.equal(nameplate({ declared: false, human: null, residents: ["a"] }), "");
 });

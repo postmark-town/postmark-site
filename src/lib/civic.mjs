@@ -23,6 +23,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
 import { loadWorldState, BOARD_PLACE } from "./board.mjs";
+import { isInstanceOf, isPredicate } from "./mark-class.mjs"; // S1: a mark's class from either form
 import { floorPinFrom } from "../../tools/lib/world-pin.mjs";
 
 import { readFileSync as readDataFile } from "node:fs";
@@ -454,11 +455,11 @@ export function predicatesOf(place, { pen = null, state = null } = {}) {
     out.push({ slot: s, value: v });
   };
   for (const mark of Object.values(pen ?? {})) {
-    if (mark?.kind === "predicated" && mark.parent === place) take(mark.slot, mark.value);
+    if (isPredicate(mark) && mark.parent === place) take(mark.slot, mark.value);
   }
   for (const mark of (Array.isArray(state?.marks) ? state.marks : [])) {
     const parent = mark?.parent ?? mark?.placementParent ?? null;
-    if (mark?.kind === "predicated" && parent === place) take(mark.slot, mark.value);
+    if (isPredicate(mark) && parent === place) take(mark.slot, mark.value);
   }
   out.sort((a, b) => a.slot.localeCompare(b.slot) || a.value.localeCompare(b.value));
   return out;
@@ -651,7 +652,8 @@ export function byStage(rows) {
 export const DEFINITION_KIND = "class";
 
 export function isIdea(mark) {
-  return Boolean(mark) && mark.class === IDEA_CLASS && mark.kind !== DEFINITION_KIND;
+  // S1: `class: idea` (old) or `kind: idea` (new), and never the class node itself (DEFINITION_KIND)
+  return isInstanceOf(mark, IDEA_CLASS);
 }
 
 // Where a mark STANDS, as the town spells it — derived from the placement

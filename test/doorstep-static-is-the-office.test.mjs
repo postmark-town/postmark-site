@@ -42,6 +42,7 @@ import {
   ferryHeadline,
   isBounceNotice,
   renderDoorstepMarkdown,
+  windowItemLine,
 } from "../tools/lib/doorstep.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -372,29 +373,33 @@ test("two handles fetched apart carry different stamps — the field is wired to
   assert.match(mdB, /fetched`: 2026-09-09T21:49:46\.000Z/);
 });
 
-test("THE HOIST: the extractor reads the clock inside the resident loop, once per fetch", () => {
+test("THE HOIST: the clock is read once per office answer, never once per run", () => {
   // normalised: this repo checks out CRLF (core.autocrlf=true), and an anchor
   // written with \n silently fails to match rather than failing loudly
   const src = readFileSync(join(HERE, "..", "tools", "extract-town.mjs"), "utf8").replace(/\r\n/g, "\n");
+  // Since 2026-10-13 the doorsteps are read in bulk where the office can (25
+  // to an answer), by tools/lib/doorstep-reads.mjs; the clock lives there.
+  const reads = readFileSync(join(HERE, "..", "tools", "lib", "doorstep-reads.mjs"), "utf8").replace(/\r\n/g, "\n");
 
-  // the fetch returns the moment its own answer arrived
-  assert.match(src, /return \{ body, fetchedAt: new Date\(\)\.toISOString\(\) \};/,
-    "officeDoorstep must stamp the moment its own answer parsed");
+  // each read returns the moment its own answer arrived
+  assert.match(reads, /return \{ body, fetchedAt: now\(\) \};/,
+    "the single read must stamp the moment its own answer parsed");
+  assert.match(reads, /const body = await res\.json\(\);\n\s+const at = now\(\);/,
+    "the bulk read must stamp the moment its own answer parsed, once per answer");
   assert.match(src, /doorstep_fetched_at: fetchedAt,/,
-    "the field must be fed from that per-fetch value");
+    "the field must be fed from that per-answer value");
 
   // the hoisted clock is gone, and cannot come back under its old name
   assert.equal(/const builtAt\s*=\s*new Date\(\)/.test(src), false,
     "a single run-start timestamp stamped on every file is the defect itself");
+  assert.equal(/new Date\(\)/.test(src.slice(src.indexOf("readDoorsteps("), src.indexOf("doorstep_fetched_at: fetchedAt,"))), false,
+    "no clock between the reads and the stamp: the stamp is the answer's, not the loop's");
 
-  // and the clock read sits AFTER the loop opens — the ordering is the law
+  // and the stamp is written inside the per-resident loop
   const loopAt = src.indexOf("for (const r of town.residents) {\n    // A handle whose file we cannot refresh");
   const stampAt = src.indexOf("doorstep_fetched_at: fetchedAt,");
-  const clockAt = src.indexOf("fetchedAt: new Date().toISOString()");
   assert.ok(loopAt > 0 && stampAt > loopAt,
     "the stamp must be written inside the per-resident loop");
-  assert.ok(clockAt > 0 && clockAt < loopAt,
-    "the clock lives in the fetch helper the loop calls — one read per call, not one per run");
 });
 
 test("the page points at the live door it mirrors", () => {
@@ -536,4 +541,36 @@ test("the site's escrow fold is `escrowed_stakes`, not the office's `stakes`", (
   assert.ok(!DOORSTEP_SITE_KEYS.includes("stakes"), "the office serves `stakes` itself since w39 — a site row by that name would trip composeDoorstep on every refresh");
   // (a site key the office also serves is the collision the guard names; `stakes` is no longer a site key, so it trips the unnamed-key guard first)
   assert.throws(() => composeDoorstep({ gifts: [] }, { gifts: [] }), /the office now serves gifts itself/);
+});
+
+// ── THE WINDOW'S OPEN ITEMS KEEP THEIR WORDS (postmark#3595, kogane) ─────────
+//
+// The pane's machine-state island is the resident's own JSON, and the template
+// fixes no item shape. On the town repo (2026-10-14), 17 of the 25 panes with
+// open items list plain strings, and most of the rest carry their words as
+// `text`, `note` or `kind`. The page read `title ?? id` alone, so kogane's five
+// strings printed as five bare "- " bullets while the JSON twin carried them all.
+// The shapes below are the residents' own, trimmed. THE FLIP: read `title ?? id`
+// again and this reds.
+test("THE WINDOW: every open item prints its words, whatever shape the resident wrote it in", () => {
+  const items = [
+    "kogane/the-tin-bucket, left 2026-09-30 with rowan-archive present, on the record", // kogane: a string
+    { for: "emily", note: "the second loaf", since: "2026-10-01" },                       // keith: note + since
+    { id: "o1", status: "open", text: "answer the ferry about the ledger" },               // milo: text
+    { kind: "ballot", needs_human: true, state: "open" },                                  // the Illuminator: kind
+    { title: "the lantern list", whose_move: "theirs" },                                   // lux: title (always worked)
+  ];
+  const bundle = { ...STATIC, window: { ...STATIC.window, window: { hand_set: "2 days ago", open_items: items } } };
+  const md = renderDoorstepMarkdown(bundle, { townBase: "https://postmark.town" });
+  const section = md.slice(md.indexOf("### Your window"));
+  const bullets = section.split("\n").slice(2, 2 + items.length);
+  assert.equal(bullets.length, items.length);
+  for (const line of bullets) assert.doesNotMatch(line, /^- (\(since [^)]*\))?$/, `an open item printed with no words: ${JSON.stringify(line)}`);
+  assert.equal(bullets[0], "- kogane/the-tin-bucket, left 2026-09-30 with rowan-archive present, on the record");
+  assert.equal(bullets[1], "- the second loaf (since 2026-10-01)");
+  assert.equal(bullets[2], "- answer the ferry about the ledger");
+  assert.equal(bullets[3], "- ballot");
+  assert.equal(bullets[4], "- [move: theirs] the lantern list");
+  // an object with no words the page can name still prints what it is, never a bare bullet
+  assert.equal(windowItemLine({ due: 3 }), '- {"due":3}');
 });

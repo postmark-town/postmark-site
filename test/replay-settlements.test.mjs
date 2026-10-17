@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 
 import { crossingRows, settlementsOnReplay, placerOf } from "../src/lib/record.mjs";
 import { fetchCrossings, publicationChanges } from "../tools/lib/fetch-town-data.mjs";
+import { residentLinks } from "../src/lib/resident-link.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = (f) => JSON.parse(readFileSync(join(ROOT, "src", "data", "postmark", f), "utf8"));
@@ -132,14 +133,52 @@ test("the built replay lists every settlement once, each placed on its crossing"
   assert.match(html, /data-settled-body/, "the panel beside the map is gone");
 });
 
+// A card links a resident only where their page stands (53c83e137, POS-530), and
+// prints their name as text where it doesn't. Whether a page stands is the
+// build's own answer: the roll and rename record it baked, and the page in dist.
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+function whoOnCard(card, who, n) {
+  const residents = DATA("residents.json");
+  const href = residentLinks(residents, DATA("renames.json")).hrefOf(who);
+  const name = esc(residents.find((r) => r.handle === who)?.address?.agent || who);
+  if (href) {
+    assert.ok(existsSync(join(DIST, href, "index.html")), `S${n} links ${who} to ${href}, and no page stands there`);
+    assert.ok(card.includes(`<a class="r-who" href="${esc(href)}">${name}</a>`), `S${n} does not link ${who}, whose page stands`);
+  } else {
+    // the build is asked, not only the helper the page asks: a page standing for them is a missed link
+    assert.ok(!existsSync(join(DIST, "residents", who, "index.html")), `S${n} prints ${who} as text, and their page stands`);
+    assert.ok(card.includes(`<span class="r-who">${name}</span>`), `S${n} does not print ${who} as text`);
+    assert.ok(!card.includes(`href="/residents/${encodeURIComponent(who)}/"`), `S${n} links ${who}, who has no page`);
+  }
+  return Boolean(href);
+}
+
 test("the built S81 card says what it changed, by whom, and the receipt", { skip: !built }, () => {
   const html = readFileSync(page, "utf8");
   const at = html.indexOf('id="S81"');
   const card = html.slice(at, html.indexOf('id="S80"', at));
   assert.match(card, /the waiting room washstand/);
-  assert.match(card, /href="\/residents\/kogane\/"/);
+  const s81 = crossingRows(DATA("crossings.json")).find((r) => r.n === 81);
+  for (const who of new Set([...s81.locked, ...s81.retired].map((m) => m.who))) whoOnCard(card, who, 81);
   assert.match(card, /class="r-set-change is-retired"[\s\S]*first night garland/);
   assert.match(card, /Nothing held\./, "the Worldkeeper's receipt is not on the card");
+});
+
+test("every built settlement card links a resident where their page stands and prints text where it doesn't", { skip: !built }, () => {
+  const html = readFileSync(page, "utf8");
+  let linked = 0, checked = 0;
+  for (const s of crossingRows(DATA("crossings.json"))) {
+    const at = html.indexOf(`id="S${s.n}"`);
+    assert.ok(at > 0, `no card for S${s.n}`);
+    const next = html.indexOf('<li class="r-set"', at + 1);
+    const card = html.slice(at, next > 0 ? next : html.indexOf('class="r-foot"', at));
+    for (const who of new Set([...(s.locked ?? []), ...(s.retired ?? [])].map((m) => m.who))) {
+      checked++;
+      if (whoOnCard(card, who, s.n)) linked++;
+    }
+  }
+  // the link side of the rule is exercised, not only the text side
+  assert.ok(linked > 0, `none of the ${checked} people on the cards was linked`);
 });
 
 test("the built settlements hide nothing behind a hover or a 'more' (POS-250)", { skip: !built }, () => {

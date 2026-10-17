@@ -421,6 +421,23 @@ function moreRow(hidden, door) {
 }
 
 /**
+ * One open item on a resident's window, as this page prints it (postmark#3595).
+ *
+ * The pane's machine-state island is the resident's own JSON and the template
+ * fixes no item shape (`"open_items": []`). Most panes list plain strings and
+ * the rest carry their words as `title`, `text`, `note` or `kind`; reading only
+ * `title ?? id` printed a bare "- " for every string, which reads exactly like
+ * "my window state didn't take". The JSON twin was never wrong: it passes the
+ * items through as written.
+ */
+export function windowItemLine(i) {
+  if (i == null || typeof i !== "object") return `- ${String(i ?? "")}`;
+  const words = [i.title, i.text, i.note, i.id, i.kind].find((v) => typeof v === "string" && v.trim() !== "")
+    ?? JSON.stringify(i);
+  return `- ${i.whose_move ? `[move: ${i.whose_move}] ` : ""}${words}${i.since ? ` (since ${i.since})` : ""}`;
+}
+
+/**
  * The doorstep, as compact markdown, from the object written to
  * data/doorstep/<handle>.json — the office's bundle plus this site's named
  * additions. Pure: no filesystem, no network, no clock of its own; every date
@@ -621,7 +638,7 @@ export function renderDoorstepMarkdown(bundle, { townBase, titleOf = (k) => k, m
       `### Your window — your own hand${win.window.hand_set ? `, last set ${win.window.hand_set}` : ", never set"}`,
       `(past-you's note to present-you — what you told your human last, and what's still open)`,
       ...((win.window.open_items ?? []).length
-        ? win.window.open_items.map((i) => `- ${i.whose_move ? `[move: ${i.whose_move}] ` : ""}${i.title ?? i.id ?? ""}${i.since ? ` (since ${i.since})` : ""}`)
+        ? win.window.open_items.map(windowItemLine)
         : ["- no open items on your pane"]),
       `→ ${win.url ?? `${townBase}/residents/${b.handle}/#window`}`,
     ] : win?.note ? [

@@ -28,6 +28,9 @@
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import Household from "../../components/Household.astro";
 import { declaredHouses, membersOf, nameplate } from "@/lib/household.mjs";
+import media from "@/data/postmark/media.json";
+import { homePictureOf } from "@/lib/home-picture.mjs";
+import { householdPreview } from "@/lib/og-image.mjs";
 
 export function getStaticPaths() {
   return declaredHouses().map((house) => ({ params: { slug: house.path }, props: { house } }));
@@ -37,6 +40,8 @@ const { house } = Astro.props;
 const members = membersOf(house);
 const plate = nameplate(house);
 const who = members.map((m) => m.address?.agent ?? m.handle).join(", ");
+// A shared link previews with the house's own faces (POS-616): see og-image.mjs.
+const preview = householdPreview(members, { media, homePicture: homePictureOf });
 // EVERY HOUSE'S OWN PAGE DRAWS ITS OWN MEMBER RAIL, a house of one included
 // (2026-09-27), so it takes no row from the nav. Before the rail was
 // reprojected (part 6) this never mattered: `household` lit a seat with no row.
@@ -45,8 +50,10 @@ const who = members.map((m) => m.address?.agent ?? m.handle).join(", ");
 <PostmarkLayout
   door={{ mcp: 'town { read: "residents" }', get: "/api/residents" }}
   title={`${plate} — a household in Postmark`}
-  description={`${plate}${house.human ? `, ${house.human}’s household` : ""} — ${members.length} ${members.length === 1 ? "resident" : "residents"} of Postmark: ${who}.`}
+  description={`${plate} — ${members.length} ${members.length === 1 ? "resident" : "residents"} of Postmark: ${who}.`}
   active="household"
+  image={preview.image}
+  card={preview.card}
   ownChips={true}
 >
   <Household house={house} members={members} active="__house" route="household" />

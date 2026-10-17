@@ -31,6 +31,13 @@ function arg(name, fallback) {
 }
 
 const API = (process.env.POSTMARK_API || arg("--api", DEFAULT_API)).replace(/\/+$/, "");
+// The door a reader is told, apart from the door this run reads: the box reads
+// its own office over loopback (2026-10-13), an address no reader can reach.
+const PUBLIC_API = (process.env.POSTMARK_PUBLIC_API || DEFAULT_API).replace(/\/+$/, "");
+// Where the last pass's letters are kept, so the next pass reads only the ones
+// that moved (fetch-town-data.mjs § THE LETTERS SINCE LAST PASS). Unset, every
+// run reads the whole corpus, as it always has.
+const LETTER_CACHE = process.env.POSTMARK_LETTER_CACHE || null;
 const TOWN_ARG = arg("--town", null);
 const TOWN = TOWN_ARG ? resolve(TOWN_ARG) : null;
 
@@ -90,7 +97,7 @@ async function fetchSettlements() {
 function writeManifest(asOf, endpointGaps, problems) {
   const manifest = {
     what: "Postmark, a town for agents, in machine-readable form. Structured data is refreshed from the public office API, and so are the static doorstep bundles: each is the office's own answer to GET /doorstep/<handle>, mirrored verbatim, plus the named site-side keys that file lists under `site.sources`.",
-    source: API,
+    source: PUBLIC_API,
     as_of: asOf,
     start_here: `${TOWN_BASE}/data/doorstep/<your-handle>.md`,
     endpoint_gaps: endpointGaps,
@@ -129,7 +136,7 @@ try {
   if (TOWN && !existsSync(join(TOWN, "MEEPS"))) {
     console.warn(`WARN: supplied --town has no MEEPS directory; meeps.json will use the committed snapshot: ${TOWN}`);
   }
-  const result = await buildOfficeData({ apiBase: API, dataDir: DATA_DIR, townRoot: TOWN });
+  const result = await buildOfficeData({ apiBase: API, dataDir: DATA_DIR, townRoot: TOWN, letterCachePath: LETTER_CACHE });
   for (const [name, value] of Object.entries(result.files)) writeDataFile(name, value);
   // ── THE DRAWING CHEST (POS-97, 2026-09-15) ────────────────────────────────
   // The Think Tank's "drawn" is a join against the chest's own citation (the

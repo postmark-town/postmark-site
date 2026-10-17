@@ -407,7 +407,12 @@ test("a click on the quay does not scroll the page: the fragment is set by hand 
 test("the built page prints what the meeps wrote as text — no markup rides in from a record",
   { skip: !existsSync(builtMeeps) }, () => {
   const page = readFileSync(builtMeeps, "utf8");
-  const panels = page.slice(page.indexOf('class="mq-panels"'), page.indexOf("<script", page.indexOf('class="mq-panels"')));
+  let panels = page.slice(page.indexOf('class="mq-panels"'), page.indexOf("<script", page.indexOf('class="mq-panels"')));
+  // The Bug Catcher's pager is the page's own (31653bcdc), written empty and filled by its
+  // script: it is taken out once, by its exact shape, so any other <nav> still fails below.
+  const pager = /<nav class="bc-pager"[^>]*\bdata-bug-pager\b[^>]*><\/nav>/g;
+  assert.equal([...panels.matchAll(pager)].length, 1, "the Bug Catcher's own pager is not on the page once, empty");
+  panels = panels.replace(pager, "");
   // The panels' own markup is a fixed vocabulary; anything else arrived from content.
   const tags = new Set([...panels.matchAll(/<([a-z][a-z0-9-]*)\b/gi)].map((m) => m[1].toLowerCase()));
   const allowed = new Set(["div", "section", "article", "svg", "rect", "path", "img", "h2", "p", "span", "a", "b", "code", "ul", "li",

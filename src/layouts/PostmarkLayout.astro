@@ -13,9 +13,15 @@ import ChipRow from "@/components/ChipRow.astro";
 import DoorLine from "@/components/DoorLine.astro";
 import HalloweenSkin from "@/components/HalloweenSkin.astro";
 import HalloweenBat from "@/components/HalloweenBat.astro";
+import { sectionCard, LARGE } from "@/lib/og-image.mjs";
 
 const {
-  title, description, active = "", image = "/banner.png", noindex = false,
+  title, description, active = "", noindex = false,
+  // THE PICTURE A SHARED LINK PREVIEWS WITH (POS-616): the page's own, picked
+  // in src/lib/og-image.mjs, with its twitter card's shape. A page that names
+  // none previews with its section's card (sectionCard, by `active`), and that
+  // is the banner until the section's card is drawn.
+  image = undefined, card = LARGE,
   canonical,
   // A page that is SERVED FROM ANOTHER DOMAIN sets this to the town's origin, so
   // its chrome keeps pointing at the town instead of at its own host. Only the
@@ -59,7 +65,7 @@ const here = sectionOf(active);
 // There is exactly one <ChipRow> in this file, and the suite counts it.
 const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
 ---
-<BaseLayout title={title} description={description} image={image} chrome="none" bgm={false} noindex={noindex} canonical={canonical}><HalloweenSkin slot="head" /><slot name="head" slot="head" />
+<BaseLayout title={title} description={description} image={image ?? sectionCard(active)} card={card} chrome="none" bgm={false} noindex={noindex} canonical={canonical}><HalloweenSkin slot="head" /><slot name="head" slot="head" />
   <script is:inline>
     // Tutorial event bus — installed during parse so any page island can emit
     // before the tracker resolves identity. The tracker below takes over this

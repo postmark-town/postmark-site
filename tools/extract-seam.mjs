@@ -38,12 +38,13 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { writeIfChanged } from "./lib/mirror.mjs";
+import { thankYouOf } from "../src/lib/funding.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SITE_ROOT = resolve(HERE, "..");
 const DATA_DIR = join(SITE_ROOT, "src", "data", "postmark");
 
-export const SEAM_FILES = ["pots.json", "deeds.json", "economy.json"];
+export const SEAM_FILES = ["pots.json", "deeds.json", "economy.json", "fund-thank-you.json"];
 
 // ── epochs ───────────────────────────────────────────────────────────────────
 // An epoch is a month (funding.mjs's EPOCH_RE: /^\d{4}-\d{2}$/), and the pot
@@ -203,6 +204,17 @@ export function seamFromTown({ mint, entries: allEntries, potFiles, dial, asOf }
       // this field, not from the posting date."
       first_close: typeof file?.first_close === "string" && file.first_close.trim()
         ? file.first_close.trim() : null,
+      // A POT WITH NO CLOSE DATE: it closes when it fills (pot-meeps-home.json
+      // § _closes_at_fill, Darko 2026-10-16: "new, no close date (closes at
+      // fill)"). Only a literal true carries; every other value is a pot with a
+      // calendar, which is what every pot was before this field.
+      closes_at_fill: file?.closes_at_fill === true,
+      // WHAT THE DOLLARS BUY, as a link a giver can open (§ _buys, Darko
+      // 2026-10-17: "we really need a link to the actual product that I'm
+      // trying to buy"). Carried only whole: a name and an https URL, or null.
+      buys: typeof file?.buys?.name === "string" && file.buys.name.trim()
+        && typeof file?.buys?.url === "string" && /^https:\/\/\S+$/.test(file.buys.url.trim())
+        ? { name: file.buys.name.trim(), url: file.buys.url.trim() } : null,
       board: file?.board,
     };
 
@@ -373,6 +385,17 @@ export function seamFromTown({ mint, entries: allEntries, potFiles, dial, asOf }
 
 // ── the checkout side ────────────────────────────────────────────────────────
 
+// THE THANK-YOU (WHITE_PAGES/fund-thank-you.json, scoped to one pot by its
+// `pot`; Darko 2026-10-17 13:41: "if the pot fills, every household whose
+// gifts to it total $10 or more gets a Postmark sticker"). Carried whole by the
+// site's own reader, or null when the town has none.
+export function thankYouFromTown(townRoot) {
+  const f = join(townRoot, "WHITE_PAGES", "fund-thank-you.json");
+  if (!existsSync(f)) return null;
+  try { return thankYouOf(JSON.parse(readFileSync(f, "utf8"))); }
+  catch { console.warn("WARN seam: WHITE_PAGES/fund-thank-you.json is not readable JSON — no thank-you emitted"); return null; }
+}
+
 export function readPotFiles(townRoot) {
   const dir = join(townRoot, "WHITE_PAGES");
   if (!existsSync(dir)) return [];
@@ -418,6 +441,7 @@ export async function emitSeam(townRoot, { dataDir = DATA_DIR } = {}) {
   };
   write("pots.json", seam.pots);
   write("deeds.json", seam.deeds);
+  write("fund-thank-you.json", thankYouFromTown(townRoot));
   if (seam.economy && asOf) write("economy.json", seam.economy);
 
   console.log(`seam: ${seam.pots.length} pot-epoch rows, ${seam.deeds.length} deeds, ` +

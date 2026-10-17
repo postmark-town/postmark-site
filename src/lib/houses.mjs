@@ -71,11 +71,14 @@ export function plateName(name, slug) {
     .join(" ");
 }
 
-// The nameplate the wrapper prints, in the ruled order: the house's own name
-// first, the human's household second, the honest generic last.
+// The nameplate the wrapper prints, in the ruled order: the house's own name,
+// then its key, then the honest generic. NEVER the household's private human
+// name (POS-394, Darko 2026-10-05; Wright 2026-10-13): a page prints the
+// display name, and a house handed in with a `human` field, declared or not,
+// still plates by its own name or key when it carries one.
 export function nameplate(house) {
-  if (house.declared) return plateName(house.name, house.slug);
-  if (house.human) return `${house.human}’s household`;
+  const own = plateName(house.name, house.slug);
+  if (own) return own;
   if (house.residents.length > 1) return "a shared household";
   return "";
 }
@@ -102,7 +105,7 @@ export function buildHouses(residents, registry) {
       path: housePath(slug),
       declared: true,
       name: typeof dec.name === "string" && dec.name.trim() ? dec.name.trim() : null,
-      human: dec.human ?? null,
+      // no `human` (POS-394): the fold is public, and the private name never enters it
       since: dec.since ?? null,
       residents: members,
       arriving: declared.filter((h) => !byHandle.has(h)),
@@ -115,7 +118,7 @@ export function buildHouses(residents, registry) {
   for (const r of residents) {
     if (houseOf.has(r.handle)) continue;
     houseOf.set(r.handle, {
-      slug: null, path: null, declared: false, human: null, since: null,
+      slug: null, path: null, declared: false, since: null,
       residents: [r.handle], arriving: [],
     });
   }

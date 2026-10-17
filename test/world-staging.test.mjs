@@ -15,7 +15,7 @@
 // `WORLD/walk-ledger.md` was not among them, so
 // `https://postmark.town/WORLD/walk-ledger.md` answered 404 in production
 // (probed live, 2026-08-26), and `spectator/viewer.mjs` answers a 404 for a
-// record by fetching `raw.githubusercontent.com/keeminlee/postmark-world/main`.
+// record by fetching `raw.githubusercontent.com/postmark-town/postmark-world/main`.
 // Prod's departures were read from the world's unblessed main tip on every load,
 // while the release lane it was built by obeyed "tags only, never main tip".
 //

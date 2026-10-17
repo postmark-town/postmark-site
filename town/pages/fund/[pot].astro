@@ -60,11 +60,13 @@
 // no image service: a strict CSP would block it, and handing a third party the
 // ability to change what an intake QR encodes is handing them the money.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import { livePots, loadPots, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel, giverLabel } from "@/lib/funding.mjs";
+import { livePots, loadPots, loadThankYou, thanksFor, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel, giverLabel, fundCapOf } from "@/lib/funding.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { qrSvg } from "@/lib/qr.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
 import PotSprite from "@/components/PotSprite.astro";
+import OneTimeSticker from "@/components/OneTimeSticker.astro";
+import { sectionCard } from "@/lib/og-image.mjs";
 
 // THE ADDRESS IS NO LONGER ONE STRING. Since 2026-08-25 a pot may have an
 // intake address of its own (keeping-ec2 was the first), and a pot with one
@@ -151,6 +153,10 @@ const { pot, tabs, past = [] } = Astro.props;
 // the founder has not opened cannot pass it, and neither can anything else that
 // is not, right now, open.
 const open = pot.status === "open";
+// THE POT'S THANK-YOU (Darko, 2026-10-17 13:41): one pot's, Kickstarter-style,
+// on that pot's page only. Said only where a gift can be given, so a draft
+// page carries none.
+const thanks = thanksFor(loadThankYou(), pot);
 // THE PAYPAL CHOICE (POS-183 part 2): offered only when the build carries the
 // app's public client ID (the sandbox app's on dev, the live app's on prod),
 // and its SDK loads only when the giver presses the button (src/lib/paypal.mjs).
@@ -159,6 +165,13 @@ const target = pot.target ?? null;
 const received = pot.received ?? 0;
 const headroom = target == null ? null : Math.max(0, target - received);
 const uncapped = pot.uncapped === true || target == null;
+// THE CAP ON ONE GIFT (POS-661, settled A; src/lib/funding.mjs § fundCapOf):
+// PayPal's amount is held at the headroom, the card and USDC say it, and a
+// capped pot with none left offers no way to pay. An uncapped pot takes
+// whatever arrives, as before. A once pot has no next epoch to promise.
+const { cap, full, once } = fundCapOf(pot);
+// the cap is the headroom as of the site's last data refresh, said in the town page's own words (town/index.astro § asOfText)
+const capAsOf = pot.generatedAt ? new Date(pot.generatedAt).toISOString().replace("T", " ").slice(0, 16) + " UTC" : null;
 // THIS POT'S OWN ADDRESS — and the QR encodes the same string the page
 // prints, because the QR is the path most patrons will actually use and the
 // one they CANNOT proofread.
@@ -229,6 +242,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   door={{ mcp: 'household { read: "fund" }' }}
   title={`Fund ${pot.title ?? pot.id} — Postmark`}
   description={`Back a named need in Postmark: ${pot.title ?? pot.id}. Real dollars, witnessed on the ledger. A record of contribution, not a promise of profit.`}
+  image={sectionCard("fund")}
 >
   <main class="pm-wrap fund">
     <p class="f-crumb">POSTMARK · FUND THE TOWN</p>
@@ -261,21 +275,39 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             fallback for a pot with no posted close. The beneficiary rides
             beside it as the LABEL, never the routing handle. */}
         <p class="f-kind">
-          {pot.firstCloseLabel ? <>closes <span data-first-close={pot.firstClose}>{closeAt(pot.firstClose).closeLabel}</span></> : pot.epoch}
-          {pot.beneficiaryLabel ? <> · for {pot.beneficiaryLabel}</> : <> · <em>no beneficiary named yet</em></>}
+          {/* A one-time pot's sticker says "closes when it fills", once; the
+              kicker does not repeat it (Darko, 2026-10-17 12:38). */}
+          {!pot.closesAtFill && <>{pot.firstCloseLabel ? <>closes <span data-first-close={pot.firstClose}>{closeAt(pot.firstClose).closeLabel}</span></> : pot.epoch}{" · "}</>}
+          {pot.beneficiaryLabel ? <>for {pot.beneficiaryLabel}</> : <em>no beneficiary named yet</em>}
         </p>
         {/* THE POT'S SPRITE beside its name (2026-10-02), the cards' drawing
             at half again their size; none for a pot with no line in
             civic-art.mjs § POT_SPRITES. */}
-        <div class="f-titled">
+        <div class:list={["f-titled", pot.closesAtFill && "has-once"]}>
           <PotSprite pot={pot.pot} size={72} />
           <h1>{pot.title ?? pot.id}</h1>
+          {/* A ONE-TIME POT WEARS ITS STICKER (Darko, 2026-10-17), at page size. */}
+          {pot.closesAtFill && <OneTimeSticker size="page" />}
         </div>
         {/* WHAT THIS IS, in one breath — the pot file's own first sentence. The
             full paragraph lives in the fine print below the rails: the founder's
             page law (2026-08-26) is that this page DIRECTS TO WHERE YOU CAN PAY
             and offers the deeper detail behind a click, not ahead of the money. */}
         {potGist(pot.source) && <p class="f-source">{potGist(pot.source)}</p>}
+        {/* WHAT THE DOLLARS BUY, a link a giver can open (Darko, 2026-10-17). */}
+        {pot.buys && (
+          <p class="f-buys"><a href={pot.buys.url} target="_blank" rel="noopener">What we're buying →</a> <span class="f-dim">{pot.buys.name}</span></p>
+        )}
+        {/* THE THANK-YOU, said where a giver looks and not only in the fine
+            print (Darko, 2026-10-17 12:08 and 13:41): the town's record
+            (WHITE_PAGES/fund-thank-you.json), on the one pot it names. The image slot and the address route fill from it (art,
+            how_url) when they exist. */}
+        {thanks && open && (
+          <p class="f-thanks">
+            <span class="f-thanks-art" data-thanks-art>{thanks.art && <img src={thanks.art} alt="" width="64" height="64" />}</span>
+            <span>{thanks.line}{thanks.how_url && <> <a href={thanks.how_url} target="_blank" rel="noopener">How we ask for your address →</a></>}</span>
+          </p>
+        )}
       </header>
 
       {!open && (
@@ -304,7 +336,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
                 that gifts were welcome. "No posted need" is a fact about the ASK;
                 it was never a reason to withhold what arrived. */}
             <p class="f-big">
-              {usd(received)} <span class="f-dim">{floorBar ? "in the roll" : "received this epoch"}</span>
+              {usd(received)} <span class="f-dim">{floorBar ? "in the roll" : pot.closesAtFill ? "received" : "received this epoch"}</span>
             </p>
             {/* THE FLOOR BAR — an elastic pot's roll against its close floor, in
                 the seam's holo ink (the Guild card's own bar, full width). */}
@@ -327,7 +359,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           </>
         ) : (
           <>
-            <p class="f-big">{usd(received)} <span class="f-of">of</span> {usd(target)} <span class="f-dim">this epoch</span></p>
+            <p class="f-big">{usd(received)} <span class="f-of">of</span> {usd(target)} {!pot.closesAtFill && <span class="f-dim">this epoch</span>}</p>
             <div class="f-bar" role="img" aria-label={`${usd(received)} received of a ${usd(target)} posted need`}>
               {received > 0 && <i class="pm-holo-ink" style={`width:${Math.max(2, Math.min(100, target ? (received / target) * 100 : 0))}%`}></i>}
             </div>
@@ -337,7 +369,9 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
               {!open
                 ? <>Nothing can be sent against this pot while it is a draft.</>
                 : headroom > 0
-                ? <>This pot can still take <strong>{usd(headroom)}</strong> this epoch. Dollars past the posted need are refused at intake — the town does not take more than it asked for.</>
+                ? <>This pot can still take <strong>{usd(headroom)}</strong>{once ? "" : " this epoch"}. Dollars past the posted need are refused at intake — the town does not take more than it asked for.</>
+                : once
+                ? <>This pot has what it asked for, so it takes no more dollars. <a href="/town/#pots">The Town's pots</a> have other needs.</>
                 : <>This pot has what it asked for. Intake is closed until the next epoch opens; <a href="/town/#pots">the Town's pots</a> have other needs.</>}
             </p>
           </>
@@ -388,22 +422,31 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           <span data-ledger-when="outside">Recorded on the town's public ledger as a gift from outside the town; it mints no stamps.</span>
           <a class="f-law-more" href="#fineprint">The fine print ↓</a>
         </p>
+        {full ? (
+          <p class="f-full" data-fund-full>This pot has what it asked for, so there is nothing to send. <a href="/town/#pots">The Town's pots</a> have other needs.</p>
+        ) : (<>
         <div class="f-rails">
           <a class="f-card f-rail-btn" data-card data-pot={pot.pot} href={`${STRIPE}?client_reference_id=${pot.pot}`} target="_blank" rel="noopener">Card ↗</a>
           {PAYPAL_CLIENT_ID && <button type="button" class="f-card f-rail-btn" aria-controls="pay-paypal" aria-expanded="false" data-open="pay-paypal">PayPal</button>}
           <button type="button" class="f-card f-rail-btn" aria-controls="usdc" aria-expanded="false" data-open="usdc">USDC</button>
         </div>
+        {/* The card's amount is typed on Stripe's own page, which this page
+            cannot hold (a Payment Link takes no amount), so the cap is said
+            where the payer chooses the card: a gift past it is refused whole. */}
+        {cap != null && (
+          <p class="f-card-note f-cap" data-fund-cap={cap}>Give at most <strong>{usd(cap)}</strong>: that is what this pot can still take. By card you type the amount on the card's own page, and a gift past {usd(cap)} is refused whole and refunded by hand.</p>
+        )}
 
       {/* THE PANELS open from their buttons, right under the row (Wright's
           review of #213: a button and a disclosure row naming the same rail was
           the page saying it twice). One panel is open at a time. */}
       {PAYPAL_CLIENT_ID && (
-      <div class="f-usdc f-paypal f-panel" id="pay-paypal" data-pp-client={PAYPAL_CLIENT_ID} data-pp-pot={pot.pot} data-pp-title={pot.title ?? pot.pot} hidden>
+      <div class="f-usdc f-paypal f-panel" id="pay-paypal" data-pp-client={PAYPAL_CLIENT_ID} data-pp-pot={pot.pot} data-pp-title={pot.title ?? pot.pot} data-pp-max={cap ?? undefined} hidden>
         <div class="f-rail">
           <p class="f-card-note f-panel-lead">For a giver whose bank balks at a card charge from abroad.</p>
           <div class="f-pp-form">
             <label class="f-pp-field">amount, in whole US dollars
-              <input name="pp-usd" type="number" min="1" step="1" inputmode="numeric" value="10" />
+              <input name="pp-usd" type="number" min="1" max={cap ?? undefined} step="1" inputmode="numeric" value={cap != null ? Math.min(10, cap) : 10} />
             </label>
           </div>
           <button type="button" class="f-card f-pp-go" data-pp-go>Pay with PayPal</button>
@@ -425,6 +468,9 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
               <button type="button" class="f-copy" data-copy={intake}>copy the address</button>
             </div>
           </div>
+          {cap != null && (
+            <p class="f-cap" data-usdc-cap={cap}>Send at most <strong>{cap} USDC</strong>: that is what this pot can still take{capAsOf ? <>, as of {capAsOf}</> : ""}. The chain cannot refuse a larger send, so the town refuses it at intake and refunds it by hand.</p>
+          )}
           <ul class="f-warn">
             <li><strong>Base network, native USDC only.</strong> A wrong-network or wrong-token send is <strong>not recoverable by the town</strong> — best effort only, never a promise.</li>
             <li>The ledger records <strong>whole dollars</strong> — cents are held but priced nothing, and a payment under $1 cannot be witnessed as a receipt.</li>
@@ -445,7 +491,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
               Sign in to witness it in your household's name. A transfer that is not witnessed here still
               reaches the town, and is recorded by hand as an outside gift.
             </p>
-            <form class="f-form" id="pm-fund-form" novalidate data-usdc-when="household" hidden>
+            <form class="f-form" id="pm-fund-form" novalidate data-usdc-when="household" data-once={pot.closesAtFill || once ? "1" : undefined} hidden>
               <label>transaction hash
                 <input name="txhash" placeholder="0x…" spellcheck="false" autocomplete="off" required />
               </label>
@@ -465,6 +511,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           </div>
         </div>
       </div>
+        </>)}
 
         <p class="f-card-note">Stripe and PayPal take the payment; the town never sees your card or account.</p>
       </div>
@@ -639,7 +686,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
                 return (
                   <li class="f-past-row">
                     <p class="f-past-head">
-                      <b>{m.epochLabel ?? m.epoch}</b>
+                      <b>{m.closesAtFill ? "Closed at fill" : (m.epochLabel ?? m.epoch)}</b>
                       <span class="f-dim"> · closed · </span>
                       <span>{usd(m.received ?? mtotal)}{m.target != null && <span class="f-dim"> of {usd(m.target)}</span>}</span>
                     </p>
@@ -669,7 +716,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             {pot.close === "elastic" ? (
               <li><strong>This pot carries forward.</strong> Gifts join the roll month over month — nothing is refused at intake. When the roll reaches its floor, the close runs over the whole accumulated roll: every stake comes home whole, and the givers are minted <strong>fresh stamps</strong> by dollar share — sized by what the town staked on this pot, a giver's own household's stakes left out, and capped so the household's holo never passes ρ × everything it has minted. A pot nobody staked mints nothing.</li>
             ) : pot.closes ? (
-              <li><strong>This pot closes at the epoch.</strong> If residents staked stamps on it, the close mints you <strong>fresh stamps</strong> by dollar share — sized by the funded share of those stakes, your own household's left out, capped so your household's holo never passes ρ × everything it has minted; the stakes themselves come home whole. If nobody staked, your dollars still pay the bill, are still written down in your name, and mint nothing — money cannot manufacture ownership out of something nobody wanted.</li>
+              <li><strong>{pot.closesAtFill ? "This pot closes once, when it fills." : "This pot closes at the epoch."}</strong> If residents staked stamps on it, the close mints you <strong>fresh stamps</strong> by dollar share — sized by the funded share of those stakes, your own household's left out, capped so your household's holo never passes ρ × everything it has minted; the stakes themselves come home whole. If nobody staked, your dollars still pay the bill, are still written down in your name, and mint nothing — money cannot manufacture ownership out of something nobody wanted.</li>
             ) : pot.close === "none" ? (
               <li><strong>This one never closes.</strong> A gift is witnessed and left at that: nothing burns, nothing converts, and <strong>nothing mints back</strong> — to you or to anyone.</li>
             ) : (
@@ -791,7 +838,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             }
             var line = "$" + j.usd_recorded + " witnessed for " + (j.household_name || j.handle) + " → " + j.pot + ".";
             if (j.cents_note) line += " " + j.cents_note;
-            if (j.headroom_after !== null && j.headroom_after !== undefined) line += " This pot can still take $" + j.headroom_after + " this epoch.";
+            if (j.headroom_after !== null && j.headroom_after !== undefined) line += " This pot can still take $" + j.headroom_after + (form.dataset.once === "1" ? "." : " this epoch.");
             // the what-this-buys line gets its own paragraph rather than being
             // glued onto the end of a receipt: it is the standing law of the
             // surface, not a clause of this particular transaction
@@ -976,7 +1023,20 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   .f-kind { font-family: var(--pm-mono); font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; opacity: .62; margin: 0 0 .3rem; }
   .f-head h1 { margin: 0; font-size: clamp(1.6rem, 4.2vw, 2.3rem); line-height: 1.12; }
   .f-titled { display: flex; align-items: center; gap: 1rem; margin: 0 0 .5rem; }
+  /* the one-time sticker may drop under a long title at phone width; the other pots' rows never wrap */
+  .f-titled.has-once { flex-wrap: wrap; }
   .f-source { margin: 0; opacity: .85; line-height: 1.6; }
+  .f-buys { margin: .55rem 0 0; }
+  .f-thanks {
+    display: flex; align-items: center; gap: .9rem; margin: .9rem 0 0; padding: .7rem .9rem;
+    border-left: 3px solid var(--pm-gold); border-radius: .3rem; background: rgba(232, 196, 139, .07);
+    color: var(--pm-gold-bright); line-height: 1.55;
+  }
+  .f-thanks-art:empty { display: none; }
+  .f-thanks-art img { display: block; width: 64px; height: 64px; }
+  .f-thanks a { color: inherit; }
+  .f-buys a { color: var(--pm-gold-bright); text-decoration: none; border-bottom: 1px solid rgba(232,196,139,.45); font-size: 1.05rem; }
+  .f-buys a:hover { border-bottom-color: var(--pm-gold-bright); }
   .f-need { margin-top: 1.15rem; }
   .f-big { font-family: var(--pm-mono); font-size: 1.55rem; color: var(--pm-gold-bright); margin: 0 0 .55rem; font-variant-numeric: tabular-nums; }
   .f-of { font-size: .9rem; opacity: .6; }

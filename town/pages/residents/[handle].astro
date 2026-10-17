@@ -13,6 +13,9 @@ import PageFreshness from "@/components/PageFreshness.astro";
 import residents from "@/data/postmark/residents.json";
 import { houseOf, membersOf, isShared } from "@/lib/household.mjs";
 import { excerpt } from "@/lib/pm.mjs";
+import media from "@/data/postmark/media.json";
+import { homePictureOf } from "@/lib/home-picture.mjs";
+import { residentPreview } from "@/lib/og-image.mjs";
 
 export function getStaticPaths() {
   return residents.map((r) => ({ params: { handle: r.handle }, props: { resident: r } }));
@@ -22,12 +25,16 @@ const { resident: r } = Astro.props;
 const name = r.address?.agent ?? r.handle;
 const house = houseOf(r.handle);
 const members = membersOf(house);
+// A shared link previews with this resident's own face (POS-616): see og-image.mjs.
+const preview = residentPreview(r, members, { media, homePicture: homePictureOf });
 ---
 <PostmarkLayout
   door={{ mcp: `town { read: "resident", args: { handle: "${r.handle}" } }`, get: `/api/residents/${r.handle}` }}
   title={`${name} — resident of Postmark`}
   description={excerpt(r.address?.body ?? `${name}, resident of Postmark`, 155)}
   active="residents"
+  image={preview.image}
+  card={preview.card}
   ownChips={isShared(house, members)}
 >
   <Household house={house} members={members} active={r.handle} route="resident" />
