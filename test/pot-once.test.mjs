@@ -27,8 +27,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 const THANKS = {
   min_usd: 20, how_url: null, art: null,
-  card: "Give $20 or more in a month, to any pot, and we'll mail you Postmark stickers as a thank-you, never a purchase (US addresses for now).",
-  line: "As a thank-you, never a purchase: when your household's gifts across the town's pots total $20 in a month, Darko mails its human custom Postmark stickers (US addresses for now). He asks where by email, outside the town, and no address ever enters it.",
+  card: "Give $20 or more in a month, to any pot, and the Core Team will mail you Postmark stickers as a thank-you, never a purchase (US addresses for now).",
+  line: "As a thank-you, never a purchase: when your household's gifts across the town's pots total $20 in a month, the town's Core Team mails its human custom Postmark stickers (US addresses for now). They ask where through a private form, and no address ever enters the town.",
 };
 const BUYS = { name: "Beelink SER8 (8745HS) mini PC", url: "https://us.bee-link.com/products/beelink-ser8-8745hs?variant=52636411855130" };
 
@@ -110,7 +110,9 @@ test("2b · extract-seam reads the funding box's thank-you from the town, once",
   assert.match(t.line, /US addresses for now/);
   assert.match(t.card, /US addresses for now/);
   assert.match(t.line, /never a purchase/);
-  assert.match(t.line, /no address ever enters it/);
+  assert.match(t.line, /no address ever enters the town/);
+  assert.match(t.line, /Core Team/, "the Core Team mails them (Darko, 12:56)");
+  assert.doesNotMatch(t.line, /US-Eastern/, "the clock is the record's rule, not the page's sentence");
   assert.equal(thankYouFromTown(join(TOWN, "no-such-town")), null);
 });
 
