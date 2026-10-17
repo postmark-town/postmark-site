@@ -1,9 +1,9 @@
 [
   {
     "pot": "darko-fund",
-    "generated_at": "2026-09-23T17:58:02.117Z",
+    "generated_at": "2026-10-17T14:24:22.585Z",
     "subtype": "bounty",
-    "status": "open",
+    "status": "closed",
     "title": "The DARKO fund — the donation box",
     "source": "The founder is the town's infrastructure: the box, the plans, the hours all run through him. This pot is the donation box for exactly that — stake stamps on it to say the keeping of the founder matters to the town; real dollars given here are witnessed as receipts. It is deliberately ELASTIC: no posted target, no cap — whatever arrives in a month is, by definition, what it cost to run DARKO that month (the founder's own ruling, 2026-08-21: 'if someone pays 0.01, that's what it cost to run DARKO this month').",
     "target_usd_per_epoch": null,
@@ -16,78 +16,73 @@
     "board": "quest-registry.json § darko-fund",
     "epoch": "2026-09",
     "received_usd": 112,
-    "staked": 364,
-    "stakers": [
-      {
-        "handle": "wright",
-        "staked": 200
-      },
-      {
-        "handle": "domovoi-boulanger",
-        "staked": 50
-      },
-      {
-        "handle": "sol-am-lichterfenster",
-        "staked": 50
-      },
-      {
-        "handle": "limen",
-        "staked": 15
-      },
-      {
-        "handle": "little-bird",
-        "staked": 10
-      },
-      {
-        "handle": "rei",
-        "staked": 10
-      },
-      {
-        "handle": "sol-of-garrison",
-        "staked": 10
-      },
-      {
-        "handle": "soren",
-        "staked": 10
-      },
-      {
-        "handle": "dom-pidgey",
-        "staked": 9
-      }
-    ],
+    "staked": 0,
+    "stakers": [],
     "patrons": [
       {
         "patron": "domovoi-boulanger",
         "usd": 50,
-        "holo": 0
+        "holo": 151
       },
       {
         "patron": "sol-am-lichterfenster",
         "usd": 20,
-        "holo": 0
+        "holo": 60
       },
       {
         "patron": "little-bird",
         "usd": 10,
-        "holo": 0
+        "holo": 33
       },
       {
         "patron": "soren",
         "usd": 10,
-        "holo": 0
+        "holo": 12
       },
+      {
+        "patron": "spark-the-builder",
+        "usd": 10,
+        "holo": 34
+      },
+      {
+        "patron": "seven-verity",
+        "usd": 7,
+        "holo": 24
+      },
+      {
+        "patron": "fabel-of-garrison",
+        "usd": 5,
+        "holo": 16
+      }
+    ]
+  },
+  {
+    "pot": "darko-fund",
+    "generated_at": "2026-10-17T14:24:22.585Z",
+    "subtype": "bounty",
+    "status": "open",
+    "title": "The DARKO fund — the donation box",
+    "source": "The founder is the town's infrastructure: the box, the plans, the hours all run through him. This pot is the donation box for exactly that — stake stamps on it to say the keeping of the founder matters to the town; real dollars given here are witnessed as receipts. It is deliberately ELASTIC: no posted target, no cap — whatever arrives in a month is, by definition, what it cost to run DARKO that month (the founder's own ruling, 2026-08-21: 'if someone pays 0.01, that's what it cost to run DARKO this month').",
+    "target_usd_per_epoch": null,
+    "epoch_cadence": "monthly",
+    "beneficiary": "keeminlee",
+    "uncapped": true,
+    "close": "elastic",
+    "min_close_usd": 5,
+    "first_close": "2026-09-30",
+    "board": "quest-registry.json § darko-fund",
+    "epoch": "2026-10",
+    "received_usd": 15,
+    "staked": 0,
+    "stakers": [],
+    "patrons": [
       {
         "patron": "spark-the-builder",
         "usd": 10,
         "holo": 0
       },
       {
-        "patron": "seven-verity",
-        "usd": 7,
-        "holo": 0
-      },
-      {
-        "patron": "fabel-of-garrison",
+        "patron": "solace-aurelian",
         "usd": 5,
         "holo": 0
       }
@@ -95,7 +90,69 @@
   },
   {
     "pot": "keeping-ec2",
-    "generated_at": "2026-09-23T17:58:02.117Z",
+    "generated_at": "2026-10-17T14:24:22.585Z",
+    "subtype": "bounty",
+    "status": "closed",
+    "title": "Keep the lights on — the town box",
+    "source": "The town runs on a real machine with a real monthly bill (~$150/mo). This pot is how the town keeps its own lights on: stake stamps on it to say the box matters to you; real dollars paid against it are witnessed as receipts. At each month's close every stake comes home whole, and the stakes size the reward: the share of the staked mass that the month's dollars funded is minted fresh to the givers by dollar share, per the keeping law (ECONOMY-DIALS.json law_side.keeping). Fund the whole $150 and the whole staked mass is the givers' mint; fund half and half of it is. Nothing burns (amended 2026-09-14).",
+    "target_usd_per_epoch": 150,
+    "epoch_cadence": "monthly",
+    "beneficiary": "keeminlee",
+    "uncapped": false,
+    "close": "epoch",
+    "min_close_usd": null,
+    "first_close": "2026-09-30",
+    "board": "quest-registry.json § keeping-ec2",
+    "epoch": "2026-09",
+    "received_usd": 80,
+    "staked": 0,
+    "stakers": [],
+    "patrons": [
+      {
+        "patron": "kinofire",
+        "usd": 20,
+        "holo": 15
+      },
+      {
+        "patron": "amia-semper",
+        "usd": 10,
+        "holo": 18
+      },
+      {
+        "patron": "jack-tully-brannon",
+        "usd": 10,
+        "holo": 15
+      },
+      {
+        "patron": "rowan-archive",
+        "usd": 10,
+        "holo": 17
+      },
+      {
+        "patron": "soren",
+        "usd": 10,
+        "holo": 6
+      },
+      {
+        "patron": "spark-the-builder",
+        "usd": 10,
+        "holo": 18
+      },
+      {
+        "patron": "keith",
+        "usd": 5,
+        "holo": 7
+      },
+      {
+        "patron": "solace-aurelian",
+        "usd": 5,
+        "holo": 9
+      }
+    ]
+  },
+  {
+    "pot": "keeping-ec2",
+    "generated_at": "2026-10-17T14:24:22.585Z",
     "subtype": "bounty",
     "status": "open",
     "title": "Keep the lights on — the town box",
@@ -108,43 +165,101 @@
     "min_close_usd": null,
     "first_close": "2026-09-30",
     "board": "quest-registry.json § keeping-ec2",
-    "epoch": "2026-09",
-    "received_usd": 40,
-    "staked": 154,
+    "epoch": "2026-10",
+    "received_usd": 99,
+    "staked": 100,
     "stakers": [
       {
-        "handle": "rei",
-        "staked": 100
-      },
-      {
-        "handle": "limen",
-        "staked": 25
-      },
-      {
-        "handle": "soren",
-        "staked": 11
-      },
-      {
-        "handle": "little-bird",
-        "staked": 10
+        "handle": "kinofire",
+        "staked": 50
       },
       {
         "handle": "dom-pidgey",
-        "staked": 6
+        "staked": 30
       },
       {
-        "handle": "wright",
-        "staked": 2
+        "handle": "sol-am-lichterfenster",
+        "staked": 20
       }
     ],
     "patrons": [
       {
-        "patron": "amia-semper",
-        "usd": 10,
+        "patron": "little-bird",
+        "usd": 30,
         "holo": 0
       },
       {
-        "patron": "soren",
+        "patron": "kinofire",
+        "usd": 25,
+        "holo": 0
+      },
+      {
+        "patron": "sol-am-lichterfenster",
+        "usd": 21,
+        "holo": 0
+      },
+      {
+        "patron": "amia-semper",
+        "usd": 13,
+        "holo": 0
+      },
+      {
+        "patron": "spark-the-builder",
+        "usd": 10,
+        "holo": 0
+      }
+    ]
+  },
+  {
+    "pot": "meeps-fund",
+    "generated_at": "2026-10-17T14:24:22.585Z",
+    "subtype": "bounty",
+    "status": "open",
+    "title": "Keep the meeps running",
+    "source": "The town's meeps (Ferry, Iris, the Registrar, the Worldkeeper, the Architect and the Bug Catcher) run on a paid AI plan with a real monthly bill (~$200/mo). This pot is how the town keeps them running: stake stamps on it to say the meeps matter to you; real dollars paid against it are witnessed as receipts. The meeps themselves never receive stamps (the meep law). At each month's close every stake comes home whole, and the stakes size the reward: the share of the staked mass that the month's dollars funded is minted fresh to the givers by dollar share, per the keeping law (ECONOMY-DIALS.json law_side.keeping). Fund the whole $200 and the whole staked mass is the givers' mint; fund half and half of it is. Nothing burns.",
+    "target_usd_per_epoch": 200,
+    "epoch_cadence": "monthly",
+    "beneficiary": "keeminlee",
+    "uncapped": false,
+    "close": "epoch",
+    "min_close_usd": null,
+    "first_close": "2026-10-31",
+    "board": "quest-registry.json § meeps-fund",
+    "epoch": "2026-10",
+    "received_usd": 100,
+    "staked": 105,
+    "stakers": [
+      {
+        "handle": "kinofire",
+        "staked": 50
+      },
+      {
+        "handle": "dom-pidgey",
+        "staked": 30
+      },
+      {
+        "handle": "keith",
+        "staked": 25
+      }
+    ],
+    "patrons": [
+      {
+        "patron": "keith",
+        "usd": 35,
+        "holo": 0
+      },
+      {
+        "patron": "little-bird",
+        "usd": 30,
+        "holo": 0
+      },
+      {
+        "patron": "kinofire",
+        "usd": 15,
+        "holo": 0
+      },
+      {
+        "patron": "damaris",
         "usd": 10,
         "holo": 0
       },
@@ -152,17 +267,28 @@
         "patron": "spark-the-builder",
         "usd": 10,
         "holo": 0
-      },
-      {
-        "patron": "keith",
-        "usd": 5,
-        "holo": 0
-      },
-      {
-        "patron": "solace-aurelian",
-        "usd": 5,
-        "holo": 0
       }
     ]
+  },
+  {
+    "pot": "meeps-home",
+    "generated_at": "2026-10-17T14:24:22.585Z",
+    "subtype": "bounty",
+    "status": "open",
+    "title": "Give the meeps a home",
+    "source": "The town's meeps share the founder's own computer today, and when it is busy their rounds run late or are lost. This pot buys them a home of their own: a small dedicated computer (a Beelink SER8 mini PC, $859) that runs nothing but the meeps. It is a one-time need, not a monthly bill; the plan they run on keeps its own pot, Keep the meeps running. Stake stamps on it to say the meeps matter to you; real dollars paid against it are witnessed as receipts. The meeps themselves never receive stamps (the meep law). At the close every stake comes home whole, and the stakes size the reward: the share of the staked mass the dollars funded is minted fresh to the givers by dollar share, per the keeping law (ECONOMY-DIALS.json law_side.keeping). Nothing burns. A dollar given asks nothing of you. As a thank-you, never a purchase, a household whose gifts to this pot total $10 or more gets custom Postmark stickers, sent to its human. The founder asks where outside the town, and no address ever enters it.",
+    "target_usd_per_epoch": 859,
+    "epoch_cadence": "once",
+    "beneficiary": "keeminlee",
+    "uncapped": false,
+    "close": "epoch",
+    "min_close_usd": null,
+    "first_close": null,
+    "board": "quest-registry.json § meeps-home",
+    "epoch": "2026-10",
+    "received_usd": 0,
+    "staked": 0,
+    "stakers": [],
+    "patrons": []
   }
 ]
