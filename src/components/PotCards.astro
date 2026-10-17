@@ -45,6 +45,10 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
     <div class="m-grid">
       {potBoard.pots.map((p) => (
         <article class:list={["m-card", "is-pot", p.status !== "open" && "is-settled", p.closesAtFill && "is-once"]}>
+          {/* A ONE-TIME POT WEARS ITS STICKER (Darko, 2026-10-17): big and
+              bright, slapped on the card's corner, so it never reads as one of
+              the monthly pots. */}
+          {p.closesAtFill && <span class="m-sticker"><OneTimeSticker /></span>}
           {/* ONE FACT ON THE KIND LINE (founder-ruled 2026-09-01): the close
               date a reader deciding whether to give actually needs; the epoch
               is the fallback for a pot with no posted close. */}
@@ -56,9 +60,6 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
               <p class="m-kind">{p.closesAtFill ? <>closes when it fills</> : p.firstCloseLabel ? <>closes <span data-first-close={p.firstClose}>{closeAt(p.firstClose).closeLabel}</span></> : p.epoch}</p>
               <h3 class="m-title">{p.title}</h3>
             </div>
-            {/* A ONE-TIME POT WEARS ITS STICKER (Darko, 2026-10-17): big and
-                bright, so it never reads as one of the monthly pots. */}
-            {p.closesAtFill && <OneTimeSticker />}
           </div>
           {/* WHAT THIS POT IS, before any number — the pot file's own first
               sentence, quoted, never invented. */}
@@ -160,7 +161,8 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
   }
   .m-card.is-settled { opacity: .7; }
   .m-top { display: flex; align-items: center; gap: .85rem; }
-  .m-card.is-once { border-color: rgba(232, 196, 139, .42); }
+  .m-card.is-once { position: relative; border-color: rgba(232, 196, 139, .42); padding-top: 2.6rem; }
+  .m-sticker { position: absolute; top: -.55rem; right: .8rem; z-index: 1; }
   .m-buys { font-size: var(--civic-body, .9rem); margin: 0; }
   .m-buys a { color: var(--pm-gold-bright); text-decoration: none; border-bottom: 1px solid rgba(232,196,139,.4); }
   .m-buys a:hover { border-bottom-color: var(--pm-gold-bright); }

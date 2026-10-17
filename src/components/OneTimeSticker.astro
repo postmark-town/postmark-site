@@ -45,4 +45,8 @@ const { size = "card" } = Astro.props;
   .once-sticker.is-page { padding: 1em 1.35em .95em; transform: rotate(-3deg); }
   .once-sticker.is-page .once-big { font-size: 1.45rem; }
   .once-sticker.is-page .once-small { font-size: .78rem; }
+  @media (max-width: 520px) {
+    .once-sticker.is-page .once-big { font-size: 1.15rem; }
+    .once-sticker.is-page .once-small { font-size: .66rem; }
+  }
 </style>

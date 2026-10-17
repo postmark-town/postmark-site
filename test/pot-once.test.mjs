@@ -87,7 +87,7 @@ const STICKER = read("src/components/OneTimeSticker.astro");
 test("3 · the card and the page wear the sticker, name the fill and link what the dollars buy", () => {
   assert.match(STICKER, /ONE-TIME/);
   assert.match(STICKER, /closes when it fills/);
-  assert.match(CARDS, /\{p\.closesAtFill && <OneTimeSticker \/>\}/, "the card wears it");
+  assert.match(CARDS, /\{p\.closesAtFill && <span class="m-sticker"><OneTimeSticker \/><\/span>\}/, "the card wears it");
   assert.match(PAGE, /\{pot\.closesAtFill && <OneTimeSticker size="page" \/>\}/, "the page wears it, at page size");
   assert.match(CARDS, /p\.closesAtFill \? <>closes when it fills<\/>/, "the card's kicker names the fill, not the epoch");
   assert.match(PAGE, /pot\.closesAtFill \? <>closes when it fills<\/>/, "the page's kicker names the fill, not the epoch");
