@@ -283,7 +283,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
         {/* THE POT'S SPRITE beside its name (2026-10-02), the cards' drawing
             at half again their size; none for a pot with no line in
             civic-art.mjs § POT_SPRITES. */}
-        <div class="f-titled">
+        <div class:list={["f-titled", pot.closesAtFill && "has-once"]}>
           <PotSprite pot={pot.pot} size={72} />
           <h1>{pot.title ?? pot.id}</h1>
           {/* A ONE-TIME POT WEARS ITS STICKER (Darko, 2026-10-17), at page size. */}
@@ -1023,7 +1023,9 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   }
   .f-kind { font-family: var(--pm-mono); font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; opacity: .62; margin: 0 0 .3rem; }
   .f-head h1 { margin: 0; font-size: clamp(1.6rem, 4.2vw, 2.3rem); line-height: 1.12; }
-  .f-titled { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin: 0 0 .5rem; }
+  .f-titled { display: flex; align-items: center; gap: 1rem; margin: 0 0 .5rem; }
+  /* the one-time sticker may drop under a long title at phone width; the other pots' rows never wrap */
+  .f-titled.has-once { flex-wrap: wrap; }
   .f-source { margin: 0; opacity: .85; line-height: 1.6; }
   .f-buys { margin: .55rem 0 0; }
   .f-thanks {
