@@ -115,10 +115,11 @@ export const HOLO_NAME_LINE =
 // ruling on the market's cards: "THE MAIN PAGE CARDS EXPLAIN WHAT THE THING
 // IS" — and the cards were leading with close mechanics instead. The full
 // paragraph stays on the pot's own fund page; a card owes a reader only this.
-// THE THANK-YOU, as the pot file posts it (pot-meeps-home.json § _thank_you,
-// Darko 2026-10-17: the $10 stickers must be clear on the pot, not buried in
-// the fine print). Carried only whole: a whole-dollar threshold and both
-// sentences, else null. how_url is the private address route, null until it
+// THE THANK-YOU, the funding box's and no one pot's (the town's
+// WHITE_PAGES/fund-thank-you.json; Darko 2026-10-17 12:47: stickers to any US
+// household whose gifts across ALL pots total $20 or more in a calendar month,
+// said where a giver looks, not buried in the fine print). Carried only whole:
+// a whole-dollar threshold and both sentences, else null. how_url is the private address route, null until it
 // exists (and https only); art is the sticker image's slot, null until the
 // design sitting (a site-relative path or https only). A torn link or image
 // drops itself, never the thank-you.
@@ -552,8 +553,6 @@ export function toPot(raw) {
     buys: typeof raw.buys?.name === "string" && raw.buys.name.trim()
       && typeof raw.buys?.url === "string" && /^https:\/\/\S+$/.test(raw.buys.url.trim())
       ? { name: raw.buys.name.trim(), url: raw.buys.url.trim() } : null,
-    // the $10 sticker thank-you, or null (thankYouOf above)
-    thankYou: thankYouOf(raw.thank_you),
     uncapped,
     // ── WHAT A CLOSE DOES HERE ───────────────────────────────────────────
     // The pot file's own word, and the thing every money surface branches on.
@@ -691,6 +690,12 @@ export function livePots(rows) {
     drafts: all.filter((p) => p.status === "draft"),
     malformed,
   };
+}
+
+// The funding box's thank-you, as tools/extract-seam.mjs emitted it, or null
+// (no emission yet, or a torn one): a surface says nothing rather than half.
+export function loadThankYou({ path = null } = {}) {
+  return thankYouOf(readEmission("fund-thank-you.json", path));
 }
 
 export function loadPots({ path = null } = {}) {

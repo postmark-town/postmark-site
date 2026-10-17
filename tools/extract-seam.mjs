@@ -44,7 +44,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SITE_ROOT = resolve(HERE, "..");
 const DATA_DIR = join(SITE_ROOT, "src", "data", "postmark");
 
-export const SEAM_FILES = ["pots.json", "deeds.json", "economy.json"];
+export const SEAM_FILES = ["pots.json", "deeds.json", "economy.json", "fund-thank-you.json"];
 
 // ── epochs ───────────────────────────────────────────────────────────────────
 // An epoch is a month (funding.mjs's EPOCH_RE: /^\d{4}-\d{2}$/), and the pot
@@ -215,10 +215,6 @@ export function seamFromTown({ mint, entries: allEntries, potFiles, dial, asOf }
       buys: typeof file?.buys?.name === "string" && file.buys.name.trim()
         && typeof file?.buys?.url === "string" && /^https:\/\/\S+$/.test(file.buys.url.trim())
         ? { name: file.buys.name.trim(), url: file.buys.url.trim() } : null,
-      // THE THANK-YOU (§ _thank_you, Darko 2026-10-17: the $10 stickers said on
-      // the pot, not in the fine print), carried whole or as null by the same
-      // reader the site's toPot uses.
-      thank_you: thankYouOf(file?.thank_you),
       board: file?.board,
     };
 
@@ -389,6 +385,17 @@ export function seamFromTown({ mint, entries: allEntries, potFiles, dial, asOf }
 
 // ── the checkout side ────────────────────────────────────────────────────────
 
+// THE FUNDING BOX'S THANK-YOU (WHITE_PAGES/fund-thank-you.json; Darko
+// 2026-10-17 12:47: "$20 or more in a calendar month", across every pot, US
+// addresses for now). One record for the whole box, so no pot file restates it.
+// Carried whole by the site's own reader, or null when the town has none.
+export function thankYouFromTown(townRoot) {
+  const f = join(townRoot, "WHITE_PAGES", "fund-thank-you.json");
+  if (!existsSync(f)) return null;
+  try { return thankYouOf(JSON.parse(readFileSync(f, "utf8"))); }
+  catch { console.warn("WARN seam: WHITE_PAGES/fund-thank-you.json is not readable JSON — no thank-you emitted"); return null; }
+}
+
 export function readPotFiles(townRoot) {
   const dir = join(townRoot, "WHITE_PAGES");
   if (!existsSync(dir)) return [];
@@ -434,6 +441,7 @@ export async function emitSeam(townRoot, { dataDir = DATA_DIR } = {}) {
   };
   write("pots.json", seam.pots);
   write("deeds.json", seam.deeds);
+  write("fund-thank-you.json", thankYouFromTown(townRoot));
   if (seam.economy && asOf) write("economy.json", seam.economy);
 
   console.log(`seam: ${seam.pots.length} pot-epoch rows, ${seam.deeds.length} deeds, ` +
