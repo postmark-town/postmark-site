@@ -271,8 +271,10 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             fallback for a pot with no posted close. The beneficiary rides
             beside it as the LABEL, never the routing handle. */}
         <p class="f-kind">
-          {pot.closesAtFill ? <>closes when it fills</> : pot.firstCloseLabel ? <>closes <span data-first-close={pot.firstClose}>{closeAt(pot.firstClose).closeLabel}</span></> : pot.epoch}
-          {pot.beneficiaryLabel ? <> · for {pot.beneficiaryLabel}</> : <> · <em>no beneficiary named yet</em></>}
+          {/* A one-time pot's sticker says "closes when it fills", once; the
+              kicker does not repeat it (Darko, 2026-10-17 12:38). */}
+          {!pot.closesAtFill && <>{pot.firstCloseLabel ? <>closes <span data-first-close={pot.firstClose}>{closeAt(pot.firstClose).closeLabel}</span></> : pot.epoch}{" · "}</>}
+          {pot.beneficiaryLabel ? <>for {pot.beneficiaryLabel}</> : <em>no beneficiary named yet</em>}
         </p>
         {/* THE POT'S SPRITE beside its name (2026-10-02), the cards' drawing
             at half again their size; none for a pot with no line in
@@ -354,7 +356,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           </>
         ) : (
           <>
-            <p class="f-big">{usd(received)} <span class="f-of">of</span> {usd(target)} <span class="f-dim">{pot.closesAtFill ? "· closes when it fills" : "this epoch"}</span></p>
+            <p class="f-big">{usd(received)} <span class="f-of">of</span> {usd(target)} {!pot.closesAtFill && <span class="f-dim">this epoch</span>}</p>
             <div class="f-bar" role="img" aria-label={`${usd(received)} received of a ${usd(target)} posted need`}>
               {received > 0 && <i class="pm-holo-ink" style={`width:${Math.max(2, Math.min(100, target ? (received / target) * 100 : 0))}%`}></i>}
             </div>

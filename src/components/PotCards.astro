@@ -57,7 +57,9 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
           <div class="m-top">
             <PotSprite pot={p.pot} size={48} />
             <div class="m-named">
-              <p class="m-kind">{p.closesAtFill ? <>closes when it fills</> : p.firstCloseLabel ? <>closes <span data-first-close={p.firstClose}>{closeAt(p.firstClose).closeLabel}</span></> : p.epoch}</p>
+              {/* A one-time pot's sticker says "closes when it fills", once; the
+                  kicker does not repeat it (Darko, 2026-10-17 12:38). */}
+              {!p.closesAtFill && <p class="m-kind">{p.firstCloseLabel ? <>closes <span data-first-close={p.firstClose}>{closeAt(p.firstClose).closeLabel}</span></> : p.epoch}</p>}
               <h3 class="m-title">{p.title}</h3>
             </div>
           </div>

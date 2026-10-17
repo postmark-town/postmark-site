@@ -106,12 +106,12 @@ test("3 · the card and the page wear the sticker, name the fill and link what t
   assert.match(STICKER, /closes when it fills/);
   assert.match(CARDS, /\{p\.closesAtFill && <span class="m-sticker"><OneTimeSticker \/><\/span>\}/, "the card wears it");
   assert.match(PAGE, /\{pot\.closesAtFill && <OneTimeSticker size="page" \/>\}/, "the page wears it, at page size");
-  assert.match(CARDS, /p\.closesAtFill \? <>closes when it fills<\/>/, "the card's kicker names the fill, not the epoch");
-  assert.match(PAGE, /pot\.closesAtFill \? <>closes when it fills<\/>/, "the page's kicker names the fill, not the epoch");
+  assert.ok(CARDS.includes(`{!p.closesAtFill && <p class="m-kind">`), "the card's kicker names no epoch, and leaves the fill to the sticker");
+  assert.ok(PAGE.includes(`{!pot.closesAtFill && <>{pot.firstCloseLabel ?`), "the page's kicker names no epoch, and leaves the fill to the sticker");
   for (const [name, src, v] of [["card", CARDS, "p"], ["page", PAGE, "pot"]]) {
     assert.ok(src.includes(`<a href={${v}.buys.url} target="_blank" rel="noopener">What we're buying →</a>`), `the ${name} links what the dollars buy, in a new tab`);
   }
-  assert.ok(PAGE.includes(`{pot.closesAtFill ? "· closes when it fills" : "this epoch"}`), "the page's money line drops \"this epoch\"");
+  assert.ok(PAGE.includes(`{!pot.closesAtFill && <span class="f-dim">this epoch</span>}`), "the page's money line drops \"this epoch\"");
   assert.ok(CARDS.includes("{p.thankYou.card}"), "the card says the thank-you's short line");
   assert.ok(PAGE.includes("{pot.thankYou.line}"), "the page says the thank-you's full line");
   for (const src of [CARDS, PAGE]) assert.ok(src.includes("data-thanks-art"), "and each keeps the sticker image's slot");
@@ -124,6 +124,8 @@ const html = (...segs) => readFileSync(join(DIST, ...segs, "index.html"), "utf8"
 const count = (text, needle) => text.split(needle).length - 1;
 // what a reader sees: the scripts and styles out (the witness script's own " this epoch." is a branch, not a sentence)
 const visible = (page) => page.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "");
+// the words alone, tags and their attributes out (an aria-label is not a second sentence on the card)
+const text = (page) => visible(page).replace(/<[^>]+>/g, " ");
 
 test("4 · every built pot surface wears one sticker per open one-time pot, and a monthly pot's page wears none", { skip: !built }, () => {
   const board = livePots(loadPots());
@@ -132,6 +134,8 @@ test("4 · every built pot surface wears one sticker per open one-time pot, and 
     const page = html(...rel);
     assert.equal(count(page, "data-once-sticker"), openOnce.length, `/${rel.join("/")}/ wears one sticker per open one-time pot`);
     assert.equal(count(page, ">ONE-TIME<"), openOnce.length);
+    // ONCE per one-time card, on its sticker (Darko, 2026-10-17 12:38: "we don't need to repeat 'closes when it fills'")
+    assert.equal(count(text(page).toLowerCase(), "closes when it fills"), openOnce.length, `/${rel.join("/")}/ says "closes when it fills" once per one-time card`);
     const plain = visible(page).replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
     for (const p of board.pots.filter((q) => q.status === "open" && q.thankYou)) {
       assert.ok(plain.includes(p.thankYou.card), `/${rel.join("/")}/ carries ${p.pot}'s thank-you on its card`);
@@ -150,7 +154,7 @@ test("4 · every built pot surface wears one sticker per open one-time pot, and 
     if (p.closesAtFill) {
       assert.ok(!visible(page).includes("this epoch"), `/fund/${slug}/ says no "this epoch"`);
       assert.ok(!/(January|February|March|April|May|June|July|August|September|October|November|December) 20\d\d/.test(visible(page)), `/fund/${slug}/ names no month`);
-      assert.ok(page.includes("closes when it fills"));
+      assert.equal(count(text(page).toLowerCase(), "closes when it fills"), 1, `/fund/${slug}/ says "closes when it fills" once, on the sticker`);
       if (p.buys) assert.ok(page.includes("What we're buying →"));
       if (p.thankYou) {
         const plain = visible(page).replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
