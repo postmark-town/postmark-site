@@ -38,6 +38,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { writeIfChanged } from "./lib/mirror.mjs";
+import { thankYouOf } from "../src/lib/funding.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SITE_ROOT = resolve(HERE, "..");
@@ -214,6 +215,10 @@ export function seamFromTown({ mint, entries: allEntries, potFiles, dial, asOf }
       buys: typeof file?.buys?.name === "string" && file.buys.name.trim()
         && typeof file?.buys?.url === "string" && /^https:\/\/\S+$/.test(file.buys.url.trim())
         ? { name: file.buys.name.trim(), url: file.buys.url.trim() } : null,
+      // THE THANK-YOU (§ _thank_you, Darko 2026-10-17: the $10 stickers said on
+      // the pot, not in the fine print), carried whole or as null by the same
+      // reader the site's toPot uses.
+      thank_you: thankYouOf(file?.thank_you),
       board: file?.board,
     };
 

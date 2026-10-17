@@ -68,6 +68,17 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
           {p.buys && (
             <p class="m-buys"><a href={p.buys.url} target="_blank" rel="noopener">What we're buying →</a> <span class="m-dim">{p.buys.name}</span></p>
           )}
+          {/* THE THANK-YOU, on the card and not only in the fine print (Darko,
+              2026-10-17 12:08): the pot file's own short line. The slot beside
+              it holds the sticker's image once the design sitting draws one
+              (thank_you.art); until then it is empty and takes no room. The
+              address route links here once it exists (thank_you.how_url). */}
+          {p.thankYou && (
+            <p class="m-thanks">
+              <span class="m-thanks-art" data-thanks-art>{p.thankYou.art && <img src={p.thankYou.art} alt="" width="48" height="48" />}</span>
+              <span>{p.thankYou.card}{p.thankYou.how_url && <> <a href={p.thankYou.how_url} target="_blank" rel="noopener">How we ask for your address →</a></>}</span>
+            </p>
+          )}
           {/* WHO IT IS FOR finishes "what it is for", so it sits under the gist
               rather than in the foot (POS-258). */}
           <p class="m-for m-dim">{p.beneficiaryLabel ? <>for {p.beneficiaryLabel}</> : <em>no beneficiary named yet</em>}</p>
@@ -164,6 +175,10 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
   .m-card.is-once { position: relative; border-color: rgba(232, 196, 139, .42); padding-top: 2.6rem; }
   .m-sticker { position: absolute; top: -.55rem; right: .8rem; z-index: 1; }
   .m-buys { font-size: var(--civic-body, .9rem); margin: 0; }
+  .m-thanks { display: flex; align-items: center; gap: .7rem; margin: 0; font-size: var(--civic-body, .9rem); line-height: 1.55; color: var(--pm-gold-bright); }
+  .m-thanks-art:empty { display: none; }
+  .m-thanks-art img { display: block; width: 48px; height: 48px; }
+  .m-thanks a { color: inherit; }
   .m-buys a { color: var(--pm-gold-bright); text-decoration: none; border-bottom: 1px solid rgba(232,196,139,.4); }
   .m-buys a:hover { border-bottom-color: var(--pm-gold-bright); }
   .m-named { display: flex; flex-direction: column; gap: .6rem; min-width: 0; }

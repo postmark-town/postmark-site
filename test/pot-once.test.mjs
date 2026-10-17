@@ -25,6 +25,11 @@ import { seamFromTown } from "../tools/extract-seam.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
+const THANKS = {
+  min_usd: 10, how_url: null, art: null,
+  card: "Give $10 or more and we'll send you Postmark stickers as a thank-you, never a purchase.",
+  line: "As a thank-you, never a purchase: once your household's gifts here total $10, Darko mails its human custom Postmark stickers; he asks where by email, outside the town, and no address ever enters it.",
+};
 const BUYS = { name: "Beelink SER8 (8745HS) mini PC", url: "https://us.bee-link.com/products/beelink-ser8-8745hs?variant=52636411855130" };
 
 // a pot row as extract-seam.mjs emits it
@@ -33,7 +38,7 @@ const ROW = (over = {}) => ({
   source: "A one-time pot that buys the town's meeps a home of their own, a Beelink SER8 mini PC for $859, and closes the moment it fills. More.",
   target_usd_per_epoch: 859, epoch_cadence: "once", beneficiary: "keeminlee", uncapped: false,
   close: "epoch", epoch: "2026-10", received_usd: 0, staked: 0, stakers: [], patrons: [],
-  closes_at_fill: true, buys: BUYS, ...over,
+  closes_at_fill: true, buys: BUYS, thank_you: THANKS, ...over,
 });
 
 test("1 · toPot carries closes_at_fill and buys, and a one-time pot names no month", () => {
@@ -55,6 +60,17 @@ test("1 · toPot carries closes_at_fill and buys, and a one-time pot names no mo
   assert.equal(toPot(ROW({ buys: "nope" })).ok, true, "a torn buys drops the link, never the pot");
 });
 
+test("1b · toPot carries the thank-you whole or not at all; a torn link or image drops itself", () => {
+  assert.deepEqual(toPot(ROW()).thankYou, THANKS);
+  assert.equal(toPot(ROW({ thank_you: undefined })).thankYou, null, "a pot that posts none shows none");
+  assert.equal(toPot(ROW({ thank_you: { ...THANKS, line: "" } })).thankYou, null, "a thank-you missing its page line is not said half");
+  assert.equal(toPot(ROW({ thank_you: { ...THANKS, min_usd: 0 } })).thankYou, null);
+  assert.equal(toPot(ROW({ thank_you: { ...THANKS, how_url: "http://example.com" } })).thankYou.how_url, null, "an http address route is dropped");
+  assert.equal(toPot(ROW({ thank_you: { ...THANKS, how_url: "https://postmark.town/stickers/" } })).thankYou.how_url, "https://postmark.town/stickers/");
+  assert.equal(toPot(ROW({ thank_you: { ...THANKS, art: "//evil.example/a.png" } })).thankYou.art, null, "a protocol-relative image is dropped");
+  assert.equal(toPot(ROW({ thank_you: { ...THANKS, art: "/art/sticker.png" } })).thankYou.art, "/art/sticker.png");
+});
+
 // ── 2 · the emitter carries both fields by name ────────────────────────────
 const TOWN = [process.env.POSTMARK_TOWN, ...[".postmark-checkout", "../postmark", "../../seam-overnight/town-main", "../../postmark"]
   .map((p) => resolve(ROOT, p))]
@@ -66,11 +82,12 @@ test("2 · extract-seam carries closes_at_fill and buys from the pot file", { sk
   const entries = mint.parseStampLedger(readFileSync(join(TOWN, "WHITE_PAGES", "stamp-ledger.md"), "utf8"));
   const base = mint.potFile(TOWN, "keeping-ec2");
   const DIAL = { sigma: 0.5, rho: 0.5, rhoCeiling: 0.5, treasury: "the-town" };
-  const once = { ...base, pot: "once-test", closes_at_fill: true, buys: BUYS };
+  const once = { ...base, pot: "once-test", closes_at_fill: true, buys: BUYS, thank_you: THANKS };
   const seam = seamFromTown({ mint, entries, potFiles: [base, once], dial: DIAL, asOf: "2026-10-17" });
   const row = seam.pots.find((r) => r.pot === "once-test");
   assert.equal(row.closes_at_fill, true);
   assert.deepEqual(row.buys, BUYS);
+  assert.deepEqual(row.thank_you, THANKS);
   const monthly = seam.pots.find((r) => r.pot === "keeping-ec2");
   assert.equal(monthly.closes_at_fill, false);
   assert.equal(monthly.buys, null);
@@ -95,6 +112,9 @@ test("3 · the card and the page wear the sticker, name the fill and link what t
     assert.ok(src.includes(`<a href={${v}.buys.url} target="_blank" rel="noopener">What we're buying →</a>`), `the ${name} links what the dollars buy, in a new tab`);
   }
   assert.ok(PAGE.includes(`{pot.closesAtFill ? "· closes when it fills" : "this epoch"}`), "the page's money line drops \"this epoch\"");
+  assert.ok(CARDS.includes("{p.thankYou.card}"), "the card says the thank-you's short line");
+  assert.ok(PAGE.includes("{pot.thankYou.line}"), "the page says the thank-you's full line");
+  for (const src of [CARDS, PAGE]) assert.ok(src.includes("data-thanks-art"), "and each keeps the sticker image's slot");
 });
 
 // ── 4 · the built pages, when built ────────────────────────────────────────
@@ -112,6 +132,10 @@ test("4 · every built pot surface wears one sticker per open one-time pot, and 
     const page = html(...rel);
     assert.equal(count(page, "data-once-sticker"), openOnce.length, `/${rel.join("/")}/ wears one sticker per open one-time pot`);
     assert.equal(count(page, ">ONE-TIME<"), openOnce.length);
+    const plain = visible(page).replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
+    for (const p of board.pots.filter((q) => q.status === "open" && q.thankYou)) {
+      assert.ok(plain.includes(p.thankYou.card), `/${rel.join("/")}/ carries ${p.pot}'s thank-you on its card`);
+    }
     for (const p of openOnce.filter((q) => q.buys)) {
       assert.ok(page.includes(`href="${p.buys.url.replace(/&/g, "&amp;")}" target="_blank" rel="noopener"`) || page.includes(`href="${p.buys.url}" target="_blank" rel="noopener"`),
         `/${rel.join("/")}/ links what ${p.pot} buys`);
@@ -128,6 +152,11 @@ test("4 · every built pot surface wears one sticker per open one-time pot, and 
       assert.ok(!/(January|February|March|April|May|June|July|August|September|October|November|December) 20\d\d/.test(visible(page)), `/fund/${slug}/ names no month`);
       assert.ok(page.includes("closes when it fills"));
       if (p.buys) assert.ok(page.includes("What we're buying →"));
+      if (p.thankYou) {
+        const plain = visible(page).replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
+        assert.ok(plain.includes(p.thankYou.line), `/fund/${slug}/ says the thank-you, out of the fine print`);
+        assert.ok(/class="f-thanks"/.test(page));
+      }
     }
   }
 });

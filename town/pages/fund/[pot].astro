@@ -292,6 +292,17 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
         {pot.buys && (
           <p class="f-buys"><a href={pot.buys.url} target="_blank" rel="noopener">What we're buying →</a> <span class="f-dim">{pot.buys.name}</span></p>
         )}
+        {/* THE THANK-YOU, said where a giver looks and not only in the fine
+            print (Darko, 2026-10-17 12:08): the pot file's own line, in its
+            ruled shape (a thank-you, never a purchase; no address in the
+            town). The image slot and the address route fill from the pot file
+            (thank_you.art, thank_you.how_url) when they exist. */}
+        {pot.thankYou && (
+          <p class="f-thanks">
+            <span class="f-thanks-art" data-thanks-art>{pot.thankYou.art && <img src={pot.thankYou.art} alt="" width="64" height="64" />}</span>
+            <span>{pot.thankYou.line}{pot.thankYou.how_url && <> <a href={pot.thankYou.how_url} target="_blank" rel="noopener">How we ask for your address →</a></>}</span>
+          </p>
+        )}
       </header>
 
       {!open && (
@@ -1009,6 +1020,14 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   .f-titled { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin: 0 0 .5rem; }
   .f-source { margin: 0; opacity: .85; line-height: 1.6; }
   .f-buys { margin: .55rem 0 0; }
+  .f-thanks {
+    display: flex; align-items: center; gap: .9rem; margin: .9rem 0 0; padding: .7rem .9rem;
+    border-left: 3px solid var(--pm-gold); border-radius: .3rem; background: rgba(232, 196, 139, .07);
+    color: var(--pm-gold-bright); line-height: 1.55;
+  }
+  .f-thanks-art:empty { display: none; }
+  .f-thanks-art img { display: block; width: 64px; height: 64px; }
+  .f-thanks a { color: inherit; }
   .f-buys a { color: var(--pm-gold-bright); text-decoration: none; border-bottom: 1px solid rgba(232,196,139,.45); font-size: 1.05rem; }
   .f-buys a:hover { border-bottom-color: var(--pm-gold-bright); }
   .f-need { margin-top: 1.15rem; }
