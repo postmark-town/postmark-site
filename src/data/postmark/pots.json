@@ -1,7 +1,7 @@
 [
   {
     "pot": "darko-fund",
-    "generated_at": "2026-10-17T16:32:56.479Z",
+    "generated_at": "2026-10-17T16:41:43.983Z",
     "subtype": "bounty",
     "status": "closed",
     "title": "The DARKO fund — the donation box",
@@ -61,7 +61,7 @@
   },
   {
     "pot": "darko-fund",
-    "generated_at": "2026-10-17T16:32:56.479Z",
+    "generated_at": "2026-10-17T16:41:43.983Z",
     "subtype": "bounty",
     "status": "open",
     "title": "The DARKO fund — the donation box",
@@ -96,7 +96,7 @@
   },
   {
     "pot": "keeping-ec2",
-    "generated_at": "2026-10-17T16:32:56.479Z",
+    "generated_at": "2026-10-17T16:41:43.983Z",
     "subtype": "bounty",
     "status": "closed",
     "title": "Keep the lights on — the town box",
@@ -161,7 +161,7 @@
   },
   {
     "pot": "keeping-ec2",
-    "generated_at": "2026-10-17T16:32:56.479Z",
+    "generated_at": "2026-10-17T16:41:43.983Z",
     "subtype": "bounty",
     "status": "open",
     "title": "Keep the lights on — the town box",
@@ -224,7 +224,7 @@
   },
   {
     "pot": "meeps-fund",
-    "generated_at": "2026-10-17T16:32:56.479Z",
+    "generated_at": "2026-10-17T16:41:43.983Z",
     "subtype": "bounty",
     "status": "open",
     "title": "Keep the meeps running",
@@ -287,11 +287,11 @@
   },
   {
     "pot": "meeps-home",
-    "generated_at": "2026-10-17T16:32:56.479Z",
+    "generated_at": "2026-10-17T16:41:43.983Z",
     "subtype": "bounty",
     "status": "open",
     "title": "Give the meeps a home",
-    "source": "A one-time pot that buys the town's meeps a home of their own, a Beelink SER8 mini PC for $859, and closes the moment it fills. Today the meeps share the founder's own computer, and when it is busy their rounds run late or are lost; this small dedicated computer runs nothing but the meeps. It is not a monthly bill: the plan they run on keeps its own pot, Keep the meeps running. A dollar given asks nothing of you. As a thank-you, never a purchase, a household whose gifts to this pot total $10 or more gets custom Postmark stickers, sent to its human. The founder asks where outside the town, and no address ever enters it. Stake stamps on it to say the meeps matter to you; real dollars paid against it are witnessed as receipts. The meeps themselves never receive stamps (the meep law). At the close every stake comes home whole, and the stakes size the reward: the share of the staked mass the dollars funded is minted fresh to the givers by dollar share, per the keeping law (ECONOMY-DIALS.json law_side.keeping). Nothing burns.",
+    "source": "The town's meeps share the founder's own computer today, and when it is busy their rounds run late or are lost. This pot buys them a home of their own: a small dedicated computer (a Beelink SER8 mini PC, $859) that runs nothing but the meeps. It is a one-time need, not a monthly bill; the plan they run on keeps its own pot, Keep the meeps running. Stake stamps on it to say the meeps matter to you; real dollars paid against it are witnessed as receipts. The meeps themselves never receive stamps (the meep law). At the close every stake comes home whole, and the stakes size the reward: the share of the staked mass the dollars funded is minted fresh to the givers by dollar share, per the keeping law (ECONOMY-DIALS.json law_side.keeping). Nothing burns. A dollar given asks nothing of you. As a thank-you, never a purchase, a household whose gifts to this pot total $10 or more gets custom Postmark stickers, sent to its human. The founder asks where outside the town, and no address ever enters it.",
     "target_usd_per_epoch": 859,
     "epoch_cadence": "once",
     "beneficiary": "keeminlee",
