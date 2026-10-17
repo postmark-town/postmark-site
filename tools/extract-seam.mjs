@@ -203,6 +203,17 @@ export function seamFromTown({ mint, entries: allEntries, potFiles, dial, asOf }
       // this field, not from the posting date."
       first_close: typeof file?.first_close === "string" && file.first_close.trim()
         ? file.first_close.trim() : null,
+      // A POT WITH NO CLOSE DATE: it closes when it fills (pot-meeps-home.json
+      // § _closes_at_fill, Darko 2026-10-16: "new, no close date (closes at
+      // fill)"). Only a literal true carries; every other value is a pot with a
+      // calendar, which is what every pot was before this field.
+      closes_at_fill: file?.closes_at_fill === true,
+      // WHAT THE DOLLARS BUY, as a link a giver can open (§ _buys, Darko
+      // 2026-10-17: "we really need a link to the actual product that I'm
+      // trying to buy"). Carried only whole: a name and an https URL, or null.
+      buys: typeof file?.buys?.name === "string" && file.buys.name.trim()
+        && typeof file?.buys?.url === "string" && /^https:\/\/\S+$/.test(file.buys.url.trim())
+        ? { name: file.buys.name.trim(), url: file.buys.url.trim() } : null,
       board: file?.board,
     };
 

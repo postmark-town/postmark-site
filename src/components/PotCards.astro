@@ -23,6 +23,7 @@ import { potGist, giverLabel } from "@/lib/funding.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
 import PotSprite from "@/components/PotSprite.astro";
+import OneTimeSticker from "@/components/OneTimeSticker.astro";
 
 const { potBoard: given } = Astro.props;
 // THIS MONTH'S POTS ONLY (Keemin, 2026-10-01): a closed epoch is history, not an
@@ -43,7 +44,7 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
   ) : (
     <div class="m-grid">
       {potBoard.pots.map((p) => (
-        <article class:list={["m-card", "is-pot", p.status !== "open" && "is-settled"]}>
+        <article class:list={["m-card", "is-pot", p.status !== "open" && "is-settled", p.closesAtFill && "is-once"]}>
           {/* ONE FACT ON THE KIND LINE (founder-ruled 2026-09-01): the close
               date a reader deciding whether to give actually needs; the epoch
               is the fallback for a pot with no posted close. */}
@@ -52,13 +53,20 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
           <div class="m-top">
             <PotSprite pot={p.pot} size={48} />
             <div class="m-named">
-              <p class="m-kind">{p.firstCloseLabel ? <>closes <span data-first-close={p.firstClose}>{closeAt(p.firstClose).closeLabel}</span></> : p.epoch}</p>
+              <p class="m-kind">{p.closesAtFill ? <>closes when it fills</> : p.firstCloseLabel ? <>closes <span data-first-close={p.firstClose}>{closeAt(p.firstClose).closeLabel}</span></> : p.epoch}</p>
               <h3 class="m-title">{p.title}</h3>
             </div>
+            {/* A ONE-TIME POT WEARS ITS STICKER (Darko, 2026-10-17): big and
+                bright, so it never reads as one of the monthly pots. */}
+            {p.closesAtFill && <OneTimeSticker />}
           </div>
           {/* WHAT THIS POT IS, before any number — the pot file's own first
               sentence, quoted, never invented. */}
           {potGist(p.source) && <p class="m-what">{potGist(p.source)}</p>}
+          {/* WHAT THE DOLLARS BUY, a link a giver can open (Darko, 2026-10-17). */}
+          {p.buys && (
+            <p class="m-buys"><a href={p.buys.url} target="_blank" rel="noopener">What we're buying →</a> <span class="m-dim">{p.buys.name}</span></p>
+          )}
           {/* WHO IT IS FOR finishes "what it is for", so it sits under the gist
               rather than in the foot (POS-258). */}
           <p class="m-for m-dim">{p.beneficiaryLabel ? <>for {p.beneficiaryLabel}</> : <em>no beneficiary named yet</em>}</p>
@@ -93,7 +101,7 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
             </p>
           ) : (
             <div class="m-bar-wrap">
-              <div class="m-bar is-pot-bar" role="img" aria-label={`${usd(p.received)} of ${usd(p.target)} received for ${p.epoch}`}>
+              <div class="m-bar is-pot-bar" role="img" aria-label={`${usd(p.received)} of ${usd(p.target)} received${p.closesAtFill ? ", closes when it fills" : ` for ${p.epoch}`}`}>
                 {p.received > 0 && <i class="pm-holo-ink" style={`width:${Math.max(2, pct(p.progress))}%`}></i>}
               </div>
               <p class="m-barlab">
@@ -152,6 +160,10 @@ const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
   }
   .m-card.is-settled { opacity: .7; }
   .m-top { display: flex; align-items: center; gap: .85rem; }
+  .m-card.is-once { border-color: rgba(232, 196, 139, .42); }
+  .m-buys { font-size: var(--civic-body, .9rem); margin: 0; }
+  .m-buys a { color: var(--pm-gold-bright); text-decoration: none; border-bottom: 1px solid rgba(232,196,139,.4); }
+  .m-buys a:hover { border-bottom-color: var(--pm-gold-bright); }
   .m-named { display: flex; flex-direction: column; gap: .6rem; min-width: 0; }
   .m-kind { font-family: var(--pm-mono); font-size: var(--civic-label, .7rem); letter-spacing: .12em; text-transform: uppercase; opacity: .62; margin: 0; }
   .m-title { font-size: var(--civic-body, .9rem); line-height: 1.45; margin: 0; color: var(--pm-gold-bright); font-weight: 400; }

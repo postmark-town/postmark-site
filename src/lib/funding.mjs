@@ -485,6 +485,7 @@ export function toPot(raw) {
   if (received < 0) return bad("received_usd is negative");
 
   const close = typeof raw.close === "string" && raw.close.trim() ? raw.close.trim() : null;
+  const closesAtFill = raw.closes_at_fill === true;
 
   // null is a REAL state, not a missing field: deriveEpochClose refuses to
   // close a pot with no beneficiary, so an unnamed beneficiary is a thing the
@@ -519,6 +520,17 @@ export function toPot(raw) {
     // the routing truth and is never rewritten — this is the label beside it.
     beneficiaryLabel: beneficiaryLabel(beneficiary),
     cadence: String(raw.epoch_cadence ?? "").trim() || null,
+    // A ONE-TIME POT: no close date, it closes when it fills (the pot file's
+    // closes_at_fill, Darko 2026-10-16). Every surface that would name a month
+    // for it names the fill instead, and wears the one-time sticker
+    // (OneTimeSticker.astro), because the epoch row it rides on is the
+    // emitter's bookkeeping, not a month the pot closes in.
+    closesAtFill,
+    // WHAT THE DOLLARS BUY, a name and an https link, or null (the pot file's
+    // `buys`, Darko 2026-10-17). A torn one is dropped, not the pot.
+    buys: typeof raw.buys?.name === "string" && raw.buys.name.trim()
+      && typeof raw.buys?.url === "string" && /^https:\/\/\S+$/.test(raw.buys.url.trim())
+      ? { name: raw.buys.name.trim(), url: raw.buys.url.trim() } : null,
     uncapped,
     // ── WHAT A CLOSE DOES HERE ───────────────────────────────────────────
     // The pot file's own word, and the thing every money surface branches on.
@@ -571,7 +583,8 @@ export function toPot(raw) {
     firstClose: FIRST_CLOSE_RE.test(String(raw.first_close ?? "").trim())
       ? String(raw.first_close).trim() : null,
     firstCloseLabel: firstCloseLabel(raw.first_close),
-    epochLabel: epochLabel(epoch),
+    // null on a one-time pot: "October 2026" beside it read as a monthly pot.
+    epochLabel: closesAtFill ? null : epochLabel(epoch),
     // DERIVED, and deliberately not stored: whether a close can ever run on
     // this pot. THE EXPLICIT WORD IS PRIMARY, both ways — "elastic" and
     // "epoch" close, and "none" does not close even if a target were posted.

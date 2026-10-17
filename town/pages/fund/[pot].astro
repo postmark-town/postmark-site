@@ -65,6 +65,7 @@ import { houseOf } from "@/lib/household.mjs";
 import { qrSvg } from "@/lib/qr.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
 import PotSprite from "@/components/PotSprite.astro";
+import OneTimeSticker from "@/components/OneTimeSticker.astro";
 import { sectionCard } from "@/lib/og-image.mjs";
 
 // THE ADDRESS IS NO LONGER ONE STRING. Since 2026-08-25 a pot may have an
@@ -270,7 +271,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             fallback for a pot with no posted close. The beneficiary rides
             beside it as the LABEL, never the routing handle. */}
         <p class="f-kind">
-          {pot.firstCloseLabel ? <>closes <span data-first-close={pot.firstClose}>{closeAt(pot.firstClose).closeLabel}</span></> : pot.epoch}
+          {pot.closesAtFill ? <>closes when it fills</> : pot.firstCloseLabel ? <>closes <span data-first-close={pot.firstClose}>{closeAt(pot.firstClose).closeLabel}</span></> : pot.epoch}
           {pot.beneficiaryLabel ? <> · for {pot.beneficiaryLabel}</> : <> · <em>no beneficiary named yet</em></>}
         </p>
         {/* THE POT'S SPRITE beside its name (2026-10-02), the cards' drawing
@@ -279,12 +280,18 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
         <div class="f-titled">
           <PotSprite pot={pot.pot} size={72} />
           <h1>{pot.title ?? pot.id}</h1>
+          {/* A ONE-TIME POT WEARS ITS STICKER (Darko, 2026-10-17), at page size. */}
+          {pot.closesAtFill && <OneTimeSticker size="page" />}
         </div>
         {/* WHAT THIS IS, in one breath — the pot file's own first sentence. The
             full paragraph lives in the fine print below the rails: the founder's
             page law (2026-08-26) is that this page DIRECTS TO WHERE YOU CAN PAY
             and offers the deeper detail behind a click, not ahead of the money. */}
         {potGist(pot.source) && <p class="f-source">{potGist(pot.source)}</p>}
+        {/* WHAT THE DOLLARS BUY, a link a giver can open (Darko, 2026-10-17). */}
+        {pot.buys && (
+          <p class="f-buys"><a href={pot.buys.url} target="_blank" rel="noopener">What we're buying →</a> <span class="f-dim">{pot.buys.name}</span></p>
+        )}
       </header>
 
       {!open && (
@@ -313,7 +320,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
                 that gifts were welcome. "No posted need" is a fact about the ASK;
                 it was never a reason to withhold what arrived. */}
             <p class="f-big">
-              {usd(received)} <span class="f-dim">{floorBar ? "in the roll" : "received this epoch"}</span>
+              {usd(received)} <span class="f-dim">{floorBar ? "in the roll" : pot.closesAtFill ? "received" : "received this epoch"}</span>
             </p>
             {/* THE FLOOR BAR — an elastic pot's roll against its close floor, in
                 the seam's holo ink (the Guild card's own bar, full width). */}
@@ -336,7 +343,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           </>
         ) : (
           <>
-            <p class="f-big">{usd(received)} <span class="f-of">of</span> {usd(target)} <span class="f-dim">this epoch</span></p>
+            <p class="f-big">{usd(received)} <span class="f-of">of</span> {usd(target)} <span class="f-dim">{pot.closesAtFill ? "· closes when it fills" : "this epoch"}</span></p>
             <div class="f-bar" role="img" aria-label={`${usd(received)} received of a ${usd(target)} posted need`}>
               {received > 0 && <i class="pm-holo-ink" style={`width:${Math.max(2, Math.min(100, target ? (received / target) * 100 : 0))}%`}></i>}
             </div>
@@ -468,7 +475,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
               Sign in to witness it in your household's name. A transfer that is not witnessed here still
               reaches the town, and is recorded by hand as an outside gift.
             </p>
-            <form class="f-form" id="pm-fund-form" novalidate data-usdc-when="household" hidden>
+            <form class="f-form" id="pm-fund-form" novalidate data-usdc-when="household" data-once={pot.closesAtFill || once ? "1" : undefined} hidden>
               <label>transaction hash
                 <input name="txhash" placeholder="0x…" spellcheck="false" autocomplete="off" required />
               </label>
@@ -663,7 +670,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
                 return (
                   <li class="f-past-row">
                     <p class="f-past-head">
-                      <b>{m.epochLabel ?? m.epoch}</b>
+                      <b>{m.closesAtFill ? "Closed at fill" : (m.epochLabel ?? m.epoch)}</b>
                       <span class="f-dim"> · closed · </span>
                       <span>{usd(m.received ?? mtotal)}{m.target != null && <span class="f-dim"> of {usd(m.target)}</span>}</span>
                     </p>
@@ -693,7 +700,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             {pot.close === "elastic" ? (
               <li><strong>This pot carries forward.</strong> Gifts join the roll month over month — nothing is refused at intake. When the roll reaches its floor, the close runs over the whole accumulated roll: every stake comes home whole, and the givers are minted <strong>fresh stamps</strong> by dollar share — sized by what the town staked on this pot, a giver's own household's stakes left out, and capped so the household's holo never passes ρ × everything it has minted. A pot nobody staked mints nothing.</li>
             ) : pot.closes ? (
-              <li><strong>This pot closes at the epoch.</strong> If residents staked stamps on it, the close mints you <strong>fresh stamps</strong> by dollar share — sized by the funded share of those stakes, your own household's left out, capped so your household's holo never passes ρ × everything it has minted; the stakes themselves come home whole. If nobody staked, your dollars still pay the bill, are still written down in your name, and mint nothing — money cannot manufacture ownership out of something nobody wanted.</li>
+              <li><strong>{pot.closesAtFill ? "This pot closes once, when it fills." : "This pot closes at the epoch."}</strong> If residents staked stamps on it, the close mints you <strong>fresh stamps</strong> by dollar share — sized by the funded share of those stakes, your own household's left out, capped so your household's holo never passes ρ × everything it has minted; the stakes themselves come home whole. If nobody staked, your dollars still pay the bill, are still written down in your name, and mint nothing — money cannot manufacture ownership out of something nobody wanted.</li>
             ) : pot.close === "none" ? (
               <li><strong>This one never closes.</strong> A gift is witnessed and left at that: nothing burns, nothing converts, and <strong>nothing mints back</strong> — to you or to anyone.</li>
             ) : (
@@ -815,7 +822,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             }
             var line = "$" + j.usd_recorded + " witnessed for " + (j.household_name || j.handle) + " → " + j.pot + ".";
             if (j.cents_note) line += " " + j.cents_note;
-            if (j.headroom_after !== null && j.headroom_after !== undefined) line += " This pot can still take $" + j.headroom_after + " this epoch.";
+            if (j.headroom_after !== null && j.headroom_after !== undefined) line += " This pot can still take $" + j.headroom_after + (form.dataset.once === "1" ? "." : " this epoch.");
             // the what-this-buys line gets its own paragraph rather than being
             // glued onto the end of a receipt: it is the standing law of the
             // surface, not a clause of this particular transaction
@@ -999,8 +1006,11 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   }
   .f-kind { font-family: var(--pm-mono); font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; opacity: .62; margin: 0 0 .3rem; }
   .f-head h1 { margin: 0; font-size: clamp(1.6rem, 4.2vw, 2.3rem); line-height: 1.12; }
-  .f-titled { display: flex; align-items: center; gap: 1rem; margin: 0 0 .5rem; }
+  .f-titled { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin: 0 0 .5rem; }
   .f-source { margin: 0; opacity: .85; line-height: 1.6; }
+  .f-buys { margin: .55rem 0 0; }
+  .f-buys a { color: var(--pm-gold-bright); text-decoration: none; border-bottom: 1px solid rgba(232,196,139,.45); font-size: 1.05rem; }
+  .f-buys a:hover { border-bottom-color: var(--pm-gold-bright); }
   .f-need { margin-top: 1.15rem; }
   .f-big { font-family: var(--pm-mono); font-size: 1.55rem; color: var(--pm-gold-bright); margin: 0 0 .55rem; font-variant-numeric: tabular-nums; }
   .f-of { font-size: .9rem; opacity: .6; }
