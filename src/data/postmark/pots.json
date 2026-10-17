@@ -1,7 +1,7 @@
 [
   {
     "pot": "darko-fund",
-    "generated_at": "2026-10-17T16:21:44.779Z",
+    "generated_at": "2026-10-17T16:32:56.479Z",
     "subtype": "bounty",
     "status": "closed",
     "title": "The DARKO fund — the donation box",
@@ -15,6 +15,7 @@
     "first_close": "2026-09-30",
     "closes_at_fill": false,
     "buys": null,
+    "thank_you": null,
     "board": "quest-registry.json § darko-fund",
     "epoch": "2026-09",
     "received_usd": 112,
@@ -60,7 +61,7 @@
   },
   {
     "pot": "darko-fund",
-    "generated_at": "2026-10-17T16:21:44.779Z",
+    "generated_at": "2026-10-17T16:32:56.479Z",
     "subtype": "bounty",
     "status": "open",
     "title": "The DARKO fund — the donation box",
@@ -74,6 +75,7 @@
     "first_close": "2026-09-30",
     "closes_at_fill": false,
     "buys": null,
+    "thank_you": null,
     "board": "quest-registry.json § darko-fund",
     "epoch": "2026-10",
     "received_usd": 15,
@@ -94,7 +96,7 @@
   },
   {
     "pot": "keeping-ec2",
-    "generated_at": "2026-10-17T16:21:44.779Z",
+    "generated_at": "2026-10-17T16:32:56.479Z",
     "subtype": "bounty",
     "status": "closed",
     "title": "Keep the lights on — the town box",
@@ -108,6 +110,7 @@
     "first_close": "2026-09-30",
     "closes_at_fill": false,
     "buys": null,
+    "thank_you": null,
     "board": "quest-registry.json § keeping-ec2",
     "epoch": "2026-09",
     "received_usd": 80,
@@ -158,7 +161,7 @@
   },
   {
     "pot": "keeping-ec2",
-    "generated_at": "2026-10-17T16:21:44.779Z",
+    "generated_at": "2026-10-17T16:32:56.479Z",
     "subtype": "bounty",
     "status": "open",
     "title": "Keep the lights on — the town box",
@@ -172,6 +175,7 @@
     "first_close": "2026-09-30",
     "closes_at_fill": false,
     "buys": null,
+    "thank_you": null,
     "board": "quest-registry.json § keeping-ec2",
     "epoch": "2026-10",
     "received_usd": 99,
@@ -220,7 +224,7 @@
   },
   {
     "pot": "meeps-fund",
-    "generated_at": "2026-10-17T16:21:44.779Z",
+    "generated_at": "2026-10-17T16:32:56.479Z",
     "subtype": "bounty",
     "status": "open",
     "title": "Keep the meeps running",
@@ -234,6 +238,7 @@
     "first_close": "2026-10-31",
     "closes_at_fill": false,
     "buys": null,
+    "thank_you": null,
     "board": "quest-registry.json § meeps-fund",
     "epoch": "2026-10",
     "received_usd": 100,
@@ -282,7 +287,7 @@
   },
   {
     "pot": "meeps-home",
-    "generated_at": "2026-10-17T16:21:44.779Z",
+    "generated_at": "2026-10-17T16:32:56.479Z",
     "subtype": "bounty",
     "status": "open",
     "title": "Give the meeps a home",
@@ -298,6 +303,13 @@
     "buys": {
       "name": "Beelink SER8 (8745HS) mini PC",
       "url": "https://us.bee-link.com/products/beelink-ser8-8745hs?variant=52636411855130"
+    },
+    "thank_you": {
+      "min_usd": 10,
+      "card": "Give $10 or more and we'll send you Postmark stickers as a thank-you, never a purchase.",
+      "line": "As a thank-you, never a purchase: once your household's gifts here total $10, Darko mails its human custom Postmark stickers; he asks where by email, outside the town, and no address ever enters it.",
+      "how_url": null,
+      "art": null
     },
     "board": "quest-registry.json § meeps-home",
     "epoch": "2026-10",
