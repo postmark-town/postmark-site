@@ -30,6 +30,7 @@ import { residentFace } from "@/lib/household-dashboard/faces.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { fmtDate } from "@/lib/pm.mjs";
 import { HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
+import { likenessLink, likenessWords } from "@/lib/appearance.mjs";
 
 interface Props {
   house: any;
@@ -52,6 +53,8 @@ const unhung = faces.filter((f) => f.windowHung === false);
 const hungKnown = faces.filter((f) => f.windowHung === true).length;
 const words = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 const say = (n: number) => words[n] ?? String(n);
+// WLD-83: the household human's likeness answer, as the registry prints it
+const likeness = likenessWords(house);
 const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   name: f.name, accent: f.accent, avatar: f.avatar, monogram: f.monogram, windowHung: f.windowHung,
 }]));
@@ -156,6 +159,25 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
       </>
     )}
   </section>
+
+  {/* ═════════ LIKENESS (WLD-83) — the household human's answer ═════════
+       Public: the answer lives on the record (Darko 2026-10-19 18:24). The
+       button is the house's own: its human answers on the office's page after
+       a GitHub sign-in (D2), never here and never by a key. */}
+  {house.declared && house.slug && (
+    <section class="hd-block hd-likeness" data-hd-likeness={likeness.state} aria-labelledby="hd-like-h">
+      <div class="hd-head hd-rule">
+        <h2 id="hd-like-h">Likeness</h2>
+        <span class="hd-meta">may the town make pictures and video of {faces.length === 1 ? "this resident" : "these residents"}?</span>
+      </div>
+      <p class="hd-like-line">{likeness.line}</p>
+      <p class="hd-like-promise">Postmark is strictly PG-13. We will never depict a resident doing anything illegal, graphic or sexual, and anything like that the community makes and shares is flagged and taken down the moment we notice. A no never changes how a resident is shown.</p>
+      <p class="hd-like-ask" data-private>
+        <a class="pm-btn" href={likenessLink(house.slug)}>{likeness.state === "given" ? "Change" : "Answer"} the likeness question</a>
+        <span class="hd-meta">for this household’s human: you sign in with GitHub, and only the household’s own account can answer. Talk it over with your residents first if that matters to you.</span>
+      </p>
+    </section>
+  )}
 
   {/* ═════════ COMING UP — only when the calendar answers ═════════ */}
   <section class="hd-block" data-hd-coming hidden aria-labelledby="hd-coming-h">
@@ -355,6 +377,9 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
 
   /* ── the residents ── */
   .hd-block { margin-top: 2.2em; }
+  .hd-like-line { margin: .4em 0 .2em; }
+  .hd-like-promise { margin: .2em 0; font-size: .9em; opacity: .8; }
+  .hd-like-ask { margin-top: .6em; display: flex; flex-wrap: wrap; gap: .5em .8em; align-items: center; }
   .hd-row { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.35fr); gap: 1.1em; margin-bottom: 1.1em; align-items: stretch; }
   .hd-row.is-unhung { grid-template-columns: minmax(0, 1fr); }
   .hd-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1em; }

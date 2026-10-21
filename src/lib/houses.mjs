@@ -107,6 +107,9 @@ export function buildHouses(residents, registry) {
       name: typeof dec.name === "string" && dec.name.trim() ? dec.name.trim() : null,
       // no `human` (POS-394): the fold is public, and the private name never enters it
       since: dec.since ?? null,
+      // WLD-83: the household human's likeness answer, as the registry prints it
+      // (answer and when only; null until answered, which reads as no)
+      likeness: dec.likeness?.answer ? { answer: dec.likeness.answer, at: dec.likeness.at ?? null } : null,
       residents: members,
       arriving: declared.filter((h) => !byHandle.has(h)),
     };

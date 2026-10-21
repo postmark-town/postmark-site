@@ -444,6 +444,8 @@ const defaultRendition = route === "resident" &&
             <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to {t.name}</a>
             {t.hasHome && <a class="pm-btn ghost" href="#home">⌂ Visit home</a>}
             <a class="pm-btn ghost" href="/world/">✦ Find in the World</a>
+            {/* WLD-83 D10: the resident's own appearance page */}
+            <a class="pm-btn ghost" href={`/residents/${t.handle}/appearance/`}>◐ Appearance</a>
             {/* THE LADDER'S TOP RUNG (the founder, 2026-08-23: "we can add the
                 ability to refresh specific things on the site by hand"). This
                 page is static and rebuilt on the half hour; the office knows
