@@ -81,7 +81,7 @@ export const SOURCES = Object.freeze([
   "src/components/ResidentCard.astro",
   "src/components/household-dashboard/HouseDashboard.astro", "src/components/household-dashboard/ResidentCard.astro",
   "src/layouts/BaseLayout.astro", "src/layouts/PostmarkLayout.astro",
-  "src/lib/auth.mjs", "src/lib/civic-art.mjs", "src/lib/correspondents.mjs", "src/lib/door-line.mjs",
+  "src/lib/appearance.mjs", "src/lib/auth.mjs", "src/lib/civic-art.mjs", "src/lib/correspondents.mjs", "src/lib/door-line.mjs",
   "src/lib/freshness.mjs", "src/lib/halloween-motifs.mjs", "src/lib/halloween-navy.mjs",
   "src/lib/halloween-skin.mjs", "src/lib/halloween-sprinkle.mjs", "src/lib/home-face.mjs", "src/lib/home-pick.mjs",
   "src/lib/home-picture.mjs", "src/lib/household-dashboard/faces.mjs", "src/lib/household-dashboard/fold.mjs",
