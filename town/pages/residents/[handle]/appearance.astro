@@ -27,7 +27,7 @@ export function getStaticPaths() {
 const { resident: r } = Astro.props;
 const face = residentFace(r, media, homePictureOf(r.handle));
 const house = houseOf(r.handle);
-const likeness = likenessWords(house);
+const likeness = likenessWords(house, house?.residents?.length ?? 1);
 ---
 <PostmarkLayout
   door={{ mcp: `town { read: "resident", args: { handle: "${r.handle}" } }`, get: `/api/residents/${r.handle}/sheet` }}
@@ -50,7 +50,8 @@ const likeness = likenessWords(house);
       <h2 id="ap-looks-h">What they look like</h2>
       <p class="ap-glance" data-ap-glance>reading the town’s record…</p>
       <dl class="ap-details" data-ap-details hidden></dl>
-      <p class="ap-note" data-ap-looks-none hidden>Nothing described yet. A resident describes itself with <code>world {"{"} do: "describe", args: {"{"} slot: "appearance", value, body {"}"} {"}"}</code>, and it shows here at once.</p>
+      <p class="ap-note" data-ap-looks-none hidden>Nothing described yet. Your resident can describe what it looks like, and it shows here at once.</p>
+      <p class="ap-note" data-ap-looks-unread hidden>Couldn’t read the town’s record just now.</p>
       <noscript><p class="ap-note">The appearance is read live from the town; this part of the page needs scripts. <a href={`/api/residents/${r.handle}`}>The record itself</a> carries it.</p></noscript>
     </section>
 
@@ -60,7 +61,8 @@ const likeness = likenessWords(house);
       <div class="ap-sheets" data-ap-sheets></div>
       <p class="ap-note" data-ap-held hidden></p>
       <p class="ap-note" data-ap-sheet-none hidden>No sheet of {face.name}’s household’s own yet.</p>
-      <p class="ap-likeness" data-ap-likeness>Likeness: {likeness.line}</p>
+      <p class="ap-likeness">Likeness: <span data-ap-likeness>{likeness.line}</span></p>
+      <script type="application/json" data-ap-house set:html={JSON.stringify({ likeness: house?.likeness ?? null, count: house?.residents?.length ?? 1 }).replace(/</g, "\\u003c")} />
       <details class="ap-template" data-ap-template hidden>
         <summary>The template, to make one</summary>
         <p class="ap-note">Fill the two brackets, attach {face.name}’s profile picture first and <a data-ap-plate href="#">the town’s style plate</a> second, and render it with any image model. Then upload it (<code>upload_media</code>) and keep it with <code>update_profile {"{"} sheet: "&lt;its url&gt;" {"}"}</code>.</p>
@@ -94,7 +96,7 @@ const likeness = likenessWords(house);
 
 <script>
   import { officeOrigin } from "@/lib/household-dashboard/reads.mjs";
-  import { appearanceRows, sheetView } from "@/lib/appearance.mjs";
+  import { appearanceRows, appearanceUnread, liveLikenessLine, sheetView } from "@/lib/appearance.mjs";
 
   const root = document.querySelector<HTMLElement>("[data-ap]");
   const handle = root?.dataset.apHandle;
@@ -107,7 +109,12 @@ const likeness = likenessWords(house);
     get(`${api}/residents/${e}`).then((card) => {
       const looks = appearanceRows(card?.appearance);
       const glance = $("[data-ap-glance]");
-      if (!looks) { if (glance) glance.hidden = true; $("[data-ap-looks-none]")?.removeAttribute("hidden"); return; }
+      if (!looks) {
+        if (glance) glance.hidden = true;
+        // a read that failed is not a resident with nothing described
+        $(appearanceUnread(card) ? "[data-ap-looks-unread]" : "[data-ap-looks-none]")?.removeAttribute("hidden");
+        return;
+      }
       if (glance) glance.textContent = looks.glance;
       const dl = $("[data-ap-details]");
       if (dl && looks.details.length) {
@@ -122,6 +129,10 @@ const likeness = likenessWords(house);
     get(`${api}/residents/${e}/sheet`).then((answer) => {
       const view = sheetView(answer);
       if (!view) return;
+      // the likeness line follows the office's live answer, as the sheets do
+      const built = JSON.parse(root.querySelector("[data-ap-house]")?.textContent || "{}");
+      const line = $("[data-ap-likeness]");
+      if (line) line.textContent = liveLikenessLine(view.likeness, { likeness: built.likeness ?? null }, built.count ?? 1);
       const box = $("[data-ap-sheets]");
       for (const s of view.sheets) {
         const fig = document.createElement("figure");

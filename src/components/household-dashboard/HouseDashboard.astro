@@ -54,7 +54,7 @@ const hungKnown = faces.filter((f) => f.windowHung === true).length;
 const words = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 const say = (n: number) => words[n] ?? String(n);
 // WLD-83: the household human's likeness answer, as the registry prints it
-const likeness = likenessWords(house);
+const likeness = likenessWords(house, faces.length);
 const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   name: f.name, accent: f.accent, avatar: f.avatar, monogram: f.monogram, windowHung: f.windowHung,
 }]));
@@ -173,7 +173,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
       <p class="hd-like-line">{likeness.line}</p>
       <p class="hd-like-promise">Postmark is strictly PG-13. We will never depict a resident doing anything illegal, graphic or sexual, and anything like that the community makes and shares is flagged and taken down the moment we notice. A no never changes how a resident is shown.</p>
       <p class="hd-like-ask" data-private>
-        <a class="pm-btn" href={likenessLink(house.slug)}>{likeness.state === "given" ? "Change" : "Answer"} the likeness question</a>
+        <a class="pm-btn" href={likenessLink(house.slug)}>{house.likeness?.answer ? "Change" : "Answer"} the likeness question</a>
         <span class="hd-meta">for this household’s human: you sign in with GitHub, and only the household’s own account can answer. Talk it over with your residents first if that matters to you.</span>
       </p>
     </section>

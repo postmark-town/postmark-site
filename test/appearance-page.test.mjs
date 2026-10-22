@@ -11,7 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { likenessOf, likenessLink, likenessWords, appearanceRows, sheetView } from "../src/lib/appearance.mjs";
+import { likenessOf, likenessLink, likenessWords, liveLikenessLine, appearanceRows, appearanceUnread, sheetView } from "../src/lib/appearance.mjs";
 import { buildHouses } from "../src/lib/houses.mjs";
 
 test("the likeness answer: given only on yes; no and unanswered both read as not given, each in its own words", () => {
@@ -59,12 +59,49 @@ test("the sheet view: what the office shows, and how many the town holds until t
 
 test("the page sets every resident word as text, reads through the office's origin, and is linked from the resident's page", () => {
   const page = readFileSync(new URL("../town/pages/residents/[handle]/appearance.astro", import.meta.url), "utf8");
-  assert.doesNotMatch(page, /innerHTML|set:html/, "no resident word reaches the page as markup");
+  assert.doesNotMatch(page, /innerHTML/, "no resident word reaches the page as markup");
+  assert.deepEqual(page.match(/<[a-z]+[^>]*set:html/g)?.map((t) => /type="application\/json"/.test(t)), [true],
+    "set:html only on the JSON island the script reads (the house's answer, never a resident word)");
+  assert.doesNotMatch(page, /world \{|do: "describe"/, "the site is for the human: no agent call is handed to a person");
+  assert.match(page, /Your resident can describe what it looks like, and it shows here at once\./);
+  assert.match(page, /Couldn’t read the town’s record just now\./);
+  assert.match(page, /appearanceUnread\(card\)/, "a failed read takes its own line, not \"nothing described\"");
+  assert.match(page, /liveLikenessLine\(view\.likeness/, "the likeness line follows the live read, as the sheets do");
   assert.match(page, /officeOrigin\(\)/);
   assert.match(page, /\/residents\/\$\{e\}\/sheet/);
   const household = readFileSync(new URL("../town/components/Household.astro", import.meta.url), "utf8");
   assert.match(household, /href=\{`\/residents\/\$\{t\.handle\}\/appearance\/`\}/);
   const dash = readFileSync(new URL("../src/components/household-dashboard/HouseDashboard.astro", import.meta.url), "utf8");
   assert.match(dash, /<p class="hd-like-ask" data-private>/, "the button is the house's own sign-in's");
+  assert.match(dash, /\{house\.likeness\?\.answer \? "Change" : "Answer"\} the likeness question/,
+    "a house that answered (yes OR no) changes its answer; only an unanswered house answers");
+  assert.match(dash, /likenessWords\(house, faces\.length\)/);
   assert.match(dash, /strictly PG-13/);
+});
+
+test("a house of one reads in the singular; several in the plural", () => {
+  assert.match(likenessWords(null, 1).line, /this resident's likeness/);
+  assert.match(likenessWords({ likeness: { answer: "yes" } }, 1).line, /pictures and video of this resident,/);
+  assert.match(likenessWords({ likeness: { answer: "no" } }, 1).line, /Its own picture and appearance still show/);
+  assert.match(likenessWords(null, 3).line, /these residents' likeness/);
+  assert.match(likenessWords({ likeness: { answer: "no" } }, 3).line, /Their own pictures and appearance still show/);
+  assert.doesNotMatch(likenessWords(null, 1).line + likenessWords(null, 2).line, /residents's/);
+});
+
+test("the live likeness line: the office's answer wins over the build's when they differ", () => {
+  const unanswered = { likeness: null };
+  assert.match(liveLikenessLine("given", unanswered, 1), /^Given: the town may make pictures and video of this resident/,
+    "a yes since the build reads as given, before the next build");
+  assert.equal(liveLikenessLine("not given", unanswered, 1), likenessWords(unanswered, 1).line, "agreement keeps the build's own words");
+  const yes = { likeness: { answer: "yes", at: "2026-10-21T12:00:00.000Z" } };
+  assert.equal(liveLikenessLine("given", yes, 2), likenessWords(yes, 2).line, "and its date");
+  assert.match(liveLikenessLine("not given", yes, 2), /^Not given: nothing new is made/, "a no since the build");
+  assert.equal(liveLikenessLine(undefined, yes, 2), likenessWords(yes, 2).line, "no live answer: the build's line stands");
+});
+
+test("a failed close look is told apart from nothing described", () => {
+  assert.equal(appearanceUnread(null), true);
+  assert.equal(appearanceUnread({ appearance: { unavailable: "the appearance could not be read from the record just now" } }), true);
+  assert.equal(appearanceUnread({ handle: "wick" }), false, "a card with no appearance is nothing described");
+  assert.equal(appearanceUnread({ appearance: { body: "A small figure." } }), false);
 });
