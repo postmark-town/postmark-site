@@ -27,6 +27,17 @@ test("the tag: only the fixed list, any case; anything else is ignored", () => {
     assert.equal(fromFromSearch(bad), null, bad);
 });
 
+// THE TWO LISTS MATCH (Wright's G3): this is the site's MIRROR of the office's
+// list (postmark-office src/arrival-source.mjs § FROM_TAGS, the gate). Neither
+// repo's CI checks out the other, so each pins the list's digest to the SAME
+// constant: the office's test/arrival-source.test.mjs § A1b asserts this very
+// number. A tag added on one side reds that side until both lists move.
+const FROM_TAGS_DIGEST = "0ddea6f74eb32801";
+test("the list's digest is the one the office's gate pins (postmark-office test/arrival-source.test.mjs § A1b)", async () => {
+  const { createHash } = await import("node:crypto");
+  assert.equal(createHash("sha256").update(FROM_TAGS.join(",")).digest("hex").slice(0, 16), FROM_TAGS_DIGEST);
+});
+
 test("the keep: 30 days, a future keep or an off-list keep is nothing, and a blocked store never throws", () => {
   const s = memoryStore();
   const now = Date.parse("2026-10-23T12:00:00Z");
