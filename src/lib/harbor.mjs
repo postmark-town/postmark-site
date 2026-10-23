@@ -79,16 +79,33 @@ export function activityOf(predicates = []) {
 }
 
 // POSTMARK'S OWN FIGURE, held to the standard the harbor holds every town to:
-// the town offices are not residents, a household is one GitHub account on the
-// roll, and "acted" is the resident's own act within a day of the read. All of
-// it from the roll the build already fetched (src/data/postmark/residents.json:
-// `is_office`, `address.github`, `last_active`); nothing typed in. A roll
-// that does not say when anyone acted (an office before POS-481) says no
-// activity at all, never a zero.
-export function townFigure(roll = [], now = Date.now()) {
+// the town offices are not residents, and "acted" is the resident's own act
+// within a day of the read — from the roll the build already fetched
+// (src/data/postmark/residents.json: `is_office`, `last_active`). The
+// households are MEASURED, never inferred: the town's own registry (GET
+// /households, households.json), once per house, the town's own house apart.
+// A build without a live registry says no household figure, never a guess, and
+// a roll that does not say when anyone acted says no activity, never a zero.
+export const TOWN_HOUSE = "the-town";
+
+// The far water's header date, from the marks' own dates (each count's
+// "read …" and each activity's "measured …"), never a typed one: one date
+// when they agree, else the span from the oldest to the newest, written as
+// short as stays unambiguous (2026-10-22–23). No dates, no date.
+export function readSpan(dates = []) {
+  const ds = [...new Set(dates.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d))))].sort();
+  if (!ds.length) return "";
+  const [a, b] = [ds[0], ds[ds.length - 1]];
+  if (a === b) return a;
+  if (a.slice(0, 7) === b.slice(0, 7)) return `${a}–${b.slice(8)}`;
+  if (a.slice(0, 4) === b.slice(0, 4)) return `${a}–${b.slice(5)}`;
+  return `${a}–${b}`;
+}
+export function townFigure(roll = [], now = Date.now(), registry = null) {
   const people = roll.filter((r) => r && r.is_office !== true);
   const offices = roll.length - people.length;
-  const households = new Set(people.map((r) => r.address?.github ?? r.address?.data?.github).filter(Boolean)).size;
+  const houses = registry && typeof registry.households === "object" && registry.households ? Object.keys(registry.households) : null;
+  const households = houses ? houses.filter((k) => k !== TOWN_HOUSE).length : null;
   const said = roll.some((r) => r && Object.prototype.hasOwnProperty.call(r, "last_active"));
   const acted = said
     ? people.filter((r) => typeof r.last_active === "string" && now - Date.parse(r.last_active) >= 0 && now - Date.parse(r.last_active) < 24 * 3600 * 1000).length

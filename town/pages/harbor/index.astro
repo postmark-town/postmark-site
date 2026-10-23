@@ -26,7 +26,9 @@
 import HarborLayout from "@/layouts/HarborLayout.astro";
 import stats from "@/data/postmark/stats.json";
 import residentsRoll from "@/data/postmark/residents.json";
-import { loadCharters, townFigure } from "@/lib/harbor.mjs";
+import householdRegistry from "@/data/postmark/households.json";
+import householdsRead from "@/data/postmark/households-read.json";
+import { loadCharters, townFigure, readSpan } from "@/lib/harbor.mjs";
 import { FRAMES, layoutTowns, shipPath, towerInks, epithetOf } from "@/lib/harbor-sky.mjs";
 import { sectionCard } from "@/lib/og-image.mjs";
 
@@ -100,10 +102,11 @@ const doors = chartered.map((t) => ({ glyph: t.glyph, name: nameOf(t.slug), door
 // Held to the standard every town is (POS-769): offices apart, households
 // counted, and who acted in a day — computed from the roll at build time,
 // never typed in (src/lib/harbor.mjs § townFigure).
-const fig = townFigure(residentsRoll);
+// the registry counts only when this build read it live; a kept snapshot is not a measure
+const fig = townFigure(residentsRoll, Date.now(), householdsRead?.live === true ? householdRegistry : null);
 const hubFigure = {
   n: fig.residents,
-  label: `residents in ${fig.households} households`,
+  label: fig.households != null ? `residents in ${fig.households} households` : "residents",
   line: [
     fig.offices ? `plus ${fig.offices} town office${fig.offices === 1 ? "" : "s"}` : "",
     fig.acted != null ? `about ${fig.acted} act in a day` : "",
@@ -114,8 +117,8 @@ const hubWords = `${hubFigure.n} ${hubFigure.label}${hubFigure.line ? `, ${hubFi
 // The card shown first. Without JS every card stands open, one after another.
 const firstCard = moored[0]?.slug ?? host?.slug ?? "";
 
-// The far water's read dates, said once when they agree.
-const farReads = [...new Set(listed.map((t) => t.count?.read).filter(Boolean))].sort();
+// The far water's read dates, from the marks' own (src/lib/harbor.mjs § readSpan).
+const farRead = readSpan(listed.flatMap((t) => [t.count?.read, t.activity?.measured]));
 
 // The postmark cancel carries a day. The build's day stands until the island
 // stamps the snapshot's own.
@@ -605,8 +608,8 @@ const sections = [
           runs there yet, and nothing has crossed. <span class="hb-badge-nocharter">listed, no charter</span>
         </p>
         <p class="hb-far-read">
-          {farReads.length === 1
-            ? `counts as each town publishes them, read ${farReads[0]}`
+          {farRead
+            ? `counts as each town publishes them, read ${farRead}`
             : "counts as each town publishes them, dated on each card"}
         </p>
       </div>

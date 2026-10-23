@@ -121,11 +121,17 @@ test("S9 · Postmark's own figure: offices apart, households counted, who acted 
     { handle: "b", is_office: false, address: { github: "one" }, last_active: "2026-10-20T01:00:00Z" },
     { handle: "c", is_office: false, address: { github: "two" }, last_active: null },
   ];
-  assert.deepEqual(townFigure(roll, now), { residents: 3, households: 2, offices: 1, acted: 1 });
+  // households are MEASURED from the town's registry, once per house, the town's own house apart
+  const registry = { households: { "the-town": {}, one: {}, two: {}, three: {} } };
+  assert.deepEqual(townFigure(roll, now, registry), { residents: 3, households: 3, offices: 1, acted: 1 });
+  // no live registry: no household figure at all, never one inferred from GitHub accounts
+  assert.equal(townFigure(roll, now).households, null);
+  assert.equal(townFigure(roll, now, null).households, null);
   // a roll that never says when anyone acted says no activity, never a zero
   assert.equal(townFigure(roll.map(({ last_active, ...r }) => r), now).acted, null);
   assert.match(PAGE, /import residentsRoll from "@\/data\/postmark\/residents\.json"/);
-  assert.match(PAGE, /const fig = townFigure\(residentsRoll\)/);
+  assert.match(PAGE, /const fig = townFigure\(residentsRoll, Date\.now\(\), householdsRead\?\.live === true \? householdRegistry : null\)/, "the household figure is not the live registry's");
+  assert.match(PAGE, /fig\.households != null \? `residents in \$\{fig\.households\} households` : "residents"/, "a missing registry still prints a household figure");
   assert.match(PAGE, /plus \$\{fig\.offices\} town office/);
   assert.match(PAGE, /about \$\{fig\.acted\} act in a day/);
   assert.doesNotMatch(PAGE, /\b(279|273)\b|176 households|\b99 act/, "a Postmark count is typed into the page");
@@ -140,4 +146,15 @@ test("S10 · every listed and chartered town prints its activity line, dated, un
   assert.match(PAGE, /<span class="hb-measured">measured \{t\.activity\.measured\}<\/span>/, "the lantern's activity is undated");
   assert.match(PAGE, /class="hb-t-small hb-t-activity">\s*\{t\.activity\.text\}/, "the chart drops a chartered town's activity");
   assert.match(PAGE, /<p class="hb-card-activity">/, "the card drops the activity");
+});
+
+test("S11 · the far water's date comes from the marks' own dates: one when they agree, a span when they differ", async () => {
+  const { readSpan } = await import("../src/lib/harbor.mjs");
+  assert.equal(readSpan([]), "");
+  assert.equal(readSpan(["2026-10-23", "2026-10-23", undefined]), "2026-10-23");
+  assert.equal(readSpan(["2026-10-23", "2026-10-22"]), "2026-10-22–23");
+  assert.equal(readSpan(["2026-09-30", "2026-10-02"]), "2026-09-30–10-02");
+  assert.equal(readSpan(["2025-12-31", "2026-01-01"]), "2025-12-31–2026-01-01");
+  assert.match(PAGE, /const farRead = readSpan\(listed\.flatMap\(\(t\) => \[t\.count\?\.read, t\.activity\?\.measured\]\)\)/);
+  assert.doesNotMatch(PAGE, /read 2026-\d\d-\d\d/, "a read date is typed into the page");
 });
