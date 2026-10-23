@@ -19,6 +19,16 @@
 // directory name, so a fifth slot needs no line here — only a place in
 // SLOT_ORDER if it should render in a particular seat.
 //
+// Towns placed after the filing freeze file by id, not under the harbor's
+// directory (POS-763): `the-town/<slug>/mark.md`, the same shape one level up,
+// standing in the harbor by position. Both filings are read.
+//
+// ── LISTED IS NOT CHARTERED ──────────────────────────────────────────────────
+// A town can stand here without a charter: Postmark lists it so residents can
+// find it, and nothing has crossed or been agreed. That town carries a
+// `slot: listed` predicate, and the page must never call it chartered, draw it
+// a road, or say the instruments read it.
+//
 // ── WHY THE AUTHORED FILES, NOT THE FOLD ─────────────────────────────────────
 // board.mjs reads WORLD/world-state.json, and that would be the tidier seam.
 // It cannot serve here yet: the fold runs at crossing saves, and at the pin
@@ -42,14 +52,18 @@ export const REGISTRY_PLACE = "the-harbor-reach/the-long-run-harbor";
 export const TOWN_CLASS = "town";
 
 // The order the slots read in on a card: where it is, how you stand there,
-// what crosses, who keeps it. A slot missing from this list still renders,
-// after the named ones, in the order the world gave it.
-const SLOT_ORDER = ["door", "boarding", "carries", "keeper"];
+// what crosses, who keeps it, who runs it, and last whether it is only listed.
+// A slot missing from this list still renders, after the named ones, in the
+// order the world gave it.
+const SLOT_ORDER = ["door", "boarding", "carries", "keeper", "run-by", "listed"];
+export const LISTED_SLOT = "listed";
 
 // A town's glyph is its slug, when the slug IS a codepoint — the convention the
 // agent towns arrived with (1f3d9 → the city, 1f916 → the forum). Postmark's
 // slug is its name, from before that convention existed, so the hub is the one
-// entry here. A new codepoint-slugged town needs no line.
+// entry here. A new codepoint-slugged town needs no line. A town that arrived
+// with a name and no codepoint (delve, the-commons) flies no glyph: the harbor
+// does not choose an emoji for another town, and the chart shows its initial.
 const NAMED_GLYPHS = { postmark: "1f4ee" };
 
 // ── frontmatter ──────────────────────────────────────────────────────────────
@@ -90,10 +104,26 @@ export function glyphFor(slug) {
 // the package's exports map and resolving it throws ERR_PACKAGE_PATH_NOT_EXPORTED
 // (the trap board.mjs already fell into once). WORLD/ is shipped but unexported,
 // so it is reached by walking up from a specifier that does resolve.
-function registryDir({ path = null, require: req = createRequire(import.meta.url) } = {}) {
-  if (path) return path;
-  const world = join(dirname(req.resolve("postmark-world/geometry")), "..", "WORLD");
-  return join(world, "marks", "let-there-be-light", "the-harbor-reach", "the-long-run-harbor");
+//
+// HARBOR_WORLD_DIR names another WORLD/ for a local preview of a world branch
+// before its pin moves (a town added in postmark-world, rendered here). A build
+// never sets it, so the served page reads the pin and nothing else.
+function worldDir(req, env) {
+  if (env.HARBOR_WORLD_DIR) return env.HARBOR_WORLD_DIR;
+  return join(dirname(req.resolve("postmark-world/geometry")), "..", "WORLD");
+}
+
+// The two filings a town can stand in: under the harbor's own directory (the
+// first charters, filed before the freeze) and by id under the town's own
+// household (every town since). `path` alone (a test's registry) reads only
+// that directory; `byIdPath` adds a second.
+function registryDirs({ path = null, byIdPath = null, require: req = createRequire(import.meta.url), env = process.env } = {}) {
+  if (path) return byIdPath ? [path, byIdPath] : [path];
+  const world = worldDir(req, env);
+  return [
+    join(world, "marks", "let-there-be-light", "the-harbor-reach", "the-long-run-harbor"),
+    join(world, "marks", "the-town"),
+  ];
 }
 
 function readMark(dir) {
@@ -107,63 +137,71 @@ function readMark(dir) {
 }
 
 // ── charters ─────────────────────────────────────────────────────────────────
-// One directory → one chartered town, or nothing. Fail-soft the whole way down,
-// exactly like the board: an unreadable registry renders as a registry that
-// could not be read, never as a build failure and never as an invented town.
+// One directory → one town, or nothing. Fail-soft the whole way down, exactly
+// like the board: an unreadable registry renders as a registry that could not
+// be read, never as a build failure and never as an invented town.
 export function loadCharters(opts = {}) {
-  let dir;
+  let dirs;
   try {
-    dir = registryDir(opts);
-  } catch {
-    return [];
-  }
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
+    dirs = registryDirs(opts);
   } catch {
     return [];
   }
 
   const towns = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const slug = entry.name;
-    const charter = readMark(join(dir, slug));
-    if (!charter || !isA(charter.data, TOWN_CLASS)) continue;
-
-    const predicates = [];
-    let children = [];
+  const seen = new Set();
+  for (const dir of dirs) {
+    let entries;
     try {
-      children = readdirSync(join(dir, slug), { withFileTypes: true });
-    } catch { /* a charter with no predicates is a thin card, not an error */ }
-    for (const child of children) {
-      if (!child.isDirectory()) continue;
-      const mark = readMark(join(dir, slug, child.name));
-      if (!mark || !isPredicate(mark.data) || !mark.data.slot) continue;
-      predicates.push({ slot: mark.data.slot, value: mark.data.value ?? "", body: mark.body });
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
     }
-    predicates.sort((a, b) => {
-      const ai = SLOT_ORDER.indexOf(a.slot);
-      const bi = SLOT_ORDER.indexOf(b.slot);
-      return (ai < 0 ? SLOT_ORDER.length : ai) - (bi < 0 ? SLOT_ORDER.length : bi);
-    });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const slug = entry.name;
+      if (seen.has(slug)) continue;
+      const charter = readMark(join(dir, slug));
+      if (!charter || !isA(charter.data, TOWN_CLASS)) continue;
+      seen.add(slug);
 
-    towns.push({
-      slug,
-      glyph: glyphFor(slug),
-      body: charter.body,
-      tier: charter.data.tier ?? "",
-      date: charter.data.date ?? "",
-      hub: slug === "postmark",
-      predicates,
-      door: predicates.find((p) => p.slot === "door")?.value ?? "",
-    });
+      const predicates = [];
+      let children = [];
+      try {
+        children = readdirSync(join(dir, slug), { withFileTypes: true });
+      } catch { /* a charter with no predicates is a thin card, not an error */ }
+      for (const child of children) {
+        if (!child.isDirectory()) continue;
+        const mark = readMark(join(dir, slug, child.name));
+        if (!mark || !isPredicate(mark.data) || !mark.data.slot) continue;
+        predicates.push({ slot: mark.data.slot, value: mark.data.value ?? "", body: mark.body });
+      }
+      predicates.sort((a, b) => {
+        const ai = SLOT_ORDER.indexOf(a.slot);
+        const bi = SLOT_ORDER.indexOf(b.slot);
+        return (ai < 0 ? SLOT_ORDER.length : ai) - (bi < 0 ? SLOT_ORDER.length : bi);
+      });
+
+      towns.push({
+        slug,
+        glyph: glyphFor(slug),
+        body: charter.body,
+        tier: charter.data.tier ?? "",
+        date: charter.data.date ?? "",
+        hub: slug === "postmark",
+        listed: predicates.some((p) => p.slot === LISTED_SLOT),
+        predicates,
+        door: predicates.find((p) => p.slot === "door")?.value ?? "",
+      });
+    }
   }
 
   // The hub first — its own charter calls it "the hub's first entry" — then the
-  // rest by the date they were chartered, oldest road first.
+  // chartered towns by the date they were chartered, oldest road first, then
+  // the listed ones the same way.
   towns.sort((a, b) => {
     if (a.hub !== b.hub) return a.hub ? -1 : 1;
+    if (a.listed !== b.listed) return a.listed ? 1 : -1;
     return String(a.date).localeCompare(String(b.date)) || a.slug.localeCompare(b.slug);
   });
   return towns;

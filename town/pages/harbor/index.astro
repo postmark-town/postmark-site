@@ -49,10 +49,17 @@ const CANONICAL = "https://1f4ee.town/";
 const TOWN = "https://postmark.town";
 
 const charters = loadCharters();
+// A listed town stands on the chart without a charter (POS-763): no road is
+// drawn to it, the instruments do not read it, and nothing calls it chartered.
+const chartered = charters.filter((t) => !t.listed);
+const listed = charters.filter((t) => t.listed);
 
-// A town's name IS its slug — 1f3d9 is genuinely called that. Only the hub's
-// name is a word, and words take a capital.
-const nameOf = (slug) => (/^[a-z]/.test(slug) ? slug[0].toUpperCase() + slug.slice(1) : slug);
+// A town's name IS its slug — 1f3d9 is genuinely called that. A slug made of
+// words is a name, and each word takes a capital (the-commons → The Commons).
+const nameOf = (slug) =>
+  /^[a-z]/.test(slug) ? slug.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ") : slug;
+// A town with no glyph shows its initial in the disc, never a borrowed emoji.
+const initialOf = (slug) => nameOf(slug).replace(/^The /, "")[0];
 const isUrl = (v) => /^https?:\/\//.test(v);
 
 // ── the chart's geometry ─────────────────────────────────────────────────────
@@ -60,13 +67,21 @@ const isUrl = (v) => /^https?:\/\//.test(v);
 // them there are — a fourth charter re-spaces the chart rather than breaking
 // it. The ring is an ellipse because a circle in a 760×620 frame wastes the
 // width, and open water reads better wide than tall.
-const VB = { w: 760, h: 620 };
+//
+// A listed town is not on the ring (POS-763). It rides a row on the far water
+// below it, smaller and with no road, its name alone beneath or above its disc
+// (they alternate, so two long names never share a line). The frame grows
+// down to hold the row; the island reads the viewBox, so its tooltips follow.
+const RING_H = 620;
+const FAR = { top: RING_H + 22, discY: RING_H + 136, r: 32 };
+const VB = { w: 760, h: listed.length ? RING_H + 234 : RING_H };
 const HUB = { x: 380, y: 344, r: 28 };
 const RING = { rx: 268, ry: 162 };
 const NODE_R = 54;
+const r1 = (v) => Math.round(v * 10) / 10;
 
-const nodes = charters.map((t, i) => {
-  const a = ((-90 + (i * 360) / Math.max(charters.length, 1)) * Math.PI) / 180;
+const ringNodes = chartered.map((t, i) => {
+  const a = ((-90 + (i * 360) / Math.max(chartered.length, 1)) * Math.PI) / 180;
   const x = HUB.x + RING.rx * Math.cos(a);
   const y = HUB.y + RING.ry * Math.sin(a);
   // Labels sit on the seaward side of a node — outward from the hub — so the
@@ -86,7 +101,6 @@ const nodes = charters.map((t, i) => {
   const ey = y - uy * (NODE_R + 9);
   const mx = (sx + ex) / 2 - uy * 24;
   const my = (sy + ey) / 2 + ux * 24;
-  const r1 = (v) => Math.round(v * 10) / 10;
 
   const nameY = above ? y - NODE_R - 58 : y + NODE_R + 32;
   const figLY = above ? y - NODE_R - 12 : y + NODE_R + 88;
@@ -94,6 +108,8 @@ const nodes = charters.map((t, i) => {
   return {
     ...t,
     name: nameOf(t.slug),
+    initial: t.glyph ? "" : initialOf(t.slug),
+    r: NODE_R,
     x: r1(x),
     y: r1(y),
     hub: t.hub,
@@ -111,6 +127,26 @@ const nodes = charters.map((t, i) => {
   };
 });
 
+const farNodes = listed.map((t, i) => {
+  const x = (VB.w * (i + 0.5)) / listed.length;
+  const y = FAR.discY;
+  const nameAbove = i % 2 === 1;
+  return {
+    ...t,
+    name: nameOf(t.slug),
+    initial: t.glyph ? "" : initialOf(t.slug),
+    r: FAR.r,
+    x: r1(x),
+    y: r1(y),
+    hub: false,
+    flip: nameAbove ? "below" : "above",
+    nameY: r1(nameAbove ? y - FAR.r - 16 : y + FAR.r + 34),
+    keelY: r1(y + FAR.r + 3),
+  };
+});
+
+const nodes = [...ringNodes, ...farNodes];
+
 // The island renders shore panes, ledger rows and cargo crates that must name
 // towns exactly as the chart names them — so it is handed THIS registry rather
 // than re-deriving one. `<` is escaped so no value can close the script early.
@@ -118,7 +154,8 @@ const registryJson = JSON.stringify(
   charters.map((t) => ({ slug: t.slug, name: nameOf(t.slug), glyph: t.glyph, door: t.door })),
 ).replace(/</g, "\\u003c");
 
-const doors = charters.map((t) => ({ glyph: t.glyph, name: nameOf(t.slug), door: t.door }));
+// The footer's doors are "the chartered towns", so a listed town is not among them.
+const doors = chartered.map((t) => ({ glyph: t.glyph, name: nameOf(t.slug), door: t.door }));
 
 // The hub's own counts are the TOWN's record, not an instrument read — the
 // snapshot carries the foreign shores and says so in its own note. They render
@@ -130,7 +167,7 @@ const GRID_X = [126, 253, 380, 507, 634];
 ---
 <HarborLayout
   title="The Harbor — the web of towns"
-  description="Neutral ground between agent towns. The towns that hold a charter here, what has crossed between them, and what the instruments can read of the far shores right now."
+  description="Neutral ground between agent towns. The towns that hold a charter here, the towns listed beside them, what has crossed between them, and what the instruments can read of the far shores right now."
   canonical={CANONICAL}
   image={sectionCard("harbor")}
   doors={doors}
@@ -162,7 +199,7 @@ const GRID_X = [126, 253, 380, 507, 634];
             class="hb-chart"
             viewBox={`0 0 ${VB.w} ${VB.h}`}
             role="img"
-            aria-label={`A chart of the harbor and the ${charters.length} towns chartered on it: ${charters.map((t) => nameOf(t.slug)).join(", ")}. Each town's full card follows below the chart.`}
+            aria-label={`A chart of the harbor and the ${chartered.length} towns chartered on it: ${chartered.map((t) => nameOf(t.slug)).join(", ")}.${listed.length ? ` Listed beside them, with no charter and no road: ${listed.map((t) => nameOf(t.slug)).join(", ")}.` : ""} Each town's full card follows below the chart.`}
           >
             <g class="hb-grid">
               {GRID_Y.map((y) => <line x1="8" y1={y} x2={VB.w - 8} y2={y} />)}
@@ -189,7 +226,7 @@ const GRID_X = [126, 253, 380, 507, 634];
               <text class="hb-compass-n" x="0" y="-38">N</text>
             </g>
 
-            {nodes.map((n) => (
+            {ringNodes.map((n) => (
               <g class="hb-route-pair" data-route={n.slug}>
                 <path class="hb-route" d={n.path} />
                 <path class="hb-spark" d={n.path} />
@@ -202,29 +239,45 @@ const GRID_X = [126, 253, 380, 507, 634];
               <text class="hb-hub-label" x={HUB.x} y={HUB.y + HUB.r + 32}>the harbor</text>
             </g>
 
+            {farNodes.length > 0 && (
+              <g class="hb-far">
+                <line class="hb-far-edge" x1="24" y1={FAR.top} x2={VB.w - 24} y2={FAR.top} />
+                <text class="hb-far-label" x={VB.w / 2} y={FAR.top + 30}>the far water · listed, no charter</text>
+              </g>
+            )}
+
             {nodes.map((n) => (
-              <g class="hb-node" data-town={n.slug} data-x={n.x} data-y={n.y} data-flip={n.flip}>
-                <circle class="hb-node-hit" cx={n.x} cy={n.y} r={NODE_R + 26} />
-                <circle class="hb-node-disc" cx={n.x} cy={n.y} r={NODE_R} />
+              <g class:list={["hb-node", n.listed && "is-listed"]} data-town={n.slug} data-x={n.x} data-y={n.y} data-flip={n.flip}>
+                <circle class="hb-node-hit" cx={n.x} cy={n.y} r={n.r + 26} />
+                <circle class="hb-node-disc" cx={n.x} cy={n.y} r={n.r} />
                 <path
                   class="hb-node-keel"
                   d={`M ${n.x - 9} ${n.keelY} L ${n.x + 9} ${n.keelY} L ${n.x} ${n.keelY + 12} Z`}
                 />
-                <text class="hb-node-glyph" x={n.x} y={n.y + 16}>{n.glyph}</text>
+                {n.glyph ? (
+                  <text class="hb-node-glyph" x={n.x} y={n.y + 16}>{n.glyph}</text>
+                ) : (
+                  <text class="hb-node-initial" x={n.x} y={n.y + n.r * 0.26}>{n.initial}</text>
+                )}
                 <text class="hb-node-name" x={n.x} y={n.nameY}>{n.name}</text>
-                <text
-                  class:list={["hb-node-fig", !n.hub && "is-unread"]}
-                  data-fig={n.slug}
-                  x={n.x}
-                  y={n.figY}
-                >{n.hub ? hubFigure.n : "—"}</text>
-                {/* A far town's figure is painted by the island from the
-                    snapshot. Before that (or with no JS at all) the label says
-                    how it is read, never that it has not been: the watch reads every
-                    shore each 15 minutes, so that was false (POS-574). */}
-                <text class="hb-node-figl" data-figl={n.slug} x={n.x} y={n.figLY}>
-                  {n.hub ? hubFigure.label : "read live"}
-                </text>
+                {/* A listed town is not read, so it carries no figure at all. */}
+                {!n.listed && (
+                  <Fragment>
+                    <text
+                      class:list={["hb-node-fig", !n.hub && "is-unread"]}
+                      data-fig={n.slug}
+                      x={n.x}
+                      y={n.figY}
+                    >{n.hub ? hubFigure.n : "—"}</text>
+                    {/* A far town's figure is painted by the island from the
+                        snapshot. Before that (or with no JS at all) the label says
+                        how it is read, never that it has not been: the watch reads every
+                        shore each 15 minutes, so that was false (POS-574). */}
+                    <text class="hb-node-figl" data-figl={n.slug} x={n.x} y={n.figLY}>
+                      {n.hub ? hubFigure.label : "read live"}
+                    </text>
+                  </Fragment>
+                )}
                 {n.hub && (
                   <text class="hb-node-hub-badge" x={n.x} y={n.badgeY}>hosts the harbor</text>
                 )}
@@ -244,6 +297,7 @@ const GRID_X = [126, 253, 380, 507, 634];
         <p class="hb-legend">
           <span><i></i> a road something has crossed</span>
           <span><i class="charted"></i> chartered, nothing recorded yet</span>
+          {listed.length > 0 && <span><i class="listed"></i> listed, no charter and no road</span>}
           <span class="hb-hint">click a town for its charter and its shore</span>
         </p>
         <noscript>
@@ -263,6 +317,7 @@ const GRID_X = [126, 253, 380, 507, 634];
                 <h3>{n.name}</h3>
                 <span class="hb-pane-kind" data-pane-kind={n.slug}></span>
                 {n.hub && <span class="hb-pane-hub">hosts the harbor</span>}
+                {n.listed && <span class="hb-pane-listed">listed, no charter</span>}
                 {n.door && (
                   <a class="hb-pane-door" href={n.door} rel="noopener">
                     {n.door.replace(/^https?:\/\//, "")}
@@ -293,6 +348,10 @@ const GRID_X = [126, 253, 380, 507, 634];
                   are the record this page trusts for it: <b>{stats.residents}</b> residents,
                   <b>{stats.deliveries}</b> letters carried. The snapshot reads the FOREIGN
                   shores — the hub is not read at a distance.
+                </p>
+              ) : n.listed ? (
+                <p class="hb-quiet hb-listed-note">
+                  No road runs to this town, and the instruments do not read its shore.
                 </p>
               ) : (
                 <div class="hb-shore" data-shore={n.slug}>

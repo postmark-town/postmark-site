@@ -292,6 +292,30 @@ body.hb::before {
   transition: stroke 0.16s ease, fill 0.16s ease;
 }
 .hb-node-glyph { font-size: 46px; text-anchor: middle; }
+/* a town that arrived with a name, not a codepoint, shows its initial: the
+   harbor does not pick an emoji for another town (POS-763) */
+.hb-node-initial {
+  fill: var(--hb-foam-dim);
+  font-family: var(--hb-mono);
+  font-size: 40px;
+  text-anchor: middle;
+}
+/* a listed town holds no charter: its disc is dashed and dimmer, and no road
+   is drawn to it, so the chart never reads it as one we sail to */
+.hb-node.is-listed .hb-node-disc {
+  fill: rgba(6, 23, 37, 0.55);
+  stroke-dasharray: 4 6;
+}
+.hb-node.is-listed .hb-node-name { fill: var(--hb-foam-dim); font-size: 22px; }
+.hb-far-edge { stroke: rgba(126, 186, 210, 0.16); stroke-width: 1; stroke-dasharray: 2 7; }
+.hb-far-label {
+  fill: var(--hb-foam-dim);
+  font-family: var(--hb-mono);
+  font-size: 15px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-anchor: middle;
+}
 .hb-node-name {
   fill: var(--hb-foam);
   font-family: var(--hb-mono);
@@ -371,6 +395,11 @@ body.hb::before {
   border-top: 2px solid rgba(232, 196, 139, 0.55);
 }
 .hb-legend i.charted { border-top: 2px dashed rgba(126, 186, 210, 0.45); }
+.hb-legend i.listed {
+  width: 12px; height: 12px;
+  border: 1.5px dashed rgba(126, 186, 210, 0.6);
+  border-radius: 50%;
+}
 .hb-legend .hb-hint { color: var(--hb-brass); }
 .js .hb-legend .hb-hint::before { content: "▸ "; }
 /* without the island there is nothing to click; the hint would be a lie */
@@ -471,6 +500,13 @@ html:not(.js) .hb-js-only { display: none; }
   letter-spacing: 0.13em; text-transform: uppercase;
   color: var(--hb-buoy);
   border: 1px solid rgba(224, 138, 60, 0.42);
+  border-radius: 999px; padding: 3px 8px; line-height: 1;
+}
+.hb-pane-listed {
+  font-family: var(--hb-mono); font-size: 0.54rem; font-weight: 700;
+  letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--hb-foam-dim);
+  border: 1px dashed rgba(126, 186, 210, 0.5);
   border-radius: 999px; padding: 3px 8px; line-height: 1;
 }
 .hb-pane-door {
@@ -840,6 +876,9 @@ html:not(.js) .hb-crate-chip { cursor: default; }
      the type along with it. These sizes buy it back — nothing moves, the
      lettering simply keeps its footing at a third of the width. */
   .hb-node-glyph { font-size: 56px; }
+  .hb-node-initial { font-size: 48px; }
+  .hb-node.is-listed .hb-node-name { font-size: 28px; }
+  .hb-far-label { font-size: 21px; letter-spacing: 1.2px; }
   .hb-node-name { font-size: 34px; letter-spacing: 1px; }
   .hb-node-fig { font-size: 42px; }
   .hb-node-figl { font-size: 23px; letter-spacing: 1.2px; }
