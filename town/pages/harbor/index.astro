@@ -62,12 +62,10 @@ const listed = charters.filter((t) => t.listed);
 const host = chartered.find((t) => t.hub);
 const moored = chartered.filter((t) => !t.hub);
 
-// A town's name IS its slug — 1f3d9 is genuinely called that. A slug made of
-// words is a name, and each word takes a capital (the-commons → The Commons).
-const nameOf = (slug) =>
-  /^[a-z]/.test(slug) ? slug.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ") : slug;
-// A town with no glyph shows its initial, never a borrowed emoji.
-const initialOf = (slug) => nameOf(slug).replace(/^The /, "")[0];
+// A town's name is its own, as its mark gives it (src/lib/harbor.mjs § nameFor).
+const nameOf = (slug) => charters.find((t) => t.slug === slug)?.name ?? slug;
+// A town with no glyph shows its initial, in its own case, never a borrowed emoji.
+const initialOf = (slug) => nameOf(slug).replace(/^the /i, "")[0];
 const isUrl = (v) => /^https?:\/\//.test(v);
 const hostOf = (url) => String(url || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
 const predicate = (t, slot) => t.predicates.find((p) => p.slot === slot)?.value ?? "";
@@ -703,7 +701,7 @@ const sections = [
                   )}
 
                   <dl class="hb-preds">
-                    {t.predicates.map((p) => (
+                    {t.predicates.filter((p) => p.slot !== "name").map((p) => (
                       <div class="hb-pred">
                         <dt>{p.slot}</dt>
                         <dd>

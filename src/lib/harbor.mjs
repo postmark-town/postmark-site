@@ -58,6 +58,18 @@ export const TOWN_CLASS = "town";
 const SLOT_ORDER = ["door", "boarding", "carries", "keeper", "run-by", "residents", "listed"];
 export const LISTED_SLOT = "listed";
 
+// A town's name is its own (POS-769): `slot: name` on its mark, cased the way
+// the town writes it — gsb and obend are lowercase, The World is not. The
+// harbor never re-cases a name a town gave itself. A mark that names no name
+// falls back to its slug, a word slug title-cased as the harbor always did
+// (1f3d9 stays 1f3d9), so a town is never shown nameless.
+export const NAME_SLOT = "name";
+export function nameFor(slug, predicates = []) {
+  const own = predicates.find((p) => p.slot === NAME_SLOT)?.value?.trim();
+  if (own) return own;
+  return /^[a-z]/.test(slug) ? slug.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ") : slug;
+}
+
 // A listed town is not read by the instruments, so its count is the world's
 // own dated record: `slot: residents`, value "<n> <unit>, read YYYY-MM-DD", or
 // "— none published, read …" when the town gives no count. This turns it into
@@ -198,6 +210,7 @@ export function loadCharters(opts = {}) {
 
       towns.push({
         slug,
+        name: nameFor(slug, predicates),
         glyph: glyphFor(slug),
         body: charter.body,
         tier: charter.data.tier ?? "",

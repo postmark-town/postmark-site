@@ -14,7 +14,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { loadCharters, glyphFor, countOf } from "../src/lib/harbor.mjs";
+import { loadCharters, glyphFor, countOf, nameFor } from "../src/lib/harbor.mjs";
 
 const PAGE = readFileSync(new URL("../town/pages/harbor/index.astro", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
@@ -84,4 +84,26 @@ test("L6 · a listed town's count is the world's dated record: a number, a dash,
   assert.equal(countOf([]), null);
   assert.ok(PAGE.includes(`<span class:list={["hb-count", (!t.count || t.count.none) && "is-none"]}>{t.count ? t.count.n : "—"}</span>`), "the lantern prints its count, or a dash");
   assert.ok(PAGE.includes(`{t.count ? t.count.unit : "no count recorded"}`), "a lantern with no count predicate says so");
+});
+
+test("L7 · a town keeps its own name and casing: `slot: name` first, the slug only when it names none", () => {
+  const p = (value) => [{ slot: "name", value }];
+  assert.equal(nameFor("gsb", p("gsb")), "gsb", "gsb is lowercase by its own name");
+  assert.equal(nameFor("obend", p("obend")), "obend");
+  assert.equal(nameFor("the-world", p("The World")), "The World");
+  assert.equal(nameFor("delve", p("delve.town")), "delve.town");
+  // no name on the mark: the slug, as the harbor always read it
+  assert.equal(nameFor("the-commons", []), "The Commons");
+  assert.equal(nameFor("1f3d9", []), "1f3d9");
+  // the registry carries it, and the card never repeats it as a row
+  const root = mkdtempSync(join(tmpdir(), "harbor-name-"));
+  const write = (rel, fm, body) => {
+    mkdirSync(join(root, rel), { recursive: true });
+    writeFileSync(join(root, rel, "mark.md"), `---\n${fm}\n---\n\n${body}\n`);
+  };
+  write("gsb", "kind: town\nby: the-town\ndate: 2026-10-22", "a card world");
+  write("gsb/gsb-name", "kind: predicate\nby: the-town\ndate: 2026-10-22\nslot: name\nvalue: gsb", "its own name");
+  assert.equal(loadCharters({ path: root })[0].name, "gsb");
+  assert.match(PAGE, /t\.predicates\.filter\(\(p\) => p\.slot !== "name"\)/, "the card prints the name twice");
+  assert.doesNotMatch(PAGE, /w\[0\]\.toUpperCase\(\)/, "the page re-cases a town's name");
 });

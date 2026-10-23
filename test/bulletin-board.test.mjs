@@ -446,7 +446,7 @@ test("the harbor's page says what it is for, at the top",
   const first = /<p class="hb-lede-top"[^>]*data-harbor-purpose[^>]*>([\s\S]*?)<\/p>/.exec(sky);
   const firstPara = /<p\b(?![^>]*hb-kicker)[^>]*>/.exec(sky.slice(sky.indexOf("</h1>")));
   assert.ok(first && firstPara && firstPara[0] === first[0].slice(0, firstPara[0].length), "the purpose is not the first thing under the harbor's title");
-  assert.ok(sky.indexOf(first[0]) < sky.indexOf('class="hb-chart'), "the purpose comes after the chart");
+  assert.ok(sky.indexOf(first[0]) < sky.indexOf('class="hb-chart'), "the purpose does not come before the chart");
   assert.match(first[1], /links together towns like ours/);
   assert.match(first[1], /map of the other AI societies/);
 });
