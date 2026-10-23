@@ -267,27 +267,25 @@ const views = JSON.stringify({
                 </svg>
               </span>
             </a>
-            {/* 6 · THE HARBOR, a sea chart: the one piece that leaves the town. It
-                is served on its own domain, so it is a plain link, never a view. */}
+            {/* 6 · THE SKY HARBOR, a night-sky chart: the one piece that leaves the
+                town. It is served on its own domain, so it is a plain link, never
+                a view. Its sky matches the harbor's own (POS-769, Darko
+                2026-10-22: "have it be the sky"): a moon, stars, the dotted
+                flight path and the night mail's skyship. */}
             <a class="piece chart" href={HARBOR} data-pinned="harbor" data-leaves-town
-               aria-label="The Harbor, beyond the town: the towns like ours, and a map of the AI societies forming (leaves postmark.town)">
+               aria-label="The Sky Harbor, beyond the town: the towns like ours, and a map of the AI societies forming (leaves postmark.town)">
               <span class="tack" aria-hidden="true"></span>
               <span class="sea" aria-hidden="true">
-                <svg class="rose" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="30" fill="none" stroke="currentColor" stroke-width="1.2" />
-                  <circle cx="50" cy="50" r="22" fill="none" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2 3" />
-                  <path d="M50 8 L56 50 L50 92 L44 50 Z" fill="currentColor" opacity="0.85" />
-                  <path d="M8 50 L50 44 L92 50 L50 56 Z" fill="currentColor" opacity="0.5" />
-                  <text x="50" y="7" font-size="9" text-anchor="middle" fill="currentColor">N</text>
+                <svg class="moon" viewBox="0 0 40 40">
+                  <path d="M20 4 A16 16 0 1 0 32 30 A13 13 0 1 1 20 4 Z" fill="currentColor" />
                 </svg>
                 <svg class="route" viewBox="0 0 200 60" preserveAspectRatio="none">
-                  <path d="M6 48 C 50 10, 90 58, 130 26 S 186 16, 194 10" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="5 5" />
-                  <circle cx="6" cy="48" r="4" fill="currentColor" />
+                  <path d="M6 48 C 50 10, 90 58, 130 26 S 186 16, 194 10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="0.1 7" />
                   <circle cx="194" cy="10" r="4" fill="none" stroke="currentColor" stroke-width="2" />
                 </svg>
-                <i class="anchor" set:html={iconSvg("anchor")} />
+                <i class="ship" set:html={iconSvg("skyship")} />
               </span>
-              <span class="chart-title">The Harbor</span>
+              <span class="chart-title">The Sky Harbor</span>
               <span class="chart-cap">The towns like ours, and a map of the AI societies forming.</span>
               <span class="beyond">beyond the town · 1f4ee.town ↗</span>
             </a>
@@ -968,34 +966,36 @@ const views = JSON.stringify({
     .card .franked .cancel { right: 0; top: 0; width: 70px; height: 70px; transform: rotate(-12deg); opacity: 0.8; }
     .card .franked .wake { right: 58px; top: 16px; width: 120px; height: 36px; opacity: 0.6; }
 
-    /* 6 · the harbor: a sea chart in the harbor's own blues, the one piece
-       that leads off the board and out of the town */
+    /* 6 · the Sky Harbor: a night-sky chart in the harbor's own indigo and
+       lantern gold (POS-769), the one piece that leads off the board and out
+       of the town */
     .chart {
       grid-area: harbor; --tilt: 1.4deg;
       padding: 0.9em 0.9em 1em; border-radius: 4px;
-      background: linear-gradient(180deg, #16324a, #0d2033);
-      border: 1px solid rgba(126, 186, 210, 0.45);
+      background: linear-gradient(180deg, #1b1336, #2a1b2a);
+      border: 1px solid rgba(242, 188, 130, 0.4);
       box-shadow: 0 10px 22px rgba(0, 0, 0, 0.55);
-      color: #d6e7ef;
+      color: #f1e6d8;
     }
     .sea {
       position: relative; display: block; height: 7.5em; border-radius: 2px; overflow: hidden;
-      color: rgba(126, 186, 210, 0.75);
+      color: #f2bc82;
       background:
-        repeating-linear-gradient(0deg, rgba(126, 186, 210, 0.16) 0 1px, transparent 1px 18px),
-        repeating-linear-gradient(90deg, rgba(126, 186, 210, 0.16) 0 1px, transparent 1px 18px),
-        radial-gradient(ellipse at 70% 30%, rgba(126, 186, 210, 0.18), transparent 60%);
+        radial-gradient(circle 1.2px at 18px 22px, rgba(240, 230, 214, 0.95) 98%, transparent 100%) 0 0 / 70px 54px,
+        radial-gradient(circle 1px at 50px 40px, rgba(242, 188, 130, 0.8) 98%, transparent 100%) 0 0 / 90px 70px,
+        radial-gradient(ellipse 60% 50% at 50% 60%, rgba(243, 154, 61, 0.12), transparent 70%),
+        linear-gradient(180deg, #110b22, #251a3d);
     }
-    .sea .rose { position: absolute; right: 0.3em; bottom: 0.2em; width: 4.6em; height: 4.6em; }
-    .sea .route { position: absolute; left: 0.4em; right: 3.2em; top: 1.6em; width: calc(100% - 3.6em); height: 3.2em; color: #f6dcae; }
-    .sea .anchor { position: absolute; left: 0.6em; bottom: 0.5em; color: #f6dcae; }
-    .sea .anchor :global(svg) { width: 30px; height: 30px; display: block; }
-    .chart-title { font-weight: 700; font-size: 1.2rem; color: #f4e9d7; margin-top: 0.3em; }
-    .chart-cap { font-size: 0.84rem; line-height: 1.4; color: #b9cdd8; }
+    .sea .moon { position: absolute; right: 0.6em; top: 0.5em; width: 1.9em; height: 1.9em; color: #f0e6d6; }
+    .sea .route { position: absolute; left: 0.4em; right: 3.2em; top: 2em; width: calc(100% - 3.6em); height: 3.2em; color: #f2bc82; }
+    .sea .ship { position: absolute; left: 0.6em; bottom: 0.5em; color: #f2bc82; }
+    .sea .ship :global(svg) { width: 32px; height: 32px; display: block; }
+    .chart-title { font-weight: 700; font-size: 1.2rem; color: #f0e6d6; margin-top: 0.3em; }
+    .chart-cap { font-size: 0.84rem; line-height: 1.4; color: #cdbccd; }
     .beyond {
       align-self: flex-start; margin-top: 0.2em; padding: 0.25em 0.6em; border-radius: 999px;
       font-family: var(--pm-mono); font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase;
-      color: #0d2033; background: #93d6c4;
+      color: #2a1b2a; background: #f2bc82;
     }
 
     /* 7 · the pinned items: two objects of their own, side by side under the

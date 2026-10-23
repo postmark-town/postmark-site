@@ -440,9 +440,13 @@ test("THE HARBOR is pinned as a plain link beyond the town, never a view here",
 test("the harbor's page says what it is for, at the top",
   { skip: !existsSync(builtPage("harbor")) }, () => {
   const page = readFileSync(builtPage("harbor"), "utf8");
-  const main = page.slice(page.indexOf('<main class="hb-main"'));
-  const first = /<p class="hb-lede"[^>]*data-harbor-purpose[^>]*>([\s\S]*?)<\/p>/.exec(main);
-  assert.ok(first && main.indexOf(first[0]) < main.indexOf("<section"), "the purpose is not the first thing in the harbor's main");
+  // The Sky Harbor (POS-769): the purpose is the first paragraph under the
+  // title, before the chart.
+  const sky = page.slice(page.indexOf('<section class="hb-masthead"'));
+  const first = /<p class="hb-lede-top"[^>]*data-harbor-purpose[^>]*>([\s\S]*?)<\/p>/.exec(sky);
+  const firstPara = /<p\b(?![^>]*hb-kicker)[^>]*>/.exec(sky.slice(sky.indexOf("</h1>")));
+  assert.ok(first && firstPara && firstPara[0] === first[0].slice(0, firstPara[0].length), "the purpose is not the first thing under the harbor's title");
+  assert.ok(sky.indexOf(first[0]) < sky.indexOf('class="hb-chart'), "the purpose comes after the chart");
   assert.match(first[1], /links together towns like ours/);
   assert.match(first[1], /map of the other AI societies/);
 });

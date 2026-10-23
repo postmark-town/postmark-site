@@ -7,7 +7,11 @@
 // content: a reader would arrive at neutral ground through a town's chrome and
 // read the registry as that town's list. This shell carries no town nav, no
 // Starforge pill, no BGM, no tutorial bus — only the harbor's own nameplate,
-// its instrument lamps, and a footer that says plainly who hosts the quay.
+// its instrument bands, and a footer that says plainly who hosts the quay.
+//
+// The Sky Harbor (POS-769, option B): the page is a night sky over a lower
+// deck. The `sky` slot holds what stands under the stars (masthead, chart, far
+// water); the default slot is the deck below.
 //
 // It emits the whole document rather than wrapping BaseLayout, because what it
 // needs from BaseLayout (head tags) is smaller than what it would have to
@@ -22,6 +26,8 @@ const {
   // The registry's doors, handed down from the page so the footer and the chart
   // read the same charters. The harbor never keeps a second list of towns.
   doors = [],
+  // the page's own sections, for the pills in the top bar
+  sections = [],
 } = Astro.props;
 
 const site = "https://postmark.town";
@@ -33,7 +39,7 @@ const ogImage = new URL(image, site).href;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!-- The whole page is progressive-enhancement gated on this one class, set
-         before first paint: without it every expand pane, ledger row and cargo
+         before first paint: without it every town card, ledger row and cargo
          crate stands OPEN in the document. A reader with no JS (or a failed
          island) gets the harbor as one long readable page; a reader with JS
          gets the dashboard. Nothing is hidden by an attribute, so a stylesheet
@@ -42,6 +48,9 @@ const ogImage = new URL(image, site).href;
     <title>{title}</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="alternate icon" href="/favicon.ico" />
+    <!-- Fraunces is served from this site, never a font CDN: the harbor makes
+         no third-party call. SIL Open Font License 1.1, /fonts/fraunces/OFL.txt. -->
+    <link rel="preload" href="/fonts/fraunces/fraunces-latin-roman.woff2" as="font" type="font/woff2" crossorigin />
     <meta name="description" content={description} />
     {canonical && <link rel="canonical" href={canonical} />}
     <meta property="og:type" content="website" />
@@ -55,49 +64,61 @@ const ogImage = new URL(image, site).href;
     <meta name="twitter:image" content={ogImage} />
   </head>
   <body class="hb">
-    <header class="hb-head">
-      <div class="hb-nameplate">
-        <span class="hb-mark" aria-hidden="true">📮</span>
-        <h1>The Harbor</h1>
-        <span class="hb-beta">beta</span>
+    <div class="hb-sky">
+      <div class="hb-wrap">
+        <header class="hb-topbar">
+          <!-- The domain and its motto together, because apart neither explains
+               itself: 1f4ee is the codepoint of 📮 U+1F4EE POSTBOX, and read aloud
+               it is the motto. Keemin's, 2026-08-16. -->
+          <p class="hb-brand">
+            <svg viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="16" fill="#2a1b2a" stroke="#f2bc82" stroke-opacity=".5" /><use href="#hb-i-env" x="7" y="7" width="20" height="20" style="color:#f2bc82" /></svg>
+            <span><b>1f4ee.town</b> · 1 ferry 4 everyone</span>
+            <span class="hb-beta">beta</span>
+          </p>
+          {sections.length > 0 && (
+            <nav aria-label="Sections">
+              <ul class="hb-nav">
+                {sections.map((s) => <li><a href={s.href}>{s.label}</a></li>)}
+              </ul>
+            </nav>
+          )}
+        </header>
+
+        <!-- Amber, because a stale instrument is a caveat. Wax red is a failure,
+             and gets said out loud rather than smoothed over. -->
+        <p class="hb-band stale" data-stale hidden></p>
+        <p class="hb-band err" data-errors hidden></p>
+
+        <slot name="sky" />
       </div>
-      <!-- The domain and its motto together, because apart neither explains
-           itself: 1f4ee is the codepoint of 📮 U+1F4EE POSTBOX, and read aloud
-           it is the motto. Keemin's, 2026-08-16. -->
-      <p class="hb-motto"><b>1f4ee.town</b> — 1 ferry 4 everyone</p>
-      <p class="hb-asof" data-asof>
-        <span class="hb-lamp" data-lamp></span>
-        <span data-asof-text>the instruments are reading the water…</span>
-      </p>
-    </header>
+    </div>
 
-    <!-- Amber, because a stale instrument is a caveat. Wax red is a failure,
-         and gets said out loud rather than smoothed over. -->
-    <p class="hb-band stale" data-stale hidden></p>
-    <p class="hb-band err" data-errors hidden></p>
-
-    <main class="hb-main">
-      <slot />
+    <main class="hb-deck">
+      <div class="hb-wrap">
+        <slot />
+      </div>
     </main>
 
     <footer class="hb-foot">
-      <p class="hb-hosted">
-        The harbor is hosted by <a href="https://postmark.town">Postmark</a>, one member
-        of the registry it publishes. The instruments read the other shores from
-        outside, on their terms.
-      </p>
-      {doors.length > 0 && (
-        <nav class="hb-doors" aria-label="The chartered towns">
-          {doors.map((d) => (
-            <a class="hb-door" href={d.door} rel="noopener">
-              <span class="hb-door-glyph" aria-hidden="true">{d.glyph}</span>
-              <span class="hb-door-name">{d.name}</span>
-              <span class="hb-door-host">{d.door.replace(/^https?:\/\//, "").replace(/\/$/, "")}</span>
-            </a>
-          ))}
-        </nav>
-      )}
-      <p class="hb-fine">Trust the ledgers over the lamps.</p>
+      <div class="hb-wrap">
+        <p class="hb-foot-line">Trust the ledgers over the lamps.</p>
+        {doors.length > 0 && (
+          <nav class="hb-doors" aria-label="The chartered towns">
+            {doors.map((d) => (
+              <a class="hb-door" href={d.door} rel="noopener">
+                <span class="hb-door-glyph" aria-hidden="true">{d.glyph}</span>
+                <span class="hb-door-name">{d.name}</span>
+                <span class="hb-door-host">{d.door.replace(/^https?:\/\//, "").replace(/\/$/, "")}</span>
+              </a>
+            ))}
+          </nav>
+        )}
+        <p class="hb-hosted">
+          The harbor is hosted by <a href="https://postmark.town">Postmark</a>, one member
+          of the registry it publishes. The instruments read the other shores from
+          outside, on their terms.
+        </p>
+      </div>
     </footer>
   </body>
 </html>

@@ -21,7 +21,7 @@ import { berthsLine } from "../src/lib/harbor-berths.mjs";
 const PAGE = readFileSync(new URL("../town/pages/harbor/index.astro", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 test("H1 · the chart's far-town label, as built, says how the figure is read — never 'not read yet'", () => {
-  const label = /<text class="hb-node-figl"[^>]*>\s*\{n\.hub \? hubFigure\.label : "([^"]+)"\}/.exec(PAGE);
+  const label = /<text[^>]*class="hb-t-unit hb-node-figl"[^>]*>\{"([^"]+)"\}/.exec(PAGE);
   assert.ok(label, "the label expression is where the chart prints it");
   assert.equal(label[1], "read live");
   assert.doesNotMatch(PAGE, /"not read yet"/, "the false label is gone from the build");
