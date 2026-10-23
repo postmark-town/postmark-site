@@ -25,7 +25,8 @@
 // parts it cannot.
 import HarborLayout from "@/layouts/HarborLayout.astro";
 import stats from "@/data/postmark/stats.json";
-import { loadCharters } from "@/lib/harbor.mjs";
+import residentsRoll from "@/data/postmark/residents.json";
+import { loadCharters, townFigure } from "@/lib/harbor.mjs";
 import { FRAMES, layoutTowns, shipPath, towerInks, epithetOf } from "@/lib/harbor-sky.mjs";
 import { sectionCard } from "@/lib/og-image.mjs";
 
@@ -96,7 +97,19 @@ const doors = chartered.map((t) => ({ glyph: t.glyph, name: nameOf(t.slug), door
 // The host's count is the TOWN's record, not an instrument read — the snapshot
 // carries the foreign shores and says so in its own note. It renders at build
 // time and never wears the staleness lamp.
-const hubFigure = { n: stats.residents, label: "residents" };
+// Held to the standard every town is (POS-769): offices apart, households
+// counted, and who acted in a day — computed from the roll at build time,
+// never typed in (src/lib/harbor.mjs § townFigure).
+const fig = townFigure(residentsRoll);
+const hubFigure = {
+  n: fig.residents,
+  label: `residents in ${fig.households} households`,
+  line: [
+    fig.offices ? `plus ${fig.offices} town office${fig.offices === 1 ? "" : "s"}` : "",
+    fig.acted != null ? `about ${fig.acted} act in a day` : "",
+  ].filter(Boolean).join(" · "),
+};
+const hubWords = `${hubFigure.n} ${hubFigure.label}${hubFigure.line ? `, ${hubFigure.line}` : ""}`;
 
 // The card shown first. Without JS every card stands open, one after another.
 const firstCard = moored[0]?.slug ?? host?.slug ?? "";
@@ -397,7 +410,7 @@ const sections = [
             class:list={["hb-chart", `hb-chart-${d.key}`]}
             viewBox={`0 0 ${d.frame.vb.w} ${d.frame.vb.h}`}
             role="img"
-            aria-label={`The Sky Harbor chart. ${host ? `Postmark hosts the harbor, ${hubFigure.n} residents.` : ""} Chartered towns moored along flight paths: ${d.towns.map((t) => t.name).join(", ") || "none yet"}.${listed.length ? ` Listed on the far water, with no charter and no flight path: ${listed.map((t) => nameOf(t.slug)).join(", ")}.` : ""} Each town's card follows below.`}
+            aria-label={`The Sky Harbor chart. ${host ? `Postmark hosts the harbor: ${hubWords}.` : ""} Chartered towns moored along flight paths: ${d.towns.map((t) => t.name).join(", ") || "none yet"}.${listed.length ? ` Listed on the far water, with no charter and no flight path: ${listed.map((t) => nameOf(t.slug)).join(", ")}.` : ""} Each town's card follows below.`}
             data-chart={d.key}
           >
             {d.key === "wide" ? (
@@ -458,6 +471,9 @@ const sections = [
                 <text x={d.frame.dock.x} y={d.frame.host.countY} text-anchor="middle">
                   <tspan class="hb-t-count hb-t-count-host" data-fig={host.slug}>{hubFigure.n}</tspan><tspan class="hb-t-unit" dx="8" data-figl={host.slug}>{hubFigure.label}</tspan>
                 </text>
+                {hubFigure.line && (
+                  <text x={d.frame.dock.x} y={d.frame.host.lineY} text-anchor="middle" class="hb-t-small hb-t-activity">{hubFigure.line}</text>
+                )}
                 <use href="#hb-postbox" x={d.frame.host.x} y={d.frame.host.y} width={d.frame.host.w} height={d.frame.host.h} />
                 <circle class="hb-badge" cx={d.frame.dock.x} cy={d.frame.host.badgeY} r={d.key === "wide" ? 14 : 12} />
                 <text x={d.frame.dock.x} y={d.frame.host.badgeY + (d.key === "wide" ? 6 : 5)} text-anchor="middle" class="hb-t-glyph" font-size={d.key === "wide" ? 16 : 13}>{host.glyph}</text>
@@ -479,7 +495,7 @@ const sections = [
 
             {d.towns.map((t) => (
               <g class="hb-node" data-town={t.slug} data-x={t.cx} data-y={t.towerUse.y} data-flip="above">
-                <rect class="hb-node-hit" x={t.towerUse.x - 10} y={t.towerUse.y - 6} width={t.towerUse.w + 20} height={d.frame.unitY - t.towerUse.y + 14} />
+                <rect class="hb-node-hit" x={t.towerUse.x - 10} y={t.towerUse.y - 6} width={t.towerUse.w + 20} height={d.frame.activityY - t.towerUse.y + 10} />
                 <use
                   href="#hb-tower"
                   x={t.towerUse.x}
@@ -498,6 +514,16 @@ const sections = [
                     how it is read, never that it has not been: the watch reads every
                     shore each 15 minutes, so that was false (POS-574). */}
                 <text x={t.cx} y={d.frame.unitY} text-anchor="middle" class="hb-t-unit hb-node-figl" data-figl={t.slug}>{"read live"}</text>
+                {/* the wide chart says it on one line; the tall one, a column
+                    wide, puts the date on a line of its own */}
+                {t.activity && (
+                  <text x={t.cx} y={d.frame.activityY} text-anchor="middle" class="hb-t-small hb-t-activity">
+                    {t.activity.text}{!d.frame.measuredY && t.activity.measured && ` · measured ${t.activity.measured}`}
+                  </text>
+                )}
+                {t.activity?.measured && d.frame.measuredY && (
+                  <text x={t.cx} y={d.frame.measuredY} text-anchor="middle" class="hb-t-small">measured {t.activity.measured}</text>
+                )}
               </g>
             ))}
 
@@ -592,6 +618,8 @@ const sections = [
               <span class="hb-where">{hostOf(t.door)}</span>
               <span class:list={["hb-count", (!t.count || t.count.none) && "is-none"]}>{t.count ? t.count.n : "—"}</span>
               <span class="hb-unit">{t.count ? t.count.unit : "no count recorded"}</span>
+              {t.activity && <span class="hb-activity">{t.activity.text}</span>}
+              {t.activity?.measured && <span class="hb-measured">measured {t.activity.measured}</span>}
               {predicate(t, "run-by") && <span class="hb-runby">run by {predicate(t, "run-by")}</span>}
               <span class="hb-badge-nocharter">no charter</span>
             </a>
@@ -682,7 +710,7 @@ const sections = [
                         {epithetOf(t.body) && <span class="hb-tag"> {epithetOf(t.body)}</span>}
                       </h3>
                       {t.hub ? (
-                        <p class="hb-card-count"><b>{hubFigure.n}</b> residents · the town's own record</p>
+                        <p class="hb-card-count"><b>{hubFigure.n}</b> {hubFigure.label}{hubFigure.line && <Fragment>, {hubFigure.line}</Fragment>} · the town's own record</p>
                       ) : t.listed ? (
                         <p class="hb-card-count">
                           <b>{t.count ? t.count.n : "—"}</b> {t.count ? t.count.unit : "no count recorded"}
@@ -690,6 +718,11 @@ const sections = [
                         </p>
                       ) : (
                         <p class="hb-card-count"><b class="is-unread" data-fig={t.slug}>—</b> <span data-figl={t.slug}>read live</span></p>
+                      )}
+                      {t.activity && (
+                        <p class="hb-card-activity">
+                          {t.activity.text}{t.activity.measured && <Fragment> · measured {t.activity.measured}</Fragment>}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -717,7 +750,7 @@ const sections = [
                   {t.hub ? (
                     <p class="hb-quay-counts">
                       The town on the other side of this quay keeps its own ledgers, and those
-                      are the record this page trusts for it: <b>{stats.residents}</b> residents,
+                      are the record this page trusts for it: <b>{hubFigure.n}</b> {hubFigure.label},
                       <b>{stats.deliveries}</b> letters carried. The snapshot reads the FOREIGN
                       shores — the host is not read at a distance.
                     </p>

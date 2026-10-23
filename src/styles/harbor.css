@@ -158,6 +158,7 @@ body.hb {
 .hb-chart .hb-t-unit { font-family: var(--hb-mono); font-size: 12.5px; letter-spacing: 0.16em; text-transform: uppercase; fill: var(--muted); }
 .hb-chart .hb-t-harbor { font-family: var(--hb-mono); font-size: 13px; letter-spacing: 0.26em; fill: var(--pm-moon); }
 .hb-chart .hb-t-small { font-family: var(--hb-mono); font-size: 12px; fill: var(--muted); }
+.hb-chart .hb-t-activity { font-size: 12.5px; fill: var(--text-soft); }
 .hb-badge { fill: var(--pm-harbor); stroke: var(--pm-gold-bright); stroke-width: 1.5; }
 
 /* a flight path: dotted gold once something has crossed it, dimmer before */
@@ -250,6 +251,9 @@ html:not(.js) .hb-js-only { display: none; }
 .hb-count { font-family: var(--hb-display); font-weight: 700; font-size: 34px; line-height: 1; color: var(--pm-gold-bright); margin: 16px 0 4px; }
 .hb-count.is-none { color: var(--text-soft); font-weight: 400; }
 .hb-unit { font-family: var(--hb-mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-soft); }
+/* what a town's people do, beside how many it counts: printed as measured, dated */
+.hb-activity { margin: 10px 0 0; font-size: 15px; line-height: 1.3; color: var(--pm-moon); }
+.hb-measured { margin: 2px 0 0; font-family: var(--hb-mono); font-size: 11px; color: var(--muted); }
 .hb-runby { font-size: 14.5px; color: var(--text-soft); margin: 12px 0 0; font-style: italic; line-height: 1.35; }
 .hb-lantern .hb-badge-nocharter { margin-top: auto; padding-top: 2px; font-size: 10.5px; }
 .hb-lantern .hb-runby + .hb-badge-nocharter,
@@ -394,6 +398,7 @@ html:not(.js) .hb-row-btn { cursor: default; }
 .hb-card-count { margin: 6px 0 0; font-size: 15.5px; color: var(--pm-ink-soft); }
 .hb-card-count b { font-family: var(--hb-display); font-size: 24px; color: var(--pm-ink); }
 .hb-card-count b.is-unread { color: var(--pm-ink-soft); font-weight: 400; }
+.hb-card-activity { margin: 4px 0 0; font-size: 14.5px; color: var(--pm-ink-soft); font-style: italic; }
 .hb-card-cancel { position: absolute; top: 6px; right: 6px; width: 78px; height: 78px; transform: rotate(-14deg); opacity: 0.78; pointer-events: none; color: var(--pm-wax); }
 .hb-card-seal { position: absolute; right: 14px; bottom: -14px; width: 58px; height: 58px; transform: rotate(8deg); filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35)); }
 .hb-charter { margin: 16px 0 0; font-size: 16px; line-height: 1.55; color: var(--pm-ink); }
@@ -554,6 +559,8 @@ html:not(.js) .hb-crate-chip { cursor: default; }
   .hb-chart .hb-t-count { font-size: 27px; }
   .hb-chart .hb-t-count-host { font-size: 21px; }
   .hb-chart .hb-t-unit { font-size: 12px; }
+  .hb-chart .hb-t-activity { font-size: 11px; }
+  .hb-chart .hb-t-small { font-size: 10.5px; }
   .hb-chart .hb-t-harbor { font-size: 12.5px; }
   .hb-t-kick { font-size: 12px; }
   .hb-tip { width: 14em; }

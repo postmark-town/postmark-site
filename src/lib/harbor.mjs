@@ -55,7 +55,7 @@ export const TOWN_CLASS = "town";
 // what crosses, who keeps it, who runs it, and last whether it is only listed.
 // A slot missing from this list still renders, after the named ones, in the
 // order the world gave it.
-const SLOT_ORDER = ["door", "boarding", "carries", "keeper", "run-by", "residents", "listed"];
+const SLOT_ORDER = ["door", "boarding", "carries", "keeper", "run-by", "residents", "activity", "listed"];
 export const LISTED_SLOT = "listed";
 
 // A town's name is its own (POS-769): `slot: name` on its mark, cased the way
@@ -64,6 +64,37 @@ export const LISTED_SLOT = "listed";
 // falls back to its slug, a word slug title-cased as the harbor always did
 // (1f3d9 stays 1f3d9), so a town is never shown nameless.
 export const NAME_SLOT = "name";
+
+// What a town's people DO, beside how many it counts (POS-769, Darko
+// 2026-10-23: "make sure the agent count is actually right"): `slot: activity`,
+// value "<what was measured>, measured YYYY-MM-DD". A count alone read as five
+// measures of one thing; the activity line is what makes them comparable. It is
+// printed as written, never rounded or restyled here.
+const ACTIVITY_RE = /^(.*?)(?:,\s*measured (\d{4}-\d{2}-\d{2}))?$/;
+export function activityOf(predicates = []) {
+  const p = predicates.find((x) => x.slot === "activity");
+  const m = p && ACTIVITY_RE.exec(String(p.value).trim());
+  if (!m || !m[1]) return null;
+  return { text: m[1], measured: m[2] ?? "" };
+}
+
+// POSTMARK'S OWN FIGURE, held to the standard the harbor holds every town to:
+// the town offices are not residents, a household is one GitHub account on the
+// roll, and "acted" is the resident's own act within a day of the read. All of
+// it from the roll the build already fetched (src/data/postmark/residents.json:
+// `is_office`, `address.github`, `last_active`); nothing typed in. A roll
+// that does not say when anyone acted (an office before POS-481) says no
+// activity at all, never a zero.
+export function townFigure(roll = [], now = Date.now()) {
+  const people = roll.filter((r) => r && r.is_office !== true);
+  const offices = roll.length - people.length;
+  const households = new Set(people.map((r) => r.address?.github ?? r.address?.data?.github).filter(Boolean)).size;
+  const said = roll.some((r) => r && Object.prototype.hasOwnProperty.call(r, "last_active"));
+  const acted = said
+    ? people.filter((r) => typeof r.last_active === "string" && now - Date.parse(r.last_active) >= 0 && now - Date.parse(r.last_active) < 24 * 3600 * 1000).length
+    : null;
+  return { residents: people.length, households, offices, acted };
+}
 export function nameFor(slug, predicates = []) {
   const own = predicates.find((p) => p.slot === NAME_SLOT)?.value?.trim();
   if (own) return own;
@@ -211,6 +242,7 @@ export function loadCharters(opts = {}) {
       towns.push({
         slug,
         name: nameFor(slug, predicates),
+        activity: activityOf(predicates),
         glyph: glyphFor(slug),
         body: charter.body,
         tier: charter.data.tier ?? "",

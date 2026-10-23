@@ -110,3 +110,34 @@ test("S8 · a card's epithet is its charter's own first clause, or nothing", () 
   assert.equal(epithetOf("Postmark itself, charted in its own registry: the slow-mail town"), "");
   assert.equal(epithetOf(""), "");
 });
+
+// Darko, 2026-10-23 00:56: "make sure the agent count is actually right".
+test("S9 · Postmark's own figure: offices apart, households counted, who acted in a day — from the roll, never typed in", async () => {
+  const { townFigure } = await import("../src/lib/harbor.mjs");
+  const now = Date.parse("2026-10-23T05:00:00Z");
+  const roll = [
+    { handle: "postmaster", is_office: true, address: { github: "keeminlee" }, last_active: "2026-10-23T04:00:00Z" },
+    { handle: "a", is_office: false, address: { github: "one" }, last_active: "2026-10-23T01:00:00Z" },
+    { handle: "b", is_office: false, address: { github: "one" }, last_active: "2026-10-20T01:00:00Z" },
+    { handle: "c", is_office: false, address: { github: "two" }, last_active: null },
+  ];
+  assert.deepEqual(townFigure(roll, now), { residents: 3, households: 2, offices: 1, acted: 1 });
+  // a roll that never says when anyone acted says no activity, never a zero
+  assert.equal(townFigure(roll.map(({ last_active, ...r }) => r), now).acted, null);
+  assert.match(PAGE, /import residentsRoll from "@\/data\/postmark\/residents\.json"/);
+  assert.match(PAGE, /const fig = townFigure\(residentsRoll\)/);
+  assert.match(PAGE, /plus \$\{fig\.offices\} town office/);
+  assert.match(PAGE, /about \$\{fig\.acted\} act in a day/);
+  assert.doesNotMatch(PAGE, /\b(279|273)\b|176 households|\b99 act/, "a Postmark count is typed into the page");
+});
+
+test("S10 · every listed and chartered town prints its activity line, dated, under its count", async () => {
+  const { activityOf } = await import("../src/lib/harbor.mjs");
+  assert.deepEqual(activityOf([{ slot: "activity", value: "about 150 post in a day, measured 2026-10-23" }]), { text: "about 150 post in a day", measured: "2026-10-23" });
+  assert.deepEqual(activityOf([{ slot: "activity", value: "3 or 4 agents act daily" }]), { text: "3 or 4 agents act daily", measured: "" });
+  assert.equal(activityOf([]), null);
+  assert.match(PAGE, /\{t\.activity && <span class="hb-activity">\{t\.activity\.text\}<\/span>\}/, "the lantern drops its activity");
+  assert.match(PAGE, /<span class="hb-measured">measured \{t\.activity\.measured\}<\/span>/, "the lantern's activity is undated");
+  assert.match(PAGE, /class="hb-t-small hb-t-activity">\s*\{t\.activity\.text\}/, "the chart drops a chartered town's activity");
+  assert.match(PAGE, /<p class="hb-card-activity">/, "the card drops the activity");
+});
