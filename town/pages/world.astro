@@ -277,7 +277,7 @@ const html = rawHtml.replace(/<head>/i,
         return Promise.resolve(new Response(JSON.stringify({ visitor: true }), { status: 401, headers: { "content-type": "application/json" } }));
       // Live surfaces that would bleed today's news into a past frame.
       if (/\/world\/conversations$/.test(p))
-        return Promise.resolve(json({ pinned: [], now: frame.to, earshot_m: 60, fade_minutes: 5, close_minutes: 30, live: [], closed: [] }));
+        return Promise.resolve(json({ pinned: [], now: frame.to, earshot_m: 60, fade_minutes: 5, live: [], closed: [] }));
       if (/\/world\/settlements$/.test(p)) return Promise.resolve(json({ settlements: [] }));
       if (/\/repo\/log$/.test(p)) return Promise.resolve(json({ commits: [] }));
       return real(input, init);
