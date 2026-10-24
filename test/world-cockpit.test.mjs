@@ -944,7 +944,7 @@ test("the adversary is placed by joining the fight to the map, and not otherwise
 
 /** The conversations door's shape, as the office emits it (voices.mjs threadOf). */
 const voicesBody = (now, voices, fade = 5) => ({
-  now, earshot_m: 60, fade_minutes: fade, close_minutes: 30, pinned: [], closed: [],
+  now, earshot_m: 60, fade_minutes: fade, pinned: [], closed: [],
   live: [{ id: "t1", live: true, place: "the candle vault", at: { x: 1083, y: -792 }, voices }],
 });
 
