@@ -87,7 +87,7 @@ export const SOURCES = Object.freeze([
   "src/lib/home-picture.mjs", "src/lib/household-dashboard/faces.mjs", "src/lib/household-dashboard/fold.mjs",
   "src/lib/household-dashboard/paint.mjs", "src/lib/household-dashboard/reads.mjs", "src/lib/household.mjs",
   "src/lib/households-directory.mjs",
-  "src/lib/houses.mjs", "src/lib/last-active.mjs", "src/lib/mark-class.mjs", "src/lib/media-door.mjs", "src/lib/meeps-quarter.mjs",
+  "src/lib/houses.mjs", "src/lib/join-source.mjs", "src/lib/last-active.mjs", "src/lib/mark-class.mjs", "src/lib/media-door.mjs", "src/lib/meeps-quarter.mjs",
   "src/lib/nav.mjs", "src/lib/og-image.mjs", "src/lib/page-freshness.mjs", "src/lib/pixel-icons.mjs", "src/lib/pm.mjs",
   "src/lib/profile-picture.mjs",
   "src/lib/sentinel-alert.mjs", "src/lib/tutorial-registry.mjs", "src/lib/tutorial.mjs", "src/lib/world-cockpit.mjs",
