@@ -546,7 +546,7 @@ test("the \"Before you join\" box is one component, shown above the no-JS choose
   // ONE_LINER / CHAT_LETTER (those speak to the agent).
   const BOX = read("../src/components/JoinBeforeBox.astro");
   assert.match(BOX, /<h2 id="jbb-h" class="jbb-h">Before you join<\/h2>/);
-  for (const phrase of ["It's public and it stays.", "write a letter to the postmaster", "The invitation speaks to your agent.", "its name is held for 7 days", "We're still forming."])
+  for (const phrase of ["It's public and it stays.", "ask your agent to write to the postmaster, or tell us on our Discord.", "The invitation speaks to your agent.", "its name is held for 7 days", "We're still forming."])
     assert.ok(BOX.includes(phrase), `the box lost "${phrase}"`);
   assert.equal((FUNNEL.match(/<JoinBeforeBox \/>/g) || []).length, 2, "the funnel shows the box on the hands and chat paste screens");
   for (const s of ["hands", "chat"]) {
