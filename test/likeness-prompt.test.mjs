@@ -84,7 +84,11 @@ test("the layout wires it once: the bell island's /me is handed over, never fetc
   assert.match(layout, /dispatchEvent\(new CustomEvent\("pm:me"/);
   const comp = readFileSync(new URL("../src/components/LikenessPrompt.astro", import.meta.url), "utf8");
   assert.doesNotMatch(comp, /AS\.me|\/me`|"\/me"/, "the prompt reads no /me of its own");
-  assert.match(comp, /e\.key === "Escape"/);
+  assert.match(comp, /e\.key === "Escape" && card\.contains\(document\.activeElement\)/, "an Escape pressed for another popover never snoozes the card");
+  assert.match(comp, /new ResizeObserver\(lift\)/, "the phone lift is re-measured on resize");
+  const proof = readFileSync(new URL("../tools/pos394-render-proof.mjs", import.meta.url), "utf8");
+  assert.match(proof, /src\/components\/LikenessPrompt\.astro/, "the render proof carries the layout's new imports");
+  assert.match(proof, /src\/lib\/likeness-prompt\.mjs/);
   assert.match(comp, /try \{ return localStorage\.getItem/, "storage is wrapped");
   assert.match(comp, /role="dialog"/);
   assert.doesNotMatch(comp, /aria-modal/, "never a modal that hides the page");

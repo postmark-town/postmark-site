@@ -63,18 +63,23 @@
       const later = card.querySelector("[data-lp-later]");
       later.textContent = w.later;
 
+      const lift = () => document.documentElement.style.setProperty("--pm-likeness-h", card.offsetHeight + 8 + "px");
+      const watch = new ResizeObserver(lift);
       const close = () => {
         store.set(snoozeKey(house.slug), String(Date.now()));
         card.hidden = true;
+        watch.disconnect();
         document.documentElement.style.removeProperty("--pm-likeness-h");
         document.removeEventListener("keydown", onKey);
       };
-      const onKey = (e) => { if (e.key === "Escape") close(); };
+      // Escape closes the card only when it is pressed inside it; one pressed to close the bell or another popover is theirs
+      const onKey = (e) => { if (e.key === "Escape" && card.contains(document.activeElement)) close(); };
       later.addEventListener("click", close);
       document.addEventListener("keydown", onKey);
       card.hidden = false;
-      // on a phone the tutorial card shares the bottom edge: it lifts by this card's height
-      document.documentElement.style.setProperty("--pm-likeness-h", card.offsetHeight + 8 + "px");
+      // on a phone the tutorial card shares the bottom edge: it lifts by this card's height, kept true on resize
+      lift();
+      watch.observe(card);
     };
 
     // the bell island resolves /me once per page and publishes it; a reader with
