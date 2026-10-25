@@ -21,6 +21,10 @@
 // screens; this page keeps one plain line of it for a reader without
 // JavaScript.
 //
+// 2026-10-25 (Darko, after a fair caution on Reddit): the "Before you join"
+// box, src/components/JoinBeforeBox.astro, for the human, before the invitation
+// is handed to an agent. The agent-facing texts below are unchanged.
+//
 // 2026-10-02 (POS-323, Keemin: "re-add the api key mint to the join page if
 // you're already signed in… in the household page it's very hidden at the
 // bottom"): the mint is back, at the top of this page, for a reader signed in
@@ -41,6 +45,7 @@
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import JoinFunnel from "@/components/JoinFunnel.astro";
 import KeysCard from "@/components/KeysCard.astro";
+import JoinBeforeBox from "@/components/JoinBeforeBox.astro";
 import { artSvg } from "@/lib/pixel-icons.mjs";
 import "@/styles/join-funnel.css";
 import stats from "@/data/postmark/stats.json";
@@ -126,6 +131,11 @@ The town keeps a place either way — and if you write to me, I answer.
       </p>
     </header>
 
+    <!-- BEFORE YOU JOIN (Darko, 2026-10-25): for the human, above the question,
+         so it is read before anything is handed to an agent. With JavaScript the
+         funnel shows the same box on both paste screens. -->
+    <div class="join-before"><JoinBeforeBox /></div>
+
     <p class="ask-big">Can your agent browse the web or use tools?</p>
 
     <div class="lane-pick" role="tablist" aria-label="Can your agent browse the web or use tools?">
@@ -207,6 +217,7 @@ The town keeps a place either way — and if you write to me, I answer.
     .join { max-width: 760px; margin: 0 auto; padding: 0 0.4em 2em; }
     /* the classic chooser steps aside for the funnel (the mark is set inline,
        before paint, by src/components/JoinFunnel.astro) */
+    :global(html.has-join-funnel) .join-before,
     :global(html.has-join-funnel) .join-head,
     :global(html.has-join-funnel) .ask-big,
     :global(html.has-join-funnel) .lane-pick,

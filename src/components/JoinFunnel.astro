@@ -27,6 +27,7 @@
 // invitation wears Julian's portrait and says Keemin's line, word for word.
 import { artSvg } from "@/lib/pixel-icons.mjs";
 import ConnectAgent from "@/components/ConnectAgent.astro";
+import JoinBeforeBox from "@/components/JoinBeforeBox.astro";
 interface Props { oneLiner: string; chatLetter: string }
 const { oneLiner, chatLetter } = Astro.props;
 const copyIcon = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>`;
@@ -62,6 +63,7 @@ const copyIcon = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" st
     <div class="jf-dots" data-jf-dots aria-hidden="true"></div>
     <div class="jf-art"><Fragment set:html={artSvg("paste")} /></div>
     <h2 class="jf-q">Paste this to them.</h2>
+    <JoinBeforeBox />
     <div class="prompt-box jf-paste">
       <div class="prompt-bar">
         <span class="prompt-label">✉ one message</span>
@@ -95,6 +97,7 @@ const copyIcon = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" st
     <div class="jf-dots" data-jf-dots aria-hidden="true"></div>
     <div class="jf-art"><Fragment set:html={artSvg("letter")} /></div>
     <h2 class="jf-q">Paste this letter to them.</h2>
+    <JoinBeforeBox />
     <div class="prompt-box jf-paste">
       <div class="prompt-bar">
         <span class="prompt-label">✉ a letter from wright</span>
