@@ -1,0 +1,118 @@
+---
+// LikenessPrompt — a signed-in reader whose household has not answered the
+// likeness question is offered the answer, once a week (WLD-83; Darko,
+// 2026-10-25 15:22: "make it so the form pops up if you haven't filled it when
+// you go onto the site, signed in").
+//
+// A card in the corner, never a modal: the page behind it stays readable and
+// clickable. Nothing is rendered until the decision is made, so a signed-out
+// reader, a visitor, a solo resident and a household that has answered see no
+// card and no flicker, and fetch nothing the page was not already fetching.
+//
+// The reads: GET /me, which the layout's bell island makes anyway and hands
+// over as the `pm:me` event (never a second sign-in path), and then the office's
+// public GET /households?h=<handle> for that one house, to see whether its record
+// carries an answer. "Not now" is kept in localStorage for seven days, wrapped
+// in try/catch; without storage the card simply shows each load.
+//
+// The decision and the words are src/lib/likeness-prompt.mjs; the answer itself
+// is the office's own page (likenessLink), after a GitHub sign-in.
+---
+<aside class="pm-likeness" data-likeness-prompt role="dialog" aria-labelledby="pm-likeness-h" aria-describedby="pm-likeness-b" hidden>
+  <p class="pm-likeness-kicker" id="pm-likeness-h" data-lp-title></p>
+  <p class="pm-likeness-q" data-lp-question></p>
+  <p class="pm-likeness-b" id="pm-likeness-b"><span data-lp-line></span> <span data-lp-change></span></p>
+  <div class="pm-likeness-row">
+    <a class="pm-btn" data-lp-answer href="#"></a>
+    <button type="button" class="pm-likeness-later" data-lp-later></button>
+  </div>
+</aside>
+
+<script>
+  import { officeBase } from "@/lib/auth.mjs";
+  import { houseOfMe, houseRecord, showPrompt, promptWords, snoozeKey } from "@/lib/likeness-prompt.mjs";
+
+  const card = document.querySelector("[data-likeness-prompt]");
+  if (card) {
+    const store = {
+      get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+      set(k, v) { try { localStorage.setItem(k, v); } catch { /* no storage: it shows again next load */ } },
+    };
+
+    const decide = async (me) => {
+      const house = houseOfMe(me);
+      if (!house) return;
+      const snoozedAt = store.get(snoozeKey(house.slug));
+      // a house that said "not now" this week is not even asked about
+      if (!showPrompt({ house, rec: {}, snoozedAt })) return;
+      let body = null;
+      try {
+        const res = await fetch(`${officeBase()}/households?h=${encodeURIComponent(house.handle)}`, { headers: { accept: "application/json" } });
+        body = res.ok ? await res.json() : null;
+      } catch { body = null; }
+      if (!showPrompt({ house, rec: houseRecord(body, house.slug), snoozedAt })) return;
+
+      const w = promptWords(house);
+      card.querySelector("[data-lp-title]").textContent = w.title;
+      card.querySelector("[data-lp-question]").textContent = w.question;
+      card.querySelector("[data-lp-line]").textContent = w.line;
+      card.querySelector("[data-lp-change]").textContent = w.change;
+      const answer = card.querySelector("[data-lp-answer]");
+      answer.textContent = w.answer;
+      answer.href = w.href;
+      const later = card.querySelector("[data-lp-later]");
+      later.textContent = w.later;
+
+      const lift = () => document.documentElement.style.setProperty("--pm-likeness-h", card.offsetHeight + 8 + "px");
+      const watch = new ResizeObserver(lift);
+      const close = () => {
+        store.set(snoozeKey(house.slug), String(Date.now()));
+        card.hidden = true;
+        watch.disconnect();
+        document.documentElement.style.removeProperty("--pm-likeness-h");
+        document.removeEventListener("keydown", onKey);
+      };
+      // Escape closes the card only when it is pressed inside it; one pressed to close the bell or another popover is theirs
+      const onKey = (e) => { if (e.key === "Escape" && card.contains(document.activeElement)) close(); };
+      later.addEventListener("click", close);
+      document.addEventListener("keydown", onKey);
+      card.hidden = false;
+      // on a phone the tutorial card shares the bottom edge: it lifts by this card's height, kept true on resize
+      lift();
+      watch.observe(card);
+    };
+
+    // the bell island resolves /me once per page and publishes it; a reader with
+    // no fresh token never reaches here (the island publishes nothing for them)
+    if (window.pmMe) decide(window.pmMe);
+    else document.addEventListener("pm:me", (e) => decide(e.detail), { once: true });
+  }
+</script>
+
+<style is:global>
+  .pm-likeness {
+    position: fixed; z-index: 55; left: 16px; bottom: 16px;
+    width: min(360px, calc(100vw - 32px)); box-sizing: border-box;
+    padding: 0.95em 1.05em 0.9em;
+    background: var(--pm-paper); color: var(--pm-ink);
+    border: 1px solid var(--pm-line); border-radius: 10px;
+    box-shadow: 0 14px 38px rgba(4, 7, 14, 0.5), 0 2px 8px rgba(4, 7, 14, 0.35);
+    font-family: var(--pm-serif); font-size: 0.9rem; line-height: 1.45;
+  }
+  .pm-likeness[hidden] { display: none; }
+  .pm-likeness p { margin: 0; }
+  .pm-likeness-kicker {
+    font: 700 0.62rem/1 var(--pm-mono); letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--pm-ink-soft); margin-bottom: 0.55em;
+  }
+  .pm-likeness-q { font-weight: 700; color: var(--pm-wax); margin-bottom: 0.4em; }
+  .pm-likeness-b { color: var(--pm-ink); margin-bottom: 0.8em; }
+  .pm-likeness-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5em 1em; }
+  .pm-likeness-later {
+    font: 600 0.78rem/1 var(--pm-mono); color: var(--pm-accent);
+    background: none; border: 0; padding: 6px 4px; cursor: pointer; border-radius: 4px;
+  }
+  .pm-likeness-later:hover { color: var(--pm-wax); text-decoration: underline; }
+  .pm-likeness a:focus-visible, .pm-likeness button:focus-visible { outline: 2px solid var(--pm-accent); outline-offset: 2px; }
+  @media (max-width: 480px) { .pm-likeness { right: 8px; left: 8px; bottom: 8px; width: auto; } }
+</style>

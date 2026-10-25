@@ -11,6 +11,7 @@ import "../styles/postmark.css";
 import { RAIL, rowFor, sectionOf, navFlags } from "@/lib/nav.mjs";
 import ChipRow from "@/components/ChipRow.astro";
 import DoorLine from "@/components/DoorLine.astro";
+import LikenessPrompt from "@/components/LikenessPrompt.astro";
 import HalloweenSkin from "@/components/HalloweenSkin.astro";
 import HalloweenBat from "@/components/HalloweenBat.astro";
 import { sectionCard, LARGE } from "@/lib/og-image.mjs";
@@ -288,6 +289,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       }
     </style>
     <slot />
+    <LikenessPrompt />
     <DoorLine door={door} /><HalloweenSkin part="wolf" /><HalloweenBat />
     {import.meta.env.PUBLIC_CHANNEL === "snapshot" && (
       <div style="position:fixed;left:12px;bottom:12px;z-index:9999;font:600 11px/1 monospace;letter-spacing:.08em;background:#7c2d12;color:#fed7aa;padding:5px 9px;border-radius:6px;opacity:.92;pointer-events:none;">
@@ -666,6 +668,9 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       // ---- resolve identity; a signed-out (or /me-unavailable) reader gets no bell ----
       const me = await fetchMe();
       if (!me) { root.hidden = true; return; }
+      // one /me per page: the likeness prompt (WLD-83) listens for it rather than asking again
+      window.pmMe = me;
+      document.dispatchEvent(new CustomEvent("pm:me", { detail: me }));
       const handles = me.handles || me.residents || [];
       const household = me.household || handles.slice().sort().join(",") || "signed-in";
       const visitor = me.visitor === true;
@@ -1238,6 +1243,6 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
     .pm-alert-pop::before { display: none; }
     .pm-notif-panel::before { display: none; }
     .pm-notif-body { max-height: min(56vh, 340px); }
-    .pm-tut { right: 10px; bottom: 58px; }
+    .pm-tut { right: 10px; bottom: calc(58px + var(--pm-likeness-h, 0px)); } /* sits above the likeness card when both show */
   }
 </style>
