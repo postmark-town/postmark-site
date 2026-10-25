@@ -216,29 +216,32 @@ const sections = [
 
     <!-- a mooring tower on its cloud; colours by CSS variables on the <use> -->
     <symbol id="hb-tower" viewBox="0 0 120 180">
-      <circle class="hb-flicker" cx="60" cy="52" r="52" fill="url(#hb-g-halo)" />
-      <ellipse cx="60" cy="168" rx="50" ry="10" fill="var(--hb-cloud-shade)" />
-      <circle cx="28" cy="160" r="14" fill="var(--hb-cloud)" />
-      <circle cx="58" cy="154" r="19" fill="var(--hb-cloud-lit)" />
-      <circle cx="90" cy="160" r="14" fill="var(--hb-cloud)" />
-      <path d="M18 160 a14 14 0 0 1 12 -13 M44 147 a19 19 0 0 1 24 -9" fill="none" stroke="var(--hb-cloud-rim)" stroke-width="2" stroke-linecap="round" opacity=".7" />
-      <path d="M40 150 L46 74 H74 L80 150 Z" fill="var(--pm-paper-deep)" />
-      <path d="M43.95 100 L76.05 100 L77 112 L43 112 Z" style="fill: var(--band, var(--pm-wax))" />
-      <path d="M41.74 128 L78.26 128 L79.21 140 L40.79 140 Z" style="fill: var(--band, var(--pm-wax))" />
-      <path d="M60 74 V150" stroke="#000" stroke-opacity=".07" stroke-width="16" />
-      <path d="M55 150 V142 a5 5 0 0 1 10 0 V150 Z" fill="var(--pm-night)" />
-      <circle class="hb-flicker hb-f2" cx="60" cy="88" r="4.2" fill="var(--pm-gold-bright)" />
-      <rect x="39" y="68" width="42" height="6.5" rx="2.5" fill="var(--pm-night)" />
-      <path d="M43 68 V62 M50 68 V62 M57 68 V62 M63 68 V62 M70 68 V62 M77 68 V62 M41 62 H79" stroke="var(--pm-night)" stroke-width="1.6" stroke-linecap="round" />
-      <rect class="hb-flicker" x="47" y="40" width="26" height="24" rx="4" fill="var(--pm-gold-bright)" />
-      <path d="M56 40 V64 M64 40 V64" stroke="var(--hb-wood)" stroke-width="1.6" />
-      <path d="M42 42 Q60 15 78 42 Z" style="fill: var(--roof, var(--pm-accent))" />
-      <path d="M48 36 Q60 22 66 24" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="2" stroke-linecap="round" />
-      <circle cx="60" cy="20" r="3.2" fill="var(--pm-gold)" />
-      <path d="M60 20 V5" stroke="var(--pm-night)" stroke-width="1.6" />
-      <path d="M60 5 L77 9 L60 13 Z" style="fill: var(--flag, var(--pm-gold))" />
-      <path d="M78 54 L99 48" stroke="var(--pm-night)" stroke-width="2.2" stroke-linecap="round" />
-      <circle cx="101.5" cy="47.3" r="3.2" fill="none" stroke="var(--pm-gold)" stroke-width="1.8" />
+      <circle class="hb-flicker" cx="60" cy="68" r="52" fill="url(#hb-g-halo)" />
+      <ellipse cx="60" cy="172" rx="56" ry="7" fill="var(--hb-cloud-shade)" />
+      <ellipse cx="12" cy="174" rx="9" ry="3.5" fill="var(--hb-cloud-shade)" opacity=".7" />
+      <path d="M4 172 Q2 163 14 162 Q18 152 32 155 Q42 145 58 150 Q72 142 86 151 Q100 147 105 158 Q118 160 116 172 Z" fill="var(--hb-cloud)" />
+      <path d="M30 158 Q46 148 62 154 Q78 146 96 158 Q64 163 30 158 Z" fill="var(--hb-cloud-lit)" />
+      <path d="M16 163 a10 10 0 0 1 8 -6 M60 150 Q72 144 84 152" fill="none" stroke="var(--hb-cloud-rim)" stroke-width="2" stroke-linecap="round" opacity=".7" />
+      <!-- a stout, tapered tower: wide at the foot, a gallery wider than the shaft, a lantern room under an overhanging pointed roof -->
+      <path d="M36 154 L45 92 H75 L84 154 Z" fill="var(--pm-paper-deep)" />
+      <path d="M41.4 114 L78.6 114 L79.5 126 L40.5 126 Z" style="fill: var(--band, var(--pm-wax))" />
+      <path d="M38.4 136 L81.6 136 L82.4 146 L37.6 146 Z" style="fill: var(--band, var(--pm-wax))" />
+      <path d="M60 92 V154" stroke="#000" stroke-opacity=".07" stroke-width="20" />
+      <path d="M54 154 V146 a6 6 0 0 1 12 0 V154 Z" fill="var(--pm-night)" />
+      <circle class="hb-flicker hb-f2" cx="60" cy="104" r="3.6" fill="var(--pm-gold-bright)" />
+      <rect x="31" y="85" width="58" height="7.5" rx="2.5" fill="var(--pm-night)" />
+      <path d="M36 85 V77 M46 85 V77 M56 85 V77 M64 85 V77 M74 85 V77 M84 85 V77 M34 77 H86" stroke="var(--pm-night)" stroke-width="1.6" stroke-linecap="round" />
+      <rect class="hb-flicker" x="46" y="53" width="28" height="25" rx="3" fill="var(--pm-gold-bright)" />
+      <path d="M55.5 53 V78 M64.5 53 V78 M46 65 H74" stroke="var(--hb-wood)" stroke-width="1.6" />
+      <rect x="43" y="49" width="34" height="5" rx="1.5" fill="var(--pm-night)" />
+      <path d="M38 50 L60 26 L82 50 Z" style="fill: var(--roof, var(--pm-accent))" />
+      <path d="M50 44 L58 34" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="2" stroke-linecap="round" />
+      <circle cx="60" cy="25" r="2.8" fill="var(--pm-gold)" />
+      <path d="M60 25 V10" stroke="var(--pm-night)" stroke-width="1.6" />
+      <path d="M60 10 L77 14 L60 18 Z" style="fill: var(--flag, var(--pm-gold))" />
+      <path d="M80 62 L100 56" stroke="var(--pm-night)" stroke-width="2.2" stroke-linecap="round" />
+      <circle cx="102.5" cy="55.3" r="3.2" fill="none" stroke="var(--pm-gold)" stroke-width="1.8" />
+      <path d="M24 164 Q38 155 52 159 Q70 152 96 164 Z" fill="var(--hb-cloud-lit)" />
     </symbol>
 
     <!-- POSTMARK, trued to its postbox (Darko, 2026-10-22: "postmark can be
@@ -247,11 +250,11 @@ const sections = [
          lamp in its cap, the slot, and the wax seal for a plate. -->
     <symbol id="hb-postbox" viewBox="0 0 120 180">
       <circle class="hb-flicker" cx="60" cy="40" r="46" fill="url(#hb-g-halo)" />
-      <ellipse cx="60" cy="168" rx="50" ry="10" fill="var(--hb-cloud-shade)" />
-      <circle cx="28" cy="160" r="14" fill="var(--hb-cloud)" />
-      <circle cx="58" cy="154" r="19" fill="var(--hb-cloud-lit)" />
-      <circle cx="90" cy="160" r="14" fill="var(--hb-cloud)" />
-      <path d="M18 160 a14 14 0 0 1 12 -13 M44 147 a19 19 0 0 1 24 -9" fill="none" stroke="var(--hb-cloud-rim)" stroke-width="2" stroke-linecap="round" opacity=".7" />
+      <ellipse cx="60" cy="172" rx="56" ry="7" fill="var(--hb-cloud-shade)" />
+      <ellipse cx="12" cy="174" rx="9" ry="3.5" fill="var(--hb-cloud-shade)" opacity=".7" />
+      <path d="M4 172 Q2 163 14 162 Q18 152 32 155 Q42 145 58 150 Q72 142 86 151 Q100 147 105 158 Q118 160 116 172 Z" fill="var(--hb-cloud)" />
+      <path d="M30 158 Q46 148 62 154 Q78 146 96 158 Q64 163 30 158 Z" fill="var(--hb-cloud-lit)" />
+      <path d="M16 163 a10 10 0 0 1 8 -6 M60 150 Q72 144 84 152" fill="none" stroke="var(--hb-cloud-rim)" stroke-width="2" stroke-linecap="round" opacity=".7" />
       <!-- plinth -->
       <rect x="28" y="140" width="64" height="11" rx="3" fill="var(--pm-night)" />
       <!-- the pillar -->
@@ -272,6 +275,7 @@ const sections = [
       <use href="#hb-i-seal" x="44" y="96" width="32" height="32" />
       <!-- the door's edge -->
       <path d="M38 133 H82" stroke="#000" stroke-opacity=".25" stroke-width="1.4" />
+      <path d="M24 164 Q38 155 52 159 Q70 152 96 164 Z" fill="var(--hb-cloud-lit)" />
     </symbol>
 
     <!-- the harbor: a floating dock with a lamp and a mail sign -->
