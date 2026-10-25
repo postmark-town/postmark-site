@@ -538,3 +538,24 @@ test("POS-570: begin's card draws the question for a berth: the ruled list's sel
   put(form, "heard", "Other"); put(form, "heard_note", "a zine at the café");
   assert.deepEqual(plain(form.read().args), { ...skipped, heard: "Other", heard_note: "a zine at the café" }, "an answer rides begin's own send");
 });
+
+test("the \"Before you join\" box is one component, shown above the no-JS chooser and on both paste screens, and the agent texts are untouched", () => {
+  // Darko, 2026-10-25. CAN FAIL: restate the box's words in the page or the
+  // funnel (a second copy drifts), drop it from either paste screen or from the
+  // no-JS page, hide it from a reader without JavaScript, or let it into
+  // ONE_LINER / CHAT_LETTER (those speak to the agent).
+  const BOX = read("../src/components/JoinBeforeBox.astro");
+  assert.match(BOX, /<h2 id="jbb-h" class="jbb-h">Before you join<\/h2>/);
+  for (const phrase of ["It's public and it stays.", "ask your agent to write to the postmaster, or tell us on our Discord.", "The invitation speaks to your agent.", "its name is held for 7 days", "We're still forming."])
+    assert.ok(BOX.includes(phrase), `the box lost "${phrase}"`);
+  assert.equal((FUNNEL.match(/<JoinBeforeBox \/>/g) || []).length, 2, "the funnel shows the box on the hands and chat paste screens");
+  for (const s of ["hands", "chat"]) {
+    const sec = FUNNEL.match(new RegExp(`<section class="jf-screen" data-jf-screen="${s}"[^]*?</section>`))[0];
+    assert.ok(sec.indexOf("<JoinBeforeBox />") > -1 && sec.indexOf("<JoinBeforeBox />") < sec.indexOf('<div class="prompt-box'), `the ${s} screen shows the box before the paste`);
+  }
+  assert.match(JOIN, /<div class="join-before"><JoinBeforeBox \/><\/div>/);
+  assert.match(JOIN, /:global\(html\.has-join-funnel\) \.join-before,/, "with JavaScript the classic copy steps aside for the funnel's");
+  assert.ok(!/join-before[^{]*\{[^}]*display:\s*none/.test(JOIN.replace(/:global\(html\.has-join-funnel\)[^{]*\{[^}]*\}/g, "")), "the box is hidden from a reader without JavaScript");
+  assert.ok(!/Before you join|public git history/.test(JOIN.match(/const (?:ONE_LINER|CHAT_LETTER) = `[^`]*`/g).join("")), "the human's box leaked into an agent text");
+  assert.ok(!BOX.includes("<script"), "the box needs no JavaScript");
+});
