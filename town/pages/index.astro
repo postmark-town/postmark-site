@@ -20,7 +20,6 @@ import { letterAddresses, letterHref } from "@/lib/mail.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { householdHref, YOUR_HOUSEHOLD } from "@/lib/home.mjs";
 import HalloweenHome from "@/components/HalloweenHome.astro";
-import HalloweenFrame from "@/components/HalloweenFrame.astro";
 import SeasonLine from "@/components/SeasonLine.astro";
 import HeroFog from "@/components/HeroFog.astro";
 
@@ -143,7 +142,6 @@ const works = [
   active="postmark"
   image="/banner.png"
 ><HeroFog slot="head" />
-  <HalloweenFrame part="top" />
   <div class="pm-index">
 
     <!-- ── LIVE TICKER — the tape above everything ──────────── -->
@@ -1003,5 +1001,4 @@ const works = [
       .card { padding: 1.6em 1.3em 1.5em; }
     }
   </style>
-<HalloweenFrame part="foot" />
 </PostmarkLayout>

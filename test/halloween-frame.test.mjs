@@ -53,3 +53,24 @@ test("it is drawn in the skin's palette, not the harbour-night one", async () =>
   assert.ok(h.includes(VARIANTS[2].blood), "the rare blood red");
   for (const old of ["#3f8f93", "#e08a2c", "#2f2d5c", "#171b30"]) assert.ok(!h.includes(old), `the old harbour colour ${old} is gone`);
 });
+
+// WHERE IT MOUNTS (Darko 2026-10-26): the frame wears wherever the skin does, which is the
+// PostmarkLayout shell, once, top before the slot and foot after it. Not the front page (it
+// would draw twice), not the harbor (default palette), not the World page (its own frame).
+import { readFileSync } from "node:fs";
+const src = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+test("the frame mounts in PostmarkLayout, once per part, top before the slot, foot after it", () => {
+  const L = src("src/layouts/PostmarkLayout.astro");
+  assert.equal((L.match(/<HalloweenFrame part="top"/g) || []).length, 1);
+  assert.equal((L.match(/<HalloweenFrame part="foot"/g) || []).length, 1);
+  const top = L.indexOf('<HalloweenFrame part="top"'), slot = L.indexOf("<slot />", top), foot = L.indexOf('<HalloweenFrame part="foot"');
+  assert.ok(top > 0 && slot > top && foot > slot);
+});
+test("no page mounts it a second time, and the harbor and the World page do not wear it", () => {
+  assert.doesNotMatch(src("town/pages/index.astro"), /<HalloweenFrame/);
+  assert.doesNotMatch(src("src/layouts/HarborLayout.astro"), /<HalloweenFrame/);
+  assert.doesNotMatch(src("town/pages/world.astro"), /<HalloweenFrame\b/);
+});
+test("the full-width tool pages opt out of the frame", () => {
+  for (const p of ["replay", "ops/graph", "conversations"]) assert.match(src(`town/pages/${p}/index.astro`), /<PostmarkLayout\s+halloweenFrame=\{false\}/);
+});

@@ -76,14 +76,14 @@ const PINS = { astro: "6.4.0", vite: "7.3.3", esbuild: "0.27.7", marked: "18.0.5
 // deliberately absent (virtual). Anything the templates import that is not
 // here fails the run.
 export const SOURCES = Object.freeze([
-  "src/components/ChipRow.astro", "src/components/DoorLine.astro", "src/components/HalloweenBat.astro",
+  "src/components/ChipRow.astro", "src/components/DoorLine.astro", "src/components/HalloweenBat.astro", "src/components/HalloweenFrame.astro",
   "src/components/LikenessPrompt.astro",
   "src/components/HalloweenMotif.astro", "src/components/HalloweenSkin.astro", "src/components/PageFreshness.astro",
   "src/components/ResidentCard.astro",
   "src/components/household-dashboard/HouseDashboard.astro", "src/components/household-dashboard/ResidentCard.astro",
   "src/layouts/BaseLayout.astro", "src/layouts/PostmarkLayout.astro",
   "src/lib/appearance.mjs", "src/lib/auth.mjs", "src/lib/civic-art.mjs", "src/lib/correspondents.mjs", "src/lib/door-line.mjs",
-  "src/lib/freshness.mjs", "src/lib/halloween-motifs.mjs", "src/lib/halloween-navy.mjs",
+  "src/lib/freshness.mjs", "src/lib/halloween-frame.mjs", "src/lib/halloween-motifs.mjs", "src/lib/halloween-navy.mjs",
   "src/lib/halloween-skin.mjs", "src/lib/halloween-sprinkle.mjs", "src/lib/home-face.mjs", "src/lib/home-pick.mjs",
   "src/lib/home-picture.mjs", "src/lib/household-dashboard/faces.mjs", "src/lib/household-dashboard/fold.mjs",
   "src/lib/household-dashboard/paint.mjs", "src/lib/household-dashboard/reads.mjs", "src/lib/household.mjs",

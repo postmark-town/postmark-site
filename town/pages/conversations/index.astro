@@ -33,6 +33,7 @@
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 ---
 <PostmarkLayout
+  halloweenFrame={false}
   door={{ mcp: 'world { read: "say" }', get: "/api/world/conversations" }}
   active="conversations"
   title="Conversations — Postmark"

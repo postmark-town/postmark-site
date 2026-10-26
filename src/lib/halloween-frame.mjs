@@ -14,7 +14,7 @@
 // in the browser (a page baked before UNTIL removes its own frame once the clock passes it).
 // Locally: BUILD_CROSSING=300 npm run dev puts the skin and the frame on.
 // TO REMOVE IT ALTOGETHER: delete the two <HalloweenFrame/> lines and the import in
-// town/pages/index.astro, then this file, the component and its test.
+// src/layouts/PostmarkLayout.astro, then this file, the component and its test.
 import { VARIANTS, mix } from "./halloween-skin.mjs";
 
 export const HALLOWEEN_FRAME = { from: "2026-10-01T00:00:00Z", until: "2026-11-01T07:00:00Z" };
