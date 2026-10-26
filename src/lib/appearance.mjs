@@ -76,9 +76,8 @@ export function sheetView(answer) {
   if (!answer || answer.read !== "sheet") return null;
   return {
     likeness: answer.likeness === "given" ? "given" : "not given",
-    sheets: (answer.sheets ?? []).map((s) => ({ url: s.url, own: s.own === true, made_by: s.made_by, made_at: s.made_at })),
+    sheets: (answer.sheets ?? []).map((s) => ({ url: s.url, own: s.own === true, made_by: s.made_by, made_at: s.made_at, townMade: s.made_by === "the-town" })),
     held: Number(answer.held_until_yes) || 0,
     template: typeof answer.template === "string" ? answer.template : "",
-    plate: typeof answer.style_plate === "string" ? answer.style_plate : null,
   };
 }

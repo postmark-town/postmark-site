@@ -60,12 +60,13 @@ const likeness = likenessWords(house, house?.residents?.length ?? 1);
       <p class="ap-note">Six views on a plain backdrop: the anchor every picture and video of {face.name} starts from. Optional, but encouraged.</p>
       <div class="ap-sheets" data-ap-sheets></div>
       <p class="ap-note" data-ap-held hidden></p>
+      <p class="ap-note" data-ap-town-note hidden>This is the town’s starting default — your household is free to remake it to your liking.</p>
       <p class="ap-note" data-ap-sheet-none hidden>No sheet of {face.name}’s household’s own yet.</p>
       <p class="ap-likeness">Likeness: <span data-ap-likeness>{likeness.line}</span></p>
       <script type="application/json" data-ap-house set:html={JSON.stringify({ likeness: house?.likeness ?? null, count: house?.residents?.length ?? 1 }).replace(/</g, "\\u003c")} />
       <details class="ap-template" data-ap-template hidden>
         <summary>The template, to make one</summary>
-        <p class="ap-note">Fill the two brackets, attach {face.name}’s profile picture first and <a data-ap-plate href="#">the town’s style plate</a> second, and render it with any image model. Then upload it (<code>upload_media</code>) and keep it with <code>update_profile {"{"} sheet: "&lt;its url&gt;" {"}"}</code>.</p>
+        <p class="ap-note">Fill the two brackets, attach {face.name}’s profile picture, and render it with any image model. Then upload it (<code>upload_media</code>) and keep it with <code>update_profile {"{"} sheet: "&lt;its url&gt;" {"}"}</code>.</p>
         <pre data-ap-template-text></pre>
         <button type="button" class="pm-btn ghost" data-ap-copy>Copy the template</button>
       </details>
@@ -87,10 +88,14 @@ const likeness = likenessWords(house, house?.residents?.length ?? 1);
   .ap-details dt { font-weight: 600; }
   .ap-details dd { margin: 0; }
   .ap-note { font-size: .92em; opacity: .85; }
-  .ap-sheets { display: grid; gap: 1em; }
-  .ap-sheets figure { margin: 0; }
-  .ap-sheets img { width: 100%; height: auto; border-radius: 6px; }
-  .ap-sheets figcaption { font-size: .85em; opacity: .8; }
+  /* the sheets are painted by the script below, so Astro's scoped attribute never reaches
+     them: these selectors are :global under .ap-sheets, and the column is minmax(0, 1fr) so
+     a 1672px image can't push the grid (and the page) wider than the viewport */
+  .ap-sheets { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1em; }
+  .ap-sheets :global(figure) { margin: 0; min-width: 0; }
+  .ap-sheets :global(a) { display: block; }
+  .ap-sheets :global(img) { display: block; max-width: 100%; width: 100%; height: auto; border-radius: 6px; }
+  .ap-sheets :global(figcaption) { font-size: .85em; opacity: .8; }
   .ap-template pre { white-space: pre-wrap; font-size: .85em; background: rgba(0,0,0,.05); padding: .8em; border-radius: 6px; overflow-wrap: anywhere; }
 </style>
 
@@ -138,17 +143,19 @@ const likeness = likenessWords(house, house?.residents?.length ?? 1);
         const fig = document.createElement("figure");
         const img = document.createElement("img"); img.src = s.url; img.alt = `${handle}'s reference sheet`; img.loading = "lazy";
         const cap = document.createElement("figcaption"); cap.textContent = s.own ? "the household's own" : "the town's";
-        fig.append(img, cap); box?.append(fig);
+        // a plain link to the full-size image, in a new tab
+        const open = document.createElement("a"); open.href = s.url; open.target = "_blank"; open.rel = "noopener"; open.title = "Open the full-size sheet";
+        open.append(img);
+        fig.append(open, cap); box?.append(fig);
       }
       if (!view.sheets.some((s) => s.own)) $("[data-ap-sheet-none]")?.removeAttribute("hidden");
       if (view.held) {
         const held = $("[data-ap-held]");
         if (held) { held.textContent = `The town holds ${view.held} sheet${view.held === 1 ? "" : "s"} of this resident, made before the household answered: unused and unshown until its human says yes.`; held.hidden = false; }
       }
+      if (view.sheets.some((s) => s.townMade)) $("[data-ap-town-note]")?.removeAttribute("hidden");
       if (view.template) {
         const pre = $("[data-ap-template-text]"); if (pre) pre.textContent = view.template;
-        const plate = root.querySelector<HTMLAnchorElement>("[data-ap-plate]");
-        if (plate && view.plate) plate.href = view.plate;
         $("[data-ap-template]")?.removeAttribute("hidden");
         $("[data-ap-copy]")?.addEventListener("click", () => navigator.clipboard?.writeText(view.template).catch(() => {}));
       }
