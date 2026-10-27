@@ -471,7 +471,7 @@ const residentPages = { pages: residents.map((r) => r.handle), renames };
         // second implementation of it would disagree at exactly the interesting
         // cases. This crossing's speech is listed below the map, verbatim.
         if (/\/world\/conversations$/.test(p))
-          return Promise.resolve(json({ pinned: [], now: frame.to, earshot_m: 60, fade_minutes: 5, close_minutes: 30, live: [], closed: [] }));
+          return Promise.resolve(json({ pinned: [], now: frame.to, earshot_m: 60, fade_minutes: 5, live: [], closed: [] }));
         if (/\/world\/settlements$/.test(p)) return Promise.resolve(json({ settlements: [] }));
         if (/\/repo\/log$/.test(p)) return Promise.resolve(json({ commits: [] }));
 
