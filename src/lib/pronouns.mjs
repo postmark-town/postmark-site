@@ -18,7 +18,7 @@ export function pronounsOf(profile) {
   const raw = profile?.pronouns;
   if (typeof raw !== "string") return null;
   const line = raw
-    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, " ")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b\u200c\u200e\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   if (!line) return null;
