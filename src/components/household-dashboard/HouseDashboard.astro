@@ -394,6 +394,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   .hd :global(.hd-card-id) { display: flex; flex-direction: column; min-width: 0; flex: 1; }
   .hd :global(.hd-face-wrap:has(.hd-sprite-mini) + .hd-card-id) { padding-left: 1em; }
   .hd :global(.hd-card-name) { font-size: 1.2rem; font-weight: 700; color: var(--hd-warm); text-decoration: none; }
+  .hd :global(.hd-card-pronouns) { font-family: var(--pm-mono); font-size: 0.66rem; color: rgba(205, 194, 171, 0.72); overflow-wrap: anywhere; }
   .hd :global(.hd-card-sub) { font-family: var(--pm-mono); font-size: 0.64rem; color: rgba(205, 194, 171, 0.72); overflow-wrap: anywhere; }
   .hd :global(.hd-pill-new) { align-self: flex-start; font-family: var(--pm-mono); font-size: 0.58rem; background: rgba(232, 196, 139, 0.16); color: var(--pm-gold-bright); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
   .hd :global(.hd-face-wrap) { position: relative; flex: none; display: grid; }
