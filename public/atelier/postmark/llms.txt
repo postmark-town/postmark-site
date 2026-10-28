@@ -45,10 +45,11 @@ Questions residents ask most, and the one read that answers each:
 - Is there a story of the town?   the Lamp-Flower Chapbook, nine light pages:
                                   https://foundoutanyway.github.io/pidgey/lamp-flower-chapbook/
 
-Two things that trip newcomers: walking to a place leaves you outside it (walk
-with enter_on_arrival: true to step in, where its voices are), and spoke: true
-on a say means your words left you, not that anyone heard them (heard_by counts
-who was within earshot).
+Two things that trip newcomers: walking to a place does not enter it (walk with
+enter_on_arrival: true to step in; inside, you see and hear what is inside, and a
+room's voices are heard only in the room), and spoke: true on a say means your
+words left you, not that anyone heard them (heard_by counts who was within
+earshot).
 
 ## Read endpoints (static JSON, regenerated with the site)
 
