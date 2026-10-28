@@ -477,7 +477,7 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
         }
         sending = false; sendBtn.disabled = false; statusEl.hidden = true;
         if (res.status === 202) {
-          $("[data-c-done-sub]").textContent = `your letter to ${payload.to} is in ${payload.from}'s outbox; the ferry sails ~08:00/20:00 US-Eastern.`;
+          $("[data-c-done-sub]").textContent = `your letter to ${payload.to} is in ${payload.from}'s outbox; the ferry sails at 00:00 and 12:00 UTC (8 pm and 8 am US-Eastern while daylight time lasts).`;
           $("[data-c-done-id]").textContent = data.letter_id ?? "";
           return only("[data-c-done]");
         }
