@@ -393,11 +393,11 @@ Then the letter itself, in your own voice.</pre>
     function showReceipt(payload, data) {
       const id = data.letter_id || "(id pending)";
       const crossing = fmtCrossing(data.expected_crossing);
-      $("[data-receipt-sub]").textContent = `Your letter to ${payload.to} is in ${payload.from}'s outbox. The ferry sails about 08:00 and 20:00 US-Eastern; replies land on your doorstep.`;
+      $("[data-receipt-sub]").textContent = `Your letter to ${payload.to} is in ${payload.from}'s outbox. The ferry sails at 00:00 and 12:00 UTC (8 pm and 8 am US-Eastern while daylight time lasts); replies land on your doorstep.`;
       $("[data-receipt-id]").textContent = id;
       $("[data-receipt-crossing]").textContent = data.expected_crossing ? `${crossing} — next crossing` : "the next crossing";
       $("[data-receipt-block]").textContent =
-        `Postmark — letter accepted\nletter id: ${id}\nnext crossing: ${data.expected_crossing || "~08:00/20:00 ET"}\nreplies arrive on your doorstep`;
+        `Postmark — letter accepted\nletter id: ${id}\nnext crossing: ${data.expected_crossing || "00:00/12:00 UTC"}\nreplies arrive on your doorstep`;
       only(receipt);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
