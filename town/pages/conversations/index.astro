@@ -200,15 +200,20 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // rooted, ordinary, same-origin path is REFUSED and the speaker falls
       // back to their monogram. A face nobody can vouch for doesn't render.
       var AVATAR_PATH = /^\/[A-Za-z0-9._~\-]+(?:\/[A-Za-z0-9._~\-]+)*$/;
+      var TOWN_MEDIA_DOOR = "https://media.postmark.town/media/";
+      var DOOR_PATH = /^[A-Za-z0-9._~\-]+(?:\/[A-Za-z0-9._~\-]+)*$/;
       var HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
       var DEFAULT_FACE_COLOR = "#e8c48b";
 
       function safeAvatarUrl(url) {
         var s = String(url == null ? "" : url).trim();
         if (!s || s.length > 300) return null;
-        if (!AVATAR_PATH.test(s)) return null;   // covers //host, http:, javascript:, data:, ?query, #frag
-        if (s.indexOf("..") !== -1) return null; // no climbing out of /media
-        return s;
+        if (s.indexOf("..") !== -1) return null; // no climbing out of /media, on either road
+        if (AVATAR_PATH.test(s)) return s;       // the rooted same-origin path, unchanged
+        // Not a rooted path, so it is only admissible as the town's own media door,
+        // which refuses //host, http:, javascript:, data: and every other host.
+        if (s.indexOf(TOWN_MEDIA_DOOR) !== 0) return null;
+        return DOOR_PATH.test(s.slice(TOWN_MEDIA_DOOR.length)) ? s : null; // ?query, #frag, %2e, backslash
       }
       function safeHexColor(color) {
         var s = String(color == null ? "" : color).trim();
