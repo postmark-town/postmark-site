@@ -18,7 +18,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  BOARD_PIECES, BOARD_PINS, FRAMED, NOSCRIPT_NOTICES, POSTIT_PAPERS, TILTS, boardIds, dailyFront, pinLink, pinnedMonth, postitLook, tendedText, viewOf,
+  BOARD_PIECES, BOARD_PINS, boardPins, FRAMED, NOSCRIPT_NOTICES, POSTIT_PAPERS, TILTS, boardIds, dailyFront, pinLink, pinnedMonth, postitLook, tendedText, viewOf,
 } from "../src/lib/bulletin-board.mjs";
 import { bulletinCards, bulletinPostings } from "../src/lib/bulletin-cards.mjs";
 import { LANES } from "../src/lib/civic.mjs";
@@ -398,7 +398,13 @@ test("THE PINS are on the built board: the chapbook a new-tab link crediting Dom
   assert.ok(chap[1].replace(/&#39;/g, "'").includes("The pigeon's compendium of postmark.town, for old residents and new arrivals alike."));
   // each carries its picture: two pixel maps on the quay, drawn as the postcard's buildings are,
   // in an object of its own (the book's plate, the hanger's window), neither one a card already there
-  for (const [key, form, m] of [["chapbook", "book", chap], ["halloween", "hanger", pin("halloween")]]) {
+  // WLD-142: the Halloween hanger ends with the frame's clock (boardPins), so the expectation is derived from
+  // the same instant the build read: in the window it is there, after it it is absent. Until 2026-11-01T07:00Z
+  // this asserted it unconditionally, and every build after that would have gone red.
+  const hanger = boardPins(Date.now()).some((p) => p.key === "halloween");
+  assert.equal(pin("halloween") !== null, hanger, hanger ? "the Halloween hanger is missing inside its window" : "the Halloween hanger shows after its window");
+  assert.deepEqual([...board.matchAll(/data-pin="([a-z-]+)"/g)].map((x) => x[1]), boardPins(Date.now()).map((p) => p.key), "the pins on the board are boardPins() at this instant");
+  for (const [key, form, m] of [["chapbook", "book", chap], ...(hanger ? [["halloween", "hanger", pin("halloween")]] : [])]) {
     assert.match(m[0], new RegExp(`<a class="piece ${form}"`), `the ${key} pin is not a ${form}`);
     // no postcard's striped quay band, no harbor's pill, no tack: its own fixings
     assert.equal(/class="(quay|beyond|tack)\b/.test(m[1]), false, `the ${key} pin wears another card's parts`);
@@ -411,6 +417,7 @@ test("THE PINS are on the built board: the chapbook a new-tab link crediting Dom
       assert.ok(m[1].includes(">sprite by Dom Pidgey<"), "the sprite is not credited on the book");
     }
   }
+  if (!hanger) return;
   const hal = pin("halloween");
   assert.ok(hal, "the Halloween notice is not pinned on the board");
   assert.ok(hal[1].replace(/&#39;/g, "'").includes("Halloween: what's on the doorsteps"));

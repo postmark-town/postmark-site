@@ -17,6 +17,7 @@
 import { ferryHeadline } from "../../tools/lib/doorstep.mjs";
 import { excerpt, townFile } from "./pm.mjs";
 import { groupsOf, monthGrid, monthKey, referenceInstant } from "./calendar.mjs";
+import { frameOn, HALLOWEEN_FRAME } from "./halloween-frame.mjs";
 
 /**
  * The post-its' papers, each a colour the site already wears (the style guide,
@@ -226,3 +227,12 @@ export function pinLink(pin, slugs = []) {
 // the page's script imports too: it is plain data and one pure function, so
 // the browser gets it without this file's doorstep and calendar readers.
 export { BOARD_PIECES, FRAMED, NOSCRIPT_NOTICES, boardIds, viewOf } from "./town-views.mjs";
+
+// WLD-142 (Darko 2026-10-31 23:01 EDT: "remove all like the Halloween creatures and the
+// decorations"): the Halloween door-hanger is decoration, so it ends with the frame, on the
+// same clock (halloween-frame.mjs HALLOWEEN_FRAME.until). The Mists need no pin.
+export const HALLOWEEN_PIN_KEYS = Object.freeze(["halloween"]);
+/** The pins the board shows at `now`: BOARD_PINS, less the Halloween hanger once the window has closed. */
+export function boardPins(now = Date.now(), cfg = HALLOWEEN_FRAME) {
+  return BOARD_PINS.filter((p) => !HALLOWEEN_PIN_KEYS.includes(p.key) || frameOn(now, cfg));
+}

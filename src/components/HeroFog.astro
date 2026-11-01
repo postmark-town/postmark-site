@@ -27,8 +27,6 @@ const STYLE = !mists ? "" : `<style>
   .pm-hero-fog i:nth-child(3) { height: 55%; background: radial-gradient(55% 80% at 75% 100%, rgba(${hi}, ${n3(0.4 * k)}), rgba(${hi}, 0)); animation-duration: 71s; }
   @keyframes pm-hero-fog { from { transform: translateX(-7%); } to { transform: translateX(7%); } }
   html body .hero-copy h1, html body .hero-copy .under, html body .hero-copy .over { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 18px rgba(0, 0, 0, 0.85); }
-  .hero-copy .pm-btn.ghost { background: rgba(${rgb(v.base)}, 0.86) !important; }
-  html body .hero-copy .pm-btn.ghost { color: ${mix(v.orange, v.ink, 0.45)} !important; }   /* over the site's own .pm .pm-btn.ghost, from the head */
   @media (prefers-reduced-motion: reduce) { .pm-hero-fog i { animation: none; } }
 </style>`;
 const HTML = part === "fog" ? FOG : STYLE;

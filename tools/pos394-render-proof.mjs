@@ -194,7 +194,7 @@ export const toDeed = (x) => x;
 // node_modules/postmark-world/WORLD/skeleton.json whenever it is called bare
 // (HalloweenMotif/Bat/Skin do, at render). null is the real function's own
 // "no season" answer.
-const MISTS_STUB = `export const siteMists = () => null;\n`;
+const MISTS_STUB = `export const siteMists = () => null;\nexport const halloweenMists = () => null;\nexport const hwGuard = () => "";\nexport const hwGuardScript = () => "";\n`;
 
 // path.sep, not "/": Windows joins entries with a backslash (POS-394 win32 correction); identical on POSIX.
 const under = (p, root) => p === root || p.startsWith(root.endsWith(path.sep) ? root : root + path.sep);
