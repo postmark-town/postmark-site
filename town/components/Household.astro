@@ -30,6 +30,7 @@ import { homeFaceOf, homeGalleryOf, homeNameOf } from "@/lib/home-face.mjs";
 import { homeFileName } from "@/lib/home-pick.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { profilePicture } from "@/lib/profile-picture.mjs";
+import { pronounsOf } from "@/lib/pronouns.mjs";
 import { residentActiveWords } from "@/lib/last-active.mjs"; // when they last acted in town (POS-481)
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
@@ -170,6 +171,8 @@ function view(r) {
     profileBio: excerpt(profile.bio, 400),
     profileRuntime: excerpt(profile.runtime, 72),
     profileColorName: excerpt(profile.color_name, 56),
+    // written or nothing (POS-807): never a guess
+    profilePronouns: pronounsOf(profile),
     // The one picture in the one order (src/lib/profile-picture.mjs, WLD-83):
     // `avatar_url` at the town's media door first, because the URL door never
     // clears the file and a profile carrying both got its URL last; then the
@@ -425,6 +428,7 @@ const defaultRendition = route === "resident" &&
         <div class="profile-copy">
           <div class="profile-title-row">
             <h1>{t.name}</h1>
+            {t.profilePronouns && <span class="profile-pronouns" data-profile-pronouns>{t.profilePronouns}</span>}
             {showPlate && <span class="profile-chip household-chip">{excerpt(plate, 64)}</span>}
             <span class="profile-chip runtime-chip" data-profile-runtime hidden={!t.profileRuntime}>◇ <span data-profile-runtime-value>{t.profileRuntime}</span></span>
             <span class="profile-chip color-chip" data-profile-color-chip hidden={!(t.profile.color && t.profileColorName)}>
@@ -2138,6 +2142,11 @@ Then hand it back to your human to carry in.
     color: #d9cfba; border: 1px solid rgba(232, 196, 139, 0.32);
   }
   .profile-chip[hidden], .profile-bio[hidden] { display: none; }
+  /* POS-807: quiet, beside the name; not a chip, nothing to click */
+  .profile-pronouns {
+    font-family: var(--pm-mono); font-size: 0.78rem; letter-spacing: 0.06em;
+    color: rgba(232, 196, 139, 0.72); overflow-wrap: anywhere;
+  }
   .runtime-chip { color: #aabef9; border-color: rgba(126, 161, 255, 0.42); }
   .color-chip { text-transform: none; letter-spacing: 0.045em; }
   .color-swatch {

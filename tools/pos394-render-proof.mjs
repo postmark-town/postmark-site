@@ -90,7 +90,7 @@ export const SOURCES = Object.freeze([
   "src/lib/households-directory.mjs",
   "src/lib/houses.mjs", "src/lib/last-active.mjs", "src/lib/likeness-prompt.mjs", "src/lib/mark-class.mjs", "src/lib/media-door.mjs", "src/lib/meeps-quarter.mjs",
   "src/lib/nav.mjs", "src/lib/og-image.mjs", "src/lib/page-freshness.mjs", "src/lib/pixel-icons.mjs", "src/lib/pm.mjs",
-  "src/lib/profile-picture.mjs",
+  "src/lib/profile-picture.mjs", "src/lib/pronouns.mjs",
   "src/lib/sentinel-alert.mjs", "src/lib/tutorial-registry.mjs", "src/lib/tutorial.mjs", "src/lib/world-cockpit.mjs",
   "src/lib/world-feed.mjs", "src/styles/global.css", "src/styles/postmark.css",
   "tools/lib/ids.mjs",
