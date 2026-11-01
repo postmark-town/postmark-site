@@ -47,6 +47,9 @@ const STYLE = !mists ? "" : [
   html body .ai-copy p { color: ${v.ink} !important; }
   html body .book-foot, html body .book-by, html body .cal-month-step { color: ${mix(v.orange, v.ink, 0.45)} !important; }
   html body .pm .pm-btn.dark-ghost { background: transparent !important; }   /* it sits on paper: the navy lift is not its */
+  /* the home hero's ghost button in the skin's plum and candle orange (moved here from HeroFog, WLD-142: it is the skin's, so it ends with it) */
+  .hero-copy .pm-btn.ghost { background: rgba(${rgbOf(v.base)}, 0.86) !important; }
+  html body .hero-copy .pm-btn.ghost { color: ${mix(v.orange, v.ink, 0.45)} !important; }
   html body .ai-copy p em { color: ${mix(v.orange, v.ink, 0.75)} !important; }
   </style>`,
 ].join("");

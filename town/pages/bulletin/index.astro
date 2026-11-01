@@ -45,7 +45,7 @@ import calendar from "@/data/postmark/calendar.json";
 import residents from "@/data/postmark/residents.json";
 import { md, emph, postingTitle, postingTeaser } from "@/lib/pm.mjs";
 import { bulletinCards, bulletinPostings, isPinned, subBoard } from "@/lib/bulletin-cards.mjs";
-import { BOARD_PIECES, BOARD_PINS, FRAMED, NOSCRIPT_NOTICES, dailyFront, pinLink, pinnedMonth, postitLook, tendedText } from "@/lib/bulletin-board.mjs";
+import { BOARD_PIECES, BOARD_PINS, HALLOWEEN_PIN_KEYS, boardPins, FRAMED, NOSCRIPT_NOTICES, dailyFront, pinLink, pinnedMonth, postitLook, tendedText } from "@/lib/bulletin-board.mjs";
 import { WEEKDAYS, utcText } from "@/lib/calendar.mjs";
 import { LANES } from "@/lib/civic.mjs";
 import { MEEPS, displayName } from "@/lib/meeps-quarter.mjs";
@@ -55,6 +55,7 @@ import { SOCIALS } from "@/lib/door-line.mjs";
 import { HARBOR } from "@/lib/nav.mjs";
 import households from "@/data/postmark/households.json";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
+import { hwGuardScript } from "@/lib/mists-season.mjs";
 
 const cards = bulletinCards(bulletin);
 // Every posting an address can open: the pinned notices AND the unpinned
@@ -62,7 +63,7 @@ const cards = bulletinCards(bulletin);
 const postings = bulletinPostings(bulletin);
 const sticks = subBoard(bulletin);
 // the pinned items on the board itself, each with where its click goes
-const pins = BOARD_PINS.map((p) => ({ ...p, link: pinLink(p, postings.map((x) => x.slug)), pictures: p.art.map((a) => paintArt(a)) }));
+const pins = boardPins().map((p) => ({ ...p, link: pinLink(p, postings.map((x) => x.slug)), pictures: p.art.map((a) => paintArt(a)) }));
 const PIN_TILTS = [-2, 2.6];
 const month = pinnedMonth(calendar);
 const daily = dailyFront(bulletin);
@@ -305,7 +306,7 @@ const views = JSON.stringify({
                   </svg>
                 ));
                 return (
-                  <li class={`pin-${p.form}`}>
+                  <li class={`pin-${p.form}`} data-pm-hwf={HALLOWEEN_PIN_KEYS.includes(p.key) ? "" : undefined}>
                     <a class={`piece ${p.form}`} style={`--tilt: ${PIN_TILTS[i % PIN_TILTS.length]}deg`}
                        href={p.link.href} data-pin={p.key} data-note-open={p.link.note ?? undefined}
                        target={p.link.leaves ? "_blank" : undefined} rel={p.link.leaves ? "noopener" : undefined}
@@ -344,6 +345,7 @@ const views = JSON.stringify({
                 );
               })}
             </ul>
+            {pins.some((p) => HALLOWEEN_PIN_KEYS.includes(p.key)) && <Fragment set:html={hwGuardScript()} />}
 
             {/* THE STICKERS: the town's socials, slapped on the cork. Plain external
                 links; a platform not open yet (`soon` in door-line.mjs) would be a

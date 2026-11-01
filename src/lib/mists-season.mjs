@@ -63,6 +63,10 @@ export function halloweenMists({ now = Date.now(), cfg = HALLOWEEN_FRAME, ...res
  *  every top-level tag of a decoration with data-pm-hwf and adds the guard that
  *  removes them once the clock passes cfg.until (the frame's own guard, shared).
  *  "" stays "". */
+export function hwGuardScript(cfg = HALLOWEEN_FRAME) {
+  const until = Date.parse(cfg.until);
+  return `<script>(function(){if(Date.now()>=${until}){var e=document.querySelectorAll("[data-pm-hwf]");for(var i=0;i<e.length;i++)e[i].remove();}})();</script>`;
+}
 export function hwGuard(html, cfg = HALLOWEEN_FRAME) {
   if (!html) return "";
   const until = Date.parse(cfg.until);

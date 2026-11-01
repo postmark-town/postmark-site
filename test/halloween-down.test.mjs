@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import * as season from "../src/lib/mists-season.mjs";
 import { HALLOWEEN_FRAME } from "../src/lib/halloween-frame.mjs";
 import { homeCrowsHTML, navBatHTML, motifHTML, SPOTS } from "../src/lib/halloween-sprinkle.mjs";
+import { boardPins, BOARD_PINS, HALLOWEEN_PIN_KEYS } from "../src/lib/bulletin-board.mjs";
 import { skinStrength } from "../src/lib/halloween-skin.mjs";
 
 const SKELETON = season.pinnedSkeleton();
@@ -74,7 +75,7 @@ test("wiring (source pin): every decoration reads the gate; the Mists' own piece
   for (const c of ["HeroFog", "SeasonLine"]) {
     const s = strip(read(`src/components/${c}.astro`));
     assert.match(s, /\bsiteMists\(\)/, `${c} (the Mists) still reads siteMists`);
-    assert.doesNotMatch(s, /halloweenMists/, `${c} is not behind the decoration's end`);
+    assert.doesNotMatch(s, /halloweenMists|hwGuard/, `${c} is not behind the decoration end (a guarded Mists would vanish in the browser)`);
   }
   assert.match(strip(read("src/components/HalloweenFrame.astro")), /frameHTML\(part, Date\.now\(\), undefined, siteMists\(\)\)/, "the frame keeps its own gate");
 });
@@ -83,4 +84,28 @@ test("one clock: no second date in the components or the gate", () => {
   for (const p of ["src/lib/mists-season.mjs", ...["Bat", "Home", "Motif", "Skin", "WorldFrame"].map((c) => `src/components/Halloween${c}.astro`)]) {
     assert.doesNotMatch(strip(read(p)), /2026-1[01]-\d\d/, `${p} holds no date of its own`);
   }
+});
+
+test("one decoration, really rendered, through the guard: carries data-pm-hwf (the browser can remove it)", () => {
+  const m = season.halloweenMists({ crossing: 300, skeleton: SKELETON, now: DURING });
+  const out = season.hwGuard(motifHTML("world", m));
+  assert.ok(/<(style|div|span) data-pm-hwf/.test(out), "a real motif carries the mark on its own tag");
+  assert.doesNotMatch(strip(read("src/components/HeroFog.astro")), /data-pm-hwf/, "the fog carries no mark: the guard can never reach it");
+});
+
+test("WLD-142 (1): the hero ghost-button palette rule is the skin, not the fog", () => {
+  assert.doesNotMatch(strip(read("src/components/HeroFog.astro")), /pm-btn\.ghost/, "the fog holds no ghost-button rule");
+  assert.match(strip(read("src/components/HalloweenSkin.astro")), /\.hero-copy \.pm-btn\.ghost/, "the skin holds it, behind the gate");
+  assert.match(strip(read("src/components/HeroFog.astro")), /text-shadow/, "the black text-shadow (contrast over the fog) stays with the fog");
+});
+
+test("WLD-142 (3): the bulletin board's Halloween pin ends with the frame; the chapbook stays", () => {
+  assert.deepEqual(HALLOWEEN_PIN_KEYS, ["halloween"]);
+  assert.deepEqual(boardPins(DURING).map((p) => p.key), BOARD_PINS.map((p) => p.key), "during Halloween both pins");
+  assert.deepEqual(boardPins(at("2026-11-01T06:59:59Z")).map((p) => p.key), ["chapbook", "halloween"]);
+  for (const now of [AFTER, LATER]) assert.deepEqual(boardPins(now).map((p) => p.key), ["chapbook"], `after: only the chapbook at ${new Date(now).toISOString()}`);
+  const page = strip(read("town/pages/bulletin/index.astro"));
+  assert.match(page, /boardPins\(\)\.map\(/, "the page lists boardPins(), not BOARD_PINS");
+  assert.doesNotMatch(page, /BOARD_PINS\.map/);
+  assert.match(page, /data-pm-hwf=\{HALLOWEEN_PIN_KEYS/, "and marks the hanger for the browser guard");
 });
