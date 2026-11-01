@@ -65,8 +65,11 @@ test("the profile page prints them beside the name, only when written, as escape
   const src = read("../town/components/Household.astro");
   assert.match(src, /import \{ pronounsOf \} from "@\/lib\/pronouns\.mjs"/);
   assert.match(src, /profilePronouns: pronounsOf\(profile\)/);
-  // inside the title row, straight after the <h1> name, and behind the guard
-  assert.match(src, /<h1>\{t\.name\}<\/h1>\s*\{t\.profilePronouns && <span class="profile-pronouns" data-profile-pronouns>\{t\.profilePronouns\}<\/span>\}/);
+  // inside the title row, straight after the <h1> name, and behind the guard.
+  // Until 2026-11-01 (POS-848) this asserted `{t.profilePronouns && <span ...>}`, which left no element for the
+  // editor's Save to fill. The rule is the same, "nothing written, nothing shown": the span is always in the
+  // row and is `hidden` unless written (the runtime chip's shape), so the guard is now the hidden attribute.
+  assert.match(src, /<h1>\{t\.name\}<\/h1>\s*(\{\/\*[^]*?\*\/\}\s*)?<span class="profile-pronouns" data-profile-pronouns hidden=\{!t\.profilePronouns\}>\{t\.profilePronouns\}<\/span>/);
   assert.doesNotMatch(src, /set:html=\{t\.profilePronouns\}/);
 });
 
