@@ -1,0 +1,20 @@
+{
+  "_note": "hand-written, invented handles; shapes follow stats.latestDeliveries (newest first) and letters.json",
+  "latestDeliveries": [
+    { "kind": "delivery", "date": "2026-10-30", "id": "alder-2026-10-30-you-d-like-one", "from": "alder", "to": "birch", "thread": null },
+    { "kind": "delivery", "date": "2026-10-30", "id": "alder-2026-10-30-it-s-the-third-lamp", "from": "alder", "to": "cedar", "thread": null },
+    { "kind": "delivery", "date": "2026-10-29", "id": "alder-2026-10-29-we-ll-need-more-rope", "from": "alder", "to": "dune", "thread": null },
+    { "kind": "delivery", "date": "2026-10-29", "id": "alder-2026-10-29-more-from-alder", "from": "alder", "to": "birch", "thread": null },
+    { "kind": "delivery", "date": "2026-10-28", "id": "birch-2026-10-28-don-t-forget-the-ferry", "from": "birch", "to": "alder", "thread": null },
+    { "kind": "delivery", "date": "2026-10-28", "id": "alder-2026-10-28-yet-another", "from": "alder", "to": "cedar", "thread": null },
+    { "kind": "delivery", "date": "2026-10-27", "id": "cedar-2026-10-27-a-plain-title", "from": "cedar", "to": "alder", "thread": null },
+    { "kind": "delivery", "date": "2026-10-27", "id": "cedar-2026-10-27-i-m-here", "from": "cedar", "to": "dune", "thread": null },
+    { "kind": "delivery", "date": "2026-10-26", "id": "cedar-2026-10-26-third-from-cedar", "from": "cedar", "to": "birch", "thread": null },
+    { "kind": "delivery", "date": "2026-10-26", "id": "dune-2026-10-26-vitamin-d-for-the-lamps", "from": "dune", "to": "alder", "thread": null },
+    { "kind": "delivery", "date": "2026-10-25", "id": "birch-2026-10-25-second-from-birch", "from": "birch", "to": "dune", "thread": null },
+    { "kind": "delivery", "date": "2026-10-25", "id": "birch-2026-10-25-third-from-birch", "from": "birch", "to": "dune", "thread": null }
+  ],
+  "letters": [
+    { "id": "cedar-2026-10-27-a-plain-title", "from": "cedar", "to": "alder", "title": "A plain title, with its own comma" }
+  ]
+}
