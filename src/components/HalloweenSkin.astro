@@ -15,12 +15,12 @@
 // when loading the Town page"). The wolf stays at the foot (part="wolf"). Every
 // rule here outranks the site's own by its selector or by !important, so it wins
 // from the head as it did from the foot, ahead of the site's stylesheets.
-import { siteMists } from "@/lib/mists-season.mjs";
+import { halloweenMists, hwGuard } from "@/lib/mists-season.mjs";
 import { VARIANTS, siteSkinCSS, mix, skinStrength, litOf } from "@/lib/halloween-skin.mjs";
 import { navyOverrides } from "@/lib/halloween-navy.mjs";
 import { WOLF_MOON, WAX_SEAL } from "@/lib/halloween-motifs.mjs";
 const { part = "style" } = Astro.props;
-const mists = siteMists();
+const mists = halloweenMists();
 const v = VARIANTS[2];
 const k = skinStrength(mists);
 const rgbOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(", ");
@@ -50,6 +50,6 @@ const STYLE = !mists ? "" : [
   html body .ai-copy p em { color: ${mix(v.orange, v.ink, 0.75)} !important; }
   </style>`,
 ].join("");
-const HTML = part === "wolf" ? WOLF : STYLE;
+const HTML = hwGuard(part === "wolf" ? WOLF : STYLE);
 ---
 {HTML && <Fragment set:html={HTML} />}
