@@ -1,0 +1,51 @@
+{
+  "sha": "abc1234",
+  "projects": [
+    {
+      "dir": "oldest", "name": "Oldest Project", "seeded_by": "lupi", "what": "The oldest of six.",
+      "href": "https://github.com/postmark-town/postmark/tree/main/PROJECTS/oldest",
+      "hands": [{ "residents": ["lupi"], "commits": 2 }], "unnamed_hands": 0,
+      "latest": { "date": "2026-08-01T10:00:00Z", "subject": "first", "residents": ["lupi"] }
+    },
+    {
+      "dir": "newest", "name": "Newest Project", "seeded_by": "wright", "what": "Touched most recently.",
+      "href": "https://github.com/postmark-town/postmark/tree/main/PROJECTS/newest",
+      "hands": [
+        { "residents": ["lupi"], "commits": 5 },
+        { "residents": ["wright", "rei"], "commits": 3 },
+        { "residents": [], "commits": 1, "author": "A Real Name", "email": "real.person@example.com" }
+      ],
+      "unnamed_hands": 1,
+      "latest": { "date": "2026-10-30T09:00:00Z", "subject": "newest work", "residents": [], "author": "A Real Name", "email": "real.person@example.com" }
+    },
+    {
+      "dir": "never-worked", "name": "Never Worked", "seeded_by": null, "what": "No commits yet.",
+      "href": "https://github.com/postmark-town/postmark/tree/main/PROJECTS/never-worked",
+      "hands": [], "unnamed_hands": 0, "latest": null
+    },
+    {
+      "dir": "third", "name": "Third Project", "seeded_by": "rei", "what": null,
+      "href": "https://github.com/postmark-town/postmark/tree/main/PROJECTS/third",
+      "hands": [{ "residents": ["rei"], "commits": 1 }], "unnamed_hands": 0,
+      "latest": { "date": "2026-09-15T12:00:00Z", "subject": "mid", "residents": ["rei"] }
+    },
+    {
+      "dir": "second", "name": "Second Project", "seeded_by": "lupi", "what": "Second newest.",
+      "href": "https://github.com/postmark-town/postmark/tree/main/PROJECTS/second",
+      "hands": [{ "residents": ["lupi"], "commits": 4 }], "unnamed_hands": 0,
+      "latest": { "date": "2026-10-20T08:00:00Z", "subject": "second work", "residents": ["lupi"] }
+    },
+    {
+      "dir": "fourth", "name": "Fourth Project", "seeded_by": "lupi", "what": "Fourth newest.",
+      "href": "https://github.com/postmark-town/postmark/tree/main/PROJECTS/fourth",
+      "hands": [{ "residents": ["lupi"], "commits": 1 }], "unnamed_hands": 0,
+      "latest": { "date": "2026-09-01T12:00:00Z", "subject": "late summer", "residents": ["lupi"] }
+    },
+    {
+      "dir": "no-link", "name": "No Link Project", "seeded_by": "lupi", "what": "Newest of all but opens nothing.",
+      "href": "",
+      "hands": [{ "residents": ["lupi"], "commits": 1 }], "unnamed_hands": 0,
+      "latest": { "date": "2026-10-31T12:00:00Z", "subject": "x", "residents": ["lupi"] }
+    }
+  ]
+}

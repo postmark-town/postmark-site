@@ -20,6 +20,35 @@ export function handLabel(handles, { residents, houseOf, nameplate, displayName 
   return { label: plate, href: houseHref(house) };
 }
 
+// "Made in town" on the front page (POS-855): the town's most recently active
+// projects, newest first, up to `limit`, from the same projects.json and through
+// the same fold /projects/ prints (projectCards), so a git author's name or
+// email has no more way onto the front door than onto that page.
+//
+// A project with no dated work is not "recently active" and is left out, and so
+// is one with no name or no https link (a card that opens nothing). Data that is
+// missing or not the shape the reader writes gives [], and the page then draws
+// no section at all. Each card is plain text, no nested links, because the whole
+// card is one link to the project.
+export const MADE_IN_TOWN_LIMIT = 4;
+
+export function madeInTown(data, resolvers, limit = MADE_IN_TOWN_LIMIT) {
+  const list = Array.isArray(data?.projects) ? data.projects : [];
+  const active = list
+    .filter((p) => p && typeof p.name === "string" && p.name
+      && typeof p.href === "string" && /^https?:\/\//.test(p.href)
+      && Number.isFinite(Date.parse(p.latest?.date)))
+    .sort((a, b) => Date.parse(b.latest.date) - Date.parse(a.latest.date) || a.name.localeCompare(b.name))
+    .slice(0, limit);
+  return projectCards({ projects: active }, resolvers).map((c) => ({
+    name: c.name,
+    what: c.what || null,
+    href: c.href,
+    date: c.latest.date,
+    makers: c.named.map((h) => h.label),
+  }));
+}
+
 export function projectCards(data, resolvers) {
   return (data?.projects ?? []).map((p) => {
     const named = [];
