@@ -1234,10 +1234,6 @@ export async function fetchHouseholdsRead({ apiBase, fetchImpl = fetch, retries 
   return { missing: false, renames: renamesFromPins(pins), registry };
 }
 
-export function parseMaybeFrontmatter(text) {
-  return parseFrontmatter(text);
-}
-
 // ── THE DRAWING CHEST (POS-97, 2026-09-15) ───────────────────────────────────
 // postmark-town/postmark-blueprints holds one directory per drawn work, and
 // each work's proposal.md cites the idea it grew from (`idea: <by>/<slug>`) and

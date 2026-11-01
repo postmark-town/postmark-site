@@ -29,7 +29,7 @@
 // Usage: node tools/extract-town.mjs --town <path-to-postmark-checkout>
 //        node tools/extract-town.mjs --town <path-to-postmark-checkout> --legacy-data
 
-import { readFileSync, mkdirSync, existsSync, readdirSync, unlinkSync } from "node:fs";
+import { readFileSync, mkdirSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

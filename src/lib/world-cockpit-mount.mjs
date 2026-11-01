@@ -13,7 +13,7 @@ import {
   HUMAN_ACTOR, actorsFor, barSlots, cockpitShows, dispatchEnvelope,
   portalOf, readBounce, statedLimit, termsFromRead, termsRows, tokenFor, tokenPlacement,
   wantsTextarea, worldToPx,
-  blockedReason, encounterOf, fighterState, humanWords, looseThings, rollsFrom, spaceOf,
+  encounterOf, fighterState, humanWords, looseThings, rollsFrom, spaceOf,
   actCandidates, adversaryOf, adversaryPlacement, chatField, chatShaped, prefillFor,
   // ⚑ `briefWords` WAS IMPORTED HERE AND IS NOT ANY MORE. It cut the door's
   // sentence down to fit the small name box, and the box was deleted the same
