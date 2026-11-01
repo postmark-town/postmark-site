@@ -7,7 +7,7 @@
   { "slug": "sample-news-c", "data": { "title": "Sample news C", "kind": "news", "posted": "2026-10-25" }, "body": "Hand-written sample. No status at all: current." },
   { "slug": "sample-standing-d", "data": { "title": "Sample standing D", "kind": "standing", "status": "open", "posted": "2026-10-20" }, "body": "Hand-written sample." },
   { "slug": "sample-ended-invitation", "data": { "title": "Sample ended invitation", "kind": " Happening ", "status": " Ended ", "posted": "2026-10-19" }, "body": "Hand-written sample. Kind and status spelled loosely." },
-  { "slug": "sample-resting-e", "data": { "title": "Sample resting notice E", "kind": "notice", "status": "resting", "posted": "2026-10-10" }, "body": "Hand-written sample. Resting reads as not current." },
+  { "slug": "sample-resting-e", "data": { "title": "Sample resting notice E", "kind": "notice", "status": "resting", "posted": "2026-10-10" }, "body": "Hand-written sample. Resting has no closed meaning: it stays." },
   { "slug": "sample-news-f", "data": { "title": "Sample news F", "kind": "news", "status": "open", "posted": "2026-10-05" }, "body": "Hand-written sample." },
   { "slug": "sample-guidance-g", "data": { "title": "Sample guidance G", "kind": "guidance", "status": "open", "posted": "2026-09-30" }, "body": "Hand-written sample. Seventh current posting: cut by the limit." },
   { "slug": "sample-undated-h", "data": { "title": "Sample undated H", "kind": "notice" }, "body": "Hand-written sample. No posted date: sorts last." },

@@ -17,7 +17,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { lensPostings, LENS_LIMIT, isClosed, isHappening, NOT_A_CARD } from "../src/lib/bulletin-cards.mjs";
+import { lensPostings, LENS_LIMIT, CLOSED_STATUSES, isClosed, isHappening, NOT_A_CARD } from "../src/lib/bulletin-cards.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURE = JSON.parse(readFileSync(join(ROOT, "test", "fixtures", "lens-postings.sample.json"), "utf8"));
@@ -40,14 +40,14 @@ test("the fixture still holds what the assertions rest on", () => {
 
 test("the band is the six newest postings that are not the Daily and not marked closed", () => {
   assert.deepEqual(slugs(lensPostings(FIXTURE)), [
-    "sample-spire-words", "sample-guidance-a", "sample-notice-b", "sample-news-c", "sample-standing-d", "sample-news-f",
+    "sample-spire-words", "sample-guidance-a", "sample-notice-b", "sample-news-c", "sample-standing-d", "sample-resting-e",
   ]);
   assert.equal(LENS_LIMIT, 6);
 });
 
 test("a closed posting never hangs, however new or loosely spelled, and neither does the Daily", () => {
   const out = slugs(lensPostings(FIXTURE, 99));
-  for (const gone of ["sample-trick-or-treat", "sample-ended-invitation", "sample-resting-e", "ferrys-daily"]) {
+  for (const gone of ["sample-trick-or-treat", "sample-ended-invitation", "ferrys-daily"]) {
     assert.equal(out.includes(gone), false, `${gone} hung on the front door`);
   }
 });
@@ -56,6 +56,15 @@ test("a happening that is not marked closed stays: the wall unpins it, so the ba
   assert.equal(slugs(lensPostings(FIXTURE))[0], "sample-spire-words");
   // no status at all is current too (a posting with no status field is not closed)
   assert.deepEqual(slugs(lensPostings([post("a-party", "2026-10-30", "happening")])), ["a-party"]);
+});
+
+test("only `closed` and `ended` close a posting: `resting` (and open, live) never hide a card", () => {
+  assert.deepEqual([...CLOSED_STATUSES].sort(), ["closed", "ended"], "the closed set changed: `resting` has no posting-status meaning in code");
+  for (const s of ["resting", "open", "live", "paused"]) {
+    assert.equal(isClosed(post("x", "2026-10-01", "happening", s)), false, `${s} read as closed`);
+    assert.deepEqual(slugs(lensPostings([post("x", "2026-10-01", "happening", s)])), ["x"], `a ${s} happening lost its door`);
+  }
+  assert.equal(slugs(lensPostings(FIXTURE)).includes("sample-resting-e"), true);
 });
 
 test("an undated posting sorts last, and fewer than six remaining shows what remains", () => {
