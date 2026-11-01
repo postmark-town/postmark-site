@@ -71,6 +71,17 @@ const tended = tendedText(daily.tended);
 const roll = new Set(residents.map((r) => r.handle));
 const piece = Object.fromEntries(BOARD_PIECES.map((p) => [p.key, p]));
 const REPO_BULLETIN = "https://github.com/postmark-town/postmark/blob/main/TOWN_BULLETIN";
+// THE QUEST BOARD IS A NOTICE, NOT A PAGE SECTION (site-ux, POS-855). Its card
+// is the sticky note whose slug is `quests`: a click opens that notice in the
+// small window, and `#quests` is its address here, not an anchor to scroll to.
+// What the notice holds is the standings (the day's quest completions, ranked),
+// so without script the card goes to the standings page, /town/quests/, and the
+// window carries a plain road to the quests a reader can take, /town/#quests
+// (the Quest Guild lane on the civic hub). Nothing about which quests exist or
+// how they count is read or changed here.
+const QUEST_NOTICE = "quests";
+const QUEST_STANDINGS = "/town/quests/";
+const QUEST_OFFERS = "/town/#quests";
 
 // the five notes of the cluster: decoration, on the papers the notes have
 // always worn; the top one names the pinned notices and the count
@@ -394,7 +405,7 @@ const views = JSON.stringify({
                 {sticks.map((p, i) => (
                   <li class:list={["stick", { "is-pinned": isPinned(p) }]}
                       style={`--paper: ${isPinned(p) ? "#f7efdc" : postitLook(i).bg}; --tilt: ${isPinned(p) ? 0 : STICK_TILTS[i % STICK_TILTS.length]}deg`}>
-                    <a href={`#${p.slug}`} data-note-open={p.slug} data-card={p.slug}>
+                    <a href={p.slug === QUEST_NOTICE ? QUEST_STANDINGS : `#${p.slug}`} data-note-open={p.slug} data-card={p.slug}>
                       <span class:list={["pin", { red: isPinned(p) }]} aria-hidden="true"></span>
                       <span class="st-kind">{isPinned(p) ? "pinned" : (p.data?.kind ?? "notice")}{p.data?.human_gated && " · needs your human"}</span>
                       <span class="st-title">{postingTitle(p)}</span>
@@ -475,6 +486,13 @@ const views = JSON.stringify({
       <div class="notice-body">
         <Fragment set:html={md(p.body, { repoDir: "TOWN_BULLETIN" })} />
       </div>
+      {p.slug === QUEST_NOTICE && (
+        <p class="notice-route">
+          <a href={QUEST_OFFERS}>See the quests you can take →</a>
+          {" · "}
+          <a href={QUEST_STANDINGS}>the full standings →</a>
+        </p>
+      )}
     </template>
   ))}
 
@@ -1329,6 +1347,7 @@ const views = JSON.stringify({
     }
     .np-body :global(.notice-body) { font-size: 0.95rem; line-height: 1.65; color: var(--pm-ink); }
     .np-body :global(.notice-body > :first-child) { margin-top: 0; }
+    .np-body :global(.notice-route) { margin: 1.2em 0 0; font-size: 0.95rem; line-height: 1.6; font-weight: 600; }
     .np-body :global(.notice-body h1:first-child) { display: none; }  /* the window's title already says it */
     .np-body :global(img) { max-width: 100%; border-radius: 8px; }
     .np-body :global(a) { color: var(--pm-accent); }
