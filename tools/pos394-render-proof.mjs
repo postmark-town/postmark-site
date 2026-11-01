@@ -90,7 +90,7 @@ export const SOURCES = Object.freeze([
   "src/lib/households-directory.mjs",
   "src/lib/houses.mjs", "src/lib/last-active.mjs", "src/lib/likeness-prompt.mjs", "src/lib/mark-class.mjs", "src/lib/media-door.mjs", "src/lib/meeps-quarter.mjs",
   "src/lib/nav.mjs", "src/lib/og-image.mjs", "src/lib/page-freshness.mjs", "src/lib/pixel-icons.mjs", "src/lib/pm.mjs",
-  "src/lib/profile-picture.mjs",
+  "src/lib/profile-edit.mjs", "src/lib/profile-picture.mjs", "src/lib/pronouns.mjs", "src/lib/sheet-upload.mjs",
   "src/lib/sentinel-alert.mjs", "src/lib/tutorial-registry.mjs", "src/lib/tutorial.mjs", "src/lib/world-cockpit.mjs",
   "src/lib/world-feed.mjs", "src/styles/global.css", "src/styles/postmark.css",
   "tools/lib/ids.mjs",
@@ -194,7 +194,7 @@ export const toDeed = (x) => x;
 // node_modules/postmark-world/WORLD/skeleton.json whenever it is called bare
 // (HalloweenMotif/Bat/Skin do, at render). null is the real function's own
 // "no season" answer.
-const MISTS_STUB = `export const siteMists = () => null;\n`;
+const MISTS_STUB = `export const siteMists = () => null;\nexport const halloweenMists = () => null;\nexport const hwGuard = () => "";\nexport const hwGuardScript = () => "";\n`;
 
 // path.sep, not "/": Windows joins entries with a backslash (POS-394 win32 correction); identical on POSIX.
 const under = (p, root) => p === root || p.startsWith(root.endsWith(path.sep) ? root : root + path.sep);
