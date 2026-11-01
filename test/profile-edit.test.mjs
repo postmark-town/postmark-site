@@ -138,5 +138,37 @@ test("PIN Clear: the click sets the flag and saves; the submit handler reads it 
   assert.match(src, /pronounsClear\.addEventListener\("click", \(\) => \{\s*field\("pronouns"\)\.value = "";\s*clearPronouns = true;\s*form\.requestSubmit\(\);/);
   assert.match(src, /const clearing = clearPronouns;\s*clearPronouns = false;/);
   assert.match(src, /\}, saved, \{ clearPronouns: clearing \}\);/);
-  assert.match(src, /const pronouns = pronounsShown\(values\)/, "the in-place update goes through the one renderer");
+  assert.match(src, /paintProfile\(\{ bubble, pronounsEl,/, "the in-place update runs the module's painter");
+});
+
+// stub elements for the painter: what it writes is what a reader would see
+const el = () => ({ textContent: "", hidden: true, style: { vars: {}, setProperty(k, v) { this.vars[k] = v; } } });
+const stubEls = () => ({ bubble: el(), pronounsEl: el(), runtimeValue: el(), runtimeChip: el(), colorName: el(), colorChip: el(), bioValue: el(), bio: el() });
+
+test("the in-place repaint after Save runs to the end: pronouns AND colour, runtime, colour name and bio (POS-848 regression, 98d28f0)", async () => {
+  const { paintProfile } = await import("../src/lib/profile-edit.mjs");
+  const els = stubEls();
+  paintProfile(els, { color: "#c90", color_name: "old brass", bio: "A few words.", runtime: "claude", pronouns: "they/them" }, "#e8c48b");
+  assert.equal(els.pronounsEl.textContent, "they/them"); assert.equal(els.pronounsEl.hidden, false);
+  assert.equal(els.bubble.style.vars["--profile-color"], "#c90");
+  assert.equal(els.runtimeValue.textContent, "claude"); assert.equal(els.runtimeChip.hidden, false);
+  assert.equal(els.colorName.textContent, "old brass"); assert.equal(els.colorChip.hidden, false);
+  assert.equal(els.bioValue.textContent, "A few words."); assert.equal(els.bio.hidden, false);
+  const cleared = stubEls();
+  paintProfile(cleared, { color: "", bio: "", pronouns: "" }, "#e8c48b");
+  assert.equal(cleared.pronounsEl.hidden, true, "cleared: nothing shown");
+  assert.equal(cleared.bubble.style.vars["--profile-color"], "#e8c48b", "the default colour comes back");
+  assert.equal(cleared.bio.hidden, true);
+  const fifty = stubEls(); const v = "ab".repeat(25);
+  paintProfile(fifty, { pronouns: v }, "#e8c48b");
+  assert.equal(fifty.pronounsEl.textContent, v, "50 characters render whole, as on reload");
+});
+
+test("the page script never redeclares a name it imports (the shadow that broke paint in 98d28f0)", () => {
+  const src = read("../town/components/Household.astro").replace(/\r/g, "");
+  const script = src.slice(src.indexOf("import { KEYS, officeBase, tokenIsFresh }"));
+  const imports = [...script.matchAll(/^\s*import \{([^}]+)\} from/gm)].flatMap((m) => m[1].split(",").map((s) => s.trim().split(/\s+as\s+/).pop())).filter(Boolean);
+  assert.ok(imports.includes("paintProfile") && imports.includes("profilePayload"), "the import list was found");
+  const clashes = imports.filter((n) => new RegExp("\\b(const|let|var|function)\\s+" + n + "\\b").test(script));
+  assert.deepEqual(clashes, []);
 });

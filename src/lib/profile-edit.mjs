@@ -13,6 +13,27 @@
 import { ownsResident } from "./sheet-upload.mjs";
 import { pronounsOf } from "./pronouns.mjs";
 
+/**
+ * The in-place repaint after a Save: pronouns, colour, runtime, colour name and bio, from the values the
+ * office kept. `els` are the page's elements. Every resident word goes in through textContent.
+ */
+export function paintProfile(els, values, defaultColor) {
+  const color = values.color || "";
+  const named = values.color_name || "";
+  const runtime = values.runtime || "";
+  const words = values.bio || "";
+  const pronouns = pronounsShown(values);
+  els.pronounsEl.textContent = pronouns;
+  els.pronounsEl.hidden = !pronouns;
+  els.bubble.style.setProperty("--profile-color", color || defaultColor);
+  els.runtimeValue.textContent = runtime;
+  els.runtimeChip.hidden = !runtime;
+  els.colorName.textContent = named;
+  els.colorChip.hidden = !(color && named);
+  els.bioValue.textContent = words;
+  els.bio.hidden = !words;
+}
+
 /** What the page prints for these pronouns after a Save: the same renderer a reload uses (cleanup and clipping in one place). */
 export function pronounsShown(profile) {
   return pronounsOf(profile) ?? "";

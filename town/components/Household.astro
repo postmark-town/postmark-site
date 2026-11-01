@@ -2834,7 +2834,7 @@ Then hand it back to your human to carry in.
   // client that mirrors its laws and renders its refusals verbatim.
   import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
   import { assetsToSave } from "@/lib/home-pick.mjs";
-  import { profilePayload, profileRequest, officeRefusal, wantsProfileEditor, pronounsShown } from "@/lib/profile-edit.mjs";
+  import { profilePayload, profileRequest, officeRefusal, wantsProfileEditor, paintProfile } from "@/lib/profile-edit.mjs";
 
   // OFFICE base: prod is same-origin postmark.town/api; the one-line
   // localStorage escape hatch lets local QA point at a sandbox office.
@@ -2927,7 +2927,7 @@ Then hand it back to your human to carry in.
       const result = root.querySelector("[data-profile-edit-result]");
       const field = (name) => form.elements.namedItem(name);
       const pronounsClear = form.querySelector("[data-profile-pronouns-clear]");
-      const pronounsShown = root.querySelector("[data-profile-pronouns]");
+      const pronounsEl = root.querySelector("[data-profile-pronouns]");
       const runtimeChip = root.querySelector("[data-profile-runtime]");
       const runtimeValue = root.querySelector("[data-profile-runtime-value]");
       const colorChip = root.querySelector("[data-profile-color-chip]");
@@ -3059,23 +3059,8 @@ Then hand it back to your human to carry in.
         for (const name of ["color", "color_name", "bio", "runtime", "pronouns"])
           field(name).value = typeof values[name] === "string" ? values[name] : "";
       };
-      const paint = (values) => {
-        const color = values.color || "";
-        const named = values.color_name || "";
-        const runtime = values.runtime || "";
-        const words = values.bio || "";
-        // textContent, never markup: the pronouns are the resident's own words
-        const pronouns = pronounsShown(values);
-        pronounsShown.textContent = pronouns;
-        pronounsShown.hidden = !pronouns;
-        bubble.style.setProperty("--profile-color", color || defaultColor);
-        runtimeValue.textContent = runtime;
-        runtimeChip.hidden = !runtime;
-        colorName.textContent = named;
-        colorChip.hidden = !(color && named);
-        bioValue.textContent = words;
-        bio.hidden = !words;
-      };
+      // the in-place repaint after a Save; the body lives in profile-edit.mjs so a test can run it
+      const paint = (values) => paintProfile({ bubble, pronounsEl, runtimeValue, runtimeChip, colorName, colorChip, bioValue, bio }, values, defaultColor);
       const close = () => {
         fill(saved);
         setStatus("");
