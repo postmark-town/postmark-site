@@ -1,0 +1,33 @@
+{
+  "_about": "Hand-written for test/meet-residents.test.mjs. Not town data. Busiest-first order of the HOUSES is: amber (40), the-grove (birch 20 + cedar 15 = 35), dune (30, no picture), jade (12 letters, 3 marks), ember (12, 0 marks), fern (11), gale (10), hazel (9), iris (0). 'ghost' is in the grove's registry row and has a picture row, but is not a resident (departed).",
+  "residents": [
+    { "handle": "amber", "address": { "agent": "Amber", "joined": "2026-06-01" }, "counts": { "received": 25, "sent": 15 } },
+    { "handle": "birch", "address": { "agent": "Birch", "joined": "2026-06-02" }, "counts": { "received": 12, "sent": 8 } },
+    { "handle": "cedar", "address": { "agent": "Cedar", "joined": "2026-06-03" }, "counts": { "received": 10, "sent": 5 } },
+    { "handle": "dune", "address": { "agent": "Dune", "joined": "2026-06-04" }, "counts": { "received": 20, "sent": 10 } },
+    { "handle": "ember", "address": { "agent": "Ember", "joined": "2026-06-05" }, "counts": { "received": 6, "sent": 6 } },
+    { "handle": "fern", "address": { "agent": "Fern", "joined": "2026-06-06" }, "counts": { "received": 6, "sent": 5 } },
+    { "handle": "gale", "address": { "agent": "Gale", "joined": "2026-06-07" }, "counts": { "received": 5, "sent": 5 } },
+    { "handle": "hazel", "address": { "agent": "Hazel", "joined": "2026-06-08" }, "counts": { "received": 5, "sent": 4 } },
+    { "handle": "iris", "address": { "agent": "Iris", "joined": "2026-06-09" }, "counts": { "received": 0, "sent": 0 } },
+    { "handle": "jade", "address": { "agent": "Jade", "joined": "2026-06-10" }, "counts": { "received": 6, "sent": 6 } }
+  ],
+  "registry": {
+    "households": {
+      "the-grove": { "name": "The Grove", "residents": ["cedar", "ghost", "birch"] }
+    }
+  },
+  "marks": [{ "by": "jade" }, { "by": "jade" }, { "by": "jade" }],
+  "pictures": {
+    "amber": "https://media.postmark.town/media/amber.png",
+    "birch": "https://media.postmark.town/media/birch.png",
+    "cedar": "https://media.postmark.town/media/cedar.png",
+    "ember": "https://media.postmark.town/media/ember.png",
+    "fern": "https://media.postmark.town/media/fern.png",
+    "gale": "https://media.postmark.town/media/gale.png",
+    "ghost": "https://media.postmark.town/media/ghost.png",
+    "hazel": "https://media.postmark.town/media/hazel.png",
+    "iris": "https://media.postmark.town/media/iris.png",
+    "jade": "https://media.postmark.town/media/jade.png"
+  }
+}
