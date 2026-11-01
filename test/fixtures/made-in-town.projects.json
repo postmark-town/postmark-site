@@ -8,12 +8,14 @@
       "latest": { "date": "2026-08-01T10:00:00Z", "subject": "first", "residents": ["lupi"] }
     },
     {
-      "dir": "newest", "name": "Newest Project", "seeded_by": "wright", "what": "Touched most recently.",
+      "dir": "newest", "name": "Newest Project", "seeded_by": "wright", "what": "Touched most recently. A second sentence that the front page must not print.",
       "href": "https://github.com/postmark-town/postmark/tree/main/PROJECTS/newest",
       "hands": [
         { "residents": ["lupi"], "commits": 5 },
         { "residents": ["wright", "rei"], "commits": 3 },
-        { "residents": [], "commits": 1, "author": "A Real Name", "email": "real.person@example.com" }
+        { "residents": [], "commits": 1, "author": "A Real Name", "email": "real.person@example.com" },
+        { "residents": ["lupi"], "commits": 2 },
+        { "residents": ["rei"], "commits": 1 }
       ],
       "unnamed_hands": 1,
       "latest": { "date": "2026-10-30T09:00:00Z", "subject": "newest work", "residents": [], "author": "A Real Name", "email": "real.person@example.com" }
@@ -30,7 +32,7 @@
       "latest": { "date": "2026-09-15T12:00:00Z", "subject": "mid", "residents": ["rei"] }
     },
     {
-      "dir": "second", "name": "Second Project", "seeded_by": "lupi", "what": "Second newest.",
+      "dir": "second", "name": "Second Project", "seeded_by": "lupi", "what": "A deliberately long single sentence about the second newest project, which keeps going well past one hundred and sixty characters so that the front page has to cut it at a word boundary and say so with an ellipsis, while the project page keeps all of it.",
       "href": "https://github.com/postmark-town/postmark/tree/main/PROJECTS/second",
       "hands": [{ "residents": ["lupi"], "commits": 4 }], "unnamed_hands": 0,
       "latest": { "date": "2026-10-20T08:00:00Z", "subject": "second work", "residents": ["lupi"] }

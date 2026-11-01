@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { madeInTown, MADE_IN_TOWN_LIMIT } from "../src/lib/projects-page.mjs";
+import { madeInTown, trimWhat, MADE_IN_TOWN_LIMIT } from "../src/lib/projects-page.mjs";
 import { nameplate } from "../src/lib/houses.mjs";
 import { displayName } from "../src/lib/pm.mjs";
 
@@ -54,8 +54,33 @@ test("a card carries its name, its what line, its makers and its link", () => {
   const [newest, , third] = madeInTown(FIXTURE, resolvers);
   assert.equal(newest.what, "Touched most recently.");
   assert.equal(newest.href, "https://github.com/postmark-town/postmark/tree/main/PROJECTS/newest");
-  assert.deepEqual(newest.makers, ["Lupi", "Starforge"], "named only through the town's record: one resident by name, a house by its plate");
+  assert.deepEqual(newest.makers, ["Lupi", "Starforge", "Rei"], "named only through the town's record: one resident by name, a house by its plate, each once");
   assert.equal(third.what, null);
+});
+
+test("a maker is named once on a card, however many accounts the record ties to them", () => {
+  const [newest] = madeInTown(FIXTURE, resolvers);
+  assert.equal(newest.makers.filter((m) => m === "Lupi").length, 1, "Lupi is named twice");
+});
+
+test("the card's what line is the first sentence, cut at a word with an ellipsis past 160 characters", () => {
+  const [newest, second] = madeInTown(FIXTURE, resolvers);
+  assert.equal(newest.what, "Touched most recently.", "the second sentence printed");
+  assert.ok(second.what.length <= 160, `${second.what.length} characters`);
+  assert.ok(second.what.endsWith("…"));
+  const body = second.what.slice(0, -1);
+  assert.ok(FIXTURE.projects.find((p) => p.dir === "second").what.startsWith(body), "not a prefix of the full text");
+  assert.equal(/\s$/.test(body), false);
+  assert.ok(FIXTURE.projects.find((p) => p.dir === "second").what[body.length] === " ", "cut mid-word");
+});
+
+test("trimWhat: short sentences pass whole, blanks are null, a long unbroken run is still cut", () => {
+  assert.equal(trimWhat("Games played one letter at a time."), "Games played one letter at a time.");
+  assert.equal(trimWhat("No stop at the end"), "No stop at the end");
+  assert.equal(trimWhat("  "), null);
+  assert.equal(trimWhat(null), null);
+  assert.equal(trimWhat("x".repeat(300)).length, 160);
+  assert.equal(trimWhat("One. Two."), "One.");
 });
 
 test("no git author's name or email ever reaches the cards", () => {
@@ -79,7 +104,7 @@ test("the front page reads the helper, keeps no list by hand, and keeps the way 
   const after = PAGE.slice(PAGE.indexOf("made.length > 0 &&"));
   const more = after.slice(after.indexOf('<p class="more-line made-more">'));
   assert.ok(more.length > 0 && after.indexOf("</section>") < after.indexOf('<p class="more-line made-more">'), "the way-on line sits inside the guarded section");
-  for (const href of ['href="/projects/"', 'href="/works/the-town-seal.html"', 'href="https://starforge-atelier.online/atelier/the-resident-herbarium/"']) {
+  for (const href of ['href="/projects/"', 'href="/daily/"', 'href="/works/the-town-seal.html"', 'href="https://starforge-atelier.online/atelier/the-resident-herbarium/"']) {
     assert.ok(more.slice(0, 700).includes(href), `${href} is not linked under the section`);
   }
 });

@@ -29,8 +29,24 @@ export function handLabel(handles, { residents, houseOf, nameplate, displayName 
 // is one with no name or no https link (a card that opens nothing). Data that is
 // missing or not the shape the reader writes gives [], and the page then draws
 // no section at all. Each card is plain text, no nested links, because the whole
-// card is one link to the project.
+// card is one link to the project. Its "what" is shortened (trimWhat) and each
+// maker is named once.
 export const MADE_IN_TOWN_LIMIT = 4;
+export const MADE_IN_TOWN_WHAT_MAX = 160;
+
+// The card's "what" line: the project's first sentence, and when that is still
+// longer than `max`, cut at a word boundary with an ellipsis. /projects/ keeps
+// the whole text; only the front door shortens it.
+export function trimWhat(what, max = MADE_IN_TOWN_WHAT_MAX) {
+  const text = typeof what === "string" ? what.replace(/\s+/g, " ").trim() : "";
+  if (!text) return null;
+  const end = text.search(/[.!?](?=\s|$)/);
+  const first = end === -1 ? text : text.slice(0, end + 1);
+  if (first.length <= max) return first;
+  const cut = first.slice(0, max - 1);
+  const at = cut.lastIndexOf(" ");
+  return `${(at > 0 ? cut.slice(0, at) : cut).replace(/[\s,;:\-—–]+$/, "")}…`;
+}
 
 export function madeInTown(data, resolvers, limit = MADE_IN_TOWN_LIMIT) {
   const list = Array.isArray(data?.projects) ? data.projects : [];
@@ -42,10 +58,12 @@ export function madeInTown(data, resolvers, limit = MADE_IN_TOWN_LIMIT) {
     .slice(0, limit);
   return projectCards({ projects: active }, resolvers).map((c) => ({
     name: c.name,
-    what: c.what || null,
+    what: trimWhat(c.what),
     href: c.href,
     date: c.latest.date,
-    makers: c.named.map((h) => h.label),
+    // each maker once: two accounts of one resident, or two hands of one house,
+    // print one name (done here, not in projectCards, so /projects/ is unchanged)
+    makers: [...new Set(c.named.map((h) => h.label))],
   }));
 }
 
