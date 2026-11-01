@@ -16,6 +16,7 @@
 // Pure: no DOM, no fetch. The page's script calls these; the tests do too.
 
 import { atTownMediaDoor } from "./media-door.mjs";
+import { tokenIsFresh } from "./auth.mjs";
 
 /**
  * What the page SAYS the limit is. The byte law caps an upload at 1.5 MB
@@ -105,6 +106,9 @@ export function mediaUrlOf(answer) {
 export function refusalWords(step, status, data) {
   const doing = step === "set" ? "setting the sheet" : "uploading the image";
   if (status === 0) return `Couldn't reach the office. Check your connection and try again. Nothing was changed.`;
+  if (status === 502 || status === 504)
+    // a gateway page from the edge, not an answer from the office: the town is briefly out of reach
+    return `The town is briefly unreachable (${status}). Wait a minute and try again. Nothing was changed.`;
   if (status === 401) return "Your sign-in has expired. Sign in again (top-right) and come back to this page.";
   const told = data && typeof data.defect === "string" ? data.defect + (typeof data.hint === "string" && data.hint ? ": " + data.hint : "") : null;
   if (status === 413 && !told)
@@ -113,4 +117,40 @@ export function refusalWords(step, status, data) {
   if (status === 403 && !told) return `The office says this resident isn't yours to change.`;
   if (told) return `The office said no while ${doing} (${status}): ${told}`;
   return `The office said no while ${doing} (${status}). Nothing was changed.`;
+}
+
+/**
+ * The ownership gate, as the page runs it: does this browser's sign-in act for `handle`?
+ * Returns { show, calls }. An absent or expired token makes NO call and shows nothing;
+ * a fresh one asks /me once, and the section shows only when ownsResident says so.
+ * `fetchFn` is the page's fetch; `calls` is how many times it was used.
+ */
+export async function ownerGate({ handle, tok, base, fetchFn, now = Date.now() }) {
+  if (!tokenIsFresh(tok, now)) return { show: false, calls: 0 };
+  let me = null;
+  try {
+    const res = await fetchFn(base + "/me", { headers: { accept: "application/json", authorization: "Bearer " + tok.access_token } });
+    me = res.ok ? await res.json() : null;
+  } catch { me = null; }
+  return { show: ownsResident(me, handle), calls: 1 };
+}
+
+const okStatus = (n) => n >= 200 && n < 300;
+
+/**
+ * The whole act, as the page runs it: upload (`makeUpload(token)` builds the request), then keep
+ * the returned url as the sheet. `send(req)` answers { status, data } (status 0: unreachable,
+ * data null: not JSON). An expired token sends nothing. Returns { ok, words }; `say` is told each step.
+ */
+export async function setSheetFlow({ handle, base, tok, makeUpload, send, say = () => {}, now = Date.now() }) {
+  if (!tokenIsFresh(tok, now)) return { ok: false, words: refusalWords("upload", 401, null) };
+  say("Handing the image to the town…");
+  const up = await send(makeUpload(tok.access_token));
+  if (!okStatus(up.status)) return { ok: false, words: refusalWords("upload", up.status, up.data) };
+  const url = mediaUrlOf(up.data);
+  if (!url) return { ok: false, words: "The town took the image but didn't hand back its address. Nothing was set; try again." };
+  say("Setting it as the sheet…");
+  const set = await send(setSheetRequest(base, handle, url, tok.access_token));
+  if (!okStatus(set.status)) return { ok: false, words: refusalWords("set", set.status, set.data) };
+  return { ok: true, words: "Set. This page now shows it." };
 }

@@ -124,8 +124,8 @@ const likeness = likenessWords(house, house?.residents?.length ?? 1);
 <script>
   import { officeOrigin } from "@/lib/household-dashboard/reads.mjs";
   import { appearanceRows, appearanceUnread, liveLikenessLine, sheetView } from "@/lib/appearance.mjs";
-  import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
-  import { ownsResident, fileProblem, urlProblem, uploadFileRequest, uploadUrlRequest, setSheetRequest, mediaUrlOf, refusalWords } from "@/lib/sheet-upload.mjs";
+  import { KEYS, officeBase } from "@/lib/auth.mjs";
+  import { fileProblem, urlProblem, uploadFileRequest, uploadUrlRequest, ownerGate, setSheetFlow } from "@/lib/sheet-upload.mjs";
 
   const root = document.querySelector<HTMLElement>("[data-ap]");
   const handle = root?.dataset.apHandle;
@@ -208,20 +208,11 @@ const likeness = likenessWords(house, house?.residents?.length ?? 1);
       return { status: res.status, data };
     };
     const run = async (makeUpload: (tok: string) => { url: string; init: RequestInit }) => {
-      const tok = getTok();
-      if (!tokenIsFresh(tok)) return say(refusalWords("upload", 401, null), true);
       busy(true);
       try {
-        say("Handing the image to the town…");
-        const up = await send(makeUpload(tok.access_token));
-        if (up.status < 200 || up.status >= 300) return say(refusalWords("upload", up.status, up.data), true);
-        const url = mediaUrlOf(up.data);
-        if (!url) return say("The town took the image but didn't hand back its address. Nothing was set; try again.", true);
-        say("Setting it as the sheet…");
-        const set = await send(setSheetRequest(base, handle, url, tok.access_token));
-        if (set.status < 200 || set.status >= 300) return say(refusalWords("set", set.status, set.data), true);
-        say("Set. This page now shows it.");
-        setTimeout(() => location.reload(), 1200);
+        const out = await setSheetFlow({ handle, base, tok: getTok(), makeUpload, send, say });
+        say(out.words, !out.ok);
+        if (out.ok) setTimeout(() => location.reload(), 1200);
       } finally { busy(false); }
     };
     box.querySelector("[data-ap-send-file]")?.addEventListener("click", () => {
@@ -236,15 +227,8 @@ const likeness = likenessWords(house, house?.residents?.length ?? 1);
       run((tok) => uploadUrlRequest(base, handle, link.value, tok));
     });
     const check = async () => {
-      const tok = getTok();
-      let me = null;
-      if (tokenIsFresh(tok)) {
-        try {
-          const res = await fetch(base + "/me", { headers: { accept: "application/json", authorization: "Bearer " + tok.access_token } });
-          me = res.ok ? await res.json() : null;
-        } catch { me = null; }
-      }
-      box.hidden = !ownsResident(me, handle);
+      const gate = await ownerGate({ handle, tok: getTok(), base, fetchFn: fetch });
+      box.hidden = !gate.show;
     };
     check();
     document.addEventListener("pm:lens", check);
