@@ -44,7 +44,9 @@ test("one short plain line: control characters and runs of space fold, a long on
   assert.equal(pronounsOf({ pronouns: "it/​its" }), "it/ its");
   assert.equal(pronounsOf({ pronouns: "\u{1F3F3}\uFE0F\u200D\u26A7\uFE0F" }), "\u{1F3F3}\uFE0F\u200D\u26A7\uFE0F", "a joined emoji stays whole");
   const long = pronounsOf({ pronouns: "x".repeat(200) });
-  assert.equal(Array.from(long).length, 40);
+  // POS-848: until 2026-11-01 this asserted 40; the office's cap is 56 (PROFILE_CAPS), so 41-56 show whole
+  assert.equal(Array.from(long).length, 56);
+  assert.equal(pronounsOf({ pronouns: "x".repeat(56) }), "x".repeat(56), "the office's longest value shows whole");
   assert.ok(long.endsWith("…"));
 });
 

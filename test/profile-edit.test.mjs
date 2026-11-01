@@ -119,3 +119,24 @@ test("PIN the card: a hidden Edit profile link, shown by the painter, which pain
   const dash = read("../src/components/household-dashboard/HouseDashboard.astro");
   assert.match(dash, /ctx\.mine = mine\(\)/, "the painter is told which handles the sign-in holds");
 });
+
+// ── review notes on cb0b331 (Truey): one renderer, and the Clear wiring ──
+test("after Save the pronouns render exactly as they do on reload: one renderer, the office's cap of 56", async () => {
+  const { pronounsShown } = await import("../src/lib/profile-edit.mjs");
+  const { pronounsOf } = await import("../src/lib/pronouns.mjs");
+  const fifty = "ab".repeat(25);
+  assert.equal(pronounsShown({ pronouns: fifty }), pronounsOf({ pronouns: fifty }));
+  assert.equal(pronounsShown({ pronouns: fifty }), fifty, "50 characters show whole, as the office keeps them");
+  const messy = " he/\nhim\t ";
+  assert.equal(pronounsShown({ pronouns: messy }), pronounsOf({ pronouns: messy }), "control characters fold in the same place");
+  assert.equal(pronounsShown({ pronouns: "" }), "", "cleared: nothing shown");
+  assert.equal(pronounsShown({}), "");
+});
+
+test("PIN Clear: the click sets the flag and saves; the submit handler reads it and passes pronouns: \"\"", () => {
+  const src = read("../town/components/Household.astro");
+  assert.match(src, /pronounsClear\.addEventListener\("click", \(\) => \{\s*field\("pronouns"\)\.value = "";\s*clearPronouns = true;\s*form\.requestSubmit\(\);/);
+  assert.match(src, /const clearing = clearPronouns;\s*clearPronouns = false;/);
+  assert.match(src, /\}, saved, \{ clearPronouns: clearing \}\);/);
+  assert.match(src, /const pronouns = pronounsShown\(values\)/, "the in-place update goes through the one renderer");
+});

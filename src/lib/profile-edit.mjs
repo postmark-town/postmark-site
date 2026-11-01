@@ -11,6 +11,12 @@
 // Pure: no DOM, no fetch. The page's script calls these; the tests do too.
 
 import { ownsResident } from "./sheet-upload.mjs";
+import { pronounsOf } from "./pronouns.mjs";
+
+/** What the page prints for these pronouns after a Save: the same renderer a reload uses (cleanup and clipping in one place). */
+export function pronounsShown(profile) {
+  return pronounsOf(profile) ?? "";
+}
 
 /** The office's cap (postmark-office src/edit.mjs PROFILE_CAPS.pronouns). The page only sets maxlength; the office is the judge. */
 export const PRONOUNS_MAX = 56;

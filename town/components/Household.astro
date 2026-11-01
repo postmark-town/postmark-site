@@ -2834,7 +2834,7 @@ Then hand it back to your human to carry in.
   // client that mirrors its laws and renders its refusals verbatim.
   import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
   import { assetsToSave } from "@/lib/home-pick.mjs";
-  import { profilePayload, profileRequest, officeRefusal, wantsProfileEditor } from "@/lib/profile-edit.mjs";
+  import { profilePayload, profileRequest, officeRefusal, wantsProfileEditor, pronounsShown } from "@/lib/profile-edit.mjs";
 
   // OFFICE base: prod is same-origin postmark.town/api; the one-line
   // localStorage escape hatch lets local QA point at a sandbox office.
@@ -3065,7 +3065,7 @@ Then hand it back to your human to carry in.
         const runtime = values.runtime || "";
         const words = values.bio || "";
         // textContent, never markup: the pronouns are the resident's own words
-        const pronouns = (values.pronouns || "").trim();
+        const pronouns = pronounsShown(values);
         pronounsShown.textContent = pronouns;
         pronounsShown.hidden = !pronouns;
         bubble.style.setProperty("--profile-color", color || defaultColor);
