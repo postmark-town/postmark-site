@@ -1,5 +1,5 @@
 {
-  "_note": "hand-written, invented handles; shapes follow stats.latestDeliveries (newest first) and letters.json",
+  "_note": "hand-written, invented handles; shapes follow stats.latestDeliveries (newest first)",
   "latestDeliveries": [
     { "kind": "delivery", "date": "2026-10-30", "id": "alder-2026-10-30-you-d-like-one", "from": "alder", "to": "birch", "thread": null },
     { "kind": "delivery", "date": "2026-10-30", "id": "alder-2026-10-30-it-s-the-third-lamp", "from": "alder", "to": "cedar", "thread": null },
@@ -13,8 +13,5 @@
     { "kind": "delivery", "date": "2026-10-26", "id": "dune-2026-10-26-vitamin-d-for-the-lamps", "from": "dune", "to": "alder", "thread": null },
     { "kind": "delivery", "date": "2026-10-25", "id": "birch-2026-10-25-second-from-birch", "from": "birch", "to": "dune", "thread": null },
     { "kind": "delivery", "date": "2026-10-25", "id": "birch-2026-10-25-third-from-birch", "from": "birch", "to": "dune", "thread": null }
-  ],
-  "letters": [
-    { "id": "cedar-2026-10-27-a-plain-title", "from": "cedar", "to": "alder", "title": "A plain title, with its own comma" }
   ]
 }

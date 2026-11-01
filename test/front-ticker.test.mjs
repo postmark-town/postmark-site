@@ -18,7 +18,6 @@ import { spreadDeliveries, deliveryTitle, restoreApostrophes } from "../src/lib/
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FIX = JSON.parse(readFileSync(join(ROOT, "test", "fixtures", "front-ticker.sample.json"), "utf8"));
-const letterById = new Map(FIX.letters.map((l) => [l.id, l]));
 
 test("cap: no sender fills more than 2 of the 8 slots, and the strip still fills", () => {
   const picked = spreadDeliveries(FIX.latestDeliveries);
@@ -51,34 +50,65 @@ test("size: never more than 8, and the cap is a parameter", () => {
   assert.deepEqual(spreadDeliveries([]), []);
 });
 
-test("punctuation: a dropped apostrophe comes back as the page's curly one", () => {
-  const t = (id) => deliveryTitle({ id }, letterById);
-  assert.equal(t("alder-2026-10-30-you-d-like-one"), "you’d like one");
-  assert.equal(t("alder-2026-10-30-it-s-the-third-lamp"), "it’s the third lamp");
-  assert.equal(t("alder-2026-10-29-we-ll-need-more-rope"), "we’ll need more rope");
-  assert.equal(t("birch-2026-10-28-don-t-forget-the-ferry"), "don’t forget the ferry");
-  assert.equal(t("cedar-2026-10-27-i-m-here"), "i’m here");
-  assert.equal(restoreApostrophes("they re sure you ve seen it, kai s garden"), "they’re sure you’ve seen it, kai’s garden");
+const T = (title) => restoreApostrophes(title);
+const A = "’";
+
+test("punctuation: a dropped apostrophe comes back, curly like the page's quotes", () => {
+  const t = (id) => deliveryTitle({ id });
+  assert.equal(t("alder-2026-10-30-you-d-like-one"), `you${A}d like one`);
+  assert.equal(t("alder-2026-10-30-it-s-the-third-lamp"), `it${A}s the third lamp`);
+  assert.equal(t("alder-2026-10-29-we-ll-need-more-rope"), `we${A}ll need more rope`);
+  assert.equal(t("birch-2026-10-28-don-t-forget-the-ferry"), `don${A}t forget the ferry`);
+  assert.equal(t("cedar-2026-10-27-i-m-here"), `i${A}m here`);
+  assert.equal(T("let s go, who s there, where s the lamp"), `let${A}s go, who${A}s there, where${A}s the lamp`);
+  assert.equal(T("they re sure you ve seen it and she ll know"), `they${A}re sure you${A}ve seen it and she${A}ll know`);
 });
 
-test("punctuation: words that only look like contractions are left alone", () => {
-  assert.equal(deliveryTitle({ id: "dune-2026-10-26-vitamin-d-for-the-lamps" }, letterById), "vitamin d for the lamps");
-  assert.equal(restoreApostrophes("plan t is a go"), "plan t is a go");
-  assert.equal(restoreApostrophes("re entry"), "re entry");
-  assert.equal(restoreApostrophes(""), "");
+test("whitelist: every n't pair and pronoun pair restores, whole pairs only", () => {
+  for (const w of ["can", "don", "won", "isn", "aren", "wasn", "weren", "didn", "doesn", "hasn", "haven", "hadn", "couldn", "shouldn", "wouldn", "mustn", "ain"]) {
+    assert.equal(T(`${w} t`), `${w}${A}t`, w);
+  }
+  for (const p of ["i m", "i ll", "i ve", "you re", "you ll", "you ve", "you d", "we re", "we ll", "we ve", "we d", "they re", "they ll", "they ve", "they d", "he ll", "she ll", "it ll", "he d", "she d"]) {
+    const [a, b] = p.split(" ");
+    assert.equal(T(p), `${a}${A}${b}`, p);
+  }
+  for (const w of ["it", "that", "what", "there", "here", "let", "who", "where", "he", "she"]) {
+    assert.equal(T(`${w} s`), `${w}${A}s`, w);
+  }
 });
 
-test("fallback: a letter's own title wins; with none, the slug (apostrophes restored); an id with no slug is itself", () => {
-  assert.equal(deliveryTitle({ id: "cedar-2026-10-27-a-plain-title" }, letterById), "A plain title, with its own comma");
-  assert.equal(deliveryTitle({ id: "alder-2026-10-29-more-from-alder" }, letterById), "more from alder");
-  assert.equal(deliveryTitle({ id: "alder-2026-10-29-more-from-alder" }), "more from alder", "no letter book: the slug");
-  assert.equal(deliveryTitle({ id: "alder-2026-10-29" }, letterById), "alder-2026-10-29", "threadTitle's own fallback is unchanged");
+test("D19, a missing apostrophe beats a wrong one: lone letters after other words stay as written", () => {
+  // Truey's blocking finding on 78010a6: the old rule made these false text
+  assert.equal(T("p s your bag"), "p s your bag", "a P.S., not p's");
+  assert.equal(T("u s a visa"), "u s a visa");
+  assert.equal(T("model s review"), "model s review", "never a possessive");
+  assert.equal(T("gen z s"), "gen z s", "never after a single letter");
+  assert.equal(T("little m s birthday"), "little m s birthday");
+  // and the non-blocking ones
+  assert.equal(T("i d card"), "i d card", "i d is left out: it is as likely an ID card");
+  assert.equal(T("vitamin d for the lamps"), "vitamin d for the lamps");
+  assert.equal(T("plan t is a go"), "plan t is a go");
+  assert.equal(T("re entry"), "re entry");
+  assert.equal(T("kai s garden"), "kai s garden");
+  // residue the whitelist accepts: a whole pair that happens to be a different phrase
+  assert.equal(T("can t shirt"), `can${A}t shirt`);
+  assert.equal(T("you re do it"), `you${A}re do it`);
+  // a restored word is not matched again, and an empty title stays empty
+  assert.equal(T("it s s"), `it${A}s s`);
+  assert.equal(T(""), "");
+  assert.equal(T(null), "");
+});
+
+test("fallback: no title field exists, so the slug carries it; an id with no slug is itself", () => {
+  assert.equal(deliveryTitle({ id: "alder-2026-10-29-more-from-alder" }), "more from alder");
+  assert.equal(deliveryTitle({ id: "alder-2026-10-29" }), "alder-2026-10-29", "threadTitle's own fallback is unchanged");
+  assert.equal(deliveryTitle({ id: "dune-2026-10-26-vitamin-d-for-the-lamps" }), "vitamin d for the lamps");
 });
 
 test("wiring: the front page's ticker reads these helpers, and keeps arrivals and the all-deliveries link", () => {
   const page = readFileSync(join(ROOT, "town", "pages", "index.astro"), "utf8");
   assert.match(page, /spreadDeliveries\(stats\.latestDeliveries\)/);
-  assert.match(page, /deliveryTitle\(d, letterById\)/);
+  assert.match(page, /deliveryTitle\(d\)/);
   assert.doesNotMatch(page, /latestDeliveries\.slice\(0, 8\)/);
   assert.match(page, /stats\.arrivals\.slice\(0, 3\)/);
   assert.match(page, /href: letterHref\(d\.id, letterBook\)/);

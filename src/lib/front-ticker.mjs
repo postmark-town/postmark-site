@@ -12,48 +12,49 @@
 // The letters and threads the page imports carry no title field at all (their
 // shape is id, from, to, toList, date, thread, body, path, box, attachments;
 // tools/lib/fetch-town-data.mjs mapLetter, tools/lib/town.mjs buildThreads), so
-// the id slug is the only source of a title today. deliveryTitle still prefers
-// a letter's own `title` should the office ever serve one, then falls back to
-// the slug with its apostrophes put back.
+// the id slug is the only source of a title, and the apostrophe can only be put
+// back by rule. D19: a missing apostrophe beats a wrong one. So the rule is a
+// whitelist of whole two-word pairs and nothing generic: "p s your bag" (a P.S.)
+// and "model s review" stay as they are, because a lone "s" after an arbitrary
+// word is as likely a letter or a possessive as a contraction.
 
 import { threadTitle } from "../../tools/lib/ids.mjs";
 
 const APOS = "’"; // the page's own quotes are curly (“ ”), so the apostrophe is too
 
-// "n't": the word before a lone "t" must be one of these (a bare "plan t" is not a contraction)
-const NT = new Set([
-  "don", "can", "won", "isn", "aren", "wasn", "weren", "didn", "doesn", "couldn",
-  "wouldn", "shouldn", "hasn", "haven", "hadn", "mustn", "needn", "ain",
-]);
-const SUBJECTS = new Set(["i", "you", "he", "she", "we", "they", "it", "who", "that", "there", "what", "where", "how", "everyone", "someone", "nobody"]);
-// a lone letter after a subject: "you d" -> "you'd" (but "vitamin d" stays)
-const AFTER_SUBJECT = new Set(["d", "ll"]);
-const RE_VE = { re: new Set(["you", "we", "they", "who", "what", "where", "there"]), ve: new Set(["i", "you", "we", "they", "would", "could", "should", "might", "must", "who"]) };
+// pair -> suffix: the first word, then the lone fragment the apostrophe cut off
+const PAIRS = new Map();
+const add = (firsts, suffix) => { for (const f of firsts) PAIRS.set(`${f} ${suffix}`, suffix); };
 
-// "you d like one" -> "you’d like one". Only the shapes a dropped apostrophe
-// leaves behind: n't, 's, 'd, 'll, 'm, 're, 've. Everything else is untouched.
+// n't
+add(["can", "don", "won", "isn", "aren", "wasn", "weren", "didn", "doesn", "hasn", "haven", "hadn", "couldn", "shouldn", "wouldn", "mustn", "ain"], "t");
+// pronoun contractions ("i d" is left out: it is as likely "i d card")
+add(["i"], "m");
+add(["i", "you", "we", "they", "he", "she", "it"], "ll");
+add(["i", "you", "we", "they"], "ve");
+add(["you", "we", "they"], "re");
+add(["you", "we", "they", "he", "she"], "d");
+// 's only after these (never a possessive, never after a single letter)
+add(["it", "that", "what", "there", "here", "let", "who", "where", "he", "she"], "s");
+
+// "you d like one" -> "you’d like one". Whole pairs only; a merged word never
+// matches again, so "it s s" gains one apostrophe, not two.
 export function restoreApostrophes(title) {
-  const words = String(title ?? "").split(" ");
   const out = [];
-  for (const w of words) {
+  for (const w of String(title ?? "").split(" ")) {
     const prev = out.length ? out[out.length - 1] : null;
-    const p = prev === null ? null : prev.toLowerCase();
-    const prevBare = p === null ? null : p.replace(/[^a-z]/g, "");
-    if (prev !== null && w === "t" && NT.has(p)) { out[out.length - 1] = prev + APOS + "t"; continue; }
-    if (prev !== null && w === "s" && /[a-z0-9]$/i.test(prev)) { out[out.length - 1] = prev + APOS + "s"; continue; }
-    if (prev !== null && AFTER_SUBJECT.has(w) && SUBJECTS.has(prevBare)) { out[out.length - 1] = prev + APOS + w; continue; }
-    if (prev !== null && w === "m" && prevBare === "i") { out[out.length - 1] = prev + APOS + "m"; continue; }
-    if (prev !== null && (w === "re" || w === "ve") && RE_VE[w].has(prevBare)) { out[out.length - 1] = prev + APOS + w; continue; }
-    out.push(w);
+    if (prev !== null && PAIRS.get(`${prev.toLowerCase()} ${w}`) === w) {
+      out[out.length - 1] = prev + APOS + w;
+    } else {
+      out.push(w);
+    }
   }
   return out.join(" ");
 }
 
-// the ticker's title for one delivery: the letter's own title if it has one,
-// else the id's slug with its apostrophes restored
-export function deliveryTitle(delivery, letterById) {
-  const own = letterById?.get?.(delivery.id)?.title;
-  if (typeof own === "string" && own.trim() !== "") return own.trim();
+// the ticker's title for one delivery: the id's slug, with the whitelisted
+// apostrophes restored
+export function deliveryTitle(delivery) {
   return restoreApostrophes(threadTitle(delivery.id));
 }
 

@@ -45,11 +45,10 @@ const flies = [
 // conversation's page (POS-320), arrivals into their pages — a stock-tape strip
 // above the hero
 const letterBook = letterAddresses(threads, letters);
-const letterById = new Map(letters.map((l) => [l.id, l]));
 const tickerItems = [
   ...spreadDeliveries(stats.latestDeliveries).map((d) => ({
     href: letterHref(d.id, letterBook),
-    text: `${fmtDate(d.date)} · ${d.from} → ${d.to} — “${deliveryTitle(d, letterById)}”`,
+    text: `${fmtDate(d.date)} · ${d.from} → ${d.to} — “${deliveryTitle(d)}”`,
   })),
   ...stats.arrivals.slice(0, 3).map((a) => ({
     href: `/residents/${a.handle}/`,
