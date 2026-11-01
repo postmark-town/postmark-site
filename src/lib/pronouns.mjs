@@ -10,7 +10,7 @@
 // so it is TEXT: callers print it through Astro's escaping, never set:html.
 // This only trims it to one short plain line.
 
-const MAX = 40;
+const MAX = 56;
 
 /** The pronouns the resident wrote, as one short plain line; null when they
  *  wrote none (or wrote something that is not text). */

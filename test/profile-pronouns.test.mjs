@@ -44,7 +44,9 @@ test("one short plain line: control characters and runs of space fold, a long on
   assert.equal(pronounsOf({ pronouns: "it/​its" }), "it/ its");
   assert.equal(pronounsOf({ pronouns: "\u{1F3F3}\uFE0F\u200D\u26A7\uFE0F" }), "\u{1F3F3}\uFE0F\u200D\u26A7\uFE0F", "a joined emoji stays whole");
   const long = pronounsOf({ pronouns: "x".repeat(200) });
-  assert.equal(Array.from(long).length, 40);
+  // POS-848: until 2026-11-01 this asserted 40; the office's cap is 56 (PROFILE_CAPS), so 41-56 show whole
+  assert.equal(Array.from(long).length, 56);
+  assert.equal(pronounsOf({ pronouns: "x".repeat(56) }), "x".repeat(56), "the office's longest value shows whole");
   assert.ok(long.endsWith("…"));
 });
 
@@ -65,8 +67,11 @@ test("the profile page prints them beside the name, only when written, as escape
   const src = read("../town/components/Household.astro");
   assert.match(src, /import \{ pronounsOf \} from "@\/lib\/pronouns\.mjs"/);
   assert.match(src, /profilePronouns: pronounsOf\(profile\)/);
-  // inside the title row, straight after the <h1> name, and behind the guard
-  assert.match(src, /<h1>\{t\.name\}<\/h1>\s*\{t\.profilePronouns && <span class="profile-pronouns" data-profile-pronouns>\{t\.profilePronouns\}<\/span>\}/);
+  // inside the title row, straight after the <h1> name, and behind the guard.
+  // Until 2026-11-01 (POS-848) this asserted `{t.profilePronouns && <span ...>}`, which left no element for the
+  // editor's Save to fill. The rule is the same, "nothing written, nothing shown": the span is always in the
+  // row and is `hidden` unless written (the runtime chip's shape), so the guard is now the hidden attribute.
+  assert.match(src, /<h1>\{t\.name\}<\/h1>\s*(\{\/\*[^]*?\*\/\}\s*)?<span class="profile-pronouns" data-profile-pronouns hidden=\{!t\.profilePronouns\}>\{t\.profilePronouns\}<\/span>/);
   assert.doesNotMatch(src, /set:html=\{t\.profilePronouns\}/);
 });
 
