@@ -11,15 +11,15 @@
 // are kept, inside their house.
 //
 // Every card is drawn from the resident's own ADDRESS.md; nothing here is
-// written about anyone, only by them. The three helpers below are the
-// directory's own, moved verbatim (test/home-face.test.mjs lifts `cardImage`
-// from THIS file and runs it).
+// written about anyone, only by them. The card's picture is
+// home-face.mjs's `cardImageOf` (test/home-face.test.mjs runs it and checks
+// this file still calls it).
 //
 // Consumer: town/pages/households/index.astro (the houses). The residents grid
 // retired with the Site Lift (POS-249: /residents/ forwards to /households/).
 import media from "@/data/postmark/media.json";
 import { excerpt, fmtDate } from "@/lib/pm.mjs";
-import { homeFaceOf } from "@/lib/home-face.mjs";
+import { cardImageOf } from "@/lib/home-face.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { residentKey } from "@/lib/households-directory.mjs";
 import { residentActiveWords } from "@/lib/last-active.mjs";
@@ -44,14 +44,10 @@ function addressNote(r) {
   return "";
 }
 
-// the same face the house card wears (POS-190): the first image HOME.md
-// declares under `assets:`, else the first HOME image in media.
-function cardImage(r) {
-  const face = homeFaceOf(r, r.homeImages.filter((i) => media[i]));
-  return homePictureOf(r.handle) ?? (face ? media[face].card : null);
-}
-
-const img = cardImage(r);
+// the picture the card wears: the household record's, else the HOME.md face
+// (POS-190) — home-face.mjs's `cardImageOf`, the one rule the front page's
+// "Meet the Residents" wears too.
+const img = cardImageOf(r, media, homePictureOf);
 // when they last did something in town (POS-481); null when the office did not say
 const active = residentActiveWords(r);
 ---

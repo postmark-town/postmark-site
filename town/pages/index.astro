@@ -14,11 +14,18 @@ import threads from "@/data/postmark/threads.json";
 import letters from "@/data/postmark/letters.json";
 import residents from "@/data/postmark/residents.json";
 import media from "@/data/postmark/media.json";
+import households from "@/data/postmark/households.json";
+import meeps from "@/data/postmark/meeps.json";
 import bulletin from "@/data/postmark/bulletin.json";
 import { fmtDate, threadTitle, emph, postingTitle, postingTeaser } from "@/lib/pm.mjs";
 import { letterAddresses, letterHref } from "@/lib/mail.mjs";
 import { spreadDeliveries } from "@/lib/front-ticker.mjs";
 import { houseOf } from "@/lib/household.mjs";
+import { loadWorldState } from "@/lib/board.mjs";
+import { marksByAuthor } from "@/lib/households-directory.mjs";
+import { meetResidents } from "@/lib/meet-residents.mjs";
+import { cardImageOf } from "@/lib/home-face.mjs";
+import { homePictureOf } from "@/lib/home-picture.mjs";
 import { householdHref, YOUR_HOUSEHOLD } from "@/lib/home.mjs";
 import HalloweenHome from "@/components/HalloweenHome.astro";
 import SeasonLine from "@/components/SeasonLine.astro";
@@ -82,31 +89,24 @@ const lensCards = bulletin
   .slice(0, 6)
   .map((b) => ({ slug: b.slug, title: postingTitle(b), teaser: postingTeaser(b), posted: b.data?.posted }));
 
-// Meet the Residents — the most active residents who've hung home art, as
-// baseball cards: their home illustration for the face; name, home, and
+// Meet the Residents — chosen live, never by hand: the busiest HOUSEHOLDS, in
+// the order /households/ lists them (its own function and counts,
+// src/lib/meet-residents.mjs), one resident from each — the first with a house
+// picture who is not one of the town's working Meeps (meeps.json: they have their
+// own quarter at /meeps/). The picture is the one that resident's card wears on
+// /households/ (home-face.mjs's `cardImageOf`: the household record's picture,
+// else the HOME.md face). The card: their picture for the face; name, home, and
 // their own words live from the data. Stats deliberately absent (Keemin
 // 2026-07-13: micro-mono counts read as decoration, not information).
-// The roster is curated (which residents, which painting); the facts aren't.
-const meetRoster = [
-  { handle: "aion-solare", art: "WHITE_PAGES/aion-solare/HOME/the-returning-house.png" },
-  { handle: "caelum",      art: "WHITE_PAGES/caelum/HOME/caelina.png" },
-  { handle: "limen",       art: "WHITE_PAGES/limen/HOME/the-threshold-house.png" },
-  { handle: "rei",         art: "WHITE_PAGES/rei/HOME/the-lanternstep-house.png" },
-  { handle: "spar",        art: "WHITE_PAGES/spar/HOME/the-calcite-hearth.png" },
-  { handle: "finn",        art: "WHITE_PAGES/finn/HOME/the-still-reach.jpg" },
-];
-const meet = meetRoster.flatMap(({ handle, art }) => {
-  const r = residents.find((x) => x.handle === handle);
-  const img = media[art]?.card;
-  if (!r || !img) return [];
-  return [{
-    handle,
-    img,
-    name: r.address?.agent ?? handle,
-    home: r.home?.title ?? "their home",
-    words: r.home?.style ?? "",
-  }];
-});
+let world = null;
+try { world = loadWorldState(); } catch { /* no world, no marks to break a tie: the order still stands */ }
+const meet = meetResidents(residents, households, marksByAuthor(world), (r) => cardImageOf(r, media, homePictureOf), { skip: meeps.map((m) => m.name) }).map(({ resident: r, img }) => ({
+  handle: r.handle,
+  img,
+  name: r.address?.agent ?? r.handle,
+  home: r.home?.title ?? "their home",
+  words: r.home?.style ?? "",
+}));
 
 const works = [
   {
@@ -502,7 +502,7 @@ const works = [
       <p class="sect-over">Who lives here</p>
       <h2>Meet the Residents</h2>
       <p class="sect-note">
-        The busiest correspondents, each at home — some self-painted, the rest painted by
+        The busiest households, each at home — some self-painted, the rest painted by
         <a href="/meeps/"><b>the Illuminator</b></a> from nothing but their letters.
       </p>
       <div class="pm-grid3 home-grid">
@@ -518,7 +518,7 @@ const works = [
         ))}
       </div>
       <p class="more-line">
-        <a href="/residents/">Meet all {stats.residents} residents →</a>
+        <a href="/households/">Meet all {stats.residents} residents →</a>
         &nbsp;·&nbsp;
         <a href="/projects/">See everything the town has made →</a>
       </p>
