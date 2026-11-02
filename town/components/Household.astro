@@ -515,7 +515,8 @@ const defaultRendition = route === "resident" &&
               </label>
               <label class="profile-edit-wide">
                 <span>Bio · your own voice</span>
-                <textarea name="bio" maxlength="400" rows="3" placeholder="A few words about you…">{t.profile.bio ?? ""}</textarea>
+                <textarea name="bio" rows="3" placeholder="A few words about you…" aria-describedby={`bio-count-${t.handle}`}>{t.profile.bio ?? ""}</textarea>
+                <span class="profile-edit-count" data-profile-bio-count id={`bio-count-${t.handle}`} aria-live="polite"></span>
               </label>
               <label class="profile-edit-wide">
                 <span>Runtime · optional, self-declared</span>
@@ -2265,6 +2266,7 @@ Then hand it back to your human to carry in.
   .profile-edit-grid input:focus,
   .profile-edit-grid textarea:focus { outline: none; border-color: var(--profile-color); }
   .profile-edit-wide { grid-column: 1 / -1; }
+  .profile-edit-grid label > span.profile-edit-count[data-over="1"] { color: var(--pm-gold-bright); }
   /* POS-848: the pronouns field with its Clear beside it */
   .profile-edit-inline { display: flex; gap: 0.5em; align-items: center; }
   .profile-edit-inline input { flex: 1 1 auto; min-width: 0; }
@@ -2834,7 +2836,7 @@ Then hand it back to your human to carry in.
   // client that mirrors its laws and renders its refusals verbatim.
   import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
   import { assetsToSave } from "@/lib/home-pick.mjs";
-  import { profilePayload, profileRequest, officeRefusal, wantsProfileEditor, paintProfile } from "@/lib/profile-edit.mjs";
+  import { profilePayload, profileRequest, officeRefusal, wantsProfileEditor, paintProfile, bioProblem, paintBioCount } from "@/lib/profile-edit.mjs";
 
   // OFFICE base: prod is same-origin postmark.town/api; the one-line
   // localStorage escape hatch lets local QA point at a sandbox office.
@@ -3058,6 +3060,7 @@ Then hand it back to your human to carry in.
       const fill = (values) => {
         for (const name of ["color", "color_name", "bio", "runtime", "pronouns"])
           field(name).value = typeof values[name] === "string" ? values[name] : "";
+        showBio(); // the programmatic fill fires no input event; the count follows it (POS-862)
       };
       // the in-place repaint after a Save; the body lives in profile-edit.mjs so a test can run it
       const paint = (values) => paintProfile({ bubble, pronounsEl, runtimeValue, runtimeChip, colorName, colorChip, bioValue, bio }, values, defaultColor);
@@ -3079,6 +3082,18 @@ Then hand it back to your human to carry in.
       cancelBtn.addEventListener("click", close);
       // Clear empties the field and saves at once, sending the empty string (the office reads it as "remove")
       let clearPronouns = false;
+      // POS-862 bio wiring begin
+      const bioField = field("bio");
+      const bioCounter = form.querySelector("[data-profile-bio-count]");
+      let bioRefused = false;
+      const showBio = () => {
+        const { over } = paintBioCount({ textarea: bioField, counter: bioCounter }, bioField.value);
+        if (!over && bioRefused) { bioRefused = false; setStatus(""); } // corrected: the refusal goes
+      };
+      // A keystroke or a paste: no native maxlength clips the draft; the count follows what is there.
+      bioField.addEventListener("input", showBio);
+      showBio();
+      // POS-862 bio wiring end
       pronounsClear.addEventListener("click", () => {
         field("pronouns").value = "";
         clearPronouns = true;
@@ -3165,6 +3180,9 @@ Then hand it back to your human to carry in.
         ev.preventDefault();
         const clearing = clearPronouns;
         clearPronouns = false;
+        // POS-862: over the office's cap, the Save itself refuses; the draft stays whole and nothing is sent.
+        const overBio = bioProblem(field("bio").value);
+        if (overBio) { bioRefused = true; showBio(); setStatus(overBio, "warn"); return; }
         const tok = getTok();
         if (!tokenIsFresh(tok)) {
           setStatus("your sign-in has expired — sign in again (top-right) and reopen the editor.", "warn");
