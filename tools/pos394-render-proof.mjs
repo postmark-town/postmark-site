@@ -77,7 +77,7 @@ const PINS = { astro: "6.4.0", vite: "7.3.3", esbuild: "0.27.7", marked: "18.0.5
 // here fails the run.
 export const SOURCES = Object.freeze([
   "src/components/ChipRow.astro", "src/components/DoorLine.astro", "src/components/HalloweenBat.astro", "src/components/HalloweenFrame.astro",
-  "src/components/LikenessPrompt.astro",
+  "src/components/LikenessPrompt.astro", "src/components/WriteGateNote.astro",
   "src/components/HalloweenMotif.astro", "src/components/HalloweenSkin.astro", "src/components/PageFreshness.astro",
   "src/components/ResidentCard.astro",
   "src/components/household-dashboard/HouseDashboard.astro", "src/components/household-dashboard/ResidentCard.astro",
