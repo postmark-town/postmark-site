@@ -955,6 +955,12 @@ export function mountCockpit(o) {
     return actorsFor(state.answer, o.me, { acting: state.acting });
   }
 
+  /** The bar's slot for an act (fixed row or tray), as the acting hand sees it now. */
+  function slotFor(action) {
+    const all = barSlots(state.answer, { acting: state.acting });
+    return [...all.fixed, ...all.tray].find((s) => s.action === action);
+  }
+
   /**
    * WHOSE STANDING THE KEY IS ORIENTED FROM — the seat, as opposed to who acts.
    *
@@ -1848,26 +1854,31 @@ export function mountCockpit(o) {
     }
   }
 
+  /** The left edge for a panel `box` wide that would like to sit at `want`,
+   *  clamped into the painting (and, as the outer bound, the viewport).
+   *  FENCED TO THE PAINTING, like the bar (placeBar, f68de054f): the card's
+   *  old floor was the VIEWPORT's left edge, so a seat near the painting's
+   *  left side slid the card onto the site rail (founder-caught 2026-08-28,
+   *  the roots card over CONVERSATIONS/sign-out). The painting's own rect is
+   *  the card's world; the viewport clamp stays only as the outer bound. */
+  function clampedLeft(box, want) {
+    const w = doc.defaultView?.innerWidth ?? 0;
+    const paintBox = liveSvg()?.getBoundingClientRect?.();
+    const lo = Math.max(12, (paintBox?.left ?? 0) + 8);
+    const hi = Math.max(lo, Math.min(w - box.width - 12, (paintBox ? paintBox.right : w) - box.width - 8));
+    return Math.min(Math.max(lo, want), hi);
+  }
+
   /** Put a fixed-position panel above the bar, clamped into the viewport. Reading
    *  the bar's own box rather than assuming its height, because a row that can
    *  scroll may or may not be showing a scrollbar. */
   function placeAbove(el, anchor) {
     if (!el || !anchor) return;
     const a = anchor.getBoundingClientRect();
-    const w = doc.defaultView?.innerWidth ?? 0;
     el.style.bottom = `${Math.max(8, (doc.defaultView?.innerHeight ?? 0) - a.top + 10)}px`;
     if (el.classList.contains("pmc-card")) {
       const box = el.getBoundingClientRect();
-      const want = a.left + a.width / 2 - box.width / 2;
-      // FENCED TO THE PAINTING, like the bar (placeBar, f68de054f): the card's
-      // old floor was the VIEWPORT's left edge, so a seat near the painting's
-      // left side slid the card onto the site rail (founder-caught 2026-08-28,
-      // the roots card over CONVERSATIONS/sign-out). The painting's own rect is
-      // the card's world; the viewport clamp stays only as the outer bound.
-      const paint = liveSvg()?.getBoundingClientRect?.();
-      const lo = Math.max(12, (paint?.left ?? 0) + 8);
-      const hi = Math.max(lo, Math.min(w - box.width - 12, (paint ? paint.right : w) - box.width - 8));
-      el.style.left = `${Math.min(Math.max(lo, want), hi)}px`;
+      el.style.left = `${clampedLeft(box, a.left + a.width / 2 - box.width / 2)}px`;
       el.style.transform = "none";
     }
   }
@@ -1947,8 +1958,7 @@ export function mountCockpit(o) {
 
   // ── the act form ──────────────────────────────────────────────────────────
   function formHtml(action) {
-    const all = barSlots(state.answer, { acting: state.acting });
-    const slot = [...all.fixed, ...all.tray].find((s) => s.action === action);
+    const slot = slotFor(action);
     if (!slot?.card) return "";
     const c = slot.card;
     // WHAT THE ANSWER CAN FILL IN FOR YOU (2026-08-28 ruling). `prefillFor` is
@@ -2292,8 +2302,7 @@ export function mountCockpit(o) {
    * second required one, gets the ordinary form back with no edit here.
    */
   function chatHtml(action) {
-    const all = barSlots(state.answer, { acting: state.acting });
-    const slot = [...all.fixed, ...all.tray].find((s) => s.action === action);
+    const slot = slotFor(action);
     const f = chatField(slot?.card);
     if (!f) return "";
     const cap = statedLimit(f.description);
@@ -2364,8 +2373,7 @@ export function mountCockpit(o) {
 
   /** Which chrome this act opens in. The card decides; nothing here is a name. */
   function opensAsChat(action) {
-    const all = barSlots(state.answer, { acting: state.acting });
-    const slot = [...all.fixed, ...all.tray].find((s) => s.action === action);
+    const slot = slotFor(action);
     return chatShaped(slot?.card);
   }
 
@@ -2373,7 +2381,7 @@ export function mountCockpit(o) {
   function drawWheel() {
     const enc = encounterOf(state.answer);
     if (!enc) return "";
-    const faces = actorsFor(state.answer, o.me, { acting: state.acting });
+    const roster = faces();
     // THE ADVERSARY'S HP IS IN THE OTHER BLOCK, and the wheel has to make the
     // same join the map does. The office builds each wheel row's `hp` out of
     // `state.hands`, which holds the JOINERS — the hostile is not one of them —
@@ -2402,8 +2410,8 @@ export function mountCockpit(o) {
     const pictureFor = (a) => {
       if (a.kind === "creature") return null;
       const row = a.kind === "human"
-        ? faces.find((f) => f.kind === "human")
-        : (faces.find((f) => f.kind === "resident" && f.handle === a.id)
+        ? roster.find((f) => f.kind === "human")
+        : (roster.find((f) => f.kind === "resident" && f.handle === a.id)
           ?? (a.id ? { kind: "resident", handle: a.id, label: a.label } : null));
       return row ? faceImageFor(row, state.profiles) : null;
     };
@@ -2735,6 +2743,9 @@ export function mountCockpit(o) {
     framedKey = key;
   }
 
+  /** A thing on the floor, in screen pixels: the drawing and the hit-test both read it. */
+  const LOOSE_R = 9;
+
   /**
    * What is lying on the floor, drawn where it fell.
    *
@@ -2750,7 +2761,7 @@ export function mountCockpit(o) {
     return looseThings(state.answer).map((t) => {
       const at = worldToPx(gridNow(), t.at);
       if (!at) return "";
-      const r = 9 * u;
+      const r = LOOSE_R * u;
       const who = t.dropped_by ? ` — dropped by ${t.dropped_by}` : "";
       return `<g class="pmc-loose" transform="translate(${at.x} ${at.y})">
         <circle cx="0" cy="0" r="${r * 1.9}" fill="#e0894e" fill-opacity="0.12"/>
@@ -2802,8 +2813,6 @@ export function mountCockpit(o) {
    * founder asked.
    */
   const ADVERSARY_R = 60;
-  /** …and a thing on the floor, which did not change. */
-  const LOOSE_R = 9;
 
   function drawAdversary() {
     if (!tokenLayer || !gridNow()) return "";
@@ -3621,12 +3630,8 @@ export function mountCockpit(o) {
     const a = root.querySelector("[data-fold]")?.getBoundingClientRect?.();
     if (ctx && a) {
       const box = ctx.getBoundingClientRect();
-      const w = doc.defaultView?.innerWidth ?? 0;
       const hgt = doc.defaultView?.innerHeight ?? 0;
-      const paint = liveSvg()?.getBoundingClientRect?.();
-      const lo = Math.max(12, (paint?.left ?? 0) + 8);
-      const hi = Math.max(lo, Math.min(w - box.width - 12, (paint ? paint.right : w) - box.width - 8));
-      ctx.style.left = `${Math.min(Math.max(lo, a.left + a.width / 2 - box.width / 2), hi)}px`;
+      ctx.style.left = `${clampedLeft(box, a.left + a.width / 2 - box.width / 2)}px`;
       ctx.style.bottom = `${Math.max(8, hgt - a.top + 10)}px`;
     }
     root.querySelector(".pmc-bar")?.addEventListener("scroll", markOverflow, { passive: true });
@@ -3810,8 +3815,7 @@ export function mountCockpit(o) {
     const form = root.querySelector("[data-form]");
     if (!form) return;
     const fields = [...form.querySelectorAll("[data-field]")];
-    const all = barSlots(state.answer, { acting: state.acting });
-    const card = [...all.fixed, ...all.tray].find((s) => s.action === form.getAttribute("data-form"))?.card;
+    const card = slotFor(form.getAttribute("data-form"))?.card;
     const required = new Set((card?.fields ?? []).filter((f) => f.required).map((f) => f.name));
     const must = fields.find((el) => !el.value && required.has(el.getAttribute("data-field")));
     (must ?? form.querySelector(".pmc-btn.go") ?? fields.find((el) => !el.value) ?? fields[0])?.focus();
