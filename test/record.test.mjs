@@ -1,5 +1,5 @@
 // record.test.mjs — The Record: the crossings from the world's own tags, the
-// five repos, and the seat's landing.
+// five repos, and the built pages.
 //
 //   node --test test/record.test.mjs
 //

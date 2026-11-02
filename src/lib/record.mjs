@@ -1,11 +1,13 @@
-// record.mjs — The Record: the crossings and the repos.
+// record.mjs — The Record: the five repos, where a room's record is kept, the
+// crossings, and the settlements placed on the replay's timeline.
 //
 // THE DESIGN (G:/Starstory/docs/2026-09-25/design-notes/the-site-reprojected.md,
 // "The Record"): "the mail · the crossings (every settlement's receipt and
 // what changed) · the works · stamps · the numbers. One seat that makes 'the
 // record is public' a place to point at." Rev. 2 adds "the repos" as a chip
 // ("five public repos, the town's own source"), and "each Record card links its
-// own repo".
+// own repo". (The Record's cards have since gone; the repos and the crossings
+// are what this file still shapes.)
 //
 // Pure and build-time: the pages import the ingest's crossings.json and the
 // bulletin, and this file shapes them. The Worldkeeper's receipts are the
