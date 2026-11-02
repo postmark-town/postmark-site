@@ -77,6 +77,9 @@ test("the target of that link exists, inside a <noscript>, and lists every slide
   assert.match(inner, /\{deck\.map\(/, "the no-script copy does not list the slides");
   assert.equal(/hidden/.test(inner), false, "a slide is hidden in the list that has no script to show it");
   assert.equal(/<dialog/.test(inner), false, "the no-script copy is a second dialog");
+  // NOT a <section>: the lane panel is one, and test/think-tank-posts.test.mjs's
+  // tankOf() cuts the panel at its first `</section>` — a nested one truncates it
+  assert.equal(/<\/?section\b/.test(inner), false, "the no-script copy is a <section> and ends the lane panel early for anything that slices on </section>");
   // the way back lands on the '?', which carries that id
   assert.match(inner, /href=\{`#ask-\$\{lane\.key\}`\}/, "no way back to the '?'");
   // and the list reads the same deck module the dialog is given

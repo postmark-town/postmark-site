@@ -89,7 +89,10 @@ const deck = helps ? tutorialFor(lane.key) : [];
       hidden: there is no script to step through them. */}
   {helps && (
     <noscript>
-      <section class="c-help-plain" id={`help-${lane.key}`} aria-labelledby={`help-${lane.key}-h`}>
+      {/* A <div role="region">, NOT a <section>: the lane's own panel is a
+          <section>, and the page's tests (think-tank-posts' `tankOf`) cut a
+          panel at its first `</section>` — a nested one ends the panel early. */}
+      <div class="c-help-plain" role="region" id={`help-${lane.key}`} aria-labelledby={`help-${lane.key}-h`}>
         <h3 class="c-help-plain-h" id={`help-${lane.key}-h`}>How {lane.name} works</h3>
         <ol class="c-help-plain-deck">
           {deck.map((s) => (
@@ -102,7 +105,7 @@ const deck = helps ? tutorialFor(lane.key) : [];
           ))}
         </ol>
         <a class="c-help-plain-close" href={`#ask-${lane.key}`}>Close</a>
-      </section>
+      </div>
     </noscript>
   )}
 </header>
