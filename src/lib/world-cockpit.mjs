@@ -166,16 +166,6 @@ export function dialLine(card) {
  * a dial is missing, say nothing rather than showing a bare field name"). So an
  * act whose class states no dials returns the empty string, and the surface
  * renders no line at all rather than an empty one with a caption over it.
- */
-/**
- * @param {object} card
- * @param {{brief?: boolean, weapon?: object|null}} [opts] `brief` returns only
- *   the FIRST phrase — the headline, for a seat that has a seat's worth of
- *   room. `weapon` is `weaponFor`'s answer, and it completes the founder's own
- *   example sentence: "d20 vs 12 to hit · d8 damage · +3 with the good lighter".
- *   It is appended only to the act the weapon says it augments, so an act that
- *   throws the same damage die and gets no help from what you are holding does
- *   not claim any.
  *
  * ⚑ WHY BRIEF EXISTS AND ELLIPSIS DOES NOT. The seat's line was capped in CSS
  * and clipped with an ellipsis, which read "d20 vs 8 to hit · d…" — measured at
@@ -185,6 +175,15 @@ export function dialLine(card) {
  * worse than a short one: it costs the same room and tells the reader there is
  * something they are not being shown. So the seat gets a whole short phrase and
  * the card gets the whole line, and neither of them is cut.
+ *
+ * @param {object} card
+ * @param {{brief?: boolean, weapon?: object|null}} [opts] `brief` returns only
+ *   the FIRST phrase — the headline, for a seat that has a seat's worth of
+ *   room. `weapon` is `weaponFor`'s answer, and it completes the founder's own
+ *   example sentence: "d20 vs 12 to hit · d8 damage · +3 with the good lighter".
+ *   It is appended only to the act the weapon says it augments, so an act that
+ *   throws the same damage die and gets no help from what you are holding does
+ *   not claim any.
  */
 export function dialSpeak(card, { brief = false, weapon = null } = {}) {
   const d = card?.dials;
@@ -1317,12 +1316,12 @@ export function prefillFor(card, answer, { only = null } = {}) {
   // ground to walk to — a relation between you and somewhere, never a thing to
   // hit.
   //
-  // A field about somewhere you stand relative to takes no target. Where the
-  // door says you are stepping OUT of it, the answer is knowable and worth
-  // filling — it is the ground you are in, which the standpoint already names.
-  // Anywhere else the honest prefill is none: the whole point of entering or
-  // walking is that the destination is the reader's choice, and this function's
-  // own rule is that a prefill happens only where there is no choice to make.
+  // A field about somewhere you stand relative to takes no target, and gets no
+  // prefill either: the whole point of entering or walking is that the
+  // destination is the reader's choice, and this function's own rule is that a
+  // prefill happens only where there is no choice to make. The field for
+  // stepping out looked like the exception, since the ground you are in seems
+  // knowable, and the note below is why it is not.
   // ⚑ AND A PLACE FIELD IS LEFT EMPTY, INCLUDING THE ONE THAT LOOKED KNOWABLE.
   //
   // The first pass filled a stepping-out field with the standpoint's own
@@ -1354,8 +1353,6 @@ export function prefillFor(card, answer, { only = null } = {}) {
 /** A field the door describes as naming somewhere you stand relative to, rather
  *  than something you aim at. The door's words, read — never a verb list. */
 const GROUND_SHAPED = /\b(?:step(?:ping)? (?:in|out)|out of|to enter|walk(?:ing)? to|you are within|stand inside)\b/i;
-/** …and the one such relation whose answer the standpoint already knows. */
-const LEAVING = /\bout of\b/i;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ONE ACT FLOW (founder-ruled 2026-08-29, live-testing)
@@ -1411,8 +1408,9 @@ export function aimKind(card) {
 }
 
 /**
- * The ground this standpoint is innermost within — for the panel to SHOW, and
- * for nothing else.
+ * The room this standpoint has entered (its portal) as `{ id, label }`, or null
+ * when it has entered nothing — for the panel to SHOW and for the mount to
+ * recognise the room once it has been left, and never to send.
  *
  * ⚑ IT IS NEVER SENT, and that is a receipt rather than a preference. The
  * founder's ruling is that a crossing-out act with one lawful answer should not
@@ -1424,7 +1422,8 @@ export function aimKind(card) {
  * the site holds only the second.
  *
  * The door already published the right answer in the field's own words: OMIT it
- * and the innermost one is used. So the panel names the room in its TO row so a
+ * and the innermost one is used. So the panel's one plain `step out of <room>`
+ * line (the mount's `flowRowsHtml`, with no FROM or TO row) names the room so a
  * reader can see what they are about to leave, and the act is dispatched with
  * the field absent, which is what the door asked for and what actually works.
  */
@@ -1524,31 +1523,6 @@ export function aimable(slot, answer, { only = null } = {}) {
 }
 
 /**
- * What an armed act may be aimed at, and where each one stands.
- *
- * The candidates are `actCandidates`' — what stands against you, who is down
- * beside you, what is lying on the floor, all three the door's own words. What
- * is added here is the POSITION, because a target that highlights has to
- * highlight somewhere.
- *
- * A TARGET THE ANSWER CANNOT PLACE IS STILL A TARGET. `nearby` is a budgeted
- * field of view and `present` is banded, so a downed ally can be perfectly real
- * and carry no coordinate this read. Dropping them would make the lifting act
- * unreachable exactly when someone is down and out of frame — so an unplaced
- * target keeps its row and is offered by name instead. `at` is null and the
- * caller draws no ring; nothing here pretends to a coordinate it does not hold,
- * which is the same rule `adversaryPlacement` already follows.
- *
- * `only` NARROWS THE SET TO PARTICULAR ROLES (founder-caught 2026-08-29, live:
- * the act that spends a whole turn getting an ally back on their feet was
- * offering the creature as its target, because every aimed act was offered every
- * candidate). It takes the ROLES `actCandidates` tags — never act names, which
- * this file still does not hold: the caller knows which of its acts is choosy
- * and says so in roles, and this end of the seam only knows what each candidate
- * is standing as. Omitted or empty, the whole set is offered exactly as before,
- * so an act nobody has ruled on is unchanged.
- */
-/**
  * EVERY COMBATANT WITH HIT POINTS, placed where the answer places them.
  *
  * FOUNDER-RULED 2026-08-29, live at the board: hp bars on ALL the tokens in an
@@ -1594,6 +1568,31 @@ export function combatantBars(answer) {
   return out;
 }
 
+/**
+ * What an armed act may be aimed at, and where each one stands.
+ *
+ * The candidates are `actCandidates`' — what stands against you, who is down
+ * beside you, what is lying on the floor, all three the door's own words. What
+ * is added here is the POSITION, because a target that highlights has to
+ * highlight somewhere.
+ *
+ * A TARGET THE ANSWER CANNOT PLACE IS STILL A TARGET. `nearby` is a budgeted
+ * field of view and `present` is banded, so a downed ally can be perfectly real
+ * and carry no coordinate this read. Dropping them would make the lifting act
+ * unreachable exactly when someone is down and out of frame — so an unplaced
+ * target keeps its row and is offered by name instead. `at` is null and the
+ * caller draws no ring; nothing here pretends to a coordinate it does not hold,
+ * which is the same rule `adversaryPlacement` already follows.
+ *
+ * `only` NARROWS THE SET TO PARTICULAR ROLES (founder-caught 2026-08-29, live:
+ * the act that spends a whole turn getting an ally back on their feet was
+ * offering the creature as its target, because every aimed act was offered every
+ * candidate). It takes the ROLES `actCandidates` tags — never act names, which
+ * this file still does not hold: the caller knows which of its acts is choosy
+ * and says so in roles, and this end of the seam only knows what each candidate
+ * is standing as. Omitted or empty, the whole set is offered exactly as before,
+ * so an act nobody has ruled on is unchanged.
+ */
 export function aimTargets(answer, { only = null } = {}) {
   const roles = Array.isArray(only) && only.length ? new Set(only) : null;
   const nearby = Array.isArray(answer?.nearby) ? answer.nearby : [];
