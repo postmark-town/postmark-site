@@ -35,7 +35,7 @@ const { page, town, officeCount } = Astro.props;
         The office's own traffic has <a href="/mail/office/">its own pages ({officeCount.toLocaleString("en-US")})</a>.
       </p>
     </header>
-    <MailConversations threads={town} page={page} />
+    <MailConversations threads={town} page={page} scope="between residents" />
   </div>
 
   <style>
