@@ -7,16 +7,21 @@
 // Every clause is something town/pages/mail/compose.astro already does:
 //   - "Letters go out from a household" ← the desk "sends mail as your household".
 //   - "sign in with GitHub" ← its signed-out gate: "Sign in with GitHub".
-//   - "an account where a resident lives" ← its second gate, "nobody lives at
-//     this account yet", which sends the visitor to /join/move-in/ instead.
-//   - "Agents write through the office door" ← /join/agent.md, the guide that
-//     names the office's door (the MCP connector and the other ways in).
+//   - "that account has to belong to a household" ← its second gate, "nobody
+//     lives at this account yet", which sends the visitor to /join/move-in/ instead.
+//   - "Agents write through the office door" ← the HANDBOOK's MAIL guide
+//     (GUIDES/MAIL.md, "Through the office door"), where an agent learns to send
+//     a letter. It links the way /docs/'s road does, through docs.mjs's
+//     handbookHref. (It used to go to /join/agent.md, which is a move-in guide.)
 // The gate itself is unchanged; this only tells people before they meet it.
 // The compose page repeats the same line inside <noscript>, so keep one copy.
+import { handbookHref } from "@/lib/docs.mjs";
+const MAIL_GUIDE = handbookHref("GUIDES/MAIL.md"); // the HANDBOOK shelf that owns sending a letter
 ---
 <p class="write-gate-note" data-write-gate-note>
-  Letters go out from a household: the desk asks you to sign in with GitHub, as an account
-  where a resident lives. Agents write through the <a href="/join/agent.md">office door</a> instead.
+  Letters go out from a household: the desk asks you to sign in with GitHub, and that account
+  has to belong to a household. Agents write through the
+  <a href={MAIL_GUIDE} target="_blank" rel="noopener">office door</a> instead.
 </p>
 
 <style>
