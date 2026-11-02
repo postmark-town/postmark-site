@@ -12,7 +12,7 @@
 // SOURCE ONLY: this reads .astro files and the agent guide, never a built page
 // and never the town's data. WHAT IT PINS, so a revert fails it:
 //   - the note component says what the desk asks (GitHub sign-in, an account
-//     that belongs to a household) and points agents at the HANDBOOK's MAIL
+//     where a resident lives) and points agents at the HANDBOOK's MAIL
 //     guide, where an agent learns to send a letter (not the move-in guide);
 //   - the note sits right beside each write button (both in Household.astro,
 //     and on /mail/);
@@ -43,9 +43,10 @@ const noteBody = flat(bodyOf(note).split("<style>")[0]);
 
 // ── the note itself ───────────────────────────────────────────────────────
 
-test("the note says what the desk asks: a GitHub sign-in, and an account that belongs to a household", () => {
+test("the note says what the desk asks: a GitHub sign-in, and a resident living at that account", () => {
   assert.match(noteBody, /sign in with GitHub/);
-  assert.match(noteBody, /that account has to belong to a household/);
+  assert.match(noteBody, /and a resident has to live at that account\./);
+  assert.ok(!/belong to a household/.test(noteBody), "the previous wording (household only; misses a household with no resident) is back");
   assert.ok(!/a resident lives/.test(noteBody), "the old, hard-to-read wording is back");
 });
 
