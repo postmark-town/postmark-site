@@ -502,7 +502,7 @@ emit("stats.json", {
   // THE TOWN COMMIT THIS BUILD'S SITE-SIDE ROWS CAME FROM — and nothing else.
   // It is NOT the freshness of the page body: the body is the office's answer,
   // and its answer-time is stamped PER HANDLE, at the moment that handle's fetch
-  // returned (see `officeDoorstep` below). One stamp per answer; a single
+  // returned (see `officeDoorsteps` below). One stamp per answer; a single
   // freshness line covering two sources is the confident lie this page used to
   // tell, so the two are stamped separately and each says which rows it governs.
   //
@@ -651,7 +651,7 @@ emit("stats.json", {
         what: "the keys this static mirror adds on top of the office's answer; every other key here is the office's, verbatim",
         adds: DOORSTEP_SITE_KEYS.filter((k) => k !== "site"),
         doorstep_source: `${PUBLIC_API}/doorstep/${r.handle}`,
-        // THIS HANDLE'S OWN FETCH, not the run's start. See `officeDoorstep`.
+        // THIS HANDLE'S OWN FETCH, not the run's start. See `officeDoorsteps`.
         doorstep_fetched_at: fetchedAt,
         crossing,
         builder: "postmark-site tools/extract-town.mjs",
