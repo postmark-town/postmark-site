@@ -15,12 +15,6 @@ import {
   wantsTextarea, worldToPx,
   blockedReason, encounterOf, fighterState, humanWords, looseThings, rollsFrom, spaceOf,
   actCandidates, adversaryOf, adversaryPlacement, chatField, chatShaped, prefillFor,
-  // ⚑ `briefWords` WAS IMPORTED HERE AND IS NOT ANY MORE. It cut the door's
-  // sentence down to fit the small name box, and the box was deleted the same
-  // day — the import outlived its only caller. Nothing in this file has a width
-  // to fit a sentence into now. It stays exported from world-cockpit.mjs with
-  // its own tests: a pure function nobody calls today is cheaper to keep than to
-  // re-derive, and it is not dead there, only unused here.
   pxToWorld, recentVoices, faceImageFor,
   aimField, aimKind, aimTargets, aimable, barFold, combatantBars, consentSplit, dialSpeak, leavingName,
   pointFields, snapPoint, walkStep, weaponFor,
