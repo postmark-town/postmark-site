@@ -82,9 +82,18 @@ test("the mail filter's cards link the letter itself, never `l.thread || l.id`",
 });
 
 test("the homepage ticker links each delivery to the letter, through the helper", () => {
+  // the page hands its letterHref and letter book to the ticker helper (POS-855
+  // moved the item-building into src/lib/front-ticker.mjs), and the helper
+  // writes every delivery's href with letterHref(d.id, ...): still one helper
+  // for a letter's address, and no second id-to-conversation map in either file
   const src = SRC("town", "pages", "index.astro");
-  assert.match(src, /href: letterHref\(d\.id, letterBook\)/);
+  const helper = SRC("src", "lib", "front-ticker.mjs");
+  assert.match(src, /tickerDeliveries\(stats\.latestDeliveries, \{ letterHref, fmtDate, threadTitle, book: letterBook \}\)/,
+    "the page must pass the site's letterHref and its letter book into the ticker helper");
+  assert.match(src, /const letterBook = letterAddresses\(threads, letters\)/);
+  assert.match(helper, /href: letterHref\(d\.id, book\)/, "the helper must build each delivery's href with letterHref(d.id, ...)");
   assert.equal(/idToThread/.test(src), false, "a second id-to-conversation map beside the helper");
+  assert.equal(/idToThread/.test(helper), false, "a second id-to-conversation map in the ticker helper");
 });
 
 test("the doorstep's thread rows take the site's letter address, for every row kind", () => {

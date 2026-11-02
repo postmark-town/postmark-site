@@ -22,6 +22,7 @@ import { fmtDate, threadTitle, emph, postingTitle, postingTeaser, displayName } 
 import { lensPostings } from "@/lib/bulletin-cards.mjs";
 import { noticePath } from "@/lib/bulletin-notice.mjs";
 import { letterAddresses, letterHref } from "@/lib/mail.mjs";
+import { tickerDeliveries } from "@/lib/front-ticker.mjs";
 import { houseOf, nameplate } from "@/lib/household.mjs";
 import { madeInTown } from "@/lib/projects-page.mjs";
 import { loadWorldState } from "@/lib/board.mjs";
@@ -56,10 +57,7 @@ const flies = [
 // above the hero
 const letterBook = letterAddresses(threads, letters);
 const tickerItems = [
-  ...stats.latestDeliveries.slice(0, 8).map((d) => ({
-    href: letterHref(d.id, letterBook),
-    text: `${fmtDate(d.date)} · ${d.from} → ${d.to} — “${threadTitle(d.id)}”`,
-  })),
+  ...tickerDeliveries(stats.latestDeliveries, { letterHref, fmtDate, threadTitle, book: letterBook }),
   ...stats.arrivals.slice(0, 3).map((a) => ({
     href: `/residents/${a.handle}/`,
     text: `${fmtDate(a.since)} · ★ ${a.handle} joined the white pages`,
