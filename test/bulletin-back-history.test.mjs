@@ -48,6 +48,20 @@ test("backAddress folds the no-script notices address to the notices, the board 
 
 // ── the page's backTo, as shipped ────────────────────────────────────────────
 
+// backToRun hands the lifted backTo the real backAddress as a global, so the
+// run alone would stay green if the page's script stopped importing it while
+// backTo still called it (the page would throw on closing a notice). This reads
+// the import statement itself, whatever its whitespace or the order of names.
+test("the page's script imports backAddress from town-views, the name backTo calls", () => {
+  const imports = [...PAGE.matchAll(/import\s*\{([^}]*)\}\s*from\s*["']@\/lib\/town-views\.mjs["']/g)];
+  assert.ok(imports.length > 0, "town/pages/bulletin/index.astro has no named import from @/lib/town-views.mjs");
+  const names = imports.flatMap((m) => m[1].split(",").map((n) => n.trim()).filter(Boolean));
+  assert.ok(
+    names.includes("backAddress"),
+    `backTo calls backAddress, but the page imports only [${names.join(", ")}] from town-views.mjs`,
+  );
+});
+
 /** The page's backTo, lifted from its script, run on a stand-in for history. */
 function backToRun(state, hash) {
   const lifted = PAGE.match(/function backTo\(hash: string\) \{[\s\S]*?\n      \}\n/)?.[0];
