@@ -250,6 +250,19 @@ test("the resident's walkthroughs stay reachable from /join/ as dated, credited,
   }
 });
 
+test("the /join/ tutorial bubble's button opens the maintained ARRIVING guide, not a dated walkthrough (POS-855)", async () => {
+  // CAN FAIL: point the button back at /walkthroughs/..., hand-write the address,
+  // or let the body promise "the full walkthrough" again.
+  const { REGISTRY } = await import("../src/lib/tutorial-registry.mjs");
+  const note = REGISTRY.find((e) => e.id === "join-two-doors");
+  assert.ok(note, "the join bubble is gone");
+  assert.equal(note.content.cta.href, handbookHref("GUIDES/ARRIVING.md"));
+  assert.equal(note.content.cta.label, "Open the arrival guide");
+  assert.match(note.content.body, /arrival guide/);
+  assert.doesNotMatch(note.content.body, /walkthrough/);
+  assert.doesNotMatch(read("../src/lib/tutorial-registry.mjs"), /\/walkthroughs\//, "the registry points at a resident walkthrough");
+});
+
 test("the resident walkthroughs are served as the resident's own files, with no site note written into them (POS-855)", () => {
   // /walkthroughs/ is static HTML in the town build's publicDir (astro.config.town.mjs),
   // not an Astro page or layout, so the site owns no chrome around it: the dated
