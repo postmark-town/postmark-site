@@ -141,10 +141,42 @@ test("[source pin] the front page's lens band sends each card to the posting's o
   assert.match(home, /import \{ noticePath \} from "@\/lib\/bulletin-notice\.mjs";/);
 });
 
-test("[source pin] the More postings note no longer says 'Not pinned', which the 'Pinned for everyone' plaque contradicts", () => {
+test("[source pin] the More postings note says 'not on the board above', not 'Not pinned', which the board's own pinned tag would contradict", () => {
   const board = read("town/pages/bulletin/index.astro");
   assert.equal(board.includes("Not pinned above"), false);
   assert.match(board, /<p class="mp-note">Postings not on the board above, newest first\.<\/p>/);
+});
+
+// ── THE BOARD'S OWN WORDS (Site UX, POS-855, cold walks of 11-02) ───────────
+// "Pinned" belongs to the three PINNED notices, and only to them. The plaque,
+// the cluster note, its aria-label and the no-JS heading name the whole set of
+// notices ("on the board"); the tag on a card and the no-JS " (pinned)" keep
+// the word for the three. Source pins: which line says what is the claim.
+
+test("[source pin] the plaque, the cluster note, its aria-label and the no-JS heading call every notice 'on the board', never 'pinned for everyone'", () => {
+  const board = read("town/pages/bulletin/index.astro");
+  assert.equal(/pinned for everyone/i.test(board), false, "the board calls all its notices pinned again");
+  assert.match(board, /<span class="plaque" aria-hidden="true">On the board<\/span>/);
+  assert.match(board, /<b>On the board<\/b>/);
+  assert.match(board, /aria-label=\{`The notices, \$\{cards\.length\} on the board`\}/);
+  assert.match(/<noscript>[\s\S]*<\/noscript>/.exec(board)?.[0] ?? "", /<h2>On the board<\/h2>/, "the no-JS heading is not 'On the board'");
+});
+
+test("[source pin] 'pinned' stays on the three that are: the card's tag and the no-JS mark both ask isPinned", () => {
+  const board = read("town/pages/bulletin/index.astro");
+  assert.match(board, /<span class="st-kind">\{isPinned\(p\) \? "pinned" : \(p\.data\?\.kind \?\? "notice"\)\}/);
+  assert.match(board, /\{isPinned\(p\) && " \(pinned\)"\}/);
+  assert.match(board, /<span class:list=\{\["pin", \{ red: isPinned\(p\) \}\]\} aria-hidden="true">/);
+});
+
+test("[source pin] the board intro holds with scripts and without: it names both, and no longer promises an in-page opening to everyone", () => {
+  const lede = /<p class="lede">([\s\S]*?)<\/p>/.exec(read("town/pages/bulletin/index.astro"))?.[1] ?? "";
+  const text = lede.replace(/\s+/g, " ");
+  assert.ok(text.length > 0, "the intro paragraph was not found");
+  assert.equal(/Click anything pinned here/.test(text), false, "the intro says 'pinned' for every piece");
+  assert.equal(/opens right on this page;/.test(text), false, "the intro promises the in-page opening with no condition");
+  assert.match(text, /right on this page when scripts run/);
+  assert.match(text, /when they don't, on its own page/);
 });
 
 // ── THE BUILT PAGES (CI only) ───────────────────────────────────────────────
