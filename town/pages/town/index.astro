@@ -1380,15 +1380,33 @@ const switchCss = [
     // So, with script on, it says what it now is (role="button" — it opens a
     // dialog, it goes nowhere) and takes Space too. Set here and not in the
     // markup, so a reader with no script keeps an honest link.
+    //
+    // SPACE ACTS ON KEYUP, as a native button does. Clicking on keydown opens
+    // the dialog, showModal() moves focus into it, and the Space keyup that
+    // follows can then land on a button INSIDE the dialog (Close, in Firefox)
+    // and shut it as it opens. So keydown only stops the page scrolling and
+    // notes that Space went down on THIS link; keyup on the same link clicks.
+    // Bound to the "?" links themselves, not to the page.
     var asks = main.querySelectorAll("a[data-tut]");
-    for (var k = 0; k < asks.length; k++) asks[k].setAttribute("role", "button");
-    main.addEventListener("keydown", function (e) {
-      if (e.key !== " ") return;
-      var ask = e.target.closest && e.target.closest("a[data-tut]");
-      if (!ask) return;
-      e.preventDefault(); // no page scroll under the dialog
-      ask.click();
-    });
+    for (var k = 0; k < asks.length; k++) {
+      (function (a) {
+        var spaceDown = false;
+        a.setAttribute("role", "button");
+        a.addEventListener("keydown", function (e) {
+          if (e.key !== " ") return;
+          e.preventDefault(); // no page scroll under the dialog
+          spaceDown = true;
+        });
+        a.addEventListener("keyup", function (e) {
+          if (e.key !== " ") return;
+          e.preventDefault();
+          if (!spaceDown) return; // Space went down somewhere else
+          spaceDown = false;
+          a.click();
+        });
+        a.addEventListener("blur", function () { spaceDown = false; });
+      })(asks[k]);
+    }
 
     // Arrow keys inside an open deck, because a slideshow that only takes
     // clicks is a slideshow a keyboard reader cannot walk.
