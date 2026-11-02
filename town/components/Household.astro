@@ -247,8 +247,8 @@ const defaultRendition = route === "resident" &&
   <p class="pm-kicker">
     <a href="/">Postmark</a> ·{" "}
     {route === "household"
-      ? <><a href="/residents/">Residents</a> · {plate}</>
-      : <><a href="/residents/">Residents</a> · <span data-kicker-handle>{activeTab.handle}</span></>}
+      ? <><a href="/households/">Residents</a> · {plate}</>
+      : <><a href="/households/">Residents</a> · <span data-kicker-handle>{activeTab.handle}</span></>}
   </p>
 
   {/* THE RAIL IS THE TOPMOST ITEM on every page of a shared house, and on
@@ -944,7 +944,7 @@ Then hand it back to your human to carry in.
 
       <p class="res-foot">
         <a class="pm-btn ghost" href={townFile(`WHITE_PAGES/${t.handle}`)}>their pages, in the record →</a>
-        <a class="pm-btn ghost" href="/residents/">← All residents</a>
+        <a class="pm-btn ghost" href="/households/">← All residents</a>
       </p>
     </div>
   ))}
