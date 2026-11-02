@@ -1,17 +1,17 @@
 {
-  "_note": "hand-written, invented handles; shapes follow stats.latestDeliveries (newest first)",
+  "_note": "wholly invented: the handles and every title phrase in the ids are made up for this test, and none is taken from a real letter, resident or walk log. Shape follows stats.latestDeliveries (newest first). Some slugs hold a lone letter (plan-s, kiln-d) on purpose: a ticker title must never gain punctuation from them.",
   "latestDeliveries": [
-    { "kind": "delivery", "date": "2026-10-30", "id": "alder-2026-10-30-you-d-like-one", "from": "alder", "to": "birch", "thread": null },
-    { "kind": "delivery", "date": "2026-10-30", "id": "alder-2026-10-30-it-s-the-third-lamp", "from": "alder", "to": "cedar", "thread": null },
-    { "kind": "delivery", "date": "2026-10-29", "id": "alder-2026-10-29-we-ll-need-more-rope", "from": "alder", "to": "dune", "thread": null },
-    { "kind": "delivery", "date": "2026-10-29", "id": "alder-2026-10-29-more-from-alder", "from": "alder", "to": "birch", "thread": null },
-    { "kind": "delivery", "date": "2026-10-28", "id": "birch-2026-10-28-don-t-forget-the-ferry", "from": "birch", "to": "alder", "thread": null },
-    { "kind": "delivery", "date": "2026-10-28", "id": "alder-2026-10-28-yet-another", "from": "alder", "to": "cedar", "thread": null },
-    { "kind": "delivery", "date": "2026-10-27", "id": "cedar-2026-10-27-a-plain-title", "from": "cedar", "to": "alder", "thread": null },
-    { "kind": "delivery", "date": "2026-10-27", "id": "cedar-2026-10-27-i-m-here", "from": "cedar", "to": "dune", "thread": null },
-    { "kind": "delivery", "date": "2026-10-26", "id": "cedar-2026-10-26-third-from-cedar", "from": "cedar", "to": "birch", "thread": null },
-    { "kind": "delivery", "date": "2026-10-26", "id": "dune-2026-10-26-vitamin-d-for-the-lamps", "from": "dune", "to": "alder", "thread": null },
-    { "kind": "delivery", "date": "2026-10-25", "id": "birch-2026-10-25-second-from-birch", "from": "birch", "to": "dune", "thread": null },
-    { "kind": "delivery", "date": "2026-10-25", "id": "birch-2026-10-25-third-from-birch", "from": "birch", "to": "dune", "thread": null }
+    { "kind": "delivery", "date": "2026-10-30", "id": "marrow-lark-2026-10-30-kettle-and-compass-inventory", "from": "marrow-lark", "to": "tansy-fen", "thread": null },
+    { "kind": "delivery", "date": "2026-10-30", "id": "marrow-lark-2026-10-30-plan-s-for-the-tin-bridge", "from": "marrow-lark", "to": "oxbow-nine", "thread": null },
+    { "kind": "delivery", "date": "2026-10-29", "id": "marrow-lark-2026-10-29-moss-ledger-third-page", "from": "marrow-lark", "to": "ferrule", "thread": null },
+    { "kind": "delivery", "date": "2026-10-29", "id": "marrow-lark-2026-10-29-lantern-oil-counts", "from": "marrow-lark", "to": "tansy-fen", "thread": null },
+    { "kind": "delivery", "date": "2026-10-28", "id": "tansy-fen-2026-10-28-toll-schedule-for-the-tin-bridge", "from": "tansy-fen", "to": "marrow-lark", "thread": null },
+    { "kind": "delivery", "date": "2026-10-28", "id": "marrow-lark-2026-10-28-one-more-from-marrow", "from": "marrow-lark", "to": "oxbow-nine", "thread": null },
+    { "kind": "delivery", "date": "2026-10-27", "id": "ferrule-2026-10-27-kiln-d-notes", "from": "ferrule", "to": "marrow-lark", "thread": null },
+    { "kind": "delivery", "date": "2026-10-27", "id": "ferrule-2026-10-27-a-plain-title-with-no-marks", "from": "ferrule", "to": "oxbow-nine", "thread": null },
+    { "kind": "delivery", "date": "2026-10-26", "id": "ferrule-2026-10-26-third-from-ferrule", "from": "ferrule", "to": "tansy-fen", "thread": null },
+    { "kind": "delivery", "date": "2026-10-26", "id": "oxbow-nine-2026-10-26-pigeon-roster-for-the-week", "from": "oxbow-nine", "to": "ferrule", "thread": null },
+    { "kind": "delivery", "date": "2026-10-25", "id": "tansy-fen-2026-10-25-second-from-tansy", "from": "tansy-fen", "to": "oxbow-nine", "thread": null },
+    { "kind": "delivery", "date": "2026-10-25", "id": "tansy-fen-2026-10-25-third-from-tansy", "from": "tansy-fen", "to": "oxbow-nine", "thread": null }
   ]
 }
