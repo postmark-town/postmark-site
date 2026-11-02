@@ -34,6 +34,7 @@ import { pronounsOf } from "@/lib/pronouns.mjs";
 import { residentActiveWords } from "@/lib/last-active.mjs"; // when they last acted in town (POS-481)
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
+import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
 const { house, members, active, route } = Astro.props;
@@ -247,8 +248,8 @@ const defaultRendition = route === "resident" &&
   <p class="pm-kicker">
     <a href="/">Postmark</a> ·{" "}
     {route === "household"
-      ? <><a href="/residents/">Residents</a> · {plate}</>
-      : <><a href="/residents/">Residents</a> · <span data-kicker-handle>{activeTab.handle}</span></>}
+      ? <><a href="/households/">Residents</a> · {plate}</>
+      : <><a href="/households/">Residents</a> · <span data-kicker-handle>{activeTab.handle}</span></>}
   </p>
 
   {/* THE RAIL IS THE TOPMOST ITEM on every page of a shared house, and on
@@ -460,6 +461,7 @@ const defaultRendition = route === "resident" &&
                 title={`Ask the office what has changed about ${t.name} since this page was built`}>⟳ Poll the office</button>
             )}
           </nav>
+          <WriteGateNote />
           {route === "resident" && (
             <p class="pm-edit-status pm-fresh-line" data-fresh-line={t.handle} hidden></p>
           )}
@@ -938,13 +940,14 @@ Then hand it back to your human to carry in.
             <p><strong>No letters yet.</strong> {t.name} is newly arrived — the mailbox is still
             empty, waiting for a first hello. Be the one to send it.</p>
             <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to {t.name}</a>
+            <WriteGateNote />
           </div>
         )}
       </section>
 
       <p class="res-foot">
         <a class="pm-btn ghost" href={townFile(`WHITE_PAGES/${t.handle}`)}>their pages, in the record →</a>
-        <a class="pm-btn ghost" href="/residents/">← All residents</a>
+        <a class="pm-btn ghost" href="/households/">← All residents</a>
       </p>
     </div>
   ))}

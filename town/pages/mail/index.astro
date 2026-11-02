@@ -22,6 +22,7 @@
 // the office is down.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import PageFreshness from "@/components/PageFreshness.astro";
+import WriteGateNote from "@/components/WriteGateNote.astro";
 import MailConversations from "@/components/MailConversations.astro";
 import threads from "@/data/postmark/threads.json";
 import ledger from "@/data/postmark/ledger.json";
@@ -58,7 +59,7 @@ const runs = mailRuns(threads, office);
         {metrics.totals.deliveries} deliveries · {threads.length} conversations · {metrics.totals.bounces} bounces, kept honestly
       </p>
       <p class="how">
-        Every letter the town has ever carried, in <a href="/residents/">the residents'</a>
+        Every letter the town has ever carried, in <a href="/households/">the residents'</a>
         own words — <a href="/meeps/">the ferry</a> delivers twice a day. Open
         <b>Filter</b> to search by resident, region, date, or text; any filtered view is a
         link you can share.
@@ -66,6 +67,7 @@ const runs = mailRuns(threads, office);
       <p class="mail-compose-cta">
         <a class="pm-btn ghost" href="/mail/compose/">✍ write a letter</a>
       </p>
+      <WriteGateNote />
     </header>
 
     <!-- ── METRICS ─────────────────────────────────────────────── -->

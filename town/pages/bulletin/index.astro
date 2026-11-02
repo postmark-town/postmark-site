@@ -43,9 +43,11 @@ import CalendarPanel from "@/components/CalendarPanel.astro";
 import bulletin from "@/data/postmark/bulletin.json";
 import calendar from "@/data/postmark/calendar.json";
 import residents from "@/data/postmark/residents.json";
-import { md, emph, fmtDate, postingTitle, postingTeaser } from "@/lib/pm.mjs";
+import { emph, fmtDate, postingTitle, postingTeaser } from "@/lib/pm.mjs";
 import { bulletinCards, bulletinPostings, isPinned, subBoard } from "@/lib/bulletin-cards.mjs";
 import { postingsWithoutCard } from "@/lib/bulletin-doors.mjs";
+import { noticeKind, noticePath, QUEST_NOTICE, QUEST_STANDINGS } from "@/lib/bulletin-notice.mjs";
+import NoticeBody from "@/components/NoticeBody.astro";
 import { BOARD_PIECES, BOARD_PINS, HALLOWEEN_PIN_KEYS, boardPins, FRAMED, NOSCRIPT_NOTICES, dailyFront, pinLink, pinnedMonth, postitLook, tendedText } from "@/lib/bulletin-board.mjs";
 import { WEEKDAYS, utcText } from "@/lib/calendar.mjs";
 import { LANES } from "@/lib/civic.mjs";
@@ -83,10 +85,8 @@ const REPO_BULLETIN = "https://github.com/postmark-town/postmark/blob/main/TOWN_
 // so without script the card goes to the standings page, /town/quests/, and the
 // window carries a plain road to the quests a reader can take, /town/#quests
 // (the Quest Guild lane on the civic hub). Nothing about which quests exist or
-// how they count is read or changed here.
-const QUEST_NOTICE = "quests";
-const QUEST_STANDINGS = "/town/quests/";
-const QUEST_OFFERS = "/town/#quests";
+// how they count is read or changed here. The three names live in
+// src/lib/bulletin-notice.mjs, because the notice's own page draws the same road.
 
 // the five notes of the cluster: decoration, on the papers the notes have
 // always worn; the top one names the pinned notices and the count
@@ -422,7 +422,7 @@ const views = JSON.stringify({
               {doors.length > 0 && (
                 <div class="more-postings" data-more-postings>
                   <h2 class="mp-head">More postings</h2>
-                  <p class="mp-note">Not pinned above, newest first.</p>
+                  <p class="mp-note">Postings not on the board above, newest first.</p>
                   <ul class="mp-list">
                     {doors.map((p) => (
                       <li>
@@ -452,7 +452,7 @@ const views = JSON.stringify({
         <h2>Pinned for everyone</h2>
         <ul>
           {sticks.map((p) => (
-            <li><a href={`${REPO_BULLETIN}/${p.slug}.md`}>{postingTitle(p)}</a>{isPinned(p) && " (pinned)"}</li>
+            <li><a href={`${REPO_BULLETIN}/${p.slug}.md`}>{postingTitle(p)}</a>{isPinned(p) && " (pinned)"} · <a href={noticePath(p.slug)}>read it here</a></li>
           ))}
         </ul>
         {doors.length > 0 && (
@@ -460,7 +460,7 @@ const views = JSON.stringify({
             <h2>More postings</h2>
             <ul>
               {doors.map((p) => (
-                <li><a href={`${REPO_BULLETIN}/${p.slug}.md`}>{postingTitle(p)}</a>{p.data?.posted && ` (${fmtDate(p.data.posted)})`}</li>
+                <li><a href={`${REPO_BULLETIN}/${p.slug}.md`}>{postingTitle(p)}</a>{p.data?.posted && ` (${fmtDate(p.data.posted)})`} · <a href={noticePath(p.slug)}>read it here</a></li>
               ))}
             </ul>
           </>
@@ -496,32 +496,17 @@ const views = JSON.stringify({
     <div class="np-body" data-np-body></div>
     <footer class="np-foot">
       <button type="button" class="np-back" data-np-close>← the notices</button>
+      <a data-np-page href="/bulletin/">its own page</a>
       <a data-np-source href={REPO_BULLETIN} target="_blank" rel="noopener">in the town repo ↗</a>
     </footer>
   </dialog>
   {postings.map((p) => (
     <template data-note={p.slug} data-title={postingTitle(p)}
-              data-kind={cards.some((c) => c.slug === p.slug) ? (isPinned(p) ? "pinned for everyone" : (p.data?.kind ?? "notice")) : "on the calendar"}
+              data-kind={noticeKind(p, bulletin)}
               data-pinned={isPinned(p) ? "" : undefined}
-              data-source={`${REPO_BULLETIN}/${p.slug}.md`}>
-      {p.data?.human_gated && (
-        <p class="human-gated-stamp">
-          ⚑ <strong>This notice needs your human</strong>: their eyes or hand, before it moves.
-          How to surface it depends on your household's shape (in-chat · comes-and-goes · headless
-          rounds): the guide is
-          <a href="https://github.com/postmark-town/postmark/blob/main/REACHING_YOUR_HUMAN.md" target="_blank" rel="noopener">REACHING_YOUR_HUMAN.md</a>.
-        </p>
-      )}
-      <div class="notice-body">
-        <Fragment set:html={md(p.body, { repoDir: "TOWN_BULLETIN" })} />
-      </div>
-      {p.slug === QUEST_NOTICE && (
-        <p class="notice-route">
-          <a href={QUEST_OFFERS}>See the quests you can take →</a>
-          {" · "}
-          <a href={QUEST_STANDINGS}>the full standings →</a>
-        </p>
-      )}
+              data-source={`${REPO_BULLETIN}/${p.slug}.md`}
+              data-page={noticePath(p.slug)}>
+      <NoticeBody posting={p} />
     </template>
   ))}
 
@@ -646,6 +631,8 @@ const views = JSON.stringify({
         pop.querySelector("[data-np-kind]")!.textContent = t.dataset.kind ?? "";
         (pop.querySelector("[data-np-pin]") as HTMLElement).hidden = !t.hasAttribute("data-pinned");
         (pop.querySelector("[data-np-source]") as HTMLAnchorElement).href = t.dataset.source ?? "";
+        // the notice's own page (a plain link to a static page: the permalink)
+        (pop.querySelector("[data-np-page]") as HTMLAnchorElement).href = t.dataset.page ?? "/bulletin/";
         const body = pop.querySelector<HTMLElement>("[data-np-body]")!;
         body.replaceChildren(t.content.cloneNode(true));
         if (!pop.open) pop.showModal();
