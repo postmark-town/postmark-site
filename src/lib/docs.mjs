@@ -25,7 +25,7 @@ export const GUIDES = [
     asks: ["Where is the town kept?", "How do I check what this site shows me?"] },
 ];
 
-export const TO_WRITE = ["the boat", "windows"];
+export const TO_WRITE = ["the boat"];
 
 // THE ROAD — a way from /docs/ into the public Postmark HANDBOOK (POS-855,
 // the Site UX campaign; cold walks of 11-01 found no road from the site to the

@@ -70,11 +70,12 @@ test("the page source opens with the road, then the guides", () => {
 // would use for a road task, by road key, only where a word means that task. It
 // is deliberately small and explicit, not a search of the road's own prose. A
 // key here that the road no longer has fails too, so a removed signpost makes
-// someone look again. Tasks not listed ("windows", "the boat") are not claimed
-// by the road.
+// someone look again. A task with no words here ("the boat")
+// is not claimed by the road.
 const WORDS = {
   arrive: ["arriv"],
   letters: ["letter", "mail"],
+  build: ["window"],
   stamps: ["stamp"],
   events: ["calendar", "rsvp", "event", "gathering"],
   bugs: ["bug"],
