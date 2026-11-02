@@ -46,6 +46,12 @@ function sourceOf(...parts) {
 const hub = sourceOf("town", "index.astro");
 const bulletin = sourceOf("bulletin", "index.astro");
 const home = sourceOf("index.astro");
+// The quest notice's constants and its route block moved out of the bulletin
+// page when the posting got a page of its own: the lib holds the three names,
+// and the shared NoticeBody component draws the road (so the window and the
+// page carry the same one).
+const noticeLib = readFileSync(join(ROOT, "src", "lib", "bulletin-notice.mjs"), "utf8");
+const noticeBody = readFileSync(join(ROOT, "src", "components", "NoticeBody.astro"), "utf8");
 
 test("the hub carries one real id=quests, on the Quest Guild lane that holds the offers", () => {
   const ids = [...hub.matchAll(/\bid="quests"/g)];
@@ -59,8 +65,8 @@ test("the hub carries one real id=quests, on the Quest Guild lane that holds the
 });
 
 test("the bulletin's Quest Board card opens its standings notice and goes to /town/quests/ without script", () => {
-  assert.match(bulletin, /const QUEST_NOTICE = "quests";/);
-  assert.match(bulletin, /const QUEST_STANDINGS = "\/town\/quests\/";/);
+  assert.match(noticeLib, /export const QUEST_NOTICE = "quests";/);
+  assert.match(noticeLib, /export const QUEST_STANDINGS = "\/town\/quests\/";/);
   assert.ok(
     bulletin.includes("<a href={p.slug === QUEST_NOTICE ? QUEST_STANDINGS : `#${p.slug}`} data-note-open={p.slug} data-card={p.slug}>"),
     "the Quest Board card no longer routes to /town/quests/ (it would be the dead `#quests` again), or lost data-note-open (the window)",
@@ -68,10 +74,10 @@ test("the bulletin's Quest Board card opens its standings notice and goes to /to
 });
 
 test("the Quest Board notice's window carries a plain link to the quests a reader can take", () => {
-  assert.match(bulletin, /const QUEST_OFFERS = "\/town\/#quests";/);
-  const at = bulletin.indexOf("{p.slug === QUEST_NOTICE && (");
+  assert.match(noticeLib, /export const QUEST_OFFERS = "\/town\/#quests";/);
+  const at = noticeBody.indexOf("{posting.slug === QUEST_NOTICE && (");
   assert.ok(at >= 0, "the Quest Board notice lost its route block");
-  const block = bulletin.slice(at, at + 400);
+  const block = noticeBody.slice(at, at + 400);
   assert.ok(block.includes("<a href={QUEST_OFFERS}>See the quests you can take →</a>"), "the 'quests you can take' link is gone");
   assert.ok(block.includes("<a href={QUEST_STANDINGS}>the full standings →</a>"), "the full-standings link is gone");
 });
@@ -88,7 +94,7 @@ test("the front page's step 03 names a quest and links it to /town/#quests", () 
 test("every road ends on a target the hub serves", () => {
   // the fragment the roads use is the id the hub has
   assert.ok(/href="\/town\/#quests"/.test(home));
-  assert.ok(/QUEST_OFFERS = "\/town\/#quests"/.test(bulletin));
+  assert.ok(/QUEST_OFFERS = "\/town\/#quests"/.test(noticeLib));
   assert.ok(/\bid="quests"/.test(hub));
 });
 
