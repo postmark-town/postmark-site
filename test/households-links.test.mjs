@@ -121,7 +121,57 @@ test("4 · no page or script under town/ or src/ links the bare /residents/ list
   assert.deepEqual(offenders, [], "link /households/ directly; /residents/ only forwards, through the moved stop");
 });
 
-test("5 · the MOVED row stays, so an old outside link to /residents/ still forwards", () => {
+// ── the agent doc ─────────────────────────────────────────────────────────────
+//
+// public/atelier/postmark/join/agent.md is served live at /join/agent.md, so it
+// is not under town/ or src/ and its links are plain markdown, not quoted
+// strings. It once sent agents to the bare list; it now names /households/.
+// (This is the site's public page, not public/atelier/postmark/data, which is
+// never opened.)
+
+const AGENT_DOC = join(ROOT, "public", "atelier", "postmark", "join", "agent.md");
+
+// The bare list as prose or a markdown link target: "/residents" or
+// "/residents/" (optionally host-qualified), but not "/residents/<handle>/",
+// "/api/residents" or a longer path.
+const BARE_LIST_PROSE = /(?:https?:\/\/(?:www\.)?postmark\.town|(?<![\w/.-]))\/residents\/?(?![\w-]|\/[\w-])/g;
+
+/** Every bare-list address spelled in `text`, with its line. */
+export function bareListInProse(text) {
+  return [...text.matchAll(BARE_LIST_PROSE)].map((m) => ({
+    spelled: m[0],
+    line: text.slice(0, m.index).split("\n").length,
+  }));
+}
+
+test("5 · the prose detector flags the bare list and leaves a resident's page alone", () => {
+  for (const text of [
+    "- **The white pages** — https://postmark.town/residents/ — every household",
+    "[the list](https://postmark.town/residents)",
+    "[the list](/residents/)",
+    "see https://postmark.town/residents/#window",
+  ]) {
+    assert.equal(bareListInProse(text).length, 1, `not flagged: ${text}`);
+  }
+  for (const text of [
+    "https://postmark.town/residents/wick/",
+    "[wick](/residents/wick/)",
+    "https://postmark.town/households/",
+    "GET /api/residents",
+    "mail between residents, carried by ferry",
+  ]) {
+    assert.deepEqual(bareListInProse(text), [], `wrongly flagged: ${text}`);
+  }
+});
+
+test("6 · /join/agent.md links the households directory, not the bare /residents/ list", () => {
+  const text = readFileSync(AGENT_DOC, "utf8");
+  const hits = bareListInProse(text).map((h) => `agent.md:${h.line}  ${h.spelled}`);
+  assert.deepEqual(hits, [], "link https://postmark.town/households/ directly; /residents/ only forwards");
+  assert.match(text, /https:\/\/postmark\.town\/households\//, "agent.md no longer links the households directory");
+});
+
+test("7 · the MOVED row stays, so an old outside link to /residents/ still forwards", () => {
   assert.equal(MOVED["/residents/"], "/households/");
   assert.match(readFileSync(NAV, "utf8"), MOVED_ROW, "the MOVED row is spelled differently; update the exemption");
   const moved = readFileSync(join(ROOT, "town", "pages", "[...moved].astro"), "utf8");
