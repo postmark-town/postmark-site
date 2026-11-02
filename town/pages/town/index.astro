@@ -538,6 +538,17 @@ const switchCss = [
                       does: a quest the daily mirror cannot measure says so
                       neutrally rather than showing a zero it did not earn.
 
+                      THE WORDS (POS-855, Rivet's trace of the board, 11-02).
+                      The number is how many rows on the BOARD show this quest
+                      ticked (`done`), over how many rows the board has (`of`,
+                      the parsed ranked rows, not the town's population), read
+                      from the bulletin's mirror: so the card says "on this
+                      board", says what was completed, and says it is a board
+                      snapshot rather than a live count. The unavailable branch
+                      is unchanged (null, or no denominator); it was "uncounted",
+                      a build word, and is now "Board count unavailable", which
+                      promises no "yet" and invents no count.
+
                       THE COMMENT LIVES OUT HERE, as a JSX comment rather than a
                       block comment inside the ternary, and that is mechanical:
                       the content laws in test/civic-hub.test.mjs strip JSX
@@ -548,13 +559,13 @@ const switchCss = [
                       about a page that was already correct. */}
                   {q.done != null && q.of ? (
                     <div class="m-bar-wrap">
-                      <div class="m-bar" role="img" aria-label={`${q.done} of ${q.of} residents finished this today`}>
+                      <div class="m-bar" role="img" aria-label={`${q.done} of ${q.of} on this board completed this (board snapshot)`}>
                         <i style={`width:${Math.max(2, pct(q.done / q.of))}%`}></i>
                       </div>
-                      <p class="m-barlab"><b>{q.done}</b> of {q.of} residents today</p>
+                      <p class="m-barlab"><b>{q.done}</b> of {q.of} on this board completed this <span class="m-dim">· board snapshot</span></p>
                     </div>
                   ) : (
-                    <p class="m-barlab m-dim">uncounted</p>
+                    <p class="m-barlab m-dim">Board count unavailable</p>
                   )}
                   <p class="m-foot"><span class="m-chip">{q.reward}</span></p>
                 </article>
