@@ -133,7 +133,7 @@ src/components/             shared pieces — JoinFunnel · KeysCard · PotCards
 src/styles/                 postmark.css · global.css · harbor.css · the join stylesheets
 src/data/postmark/          GENERATED — the data layer
 public/atelier/postmark/    GENERATED (mostly) — the served asset tree
-tools/                      extract-town · fetch-town · sync-renditions · sync-postmark-atlas · extract-seam ·
+tools/                      extract-town · fetch-town · sync-renditions · extract-seam ·
                             resolve-world-pin · build-stamp · clean-dist · train-week-check · lib/
 astro.config.town.mjs       the build
 ```
