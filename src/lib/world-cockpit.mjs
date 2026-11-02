@@ -779,9 +779,10 @@ export function encounterOf(answer) {
  *     encounter_detail.hands[<who>].weapon = { thing, bonus, for? }
  *
  * `thing` is the mark id, `bonus` the number it adds. The office already builds
- * exactly this shape internally — `weaponInHand` answers
- * `{ thing, bonus, says }` off the held grant — so the field is that answer
- * carried out to a caller rather than a new idea.
+ * exactly this shape internally — its arena helper that looked up the held
+ * weapon answered `{ thing, bonus, says }` off the held grant — so the field
+ * is that answer carried out to a caller rather than a new idea. (That helper
+ * went with the arena when the office closed it, office dd402ca1, 2026-09-30.)
  *
  * ⚑ `augments` IS WHICH ACT THE BONUS HELPS — the ruled name (Wright with lane
  * bday-law, 2026-08-29). A weapon helps ONE act: the office finds it by looking
@@ -1049,9 +1050,11 @@ export function blockedReason(answer, { acting = null } = {}) {
     // their own clock and nothing here drives them — which is the distinction
     // that keeps this from being "stop gating".
     //
-    // The office says the same thing on the read half (`actingBlocked`); this
-    // is the derivation for a door that has not spoken, and the two agree on
-    // purpose.
+    // The office's read half said the same thing through `acting_blocked` on
+    // the standpoint; the office has since closed the arena and no longer
+    // computes that field (office dd402ca1, 2026-09-30). This is the derivation
+    // for a door that has not spoken, and it was written to agree with that
+    // field on purpose.
     const order = enc.order ?? [];
     let i = order.findIndex((a) => a.current);
     let guard = 0;
@@ -1181,8 +1184,9 @@ export function looseThings(answer) {
  * What stands against this standpoint, if the door named one.
  *
  * CONTRACT: `answer.encounter_detail.adversary = { id, hp, of, body }` — the
- * office's `publicState` block (arena.mjs). It carries NO position, deliberately
- * or not; `adversaryPlacement` below joins it to `nearby` for that, which is the
+ * office's public encounter block, which the office built in its arena before
+ * the arena was closed (office dd402ca1, 2026-09-30). It carries NO position,
+ * deliberately or not; `adversaryPlacement` below joins it to `nearby` for that, which is the
  * only route the answer offers.
  */
 export function adversaryOf(answer) {

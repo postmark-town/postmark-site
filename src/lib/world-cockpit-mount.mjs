@@ -2775,7 +2775,7 @@ export function mountCockpit(o) {
    * head — but bigger by a constant, so the whole scene zooms together.
    *
    * The hp bar is the door's arithmetic shown, never the site's: `hp` and `of`
-   * are the numbers `publicState` sent, and a bar with either missing simply is
+   * are the numbers the door's encounter block sent, and a bar with either missing simply is
    * not drawn rather than guessing a full one.
    */
   /**
