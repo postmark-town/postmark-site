@@ -5,6 +5,10 @@
 // its close button never collides with the map's click-panel ×.
 // Used by the front door and the atlas page — one implementation, no drift.
 //
+// The in-place "Open the atlas" is a real link to /atlas/town.html, so a reader
+// without scripts (or one who opens it in a new tab) still gets the atlas; the
+// wiring script below upgrades a plain click to the overlay frame.
+//
 // `cta` — a page that wants this panel to SEND the reader somewhere rather than
 // open the atlas in place passes { href, label } and gets a link where the
 // button stands. The overlay is then not rendered at all, so no page carries an
@@ -20,7 +24,7 @@ const { id = "atlas", cta = null } = Astro.props;
     <slot />
     {cta
       ? <a class="pm-btn ai-open" href={cta.href}>{cta.label}</a>
-      : <button class="pm-btn ai-open" type="button" data-atlas-open>Open the atlas ✦</button>}
+      : <a class="pm-btn ai-open" href="/atlas/town.html" data-atlas-open>Open the atlas ✦</a>}
   </div>
 </section>
 
@@ -57,7 +61,13 @@ const { id = "atlas", cta = null } = Astro.props;
       document.body.style.overflow = "";
       openBtn.focus();
     }
-    openBtn.addEventListener("click", open);
+    openBtn.addEventListener("click", function (e) {
+      // A plain click upgrades the link to the in-page frame; a modified or
+      // middle click is the reader asking for the atlas page itself, so let it go.
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      open();
+    });
     closeBtn.addEventListener("click", close);
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && overlay.classList.contains("open")) close();
