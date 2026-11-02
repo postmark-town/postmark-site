@@ -8,12 +8,14 @@
 // is open, close, and step.
 //
 // THE SLIDES ARE ALL IN THE MARKUP, one shown at a time. A dialog that fetched
-// or built its slides would be a second way for this page to be wrong; a reader
-// with the script off never opens it at all, which is correct — the panel
-// underneath is the page, and this is a footnote you can ask for.
+// or built its slides would be a second way for this page to be wrong. A reader
+// with the script off never opens THIS dialog; they get the same slides as a
+// plain list from LaneHead.astro (its "?" is a link to it), so the deck is
+// reachable either way and never shown twice.
 //
 // The verbs on the slides are the office's own, cited in src/lib/civic-tutorial.mjs.
 import { paint, SPRITE_W, SPRITE_H } from "@/lib/civic-art.mjs";
+import { CALL_LABEL } from "@/lib/civic-tutorial.mjs";
 
 const { lane, slides = [] } = Astro.props;
 ---
@@ -42,6 +44,7 @@ const { lane, slides = [] } = Astro.props;
           {/* A CALL, WHERE THERE IS ONE. A step with no door on the train
               carries no code block at all rather than a plausible-looking call
               the office would refuse — see civic-tutorial.mjs's bounty deck. */}
+          {s.call && <p class="c-tut-call-label">{CALL_LABEL}</p>}
           {s.call && <code class="c-tut-call">{s.call}</code>}
         </div>
       </li>
@@ -153,8 +156,13 @@ const { lane, slides = [] } = Astro.props;
   /* IT WRAPS. `overflow-x: auto` is gone with `white-space: pre` — a scroller
      around content that now wraps is a scrollbar that can never appear, which
      is the same species of dead rule this page has already shipped twice. */
+  .c-tut-call-label {
+    margin: .7rem 0 0;
+    font-family: var(--pm-mono); font-size: var(--civic-label, .7rem); letter-spacing: .12em;
+    text-transform: uppercase; color: rgba(205, 194, 171, .6);
+  }
   .c-tut-call {
-    display: block; margin: .7rem 0 0; padding: .55rem .7rem;
+    display: block; margin: .3rem 0 0; padding: .55rem .7rem;
     background: rgba(7, 11, 21, .6); border: 1px solid rgba(232, 196, 139, .18);
     border-radius: 7px; font-family: var(--pm-mono); font-size: .72rem;
     line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere;

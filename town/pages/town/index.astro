@@ -1274,8 +1274,9 @@ const switchCss = [
           or on a click (2026-09-02): the panel swaps where the reader is.
        2. THE "?" DIALOG. A native <dialog> needs showModal() called, and the
           deck needs a step. Both are enhancement by definition — with the
-          script off the "?" simply does nothing and the panel under it is the
-          whole page, unchanged.
+          script off the "?" is an ordinary link to the same slides as a plain
+          list (LaneHead.astro's <noscript>), revealed by :target; the panel
+          under it is the whole page, unchanged.
 
      WHAT LEFT WITH THE FOLDS: `reveal()` (there is nothing to open any more),
      the data-jump handler and its pushState (an in-page link is an ORDINARY
@@ -1362,12 +1363,31 @@ const switchCss = [
       }
       var ask = e.target.closest && e.target.closest("[data-tut]");
       if (!ask) return;
+      // The "?" is a link (so it works with no script); with script the fragment
+      // must never move — stopped BEFORE the showModal check, so a browser with
+      // no <dialog> does not navigate to a #help-<key> that, with script on, is
+      // not on the page, and lose the reader's lane.
+      e.preventDefault();
       var dialog = document.getElementById("tut-" + ask.getAttribute("data-tut"));
       // A browser with no <dialog> gets no modal and no error — the panel it
       // would have explained is right there, which is the fallback.
       if (!dialog || typeof dialog.showModal !== "function") return;
       step(dialog, 0);
       dialog.showModal();
+    });
+
+    // THE "?" WAS A <button> AND ANSWERED SPACE; AS A LINK IT ANSWERS ONLY ENTER.
+    // So, with script on, it says what it now is (role="button" — it opens a
+    // dialog, it goes nowhere) and takes Space too. Set here and not in the
+    // markup, so a reader with no script keeps an honest link.
+    var asks = main.querySelectorAll("a[data-tut]");
+    for (var k = 0; k < asks.length; k++) asks[k].setAttribute("role", "button");
+    main.addEventListener("keydown", function (e) {
+      if (e.key !== " ") return;
+      var ask = e.target.closest && e.target.closest("a[data-tut]");
+      if (!ask) return;
+      e.preventDefault(); // no page scroll under the dialog
+      ask.click();
     });
 
     // Arrow keys inside an open deck, because a slideshow that only takes

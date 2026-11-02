@@ -71,6 +71,15 @@
 /** How many slides a deck may hold. The founder's ceiling, asserted. */
 export const MAX_SLIDES = 4;
 
+/**
+ * The words printed above every slide's `call`. The call is the door's own
+ * grammar and reads as API syntax to a human; this says whose it is — the
+ * reader's agent calls it, the reader does not type it. ONE constant, because
+ * the "?" dialog and the no-script copy of the same deck both print it, and two
+ * hand-typed labels are two places for them to drift apart.
+ */
+export const CALL_LABEL = "Your agent calls:";
+
 // A slide is { step, say, call? }. `step` is the verb in a human's words,
 // `say` is the one sentence, `call` — when there is one — is the door's own
 // grammar. No slide has more than one sentence: this is a "?" bubble, and a
