@@ -25,6 +25,7 @@ import {
   enterContinues, enterHint, labelOf, reviewRows, editKey,
 } from "../src/lib/join-funnel.mjs";
 import { ART, artRects, artSvg } from "../src/lib/pixel-icons.mjs";
+import { handbookHref } from "../src/lib/docs.mjs";
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
 const PROTO = read("../public/atelier/postmark/join/move-in/mcp-proto.js");
@@ -216,18 +217,51 @@ test("the funnel's two answers carry the chooser's lane key, so join:lane-chosen
   assert.ok(!/pmTutorialEmit\(/.test(FUNNEL), "the funnel emits on its own; the emit belongs to the page");
 });
 
-test("the walkthrough invitation is Julian's portrait and Keemin's line, word for word, on the funnel AND the no-JS chat card", () => {
-  // Keemin, 2026-09-27: "a little icon of Julian and it should say 'Click me for
-  // a full walkthrough, written by a resident and his human!'". CAN FAIL:
-  // reword the line, drop the portrait, or leave the old framing on either card.
-  const LINE = "Click me for a full walkthrough, written by a resident and his human!";
+test("the main 'every step written out' invitation points at the maintained ARRIVING guide, on the funnel AND the no-JS chat card (POS-855)", () => {
+  // The invitation first sent a visitor to the 2026-08-02 chat-only walkthrough,
+  // which describes a move-in that is gone. The public HANDBOOK marks all three
+  // walkthroughs dated, so the main call is the maintained guide. CAN FAIL: point
+  // the card back at /walkthroughs/..., hand-write the URL, or bring back the old
+  // "full walkthrough, written by a resident" line.
+  assert.equal(handbookHref("GUIDES/ARRIVING.md"), "https://github.com/postmark-town/postmark-blueprints/blob/main/HANDBOOK/GUIDES/ARRIVING.md");
   for (const [where, src] of [["the funnel", FUNNEL], ["the no-JS page", JOIN]]) {
-    const m = src.match(/<a class="join-julian" href="\/walkthroughs\/chat-only\/">([\s\S]*?)<\/a>/);
-    assert.ok(m, `${where} lost the walkthrough invitation`);
+    const m = src.match(/<a class="join-julian" href=\{handbookHref\("GUIDES\/ARRIVING\.md"\)\} target="_blank" rel="noopener">([\s\S]*?)<\/a>/);
+    assert.ok(m, `${where}'s main invitation is not a link to the ARRIVING guide`);
     assert.match(m[1], /artSvg\("julian"\)/, `${where}'s invitation lost Julian's portrait`);
-    assert.ok(m[1].includes(`<span class="join-julian-t">${LINE}</span>`), `${where}'s invitation is not Keemin's line word for word`);
-    assert.ok(!/Rather have every step written out/.test(src), `${where} still carries the old framing`);
+    assert.match(m[1], /<span class="join-julian-t">[^<]*arrival guide[^<]*<\/span>/, `${where}'s invitation does not name the guide`);
+    assert.match(src, /import \{ handbookHref \} from "@\/lib\/docs\.mjs";/, `${where} builds the guide's address some other way than docs.mjs`);
+    assert.ok(!/Click me for a full walkthrough/.test(src), `${where} still carries the old line`);
+    assert.ok(!/Rather have every step written out/.test(src), `${where} still carries the older framing`);
+    assert.ok(!/<a class="join-julian" href="\/walkthroughs\//.test(src), `${where}'s main invitation still opens a resident walkthrough`);
   }
+});
+
+test("the resident's walkthroughs stay reachable from /join/ as dated, credited, the v2 named the newer, nothing called current (POS-855)", () => {
+  // CAN FAIL: drop either link, lose the credit or the date, call v2 "current",
+  // or let a walkthrough link be the main card again.
+  for (const [where, src] of [["the funnel", FUNNEL], ["the no-JS page", JOIN]]) {
+    const m = src.match(/<p class="[^"]*\bjoin-old-walks\b[^"]*">([\s\S]*?)<\/p>/);
+    assert.ok(m, `${where} lost the dated walkthrough line`);
+    const line = m[1];
+    assert.match(line, /^Earlier walkthroughs by a resident and his human, from before the screens changed:/, `${where}: credit or date missing`);
+    assert.match(line, /<a href="\/walkthroughs\/chat-only\/">the August one<\/a>/, `${where} lost the first walkthrough`);
+    assert.match(line, /<a href="\/walkthroughs\/chat-only\/chat-only-v2\/">the newer one<\/a>/, `${where} lost v2, or stopped naming it the newer`);
+    assert.ok(!/current|latest|up to date/i.test(line), `${where} calls a dated walkthrough current`);
+  }
+});
+
+test("the resident walkthroughs are served as the resident's own files, with no site note written into them (POS-855)", () => {
+  // /walkthroughs/ is static HTML in the town build's publicDir (astro.config.town.mjs),
+  // not an Astro page or layout, so the site owns no chrome around it: the dated
+  // note lives on /join/, and the originals stay as written. CAN FAIL: a route or
+  // layout appears for /walkthroughs/, or a pointer to the guide is edited into a file.
+  const dir = new URL("../public/atelier/postmark/walkthroughs/chat-only/", import.meta.url);
+  for (const f of ["index.html", "chat-only-v2/index.html"]) {
+    assert.ok(existsSync(new URL(f, dir)), `${f} is gone`);
+    assert.doesNotMatch(readFileSync(new URL(f, dir), "utf8"), /ARRIVING|postmark-blueprints|HANDBOOK\//, `${f} was edited to carry a site pointer`);
+  }
+  assert.ok(!existsSync(new URL("../town/pages/walkthroughs", import.meta.url)), "a site page now wraps /walkthroughs/");
+  assert.ok(!existsSync(new URL("../town/pages/walkthroughs.astro", import.meta.url)), "a site page now wraps /walkthroughs/");
 });
 
 test("each step wears its little picture, and every picture is a clean 16x16 map in the town's inks", () => {
