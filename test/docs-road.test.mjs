@@ -18,7 +18,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { GUIDES, ROAD, HANDBOOK_BASE, HANDBOOK_INDEX, handbookHref } from "../src/lib/docs.mjs";
+import { GUIDES, ROAD, TO_WRITE, HANDBOOK_BASE, HANDBOOK_INDEX, handbookHref } from "../src/lib/docs.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist-town");
@@ -62,6 +62,37 @@ test("the page source opens with the road, then the guides", () => {
   assert.ok(src.indexOf("ROAD.map") > 0, "the page does not render the road");
   assert.ok(src.indexOf("HANDBOOK_INDEX") > 0, "the page does not link the HANDBOOK's INDEX");
   assert.ok(road < guides, "the road is not before the guides");
+});
+
+// "Still to write" must not name a task the road already signposts (the index
+// once ended "Still to write: the calendar and RSVPs" while the road's EVENTS
+// line sent the reader to that very guide). WORDS is the words a TO_WRITE item
+// would use for a road task, by road key, only where a word means that task. It
+// is deliberately small and explicit, not a search of the road's own prose. A
+// key here that the road no longer has fails too, so a removed signpost makes
+// someone look again. A task with no words here ("the boat")
+// is not claimed by the road.
+const WORDS = {
+  arrive: ["arriv"],
+  letters: ["letter", "mail"],
+  build: ["window"],
+  stamps: ["stamp"],
+  events: ["calendar", "rsvp", "event", "gathering"],
+  bugs: ["bug"],
+  code: ["contribut"],
+};
+
+test("'still to write' names no task the road already signposts", () => {
+  const roadKeys = ROAD.map((r) => r.key);
+  for (const key of Object.keys(WORDS)) assert.ok(roadKeys.includes(key), `${key} is no longer on the road: re-read WORDS`);
+  assert.ok(TO_WRITE.length > 0);
+  for (const item of TO_WRITE) {
+    for (const [key, words] of Object.entries(WORDS)) {
+      for (const w of words) {
+        assert.ok(!item.toLowerCase().includes(w), `"${item}" is still to write, but the road's "${key}" line already points to it ("${w}")`);
+      }
+    }
+  }
 });
 
 const decode = (s) => String(s).replace(/&amp;/g, "&").replace(/&#x27;/g, "'").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
