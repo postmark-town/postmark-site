@@ -111,11 +111,15 @@ export function madeInTown(data, resolvers, limit = MADE_IN_TOWN_LIMIT) {
 // this resident is a named hand, newest first, up to `limit`, from the same
 // projects.json /projects/ prints.
 //
-// The rule is /projects/'s (Wright's POS-256 ruling): a resident is a hand of a
-// project only when their handle is in some hand's `residents`, compared exactly.
-// A hand the record ties to no resident (a git-only hand: it has an author name
-// and an email and an empty `residents`) never matches anyone, and the name and
-// email are never read here. A handle is one account: an account of the same
+// The rule is /projects/'s (Wright's POS-256 ruling), and it is the same code:
+// a hand counts for a resident only when handLabel (above, with the resolvers
+// the page passes /projects/) would NAME it, and their handle is in its
+// `residents`, compared exactly. So a lone resident, or several residents of one
+// household that has a nameplate, are named; a hand across two houses, or whose
+// house cannot be resolved, is counted on /projects/ and never named, and it is
+// not listed here either. A hand the record ties to no resident (a git-only hand:
+// an author name, an email, an empty `residents`) never matches anyone, and the
+// name and email are never read. A handle is one account: an account of the same
 // household is a different handle and has its own page and its own list.
 //
 // Returns { projects: [{ name, href, date }], total }: `total` counts every match,
@@ -125,7 +129,7 @@ export function madeInTown(data, resolvers, limit = MADE_IN_TOWN_LIMIT) {
 // { projects: [], total: 0 }, and the page then prints nothing at all.
 export const RESIDENT_PROJECTS_LIMIT = 5;
 
-export function projectsByResident(data, handle, limit = RESIDENT_PROJECTS_LIMIT) {
+export function projectsByResident(data, handle, resolvers, limit = RESIDENT_PROJECTS_LIMIT) {
   const none = { projects: [], total: 0 };
   if (typeof handle !== "string" || !handle) return none;
   const list = Array.isArray(data?.projects) ? data.projects : [];
@@ -134,7 +138,8 @@ export function projectsByResident(data, handle, limit = RESIDENT_PROJECTS_LIMIT
       && typeof p.href === "string" && /^https?:\/\//.test(p.href)
       && Number.isFinite(Date.parse(p.latest?.date))
       && Array.isArray(p.hands)
-      && p.hands.some((h) => Array.isArray(h?.residents) && h.residents.includes(handle)))
+      && p.hands.some((h) => Array.isArray(h?.residents) && h.residents.includes(handle)
+        && handLabel(h.residents, resolvers) !== null))
     .sort((a, b) => Date.parse(b.latest.date) - Date.parse(a.latest.date) || a.name.localeCompare(b.name));
   return {
     projects: mine.slice(0, Math.max(0, limit)).map((p) => ({ name: p.name, href: p.href, date: p.latest.date })),

@@ -17,7 +17,9 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { projectsByResident, RESIDENT_PROJECTS_LIMIT } from "../src/lib/projects-page.mjs";
+import { projectsByResident as byResident, projectCards, RESIDENT_PROJECTS_LIMIT } from "../src/lib/projects-page.mjs";
+import { nameplate } from "../src/lib/houses.mjs";
+import { displayName } from "../src/lib/pm.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (...p) => readFileSync(join(ROOT, ...p), "utf8");
@@ -31,6 +33,17 @@ const project = (dir, date, hands, extra = {}) => ({
 const hand = (residents, commits = 1) => ({ residents, commits });
 // a hand the town's record ties to no resident: only a git author and an email
 const gitOnly = () => ({ residents: [], commits: 9, author: "Invented Person", email: "invented.person@example.test" });
+
+// ada-fx and ben-fx share a household with a nameplate; cat-fx and ada-fx-2 are
+// houses of one; ghost-fx is in no house the record can resolve.
+const house = { declared: true, slug: "fixture-house", name: "Fixture House", residents: ["ada-fx", "ben-fx"] };
+const resolvers = {
+  residents: [],
+  houseOf: (h) => (house.residents.includes(h) ? house : h === "ghost-fx" ? undefined : { declared: false, slug: h, residents: [h] }),
+  nameplate,
+  displayName,
+};
+const projectsByResident = (data, handle, limit) => byResident(data, handle, resolvers, limit);
 
 const FIXTURE = {
   sha: "abc1234",
@@ -47,7 +60,11 @@ const FIXTURE = {
     project("juliet", null, [hand(["ada-fx"])]),                                  // no dated work
     project("kilo", "2026-10-31T08:00:00Z", [hand(["ada-fx"])], { href: "" }),    // nothing to open
     project("lima", "2026-10-31T08:00:00Z", [hand(["ada-fx"])], { name: "" }),    // no name
-    project("mike", "2026-03-01T08:00:00Z", [hand(["ADA-FX", "ada-fx-2", "ada"])]), // near misses only
+    project("mike", "2026-03-01T08:00:00Z", [hand(["ADA-FX"]), hand(["ada-fx-2"]), hand(["ada"])]), // near misses only
+    // /projects/ counts these hands and never names them, so neither does a resident's page
+    project("papa", "2026-10-29T08:00:00Z", [hand(["ada-fx", "cat-fx"])]),       // across two houses
+    project("romeo", "2026-10-28T08:00:00Z", [hand(["ada-fx", "ghost-fx"])]),    // a house the record cannot resolve
+    project("quebec", "2026-10-27T08:00:00Z", [hand(["cat-fx"]), hand(["ada-fx", "cat-fx"])]), // cat-fx alone is named
   ],
 };
 
@@ -88,6 +105,20 @@ test("a git-only hand never matches: not by author, not by email, not by empty r
 test("a hand of several residents counts for each of them", () => {
   assert.ok(projectsByResident(FIXTURE, "ada-fx").projects.some((p) => p.name === "Project delta"));
   assert.ok(projectsByResident(FIXTURE, "ben-fx").projects.some((p) => p.name === "Project delta"));
+});
+
+test("a hand /projects/ would not name is not listed: across two houses, or a house the record cannot resolve", () => {
+  const ada = projectsByResident(FIXTURE, "ada-fx", 99).projects.map((p) => p.name);
+  for (const name of ["Project papa", "Project romeo", "Project quebec"]) assert.equal(ada.includes(name), false, `${name} is listed for ada-fx`);
+  const cat = projectsByResident(FIXTURE, "cat-fx");
+  assert.deepEqual(cat.projects.map((p) => p.name), ["Project quebec"], "only cat-fx's own lone hand names them");
+  assert.deepEqual(projectsByResident(FIXTURE, "ghost-fx"), { projects: [], total: 0 });
+  // the one fold: exactly the projects /projects/ would name this resident on
+  for (const who of ["ada-fx", "ben-fx", "cat-fx"]) {
+    const named = projectCards(FIXTURE, resolvers).filter((c) => c.named.some((h) => h.href.includes(`/${who}/`) || h.label === nameplate(house)));
+    const viaPage = projectsByResident(FIXTURE, who, 99).projects.map((p) => p.name);
+    for (const name of viaPage) assert.ok(named.some((c) => c.name === name), `${who}: ${name} is listed here but /projects/ names no hand on it`);
+  }
 });
 
 test("a project is listed once, however many of the resident's hands it holds", () => {
@@ -133,7 +164,7 @@ const made = PAGE.slice(PAGE.indexOf('<section class="made"'), PAGE.indexOf("<!-
 test("the resident page calls the helper with the tab's own handle, from projects.json", () => {
   assert.match(PAGE, /import \{ projectsByResident \} from "@\/lib\/projects-page\.mjs"/);
   assert.match(PAGE, /import projectsData from "@\/data\/postmark\/projects\.json"/);
-  assert.match(PAGE, /madeProjects: projectsByResident\(projectsData, r\.handle\)/);
+  assert.match(PAGE, /madeProjects: projectsByResident\(projectsData, r\.handle, \{ residents: \[\], houseOf, nameplate, displayName \}\)/);
 });
 
 test("the list sits in 'What <name> has made', prints nothing when empty, and links the town's projects only when there are more", () => {

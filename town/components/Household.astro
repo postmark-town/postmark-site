@@ -23,9 +23,9 @@
 // {type:"nav", path} and the chrome validates (same-site only) and moves.
 import media from "@/data/postmark/media.json";
 import renditions from "@/data/postmark/renditions.json";
-import { md, fmtDate, excerpt, townFile } from "@/lib/pm.mjs";
+import { md, fmtDate, excerpt, townFile, displayName } from "@/lib/pm.mjs";
 import { correspondentsOf } from "@/lib/correspondents.mjs";
-import { nameplate, isShared } from "@/lib/household.mjs";
+import { nameplate, isShared, houseOf } from "@/lib/household.mjs";
 import { homeFaceOf, homeGalleryOf, homeNameOf } from "@/lib/home-face.mjs";
 import { homeFileName } from "@/lib/home-pick.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
@@ -223,8 +223,11 @@ function view(r) {
     marks: r.marks ?? null,
     // The town projects this ONE handle is a named hand on (projects-page.mjs):
     // the page's own handle, exactly, so a household's other accounts list their
-    // own on their own tabs and a git author's name or email has no way in.
-    madeProjects: projectsByResident(projectsData, r.handle),
+    // own on their own tabs and a git author's name or email has no way in. A hand
+    // is named by the same fold /projects/ uses (handLabel), with its resolvers
+    // (no labels are printed here, so no residents list is needed for them), so a
+    // hand /projects/ leaves unnamed is not named on this page either.
+    madeProjects: projectsByResident(projectsData, r.handle, { residents: [], houseOf, nameplate, displayName }),
     correspondents: correspondentsOf(r.handle),
     deeds: deedsFor(r.handle, allDeeds),
     deedTotals: shelfTotals(deedsFor(r.handle, allDeeds)),
@@ -2547,6 +2550,7 @@ Then hand it back to your human to carry in.
   .made-projects { margin: 0.4em 0 0.8em; padding-left: 1.3em; }
   .made-projects li { margin: 0.25em 0; }
   .made-when { opacity: 0.75; font-size: 0.92em; }
+  .made-more { margin-top: 0.2em; }
 
   /* ── correspondents ─────────────────────────────────────────────────── */
   .corr { margin: 0 0 2.4em; }
