@@ -61,6 +61,16 @@ const { id = "atlas", cta = null } = Astro.props;
       document.body.style.overflow = "";
       openBtn.focus();
     }
+    // THE OPENER WAS A <button> AND ANSWERED SPACE; AS A LINK IT ANSWERS ONLY
+    // ENTER. So, with script on, it says what it now is (role="button": it opens
+    // a frame in place) and takes Space too. Set here and not in the markup, so a
+    // reader with no script keeps an honest link.
+    openBtn.setAttribute("role", "button");
+    openBtn.addEventListener("keydown", function (e) {
+      if (e.key !== " ") return;
+      e.preventDefault(); // no page scroll under the frame
+      openBtn.click();
+    });
     openBtn.addEventListener("click", function (e) {
       // A plain click upgrades the link to the in-page frame; a modified or
       // middle click is the reader asking for the atlas page itself, so let it go.

@@ -7,8 +7,8 @@
 //   1. "Open the atlas" was a <button> that set an iframe from data-src, with no
 //      anchor and no noscript, so a reader without scripts could not open it.
 //   2. The page promised doors "into their page, their mail, and the rest of the
-//      town"; the atlas's own panels give the page door (the extractor appends it
-//      in tools/extract-town.mjs; the map itself is the town's).
+//      town"; the atlas's own panels give less, and not the same for every place
+//      (the extractor appends them in tools/extract-town.mjs; the map is the town's).
 //   3. It called the atlas "the blueprint for the walkable town coming next",
 //      but the walkable World is live at /world/.
 //
@@ -51,16 +51,39 @@ test("with scripts, a plain click still opens the in-page frame", () => {
   assert.ok(!/<iframe\b[^>]*\ssrc=/.test(invite), "the frame loads the atlas up front instead of on open");
 });
 
+test("a modified or middle click still follows the link", () => {
+  const script = invite.match(/<script>([\s\S]*?)<\/script>/)[1];
+  assert.match(script, /e\.button !== 0 \|\| e\.metaKey \|\| e\.ctrlKey \|\| e\.shiftKey \|\| e\.altKey\) return;/,
+    "the click handler no longer lets a modified or middle click through to the link");
+});
+
+test("with scripts on, the link keeps Space as well as Enter, and says it is a button", () => {
+  const script = invite.match(/<script>([\s\S]*?)<\/script>/)[1];
+  // Set by the script, never in the markup: a reader with no script keeps an honest link.
+  assert.ok(!/role="button"/.test(markup(invite)), "role=button is in the markup, so a no-script reader gets a 'button' that is a link");
+  assert.match(script, /openBtn\.setAttribute\("role", "button"\)/, "the script does not mark the link as a button");
+  const k = script.indexOf('if (e.key !== " ") return;');
+  assert.ok(k > 0, "no Space handler on the opener");
+  const body = script.slice(k, script.indexOf("});", k));
+  assert.match(body, /e\.preventDefault\(\)/, "Space must be stopped (no page scroll) before it opens");
+  assert.match(body, /openBtn\.click\(\)/, "Space must open the way a click does");
+});
+
 test("the front door's cta branch is untouched: a link where the opener stands", () => {
   assert.match(invite, /cta\s*\?\s*<a class="pm-btn ai-open" href=\{cta\.href\}>\{cta\.label\}<\/a>/);
 });
 
-test("the atlas page promises each place's own words and a page door, not mail doors", () => {
+test("the atlas page promises each place's own words and no doors", () => {
+  // The extractor's doors depend on the place: a resident on the list gets their
+  // page, the postmaster's place gets the Daily and the Meeps, the centre adds
+  // the Mail, and a place with no resident gets none. So the line says only the
+  // words, which every place gives.
   const text = flat(markup(page));
   const line = text.match(/Click anything[^.]*\./);
   assert.ok(line, "the 'Click anything' line is missing from the atlas page");
   assert.match(line[0], /own words/);
-  assert.match(line[0], /a door to their page/);
+  assert.ok(!/\bdoors?\b/i.test(line[0]), "the 'Click anything' line promises doors again");
+  assert.ok(!/their page/i.test(line[0]), "the 'Click anything' line promises a page door again");
   assert.ok(!/their mail/i.test(text), "the page promises a door into their mail again");
   assert.ok(!/rest of the town/i.test(text), "the page promises doors into the rest of the town again");
 });
