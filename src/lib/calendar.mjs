@@ -158,6 +158,9 @@ export function whenLine(event) {
     const until = durationWords(event.starts_in_s);
     return until ? `starts in ${until}` : "";
   }
+  // The same direction problem at the other end: an under-way event whose end has
+  // already passed (negative ends_in_s) must not read "ends in <gap>". No line.
+  if (Number(event?.ends_in_s) < 0) return "";
   const left = durationWords(event?.ends_in_s);
   return left ? `ends in ${left}` : "";
 }
