@@ -20,6 +20,7 @@ import bulletin from "@/data/postmark/bulletin.json";
 import projectsData from "@/data/postmark/projects.json";
 import { fmtDate, threadTitle, emph, postingTitle, postingTeaser, displayName } from "@/lib/pm.mjs";
 import { lensPostings } from "@/lib/bulletin-cards.mjs";
+import { noticePath } from "@/lib/bulletin-notice.mjs";
 import { letterAddresses, letterHref } from "@/lib/mail.mjs";
 import { houseOf, nameplate } from "@/lib/household.mjs";
 import { madeInTown } from "@/lib/projects-page.mjs";
@@ -379,7 +380,7 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
             <p class="c-kicker">the town bulletin{b.posted ? ` · ${fmtDate(b.posted)}` : ""}</p>
             <h3>{b.title}</h3>
             <p set:html={emph(b.teaser)} />
-            <p class="c-cta"><a class="c-paperlink" href={`/bulletin/#${b.slug}`}>read the posting →</a></p>
+            <p class="c-cta"><a class="c-paperlink" href={noticePath(b.slug)}>read the posting →</a></p>
           </article>
         ))}
       </div>

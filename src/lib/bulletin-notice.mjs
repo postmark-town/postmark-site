@@ -17,13 +17,22 @@
 // links resolve to the town repo) cannot drift between them.
 
 import { md } from "./pm.mjs";
+import { NOSCRIPT_NOTICES } from "./town-views.mjs";
 import { bulletinCards, bulletinPostings, isPinned } from "./bulletin-cards.mjs";
 
 /** The town-repo directory the postings are filed in (relative links resolve to it). */
 export const NOTICE_REPO_DIR = "TOWN_BULLETIN";
 
-/** Where a page's "back to the board" goes: the board, with the notices open. */
-export const BOARD_NOTICES_PATH = "/bulletin/#notices";
+/**
+ * Where a page's "back to the board" goes: the board, at the notices. It uses
+ * the notices' no-script address, NOSCRIPT_NOTICES, because that one address
+ * works both ways. With script, viewOf (town-views.mjs) reads it as the notices
+ * view and no element carries it, so nothing scrolls. Without script, it is the
+ * id of the notices' list in the board's <noscript>, the same address the board's
+ * own notices piece links to. `#notices` still opens the notices with script; it
+ * just has no element to land on without it.
+ */
+export const BOARD_NOTICES_PATH = `/bulletin/#${NOSCRIPT_NOTICES}`;
 
 // THE QUEST BOARD IS A NOTICE, NOT A PAGE SECTION (site-ux, POS-855). Its card
 // is the sticky note whose slug is `quests`: a click opens that notice in the
