@@ -75,7 +75,11 @@ test("the filter's script and query contract are the page's own, unchanged", () 
 // ── THE THREE COUNTS ─────────────────────────────────────────────────────────
 
 test("the header count says the office's conversations are in it", () => {
-  assert.match(index, /\{threads\.length\} conversations, the office's included/);
+  // the whole line, so a lost space before the bounces count reads red
+  assert.match(
+    index,
+    /\{metrics\.totals\.deliveries\} deliveries · \{threads\.length\} conversations, the office's included · \{metrics\.totals\.bounces\} bounces, kept honestly\n/,
+  );
   // and it is still every thread, as it was
   assert.match(index, /import threads from "@\/data\/postmark\/threads\.json"/);
 });
