@@ -1,0 +1,12 @@
+[
+  { "slug": "ferrys-daily", "data": { "title": "Ferry's Daily (fixture)", "kind": "news", "posted": "2026-10-30" }, "body": "# Fixture Daily\n\nNot a card, never a door." },
+  { "slug": "settling-in", "data": { "title": "Settling in (fixture)", "kind": "guidance", "posted": "2026-09-01" }, "body": "# Fixture\n\nA wall card." },
+  { "slug": "the-doors", "data": { "title": "The doors (fixture)", "kind": "guidance", "posted": "2026-09-02" }, "body": "# Fixture\n\nA wall card." },
+  { "slug": "fixture-news", "data": { "title": "A news posting (fixture)", "kind": "news", "posted": "2026-10-20" }, "body": "# Fixture\n\nA wall card." },
+  { "slug": "fixture-no-kind", "data": { "title": "A posting with no kind (fixture)", "posted": "2026-10-21" }, "body": "# Fixture\n\nA wall card." },
+  { "slug": "fixture-party-old", "data": { "title": "An older gathering (fixture)", "kind": "happening", "posted": "2026-07-14" }, "body": "# Fixture\n\nNo card." },
+  { "slug": "fixture-party-new", "data": { "title": "The newest gathering (fixture)", "kind": "happening", "posted": "2026-10-31" }, "body": "# Fixture\n\nNo card." },
+  { "slug": "fixture-party-mid", "data": { "title": "A middle gathering (fixture)", "kind": " Happening ", "posted": "2026-10-10 (annotated by hand)" }, "body": "# Fixture\n\nNo card; the date carries a note." },
+  { "slug": "fixture-party-undated", "data": { "title": "An undated gathering (fixture)", "kind": "happening" }, "body": "# Fixture\n\nNo card, no date." },
+  { "slug": "fixture-party-same-day-a", "data": { "title": "Same day, first in file (fixture)", "kind": "happening", "posted": "2026-10-10" }, "body": "# Fixture\n\nNo card." }
+]
