@@ -518,7 +518,7 @@ const views = JSON.stringify({
     // come back, and viewOf (town-views.mjs, the suite's own reader) to say
     // what an address opens. Nothing here calls a scroll, and no element
     // carries an address as its id, so the page stays where the reader put it.
-    import { FRAMED, viewOf } from "@/lib/town-views.mjs";
+    import { FRAMED, backAddress, viewOf } from "@/lib/town-views.mjs";
 
     const stage = document.querySelector<HTMLElement>("[data-stage]");
     if (stage) {
@@ -678,7 +678,7 @@ const views = JSON.stringify({
       }
       function backTo(hash: string) {
         const s = history.state;
-        const from = s && s.town ? (s.from === "board" ? "" : s.from) : null;
+        const from = s && s.town ? backAddress(s.from) : null;
         if (from === hash) history.back();
         else go(hash);
       }
