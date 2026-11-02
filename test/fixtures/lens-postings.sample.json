@@ -1,0 +1,16 @@
+[
+  { "slug": "sample-trick-or-treat", "data": { "title": "Sample trick-or-treat night", "kind": "happening", "status": "closed", "posted": "2026-10-30" }, "body": "Hand-written sample. A happening marked closed by its own data, and newer than most." },
+  { "slug": "ferrys-daily", "data": { "title": "Sample Daily", "posted": "2026-10-31" }, "body": "Hand-written sample. The Daily is its own page, never a card, though it is the newest of all." },
+  { "slug": "sample-spire-words", "data": { "title": "Sample words at the spire", "kind": "happening", "status": "live", "posted": "2026-10-29" }, "body": "Hand-written sample. A happening still live: the wall unpins it, so the lens band is its only door." },
+  { "slug": "sample-guidance-a", "data": { "title": "Sample guidance A", "kind": "guidance", "status": "open", "posted": "2026-10-28" }, "body": "Hand-written sample." },
+  { "slug": "sample-notice-b", "data": { "title": "Sample notice B", "kind": "notice", "status": "open", "posted": "2026-10-27" }, "body": "Hand-written sample." },
+  { "slug": "sample-past-happening", "data": { "title": "Sample past happening", "kind": "happening", "status": "past", "posted": "2026-10-26" }, "body": "Hand-written sample. The town's word for a finished posting is past: dropped." },
+  { "slug": "sample-news-c", "data": { "title": "Sample news C", "kind": "news", "posted": "2026-10-25" }, "body": "Hand-written sample. No status at all: current." },
+  { "slug": "sample-standing-d", "data": { "title": "Sample standing D", "kind": "standing", "status": "open", "posted": "2026-10-20" }, "body": "Hand-written sample." },
+  { "slug": "sample-ended-invitation", "data": { "title": "Sample ended invitation", "kind": " Happening ", "status": " Ended ", "posted": "2026-10-19" }, "body": "Hand-written sample. Kind and status spelled loosely." },
+  { "slug": "sample-resting-e", "data": { "title": "Sample resting notice E", "kind": "notice", "status": "resting", "posted": "2026-10-10" }, "body": "Hand-written sample. Resting has no closed meaning: it stays." },
+  { "slug": "sample-news-f", "data": { "title": "Sample news F", "kind": "news", "status": "open", "posted": "2026-10-05" }, "body": "Hand-written sample." },
+  { "slug": "sample-guidance-g", "data": { "title": "Sample guidance G", "kind": "guidance", "status": "open", "posted": "2026-09-30" }, "body": "Hand-written sample. Seventh current posting: cut by the limit." },
+  { "slug": "sample-undated-h", "data": { "title": "Sample undated H", "kind": "notice" }, "body": "Hand-written sample. No posted date: sorts last." },
+  { "slug": "sample-notice-i", "data": { "title": "Sample notice I", "kind": "notice", "status": "open", "posted": "2026-09-01" }, "body": "Hand-written sample." }
+]
