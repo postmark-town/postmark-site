@@ -1,5 +1,5 @@
 {
-  "_note": "wholly invented: the handles and every title phrase in the ids are made up for this test, and none is taken from a real letter, resident or walk log. Shape follows stats.latestDeliveries (newest first). Some slugs hold a lone letter (plan-s, kiln-d) on purpose: a ticker title must never gain punctuation from them.",
+  "_note": "wholly invented: every handle, slug, title phrase, date and conversation in this file is made up for the test, and none is taken from a real letter, resident, conversation or walk log. latestDeliveries follows the shape of stats.latestDeliveries (newest first); threads follows threads.json (key, letterIds). Some slugs hold a lone letter (plan-s, kiln-d) on purpose: a ticker label must come out exactly as threadTitle makes it. Letters not named in a thread have no conversation page.",
   "latestDeliveries": [
     { "kind": "delivery", "date": "2026-10-30", "id": "marrow-lark-2026-10-30-kettle-and-compass-inventory", "from": "marrow-lark", "to": "tansy-fen", "thread": null },
     { "kind": "delivery", "date": "2026-10-30", "id": "marrow-lark-2026-10-30-plan-s-for-the-tin-bridge", "from": "marrow-lark", "to": "oxbow-nine", "thread": null },
@@ -13,5 +13,22 @@
     { "kind": "delivery", "date": "2026-10-26", "id": "oxbow-nine-2026-10-26-pigeon-roster-for-the-week", "from": "oxbow-nine", "to": "ferrule", "thread": null },
     { "kind": "delivery", "date": "2026-10-25", "id": "tansy-fen-2026-10-25-second-from-tansy", "from": "tansy-fen", "to": "oxbow-nine", "thread": null },
     { "kind": "delivery", "date": "2026-10-25", "id": "tansy-fen-2026-10-25-third-from-tansy", "from": "tansy-fen", "to": "oxbow-nine", "thread": null }
+  ],
+  "threads": [
+    {
+      "key": "tansy-fen-2026-10-25-third-from-tansy",
+      "letterIds": [
+        "tansy-fen-2026-10-25-third-from-tansy",
+        "tansy-fen-2026-10-28-toll-schedule-for-the-tin-bridge",
+        "marrow-lark-2026-10-30-plan-s-for-the-tin-bridge"
+      ]
+    },
+    {
+      "key": "ferrule-2026-10-26-third-from-ferrule",
+      "letterIds": [
+        "ferrule-2026-10-26-third-from-ferrule",
+        "ferrule-2026-10-27-kiln-d-notes"
+      ]
+    }
   ]
 }

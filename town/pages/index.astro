@@ -19,7 +19,7 @@ import meeps from "@/data/postmark/meeps.json";
 import bulletin from "@/data/postmark/bulletin.json";
 import { fmtDate, threadTitle, emph, postingTitle, postingTeaser } from "@/lib/pm.mjs";
 import { letterAddresses, letterHref } from "@/lib/mail.mjs";
-import { spreadDeliveries } from "@/lib/front-ticker.mjs";
+import { tickerDeliveries } from "@/lib/front-ticker.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { loadWorldState } from "@/lib/board.mjs";
 import { marksByAuthor } from "@/lib/households-directory.mjs";
@@ -53,10 +53,7 @@ const flies = [
 // above the hero
 const letterBook = letterAddresses(threads, letters);
 const tickerItems = [
-  ...spreadDeliveries(stats.latestDeliveries).map((d) => ({
-    href: letterHref(d.id, letterBook),
-    text: `${fmtDate(d.date)} · ${d.from} → ${d.to} — “${threadTitle(d.id)}”`,
-  })),
+  ...tickerDeliveries(stats.latestDeliveries, { letterHref, fmtDate, threadTitle, book: letterBook }),
   ...stats.arrivals.slice(0, 3).map((a) => ({
     href: `/residents/${a.handle}/`,
     text: `${fmtDate(a.since)} · ★ ${a.handle} joined the white pages`,

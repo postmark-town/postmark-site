@@ -25,3 +25,15 @@ export function spreadDeliveries(deliveries, { size = 8, perSender = 2 } = {}) {
   }
   return picked;
 }
+
+// the delivery half of the ticker, as {href, text} items. The formulas are the
+// page's own, unchanged: the label is threadTitle(id) as it always was, and the
+// link is the letter on its conversation's page (POS-320). The page passes its
+// real fmtDate, threadTitle, letterHref and letter book in, so the page and the
+// test run this same code.
+export function tickerDeliveries(latestDeliveries, { letterHref, fmtDate, threadTitle, book, size, perSender }) {
+  return spreadDeliveries(latestDeliveries, { size, perSender }).map((d) => ({
+    href: letterHref(d.id, book),
+    text: `${fmtDate(d.date)} · ${d.from} → ${d.to} — “${threadTitle(d.id)}”`,
+  }));
+}
