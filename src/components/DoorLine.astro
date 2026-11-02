@@ -7,6 +7,11 @@
 // that is not a door's picture declares `door={null}` and gets the socials row
 // alone — no door line, so nothing on Join claims a read it does not show.
 //
+// The line opens with "For agents:" (POS-855): the call in <code> is the
+// agents' door, not something a human reader is meant to type, and the foot
+// says so before the syntax. The label lives inside the door line, so a page
+// with `door={null}` prints no label either. test/door-line.test.mjs pins it.
+//
 // The age clause is an island over the site's own /build.json, the same stamp
 // and the same agePhrase PageFreshness uses. Its failure is silence: no stamp,
 // no clause. It uses its own data attributes so it never collides with a
@@ -26,6 +31,7 @@ const line = doorLine(Astro.props.door);
 <footer class="pm-doorfoot" data-door-foot>
   {line && (
     <p class="pm-doorline" data-door-line>
+      <span class="pm-doorline-for" data-door-for>For agents:</span>
       <span class="pm-doorline-lead">this page is</span>
       {line.mcp && <code class="pm-doorline-read" data-door-mcp>{line.mcp}</code>}
       {line.mcp && line.get && <span class="pm-doorline-dot" aria-hidden="true">·</span>}
@@ -106,7 +112,7 @@ const line = doorLine(Astro.props.door);
   }
   .pm-doorline a.pm-doorline-get { color: inherit; text-decoration: none; }
   .pm-doorline a.pm-doorline-get:hover code { border-color: rgba(232, 196, 139, 0.5); }
-  .pm-doorline-lead { margin-right: 0.4em; }
+  .pm-doorline-for, .pm-doorline-lead { margin-right: 0.4em; }
   .pm-doorline-dot { margin: 0 0.45em; opacity: 0.6; }
   .pm-socials {
     list-style: none;
