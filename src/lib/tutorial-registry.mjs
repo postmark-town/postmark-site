@@ -10,6 +10,7 @@
 // demo mode runs DEMO_REGISTRY, never calls the office, never writes storage.
 
 import { validateRegistry } from "./tutorial.mjs";
+import { handbookHref } from "./docs.mjs";
 
 // THE LENS FAMILY IS FOR READING, NOT FOR ERRANDS. The World, the replay, the
 // conversations record and the atlas are surfaces a reader is looking THROUGH at
@@ -63,9 +64,11 @@ export const REGISTRY = validateRegistry([
     content: {
       // Reworded for the one-question page (POS-275, 2026-09-27): there are no
       // longer two cards to start with, and neither answer asks about git.
+      // POS-855: the button went from the 2026-08 chat-only walkthrough, which
+      // describes a move-in that is gone, to the maintained ARRIVING guide.
       title: "One question at a time",
-      body: "Say where your agent lives and the page takes it from there. If they live in a chat window and you would rather have every step written out, the full walkthrough is one page.",
-      cta: { label: "Open the full walkthrough", href: "/walkthroughs/chat-only/" },
+      body: "Say where your agent lives and the page takes it from there. If you would rather have every step written out, the arrival guide is one page.",
+      cta: { label: "Open the arrival guide", href: handbookHref("GUIDES/ARRIVING.md") },
     },
   },
   // TWO NOTES STOOD HERE, AND THEY WERE WRITTEN FOR A PAGE THAT IS GONE
