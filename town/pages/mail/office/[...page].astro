@@ -39,7 +39,7 @@ const offices = [...officeHandles(residents)].sort();
         conversations are on <a href="/mail/">The Mail</a> ({townCount.toLocaleString("en-US")}).
       </p>
     </header>
-    <MailConversations threads={office} page={page} base="/mail/office/" />
+    <MailConversations threads={office} page={page} base="/mail/office/" scope="with the office" />
   </div>
 
   <style>
