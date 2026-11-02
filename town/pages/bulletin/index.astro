@@ -43,8 +43,9 @@ import CalendarPanel from "@/components/CalendarPanel.astro";
 import bulletin from "@/data/postmark/bulletin.json";
 import calendar from "@/data/postmark/calendar.json";
 import residents from "@/data/postmark/residents.json";
-import { md, emph, postingTitle, postingTeaser } from "@/lib/pm.mjs";
+import { md, emph, fmtDate, postingTitle, postingTeaser } from "@/lib/pm.mjs";
 import { bulletinCards, bulletinPostings, isPinned, subBoard } from "@/lib/bulletin-cards.mjs";
+import { postingsWithoutCard } from "@/lib/bulletin-doors.mjs";
 import { BOARD_PIECES, BOARD_PINS, HALLOWEEN_PIN_KEYS, boardPins, FRAMED, NOSCRIPT_NOTICES, dailyFront, pinLink, pinnedMonth, postitLook, tendedText } from "@/lib/bulletin-board.mjs";
 import { WEEKDAYS, utcText } from "@/lib/calendar.mjs";
 import { LANES } from "@/lib/civic.mjs";
@@ -62,6 +63,10 @@ const cards = bulletinCards(bulletin);
 // happenings, so /bulletin/#<a happening> still opens its notice.
 const postings = bulletinPostings(bulletin);
 const sticks = subBoard(bulletin);
+// The postings the page carries a body for but hangs no card for (the
+// happenings, which the calendar owns): a plain "More postings" list under the
+// wall gives each a door (POS-855, bulletin-doors.mjs).
+const doors = postingsWithoutCard(bulletin);
 // the pinned items on the board itself, each with where its click goes
 const pins = boardPins().map((p) => ({ ...p, link: pinLink(p, postings.map((x) => x.slug)), pictures: p.art.map((a) => paintArt(a)) }));
 const PIN_TILTS = [-2, 2.6];
@@ -403,6 +408,20 @@ const views = JSON.stringify({
                   </li>
                 ))}
               </ol>
+              {doors.length > 0 && (
+                <div class="more-postings" data-more-postings>
+                  <h2 class="mp-head">More postings</h2>
+                  <p class="mp-note">Not pinned above, newest first.</p>
+                  <ul class="mp-list">
+                    {doors.map((p) => (
+                      <li>
+                        {p.data?.posted && <time class="mp-date" datetime={String(p.data.posted).slice(0, 10)}>{fmtDate(p.data.posted)}</time>}
+                        <a href={`#${p.slug}`} data-note-open={p.slug} data-door={p.slug}>{postingTitle(p)}</a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </section>
             <div class="sill" aria-hidden="true"></div>
           </div>
@@ -425,6 +444,16 @@ const views = JSON.stringify({
             <li><a href={`${REPO_BULLETIN}/${p.slug}.md`}>{postingTitle(p)}</a>{isPinned(p) && " (pinned)"}</li>
           ))}
         </ul>
+        {doors.length > 0 && (
+          <>
+            <h2>More postings</h2>
+            <ul>
+              {doors.map((p) => (
+                <li><a href={`${REPO_BULLETIN}/${p.slug}.md`}>{postingTitle(p)}</a>{p.data?.posted && ` (${fmtDate(p.data.posted)})`}</li>
+              ))}
+            </ul>
+          </>
+        )}
       </section>
     </noscript>
 
@@ -1289,6 +1318,16 @@ const views = JSON.stringify({
       display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden;
     }
     .st-teaser :global(strong) { color: var(--pm-ink); }
+
+    /* the postings with no card: a plain list under the cork's notes */
+    .more-postings { margin: 2.4em 0 0; padding: 1.2em 0.2em 0; border-top: 1px solid rgba(232, 196, 139, 0.3); color: #e9dfca; }
+    .mp-head { margin: 0; font-size: 1.1rem; color: var(--pm-gold-bright); }
+    .mp-note { margin: 0.2em 0 0.8em; font-size: 0.85rem; color: #cdc2ab; }
+    .mp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5em; }
+    .mp-list li { display: flex; flex-wrap: wrap; gap: 0.2em 0.9em; align-items: baseline; }
+    .mp-date { font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.06em; color: #cdc2ab; min-width: 9.5em; }
+    .mp-list a { color: var(--pm-gold-bright); overflow-wrap: anywhere; }
+    .mp-list a:focus-visible { outline: 2px solid var(--pm-gold); outline-offset: 3px; }
 
     /* ── ONE NOTICE, in its own small window ─────────────────────────── */
     .note-pop {
