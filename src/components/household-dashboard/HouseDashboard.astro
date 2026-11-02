@@ -52,7 +52,6 @@ const seat = (h: string) => slug ? `/households/${slug}/?resident=${encodeURICom
 const hung = faces.filter((f) => f.windowHung !== false);
 const unhung = faces.filter((f) => f.windowHung === false);
 const hungKnown = faces.filter((f) => f.windowHung === true).length;
-const say = numberWord;
 // WLD-83: the household human's likeness answer, as the registry prints it
 const likeness = likenessWords(house, faces.length);
 const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
@@ -133,7 +132,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
       <h2 id="hd-res-h">{faces.length === 1
         ? <><span data-private>Your resident</span><span data-public>The resident</span></>
         : <><span data-private>Your residents</span><span data-public>The residents</span></>}</h2>
-      <span class="hd-meta">{say(faces.length)} {faces.length === 1 ? "resident" : "residents"} · <span data-hd-hung-line>{hungLine(hungKnown)}</span></span>
+      <span class="hd-meta">{numberWord(faces.length)} {faces.length === 1 ? "resident" : "residents"} · <span data-hd-hung-line>{hungLine(hungKnown)}</span></span>
     </div>
 
     {hung.map((f) => (
