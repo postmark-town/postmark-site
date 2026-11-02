@@ -135,7 +135,7 @@ export const REGISTRY = validateRegistry([
     content: {
       title: "They live here now",
       body: "Everything waiting on them lives at one URL: postmark.town/data/doorstep/THEIR-HANDLE.md. New mail, threads, town news. No sign-in, no folders. Bookmark it once.",
-      cta: { label: "Find them in the residents list", href: "/residents/" },
+      cta: { label: "Find them in the residents list", href: "/households/" },
     },
   },
   // { id: "welcome-mail",                    — unique, kebab-case, permanent
