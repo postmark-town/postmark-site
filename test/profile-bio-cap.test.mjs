@@ -32,12 +32,14 @@ const between = (text, from, to) => {
   return text.slice(a, b + to.length);
 };
 const BIO_BLOCK = between(SRC, "// POS-862 bio wiring begin", "// POS-862 bio wiring end");
+// the real refill (cancel, and after a Save): a programmatic value set that fires no input event
+const FILL = between(SRC, "const fill = (values) => {", "\n      };");
 const SUBMIT = between(SRC, 'form.addEventListener("submit", async (ev) => {', "setResult(message);\n      });");
 
 const NAMES = [
   "form", "field", "setStatus", "paintBioCount", "bioProblem", "clearPronouns", "getTok", "tokenIsFresh", "profilePayload",
   "saved", "framing", "preparedAvatar", "previewUrl", "bubbleObjectUrl", "renderFramed", "saveBtn", "cancelBtn", "avatarInput",
-  "setAvatarStatus", "profileRequest", "OFFICE_BASE", "handle", "fetch", "officeRefusal", "fill", "paint", "avatar", "showAvatar",
+  "setAvatarStatus", "profileRequest", "OFFICE_BASE", "handle", "fetch", "officeRefusal", "paint", "avatar", "showAvatar",
   "blobBase64", "close", "setResult",
 ];
 
@@ -65,14 +67,14 @@ function mount(initialBio = "") {
     saveBtn: new El(), cancelBtn: new El(), avatarInput: new El(), setAvatarStatus: () => {},
     profileRequest, OFFICE_BASE: "/api", handle: "wick",
     fetch: async (url, init) => { log.fetches.push({ url, init }); return { ok: true, status: 200, json: async () => ({ profile: {} }) }; },
-    officeRefusal, fill: () => {}, paint: () => {}, avatar: null, showAvatar: () => {}, blobBase64: async () => "",
+    officeRefusal, paint: () => {}, avatar: null, showAvatar: () => {}, blobBase64: async () => "",
     close: () => { log.closed++; }, setResult: (m) => log.results.push(m),
   };
-  // the bio block and the handler are lifted into ONE function scope, as they share it in the component
-  const run = new Function(...NAMES, `${BIO_BLOCK}\n${SUBMIT}\nreturn { showBio };`);
-  const { showBio } = run(...NAMES.map((n) => scope[n]));
+  // the real fill, the bio block and the handler are lifted into ONE function scope, as they share it in the component
+  const run = new Function(...NAMES, `${FILL}\n${BIO_BLOCK}\n${SUBMIT}\nreturn { showBio, fill };`);
+  const { showBio, fill } = run(...NAMES.map((n) => scope[n]));
   return {
-    textarea, counter, log, showBio,
+    textarea, counter, log, showBio, fill,
     type(value) { textarea.value = value; textarea.dispatchEvent(new Event("input")); }, // a keystroke, or a paste once the browser has inserted it
     async save() { const ev = new Event("submit", { cancelable: true }); await submit(ev); return ev; },
   };
@@ -177,4 +179,25 @@ test("the helpers alone: bioProblem is null through 400 and names the surplus af
   assert.equal(bioProblem(chars(400)), null);
   assert.equal(bioProblem(chars(402)).includes("shorten it by 2"), true);
   assert.equal(bioProblem(undefined), null);
+});
+
+// FIX 2 (POS-862): the REAL fill runs here (sliced from the component with the rest), not a stub. Cancel and the
+// repaint after a Save set the box programmatically, which fires no `input` event, so the count must follow the fill.
+test("the real fill keeps a long saved bio whole and refreshes the count; a short one clears the over-cap state", () => {
+  const longSaved = chars(430); // invented
+  const m = mount("an invented draft");
+  assert.equal(m.counter.textContent, `${bioCount("an invented draft")} / 400`);
+  m.type(chars(120));
+  m.fill({ bio: longSaved, color: "#c90", color_name: "invented", runtime: "invented-runtime", pronouns: "they/them" });
+  assert.equal(m.textarea.value, longSaved, "a long saved bio is kept whole by the refill, not clipped");
+  assert.equal(m.counter.textContent, "430 / 400 — 30 too many", "the counter followed the programmatic fill");
+  assert.equal(m.counter.dataset.over, "1");
+  assert.equal(m.textarea.attrs["aria-invalid"], "true");
+  m.fill({ bio: "short invented" });
+  assert.equal(m.counter.textContent, `${bioCount("short invented")} / 400`);
+  assert.equal(m.counter.dataset.over, "");
+  assert.equal(m.textarea.attrs["aria-invalid"], "false");
+  m.fill({});
+  assert.equal(m.textarea.value, "", "a fill without a bio empties it, as before");
+  assert.equal(m.counter.textContent, "0 / 400");
 });
