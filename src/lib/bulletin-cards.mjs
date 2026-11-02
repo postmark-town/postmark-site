@@ -63,6 +63,53 @@ export function bulletinCards(bulletin) {
     .filter((p) => !isHappening(p));
 }
 
+// ── THE HOME PAGE'S SIGNED-IN CARD BAND (Site UX campaign, POS-855, D7) ──────
+// The signed-in reader's front door shows the newest postings as teaser cards.
+// It used to take the six newest of everything but Ferry's Daily, which hung
+// the calendar's happenings (a trick-or-treat night, an ended invitation) on
+// the front door after their day.
+//
+// THE RULE (D7, as amended 11-01 18:15). The band keeps the wall's "not the
+// Daily" and does NOT drop happenings wholesale: the wall unpins them, so this
+// band is the only door some of them have. It skips a posting whose OWN
+// frontmatter marks it closed — `data.status`, the structured field the
+// postings carry. "closed", "ended" and "past" mean finished: the town's word
+// for a finished posting is `past` (Wright, 00:18Z); the other two are kept as
+// the plain words. Any other word (open, live, resting) has no finished
+// meaning, so it never hides a card: hiding a happening takes away its only
+// door. Nothing is guessed from a date.
+
+/** How many cards the lens band hangs at most. */
+export const LENS_LIMIT = 6;
+
+/**
+ * The `data.status` words that mean the posting is over: it is not a current
+ * posting. Anything else, or no status at all, is current. `past` is the town's
+ * own word for a finished posting (Wright, 00:18Z).
+ */
+export const CLOSED_STATUSES = Object.freeze(["closed", "ended", "past"]);
+
+/** A posting is closed when its own `status` says so. */
+export function isClosed(posting) {
+  return CLOSED_STATUSES.includes(String(posting?.data?.status ?? "").trim().toLowerCase());
+}
+
+/**
+ * The postings the signed-in card band shows: every posting but Ferry's Daily
+ * and those marked closed (a happening that is not closed stays), newest
+ * `posted` first, at most `limit`. Ties keep the bulletin's file order (a
+ * stable sort). An empty list is a real answer: the page then shows the story
+ * band instead of an empty one.
+ * @param {Array<{slug: string, data?: object}>} bulletin  bulletin.json
+ * @param {number} [limit]
+ */
+export function lensPostings(bulletin, limit = LENS_LIMIT) {
+  return (bulletin ?? [])
+    .filter((p) => !NOT_A_CARD.has(p.slug) && !isClosed(p))
+    .sort((a, b) => String(b.data?.posted ?? "").localeCompare(String(a.data?.posted ?? "")))
+    .slice(0, limit);
+}
+
 // ── PINNED FOR EVERYONE (Keemin, 2026-09-27) ────────────────────────────────
 // "For the notices, we should have a couple of them always pinned at the top:
 // PSAs are an obvious choice … pin 1-2 more durable ones. These should be

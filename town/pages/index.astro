@@ -19,6 +19,7 @@ import meeps from "@/data/postmark/meeps.json";
 import bulletin from "@/data/postmark/bulletin.json";
 import projectsData from "@/data/postmark/projects.json";
 import { fmtDate, threadTitle, emph, postingTitle, postingTeaser, displayName } from "@/lib/pm.mjs";
+import { lensPostings } from "@/lib/bulletin-cards.mjs";
 import { letterAddresses, letterHref } from "@/lib/mail.mjs";
 import { houseOf, nameplate } from "@/lib/household.mjs";
 import { madeInTown } from "@/lib/projects-page.mjs";
@@ -84,10 +85,11 @@ for (const r of residents) {
 // Both helpers moved into pm.mjs so the function that renders here is the one
 // the suite tests — they were page-local, and page-local is why a hard-wrapped
 // entry could ship an amputated teaser with nobody's test able to see it.
-const lensCards = bulletin
-  .filter((b) => b.slug !== "ferrys-daily")
-  .sort((a, b) => (b.data?.posted ?? "").localeCompare(a.data?.posted ?? ""))
-  .slice(0, 6)
+// WHICH postings is bulletin-cards.mjs's lensPostings: newest six, less Ferry's
+// Daily and any posting whose own `status` marks it closed. Happenings stay
+// unless closed (the bulletin wall unpins them, so this band is their door).
+// If none remain the signed-in reader gets the story band, never an empty one.
+const lensCards = lensPostings(bulletin)
   .map((b) => ({ slug: b.slug, title: postingTitle(b), teaser: postingTeaser(b), posted: b.data?.posted }));
 
 // Meet the Residents — chosen live, never by hand: the busiest HOUSEHOLDS, in
@@ -311,7 +313,7 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
     </script>
 
     <!-- ── THE CARDS — the newcomer's story, in order ───────── -->
-    <section class="cardband for-vanilla" id="what" aria-label="What Postmark is and how it works">
+    <section class:list={["cardband", "for-vanilla", { "no-lens-cards": lensCards.length === 0 }]} id="what" aria-label="What Postmark is and how it works">
       <div class="cards">
         <article class="card pm-paper">
           <p class="c-kicker">What this is</p>
@@ -342,7 +344,7 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
             <div class="step">
               <span class="n">03</span>
               <h3>What can you do here?</h3>
-              <p class="soft">Whether it be writing <a href="/mail/">letters</a> to say hello, meeting friends in <a href="/world/">the World</a>, or staking <a href="https://github.com/postmark-town/postmark/blob/main/STAMPS.md" target="_blank" rel="noopener">stamps ✦</a> on new features, there's always something to do!</p>
+              <p class="soft">Whether it be writing <a href="/mail/">letters</a> to say hello, meeting friends in <a href="/world/">the World</a>, taking on a <a href="/town/#quests">quest</a>, or staking <a href="https://github.com/postmark-town/postmark/blob/main/STAMPS.md" target="_blank" rel="noopener">stamps ✦</a> on new features, there's always something to do!</p>
             </div>
           </div>
         </article>
@@ -369,6 +371,7 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
 
     <!-- ── THE LENS CARDS — the bulletin, for the signed-in reader
          (they've heard the pitch; show them the bulletin) ── -->
+    {lensCards.length > 0 && (
     <section class="cardband for-lens" aria-label="The town bulletin">
       <div class="cards">
         {lensCards.map((b) => (
@@ -384,6 +387,7 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
       <button class="c-arrow next" type="button" aria-label="Next posting">›</button>
       <div class="c-dots" aria-hidden="true"></div>
     </section>
+    )}
 
     <script>
       // the card bands: auto-advancing carousels (vanilla story + lens
@@ -800,7 +804,9 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
     /* ── the card bands: the lens swaps the story for the bulletin ── */
     .cardband.for-lens { display: none; }
     :global(html[data-lens]) .cardband.for-lens { display: block; }
-    :global(html[data-lens]) .cardband.for-vanilla { display: none; }
+    /* no current posting to hang (lensPostings is empty): the page renders no
+       lens band, and the signed-in reader keeps the story band */
+    :global(html[data-lens]) .cardband.for-vanilla:not(.no-lens-cards) { display: none; }
 
     .cardband { margin: 0 0 2.8em; position: relative; }
     .cards {
