@@ -1,4 +1,4 @@
-// record.mjs — The Record: the crossings, the repos, and the seat's own cards.
+// record.mjs — The Record: the crossings and the repos.
 //
 // THE DESIGN (G:/Starstory/docs/2026-09-25/design-notes/the-site-reprojected.md,
 // "The Record"): "the mail · the crossings (every settlement's receipt and
@@ -33,26 +33,6 @@ export const REPOS = [
   { key: "postmark-blueprints", name: "postmark-blueprints", short: "the chest", href: `${GH}/postmark-blueprints`,
     said: "The town's drawing chest — proposals, subscriptions, and blueprints for the works of Postmark. From idea to grand opening.",
     holds: "Every drawn idea on its way from the Think Tank to a standing work." },
-];
-
-// ── THE RECORD'S OWN CARDS (the seat's landing) ──────────────────────────────
-// In the order the rail lists them. `repo` is the repo each card links, per the
-// design ("the mail → postmark, the crossings → postmark-world, the works →
-// the office"); stamps and the numbers read the town's ledger, so they link
-// the town.
-export const RECORD_CARDS = [
-  { key: "mail", label: "the mail", href: "/mail/", repo: "postmark",
-    what: "Every letter the town has carried — the threads, the deliveries, the bounces." },
-  { key: "crossings", label: "the crossings", href: "/records/crossings/", repo: "postmark-world",
-    what: "Every settlement the Worldkeeper has blessed, with his receipt and what changed." },
-  { key: "works", label: "the works", href: "/works/", repo: "postmark-office",
-    what: "What the town has made of itself — the living instruments, each recomputable from the record." },
-  { key: "stamps", label: "stamps", href: "/stamps/", repo: "postmark",
-    what: "The town's currency: how a stamp is earned, staked, and where a staked stamp goes." },
-  { key: "numbers", label: "the numbers", href: "/numbers/", repo: "postmark",
-    what: "The economy's dials and gauges, read from the ledger's own derived record." },
-  { key: "repos", label: "the repos", href: "/records/repos/", repo: null,
-    what: "The five public repositories the town is made of. Clone any of them and check." },
 ];
 
 export const repoHref = (key) => REPOS.find((r) => r.key === key)?.href ?? null;
@@ -177,20 +157,6 @@ export function crossingRows(data, { bulletin = null } = {}) {
       tagHref: `${GH}/postmark-world/releases/tag/${encodeURIComponent(c.tag ?? `settlement/S${c.n}`)}`,
     };
   });
-}
-
-/**
- * Settlements the office's door knows that this build does not — landed since
- * the bake. The page's island prepends these (number, sha, when) so the list is
- * never behind the town between rebuilds; their receipts arrive with the next
- * build.
- */
-export function newerThan(snapshotMax, doorBody) {
-  const recent = Array.isArray(doorBody?.recent) ? doorBody.recent : [];
-  return recent
-    .filter((r) => Number.isInteger(r?.n) && r.n > snapshotMax)
-    .sort((a, b) => b.n - a.n)
-    .map((r) => ({ n: r.n, sha: r.sha ? String(r.sha).slice(0, 9) : null, blessedAt: r.date ?? null }));
 }
 
 // ── THE SETTLEMENTS, ON THE REPLAY'S TIMELINE (the Site Lift, POS-255) ──────
