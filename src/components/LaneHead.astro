@@ -180,10 +180,15 @@ const deck = helps ? tutorialFor(lane.key) : [];
   @media (prefers-reduced-motion: reduce) { .c-help { transition: none; } .c-help:hover { transform: none; } }
 
   /* THE NO-SCRIPT LIST: shut until the "?" is followed, then a plain panel under
-     the plaque. It spans both grid columns so it is not squeezed beside the "?". */
+     the plaque. It spans both grid columns so it is not squeezed beside the "?".
+     THE GRID ITEM IS THE <noscript>, not the list inside it, so the span is set
+     on the <noscript> (a `grid-column` on the list would do nothing). With
+     script on the UA hides <noscript> (`display: none !important`), so it is not
+     a grid item and this rule changes nothing there. */
+  .c-top > noscript { grid-column: 1 / -1; }
   .c-help-plain { display: none; }
   .c-help-plain:target {
-    display: block; grid-column: 1 / -1; margin: 1rem 0 0; padding: 1rem 1.2rem;
+    display: block; margin: 1rem 0 0; padding: 1rem 1.2rem;
     border: 1px solid var(--lane-edge-open, rgba(232, 196, 139, .4)); border-radius: 12px;
     background: rgba(7, 11, 21, .5); color: rgba(244, 233, 215, .9);
   }

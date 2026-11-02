@@ -95,15 +95,42 @@ test("the list is shut by CSS until the '?' is followed, and the reveal is :targ
   assert.match(css, /\.c-help-plain:target\s*\{[^}]*display:\s*block/, "following the '?' does not reveal the list");
 });
 
+test("the full-width span is on the <noscript>, which is the grid item", () => {
+  const css = head.slice(head.indexOf("<style>"));
+  assert.match(css, /\.c-top\s*>\s*noscript\s*\{\s*grid-column:\s*1\s*\/\s*-1;?\s*\}/,
+    "the <noscript> grid item does not span both columns");
+  // a grid-column on the list inside it would do nothing (it is not the grid item)
+  const target = css.match(/\.c-help-plain:target\s*\{[^}]*\}/)[0];
+  assert.equal(/grid-column/.test(target), false, "grid-column is back on the list, where it does nothing");
+});
+
+test("with the script on, the '?' keeps Space as well as Enter, and says it is a button", () => {
+  // set by the script, not the markup: with no script it stays an honest link
+  assert.equal(/role="button"/.test(headMarkup), false, "role=button is in the markup, so a no-script reader gets a 'button' that is a link");
+  assert.match(hub, /querySelectorAll\("a\[data-tut\]"\)/);
+  assert.match(hub, /setAttribute\("role", "button"\)/, "the script does not mark the link as a button");
+  const k = hub.indexOf('if (e.key !== " ") return;');
+  assert.ok(k > 0, "no Space handler for the '?'");
+  const handler = hub.slice(k, k + 300);
+  assert.match(handler, /closest\("a\[data-tut\]"\)/);
+  assert.ok(handler.indexOf("e.preventDefault()") > -1 && handler.indexOf("ask.click()") > handler.indexOf("e.preventDefault()"),
+    "Space must be stopped (no page scroll) and then open the same way a click does");
+});
+
 test("with the script on the same dialog opens: the one handler stops the link and calls showModal()", () => {
   // the handler is unchanged in shape: find [data-tut], find the dialog by id, showModal
   assert.match(hub, /e\.target\.closest\("\[data-tut\]"\)/);
   assert.match(hub, /document\.getElementById\("tut-" \+ ask\.getAttribute\("data-tut"\)\)/);
-  const at = hub.indexOf('typeof dialog.showModal !== "function") return;');
-  assert.ok(at > 0, "the showModal guard moved");
-  const after = hub.slice(at, at + 400);
-  assert.ok(after.indexOf("e.preventDefault()") > -1 && after.indexOf("e.preventDefault()") < after.indexOf("dialog.showModal()"),
-    "the link is not stopped before showModal(): the fragment would move under the open dialog");
+  const from = hub.indexOf('var ask = e.target.closest && e.target.closest("[data-tut]");');
+  const guard = hub.indexOf('typeof dialog.showModal !== "function") return;', from);
+  const open = hub.indexOf("dialog.showModal();", guard);
+  assert.ok(from > 0 && guard > from && open > guard, "the click handler moved");
+  const stop = hub.indexOf("e.preventDefault();", from);
+  // stopped BEFORE the showModal() guard, so a browser without showModal does not
+  // navigate to a #help-<key> that is not on the page (with script on) and lose
+  // the reader's lane; and still before showModal() itself
+  assert.ok(stop > from && stop < guard,
+    "the link is not stopped before the showModal() guard: a browser without showModal would follow the fragment");
   // the dialog is still the native one, in the same id scheme the handler reads
   assert.match(tutMarkup, /<dialog class="c-tut" id=\{`tut-\$\{lane\.key\}`\}/);
 });
