@@ -34,18 +34,58 @@ export function handLabel(handles, { residents, houseOf, nameplate, displayName 
 export const MADE_IN_TOWN_LIMIT = 4;
 export const MADE_IN_TOWN_WHAT_MAX = 160;
 
+// A sentence ends at ".", "!" or "?" (and any closing quote or bracket) that is
+// followed by an uppercase letter or the end of the text, so "e.g. the" does not
+// end one; a short list of abbreviations ("Dr. Smith") is passed over too.
+const ABBREVIATION = /(?:^|\s)(?:Mr|Mrs|Ms|Dr|Prof|St|Sr|Jr|vs|e\.g|i\.e)$/i;
+function firstSentence(text) {
+  const stop = /[.!?]["')\]”’]*(?=\s+[A-Z]|\s*$)/g;
+  let m;
+  while ((m = stop.exec(text))) {
+    if (text[m.index] === "." && ABBREVIATION.test(text.slice(0, m.index))) continue;
+    return text.slice(0, m.index + m[0].length);
+  }
+  return text;
+}
+
+// Never leave an unmatched "(" or an odd number of '"' on a card: cut back to
+// just before the last unmatched "(" (or the last '"' when they are odd), until
+// both balance.
+function closeOff(s) {
+  for (;;) {
+    const open = [];
+    for (let i = 0; i < s.length; i += 1) {
+      if (s[i] === "(") open.push(i);
+      else if (s[i] === ")") open.pop();
+    }
+    if (open.length) { s = s.slice(0, open[open.length - 1]); continue; }
+    if ((s.match(/"/g) ?? []).length % 2) { s = s.slice(0, s.lastIndexOf('"')); continue; }
+    return s;
+  }
+}
+
 // The card's "what" line: the project's first sentence, and when that is still
-// longer than `max`, cut at a word boundary with an ellipsis. /projects/ keeps
+// longer than `max`, cut at a word boundary with an ellipsis; a cut never leaves
+// a bracket or quote open (nothing left to show gives null). /projects/ keeps
 // the whole text; only the front door shortens it.
 export function trimWhat(what, max = MADE_IN_TOWN_WHAT_MAX) {
   const text = typeof what === "string" ? what.replace(/\s+/g, " ").trim() : "";
   if (!text) return null;
-  const end = text.search(/[.!?](?=\s|$)/);
-  const first = end === -1 ? text : text.slice(0, end + 1);
-  if (first.length <= max) return first;
-  const cut = first.slice(0, max - 1);
-  const at = cut.lastIndexOf(" ");
-  return `${(at > 0 ? cut.slice(0, at) : cut).replace(/[\s,;:\-—–]+$/, "")}…`;
+  let s = firstSentence(text);
+  let ellipsis = false;
+  if (s.length > max) {
+    const cut = s.slice(0, max - 1);
+    const at = cut.lastIndexOf(" ");
+    s = at > 0 ? cut.slice(0, at) : cut;
+    ellipsis = true;
+  }
+  if (s.length < text.length) {
+    const closed = closeOff(s);
+    if (closed.length < s.length) { s = closed; ellipsis = true; }
+  }
+  if (!ellipsis) return s;
+  s = s.replace(/[\s,;:\-—–]+$/, "");
+  return s ? `${s}…` : null;
 }
 
 export function madeInTown(data, resolvers, limit = MADE_IN_TOWN_LIMIT) {

@@ -130,3 +130,26 @@ export function homePicturesOf(registry) {
   }
   return out;
 }
+
+// ── the picture a resident's CARD wears (the households directory, the front page) ──
+//
+// ONE OWNER of the rule ResidentCard used to keep to itself, now that a second
+// reader (the front page's "Meet the Residents") wears the same picture: the
+// household record's picture first (POS-219), else the HOME.md face
+// (`homeFaceOf` over the HOME images the build claimed in `media`), as that
+// image's `card` size; null when the resident has neither.
+//
+// Pure: `media` (the build's media map) and `pictureOf` (home-picture.mjs's
+// `homePictureOf`, which reads the registry at build time) come in as
+// arguments, so the suite runs the rule without the site's aliases.
+
+/**
+ * @param {{ handle: string, homeImages?: string[], home?: { assets?: unknown } | null }} r  the resident record
+ * @param {Record<string, { card?: string }>} media  the build's media map
+ * @param {(handle: string) => string | null} pictureOf  the record's picture for a handle
+ * @returns {string | null}  the image URL the card shows, or null
+ */
+export function cardImageOf(r, media, pictureOf) {
+  const face = homeFaceOf(r, (r.homeImages ?? []).filter((i) => media[i]));
+  return pictureOf(r.handle) ?? (face ? media[face].card : null);
+}

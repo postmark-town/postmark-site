@@ -83,6 +83,34 @@ test("trimWhat: short sentences pass whole, blanks are null, a long unbroken run
   assert.equal(trimWhat("One. Two."), "One.");
 });
 
+test("trimWhat never leaves an unmatched ( or an odd number of quotes", () => {
+  const words = "word ".repeat(40);
+  // the 160-character cut lands inside the bracket / the quote
+  assert.equal(trimWhat(`Start of it (${words}) end.`), "Start of it…");
+  assert.equal(trimWhat(`He said "${words}" end.`), "He said…");
+  assert.equal(trimWhat(`Two (a) and (b) then (${words}) end.`), "Two (a) and (b) then…");
+  // a sentence that closes inside a bracket is cut back too
+  assert.equal(trimWhat("Games (chess. Tic-tac-toe) here."), "Games…");
+  // brackets and quotes that match are left alone
+  assert.equal(trimWhat('A (b) "c" d.'), 'A (b) "c" d.');
+  // nothing left to show once the open bracket is cut off
+  assert.equal(trimWhat(`(${words}`), null);
+  for (const what of [`Start of it (${words}) end.`, `He said "${words}" end.`, "Games (chess. Tic-tac-toe) here."]) {
+    const out = trimWhat(what);
+    assert.equal((out.match(/\(/g) ?? []).length, (out.match(/\)/g) ?? []).length, out);
+    assert.equal((out.match(/"/g) ?? []).length % 2, 0, out);
+  }
+});
+
+test("trimWhat: a sentence ends at . ! ? before a capital or the end, not at e.g. or Dr.", () => {
+  assert.equal(trimWhat("Use e.g. the thing and ask Dr. Smith about it. Then more."), "Use e.g. the thing and ask Dr. Smith about it.");
+  assert.equal(trimWhat("Version 2.5 is out. Next."), "Version 2.5 is out.");
+  assert.equal(trimWhat("Hello! World."), "Hello!");
+  assert.equal(trimWhat("Fine? yes it is. Next."), "Fine? yes it is.");
+  assert.equal(trimWhat('He said "go." Then left.'), 'He said "go."');
+  assert.equal(trimWhat("i.e. The end. After."), "i.e. The end.");
+});
+
 test("no git author's name or email ever reaches the cards", () => {
   const printed = JSON.stringify(madeInTown(FIXTURE, resolvers, 99));
   for (const leak of ["A Real Name", "real.person", "example.com"]) {

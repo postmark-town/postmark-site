@@ -20,7 +20,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { homeFaceOf, homeGalleryOf, homePicturesOf } from "../src/lib/home-face.mjs";
+import { homeFaceOf, homeGalleryOf, homePicturesOf, cardImageOf } from "../src/lib/home-face.mjs";
 
 // POS-219: every reader asks the household record's picture first. The fixtures
 // below set it per test through this one switch; null is "the record holds none".
@@ -111,11 +111,11 @@ const lift = (url, re, what) => {
   return m;
 };
 
-// residents directory: `function cardImage(r) { … }` — in the card component
-// since the site, reprojected, part 4 (the grid and the households share it)
-const DIR = lift("../src/components/ResidentCard.astro", /^function cardImage\(r\) \{[\s\S]*?^\}/m, "the directory's cardImage");
-// eslint-disable-next-line no-new-func -- runs the page's own function
-const cardImage = new Function("media", "homeFaceOf", "homePictureOf", `${DIR[0]}\nreturn cardImage;`)(MEDIA, homeFaceOf, homePictureOf);
+// residents directory: the card's picture is home-face.mjs's `cardImageOf`, one
+// rule shared with the front page's "Meet the Residents". The helper runs here
+// directly; the component is checked to still call it the way this suite does.
+lift("../src/components/ResidentCard.astro", /^const img = cardImageOf\(r, media, homePictureOf\);/m, "the directory card's call to cardImageOf");
+const cardImage = (r) => cardImageOf(r, MEDIA, homePictureOf);
 
 // correspondent cards: `function corrImage(h) { … }` in src/lib/correspondents.mjs
 const CORR = lift("../src/lib/correspondents.mjs", /^function corrImage\(h\) \{[\s\S]*?^\}/m, "the correspondents' corrImage");
