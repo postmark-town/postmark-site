@@ -9,8 +9,16 @@
 // true for every reader) and whose `datetime` and `title` carry the record. The
 // island below rewrites the text into the reader's own zone with the browser's
 // Intl, which is the only thing that knows the zone.
+//
+// THE WORDS (POS-855). The phase badge is the office's phase in plain words
+// ("announced" reads "coming up", since the host's announcements are a
+// different list). The "starts in 4 d 17 h" line is the office's count from its
+// `as_of`, frozen into the page at build, so it is followed by that instant
+// ("as of ...") rather than left to read as live. The place prints its readable
+// name and its coordinates as text; a place with neither prints no row. On the
+// event's own page the card carries the page's one sentence about time zones.
 import {
-  PHASE_WORDS, eventHref, placeOf, residentHref, whenLine, utcText,
+  PHASE_WORDS, ZONE_FLOOR, eventHref, placeOf, residentHref, whenLine, utcText, zoneLine,
 } from "@/lib/calendar.mjs";
 
 interface Props {
@@ -19,8 +27,10 @@ interface Props {
   roll: Set<string>;
   /** the event page's card: the title is not a link, and the RSVP list shows */
   full?: boolean;
+  /** calendar.json's as_of: the instant the "starts in" count was read at */
+  asOf?: string | null;
 }
-const { event: e, roll, full = false } = Astro.props;
+const { event: e, roll, full = false, asOf = null } = Astro.props;
 const place = placeOf(e.place);
 const hostHref = residentHref(e.host, roll);
 const href = eventHref(e.id);
@@ -39,7 +49,13 @@ const times = [
   <p class="cal-phase">
     {e.cancelled && <span class="cal-cancelled" data-cancelled>cancelled</span>}
     <span class="cal-phase-word">{phase}</span>
-    {when && <span class="cal-when"> · {when}</span>}
+    {when && (
+      <span class="cal-when"> · {when}{" "}
+        <span class="cal-when-asof" data-when-asof>(as of {asOf
+          ? <time datetime={asOf} title={`${asOf} (UTC)`} data-local>{utcText(asOf)}</time>
+          : "the last build"})</span>
+      </span>
+    )}
   </p>
   {full
     ? <h1 class="cal-title">{e.title}</h1>
@@ -49,12 +65,15 @@ const times = [
   <dl class="cal-facts">
     <dt>hosted by</dt>
     <dd>{hostHref ? <a href={hostHref}>{e.host}</a> : e.host}</dd>
-    <dt>at</dt>
-    <dd>
-      {place.href
-        ? <a class="cal-place" href={place.href} title={place.point ? `in the World at ${place.point}` : undefined}>{place.label}</a>
-        : <span class="cal-place">{place.label}</span>}
-    </dd>
+    {place.label && <dt>at</dt>}
+    {place.label && (
+      <dd data-place>
+        {place.href
+          ? <a class="cal-place" href={place.href}>{place.label}</a>
+          : <span class="cal-place">{place.label}</span>}
+        {place.name && place.point && <span class="cal-coords" data-place-point> {place.point}</span>}
+      </dd>
+    )}
     {times.map(([label, iso]) => (
       <>
         <dt>{label}</dt>
@@ -67,6 +86,8 @@ const times = [
       {revised > 0 && <span class="cal-revised" data-revised> · revised {revised}×</span>}
     </dd>
   </dl>
+
+  {full && <p class="cal-zone" data-cal-zone-card>{ZONE_FLOOR}</p>}
 
   {full && (
     <section class="cal-rsvp-list">
@@ -86,13 +107,22 @@ const times = [
 </article>
 
 <script>
-  import { LOCAL_FORMAT } from "@/lib/calendar.mjs";
+  import { LOCAL_FORMAT, zoneLine } from "@/lib/calendar.mjs";
   // The reader's zone, from the reader's browser. A <time> that will not parse
   // keeps its UTC floor, which is still true.
   for (const el of document.querySelectorAll("time[data-local]")) {
     try {
       const d = new Date(el.getAttribute("datetime"));
       if (!Number.isNaN(d.getTime())) el.textContent = d.toLocaleString(undefined, LOCAL_FORMAT);
+    } catch {}
+  }
+  // The event page's one sentence about the zone, once the times are the reader's.
+  const said = document.querySelector("[data-cal-zone-card]");
+  if (said) {
+    try {
+      const zone = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+        .formatToParts(new Date()).find((x) => x.type === "timeZoneName")?.value;
+      said.textContent = zoneLine(zone);
     } catch {}
   }
 </script>
@@ -122,6 +152,9 @@ const times = [
   }
   .cal-facts dt { color: var(--pm-ink-soft); font-family: var(--pm-mono); font-size: 0.78rem; padding-top: 0.15em; }
   .cal-facts dd { margin: 0; overflow-wrap: anywhere; }
+  .cal-coords, .cal-when-asof { color: var(--pm-ink-soft); font-family: var(--pm-mono); font-size: 0.82em; }
+  .cal-when-asof { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .cal-zone { margin: 0.7em 0 0; color: var(--pm-ink-soft); font-size: 0.85rem; }
   .cal-revised { color: var(--pm-ink-soft); font-size: 0.85em; }
   .cal-rsvp-list h2 { font-size: 1.05em; margin: 1.2em 0 0.4em; }
   .cal-rsvp-list ul { margin: 0; padding-left: 1.2em; }

@@ -32,7 +32,7 @@ const month = monthGrid(calendar, monthKey(ref), ref);
     <section class="cal-group" data-group={g.key}>
       <h2>{g.label}</h2>
       {g.events.length
-        ? g.events.map((e) => <CalendarCard event={e} roll={roll} />)
+        ? g.events.map((e) => <CalendarCard event={e} roll={roll} asOf={calendar?.as_of ?? null} />)
         : <p class="cal-empty" data-empty>{g.empty}</p>}
     </section>
   ))}
