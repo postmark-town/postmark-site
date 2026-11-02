@@ -62,11 +62,22 @@ test("with scripts on, the link keeps Space as well as Enter, and says it is a b
   // Set by the script, never in the markup: a reader with no script keeps an honest link.
   assert.ok(!/role="button"/.test(markup(invite)), "role=button is in the markup, so a no-script reader gets a 'button' that is a link");
   assert.match(script, /openBtn\.setAttribute\("role", "button"\)/, "the script does not mark the link as a button");
-  const k = script.indexOf('if (e.key !== " ") return;');
-  assert.ok(k > 0, "no Space handler on the opener");
-  const body = script.slice(k, script.indexOf("});", k));
-  assert.match(body, /e\.preventDefault\(\)/, "Space must be stopped (no page scroll) before it opens");
-  assert.match(body, /openBtn\.click\(\)/, "Space must open the way a click does");
+  // Space acts on KEYUP, the way a native button does: open() moves focus to the
+  // close button, and a keyup landing there would press it and shut the frame as
+  // it opens (Firefox). Both listeners are on the opener only.
+  const handler = (type) => {
+    const at = script.indexOf(`openBtn.addEventListener("${type}"`);
+    assert.ok(at > 0, `no ${type} listener bound to the opener (openBtn)`);
+    return script.slice(at, script.indexOf("});", at));
+  };
+  const down = handler("keydown");
+  const up = handler("keyup");
+  assert.match(down, /e\.key !== " "/, "keydown does not look for Space");
+  assert.match(down, /e\.preventDefault\(\)/, "Space keydown must be stopped (no page scroll)");
+  assert.ok(!/\.click\(\)/.test(down), "Space opens on keydown again: the keyup would land on the close button");
+  assert.ok(!/\bopen\(\)/.test(down), "Space keydown opens the frame directly");
+  assert.match(up, /e\.key !== " "/, "keyup does not look for Space");
+  assert.match(up, /openBtn\.click\(\)/, "Space keyup must open the way a click does");
 });
 
 test("the front door's cta branch is untouched: a link where the opener stands", () => {

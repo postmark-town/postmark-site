@@ -66,11 +66,23 @@ const { id = "atlas", cta = null } = Astro.props;
     // a frame in place) and takes Space too. Set here and not in the markup, so a
     // reader with no script keeps an honest link.
     openBtn.setAttribute("role", "button");
+    // A native button takes Space on KEYUP, so this does too: open() moves focus
+    // to the close button, and a keyup that landed there would press it and shut
+    // the frame as it opens (Firefox). Keydown only stops the page scroll and
+    // remembers that Space went down on the opener.
+    var spaceDown = false;
     openBtn.addEventListener("keydown", function (e) {
       if (e.key !== " ") return;
       e.preventDefault(); // no page scroll under the frame
+      spaceDown = true;
+    });
+    openBtn.addEventListener("keyup", function (e) {
+      if (e.key !== " " || !spaceDown) return;
+      spaceDown = false;
+      e.preventDefault();
       openBtn.click();
     });
+    openBtn.addEventListener("blur", function () { spaceDown = false; });
     openBtn.addEventListener("click", function (e) {
       // A plain click upgrades the link to the in-page frame; a modified or
       // middle click is the reader asking for the atlas page itself, so let it go.
