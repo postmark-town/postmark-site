@@ -198,9 +198,11 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
         <WriteGateNote />
         <!-- true for every reader, signed in or not: the page's own script grays all three
              write-back controls (wb-off) unless the signed-in household holds `a` or `b`
-             (isPairViewer, below), so a signed-in outsider is also stopped, and the sign-in
-             note above says nothing about that. Static copy; the gate and the script are untouched. -->
-        <p class="fr-gate-who" data-write-gate-pair>Only the two writers of this conversation can write back here.</p>
+             (isPairViewer checks every handle of the household, so a housemate of either
+             writer can write back too: the line names households, not the two writers).
+             A signed-in outsider is also stopped, and the sign-in note above says nothing
+             about that. Static copy; the gate and the script are untouched. -->
+        <p class="fr-gate-who" data-write-gate-pair>Only the two households in this conversation can write back here.</p>
       </div>
     </section>
 

@@ -4,7 +4,9 @@
 // write-back controls are enabled only when the signed-in household holds one of
 // the pair: a signed-in reader who is neither writer is told to sign in and finds
 // grayed buttons. One short static line beside the note is true for everyone:
-// only the two writers of the conversation can write back there.
+// only the two households in the conversation can write back there. (The gate is
+// `isPairViewer`: it tests every handle of the signed-in household, so a housemate of
+// either writer can write back too. The line names households, not "the two writers".)
 //
 // SOURCE ONLY: reads town/pages/mail/with/[pair].astro, never a built page or the
 // town's data. WHAT IT PINS, so a revert fails it:
@@ -32,10 +34,10 @@ const scriptAt = body.indexOf("<script>");
 const markup = body.slice(0, scriptAt); // the page's markup only
 const script = body.slice(scriptAt);
 
-const LINE = "Only the two writers of this conversation can write back here.";
+const LINE = "Only the two households in this conversation can write back here.";
 const strip = (s) => s.replace(/<!--[\s\S]*?-->/g, "");
 
-test("the page says, once, that only the conversation's two writers can write back", () => {
+test("the page says, once, that only the conversation's two households can write back", () => {
   assert.equal(strip(markup).split(LINE).length - 1, 1, "expected the line exactly once in the page markup");
   assert.equal(strip(body).split(LINE).length - 1, 1, "the line is also in the page's script or styles");
 });
@@ -47,7 +49,7 @@ test("the line sits inside the gate-note wrapper, after the shared sign-in note,
   const wrapper = strip(markup.slice(wrapStart, wrapEnd));
   assert.ok(wrapper.includes("<WriteGateNote />"), "the shared note must stay in the wrapper");
   assert.ok(wrapper.indexOf(LINE) > wrapper.indexOf("<WriteGateNote />"), "the line comes after the sign-in note");
-  const tag = wrapper.match(/<p\b[^>]*>(?=\s*Only the two writers)/)?.[0] ?? "";
+  const tag = wrapper.match(/<p\b[^>]*>(?=\s*Only the two households)/)?.[0] ?? "";
   assert.ok(tag, "the line is its own <p>");
   assert.doesNotMatch(tag, /\bhidden\b|data-c-|\{/, "the line is plain static copy: no hidden, no switch, no expression");
 });
@@ -59,7 +61,11 @@ test("the line is true: the script grays every write-back control unless the hou
   assert.match(script, /if \(el\.classList\.contains\("wb-off"\)\) return;/);
 });
 
-test("the shared sign-in note is unchanged (it is the sign-in line, not the writers line)", () => {
-  assert.doesNotMatch(note, /two writers/, "the writers line belongs to the conversation page, not the shared note");
+test("the line does not overclaim: it says households, never 'the two writers' (a housemate can write back)", () => {
+  assert.doesNotMatch(strip(body), /two writers/, "the page says 'two writers' again, but isPairViewer lets a housemate of either write back");
+});
+
+test("the shared sign-in note is unchanged (it is the sign-in line, not the households line)", () => {
+  assert.doesNotMatch(note, /two households/, "the households line belongs to the conversation page, not the shared note");
   assert.match(note, /Letters go out from a household: the desk asks you to sign in with GitHub/);
 });
