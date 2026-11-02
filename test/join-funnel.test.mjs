@@ -261,6 +261,12 @@ test("the /join/ tutorial bubble's button opens the maintained ARRIVING guide, n
   assert.match(note.content.body, /arrival guide/);
   assert.doesNotMatch(note.content.body, /walkthrough/);
   assert.doesNotMatch(read("../src/lib/tutorial-registry.mjs"), /\/walkthroughs\//, "the registry points at a resident walkthrough");
+  // The layout imports the registry, so the POS-394 render proof's code-only
+  // projection must carry every file the registry imports, or its Astro build
+  // crashes ("Could not resolve ./docs.mjs", CI, 2026-11-02). CAN FAIL: drop
+  // docs.mjs from SOURCES while the registry still imports it.
+  assert.match(read("../src/lib/tutorial-registry.mjs"), /from "\.\/docs\.mjs"/);
+  assert.match(read("../tools/pos394-render-proof.mjs"), /"src\/lib\/docs\.mjs"/, "the render proof's SOURCES lost docs.mjs");
 });
 
 test("the resident walkthroughs are served as the resident's own files, with no site note written into them (POS-855)", () => {
