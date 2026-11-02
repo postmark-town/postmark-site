@@ -130,7 +130,7 @@ const views = JSON.stringify({
 <PostmarkLayout
   door={{ mcp: 'town { read: "bulletin" }', get: "/api/bulletin" }}
   title="The Town — Postmark"
-  description="The town's board: this month's calendar, Ferry's Daily, the notices pinned for everyone, the meeps and the civic quarter. Open any of them right here."
+  description="The town's board: this month's calendar, Ferry's Daily, the notices on the board, the meeps and the civic quarter. Open any of them from here."
   active="bulletin"
 >
   <div class="board-page">
@@ -138,9 +138,9 @@ const views = JSON.stringify({
       <h1>The Town</h1>
       <p class="lede">
         This is the town's shared board: this month's calendar, Ferry's Daily, the notices
-        pinned for everyone, the civic quarter, the meeps, and the harbor beyond the water.
-        Click anything pinned here and it opens right on this page; the arrow at the top
-        brings you back to the board.
+        on the board, the civic quarter, the meeps, and the harbor beyond the water.
+        Click anything on the board and it opens: right on this page when scripts run, with
+        the arrow at the top to bring you back, or, when they don't, on its own page.
       </p>
     </header>
 
@@ -220,12 +220,12 @@ const views = JSON.stringify({
 
             {/* 3 · THE POST-ITS, a cluster: one click opens the notices' sub-board */}
             <a class="piece notes" href={`#${NOSCRIPT_NOTICES}`} data-pinned="notices" data-open={piece.notices.hash}
-               aria-label={`The notices, ${cards.length} pinned for everyone`}>
+               aria-label={`The notices, ${cards.length} on the board`}>
               {notes.map((look, i) => (
                 <span class={`note n${i}`} style={`--paper: ${look.bg}`} aria-hidden="true">
                   {i === 4 && (
                     <>
-                      <b>Pinned for everyone</b>
+                      <b>On the board</b>
                       {firstPinned.length > 0 && <em>{firstPinned.join(" · ")}{cards.length > firstPinned.length && " · …"}</em>}
                       <i>{cards.length} notices · open the board</i>
                     </>
@@ -405,7 +405,7 @@ const views = JSON.stringify({
           {/* THE NOTICES' SUB-BOARD: a sticky note per notice, the pinned first under red pins */}
           <div class="view-body" data-view="notices" hidden>
             <section class="subboard" aria-label="The notices">
-              <span class="plaque" aria-hidden="true">Pinned for everyone</span>
+              <span class="plaque" aria-hidden="true">On the board</span>
               <ol class="sticks">
                 {sticks.map((p, i) => (
                   <li class:list={["stick", { "is-pinned": isPinned(p) }]}
@@ -449,7 +449,7 @@ const views = JSON.stringify({
     {/* Without JavaScript: the notices, listed, each a link to its file in the town repo */}
     <noscript>
       <section class="nojs-notices" id={NOSCRIPT_NOTICES} aria-label="The notices">
-        <h2>Pinned for everyone</h2>
+        <h2>On the board</h2>
         <ul>
           {sticks.map((p) => (
             <li><a href={`${REPO_BULLETIN}/${p.slug}.md`}>{postingTitle(p)}</a>{isPinned(p) && " (pinned)"} · <a href={noticePath(p.slug)}>read it here</a></li>
