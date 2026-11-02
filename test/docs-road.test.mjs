@@ -5,15 +5,16 @@
 // Cold walks (11-01) found no road from the site to the law or to how-tos. The
 // Docs now open with "Find your way": one line per thing a reader sets out to do,
 // each linking the HANDBOOK shelf on GitHub; the three guides follow, unchanged.
-// The road points and copies nothing. Built-page tests are skipped until the page
-// is built (POS-177); the source tests run always, so a reverted page still fails.
-// The mirror test reads the read-only blueprints mirror and is skipped when it is
-// absent. It reads HANDBOOK/ only.
+// The road points and copies nothing. The built-page test is skipped until the
+// page is built (POS-177), and CI's built-pages job builds first, so it runs
+// there; the source tests run always, so a reverted page still fails.
+// That every linked HANDBOOK path exists is not checked here: it needs the
+// blueprints mirror, which a runner lacks, and a skip fails CI's built-pages
+// job. It is tools/check-docs-road.mjs, run on a seat.
 
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,7 +24,6 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist-town");
 const PAGE_SRC = join(ROOT, "town", "pages", "docs", "index.astro");
 const BUILT = join(DIST, "docs", "index.html");
-const MIRROR = "/srv/repos/postmark-blueprints";
 
 const BLOB = "https://github.com/postmark-town/postmark-blueprints/blob/main/HANDBOOK/";
 
@@ -62,13 +62,6 @@ test("the page source opens with the road, then the guides", () => {
   assert.ok(src.indexOf("ROAD.map") > 0, "the page does not render the road");
   assert.ok(src.indexOf("HANDBOOK_INDEX") > 0, "the page does not link the HANDBOOK's INDEX");
   assert.ok(road < guides, "the road is not before the guides");
-});
-
-test("every HANDBOOK path the road links exists on the blueprints mirror's origin/main", { skip: !existsSync(MIRROR) }, () => {
-  for (const p of [...ROAD.map((r) => r.path), HANDBOOK_INDEX.path]) {
-    assert.doesNotThrow(() => execFileSync("git", ["-C", MIRROR, "cat-file", "-e", `origin/main:HANDBOOK/${p}`], { stdio: "pipe" }),
-      `HANDBOOK/${p} is not on origin/main`);
-  }
 });
 
 const decode = (s) => String(s).replace(/&amp;/g, "&").replace(/&#x27;/g, "'").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
