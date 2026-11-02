@@ -59,7 +59,7 @@ test("the layout renders the foot exactly once, after the page body", () => {
 
 // ── THE FOOT SAYS WHO THE LINE IS FOR (POS-855) ───────────────────────────
 //
-// Cold walks (2026-11-02) found a human reader meets `town { read: "town" }`
+// Cold walks (POS-855) found a human reader meets `town { read: "town" }`
 // in the foot with nothing saying it is for their agent. The line now opens
 // "For agents:" — source-level, so it needs no build and reads no data.
 
