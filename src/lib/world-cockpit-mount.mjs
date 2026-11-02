@@ -956,17 +956,6 @@ export function mountCockpit(o) {
   }
 
   /**
-   * Who the bar is serving when nobody has chosen yet.
-   *
-   * The door's `stance` decides it, not the roster's order: where the record says
-   * a HUMAN is the one embodied, the map is already showing that person standing
-   * there, and a bar quietly serving one of their residents would contradict the
-   * figure on the map. Resolved before the first paint rather than inside the
-   * roster's draw — the standpoint plate is painted first and read `null` for its
-   * whole first frame, which is what "a spectator · inside a-hall/the-lit-door"
-   * in the first QA shot was.
-   */
-  /**
    * WHOSE STANDING THE KEY IS ORIENTED FROM — the seat, as opposed to who acts.
    *
    * ⚑ THE ACT SIDE OF THE SEAT LAW, and it was still using the old rule a day
@@ -997,6 +986,17 @@ export function mountCockpit(o) {
     return state.seat ?? orientingHandle(o.me);
   }
 
+  /**
+   * Who the bar is serving when nobody has chosen yet.
+   *
+   * The door's `stance` decides it, not the roster's order: where the record says
+   * a HUMAN is the one embodied, the map is already showing that person standing
+   * there, and a bar quietly serving one of their residents would contradict the
+   * figure on the map. Resolved before the first paint rather than inside the
+   * roster's draw — the standpoint plate is painted first and read `null` for its
+   * whole first frame, which is what "a spectator · inside a-hall/the-lit-door"
+   * in the first QA shot was.
+   */
   function resolveActing() {
     if (state.acting) return;
     const list = faces();
@@ -1062,7 +1062,8 @@ export function mountCockpit(o) {
     // who-acts beside what-they-do. The law line rides as the dock's own title
     // now that a horizontal strip has no room for a paragraph.
     // The standpoint plate hangs off THIS box (2026-08-28 ruling) — a hover
-    // reveal on the dock, the same way the faces' own name boxes are.
+    // reveal on the dock (the faces have no name boxes of their own any more;
+    // see "THE SMALL NAME BOX IS GONE" above).
     // NO `title` HERE ANY MORE. It was a THIRD card on the same hover: the
     // browser's own tooltip, drawn on its own clock over whichever of ours the
     // reader was already reading. The line it carried is law worth keeping, so
@@ -1272,60 +1273,6 @@ export function mountCockpit(o) {
     `<svg class="pmc-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v10 M8 13h8 M10 13v7h4v-7"/></svg>`;
 
   /**
-   * THE THREE RULINGS THAT ARE ABOUT PARTICULAR ACTS, kept where the other
-   * name-keyed thing already lives.
-   *
-   * ⚑ THIS IS THE SECOND NAME TABLE ON THIS SURFACE and it is here for exactly
-   * the reason the first one is. `world-cockpit.mjs` holds no verb names and a
-   * falsifier greps it to keep that true; a ruling ABOUT a named act therefore
-   * cannot live in the arithmetic, and `barFold` takes these as arguments so it
-   * never learns one. Called with none of them it is a pure channel split.
-   *
-   * KEEP — founder, 2026-08-29: the room's acts plus "WALK/SAY/EXIT". The first
-   * of those needs no naming: `barFold` keeps every act the door opened on the
-   * ground's own channel, which IS the room's acts, whatever they are called
-   * tomorrow. These are the ambient ones that hold a seat anyway — going
-   * somewhere, speaking, and the way through a door are what you do in a room
-   * besides fight.
-   *
-   * ⚑ ENTER WAS ADDED AFTER THE FIRST BUILD (conductor's ruling, 2026-08-29,
-   * flagged for the founder's veto). His list named three and this is four, and
-   * the reasoning for the fourth is that the list was DECLUTTERING rather than
-   * hiding: the crossing act is the party's first gesture, it and the way out
-   * are one pair in the record (same class, same blurb — "An entry is one
-   * passage written … exit writes the next"), and folding one of a pair while
-   * seating the other put the way IN behind a tray in the antechamber, which is
-   * the room where it is the only thing anyone wants. Shipped as built, then
-   * reversed on the reading of the shot.
-   *
-   * ⚑ GIVE AND TAKE JOINED THEM ON THE FOUNDER'S OWN WORD, live-testing the
-   * dungeon: "give and take need to be main bar action buttons due to the item
-   * you can pick up to help with the fight." That SUPERSEDES the earlier reading
-   * of his keep-list, and the earlier reading is kept here rather than replaced
-   * because it was not arbitrary — the original three were the acts you take
-   * BESIDES fighting, and give/take were folded as things you carry everywhere.
-   * What that reading missed is that in this room they are not ambient at all:
-   * the good lighter is the fight's own mechanic, so picking it up and handing
-   * it over are arena gestures wearing ambient verbs. A fold keyed on the
-   * door's channel could not see that, because the channel is right and the
-   * MEANING is what changed. Six seats now; the row still measures clear at
-   * 1280 (see the shot runner, which fails the run on overflow).
-   *
-   * HIDE — "hide the mark and note UI buttons in the dungeon grounds", and UI
-   * hiding is the whole of it: the acts are untouched, the door still affords
-   * them, the MCP still takes them, and stepping back out of portal ground
-   * brings the seats back. Leaving a claim on a boss room and writing yourself
-   * a private note mid-fight are not what the room is for.
-   *
-   * GATE — the one act whose whole precondition is the phase. The office's own
-   * words for it, read 2026-08-29: "Take what is left when the encounter is
-   * spent. Refused while anything is still standing — the … verb's own
-   * precondition is the phase." So the seat appears when the room reaches that
-   * phase and not before, which is the surface agreeing with a refusal the door
-   * was already going to give. `PHASES` is the office's list (encounter.mjs):
-   * afoot, spent, wiped.
-   */
-  /**
    * ACTS THAT ARE AIMED AT NOBODY, by name, because the door cannot say it.
    *
    * FOUNDER, live-testing 2026-08-29: "guard asks you to pick a target on the
@@ -1388,6 +1335,64 @@ export function mountCockpit(o) {
   /** …and the same question asked of the live answer: what it may be aimed at
    *  HERE, narrowed. */
   const targetsFor = (action) => aimTargets(state.answer, { only: aimRoles(action) });
+  /**
+   * THE THREE RULINGS THAT ARE ABOUT PARTICULAR ACTS — `BAR_KEEP`,
+   * `DUNGEON_HIDE` and `PHASE_GATE`, just below — kept with the other
+   * name-keyed lists (`ICONS`, above; `SELF_DIRECTED` and `AIM_ROLES`, just
+   * before).
+   *
+   * ⚑ THESE ARE MORE NAME TABLES ON THIS SURFACE and they are here for exactly
+   * the reason `ICONS` is. `world-cockpit.mjs` holds no verb names and a
+   * falsifier greps it to keep that true; a ruling ABOUT a named act therefore
+   * cannot live in the arithmetic, and `barFold` takes these as arguments so it
+   * never learns one. Called with none of them it is a pure channel split.
+   *
+   * KEEP — founder, 2026-08-29: the room's acts plus "WALK/SAY/EXIT". The first
+   * of those needs no naming: `barFold` keeps every act the door opened on the
+   * ground's own channel, which IS the room's acts, whatever they are called
+   * tomorrow. These are the ambient ones that hold a seat anyway — going
+   * somewhere, speaking, and the way through a door are what you do in a room
+   * besides fight.
+   *
+   * ⚑ ENTER WAS ADDED AFTER THE FIRST BUILD (conductor's ruling, 2026-08-29,
+   * flagged for the founder's veto). His list named three and this is four, and
+   * the reasoning for the fourth is that the list was DECLUTTERING rather than
+   * hiding: the crossing act is the party's first gesture, it and the way out
+   * are one pair in the record (same class, same blurb — "An entry is one
+   * passage written … exit writes the next"), and folding one of a pair while
+   * seating the other put the way IN behind a tray in the antechamber, which is
+   * the room where it is the only thing anyone wants. Shipped as built, then
+   * reversed on the reading of the shot.
+   *
+   * ⚑ GIVE AND TAKE JOINED THEM ON THE FOUNDER'S OWN WORD, live-testing the
+   * dungeon: "give and take need to be main bar action buttons due to the item
+   * you can pick up to help with the fight." That SUPERSEDED the earlier reading
+   * of his keep-list, and the earlier reading is kept here rather than replaced
+   * because it was not arbitrary — the original three were the acts you take
+   * BESIDES fighting, and give/take were folded as things you carry everywhere.
+   * What that reading missed is that in this room they are not ambient at all:
+   * the good lighter is the fight's own mechanic, so picking it up and handing
+   * it over are arena gestures wearing ambient verbs. A fold keyed on the
+   * door's channel could not see that, because the channel is right and the
+   * MEANING is what changed. That made six seats, and the row still measured
+   * clear at 1280 (see the shot runner, which fails the run on overflow). THEY
+   * HAVE SINCE LEFT AGAIN — see the reversal just below; `BAR_KEEP` is four
+   * names today.
+   *
+   * HIDE — "hide the mark and note UI buttons in the dungeon grounds", and UI
+   * hiding is the whole of it: the acts are untouched, the door still affords
+   * them, the MCP still takes them, and stepping back out of portal ground
+   * brings the seats back. Leaving a claim on a boss room and writing yourself
+   * a private note mid-fight are not what the room is for.
+   *
+   * GATE — the one act whose whole precondition is the phase. The office's own
+   * words for it, read 2026-08-29: "Take what is left when the encounter is
+   * spent. Refused while anything is still standing — the … verb's own
+   * precondition is the phase." So the seat appears when the room reaches that
+   * phase and not before, which is the surface agreeing with a refusal the door
+   * was already going to give. `PHASES` is the office's list (encounter.mjs):
+   * afoot, spent, wiped.
+   */
   // ⚑ GIVE AND TAKE ARE OFF THE ROW AGAIN (founder, live: "let's also just
   // remove the give and take buttons as it's confusing; we can just rely on the
   // agents to pick up the weapon/upgrade").
@@ -1506,8 +1511,6 @@ export function mountCockpit(o) {
     return weaponFor(state.answer, state.acting);
   }
 
-  /** The bar, folded. One reading, used by drawBar and by the keyboard — a
-   *  second one is how a number key came to open a seat that was not on the row. */
   /**
    * A CHOOSY ACT WITH NOTHING TO AIM AT IS GREYED, WITH ITS REASON.
    *
@@ -1535,6 +1538,8 @@ export function mountCockpit(o) {
     return { ...s, enabled: false, blocked: AIM_ROLES[s.action].idle };
   }
 
+  /** The bar, folded. One reading, used by drawBar and by the keyboard — a
+   *  second one is how a number key came to open a seat that was not on the row. */
   function foldedBar() {
     const bar = barSlots(state.answer, { acting: state.acting });
     const fold = barFold(bar, {
@@ -1564,7 +1569,8 @@ export function mountCockpit(o) {
       return gap + slotHtml(s, ground ? "afford" : "");
     }).join("");
     // The dock rides INSIDE the row but OUTSIDE the bar's scrollport — siblings,
-    // so the scroll clips verbs and never the faces' name boxes.
+    // so the scroll clips verbs and never the faces or the standpoint plate
+    // that hangs off the dock.
     return `<div class="pmc-barrow">${drawRoster()}<div class="pmc-bar" role="toolbar" aria-label="what can be done from here">
       ${seats}
       ${folded.length ? foldButtonHtml(folded) : ""}
