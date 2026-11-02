@@ -58,8 +58,15 @@ test("a happening that is not marked closed stays: the wall unpins it, so the ba
   assert.deepEqual(slugs(lensPostings([post("a-party", "2026-10-30", "happening")])), ["a-party"]);
 });
 
-test("only `closed` and `ended` close a posting: `resting` (and open, live) never hide a card", () => {
-  assert.deepEqual([...CLOSED_STATUSES].sort(), ["closed", "ended"], "the closed set changed: `resting` has no posting-status meaning in code");
+test("a `status: past` posting is dropped: past is the town's word for a finished posting", () => {
+  assert.equal(isClosed(post("x", "2026-10-01", "happening", "past")), true);
+  assert.equal(isClosed(post("x", "2026-10-01", "happening", " Past ")), true);
+  assert.deepEqual(slugs(lensPostings([post("x", "2026-10-01", "happening", "past")])), []);
+  assert.equal(slugs(lensPostings(FIXTURE, 99)).includes("sample-past-happening"), false, "a past happening hung on the front door");
+});
+
+test("only `closed`, `ended` and `past` close a posting: `resting` (and open, live) never hide a card", () => {
+  assert.deepEqual([...CLOSED_STATUSES].sort(), ["closed", "ended", "past"], "the closed set changed: `resting` has no finished meaning, and `past` is the town's word");
   for (const s of ["resting", "open", "live", "paused"]) {
     assert.equal(isClosed(post("x", "2026-10-01", "happening", s)), false, `${s} read as closed`);
     assert.deepEqual(slugs(lensPostings([post("x", "2026-10-01", "happening", s)])), ["x"], `a ${s} happening lost its door`);
@@ -101,12 +108,16 @@ test("[source pin] the page takes its lens band from lensPostings and draws none
   assert.match(page, /html\[data-lens\]\) \.cardband\.for-vanilla:not\(\.no-lens-cards\) \{ display: none; \}/);
 });
 
-// ── THE BUILT PAGE (skipped until it is built, as POS-177 rules) ────────────
+// ── THE BUILT PAGE (CI only) ────────────────────────────────────────────────
+// This case reads the generated bulletin data and the built HTML. It runs only
+// when CI asks for it: GitHub Actions sets CI=true on every job (no workflow
+// here sets it by hand), and the `built-pages` job builds first. Locally it
+// skips, even when a dist-town exists.
 
 const built = join(ROOT, "dist-town", "index.html");
 
 test("the built front page hangs exactly lensPostings' cards in the lens band",
-  { skip: !existsSync(built) }, () => {
+  { skip: !(process.env.CI && existsSync(built)) }, () => {
   const BULLETIN = JSON.parse(readFileSync(join(ROOT, "src", "data", "postmark", "bulletin.json"), "utf8"));
   const page = readFileSync(built, "utf8");
   const want = slugs(lensPostings(BULLETIN));

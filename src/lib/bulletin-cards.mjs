@@ -73,19 +73,21 @@ export function bulletinCards(bulletin) {
 // Daily" and does NOT drop happenings wholesale: the wall unpins them, so this
 // band is the only door some of them have. It skips a posting whose OWN
 // frontmatter marks it closed — `data.status`, the structured field the
-// postings carry. Only "closed" and "ended" mean finished. Other words seen
-// (open, live, resting) have no posting-status meaning in code, so they never
-// hide a card: hiding a happening takes away its only door. Nothing is guessed
-// from a date.
+// postings carry. "closed", "ended" and "past" mean finished: the town's word
+// for a finished posting is `past` (Wright, 00:18Z); the other two are kept as
+// the plain words. Any other word (open, live, resting) has no finished
+// meaning, so it never hides a card: hiding a happening takes away its only
+// door. Nothing is guessed from a date.
 
 /** How many cards the lens band hangs at most. */
 export const LENS_LIMIT = 6;
 
 /**
  * The `data.status` words that mean the posting is over: it is not a current
- * posting. Anything else, or no status at all, is current.
+ * posting. Anything else, or no status at all, is current. `past` is the town's
+ * own word for a finished posting (Wright, 00:18Z).
  */
-export const CLOSED_STATUSES = Object.freeze(["closed", "ended"]);
+export const CLOSED_STATUSES = Object.freeze(["closed", "ended", "past"]);
 
 /** A posting is closed when its own `status` says so. */
 export function isClosed(posting) {

@@ -4,6 +4,7 @@
   { "slug": "sample-spire-words", "data": { "title": "Sample words at the spire", "kind": "happening", "status": "live", "posted": "2026-10-29" }, "body": "Hand-written sample. A happening still live: the wall unpins it, so the lens band is its only door." },
   { "slug": "sample-guidance-a", "data": { "title": "Sample guidance A", "kind": "guidance", "status": "open", "posted": "2026-10-28" }, "body": "Hand-written sample." },
   { "slug": "sample-notice-b", "data": { "title": "Sample notice B", "kind": "notice", "status": "open", "posted": "2026-10-27" }, "body": "Hand-written sample." },
+  { "slug": "sample-past-happening", "data": { "title": "Sample past happening", "kind": "happening", "status": "past", "posted": "2026-10-26" }, "body": "Hand-written sample. The town's word for a finished posting is past: dropped." },
   { "slug": "sample-news-c", "data": { "title": "Sample news C", "kind": "news", "posted": "2026-10-25" }, "body": "Hand-written sample. No status at all: current." },
   { "slug": "sample-standing-d", "data": { "title": "Sample standing D", "kind": "standing", "status": "open", "posted": "2026-10-20" }, "body": "Hand-written sample." },
   { "slug": "sample-ended-invitation", "data": { "title": "Sample ended invitation", "kind": " Happening ", "status": " Ended ", "posted": "2026-10-19" }, "body": "Hand-written sample. Kind and status spelled loosely." },
