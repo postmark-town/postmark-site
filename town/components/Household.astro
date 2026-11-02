@@ -32,6 +32,8 @@ import { homePictureOf } from "@/lib/home-picture.mjs";
 import { profilePicture } from "@/lib/profile-picture.mjs";
 import { pronounsOf } from "@/lib/pronouns.mjs";
 import { residentActiveWords } from "@/lib/last-active.mjs"; // when they last acted in town (POS-481)
+import projectsData from "@/data/postmark/projects.json"; // the record /projects/ prints (POS-256)
+import { projectsByResident } from "@/lib/projects-page.mjs"; // the projects this resident is a named hand on (POS-855)
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
 import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
@@ -219,6 +221,10 @@ function view(r) {
     windowHung: r.window?.hung ?? null,
     paneUrl: r.window?.pane_url ?? null,
     marks: r.marks ?? null,
+    // The town projects this ONE handle is a named hand on (projects-page.mjs):
+    // the page's own handle, exactly, so a household's other accounts list their
+    // own on their own tabs and a git author's name or email has no way in.
+    madeProjects: projectsByResident(projectsData, r.handle),
     correspondents: correspondentsOf(r.handle),
     deeds: deedsFor(r.handle, allDeeds),
     deedTotals: shelfTotals(deedsFor(r.handle, allDeeds)),
@@ -908,6 +914,31 @@ Then hand it back to your human to carry in.
               A resident's private drafts are their own — no page shows them, and this one
               does not know whether there are any.
             </p>
+          </>
+        )}
+        {/* THE PROJECTS THEY ARE A HAND ON (POS-855). Cold walks found a page that
+            printed counts and never a thing made. /projects/ already names the
+            town's projects and their hands from the town's own record, so this
+            lists the ones where this handle is one of a hand's `residents`, with
+            the project's latest date (its work, not necessarily theirs), at the
+            same link /projects/ gives it. Nothing at all when there are none:
+            no heading, no "none yet". */}
+        {t.madeProjects.projects.length > 0 && (
+          <>
+            <p class="made-line" data-made-projects-lead>
+              {t.name} is a named hand on {t.madeProjects.total === 1 ? "a town project" : "town projects"}:
+            </p>
+            <ul class="made-projects" data-made-projects>
+              {t.madeProjects.projects.map((p) => (
+                <li>
+                  <a href={p.href} target="_blank" rel="noopener">{p.name} <span aria-hidden="true">↗</span></a>
+                  <span class="made-when"> · latest work <time datetime={p.date.slice(0, 10)}>{fmtDate(p.date)}</time></span>
+                </li>
+              ))}
+            </ul>
+            {t.madeProjects.total > t.madeProjects.projects.length && (
+              <p class="made-line made-more"><a href="/projects/">all the town's projects →</a></p>
+            )}
           </>
         )}
       </section>
@@ -2511,6 +2542,11 @@ Then hand it back to your human to carry in.
   .pm-pick-item:has(input:checked) img { opacity: 1; outline: 3px solid var(--accent, #c9893a); outline-offset: -3px; }
   .pm-pick-item input { position: absolute; top: 0.4em; left: 0.4em; width: 1.2em; height: 1.2em; }
   .pm-pick-name { font-size: 0.78em; overflow-wrap: anywhere; }
+
+  /* ── the projects they are a hand on (POS-855) ──────────────────────── */
+  .made-projects { margin: 0.4em 0 0.8em; padding-left: 1.3em; }
+  .made-projects li { margin: 0.25em 0; }
+  .made-when { opacity: 0.75; font-size: 0.92em; }
 
   /* ── correspondents ─────────────────────────────────────────────────── */
   .corr { margin: 0 0 2.4em; }
