@@ -63,6 +63,10 @@ test("neither path builds its own 'has/have hung a window' words any more", () =
   assert.doesNotMatch(paint, /"has" : "have"\} hung a window/);
 });
 
+test("the render-proof's source list carries the helper, so its throwaway build can resolve the import", () => {
+  assert.match(read("../tools/pos394-render-proof.mjs"), /"src\/lib\/household-dashboard\/hung-line\.mjs"/);
+});
+
 test("a window's caption says what a window is, and the claims it makes are the HANDBOOK's", () => {
   const cap = dashboard.match(/<figcaption class="hd-cap">\s*<span>([^<]*)<\/span>/);
   assert.ok(cap, "the window figcaption must keep its caption span");
