@@ -545,41 +545,6 @@ export function humanWords(face) {
   return stance ? `the door calls this standing "${stance}"` : "where ground allows";
 }
 
-/**
- * THE SHORT FORM OF A DOOR'S SENTENCE — for a hover, which is not a panel.
- *
- * The founder, live on the dev board 2026-08-29: hovering the human face showed
- * two overlapping cards, the second of them a recitation — the door's sentence
- * naming every verb that ground's class grants, in full, hanging off a 2.3em
- * circle. His ruling: one hover, one concise card, the name and one short line;
- * the long form belongs on the panel.
- *
- * ⚑ THE VERBS ARE NOT QUOTED HERE, and the omission is the point rather than
- * squeamishness: this file may not name a verb (world-cockpit.test.mjs reads
- * its source and fails if it does, because a bar with a verb list is a bar that
- * stopped rendering the door). Writing the founder's sentence out verbatim in
- * this comment tripped that guard — correctly. The shape is described instead.
- *
- * ⚑ IT CUTS, IT NEVER REWRITES. The door's words are law quoted at the reader,
- * and a site that paraphrased them would be writing law again — the thing this
- * whole surface exists not to do. So this takes a PREFIX of the door's own
- * sentence and marks the cut with an ellipsis, and the full sentence is still
- * shown, verbatim, on the standpoint plate.
- *
- * The cut lands on a clause boundary where there is one before the cap, because
- * a sentence guillotined mid-word reads as a bug rather than as a summary.
- */
-export function briefWords(said, cap = 72) {
-  const s = String(said ?? "").trim();
-  if (!s || s.length <= cap) return s;
-  const head = s.slice(0, cap);
-  // The boundaries a sentence in this town actually uses, longest-first: an em
-  // dash is where a clause turns, and it is where these recitations begin.
-  const cut = Math.max(head.lastIndexOf(" — "), head.lastIndexOf("; "), head.lastIndexOf(", "));
-  const kept = cut > cap * 0.4 ? head.slice(0, cut) : head.replace(/\s+\S*$/, "");
-  return `${kept.trim()}…`;
-}
-
 /** The innermost parcel in the containment spine that one of these handles holds,
  *  or null. A parcel's `by` is its household's own resident — the same reading the
  *  world's ids carry everywhere (`vermillion/the-pando-peak-parcel`). */
