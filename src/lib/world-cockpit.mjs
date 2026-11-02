@@ -1287,6 +1287,7 @@ export function prefillFor(card, answer, { only = null } = {}) {
   // prefill happens only where there is no choice to make. The field for
   // stepping out looked like the exception, since the ground you are in seems
   // knowable, and the note below is why it is not.
+  //
   // ⚑ AND A PLACE FIELD IS LEFT EMPTY, INCLUDING THE ONE THAT LOOKED KNOWABLE.
   //
   // The first pass filled a stepping-out field with the standpoint's own
@@ -1407,10 +1408,13 @@ export function leavingName(answer) {
   // `portalOf` already reads it — one reader, so the exit card and the chip
   // cannot name two different rooms.
   //
-  // ⚑ AND `within` IS NOT MERELY WRONG HERE, IT IS SPOKEN FOR: the exit-prefill
-  // work leans on it as the containment chain it is. The two must not be
-  // conflated, which is why this reaches for the portal rather than filtering
-  // the chain down to something room-shaped.
+  // ⚑ AND `within` IS NOT MERELY WRONG HERE, IT IS SPOKEN FOR: other readers
+  // lean on it as the containment chain it is — `ownParcelIn` (the innermost
+  // parcel your household owns, for the human face), the mount's `leadsTo` (the
+  // room one step outward, for the exit seat's dial line) and the mount's
+  // `frameScene` (the innermost ground's extent, for the camera floor). The two
+  // must not be conflated, which is why this reaches for the portal rather than
+  // filtering the chain down to something room-shaped.
   const portal = portalOf(answer);
   return portal
     ? { id: portal.id, label: portal.id.split("/").pop().replace(/-/g, " ") }
