@@ -11,7 +11,7 @@
 //   GET /quests/{h}               the day's board, and whom the mint counted
 //   GET /world/walkers            where each one stands (one read for the town)
 //   GET /world/conversations      what each one said (one read for the town)
-//   GET /calendar                 coming up — answers 404 until POS-207 ships
+//   GET /calendar                 coming up — the office serves it (POS-207)
 //
 // THE SWITCH IS ONE CHANGE. POS-276 is building the house-wide read,
 // `household { read: "house" }`; when it lands, readHouse() asks it once and

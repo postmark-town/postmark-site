@@ -16,7 +16,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { seamFromTown, nextMonth, firstOpenEpoch, monthOf } from "../tools/extract-seam.mjs";
-import { livePots, loadEconomy, readEconomy, toPot, toDeed, deedReads, TREASURY_POT } from "../src/lib/funding.mjs";
+import { livePots, loadEconomy, readEconomy, toPot, TREASURY_POT } from "../src/lib/funding.mjs";
 
 // The town checkout, if this machine has one. Everything that needs the real
 // stamp-mint.mjs skips without it rather than pretending to have run.
