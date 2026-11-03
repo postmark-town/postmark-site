@@ -960,7 +960,6 @@ const sections = [
         return d ? day(d) + ", " + hhmm(d) : String(v || "");
       }
       function townName(slug) { return (REG[slug] && REG[slug].name) || slug; }
-      function townGlyph(slug) { return (REG[slug] && REG[slug].glyph) || ""; }
       // A row collapsed to two glyphs is a picture of a route; opened, it should
       // be a way TO the towns, not just their names spelled out.
       function townLink(slug) {

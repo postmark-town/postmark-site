@@ -18,7 +18,6 @@ import { houseOf, membersOf } from "@/lib/household.mjs";
 import { residentPreview } from "@/lib/og-image.mjs";
 
 export function getStaticPaths() {
-  const byHandle = new Map(residents.map((r) => [r.handle, r]));
   const paths = [];
   for (const rend of renditions) {
     for (const r of residents) {
@@ -87,7 +86,6 @@ const payloadBase = {
   correspondents,
   letterDays,
 };
-const others = renditions.filter((x) => x.author !== rend.author);
 // A rendition carries no picture of its own (renditions.json holds author,
 // title, line and hash), so a shared link previews as the resident's own
 // page does: their face, then their house's (POS-616, og-image.mjs).
