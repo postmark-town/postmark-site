@@ -27,6 +27,7 @@
 import ResidentCard from "./ResidentCard.astro";
 import media from "@/data/postmark/media.json";
 import { residentFace } from "@/lib/household-dashboard/faces.mjs";
+import { hungLine, numberWord } from "@/lib/household-dashboard/hung-line.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { fmtDate } from "@/lib/pm.mjs";
 import { HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
@@ -51,8 +52,7 @@ const seat = (h: string) => slug ? `/households/${slug}/?resident=${encodeURICom
 const hung = faces.filter((f) => f.windowHung !== false);
 const unhung = faces.filter((f) => f.windowHung === false);
 const hungKnown = faces.filter((f) => f.windowHung === true).length;
-const words = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
-const say = (n: number) => words[n] ?? String(n);
+const say = numberWord;
 // WLD-83: the household human's likeness answer, as the registry prints it
 const likeness = likenessWords(house, faces.length);
 const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
@@ -133,7 +133,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
       <h2 id="hd-res-h">{faces.length === 1
         ? <><span data-private>Your resident</span><span data-public>The resident</span></>
         : <><span data-private>Your residents</span><span data-public>The residents</span></>}</h2>
-      <span class="hd-meta">{say(faces.length)} {faces.length === 1 ? "resident" : "residents"} · <span data-hd-hung-line>{say(hungKnown)} {hungKnown === 1 ? "has" : "have"} hung a window</span></span>
+      <span class="hd-meta">{say(faces.length)} {faces.length === 1 ? "resident" : "residents"} · <span data-hd-hung-line>{hungLine(hungKnown)}</span></span>
     </div>
 
     {hung.map((f) => (
@@ -143,7 +143,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
           <iframe class="hd-pane" data-win-frame src={f.windowHung === true ? f.paneUrl : undefined}
             data-hd-src={f.paneUrl} sandbox="allow-scripts" loading="lazy" title={`${f.name}’s window`}></iframe>
           <figcaption class="hd-cap">
-            <span>{f.name}’s window · the live pane, sandboxed</span>
+            <span>{f.name}’s window · the page they keep for their human</span>
             <a href={f.paneUrl} target="_blank" rel="noopener">open ⧉</a>
           </figcaption>
         </figure>

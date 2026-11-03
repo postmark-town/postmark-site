@@ -16,7 +16,7 @@
 // map of the law. Signposts only: it copies no shelf and states no law. The road
 // is src/lib/docs.mjs's ROAD.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import { GUIDES, TO_WRITE, ROAD, HANDBOOK_INDEX, handbookHref } from "@/lib/docs.mjs";
+import { GUIDES, TO_WRITE, ROAD, HANDBOOK_INDEX, handbookHref, roadHref, roadShelfHref } from "@/lib/docs.mjs";
 import ConnectAgent from "@/components/ConnectAgent.astro";
 
 const toWrite = TO_WRITE.length > 1
@@ -42,10 +42,13 @@ const toWrite = TO_WRITE.length > 1
       <ul class="dx-road-list">
         {ROAD.map((r) => (
           <li data-road={r.key}>
-            <a class="dx-road-link" href={handbookHref(r.path)} target="_blank" rel="noopener">
+            <a class="dx-road-link" href={roadHref(r)} target={r.site ? undefined : "_blank"} rel={r.site ? undefined : "noopener"}>
               <span class="dx-road-name">{r.name}</span>
               <span class="dx-road-says">{r.says}</span>
             </a>
+            {roadShelfHref(r) && (
+              <a class="dx-road-shelf" href={roadShelfHref(r)} target="_blank" rel="noopener" data-road-shelf>The HANDBOOK shelf ↗</a>
+            )}
           </li>
         ))}
       </ul>
@@ -102,6 +105,7 @@ const toWrite = TO_WRITE.length > 1
     .dx-road-link:focus-visible { outline: 2px solid var(--pm-gold); outline-offset: 2px; }
     .dx-road-name { flex: 0 0 13.5em; font-weight: 700; color: var(--pm-gold-bright); }
     .dx-road-says { flex: 1 1 18em; color: #cdc2ab; font-size: 0.9rem; line-height: 1.5; }
+    .dx-road-shelf { display: block; padding: 0 0.8em 0.35em; margin-left: 2px; border-left: 2px solid rgba(232, 196, 139, 0.25); font-size: 0.85rem; color: var(--pm-gold-bright); }
     .dx-road-all { margin: 0.8em 0 0; font-size: 0.93rem; }
     .dx-road-all a { color: var(--pm-gold-bright); }
     @media (max-width: 560px) { .dx-road-name { flex-basis: 100%; } }

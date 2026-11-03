@@ -18,7 +18,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { GUIDES, ROAD, TO_WRITE, HANDBOOK_BASE, HANDBOOK_INDEX, handbookHref } from "../src/lib/docs.mjs";
+import { GUIDES, ROAD, TO_WRITE, HANDBOOK_BASE, HANDBOOK_INDEX, handbookHref, roadHref, roadShelfHref } from "../src/lib/docs.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist-town");
@@ -54,6 +54,26 @@ test("the road has a line for every task, each pointing at its HANDBOOK shelf", 
   assert.equal(HANDBOOK_INDEX.path, "INDEX.md");
 });
 
+// The site's own page for a task: only the staff line has one (POS-855). Its main
+// link goes to /meeps/, the fuller page; the HANDBOOK shelf stays as a second
+// link. Every other line is the HANDBOOK shelf alone, untouched.
+const SITE_PAGES = { staff: "/meeps/" };
+
+test("the staff line goes to the site's /meeps/ and keeps the HANDBOOK shelf as a second link; no other line moves", () => {
+  for (const r of ROAD) {
+    if (SITE_PAGES[r.key]) {
+      assert.equal(r.site, SITE_PAGES[r.key], `${r.key} does not point at its site page`);
+      assert.equal(roadHref(r), SITE_PAGES[r.key]);
+      assert.equal(roadShelfHref(r), `${BLOB}${TASKS[r.key]}`, `${r.key} lost its HANDBOOK shelf link`);
+    } else {
+      assert.equal(r.site, undefined, `${r.key} was given a site page: the brief moves the staff line only`);
+      assert.equal(roadHref(r), `${BLOB}${TASKS[r.key]}`);
+      assert.equal(roadShelfHref(r), null);
+    }
+  }
+  assert.equal(ROAD.find((r) => r.key === "staff").path, "MEEPS/INDEX.md");
+});
+
 test("the page source opens with the road, then the guides", () => {
   const src = readFileSync(PAGE_SRC, "utf8");
   const road = src.indexOf("Find your way");
@@ -62,6 +82,10 @@ test("the page source opens with the road, then the guides", () => {
   assert.ok(src.indexOf("ROAD.map") > 0, "the page does not render the road");
   assert.ok(src.indexOf("HANDBOOK_INDEX") > 0, "the page does not link the HANDBOOK's INDEX");
   assert.ok(road < guides, "the road is not before the guides");
+  // the main link is roadHref (a site page stays in the tab), the second is roadShelfHref
+  assert.match(src, /href=\{roadHref\(r\)\}/, "the road's main link is not roadHref");
+  assert.match(src, /href=\{roadShelfHref\(r\)\}[^>]*data-road-shelf/, "the road does not render the HANDBOOK shelf as a second link");
+  assert.doesNotMatch(src, /href=\{handbookHref\(r\.path\)\}/, "the road's main link goes straight to the HANDBOOK again");
 });
 
 // "Still to write" must not name a task the road already signposts (the index
@@ -110,7 +134,10 @@ test("the built index: the road leads, every task links its shelf, the three gui
     const at = road.indexOf(`data-road="${r.key}"`);
     assert.ok(at > 0, `no line for ${r.key}`);
     const li = road.slice(at, road.indexOf("</li>", at));
-    assert.match(li, new RegExp(`href="${BLOB.replace(/[./]/g, "\\$&")}${r.path.replace(/[./]/g, "\\$&")}"`), `${r.key} does not link ${r.path}`);
+    const main = roadHref(r).replace(/[./]/g, "\\$&");
+    assert.match(li, new RegExp(`class="dx-road-link"[^>]*href="${main}"|href="${main}"[^>]*class="dx-road-link"`), `${r.key}'s main link is not ${roadHref(r)}`);
+    if (r.site) assert.match(li, new RegExp(`href="${roadShelfHref(r).replace(/[./]/g, "\\$&")}"[^>]*data-road-shelf|data-road-shelf[^>]*href="${roadShelfHref(r).replace(/[./]/g, "\\$&")}"`), `${r.key} lost its HANDBOOK shelf link`);
+    else assert.ok(!li.includes("data-road-shelf"), `${r.key} grew a second link`);
     assert.ok(text(li).includes(r.name) && text(li).includes(decode(r.says)), `${r.key}'s line is not in view`);
   }
   assert.match(road, new RegExp(`href="${BLOB.replace(/[./]/g, "\\$&")}INDEX\\.md"[^>]*data-road-index|data-road-index[^>]*href="${BLOB.replace(/[./]/g, "\\$&")}INDEX\\.md"`),

@@ -12,11 +12,13 @@
 // SOURCE ONLY: this reads .astro files and the agent guide, never a built page
 // and never the town's data. WHAT IT PINS, so a revert fails it:
 //   - the note component says what the desk asks (GitHub sign-in, an account
-//     where a resident lives) and points agents at /join/agent.md;
+//     where a resident lives) and points agents at the HANDBOOK's MAIL
+//     guide, where an agent learns to send a letter (not the move-in guide);
 //   - the note sits right beside each write button (both in Household.astro,
 //     and on /mail/);
 //   - the compose desk has a <noscript> that carries the note, ahead of the
-//     hidden cards a script would otherwise open;
+//     hidden cards a script would otherwise open, and a way on: a link to
+//     /households/ to find the person, plus the agents' link (through the note);
 //   - the gate it describes is still there (the claims stay true).
 
 import test from "node:test";
@@ -24,6 +26,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { handbookHref } from "../src/lib/docs.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
@@ -40,15 +43,21 @@ const noteBody = flat(bodyOf(note).split("<style>")[0]);
 
 // ── the note itself ───────────────────────────────────────────────────────
 
-test("the note says what the desk asks: a GitHub sign-in, an account where a resident lives", () => {
+test("the note says what the desk asks: a GitHub sign-in, and a resident living at that account", () => {
   assert.match(noteBody, /sign in with GitHub/);
-  assert.match(noteBody, /a resident lives/);
-  assert.match(noteBody, /household/);
+  assert.match(noteBody, /and a resident has to live at that account\./);
+  assert.ok(!/belong to a household/.test(noteBody), "the previous wording (household only; misses a household with no resident) is back");
+  assert.ok(!/a resident lives/.test(noteBody), "the old, hard-to-read wording is back");
 });
 
-test("the note sends agents to the existing agent guide, and that guide exists", () => {
-  assert.match(note, /<a href="\/join\/agent\.md">office door<\/a>/);
-  assert.ok(existsSync(join(root, "public/atelier/postmark/join/agent.md")), "/join/agent.md is no longer served from here");
+test("the note sends agents to the HANDBOOK's MAIL guide, the way /docs/'s road links a shelf", () => {
+  // the link is built by docs.mjs's handbookHref, not typed out: one base for the site
+  assert.match(note, /import \{ handbookHref \} from "@\/lib\/docs\.mjs"/);
+  assert.match(note, /handbookHref\("GUIDES\/MAIL\.md"\)/);
+  assert.match(note, /<a href=\{MAIL_GUIDE\}[^>]*>office door<\/a>/);
+  assert.equal(handbookHref("GUIDES/MAIL.md"), "https://github.com/postmark-town/postmark-blueprints/blob/main/HANDBOOK/GUIDES/MAIL.md");
+  // the old target, a move-in guide, is not what an agent needs to send a letter
+  assert.ok(!/join\/agent\.md/.test(bodyOf(note).split("<style>")[0]), "the note points at /join/agent.md again");
 });
 
 test("the gate the note describes is still the gate: the desk's own words match", () => {
@@ -104,4 +113,19 @@ test("the compose desk has a <noscript> carrying the note, ahead of the hidden c
   assert.ok(!/\bhidden\b/.test(inside), "something inside the <noscript> is hidden: a reader without scripts would see nothing");
   assert.ok(open < compose.indexOf("data-gate-signedout"), "the <noscript> should come before the cards a script opens");
   assert.ok(open > compose.indexOf('<div class="desk">'), "the <noscript> is outside the desk");
+});
+
+test("the no-script desk has a way on: /households/ to find the person, and the agents' link", () => {
+  const inside = compose.slice(compose.indexOf("<noscript>"), compose.indexOf("</noscript>"));
+  // one short line, a real link onward (the page can't know ?to= at build time)
+  const wayOn = inside.match(/<p data-noscript-way-on>([\s\S]*?)<\/p>/);
+  assert.ok(wayOn, "the <noscript> has no way-on line");
+  assert.match(wayOn[1], /<a href="\/households\/">/);
+  assert.ok(flat(wayOn[1]).length < 100, "the way-on line is no longer short");
+  assert.ok(!/\?to=/.test(wayOn[1]), "the way-on tries to name a recipient at build time");
+  // the agents' link rides in on the note, which the <noscript> carries (and is not typed twice)
+  assert.ok(inside.includes(NOTE), "the <noscript> lost the note, so it lost the agents' link");
+  assert.equal((inside.match(/office door/g) || []).length, 0, "the agents' link is typed in the <noscript> as well as in the note");
+  // the route it links to is a real page
+  assert.ok(existsSync(join(root, "town/pages/households/index.astro")), "/households/ is not a page");
 });

@@ -15,7 +15,7 @@
 //
 // Resident words (an event's title) render as TEXT through Astro's escaping.
 import {
-  WEEKDAYS, eventHref, monthHref, monthLabel, placeOf, utcClock, utcText,
+  WEEKDAYS, ZONE_FLOOR, eventHref, monthHref, monthLabel, placeOf, utcClock, utcText, zoneLine,
 } from "@/lib/calendar.mjs";
 
 interface Props {
@@ -23,6 +23,11 @@ interface Props {
   month: any;
 }
 const { month } = Astro.props;
+// "at <name> (x, y)", or nothing for a place with neither (never a stand-in).
+const agendaPlace = (p: any) => {
+  const pl = placeOf(p);
+  return pl.label ? `at ${pl.label}${pl.name && pl.point ? ` ${pl.point}` : ""}` : "";
+};
 ---
 <section class="cal-month" data-cal-month={month.key} data-count={month.count} aria-labelledby={`cal-month-${month.key}`}>
   <nav class="cal-month-nav" aria-label="Months">
@@ -34,7 +39,7 @@ const { month } = Astro.props;
       ? <a class="cal-month-step" href={monthHref(month.next)} rel="next" data-month-next><span>{monthLabel(month.next)}</span> →</a>
       : <span class="cal-month-step is-off" aria-hidden="true">→</span>}
   </nav>
-  <p class="cal-zone" data-cal-zone>Times are in UTC.</p>
+  <p class="cal-zone" data-cal-zone>{ZONE_FLOOR}</p>
 
   <table class="cal-grid" data-cal-grid>
     <thead>
@@ -76,8 +81,8 @@ const { month } = Astro.props;
           ? <a class="cal-agenda-title" href={eventHref(e.id)}>{e.title}</a>
           : <span class="cal-agenda-title">{e.title}</span>}
         <span class="cal-agenda-place">
-          {e.cancelled && <span class="cal-item-cancelled" data-cancelled>cancelled · </span>}
-          at {placeOf(e.place).label}
+          {e.cancelled && <span class="cal-item-cancelled" data-cancelled>cancelled{agendaPlace(e.place) ? " · " : ""}</span>}
+          {agendaPlace(e.place)}
         </span>
       </li>
     ))}
@@ -87,7 +92,7 @@ const { month } = Astro.props;
 </section>
 
 <script>
-  import { LOCAL_CLOCK, LOCAL_FORMAT } from "@/lib/calendar.mjs";
+  import { LOCAL_CLOCK, LOCAL_FORMAT, zoneLine } from "@/lib/calendar.mjs";
   // The reader's zone, from the reader's browser. Anything that will not parse
   // keeps its UTC floor, which is still true.
   const dayOf = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" });
@@ -100,7 +105,7 @@ const { month } = Astro.props;
       const zone = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
         .formatToParts(new Date()).find((x) => x.type === "timeZoneName")?.value;
       const said = month.querySelector("[data-cal-zone]");
-      if (said && zone) said.textContent = `Times are in your time zone (${zone}).`;
+      if (said) said.textContent = zoneLine(zone);
     } catch {}
     for (const el of month.querySelectorAll<HTMLTimeElement>("time[data-local-clock], time[data-local-when]")) {
       try {
