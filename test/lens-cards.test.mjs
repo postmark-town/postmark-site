@@ -100,7 +100,8 @@ const read = (p) => readFileSync(join(ROOT, p), "utf8");
 
 test("[source pin] the page takes its lens band from lensPostings and draws none when it is empty", () => {
   const page = read("town/pages/index.astro");
-  assert.match(page, /import \{ lensPostings \} from "@\/lib\/bulletin-cards\.mjs"/);
+  // (front-latest added latestPostings and postingWhen to this import: the signed-out list and the dates)
+  assert.match(page, /import \{[^}]*\blensPostings\b[^}]*\} from "@\/lib\/bulletin-cards\.mjs"/);
   assert.match(page, /const lensCards = lensPostings\(bulletin\)/);
   assert.match(page, /\{lensCards\.length > 0 && \(\s*<section class="cardband for-lens"/, "the lens band renders even when empty");
   // the story band stays for a signed-in reader exactly when the lens band is absent
