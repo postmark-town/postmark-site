@@ -60,7 +60,7 @@
 // no image service: a strict CSP would block it, and handing a third party the
 // ability to change what an intake QR encodes is handing them the money.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import { livePots, loadPots, fundPages, isFunded, loadThankYou, thanksFor, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel, giverLabel, fundCapOf } from "@/lib/funding.mjs";
+import { livePots, loadPots, fundPages, isFunded, loadThankYou, thanksFor, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel, giverLabel, fundCapOf, usd, pct } from "@/lib/funding.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { qrSvg } from "@/lib/qr.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
@@ -169,8 +169,6 @@ const capAsOf = pot.generatedAt ? new Date(pot.generatedAt).toISOString().replac
 // one they CANNOT proofread.
 const intake = intakeFor(pot.pot);
 const qr = qrSvg(intake, { size: 208, title: `Postmark intake address for ${pot.pot}: ${intake}` });
-const usd = (n) => "$" + Number(n).toLocaleString("en-US");
-const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
 
 // The per-dollar estimate moved HERE from the market's card (founder's card
 // law, 2026-08-26): what a dollar mints is this page's detail, not the
