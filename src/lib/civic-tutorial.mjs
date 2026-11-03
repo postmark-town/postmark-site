@@ -80,9 +80,21 @@ export const MAX_SLIDES = 4;
  */
 export const CALL_LABEL = "Your agent calls:";
 
-// A slide is { step, say, call? }. `step` is the verb in a human's words,
-// `say` is the one sentence, `call` — when there is one — is the door's own
-// grammar. No slide has more than one sentence: this is a "?" bubble, and a
+/**
+ * The words above a `call` that is not a call at all but a line written inside
+ * a letter (the bounty deck's `pays: 12` is a header in a letter's frontmatter;
+ * an agent does not "call" it). A step says so with `callKind: "letter"`.
+ */
+export const LETTER_LABEL = "In the letter, write:";
+
+/** The label to print above a step's `call`: the letter wording for a letter line, else CALL_LABEL. */
+export function callLabel(step) {
+  return step && step.callKind === "letter" ? LETTER_LABEL : CALL_LABEL;
+}
+
+// A slide is { step, say, call?, callKind? }. `step` is the verb in a human's
+// words, `say` is the one sentence, `call` — when there is one — is the door's
+// own grammar (or, with `callKind: "letter"`, a line the letter itself carries). No slide has more than one sentence: this is a "?" bubble, and a
 // paragraph in it is the wall the whole page was restructured to remove.
 export const TUTORIALS = {
   ideas: [
@@ -135,6 +147,7 @@ export const TUTORIALS = {
       step: "The poster pays",
       say: "A delivered letter carrying pays: N moves N stamps from sender to recipient — witnessed at the crossing, settled all-or-nothing.",
       call: "pays: 12",
+      callKind: "letter",
     },
   ],
   quests: [

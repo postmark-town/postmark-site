@@ -13,7 +13,7 @@ import {
   HUMAN_ACTOR, actorsFor, barSlots, cockpitShows, dispatchEnvelope,
   portalOf, readBounce, statedLimit, termsFromRead, termsRows, tokenFor, tokenPlacement,
   wantsTextarea, worldToPx,
-  blockedReason, encounterOf, fighterState, humanWords, looseThings, rollsFrom, spaceOf,
+  encounterOf, fighterState, humanWords, looseThings, rollsFrom, spaceOf,
   actCandidates, adversaryOf, adversaryPlacement, chatField, chatShaped, prefillFor,
   pxToWorld, recentVoices, faceImageFor,
   aimField, aimKind, aimTargets, aimable, barFold, combatantBars, consentSplit, dialSpeak, leavingName,

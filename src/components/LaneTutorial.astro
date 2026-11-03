@@ -15,7 +15,7 @@
 //
 // The verbs on the slides are the office's own, cited in src/lib/civic-tutorial.mjs.
 import { paint, SPRITE_W, SPRITE_H } from "@/lib/civic-art.mjs";
-import { CALL_LABEL } from "@/lib/civic-tutorial.mjs";
+import { callLabel } from "@/lib/civic-tutorial.mjs";
 
 const { lane, slides = [] } = Astro.props;
 ---
@@ -44,7 +44,7 @@ const { lane, slides = [] } = Astro.props;
           {/* A CALL, WHERE THERE IS ONE. A step with no door on the train
               carries no code block at all rather than a plausible-looking call
               the office would refuse — see civic-tutorial.mjs's bounty deck. */}
-          {s.call && <p class="c-tut-call-label">{CALL_LABEL}</p>}
+          {s.call && <p class="c-tut-call-label">{callLabel(s)}</p>}
           {s.call && <code class="c-tut-call">{s.call}</code>}
         </div>
       </li>
