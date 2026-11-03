@@ -1,9 +1,11 @@
 // The household resolver — the ONE place the site answers "whose house is this".
 //
 // A household is the HUMAN, town-facing: 1 human = 1 household = N residents
-// (Keemin's ruling, 2026-08-07). The declared registry is the town's
-// tools/households.json, synced into src/data/postmark/households.json by
-// tools/extract-town.mjs. Everyone else is a house of one — the wrapper has no
+// (Keemin's ruling, 2026-08-07). The declared registry is the office's, read
+// from its public GET /households (`registry`, in the same shape as the town's
+// tools/households.json) and written, verbatim, to the build's data layer as
+// households.json by tools/lib/fetch-town-data.mjs (via tools/fetch-town.mjs)
+// and by tools/extract-town.mjs. Everyone else is a house of one — the wrapper has no
 // special case for solos, it just renders a household whose member list is
 // length 1.
 //
