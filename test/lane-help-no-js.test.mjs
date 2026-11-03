@@ -109,12 +109,26 @@ test("with the script on, the '?' keeps Space as well as Enter, and says it is a
   assert.equal(/role="button"/.test(headMarkup), false, "role=button is in the markup, so a no-script reader gets a 'button' that is a link");
   assert.match(hub, /querySelectorAll\("a\[data-tut\]"\)/);
   assert.match(hub, /setAttribute\("role", "button"\)/, "the script does not mark the link as a button");
-  const k = hub.indexOf('if (e.key !== " ") return;');
-  assert.ok(k > 0, "no Space handler for the '?'");
-  const handler = hub.slice(k, k + 300);
-  assert.match(handler, /closest\("a\[data-tut\]"\)/);
-  assert.ok(handler.indexOf("e.preventDefault()") > -1 && handler.indexOf("ask.click()") > handler.indexOf("e.preventDefault()"),
-    "Space must be stopped (no page scroll) and then open the same way a click does");
+  // SPACE ACTS ON KEYUP, like a native button. A click on keydown opens the
+  // dialog, showModal() moves focus in, and the Space keyup then lands on a
+  // button inside it (Close, in Firefox) and shuts it as it opens.
+  const body = (evt) => {
+    const m = hub.match(new RegExp(`a\\.addEventListener\\("${evt}", function \\(e\\) \\{([\\s\\S]*?)\\n        \\}\\);`));
+    assert.ok(m, `the '?' link has no ${evt} listener of its own (bound to the links, not the page)`);
+    return m[1];
+  };
+  const down = body("keydown");
+  const up = body("keyup");
+  assert.match(down, /e\.key !== " "/);
+  assert.match(down, /e\.preventDefault\(\)/, "keydown must stop the page scrolling");
+  assert.match(down, /spaceDown = true/, "keydown must note that Space went down on this link");
+  assert.equal(/\.click\(\)/.test(down), false, "keydown clicks the link: the keyup that follows can close the dialog it just opened");
+  assert.match(up, /e\.key !== " "/);
+  assert.match(up, /if \(!spaceDown\) return;/, "keyup must only act when Space went down on this link");
+  assert.match(up, /a\.click\(\)/, "keyup does not open the dialog");
+  // and the page-wide Space handler is gone
+  assert.equal(/main\.addEventListener\("keydown"[^]*?closest\("a\[data-tut\]"\)/.test(hub), false,
+    "a page-wide Space handler on a[data-tut] is back");
 });
 
 test("with the script on the same dialog opens: the one handler stops the link and calls showModal()", () => {
