@@ -153,7 +153,9 @@ const NAMES_THE_KEEP = [
   new RegExp(["join", "source"].join("-")),
   new RegExp(["recallFrom", "rememberFrom", "fromFromSearch"].join("|")),
 ];
-const READS_THE_RAW_PARAM = [/\.get\(\s*["'`]from["'`]\s*\)/, /[?&]from=/];
+// `[?&\]]from=` is a `?from=` or `&from=` in a link, and `]from=` too: the end of the `[?&]` class in a REGEX that reads it
+// (Truey's review flipped a join page to `/[?&]from=([^&]*)/.exec(search)`, which `[?&]from=` alone cannot see).
+const READS_THE_RAW_PARAM = [/\.get\(\s*["'`]from["'`]\s*\)/, /[?&\]]from=/];
 
 /** The only files that may name the keep or read a raw `from`, and why. Anything else is a defect of this PR. */
 const MAY_NAME_IT = new Map([
@@ -177,8 +179,10 @@ test("nothing shows the tag or reads it: no shipped file but the layout and the 
   // the matchers can match (a pattern that cannot is a scan that cannot fail)
   const sample = [`localStorage.getItem("${["pm", "from"].join(".")}")`, `import x from "@/lib/${["join", "source"].join("-")}.mjs"`, "recallFrom(s)", "rememberFrom(s)", "fromFromSearch(q)"];
   for (const s of sample) assert.ok(NAMES_THE_KEEP.some((re) => re.test(s)), `a pattern matches ${s}`);
-  for (const s of [`new URLSearchParams(location.search).get("from")`, `p.get('from')`, "/join/?from=reddit", "/x?a=1&from=reddit"])
+  for (const s of [`new URLSearchParams(location.search).get("from")`, `p.get('from')`, "/join/?from=reddit", "/x?a=1&from=reddit", "/[?&]from=([^&]*)/.exec(search)"])
     assert.ok(READS_THE_RAW_PARAM.some((re) => re.test(s)), `a pattern matches ${s}`);
+  for (const s of [`<p data-from={m.profile.from}>`, "from=stops[i]; to=stops[i+1];", `import x from "y"`])
+    assert.ok(!READS_THE_RAW_PARAM.some((re) => re.test(s)), `and no pattern matches ${s}, which is not a query read`);
 
   const scanned = [], hits = new Map();
   for (const root of SCANNED_ROOTS)
