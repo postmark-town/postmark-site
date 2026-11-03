@@ -94,20 +94,69 @@ export function isClosed(posting) {
   return CLOSED_STATUSES.includes(String(posting?.data?.status ?? "").trim().toLowerCase());
 }
 
+// THE DATE A POSTING IS ORDERED BY (Site UX, POS-855, front-latest). Every
+// bulletin date on the site is `data.posted`. A posting may also carry an
+// optional `data.updated`, for a keeper who revises a posting and wants it back
+// at the top. When it is present (not blank) it is the date the posting is
+// ordered by AND the date shown, worded "updated <date>"; otherwise `posted` is,
+// exactly as before. No posting carries `updated` today, so nothing reorders
+// until a keeper adds one (finding F-27).
+
+/**
+ * The date a posting is ordered and shown by: `data.updated` when present, else
+ * `data.posted` (taken as written, so the order without `updated` is the old
+ * order, byte for byte). Empty when the posting has neither.
+ * @param {{data?: object}} posting
+ * @returns {{date: string, updated: boolean}}
+ */
+export function postingStamp(posting) {
+  const updated = String(posting?.data?.updated ?? "");
+  if (updated.trim()) return { date: updated, updated: true };
+  return { date: String(posting?.data?.posted ?? ""), updated: false };
+}
+
+/**
+ * The words that date a posting for a reader: "<date>", or "updated <date>"
+ * when the posting is ordered by `updated`; empty when it has no date. `fmt`
+ * words the date itself (the pages pass pm.mjs's fmtDate).
+ * @param {{data?: object}} posting
+ * @param {(iso: string) => string} [fmt]
+ */
+export function postingWhen(posting, fmt = (d) => d) {
+  const { date, updated } = postingStamp(posting);
+  if (!date) return "";
+  return updated ? `updated ${fmt(date.trim())}` : fmt(date);
+}
+
 /**
  * The postings the signed-in card band shows: every posting but Ferry's Daily
  * and those marked closed (a happening that is not closed stays), newest
- * `posted` first, at most `limit`. Ties keep the bulletin's file order (a
- * stable sort). An empty list is a real answer: the page then shows the story
- * band instead of an empty one.
+ * first by `updated` when a posting has one and `posted` when not, at most
+ * `limit`. Ties keep the bulletin's file order (a stable sort). An empty list
+ * is a real answer: the page then shows the story band instead of an empty one.
+ * Callers: the home page's signed-in band (LENS_LIMIT) and its signed-out
+ * "Latest on the bulletin" list (latestPostings); nothing else.
  * @param {Array<{slug: string, data?: object}>} bulletin  bulletin.json
  * @param {number} [limit]
  */
 export function lensPostings(bulletin, limit = LENS_LIMIT) {
   return (bulletin ?? [])
     .filter((p) => !NOT_A_CARD.has(p.slug) && !isClosed(p))
-    .sort((a, b) => String(b.data?.posted ?? "").localeCompare(String(a.data?.posted ?? "")))
+    .sort((a, b) => postingStamp(b).date.localeCompare(postingStamp(a).date))
     .slice(0, limit);
+}
+
+/** How many postings the signed-out front page lists under the story. */
+export const LATEST_LIMIT = 3;
+
+/**
+ * The signed-out front page's "Latest on the bulletin": the first LATEST_LIMIT
+ * of lensPostings, so it is the same postings in the same order the signed-in
+ * band opens with, never a second rule.
+ * @param {Array<{slug: string, data?: object}>} bulletin  bulletin.json
+ */
+export function latestPostings(bulletin) {
+  return lensPostings(bulletin, LATEST_LIMIT);
 }
 
 // ── PINNED FOR EVERYONE (Keemin, 2026-09-27) ────────────────────────────────

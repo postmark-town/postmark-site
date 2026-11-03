@@ -19,7 +19,7 @@ import meeps from "@/data/postmark/meeps.json";
 import bulletin from "@/data/postmark/bulletin.json";
 import projectsData from "@/data/postmark/projects.json";
 import { fmtDate, threadTitle, emph, postingTitle, postingTeaser, displayName } from "@/lib/pm.mjs";
-import { lensPostings } from "@/lib/bulletin-cards.mjs";
+import { lensPostings, latestPostings, postingWhen } from "@/lib/bulletin-cards.mjs";
 import { noticePath } from "@/lib/bulletin-notice.mjs";
 import { letterAddresses, letterHref } from "@/lib/mail.mjs";
 import { tickerDeliveries } from "@/lib/front-ticker.mjs";
@@ -89,7 +89,14 @@ for (const r of residents) {
 // unless closed (the bulletin wall unpins them, so this band is their door).
 // If none remain the signed-in reader gets the story band, never an empty one.
 const lensCards = lensPostings(bulletin)
-  .map((b) => ({ slug: b.slug, title: postingTitle(b), teaser: postingTeaser(b), posted: b.data?.posted }));
+  .map((b) => ({ slug: b.slug, title: postingTitle(b), teaser: postingTeaser(b), when: postingWhen(b, fmtDate) }));
+
+// the signed-out "Latest on the bulletin": the newest three of the same
+// postings in the same order, as title and date, so a newcomer sees something
+// of what happened lately (POS-855). No postings, no list. The date is the one
+// the order uses: `updated` when a posting has one, else `posted`.
+const latest = latestPostings(bulletin)
+  .map((b) => ({ slug: b.slug, title: postingTitle(b), when: postingWhen(b, fmtDate) }));
 
 // Meet the Residents — chosen live, never by hand: the busiest HOUSEHOLDS, in
 // the order /households/ lists them (its own function and counts,
@@ -375,7 +382,7 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
       <div class="cards">
         {lensCards.map((b) => (
           <article class="card pm-paper">
-            <p class="c-kicker">the town bulletin{b.posted ? ` · ${fmtDate(b.posted)}` : ""}</p>
+            <p class="c-kicker">the town bulletin{b.when ? ` · ${b.when}` : ""}</p>
             <h3>{b.title}</h3>
             <p set:html={emph(b.teaser)} />
             <p class="c-cta"><a class="c-paperlink" href={noticePath(b.slug)}>read the posting →</a></p>
@@ -385,6 +392,26 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
       <button class="c-arrow prev" type="button" aria-label="Previous posting">‹</button>
       <button class="c-arrow next" type="button" aria-label="Next posting">›</button>
       <div class="c-dots" aria-hidden="true"></div>
+    </section>
+    )}
+
+    <!-- ── LATEST ON THE BULLETIN — the signed-out reader's "what's new".
+         The story above is hand-written and does not change from day to day;
+         this is the bulletin's newest three, title and date, each to the
+         posting's own page. Plain links, no script. The signed-in reader has
+         the bulletin band instead, so CSS hides this one beside it. ── -->
+    {latest.length > 0 && (
+    <section class="latest" aria-labelledby="latest-h">
+      <h2 id="latest-h">Latest on the bulletin</h2>
+      <ul class="latest-list">
+        {latest.map((b) => (
+          <li>
+            <a href={noticePath(b.slug)}>{b.title}</a>
+            {b.when && <span class="latest-when">{b.when}</span>}
+          </li>
+        ))}
+      </ul>
+      <p class="latest-all"><a href="/bulletin/">The whole bulletin →</a></p>
     </section>
     )}
 
@@ -806,6 +833,29 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
     /* no current posting to hang (lensPostings is empty): the page renders no
        lens band, and the signed-in reader keeps the story band */
     :global(html[data-lens]) .cardband.for-vanilla:not(.no-lens-cards) { display: none; }
+
+    /* "Latest on the bulletin" (signed out): the signed-in reader has the bulletin
+       band, so it goes. If the band is absent (nothing to hang) this list is
+       absent too, since both come from lensPostings. */
+    :global(html[data-lens]) .latest { display: none; }
+    .latest { margin: 0 0 2.8em; }
+    .latest h2 {
+      margin: 0 0 0.4em; font-size: clamp(1.15rem, 2.4vw, 1.4rem);
+      color: var(--pm-gold-bright);
+    }
+    .latest-list { list-style: none; margin: 0; padding: 0; }
+    .latest-list li {
+      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+      gap: 0.2em 1em; padding: 0.55em 0;
+      border-top: 1px solid rgba(232, 196, 139, 0.22);
+    }
+    .latest-list li:last-child { border-bottom: 1px solid rgba(232, 196, 139, 0.22); }
+    .latest-list a { color: var(--pm-gold); text-decoration: none; }
+    .latest-list a:hover { text-decoration: underline; }
+    .latest-when { font-family: var(--pm-mono); font-size: 0.72rem; color: #cdc2ab; }
+    .latest-all { margin: 0.6em 0 0; font-family: var(--pm-mono); font-size: 0.72rem; }
+    .latest-all a { color: var(--pm-gold); text-decoration: none; }
+    .latest-all a:hover { text-decoration: underline; }
 
     .cardband { margin: 0 0 2.8em; position: relative; }
     .cards {
