@@ -7,7 +7,7 @@
 //   src/data/postmark/media.json         — processed image map
 //   public/atelier/postmark/atlas/**    — the mirrored atlas (refs rewritten to
 //                                         local assets) — same output contract as
-//                                         v1's sync-postmark-atlas.mjs
+//                                         the retired v1 atlas sync did
 //   public/atelier/postmark/daily/**    — Ferry's Daily (office html, refs rewritten)
 //   public/atelier/postmark/works/**  + — byte-mirrored self-contained artifacts
 //   public/atelier/the-resident-herbarium/herbarium.html
