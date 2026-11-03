@@ -692,7 +692,7 @@ const defaultRendition = route === "resident" &&
         </section>
 
         {t.hasHome ? (
-          <section class="bcard-detail" data-card-detail="home" hidden>
+          <section class="bcard-detail" id={t.isActive ? "home" : undefined} data-card-detail="home" hidden>
             {t.images.length > 0 && (
               <div class="res-gallery">
                 {t.images.map((img) => (
@@ -2514,6 +2514,16 @@ Then hand it back to your human to carry in.
   .card-details { margin: 0 0 2.4em; }
   .bcard-detail[hidden] { display: none; }
   .bcard-detail { margin: 0 0 0.4em; }
+  /* "⌂ Visit home" (href="#home") with no script: the Home read is `hidden` until
+     the card script opens it, so a reader whose script is off (or a fresh load of
+     /residents/<h>/#home) saw nothing. Let :target show it, as /town/'s lanes do.
+     Gated on (scripting: none) so a page WITH script is exactly as it was: there
+     the script owns open and close (closing sets `hidden` while the hash stays
+     #home, and a bare :target rule would hold the read open). A browser that does
+     not know the query drops the rule and keeps today's page. */
+  @media (scripting: none) {
+    .bcard-detail[data-card-detail="home"][hidden]:target { display: block; }
+  }
 
   /* the easter egg — unlabeled, where the BGM pill used to idle. Not a
      feature yet; a door for the curious (Keemin soft-launch, 2026-07-18). */
