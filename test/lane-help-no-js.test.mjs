@@ -14,14 +14,15 @@
 //     and calls showModal() — the same dialog as before — and a <noscript> is
 //     never parsed as markup then, so the slides exist once on the page.
 //
-// THE LABEL: CALL_LABEL (civic-tutorial.mjs) is printed above every `call`,
-// in the dialog and in the no-script list.
+// THE LABEL: callLabel(step) (civic-tutorial.mjs) is printed above every `call`,
+// in the dialog and in the no-script list: CALL_LABEL, or LETTER_LABEL ("In the
+// letter, write:") for a step marked `callKind: "letter"`.
 
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { CALL_LABEL, TUTORIALS, tutorialFor, MAX_SLIDES } from "../src/lib/civic-tutorial.mjs";
+import { CALL_LABEL, LETTER_LABEL, callLabel, TUTORIALS, tutorialFor, MAX_SLIDES } from "../src/lib/civic-tutorial.mjs";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
 const head = read("../src/components/LaneHead.astro");
@@ -37,11 +38,27 @@ const tutMarkup = markupOf(tut);
 
 test("the label is the one agreed wording, and it is a shared constant", () => {
   assert.equal(CALL_LABEL, "Your agent calls:");
-  // not re-typed in either component: both read the constant
+  assert.equal(LETTER_LABEL, "In the letter, write:");
+  // not re-typed in either component: both read callLabel(), which reads the constants
   for (const [name, src] of [["LaneHead", head], ["LaneTutorial", tut]]) {
-    assert.match(src, /import \{[^}]*\bCALL_LABEL\b[^}]*\} from "@\/lib\/civic-tutorial\.mjs"/,
-      `${name} does not import CALL_LABEL`);
+    assert.match(src, /import \{[^}]*\bcallLabel\b[^}]*\} from "@\/lib\/civic-tutorial\.mjs"/,
+      `${name} does not import callLabel`);
     assert.equal(src.includes("Your agent calls"), false, `${name} types the label by hand`);
+    assert.equal(src.includes("In the letter, write"), false, `${name} types the letter label by hand`);
+  }
+});
+
+test("a step marked callKind: 'letter' gets the letter label; every other step keeps CALL_LABEL", () => {
+  assert.equal(callLabel({ call: "x" }), CALL_LABEL);
+  assert.equal(callLabel({ call: "x", callKind: "letter" }), LETTER_LABEL);
+  // the one letter line today is the bounty deck's `pays:` step, and only that one
+  const letters = Object.entries(TUTORIALS).flatMap(([k, d]) => d.filter((s) => s.callKind === "letter").map((s) => [k, s]));
+  assert.equal(letters.length, 1);
+  assert.equal(letters[0][0], "bounties");
+  assert.equal(letters[0][1].call, "pays: 12");
+  assert.equal(callLabel(letters[0][1]), "In the letter, write:");
+  for (const s of Object.values(TUTORIALS).flat()) {
+    if (s.call && s.callKind !== "letter") assert.equal(callLabel(s), "Your agent calls:", s.call);
   }
 });
 
@@ -50,7 +67,7 @@ test("every `call` is printed with the label directly above it, in the dialog an
     ["LaneTutorial", tutMarkup, "c-tut-call-label", "c-tut-call"],
     ["LaneHead", headMarkup, "c-help-plain-call-label", "c-help-plain-call"],
   ]) {
-    const label = new RegExp(`\\{s\\.call && <p class="${labelClass}">\\{CALL_LABEL\\}</p>\\}\\s*\\n\\s*\\{s\\.call && <code class="${callClass}">\\{s\\.call\\}</code>\\}`);
+    const label = new RegExp(`\\{s\\.call && <p class="${labelClass}">\\{callLabel\\(s\\)\\}</p>\\}\\s*\\n\\s*\\{s\\.call && <code class="${callClass}">\\{s\\.call\\}</code>\\}`);
     assert.match(markup, label, `${name}: the call is not preceded by the CALL_LABEL line`);
   }
 });

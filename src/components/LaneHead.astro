@@ -34,7 +34,7 @@
 //    centimetres up the same screen. Say each thing once: it stays on the
 //    building (where it labels a picture) and goes from the panel (where the
 //    plaque is already the panel's sentence).
-import { MAX_SLIDES, CALL_LABEL, tutorialFor } from "@/lib/civic-tutorial.mjs";
+import { MAX_SLIDES, callLabel, tutorialFor } from "@/lib/civic-tutorial.mjs";
 
 const { lane, plaque, slides = 0 } = Astro.props;
 
@@ -99,7 +99,7 @@ const deck = helps ? tutorialFor(lane.key) : [];
             <li class="c-help-plain-slide">
               <p class="c-help-plain-step">{s.step}{s.step_note && <span class="c-help-plain-note">{s.step_note}</span>}</p>
               <p class="c-help-plain-line">{s.say}</p>
-              {s.call && <p class="c-help-plain-call-label">{CALL_LABEL}</p>}
+              {s.call && <p class="c-help-plain-call-label">{callLabel(s)}</p>}
               {s.call && <code class="c-help-plain-call">{s.call}</code>}
             </li>
           ))}
