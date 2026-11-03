@@ -34,9 +34,9 @@ const NBSP = String.fromCharCode(0xa0);
 const BREAKS = { "a lone CR": "\r", "a lone U+2028": LS, "a lone U+2029": PS };
 
 /** `head` + `fill` repeated + `tail`, exactly SIZE characters long. */
-function sized(head, fill, tail) {
+function sized(head, fill, tail, pad = "y") {
   const room = SIZE - head.length - tail.length;
-  const text = head + fill.repeat(Math.floor(room / fill.length)) + "y".repeat(room % fill.length) + tail;
+  const text = head + fill.repeat(Math.floor(room / fill.length)) + pad.repeat(room % fill.length) + tail;
   assert.equal(text.length, SIZE, "the input is exactly SIZE characters");
   return text;
 }
@@ -144,14 +144,17 @@ test(`parseLedger: a bounce defect of about 64,000 spaces, text, then a lone CR 
   assert.deepEqual(value, []);
 });
 
-// The old regex was cubic in the whitespace after the second "·", so this line puts 3,000
-// spaces there (about 5 s on main) and fills the rest of its 64,000 characters with a sender
-// that never closes; at 64,000 spaces main would take hours.
-test(`parseLedger: a bounce line of 3,000 spaces before "(from" and no ")" in 64,000 characters reads in under ${BOUND_MS} ms, as no entry`, () => {
-  const line = sized(`${HEAD}${" ".repeat(3000)}(from a`, "b", "");
-  const { value, ms } = timed(() => parseLedger(line));
+// The old regex was cubic in the whitespace after the second "·", so this ledger's bounce line
+// holds 3,000 spaces there (about 5 s on main; 64,000 would take hours), and ordinary delivery
+// lines fill the rest of its 64,000 characters.
+test(`parseLedger: a 64,000-character ledger whose bounce line holds 3,000 spaces before "(from" reads in under ${BOUND_MS} ms, deliveries only`, () => {
+  const delivery = "\n- 2026-11-03 · 2026-11-03-hello · a → b";
+  const text = sized(`${HEAD}${" ".repeat(3000)}(from a`, delivery, "", " ");
+  const deliveries = text.split("\n").length - 1;
+  const { value, ms } = timed(() => parseLedger(text));
   assert.ok(ms < BOUND_MS, `${LAW}; this read took ${ms.toFixed(0)} ms`);
-  assert.deepEqual(value, []);
+  const one = { kind: "delivery", date: "2026-11-03", id: "2026-11-03-hello", from: "a", to: "b", thread: null };
+  assert.deepEqual(value, Array.from({ length: deliveries }, () => one));
 });
 
 test("CONTROL parseLedger: a 64,000-character bounce line with a long defect reads fast on either reader, and reads whole", () => {
