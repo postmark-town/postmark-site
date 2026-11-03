@@ -519,34 +519,70 @@ export async function fetchLettersSince({ apiBase, fetchImpl, retries, gate = nu
 // where that door says 404). `cards` comes back as a Map handle → card, or null
 // when any page came back without them: an older office ignores the parameter,
 // and the caller then reads the cards one by one, as it always has.
+//
+// A WALK THE TOWN MOVED UNDER IS WALKED AGAIN (STAR-108, 2026-11-03). The door
+// pages an alphabetical roll by offset, so a resident who joins or leaves while
+// the walk is between pages shifts every later row by one: a join ahead of the
+// cursor shows one row twice and misses the joiner, and a leave skips one. The
+// 11-03 deploy read `total` 336 on the first page, a resident joined at row 10
+// before the second, and the walk came back 337 rows long with one of them
+// twice — "walked 337 of 336", a refusal on a roll that was whole a minute
+// later. Every page names the door's `total`, so a move is visible in the walk
+// itself: the totals disagree, or a handle repeats. A walk that saw either is
+// walked again (up to WALKS times); one that saw neither and still comes up
+// short is the truncation above, and refuses at once, as before.
 export const CARD_PAGE = 100;
-export async function fetchResidentRoll({ apiBase, fetchImpl, retries, gate = null, limit = 200, cards = false } = {}) {
+export const WALKS = 3;
+async function walkRoll({ apiBase, fetchImpl, retries, gate, size, cards }) {
   const roll = [];
   const cardByHandle = new Map();
+  const seen = new Set();
+  const totals = new Set();
   let withCards = cards;
-  let total = null;
+  let repeated = 0;
   let pages = 0;
-  const size = cards ? CARD_PAGE : limit;
   for (let offset = 0; ; offset += size) {
     const { body } = await apiGet(`/residents?limit=${size}&offset=${offset}${cards ? "&cards=1" : ""}`, { apiBase, fetchImpl, retries, gate, timeoutMs: cards ? 60_000 : undefined });
     pages += 1;
     // The pre-2026-09-10 office: one array, the whole roll, the limit ignored.
-    if (Array.isArray(body)) return { roll: ensureArray(body, "/residents"), paged: false, total: body.length, pages, cards: null };
+    if (Array.isArray(body)) return { bare: ensureArray(body, "/residents"), pages };
     const batch = ensureArray(body?.residents, "/residents.residents");
-    if (offset === 0 && Number.isInteger(body.total)) total = body.total;
-    roll.push(...batch);
-    if (withCards && Array.isArray(body.cards) && body.cards.length === batch.length)
-      batch.forEach((row, i) => cardByHandle.set(row.handle, body.cards[i] ?? null));
-    else withCards = false;
+    if (Number.isInteger(body.total)) totals.add(body.total);
+    batch.forEach((row, i) => {
+      if (seen.has(row.handle)) { repeated += 1; return; }
+      seen.add(row.handle);
+      roll.push(row);
+      if (withCards && Array.isArray(body.cards) && body.cards.length === batch.length) cardByHandle.set(row.handle, body.cards[i] ?? null);
+    });
+    if (!(Array.isArray(body.cards) && body.cards.length === batch.length)) withCards = false;
     // Paged on the page's own length rather than on `complete`, the same idiom
     // fetchLetterCorpus uses — and with the same reason to distrust a flag this
     // loop may be reading from a door that does not have it.
     if (batch.length < size) break;
   }
+  const total = totals.size ? [...totals].at(-1) : null;
+  return { roll, pages, total, moved: totals.size > 1 || repeated > 0, cards: withCards ? cardByHandle : null };
+}
+export async function fetchResidentRoll({ apiBase, fetchImpl, retries, gate = null, limit = 200, cards = false } = {}) {
+  const size = cards ? CARD_PAGE : limit;
+  let pages = 0;
+  let walks = 0;
+  let walk;
+  for (let n = 1; n <= WALKS; n += 1) {
+    walks = n;
+    walk = await walkRoll({ apiBase, fetchImpl, retries, gate, size, cards });
+    pages += walk.pages;
+    if (walk.bare) return { roll: walk.bare, paged: false, total: walk.bare.length, pages, cards: null };
+    if (!walk.moved) break;
+    if (n === WALKS) {
+      throw new Error(`/residents: the town moved under all ${WALKS} walks of the roll (the door's total changed between pages, or a resident showed on two pages) — a roll read mid-move would publish a town with pages missing or doubled`);
+    }
+  }
+  const { roll, total } = walk;
   if (total !== null && roll.length !== total) {
     throw new Error(`/residents: walked ${roll.length} of ${total} residents — a partial roll would publish a town with pages missing`);
   }
-  return { roll, paged: true, total: total ?? roll.length, pages, cards: withCards ? cardByHandle : null };
+  return { roll, paged: true, total: total ?? roll.length, pages, walks, cards: walk.cards };
 }
 
 /** Newest-first union by id; the inbox copy wins over an outbox one. */
