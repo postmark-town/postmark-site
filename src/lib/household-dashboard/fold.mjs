@@ -11,7 +11,7 @@
 const DAY = 86_400_000;
 
 /** An instant from the office, as ms — ISO, or the `Date.toString()` spelling
- *  the doorstep's rulings still use (a cross-door grammar defect, NOTE.md). */
+ *  the doorstep's rulings still use (a cross-door grammar defect). */
 export function parseAt(v) {
   if (v == null || v === "") return null;
   const ms = typeof v === "number" ? v : Date.parse(String(v));
@@ -114,7 +114,7 @@ export function countKinds(items) {
 // ── each resident's card ────────────────────────────────────────────────────
 
 /** Their newest act: a letter they wrote or a line they said. Its words are
- *  the card's "doing" — no read answers what a resident is doing (NOTE.md),
+ *  the card's "doing" — no read answers what a resident is doing,
  *  so the page shows what they last did, in their own words. */
 export function lastActOf(handle, items) {
   return items.find((i) => i.who === handle && (i.kind === "said" || (i.kind === "letter" && i.dir === "out"))) ?? null;

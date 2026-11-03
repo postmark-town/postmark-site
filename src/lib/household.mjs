@@ -1,9 +1,11 @@
 // The household resolver — the ONE place the site answers "whose house is this".
 //
 // A household is the HUMAN, town-facing: 1 human = 1 household = N residents
-// (Keemin's ruling, 2026-08-07). The declared registry is the town's
-// tools/households.json, synced into src/data/postmark/households.json by
-// tools/extract-town.mjs. Everyone else is a house of one — the wrapper has no
+// (Keemin's ruling, 2026-08-07). The declared registry is the office's, read
+// from its public GET /households (`registry`, in the same shape as the town's
+// tools/households.json) and written, verbatim, to the build's data layer as
+// households.json by tools/lib/fetch-town-data.mjs (via tools/fetch-town.mjs)
+// and by tools/extract-town.mjs. Everyone else is a house of one — the wrapper has no
 // special case for solos, it just renders a household whose member list is
 // length 1.
 //
@@ -15,7 +17,7 @@ import registry from "@/data/postmark/households.json";
 import residents from "@/data/postmark/residents.json";
 import { buildHouses } from "./houses.mjs";
 
-export { houseName, nameplate, buildHouses } from "./houses.mjs";
+export { nameplate } from "./houses.mjs";
 
 // The site's one index, built once for the whole build (every resident page
 // asks it the same question).
@@ -23,7 +25,6 @@ const index = buildHouses(residents, registry);
 const byHandle = new Map(residents.map((r) => [r.handle, r]));
 
 export const houseOf = (handle) => index.houseOf.get(handle);
-export const houseBySlug = (slug) => index.bySlug.get(slug);
 export const declaredHouses = () => [...index.bySlug.values()];
 export const membersOf = (house) => house.residents.map((h) => byHandle.get(h)).filter(Boolean);
 // When a resident last acted is the office's fact, carried on their row
