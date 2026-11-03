@@ -194,7 +194,16 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
       </div>
       <!-- what writing needs, said once, under the first write-back button a reader
            meets (the rail link and the foot button open the same desk) — POS-855 -->
-      <div class="fr-gate-note"><WriteGateNote /></div>
+      <div class="fr-gate-note">
+        <WriteGateNote />
+        <!-- true for every reader, signed in or not: the page's own script grays all three
+             write-back controls (wb-off) unless the signed-in household holds `a` or `b`
+             (isPairViewer checks every handle of the household, so a housemate of either
+             writer can write back too: the line names households, not the two writers).
+             A signed-in outsider is also stopped, and the sign-in note above says nothing
+             about that. Static copy; the gate and the script are untouched. -->
+        <p class="fr-gate-who" data-write-gate-pair>Only the two households in this conversation can write back here.</p>
+      </div>
     </section>
 
     {showMilestone && (
@@ -556,7 +565,8 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
     .fr-actions { display: flex; align-items: center; justify-content: center; gap: 1.2em; flex-wrap: wrap; margin-top: 1.1em; }
     .fr-actions .turn { font-family: var(--pm-mono); font-size: 0.8rem; color: var(--pm-ink-soft); }
     .fr-actions .turn b { color: var(--pm-wax); }
-    .fr-gate-note { display: flex; justify-content: center; text-align: center; }
+    .fr-gate-note { display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .fr-gate-who { margin: 0.4em 0 0; max-width: 46ch; font-size: 0.85rem; line-height: 1.5; opacity: 0.85; }
 
     /* the budding-friendship milestone (decision 7 — the pair's achievement, on
        the pair page, not a personal quest card) */

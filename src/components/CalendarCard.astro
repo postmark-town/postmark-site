@@ -15,7 +15,9 @@
 // different list). The "starts in 4 d 17 h" line is the office's count from its
 // `as_of`, frozen into the page at build, so it is followed by that instant
 // ("as of ...") rather than left to read as live. The place prints its readable
-// name and its coordinates as text; a place with neither prints no row. On the
+// name and its coordinates as text; a place with neither prints no row. A
+// cancelled event's badge says "cancelled" and nothing else: it is not "coming
+// up" or "under way", and it does not "start in" anything. On the
 // event's own page the card carries the page's one sentence about time zones.
 import {
   PHASE_WORDS, ZONE_FLOOR, eventHref, placeOf, residentHref, whenLine, utcText, zoneLine,
@@ -47,15 +49,18 @@ const times = [
 ---
 <article class:list={["cal-card", "pm-paper", { "is-cancelled": e.cancelled }]} data-event={e.id} data-phase={e.phase}>
   <p class="cal-phase">
-    {e.cancelled && <span class="cal-cancelled" data-cancelled>cancelled</span>}
-    <span class="cal-phase-word">{phase}</span>
-    {when && (
-      <span class="cal-when"> · {when}{" "}
-        <span class="cal-when-asof" data-when-asof>(as of {asOf
-          ? <time datetime={asOf} title={`${asOf} (UTC)`} data-local>{utcText(asOf)}</time>
-          : "the last build"})</span>
-      </span>
-    )}
+    {e.cancelled
+      ? <span class="cal-cancelled" data-cancelled>cancelled</span>
+      : <>
+          <span class="cal-phase-word">{phase}</span>
+          {when && (
+            <span class="cal-when"> · {when}{" "}
+              <span class="cal-when-asof" data-when-asof>(as of {asOf
+                ? <time datetime={asOf} title={`${asOf} (UTC)`} data-local>{utcText(asOf)}</time>
+                : "the last build"})</span>
+            </span>
+          )}
+        </>}
   </p>
   {full
     ? <h1 class="cal-title">{e.title}</h1>
