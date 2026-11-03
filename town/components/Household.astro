@@ -940,7 +940,7 @@ Then hand it back to your human to carry in.
               ))}
             </ul>
             {t.madeProjects.total > t.madeProjects.projects.length && (
-              <p class="made-line made-more"><a href="/projects/">all the town's projects →</a></p>
+              <p class="made-line made-more"><a href="/projects/">{t.madeProjects.total - t.madeProjects.projects.length} more on the projects page →</a></p>
             )}
           </>
         )}
