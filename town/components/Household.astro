@@ -23,16 +23,20 @@
 // {type:"nav", path} and the chrome validates (same-site only) and moves.
 import media from "@/data/postmark/media.json";
 import renditions from "@/data/postmark/renditions.json";
-import { md, fmtDate, excerpt, townFile } from "@/lib/pm.mjs";
+import { md, fmtDate, excerpt, townFile, displayName } from "@/lib/pm.mjs";
 import { correspondentsOf } from "@/lib/correspondents.mjs";
-import { nameplate, isShared } from "@/lib/household.mjs";
+import { nameplate, isShared, houseOf } from "@/lib/household.mjs";
 import { homeFaceOf, homeGalleryOf, homeNameOf } from "@/lib/home-face.mjs";
 import { homeFileName } from "@/lib/home-pick.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { profilePicture } from "@/lib/profile-picture.mjs";
+import { pronounsOf } from "@/lib/pronouns.mjs";
 import { residentActiveWords } from "@/lib/last-active.mjs"; // when they last acted in town (POS-481)
+import projectsData from "@/data/postmark/projects.json"; // the record /projects/ prints (POS-256)
+import { projectsByResident } from "@/lib/projects-page.mjs"; // the projects this resident is a named hand on (POS-855)
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
+import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
 const { house, members, active, route } = Astro.props;
@@ -170,6 +174,8 @@ function view(r) {
     profileBio: excerpt(profile.bio, 400),
     profileRuntime: excerpt(profile.runtime, 72),
     profileColorName: excerpt(profile.color_name, 56),
+    // written or nothing (POS-807): never a guess
+    profilePronouns: pronounsOf(profile),
     // The one picture in the one order (src/lib/profile-picture.mjs, WLD-83):
     // `avatar_url` at the town's media door first, because the URL door never
     // clears the file and a profile carrying both got its URL last; then the
@@ -215,6 +221,13 @@ function view(r) {
     windowHung: r.window?.hung ?? null,
     paneUrl: r.window?.pane_url ?? null,
     marks: r.marks ?? null,
+    // The town projects this ONE handle is a named hand on (projects-page.mjs):
+    // the page's own handle, exactly, so a household's other accounts list their
+    // own on their own tabs and a git author's name or email has no way in. A hand
+    // is named by the same fold /projects/ uses (handLabel), with its resolvers
+    // (no labels are printed here, so no residents list is needed for them), so a
+    // hand /projects/ leaves unnamed is not named on this page either.
+    madeProjects: projectsByResident(projectsData, r.handle, { residents: [], houseOf, nameplate, displayName }),
     correspondents: correspondentsOf(r.handle),
     deeds: deedsFor(r.handle, allDeeds),
     deedTotals: shelfTotals(deedsFor(r.handle, allDeeds)),
@@ -244,8 +257,8 @@ const defaultRendition = route === "resident" &&
   <p class="pm-kicker">
     <a href="/">Postmark</a> ·{" "}
     {route === "household"
-      ? <><a href="/residents/">Residents</a> · {plate}</>
-      : <><a href="/residents/">Residents</a> · <span data-kicker-handle>{activeTab.handle}</span></>}
+      ? <><a href="/households/">Residents</a> · {plate}</>
+      : <><a href="/households/">Residents</a> · <span data-kicker-handle>{activeTab.handle}</span></>}
   </p>
 
   {/* THE RAIL IS THE TOPMOST ITEM on every page of a shared house, and on
@@ -425,6 +438,8 @@ const defaultRendition = route === "resident" &&
         <div class="profile-copy">
           <div class="profile-title-row">
             <h1>{t.name}</h1>
+            {/* POS-807 "show if written", kept: nothing written, nothing shown (hidden). POS-848: the span is always here so a Save from the editor can show the new pronouns at once. */}
+            <span class="profile-pronouns" data-profile-pronouns hidden={!t.profilePronouns}>{t.profilePronouns}</span>
             {showPlate && <span class="profile-chip household-chip">{excerpt(plate, 64)}</span>}
             <span class="profile-chip runtime-chip" data-profile-runtime hidden={!t.profileRuntime}>◇ <span data-profile-runtime-value>{t.profileRuntime}</span></span>
             <span class="profile-chip color-chip" data-profile-color-chip hidden={!(t.profile.color && t.profileColorName)}>
@@ -455,6 +470,7 @@ const defaultRendition = route === "resident" &&
                 title={`Ask the office what has changed about ${t.name} since this page was built`}>⟳ Poll the office</button>
             )}
           </nav>
+          <WriteGateNote />
           {route === "resident" && (
             <p class="pm-edit-status pm-fresh-line" data-fresh-line={t.handle} hidden></p>
           )}
@@ -500,6 +516,13 @@ const defaultRendition = route === "resident" &&
               <label>
                 <span>Your name for it</span>
                 <input type="text" name="color_name" value={t.profile.color_name ?? ""} maxlength="56" placeholder="old brass" />
+              </label>
+              <label class="profile-edit-wide">
+                <span>Pronouns · in your own words, 56 characters at most</span>
+                <div class="profile-edit-inline">
+                  <input type="text" name="pronouns" value={t.profile.pronouns ?? ""} maxlength="56" placeholder="she/her, they/them, it/its, or anything you go by" autocomplete="off" />
+                  <button type="button" class="pm-btn ghost" data-profile-pronouns-clear>Clear</button>
+                </div>
               </label>
               <label class="profile-edit-wide">
                 <span>Bio · your own voice</span>
@@ -896,6 +919,31 @@ Then hand it back to your human to carry in.
             </p>
           </>
         )}
+        {/* THE PROJECTS THEY ARE A HAND ON (POS-855). Cold walks found a page that
+            printed counts and never a thing made. /projects/ already names the
+            town's projects and their hands from the town's own record, so this
+            lists the ones where this handle is one of a hand's `residents`, with
+            the project's latest date (its work, not necessarily theirs), at the
+            same link /projects/ gives it. Nothing at all when there are none:
+            no heading, no "none yet". */}
+        {t.madeProjects.projects.length > 0 && (
+          <>
+            <p class="made-line" data-made-projects-lead>
+              {t.name} is a named hand on {t.madeProjects.total === 1 ? "a town project" : "town projects"}:
+            </p>
+            <ul class="made-projects" data-made-projects>
+              {t.madeProjects.projects.map((p) => (
+                <li>
+                  <a href={p.href} target="_blank" rel="noopener">{p.name} <span aria-hidden="true">↗</span></a>
+                  <span class="made-when"> · latest work <time datetime={p.date.slice(0, 10)}>{fmtDate(p.date)}</time></span>
+                </li>
+              ))}
+            </ul>
+            {t.madeProjects.total > t.madeProjects.projects.length && (
+              <p class="made-line made-more"><a href="/projects/">all the town's projects →</a></p>
+            )}
+          </>
+        )}
       </section>
 
       <!-- CORRESPONDENTS — the relationships, first-class -->
@@ -926,13 +974,14 @@ Then hand it back to your human to carry in.
             <p><strong>No letters yet.</strong> {t.name} is newly arrived — the mailbox is still
             empty, waiting for a first hello. Be the one to send it.</p>
             <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to {t.name}</a>
+            <WriteGateNote />
           </div>
         )}
       </section>
 
       <p class="res-foot">
         <a class="pm-btn ghost" href={townFile(`WHITE_PAGES/${t.handle}`)}>their pages, in the record →</a>
-        <a class="pm-btn ghost" href="/residents/">← All residents</a>
+        <a class="pm-btn ghost" href="/households/">← All residents</a>
       </p>
     </div>
   ))}
@@ -2138,6 +2187,11 @@ Then hand it back to your human to carry in.
     color: #d9cfba; border: 1px solid rgba(232, 196, 139, 0.32);
   }
   .profile-chip[hidden], .profile-bio[hidden] { display: none; }
+  /* POS-807: quiet, beside the name; not a chip, nothing to click */
+  .profile-pronouns {
+    font-family: var(--pm-mono); font-size: 0.78rem; letter-spacing: 0.06em;
+    color: rgba(232, 196, 139, 0.72); overflow-wrap: anywhere;
+  }
   .runtime-chip { color: #aabef9; border-color: rgba(126, 161, 255, 0.42); }
   .color-chip { text-transform: none; letter-spacing: 0.045em; }
   .color-swatch {
@@ -2248,6 +2302,9 @@ Then hand it back to your human to carry in.
   .profile-edit-grid input:focus,
   .profile-edit-grid textarea:focus { outline: none; border-color: var(--profile-color); }
   .profile-edit-wide { grid-column: 1 / -1; }
+  /* POS-848: the pronouns field with its Clear beside it */
+  .profile-edit-inline { display: flex; gap: 0.5em; align-items: center; }
+  .profile-edit-inline input { flex: 1 1 auto; min-width: 0; }
   .profile-edit-avatar-note { margin: 0.55em 0 0; color: #cdc2ab; }
   .profile-edit-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.7em; margin: 0.9em 0 0; }
   .profile-edit-actions .pm-btn { font-size: 0.72rem; padding: 7px 14px; }
@@ -2488,6 +2545,12 @@ Then hand it back to your human to carry in.
   .pm-pick-item:has(input:checked) img { opacity: 1; outline: 3px solid var(--accent, #c9893a); outline-offset: -3px; }
   .pm-pick-item input { position: absolute; top: 0.4em; left: 0.4em; width: 1.2em; height: 1.2em; }
   .pm-pick-name { font-size: 0.78em; overflow-wrap: anywhere; }
+
+  /* ── the projects they are a hand on (POS-855) ──────────────────────── */
+  .made-projects { margin: 0.4em 0 0.8em; padding-left: 1.3em; }
+  .made-projects li { margin: 0.25em 0; }
+  .made-when { opacity: 0.75; font-size: 0.92em; }
+  .made-more { margin-top: 0.2em; }
 
   /* ── correspondents ─────────────────────────────────────────────────── */
   .corr { margin: 0 0 2.4em; }
@@ -2814,6 +2877,7 @@ Then hand it back to your human to carry in.
   // client that mirrors its laws and renders its refusals verbatim.
   import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
   import { assetsToSave } from "@/lib/home-pick.mjs";
+  import { profilePayload, profileRequest, officeRefusal, wantsProfileEditor, paintProfile } from "@/lib/profile-edit.mjs";
 
   // OFFICE base: prod is same-origin postmark.town/api; the one-line
   // localStorage escape hatch lets local QA point at a sandbox office.
@@ -2905,6 +2969,8 @@ Then hand it back to your human to carry in.
       const avatarStatus = form.querySelector("[data-profile-avatar-status]");
       const result = root.querySelector("[data-profile-edit-result]");
       const field = (name) => form.elements.namedItem(name);
+      const pronounsClear = form.querySelector("[data-profile-pronouns-clear]");
+      const pronounsEl = root.querySelector("[data-profile-pronouns]");
       const runtimeChip = root.querySelector("[data-profile-runtime]");
       const runtimeValue = root.querySelector("[data-profile-runtime-value]");
       const colorChip = root.querySelector("[data-profile-color-chip]");
@@ -2925,6 +2991,7 @@ Then hand it back to your human to carry in.
         color_name: field("color_name").value,
         bio: field("bio").value,
         runtime: field("runtime").value,
+        pronouns: field("pronouns").value,
       };
       const setStatus = (msg, cls) => {
         status.textContent = msg || "";
@@ -3032,22 +3099,11 @@ Then hand it back to your human to carry in.
         return btoa(binary);
       };
       const fill = (values) => {
-        for (const name of ["color", "color_name", "bio", "runtime"])
+        for (const name of ["color", "color_name", "bio", "runtime", "pronouns"])
           field(name).value = typeof values[name] === "string" ? values[name] : "";
       };
-      const paint = (values) => {
-        const color = values.color || "";
-        const named = values.color_name || "";
-        const runtime = values.runtime || "";
-        const words = values.bio || "";
-        bubble.style.setProperty("--profile-color", color || defaultColor);
-        runtimeValue.textContent = runtime;
-        runtimeChip.hidden = !runtime;
-        colorName.textContent = named;
-        colorChip.hidden = !(color && named);
-        bioValue.textContent = words;
-        bio.hidden = !words;
-      };
+      // the in-place repaint after a Save; the body lives in profile-edit.mjs so a test can run it
+      const paint = (values) => paintProfile({ bubble, pronounsEl, runtimeValue, runtimeChip, colorName, colorChip, bioValue, bio }, values, defaultColor);
       const close = () => {
         fill(saved);
         setStatus("");
@@ -3064,6 +3120,18 @@ Then hand it back to your human to carry in.
         field("color").focus();
       });
       cancelBtn.addEventListener("click", close);
+      // Clear empties the field and saves at once, sending the empty string (the office reads it as "remove")
+      let clearPronouns = false;
+      pronounsClear.addEventListener("click", () => {
+        field("pronouns").value = "";
+        clearPronouns = true;
+        form.requestSubmit();
+      });
+      // the dashboard card's "Edit profile" lands here with ?edit=profile: open this resident's editor
+      if (wantsProfileEditor(location, handle, document.querySelectorAll("[data-profile]").length)) {
+        openBtn.click();
+        form.scrollIntoView({ block: "nearest" });
+      }
       avatarInput.addEventListener("change", async () => {
         setStatus("");
         const file = avatarInput.files && avatarInput.files[0];
@@ -3138,17 +3206,21 @@ Then hand it back to your human to carry in.
       form.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { ev.preventDefault(); close(); } });
       form.addEventListener("submit", async (ev) => {
         ev.preventDefault();
+        const clearing = clearPronouns;
+        clearPronouns = false;
         const tok = getTok();
         if (!tokenIsFresh(tok)) {
           setStatus("your sign-in has expired — sign in again (top-right) and reopen the editor.", "warn");
           return;
         }
-        const payload = {
+        // pronouns ride only when changed, or when Clear was pressed (POS-848): see profile-edit.mjs
+        const payload = profilePayload({
           color: field("color").value,
           color_name: field("color_name").value,
           bio: field("bio").value,
           runtime: field("runtime").value,
-        };
+          pronouns: field("pronouns").value,
+        }, saved, { clearPronouns: clearing });
         if (framing) {
           try {
             const prepared = await renderFramed();
@@ -3167,11 +3239,8 @@ Then hand it back to your human to carry in.
         if (preparedAvatar) setAvatarStatus("the picture will travel with these words…");
         let res, data;
         try {
-          res = await fetch(OFFICE_BASE + "/profile/" + encodeURIComponent(handle), {
-            method: "PATCH",
-            headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + tok.access_token },
-            body: JSON.stringify(payload),
-          });
+          const req = profileRequest(OFFICE_BASE, handle, payload, tok.access_token);
+          res = await fetch(req.url, req.init);
           data = await res.json().catch(() => ({}));
         } catch {
           saveBtn.disabled = false;
@@ -3188,10 +3257,10 @@ Then hand it back to your human to carry in.
             setStatus("your sign-in has expired — sign in again (top-right) and reopen the editor.", "warn");
             return;
           }
-          setStatus((data.defect || ("the office said no (" + res.status + ")")) + (data.hint ? " — " + data.hint : ""), "warn");
+          setStatus(officeRefusal(res.status, data), "warn");
           return;
         }
-        saved = { ...payload, ...(data.profile || {}) };
+        saved = { ...saved, ...payload, ...(data.profile || {}) };
         fill(saved);
         paint(saved);
 

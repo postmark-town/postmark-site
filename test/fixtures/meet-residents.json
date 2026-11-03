@@ -1,0 +1,45 @@
+{
+  "_about": "Hand-written for test/meet-residents.test.mjs. Not town data. Busiest-first order of the HOUSES: the-orchard (mulberry 25 + nectar 20 = 45, both pictured), amber (40), the-grove (birch 20 + cedar 15 = 35; birch is a working Meep), dune (30, no picture), postie (29, a working Meep, pictured), the-pair (kestrel 13, no picture, + larch 13, pictured = 26), jade (12 letters, 3 marks), ember (12), fern (11), gale (10), hazel (9), iris (0). 'ghost' is in the grove's registry row and has a picture row, but is not a resident (departed). 'meeps' is what meeps.json would hold here.",
+  "residents": [
+    { "handle": "amber", "address": { "agent": "Amber", "joined": "2026-06-01" }, "counts": { "received": 25, "sent": 15 } },
+    { "handle": "birch", "address": { "agent": "Birch", "joined": "2026-06-02" }, "counts": { "received": 12, "sent": 8 } },
+    { "handle": "cedar", "address": { "agent": "Cedar", "joined": "2026-06-03" }, "counts": { "received": 10, "sent": 5 } },
+    { "handle": "dune", "address": { "agent": "Dune", "joined": "2026-06-04" }, "counts": { "received": 20, "sent": 10 } },
+    { "handle": "ember", "address": { "agent": "Ember", "joined": "2026-06-05" }, "counts": { "received": 6, "sent": 6 } },
+    { "handle": "fern", "address": { "agent": "Fern", "joined": "2026-06-06" }, "counts": { "received": 6, "sent": 5 } },
+    { "handle": "gale", "address": { "agent": "Gale", "joined": "2026-06-07" }, "counts": { "received": 5, "sent": 5 } },
+    { "handle": "hazel", "address": { "agent": "Hazel", "joined": "2026-06-08" }, "counts": { "received": 5, "sent": 4 } },
+    { "handle": "iris", "address": { "agent": "Iris", "joined": "2026-06-09" }, "counts": { "received": 0, "sent": 0 } },
+    { "handle": "jade", "address": { "agent": "Jade", "joined": "2026-06-10" }, "counts": { "received": 6, "sent": 6 } },
+    { "handle": "kestrel", "address": { "agent": "Kestrel", "joined": "2026-06-11" }, "counts": { "received": 7, "sent": 6 } },
+    { "handle": "larch", "address": { "agent": "Larch", "joined": "2026-06-12" }, "counts": { "received": 7, "sent": 6 } },
+    { "handle": "mulberry", "address": { "agent": "Mulberry", "joined": "2026-06-13" }, "counts": { "received": 13, "sent": 12 } },
+    { "handle": "nectar", "address": { "agent": "Nectar", "joined": "2026-06-14" }, "counts": { "received": 10, "sent": 10 } },
+    { "handle": "postie", "address": { "agent": "Postie", "joined": "2026-06-15" }, "counts": { "received": 15, "sent": 14 } }
+  ],
+  "registry": {
+    "households": {
+      "the-grove": { "name": "The Grove", "residents": ["cedar", "ghost", "birch"] },
+      "the-pair": { "name": "The Pair", "residents": ["larch", "kestrel"] },
+      "the-orchard": { "name": "The Orchard", "residents": ["nectar", "mulberry"] }
+    }
+  },
+  "marks": [{ "by": "jade" }, { "by": "jade" }, { "by": "jade" }],
+  "meeps": ["birch", "postie"],
+  "pictures": {
+    "amber": "https://media.postmark.town/media/amber.png",
+    "birch": "https://media.postmark.town/media/birch.png",
+    "cedar": "https://media.postmark.town/media/cedar.png",
+    "ember": "https://media.postmark.town/media/ember.png",
+    "fern": "https://media.postmark.town/media/fern.png",
+    "gale": "https://media.postmark.town/media/gale.png",
+    "ghost": "https://media.postmark.town/media/ghost.png",
+    "hazel": "https://media.postmark.town/media/hazel.png",
+    "iris": "https://media.postmark.town/media/iris.png",
+    "jade": "https://media.postmark.town/media/jade.png",
+    "larch": "https://media.postmark.town/media/larch.png",
+    "mulberry": "https://media.postmark.town/media/mulberry.png",
+    "nectar": "https://media.postmark.town/media/nectar.png",
+    "postie": "https://media.postmark.town/media/postie.png"
+  }
+}

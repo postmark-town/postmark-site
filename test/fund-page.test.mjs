@@ -13,6 +13,7 @@ import { HOLO_LINE, INTAKE, INTAKE_BY_POT, intakeFor, toPot } from "../src/lib/f
 import { qrMatrix } from "../src/lib/qr.mjs";
 
 const PAGE = readFileSync(new URL("../town/pages/fund/[pot].astro", import.meta.url), "utf8");
+const FUNDING = readFileSync(new URL("../src/lib/funding.mjs", import.meta.url), "utf8");
 
 // The addresses the OFFICE publishes and verifies against. Written out here
 // rather than imported: the office is a different repo, and a constant that
@@ -164,7 +165,11 @@ test("a closed pot gets no page, and one page per pot", () => {
   // into a month that is already sealed. And a route keyed on toPot's
   // `<pot>@<epoch>` id would give one pot two pages with two different
   // headrooms, and a patron no way to tell which one the town meant.
-  assert.match(PAGE, /if \(p\.status === "closed"\) continue;/);
+  // RE-PINNED 2026-10-23 (POS-664): the selection moved to funding.mjs §
+  // fundPages, which keeps the skip and adds the one exception, a FILLED
+  // one-time pot (test/fund-funded.test.mjs proves both).
+  assert.match(FUNDING, /if \(p\.status === "closed"\) continue;/);
+  assert.match(PAGE, /fundPages\(board\)/, "the page routes through the one selection");
   assert.match(PAGE, /params: \{ pot: pot\.pot \}/, "the route is the pot SLUG, not the pot-epoch id");
   assert.ok(!/params: \{ pot: pot\.id \}/.test(PAGE));
 });
@@ -206,6 +211,31 @@ test("ONLY AN OPEN POT CARRIES THE MONEY MOMENT", () => {
   assert.ok(!/data-copy=\{intake\}/.test(ungated), "no copy-the-address button outside the gate either");
   assert.ok(!/set:html=\{qr\}/.test(ungated), "the QR appears nowhere outside the gate");
   assert.ok(!/id="pm-fund-form"/.test(ungated), "the witness form appears nowhere outside the gate");
+
+  // EVERY RAIL, not only the address (POS-664): a funded pot is closed, so the
+  // gate is all that keeps the card, PayPal, USDC and stake controls off it.
+  // Each must be inside the gate and nowhere outside it. The gate is measured
+  // WHOLE here, from its `{open && (<>` to the `</>)}` that closes it before the
+  // roll: the lazy match above stops at the pay panel's own inner `</>)}`, which
+  // is enough for the address and the form and short of the stake box.
+  const gateAt = BODY.indexOf("{open && (<>");
+  const gateEnd = BODY.lastIndexOf("</>)}", BODY.indexOf("── 5 · BEHIND CLICKS")) + "</>)}".length;
+  assert.ok(gateAt > 0 && gateEnd > gateAt, "the gate opens and closes before the roll");
+  const whole = BODY.slice(gateAt, gateEnd);
+  // the markup only: the scripts below the template look the controls up by
+  // name ("[data-stake-form]"), which renders nothing
+  const outside = BODY.slice(0, gateAt) + BODY.slice(gateEnd, BODY.indexOf("<script", gateEnd));
+  for (const [rail, re] of [
+    ["the card link", /\$\{STRIPE\}\?client_reference_id=/],
+    ["the PayPal panel", /data-pp-client=/],
+    ["the USDC panel", /id="usdc"/],
+    ["the stake form", /data-stake-form/],
+    ["the stake box", /data-stake data-pot=/],
+    ["the gift cap", /data-fund-cap=/],
+  ]) {
+    assert.match(whole, re, `${rail} is inside the gate`);
+    assert.ok(!re.test(outside), `${rail} appears nowhere outside the gate`);
+  }
 
   // a draft page must SAY it is a draft rather than merely going quiet
   assert.match(PAGE, /\{!open && \(/, "a non-open pot renders its own state");
@@ -314,7 +344,9 @@ test("POS-184 — the stakers block is gated on NULL, not on emptiness — the d
   // The founder staked twice on exactly that class of lie (the fund page's
   // `applied` envelope, 2026-09-17) — a surface stating as fact something it
   // had never actually read.
-  assert.match(PAGE, /\{stakers !== null && \(/,
+  // (POS-664 adds one clause between: a funded pot's EMPTY list renders
+  // nothing, since it takes no stakes; the null gate is unchanged.)
+  assert.match(PAGE, /\{stakers !== null && (!\(funded && stakers\.length === 0\) && )?\(/,
     "the section renders only when the emission actually carried the field");
   assert.match(PAGE, /stakers\.length === 0 \? \(/,
     "and an emitted empty list gets its own sentence, never a bare heading");

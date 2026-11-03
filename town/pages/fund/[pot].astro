@@ -60,7 +60,7 @@
 // no image service: a strict CSP would block it, and handing a third party the
 // ability to change what an intake QR encodes is handing them the money.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import { livePots, loadPots, loadThankYou, thanksFor, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel, giverLabel, fundCapOf } from "@/lib/funding.mjs";
+import { livePots, loadPots, fundPages, isFunded, loadThankYou, thanksFor, POT_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, intakeFor, potGist, mintPerDollar, patronLabel, giverLabel, fundCapOf } from "@/lib/funding.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { qrSvg } from "@/lib/qr.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
@@ -124,26 +124,15 @@ export const STRIPE = "https://buy.stripe.com/eVq9AV78zdI2h2o0lbd7q00";
 // draft is not a tab — a tab is an invitation, and a draft cannot take a
 // dollar — so a draft's own page shows its tab strip with itself absent and
 // says why below.
+//
+// A FILLED ONE-TIME POT KEEPS ITS PAGE (POS-664): the receipt that fills it
+// closes its file in the same act, and a giver following a shared link should
+// read "funded, thank you" and the roll, not a 404. The selection is
+// funding.mjs § fundPages, and the page says funded only where § isFunded does.
 export function getStaticPaths() {
   const wantFixture = import.meta.env.DEV && process.env.SEAM_FIXTURE === "1";
   const board = livePots(wantFixture ? POT_FIXTURE : loadPots());
-  const current = new Map();
-  for (const p of [...board.pots, ...board.drafts]) {
-    if (p.status === "closed") continue;
-    const held = current.get(p.pot);
-    if (!held || String(p.epoch ?? "") > String(held.epoch ?? "")) current.set(p.pot, p);
-  }
-  const all = [...current.values()];
-  const tabs = all.filter((p) => p.status === "open").map((p) => ({
-    pot: p.pot, title: p.title ?? p.pot,
-    received: p.received ?? 0, target: p.target ?? null, staked: p.staked ?? 0,
-  }));
-  // PAST MONTHS (2026-10-01): every closed epoch of this pot, newest first. The
-  // board drops them (PotCards.astro); this page is where a sealed month is read.
-  const pastOf = (slug) => board.pots
-    .filter((p) => p.pot === slug && p.status === "closed")
-    .sort((a, b) => String(b.epoch).localeCompare(String(a.epoch)));
-  return all.map((pot) => ({ params: { pot: pot.pot }, props: { pot, tabs, past: pastOf(pot.pot) } }));
+  return fundPages(board).map(({ pot, tabs, past }) => ({ params: { pot: pot.pot }, props: { pot, tabs, past } }));
 }
 
 const { pot, tabs, past = [] } = Astro.props;
@@ -151,8 +140,11 @@ const { pot, tabs, past = [] } = Astro.props;
 // off this: the disclosures, the address, the QR, the witness form — and the
 // stake control, because a stake is a credentialed act on an OPEN pot. A pot
 // the founder has not opened cannot pass it, and neither can anything else that
-// is not, right now, open.
+// is not, right now, open — a funded pot included.
 const open = pot.status === "open";
+// A FILLED ONE-TIME POT (POS-664): every !open arm below says funded for it,
+// and draft for the rest. It is never open, so it carries no rail.
+const funded = isFunded(pot);
 // THE POT'S THANK-YOU (Darko, 2026-10-17 13:41): one pot's, Kickstarter-style,
 // on that pot's page only. Said only where a gift can be given, so a draft
 // page carries none.
@@ -240,8 +232,10 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
 ---
 <PostmarkLayout
   door={{ mcp: 'household { read: "fund" }' }}
-  title={`Fund ${pot.title ?? pot.id} — Postmark`}
-  description={`Back a named need in Postmark: ${pot.title ?? pot.id}. Real dollars, witnessed on the ledger. A record of contribution, not a promise of profit.`}
+  title={funded ? `${pot.title ?? pot.id}, funded — Postmark` : `Fund ${pot.title ?? pot.id} — Postmark`}
+  description={funded
+    ? `${pot.title ?? pot.id}: a named need in Postmark, funded in full. Every dollar is witnessed on the town's public ledger.`
+    : `Back a named need in Postmark: ${pot.title ?? pot.id}. Real dollars, witnessed on the ledger. A record of contribution, not a promise of profit.`}
   image={sectionCard("fund")}
 >
   <main class="pm-wrap fund">
@@ -260,9 +254,9 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
         </a>
       ))}
       {!open && (
-        <span class="f-tab is-here is-draft" aria-current="page">
+        <span class:list={["f-tab is-here", funded ? "is-funded" : "is-draft"]} aria-current="page">
           <span class="f-tab-title"><PotSprite pot={pot.pot} size={24} />{pot.title ?? pot.id}</span>
-          <span class="f-tab-meta f-dim">draft · not open</span>
+          <span class="f-tab-meta f-dim">{funded ? "funded · closed" : "draft · not open"}</span>
         </span>
       )}
     </nav>
@@ -310,7 +304,21 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
         )}
       </header>
 
-      {!open && (
+      {/* FUNDED (POS-664): said only where isFunded holds, so never over money
+          that did not fill the pot. The thank-you here is the town's own
+          filled_line, or no sticker sentence at all. */}
+      {funded && (
+        <section class="f-draft f-funded" aria-label="This pot is funded" data-funded>
+          <p class="f-draft-tag">FUNDED</p>
+          <p>
+            <strong>This pot has what it asked for. Thank you to every household that gave.</strong>
+            {" "}It takes no more dollars and no stakes. <a href="/town/#pots">The Town's pots</a> have other needs.
+          </p>
+          {thanks?.filled_line && <p class="f-thanks-filled" data-thanks-filled>{thanks.filled_line}</p>}
+        </section>
+      )}
+
+      {!open && !funded && (
         <section class="f-draft" aria-label="This pot is not open">
           <p class="f-draft-tag">DRAFT · NOT OPEN</p>
           <p>
@@ -366,7 +374,9 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
             {/* the headroom sentence is an invitation to send exactly this much,
                 so it belongs only to a pot that can actually receive it */}
             <p class="f-room">
-              {!open
+              {funded
+                ? <>Funded in full: every dollar is on the roll below.</>
+                : !open
                 ? <>Nothing can be sent against this pot while it is a draft.</>
                 : headroom > 0
                 ? <>This pot can still take <strong>{usd(headroom)}</strong>{once ? "" : " this epoch"}. Dollars past the posted need are refused at intake — the town does not take more than it asked for.</>
@@ -382,7 +392,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
           number the town's stakes have put behind this need), the receipts,
           and the way to each. */}
       <p class="f-facts">
-        <span class="f-chip is-stamp"><b data-staked>{staked}</b><span class="f-u">✦</span> staked</span>
+        {(!funded || staked > 0) && <span class="f-chip is-stamp"><b data-staked>{staked}</b><span class="f-u">✦</span> staked</span>}
         {open && <a class="f-facts-link" href="#stake">stake yours ↓</a>}
         <span class="f-chip"><b>{roll.length}</b> {roll.length === 1 ? "receipt" : "receipts"}{pot.epochLabel && <span class="f-dim"> · {pot.epochLabel}</span>}</span>
         <a class="f-facts-link" href="#roll">the roll ↓</a>
@@ -573,9 +583,9 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
         who wants the names has them and a reader who wants the money moment
         is not made to scroll past six lines to reach it. */}
     <section class="f-roll" id="roll" aria-label="What has arrived against this pot">
-      <details class="f-fold" open={roll.length === 0}>
+      <details class="f-fold" open={roll.length === 0 || funded}>
         <summary>
-          <span class="f-fold-sum">What has arrived{pot.epochLabel && <span class="f-dim"> — {pot.epochLabel}</span>}</span>
+          <span class="f-fold-sum">{funded ? "Who gave" : "What has arrived"}{pot.epochLabel && <span class="f-dim"> — {pot.epochLabel}</span>}</span>
           <span class="f-fold-meta">{roll.length === 0 ? "nothing yet" : `${roll.length === 1 ? "one receipt" : `${roll.length} receipts`} · ${usd(rollTotal)}`}</span>
         </summary>
         <div class="f-fold-body">
@@ -628,7 +638,11 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
         two bytes of whitespace in every fund page — which is the whole of what
         this lane's deploy-order proof measures. Pretty-printing this apart is a
         one-character change that makes the before/after comparison stop being
-        byte-for-byte. */}{stakers !== null && (
+        byte-for-byte.
+
+        A FUNDED POT (POS-664) shows its stakers only while they stand: after
+        its keeping close the list is [] because every stake came home, and
+        "Being first is allowed" over a pot that takes no stakes would be wrong. */}{stakers !== null && !(funded && stakers.length === 0) && (
       <section class="f-roll" id="stakers" aria-label="Who has staked on this pot">
         <details class="f-fold" open={stakers.length === 0}>
           <summary>
@@ -740,7 +754,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
         ✧ holo is fresh mint to a giver, liquid like any stamp — the word names
         its source and its ink, and it is {HOLO_LINE}.
         {" "}Holo is {HOLO_NAME_LINE}
-        {open
+        {open || funded
           ? <> Every receipt this page records lands in the town's signed <a href="https://github.com/postmark-town/postmark/blob/main/WHITE_PAGES/stamp-ledger.md" target="_blank" rel="noopener">public
             ledger</a>, where anyone can read it back against the chain.</>
           /* a draft page records nothing, and saying otherwise would promise a
@@ -1060,6 +1074,9 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
   .f-draft p:last-child { margin-bottom: 0; }
   .f-draft a { color: inherit; }
   .f-draft-tag { font-family: var(--pm-mono); font-size: .68rem; letter-spacing: .18em; color: var(--pm-gold); margin: 0 0 .5rem !important; }
+  /* a funded pot is settled, not pending: a solid edge where a draft's is dashed */
+  .f-draft.f-funded { border-style: solid; border-color: rgba(232, 196, 139, .55); background: rgba(232, 196, 139, .07); }
+  .f-thanks-filled { color: var(--pm-gold-bright); }
 
   /* the consent line — one sentence above every rail */
   .f-law { margin-top: 1.1rem; padding: .85rem 1.15rem; border: 1px solid rgba(232, 196, 139, .22); border-radius: 12px; background: rgba(13, 20, 38, .55); }

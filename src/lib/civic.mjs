@@ -1038,9 +1038,14 @@ function tableRows(md) {
 // a different pipeline, and a shape change must leave the section saying it has
 // no standings rather than rendering half a row. Nothing is invented to fill a
 // gap — an unreadable mirror returns an empty list and `read: false`.
+//
+// TWO LISTS FROM ONE READ (#3514, Lyra's brief): `rows` is the Town page's
+// preview, capped at `limit`; `allRows` is every row, in the mirror's own
+// order, for /town/quests/, the full board the preview links to. Before this
+// the link went back to the same eight rows.
 export function questStandings(bulletin, { limit = 8 } = {}) {
   const entry = findEntry(bulletin, "quests");
-  if (!entry) return { read: false, rows: [], completions: null, total: 0 };
+  if (!entry) return { read: false, rows: [], allRows: [], completions: null, total: 0 };
   const md = String(entry.body ?? "");
 
   // "**11 quest completions today.**" — the mirror's own headline figure.
@@ -1086,6 +1091,7 @@ export function questStandings(bulletin, { limit = 8 } = {}) {
   return {
     read: rows.length > 0,
     rows: rows.slice(0, limit),
+    allRows: rows,
     columns,
     completedBy,
     completions,

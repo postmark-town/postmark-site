@@ -266,7 +266,18 @@ export function seamFromTown({ mint, entries: allEntries, potFiles, dial, asOf }
 
     // THE OPEN ROW. A pot whose FILE says `closed` has stopped asking, so it
     // gets no open row — only the months it actually closed.
-    if (String(file?.status) === "closed") continue;
+    //
+    // ONE EXCEPTION, A POT CLOSED AT FILL AND NOT YET KEPT (POS-664). The
+    // receipt that fills a closes_at_fill pot closes its file in the same act
+    // (town #3896), and its one keeping close runs later by the founder's hand.
+    // Between the two the pot has no open row and no closed epoch, so it would
+    // vanish whole, roll included, and /fund/<pot> would 404 to a giver
+    // following a shared link. So it gets this row, said as what it is: status
+    // closed, the unsettled receipts as its roll, the stakes still in escrow.
+    // Once the keeping close runs, its closed-epoch row above carries the pot
+    // and this one stops, so the two never stand together.
+    const filledNotKept = String(file?.status) === "closed" && base.closes_at_fill && myClosed.size === 0;
+    if (String(file?.status) === "closed" && !filledNotKept) continue;
 
     const mine = receipts.filter((r) => r.pot === pot && !settled.has(r.ref));
     const newestReceipt = mine.reduce((max, r) => (r.date > max ? r.date : max), "");

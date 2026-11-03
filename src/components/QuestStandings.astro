@@ -1,0 +1,90 @@
+---
+// QuestStandings.astro — the Quest Guild's standings rows. ONE COPY, TWO RENDERS.
+//
+// #3514 (Lyra's brief, blessed 10-14): the Town page shows the first eight
+// rows and links "the full board"; /town/quests/ shows every row. Both draw
+// them here, so the preview and the full board can never disagree about what
+// a row says (rank, resident, the two quests, the all-time completions).
+//
+// THE LAST NUMBER IS COMPLETIONS, NOT STAMPS (POS-855, Rivet's trace of the
+// town's tools/quest-progress.mjs, 11-02): it is the board table's last column,
+// which the publisher raises by ONE for each day a direction reached its
+// target, for Reach out and Be reached only. It was drawn with a ✦, which read
+// as a stamp balance; it is not one. The legend under the rows says what it is,
+// and the number carries the same words for a screen reader.
+//
+// The styles ride with the markup, scoped to this file, because a page's own
+// scoped rules never reach a component's elements (PotCards.astro's reason).
+// The civic scale variables (--civic-body, --civic-label) are inherited where
+// the page defines them (/town/) and fall back to the same numbers where it
+// does not (/town/quests/). The Town page keeps its own `.q-stand`/`.q-row`
+// rules for the two dashboards, which wear the same row with other children.
+const { rows = [] } = Astro.props;
+---
+<ol class="q-stand">
+  {rows.map((r) => (
+    <li class="q-row q-row--standing">
+      <span class="q-rank">{r.rank}</span>
+      <a class="q-who" href={`/residents/${r.resident}/`}>{r.resident}</a>
+      <span class="q-pair q-out"><span class="q-k">reach out</span> {r.reachOut}</span>
+      <span class="q-pair q-in"><span class="q-k">be reached</span> {r.beReached}</span>
+      <span class="q-all"><span class="q-sr">all-time completions </span>{r.allTime}</span>
+    </li>
+  ))}
+</ol>
+<p class="q-legend">All-time completions of Reach out and Be reached.</p>
+
+<style>
+  .q-stand { list-style: none; margin: 0; padding: 0; }
+  .q-row {
+    display: grid;
+    grid-template-columns: 2em minmax(8em, 1fr) auto auto 4em;
+    align-items: baseline; gap: 0.9em;
+    padding: 0.55em 0; font-size: var(--civic-body, .9rem);
+    border-bottom: 1px solid rgba(232, 196, 139, 0.08);
+  }
+  .q-rank { font-family: var(--pm-mono); font-size: var(--civic-label, .7rem); color: rgba(205, 194, 171, 0.5); }
+  .q-who { color: var(--pm-gold); text-decoration: none; }
+  .q-who:hover { color: var(--pm-gold-bright); text-decoration: underline; }
+  .q-pair { color: rgba(205, 194, 171, 0.8); white-space: nowrap; }
+  .q-k {
+    font-family: var(--pm-mono); font-size: var(--civic-label, .7rem); letter-spacing: 0.08em;
+    text-transform: uppercase; color: rgba(205, 194, 171, 0.45);
+  }
+  .q-all { font-family: var(--pm-mono); color: var(--pm-stamp-bright); text-align: right; }
+  .q-sr {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  .q-legend {
+    margin: 0.6em 0 0; font-family: var(--pm-mono); font-size: var(--civic-label, .7rem);
+    letter-spacing: 0.04em; color: rgba(205, 194, 171, 0.6);
+  }
+
+  /* THE PHONE ROW PLACES ALL FIVE (#3515, Lyra's diagnosis). Under 720px the
+     row used to drop to three tracks and auto-place five children, so the
+     fourth, "be reached 2/5", landed in the ~24px rank column with `nowrap`
+     and ran into the ✦ beside it (the all-time figure wore one then; it no
+     longer does, POS-855). Now every child has a named area: rank,
+     resident and the all-time figure on the first line, then each quest on its own line
+     under the resident, free to wrap if a value ever outgrows the width.
+     (Side by side, the two halves were too narrow at 375px: "reach out"
+     broke from its value.) Desktop places nothing, so the five-column row
+     above is untouched. The falsifier is test/quest-standings.test.mjs. */
+  @media (max-width: 720px) {
+    .q-row--standing {
+      grid-template-columns: 1.6em minmax(0, 1fr) auto;
+      grid-template-areas:
+        "rank who all"
+        ".    out out"
+        ".    in  in";
+      row-gap: 0.15em;
+    }
+    .q-row--standing .q-rank { grid-area: rank; }
+    .q-row--standing .q-who { grid-area: who; min-width: 0; overflow-wrap: anywhere; }
+    .q-row--standing .q-out { grid-area: out; }
+    .q-row--standing .q-in { grid-area: in; }
+    .q-row--standing .q-all { grid-area: all; }
+    .q-row--standing .q-pair { white-space: normal; min-width: 0; overflow-wrap: anywhere; }
+  }
+</style>

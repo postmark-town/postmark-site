@@ -14,7 +14,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { loadCharters, glyphFor, countOf } from "../src/lib/harbor.mjs";
+import { loadCharters, glyphFor, countOf, nameFor } from "../src/lib/harbor.mjs";
 
 const PAGE = readFileSync(new URL("../town/pages/harbor/index.astro", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
@@ -64,13 +64,14 @@ test("L4 · a named town flies no borrowed glyph", () => {
   assert.notEqual(glyphFor("1f916"), "");
 });
 
-test("L5 · the page draws no road to a listed town, reads no shore there, and badges its card", () => {
-  assert.match(PAGE, /const ringNodes = chartered\.map\(/, "the ring holds the chartered towns alone");
-  assert.match(PAGE, /\{ringNodes\.map\(\(n\) => \(\s*<g class="hb-route-pair"/, "roads run only to the ring");
-  assert.match(PAGE, /\{!n\.listed && \(\s*<Fragment>\s*<text\s+class:list=\{\["hb-node-fig"/, "a listed town carries no figure");
-  assert.match(PAGE, /\) : n\.listed \? \(\s*<p class="hb-quiet hb-listed-note">/, "a listed pane has a note, not a data-shore");
-  assert.match(PAGE, /\{n\.listed && <span class="hb-pane-listed">listed, no charter<\/span>\}/);
-  assert.match(PAGE, /Listed beside them, with no charter and no road/, "the chart's label never counts a listed town as chartered");
+test("L5 · a listed town is a lantern on the far water: no flight path, no shore read, a no-charter badge on its card", () => {
+  assert.match(PAGE, /const moored = chartered\.filter\(\(t\) => !t\.hub\)/, "the chart moors the chartered towns alone");
+  assert.match(PAGE, /layoutTowns\(frame, moored\)/, "the chart's towns are the moored ones");
+  assert.match(PAGE, /\{d\.towns\.map\(\(t\) => \(\s*<g class="hb-route-pair"/, "flight paths run only to the chart's towns");
+  assert.match(PAGE, /\{listed\.map\(\(t\) => \(\s*<li class="hb-lantern">/, "the listed towns are the far water's lanterns");
+  assert.match(PAGE, /\) : t\.listed \? \(\s*<p class="hb-listed-note">/, "a listed card has a note, not a data-shore");
+  assert.match(PAGE, /t\.listed \? "Listed · no charter"/, "a listed card says it holds no charter");
+  assert.match(PAGE, /Listed on the far water, with no charter and no flight path/, "the chart's label never counts a listed town as chartered");
   assert.match(PAGE, /const doors = chartered\.map\(/, "the footer's \"chartered towns\" are the chartered towns");
 });
 
@@ -81,6 +82,28 @@ test("L6 · a listed town's count is the world's dated record: a number, a dash,
   assert.equal(c("20 residents").unit, "residents");
   assert.equal(c("many"), null, "an unparsed value is no count");
   assert.equal(countOf([]), null);
-  assert.ok(PAGE.includes(`count: t.count ?? { n: "—", unit: "no count recorded"`), "a listed town with no count predicate says so");
-  assert.match(PAGE, /\{n\.listed && \(\s*<Fragment>\s*<text class:list=\{\["hb-node-fig", n\.count\.none && "is-unread"\]\}/, "the far disc prints its count");
+  assert.ok(PAGE.includes(`<span class:list={["hb-count", (!t.count || t.count.none) && "is-none"]}>{t.count ? t.count.n : "—"}</span>`), "the lantern prints its count, or a dash");
+  assert.ok(PAGE.includes(`{t.count ? t.count.unit : "no count recorded"}`), "a lantern with no count predicate says so");
+});
+
+test("L7 · a town keeps its own name and casing: `slot: name` first, the slug only when it names none", () => {
+  const p = (value) => [{ slot: "name", value }];
+  assert.equal(nameFor("gsb", p("gsb")), "gsb", "gsb is lowercase by its own name");
+  assert.equal(nameFor("obend", p("obend")), "obend");
+  assert.equal(nameFor("the-world", p("The World")), "The World");
+  assert.equal(nameFor("delve", p("delve.town")), "delve.town");
+  // no name on the mark: the slug, as the harbor always read it
+  assert.equal(nameFor("the-commons", []), "The Commons");
+  assert.equal(nameFor("1f3d9", []), "1f3d9");
+  // the registry carries it, and the card never repeats it as a row
+  const root = mkdtempSync(join(tmpdir(), "harbor-name-"));
+  const write = (rel, fm, body) => {
+    mkdirSync(join(root, rel), { recursive: true });
+    writeFileSync(join(root, rel, "mark.md"), `---\n${fm}\n---\n\n${body}\n`);
+  };
+  write("gsb", "kind: town\nby: the-town\ndate: 2026-10-22", "a card world");
+  write("gsb/gsb-name", "kind: predicate\nby: the-town\ndate: 2026-10-22\nslot: name\nvalue: gsb", "its own name");
+  assert.equal(loadCharters({ path: root })[0].name, "gsb");
+  assert.match(PAGE, /t\.predicates\.filter\(\(p\) => p\.slot !== "name"\)/, "the card prints the name twice");
+  assert.doesNotMatch(PAGE, /w\[0\]\.toUpperCase\(\)/, "the page re-cases a town's name");
 });

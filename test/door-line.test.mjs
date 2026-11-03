@@ -57,6 +57,33 @@ test("the layout renders the foot exactly once, after the page body", () => {
   assert.ok(shell.indexOf("<slot />") < shell.indexOf("<DoorLine"), "the foot sits below the page's own body");
 });
 
+// ── THE FOOT SAYS WHO THE LINE IS FOR (POS-855) ───────────────────────────
+//
+// Cold walks (POS-855) found a human reader meets `town { read: "town" }`
+// in the foot with nothing saying it is for their agent. The line now opens
+// "For agents:" — source-level, so it needs no build and reads no data.
+
+test("the door line opens with its 'For agents:' label, before 'this page is'", () => {
+  const src = readFileSync(join(ROOT, "src", "components", "DoorLine.astro"), "utf8");
+  const open = src.indexOf("<p class=\"pm-doorline\" data-door-line>");
+  assert.ok(open > -1, "DoorLine no longer renders its door line <p>");
+  const close = src.indexOf("</p>", open);
+  const line = src.slice(open, close);
+  const label = /<span class="pm-doorline-for" data-door-for>For agents:<\/span>/.exec(line);
+  assert.ok(label, "the door line has lost its 'For agents:' label");
+  assert.ok(label.index < line.indexOf("this page is"), "the label must come before 'this page is'");
+  assert.ok(label.index < line.indexOf("data-door-mcp"), "the label must come before the call");
+  // Inside the `line &&` guard: a page with door={null} prints no door line, so no label either.
+  assert.ok(src.lastIndexOf("{line && (", open) > -1, "the label must sit inside the `line &&` guard");
+});
+
+test("the label is not the only thing that was kept: the call, the GET and the age clause are still on the line", () => {
+  const src = readFileSync(join(ROOT, "src", "components", "DoorLine.astro"), "utf8");
+  for (const needle of ["data-door-mcp", "data-door-get", "data-door-age", "<ul class=\"pm-socials\""]) {
+    assert.ok(src.includes(needle), `DoorLine lost ${needle}`);
+  }
+});
+
 // ── THE LINE ITSELF ───────────────────────────────────────────────────────
 
 test("doorLine: null and an empty door are no line; a read and a GET are both kept", () => {

@@ -162,6 +162,8 @@ a.jf-choice { text-decoration: none; }
 .join-julian-face { flex: none; border-radius: 6px; background: var(--pm-paper-deep, #efe3c8); padding: 4px; }
 .join-julian-t { font-size: 0.95rem; line-height: 1.4; font-weight: 600; color: var(--pm-ink, #2e2417); }
 .lane .join-julian { margin: 0; box-shadow: none; }
+/* the resident's own walkthroughs, kept reachable and marked as dated (POS-855) */
+.join-old-walks { margin: 0.9em 0 1.2em; font-size: 0.88rem; line-height: 1.5; }
 
 /* ── THE FIELD SCREEN: the generator's nodes, one at a time ────────────────── */
 

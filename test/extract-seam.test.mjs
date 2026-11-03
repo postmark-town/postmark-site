@@ -631,3 +631,66 @@ test("POS-184 — a pot nobody has staked emits an EMPTY list; an older emission
   assert.equal(toPot(older).stakers, null, "and the reader says `null` — did not look — never `[]`");
   assert.notDeepEqual(toPot(older).stakers, [], "the two states are distinguishable, which is the point");
 });
+
+// ── POS-664: a pot closed at fill keeps a row until its keeping close ───────
+// The receipt that fills a closes_at_fill pot closes its FILE in the same act
+// (town #3896); its one keeping close runs later, by the founder's hand. Between
+// the two the emitter used to write nothing for it, so /fund/<pot> had no row
+// to render and 404'd. THE FLIP: drop `filledNotKept` from extract-seam.mjs's
+// open-row guard and the first test goes red.
+const onceFile = (mint, over = {}) => ({
+  ...mint.potFile(TOWN, "keeping-ec2"), pot: "once-test", title: "A one-time need",
+  target_usd_per_epoch: 100, epoch_cadence: "once", closes_at_fill: true, first_close: null, ...over,
+});
+
+test("POS-664 — a once pot filled and not yet kept emits ONE closed row: its roll, its standing stakes", { skip: !haveTown }, async () => {
+  const mint = await loadMint();
+  const entries = mint.parseStampLedger([
+    mint.potStakeLine({ date: "2026-10-20", handle: "alden", pot: "once-test", n: 30, via: "web" }),
+    mint.potReceiptLine({ date: "2026-10-20", pot: "once-test", rail: "usdc", usd: 60, from: "wright", ref: "usdc:0x01" }),
+    mint.potReceiptLine({ date: "2026-10-22", pot: "once-test", rail: "stripe", usd: 40, from: "rei", ref: "stripe:pi_fill" }),
+  ].join("\n"));
+  const seam = seamFromTown({ mint, entries, potFiles: [onceFile(mint, { status: "closed" })], dial: DIAL, asOf: "2026-10-22" });
+  const rows = seam.pots.filter((p) => p.pot === "once-test");
+
+  assert.equal(rows.length, 1, "one row, never none: the pot does not vanish between its fill and its close");
+  const [row] = rows;
+  assert.equal(row.status, "closed", "said as what it is: closed, never open");
+  assert.equal(row.received_usd, 100);
+  assert.deepEqual(row.patrons.map((p) => [p.patron, p.usd]), [["wright", 60], ["rei", 40]], "the roll is the unsettled receipts");
+  assert.deepEqual(row.stakers, [{ handle: "alden", staked: 30 }], "the stakes still stand in escrow until the keeping close");
+  const p = toPot(row);
+  assert.equal(p.ok, true, p.reason);
+  assert.equal(p.status, "closed");
+  assert.equal(p.closesAtFill, true);
+});
+
+test("POS-664 — after the keeping close only the closed-epoch row stands, never two", { skip: !haveTown }, async () => {
+  const mint = await loadMint();
+  const entries = mint.parseStampLedger([
+    mint.potStakeLine({ date: "2026-10-20", handle: "alden", pot: "once-test", n: 30, via: "web" }),
+    mint.potReceiptLine({ date: "2026-10-20", pot: "once-test", rail: "usdc", usd: 60, from: "wright", ref: "usdc:0x01" }),
+    mint.potReceiptLine({ date: "2026-10-22", pot: "once-test", rail: "stripe", usd: 40, from: "rei", ref: "stripe:pi_fill" }),
+    mint.potReturnLine({ date: "2026-10-23", pot: "once-test", handle: "alden", n: 30, epoch: "2026-10" }),
+    mint.holoMintLine({ date: "2026-10-23", handle: "wright", n: 9, pot: "once-test", epoch: "2026-10", ref: "usdc:0x01" }),
+    mint.holoMintLine({ date: "2026-10-23", handle: "rei", n: 6, pot: "once-test", epoch: "2026-10", ref: "stripe:pi_fill" }),
+  ].join("\n"));
+  const seam = seamFromTown({ mint, entries, potFiles: [onceFile(mint, { status: "closed" })], dial: DIAL, asOf: "2026-10-23" });
+  const rows = seam.pots.filter((p) => p.pot === "once-test");
+
+  assert.equal(rows.length, 1, "the close's own row carries the pot now; the fill row stops");
+  assert.equal(rows[0].status, "closed");
+  assert.equal(rows[0].epoch, "2026-10");
+  assert.equal(rows[0].received_usd, 100);
+  assert.deepEqual(rows[0].patrons.map((p) => [p.patron, p.usd, p.holo]), [["wright", 60, 9], ["rei", 40, 6]]);
+  assert.deepEqual(rows[0].stakers, [], "every stake came home");
+});
+
+test("POS-664 — a closed MONTHLY pot still gets no row beyond its closed months", { skip: !haveTown }, async () => {
+  const mint = await loadMint();
+  const entries = mint.parseStampLedger(
+    mint.potReceiptLine({ date: "2026-10-20", pot: "keeping-ec2", rail: "usdc", usd: 60, from: "wright", ref: "usdc:0x02" }));
+  const file = { ...mint.potFile(TOWN, "keeping-ec2"), status: "closed", closes_at_fill: false };
+  const seam = seamFromTown({ mint, entries, potFiles: [file], dial: DIAL, asOf: "2026-10-22" });
+  assert.deepEqual(seam.pots.filter((p) => p.pot === "keeping-ec2"), [], "a pot that stopped asking has no open row, as before");
+});

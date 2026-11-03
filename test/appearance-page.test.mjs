@@ -49,12 +49,23 @@ test("the appearance rows: the glance first, then each detail by its slot; none 
 
 test("the sheet view: what the office shows, and how many the town holds until the yes", () => {
   const view = sheetView({ read: "sheet", likeness: "not given", sheets: [{ url: "https://media.postmark.town/media/x/own.webp", own: true, made_by: "lantern-row" }],
-    held_until_yes: 1, template: "Make ONE image", style_plate: "https://media.postmark.town/media/the-town/plate.webp" });
+    held_until_yes: 1, template: "Make ONE image", style_plate: null });
   assert.deepEqual(view.sheets.map((s) => s.own), [true]);
   assert.equal(view.held, 1);
   assert.equal(view.likeness, "not given");
   assert.equal(sheetView(null), null);
   assert.equal(sheetView({ error: "bounce" }), null);
+  assert.equal("plate" in view, false, "the town's style plate left the sheet (10-25)");
+});
+
+test("the town's own sheet is marked a starting default, and the template note names no style plate", () => {
+  const view = sheetView({ read: "sheet", likeness: "given", sheets: [{ url: "https://media.postmark.town/media/the-town/s.webp", own: false, made_by: "the-town" },
+    { url: "https://media.postmark.town/media/x/own.webp", own: true, made_by: "lantern-row" }], template: "Make ONE image", style_plate: null });
+  assert.deepEqual(view.sheets.map((s) => s.townMade), [true, false]);
+  const page = readFileSync(new URL("../town/pages/residents/[handle]/appearance.astro", import.meta.url), "utf8");
+  assert.doesNotMatch(page, /style plate|data-ap-plate/i);
+  assert.match(page, /This is the town’s starting default — your household is free to remake it to your liking\./);
+  assert.match(page, /attach \{face\.name\}’s profile picture, and render it/);
 });
 
 test("the page sets every resident word as text, reads through the office's origin, and is linked from the resident's page", () => {
@@ -77,6 +88,15 @@ test("the page sets every resident word as text, reads through the office's orig
     "a house that answered (yes OR no) changes its answer; only an unanswered house answers");
   assert.match(dash, /likenessWords\(house, faces\.length\)/);
   assert.match(dash, /strictly PG-13/);
+});
+
+test("the reference sheet fits its column, and opens full size on a click (the script paints it, so the CSS is :global)", () => {
+  const page = readFileSync(new URL("../town/pages/residents/[handle]/appearance.astro", import.meta.url), "utf8");
+  assert.match(page, /\.ap-sheets \{[^}]*grid-template-columns: minmax\(0, 1fr\)/, "a grid column can't grow to the image's natural width");
+  assert.match(page, /\.ap-sheets :global\(img\) \{[^}]*max-width: 100%[^}]*height: auto/,
+    "the painted img is outside Astro's scope, so a scoped rule never reached it (1672px sheet, page 1954px wide)");
+  assert.match(page, /open\.href = s\.url; open\.target = "_blank"; open\.rel = "noopener"/, "a click opens the image itself in a new tab");
+  assert.match(page, /open\.append\(img\)/);
 });
 
 test("a house of one reads in the singular; several in the plural", () => {

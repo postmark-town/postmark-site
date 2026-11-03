@@ -748,6 +748,15 @@ test("the standings cap at the limit, so one lane cannot become the whole page",
   const q = questStandings(many);
   assert.equal(q.total, 40, "the total counts everybody");
   assert.equal(q.rows.length, 8, "but the page shows a head of it");
+  // AND THE FULL BOARD HAS ALL OF IT (#3514, Lyra's falsifier): the Town page's
+  // "the full board" link goes to /town/quests/, which renders `allRows`. Before
+  // the fix there was no full list to render, and the link went back to these 8.
+  assert.equal(q.allRows.length, 40, "the full board carries every row");
+  assert.deepEqual(q.allRows.slice(0, 8), q.rows, "the preview is the head of the full board");
+  assert.equal(q.allRows[0].rank, 1, "in the mirror's own order: first");
+  assert.equal(q.allRows[39].rank, 40, "in the mirror's own order: last");
+  assert.deepEqual(q.allRows.map((r) => r.resident), Array.from({ length: 40 }, (_, i) => `r${i}`),
+    "source order, nothing re-sorted");
 });
 
 test("an unreadable quest mirror says so rather than showing an empty board", () => {
@@ -759,6 +768,9 @@ test("an unreadable quest mirror says so rather than showing an empty board", ()
     "a body with no table is unread, not a town with no questers");
   assert.equal(questStandings(null).read, false);
   assert.equal(questStandings(undefined).rows.length, 0);
+  // the full board's list is empty too, in both unreadable shapes (#3514)
+  assert.deepEqual(questStandings([]).allRows, []);
+  assert.deepEqual(questStandings([{ slug: "quests", body: "the board is being rebuilt" }]).allRows, []);
 });
 
 test("the marketplace is counted by section, so the archive is not sold as live", () => {

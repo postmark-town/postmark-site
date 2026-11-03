@@ -158,7 +158,10 @@ test("BUILT /calendar/: each event sits in its group, in order, and an empty gro
       const card = sec.slice(sec.indexOf(`data-event="${escapeHtml(e.id)}"`));
       const cardHtml = card.slice(0, card.indexOf("</article>"));
       assert.equal(/data-cancelled/.test(cardHtml), Boolean(e.cancelled), `${e.id}: the cancelled mark does not match the record`);
-      assert.ok(cardHtml.includes(`href="${placeOf(e.place).href}"`), `${e.id}: the place is not linked into the World at its point`);
+      // A place with no recorded point has no link (POS-855): it must not be linked to a made-up one.
+      const at = placeOf(e.place);
+      if (at.href) assert.ok(cardHtml.includes(`href="${at.href}"`), `${e.id}: the place is not linked into the World at its point`);
+      else assert.equal(cardHtml.includes("/world/?at="), false, `${e.id}: a place with no point is linked into the World`);
     }
   }
 });

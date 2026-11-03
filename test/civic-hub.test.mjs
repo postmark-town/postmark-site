@@ -475,7 +475,8 @@ test("THE LAW: the Guild reads the pots, then the quest cards, then the standing
   const head = guild.indexOf("<LaneHead");
   const cards = guild.indexOf("questRows.map");
   const pots = guild.indexOf('<div id="pots"');
-  const standings = guild.indexOf('<ol class="q-stand">');
+  // the standings rows are one component since #3514 (the full board draws them too)
+  const standings = guild.indexOf("<QuestStandings");
   assert.ok(head > 0 && cards > 0 && pots > 0 && standings > 0,
     `the Guild lost a block — head:${head} cards:${cards} pots:${pots} standings:${standings}`);
   assert.ok(head < pots, "the lane's head still opens it");
@@ -1470,12 +1471,16 @@ test("RULE 2: explain by link, never inline — and what survives is a question"
   // general watcher is test/anchor-links.test.mjs, which is why this line can
   // never again pin an address with nothing behind it and stay green.
   //
+  // AND RE-AIMED AGAIN (#3514, Lyra): the Quests grid was the same lane the
+  // eight standings rows sat in, so "the full board" never showed the rest.
+  // It opens /town/quests/ now, which lists every row.
+  //
   // `/bulletin/#marketplace` below is NOT re-aimed and is dead by the same
   // mechanism. It is declared in that file's KNOWN_OPEN with the reason:
   // where the price rows should land is a content call, not a typo.
   for (const [what, href] of [
     ["where holo is explained", "/docs/stamps/#seam"],
-    ["the full quest board", "/town/#quests"],
+    ["the full quest board", "/town/quests/"],
     ["the price board", "/bulletin/#marketplace"],
     ["the postmaster, who hand-sets a listing", "/mail/compose/?to=postmaster"],
   ]) {

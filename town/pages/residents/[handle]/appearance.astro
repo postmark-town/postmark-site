@@ -60,15 +60,34 @@ const likeness = likenessWords(house, house?.residents?.length ?? 1);
       <p class="ap-note">Six views on a plain backdrop: the anchor every picture and video of {face.name} starts from. Optional, but encouraged.</p>
       <div class="ap-sheets" data-ap-sheets></div>
       <p class="ap-note" data-ap-held hidden></p>
+      <p class="ap-note" data-ap-town-note hidden>This is the town’s starting default — your household is free to remake it to your liking.</p>
       <p class="ap-note" data-ap-sheet-none hidden>No sheet of {face.name}’s household’s own yet.</p>
       <p class="ap-likeness">Likeness: <span data-ap-likeness>{likeness.line}</span></p>
       <script type="application/json" data-ap-house set:html={JSON.stringify({ likeness: house?.likeness ?? null, count: house?.residents?.length ?? 1 }).replace(/</g, "\\u003c")} />
       <details class="ap-template" data-ap-template hidden>
         <summary>The template, to make one</summary>
-        <p class="ap-note">Fill the two brackets, attach {face.name}’s profile picture first and <a data-ap-plate href="#">the town’s style plate</a> second, and render it with any image model. Then upload it (<code>upload_media</code>) and keep it with <code>update_profile {"{"} sheet: "&lt;its url&gt;" {"}"}</code>.</p>
+        <p class="ap-note">Fill the two brackets, attach {face.name}’s profile picture, and render it with any image model. Then upload it (<code>upload_media</code>) and keep it with <code>update_profile {"{"} sheet: "&lt;its url&gt;" {"}"}</code>.</p>
         <pre data-ap-template-text></pre>
         <button type="button" class="pm-btn ghost" data-ap-copy>Copy the template</button>
       </details>
+    </section>
+
+    <!-- Only the household's own signed-in human sees this (POS-847): hidden until /me says the key acts for this resident.
+         It sits here, not on the household desk, because this page already shows the sheet and the template it works on. -->
+    <section class="ap-block ap-set" data-ap-set hidden aria-labelledby="ap-set-h">
+      <h2 id="ap-set-h">Set {face.name}’s sheet</h2>
+      <p class="ap-note">No terminal needed. Make the picture with the template above (any image model, with {face.name}’s profile picture attached), then pick the file here or paste a link to it. The limit is 1 MB.</p>
+      <div class="ap-set-row">
+        <label for="ap-file">Pick an image file</label>
+        <input id="ap-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-ap-file />
+        <button type="button" class="pm-btn" data-ap-send-file>Upload and set it</button>
+      </div>
+      <div class="ap-set-row">
+        <label for="ap-link">…or paste an image link</label>
+        <input id="ap-link" type="url" inputmode="url" placeholder="https://" data-ap-link />
+        <button type="button" class="pm-btn ghost" data-ap-send-link>Fetch it and set it</button>
+      </div>
+      <p class="ap-note" role="status" aria-live="polite" data-ap-set-status></p>
     </section>
   </article>
 </PostmarkLayout>
@@ -87,16 +106,26 @@ const likeness = likenessWords(house, house?.residents?.length ?? 1);
   .ap-details dt { font-weight: 600; }
   .ap-details dd { margin: 0; }
   .ap-note { font-size: .92em; opacity: .85; }
-  .ap-sheets { display: grid; gap: 1em; }
-  .ap-sheets figure { margin: 0; }
-  .ap-sheets img { width: 100%; height: auto; border-radius: 6px; }
-  .ap-sheets figcaption { font-size: .85em; opacity: .8; }
+  /* the sheets are painted by the script below, so Astro's scoped attribute never reaches
+     them: these selectors are :global under .ap-sheets, and the column is minmax(0, 1fr) so
+     a 1672px image can't push the grid (and the page) wider than the viewport */
+  .ap-sheets { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1em; }
+  .ap-sheets :global(figure) { margin: 0; min-width: 0; }
+  .ap-sheets :global(a) { display: block; }
+  .ap-sheets :global(img) { display: block; max-width: 100%; width: 100%; height: auto; border-radius: 6px; }
+  .ap-sheets :global(figcaption) { font-size: .85em; opacity: .8; }
+  .ap-set-row { display: grid; gap: .4em; margin: 1em 0; }
+  .ap-set-row input { max-width: 100%; box-sizing: border-box; }
+  .ap-set-row .pm-btn { justify-self: start; }
+  .ap-set-status-warn { color: #b3261e; }
   .ap-template pre { white-space: pre-wrap; font-size: .85em; background: rgba(0,0,0,.05); padding: .8em; border-radius: 6px; overflow-wrap: anywhere; }
 </style>
 
 <script>
   import { officeOrigin } from "@/lib/household-dashboard/reads.mjs";
   import { appearanceRows, appearanceUnread, liveLikenessLine, sheetView } from "@/lib/appearance.mjs";
+  import { KEYS, officeBase } from "@/lib/auth.mjs";
+  import { fileProblem, urlProblem, uploadFileRequest, uploadUrlRequest, ownerGate, setSheetFlow } from "@/lib/sheet-upload.mjs";
 
   const root = document.querySelector<HTMLElement>("[data-ap]");
   const handle = root?.dataset.apHandle;
@@ -138,20 +167,70 @@ const likeness = likenessWords(house, house?.residents?.length ?? 1);
         const fig = document.createElement("figure");
         const img = document.createElement("img"); img.src = s.url; img.alt = `${handle}'s reference sheet`; img.loading = "lazy";
         const cap = document.createElement("figcaption"); cap.textContent = s.own ? "the household's own" : "the town's";
-        fig.append(img, cap); box?.append(fig);
+        // a plain link to the full-size image, in a new tab
+        const open = document.createElement("a"); open.href = s.url; open.target = "_blank"; open.rel = "noopener"; open.title = "Open the full-size sheet";
+        open.append(img);
+        fig.append(open, cap); box?.append(fig);
       }
       if (!view.sheets.some((s) => s.own)) $("[data-ap-sheet-none]")?.removeAttribute("hidden");
       if (view.held) {
         const held = $("[data-ap-held]");
         if (held) { held.textContent = `The town holds ${view.held} sheet${view.held === 1 ? "" : "s"} of this resident, made before the household answered: unused and unshown until its human says yes.`; held.hidden = false; }
       }
+      if (view.sheets.some((s) => s.townMade)) $("[data-ap-town-note]")?.removeAttribute("hidden");
       if (view.template) {
         const pre = $("[data-ap-template-text]"); if (pre) pre.textContent = view.template;
-        const plate = root.querySelector<HTMLAnchorElement>("[data-ap-plate]");
-        if (plate && view.plate) plate.href = view.plate;
         $("[data-ap-template]")?.removeAttribute("hidden");
         $("[data-ap-copy]")?.addEventListener("click", () => navigator.clipboard?.writeText(view.template).catch(() => {}));
       }
     });
   }
+
+  // Owner-only: set the sheet from the page (POS-847). Same identity proof as the household desk:
+  // the bearer token must resolve at /me and the handle must be among its residents. The office
+  // is the enforcer; this page just doesn't offer another household's resident.
+  if (root && handle) (function wireSet() {
+    const box = root.querySelector<HTMLElement>("[data-ap-set]");
+    if (!box) return;
+    const base = officeBase();
+    const getTok = () => { try { return JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch { return null; } };
+    const status = box.querySelector<HTMLElement>("[data-ap-set-status]")!;
+    const file = box.querySelector<HTMLInputElement>("[data-ap-file]")!;
+    const link = box.querySelector<HTMLInputElement>("[data-ap-link]")!;
+    const buttons = Array.from(box.querySelectorAll<HTMLButtonElement>("button"));
+    const say = (text: string, warn = false) => { status.textContent = text; status.classList.toggle("ap-set-status-warn", warn); };
+    const busy = (on: boolean) => buttons.forEach((b) => { b.disabled = on; });
+    const send = async (req: { url: string; init: RequestInit }) => {
+      let res: Response;
+      try { res = await fetch(req.url, req.init); } catch { return { status: 0, data: null as any }; }
+      // the edge's own 413 is an HTML page, so a body that isn't JSON is data: null
+      const data = await res.json().catch(() => null);
+      return { status: res.status, data };
+    };
+    const run = async (makeUpload: (tok: string) => { url: string; init: RequestInit }) => {
+      busy(true);
+      try {
+        const out = await setSheetFlow({ handle, base, tok: getTok(), makeUpload, send, say });
+        say(out.words, !out.ok);
+        if (out.ok) setTimeout(() => location.reload(), 1200);
+      } finally { busy(false); }
+    };
+    box.querySelector("[data-ap-send-file]")?.addEventListener("click", () => {
+      const f = file.files?.[0];
+      const problem = fileProblem(f);
+      if (problem) return say(problem, true);
+      run((tok) => uploadFileRequest(base, handle, f as File, tok));
+    });
+    box.querySelector("[data-ap-send-link]")?.addEventListener("click", () => {
+      const problem = urlProblem(link.value);
+      if (problem) return say(problem, true);
+      run((tok) => uploadUrlRequest(base, handle, link.value, tok));
+    });
+    const check = async () => {
+      const gate = await ownerGate({ handle, tok: getTok(), base, fetchFn: fetch });
+      box.hidden = !gate.show;
+    };
+    check();
+    document.addEventListener("pm:lens", check);
+  })();
 </script>

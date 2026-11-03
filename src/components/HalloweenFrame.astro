@@ -1,0 +1,13 @@
+---
+// HalloweenFrame — the front page's Halloween frame (Darko 2026-10-24), in the Mists skin's palette,
+// on the skin's own switch (siteMists) AND before 2026-11-01T07:00Z: lanterns, webs,
+// a witch hat and broom, bats, a moon and candles in the side gutters (narrow screens:
+// a web-and-bat band at the top, a lantern-and-hat row at the foot, so nothing lies
+// over text). Switch: halloween-frame.mjs § THE ONE SWITCH, TWICE; off, it renders nothing. Decorative only: aria-hidden, no pointer events.
+// part="top" goes first in the page, part="foot" after it.
+import { frameHTML } from "@/lib/halloween-frame.mjs";
+import { siteMists } from "@/lib/mists-season.mjs";
+const { part = "top" } = Astro.props;
+const HTML = frameHTML(part, Date.now(), undefined, siteMists());
+---
+{HTML && <Fragment set:html={HTML} />}

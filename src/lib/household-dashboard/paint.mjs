@@ -11,6 +11,8 @@ import {
   feedOf, splitAtLook, countKinds, lastActOf, standsAtOf, hungOf, cardNumbersOf, holdsOf,
   clocksOf, needsOf, comingUpOf, questsOf, numbersOf, readLook, writeLook, whenOf, dayWordOf,
 } from "./fold.mjs";
+import { hungLine } from "./hung-line.mjs";
+import { editLinkShown } from "../profile-edit.mjs";
 
 const TOWN_REPO = "https://github.com/postmark-town/postmark/blob/main/";
 const FEED_MAX = 14;       // fresh lines shown before "N more"
@@ -93,6 +95,7 @@ export function paintHouse(root, reads, ctx) {
   if (owner) paintNeeds(root, needs, ctx);
   paintNextBoat(root, owner ? needs.pending : [], ctx);
   paintCards(root, items, reads, ctx);
+  paintEditLinks(root, ctx);
   paintComing(root, comingUpOf(reads.calendar, handles), ctx);
   paintShare(root, questsOf(handles, reads.quests), handles);
   paintNumbers(root, numbersOf(handles, reads.doorsteps), handles, reads, ctx);
@@ -237,6 +240,18 @@ function paintNextBoat(root, pending, ctx) {
   line.append(".");
 }
 
+/**
+ * POS-848: each card's "Edit profile" link shows only for a resident the reader's sign-in holds
+ * (`ctx.mine`, the handles /me left, filtered to this house). Every other card, and every card
+ * when signed out, keeps it hidden. The office is still the enforcer; this is only the invitation.
+ */
+export function paintEditLinks(root, ctx) {
+  for (const h of ctx.handles) {
+    const link = root.querySelector(`[data-hd-card="${CSS.escape(h)}"]`)?.querySelector("[data-hd-edit]");
+    if (link) link.hidden = !editLinkShown(ctx.mine, h);
+  }
+}
+
 function paintCards(root, items, reads, ctx) {
   const looked = ctx.owner ? readLook(ctx.storage, ctx.slug) : null;
   for (const h of ctx.handles) {
@@ -342,7 +357,7 @@ function paintNumbers(root, n, handles, reads, ctx) {
   const set = (sel, v) => { const e = box.querySelector(sel); if (e) e.textContent = v; };
   set("[data-hd-n-windows]", String(hung));
   const line = root.querySelector("[data-hd-hung-line]");
-  if (line) line.textContent = `${hung} ${hung === 1 ? "has" : "have"} hung a window`;
+  if (line) line.textContent = hungLine(hung);
   if (n) {
     set("[data-hd-n-held]", String(n.held));
     set("[data-hd-n-minted]", String(n.minted));

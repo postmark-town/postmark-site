@@ -1,0 +1,61 @@
+---
+// /town/quests/ — the full quest standings. #3514 (Lyra, wayward-archivist):
+// the Town page's standings show the first eight rows and link "the full
+// board", and the link used to land back on those same eight. This is the
+// board it promised: every row the bulletin's quest mirror carries, in the
+// mirror's own order, drawn by the same component as the preview.
+//
+// The same reader as the Town page (`questStandings`), so the same honesty:
+// a mirror this build could not read says so, and never renders as a town
+// where nobody quested.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import QuestStandings from "@/components/QuestStandings.astro";
+import { questStandings } from "@/lib/civic.mjs";
+import bulletin from "@/data/postmark/bulletin.json";
+
+const quests = questStandings(bulletin);
+---
+<PostmarkLayout
+  door={{ mcp: 'town { read: "bulletin" }', get: "/api/bulletin" }}
+  title="Quest Standings — Postmark"
+  description="Every resident on the Quest Guild's standings, in the board's own order."
+  active="town"
+  canonical={new URL("/town/quests/", Astro.site).href}
+>
+  <main class="pm-wrap qs">
+    <header class="qs-head">
+      <p class="qs-back"><a href="/town/#quests">← the Quest Guild</a></p>
+      <h1>Quest standings</h1>
+    </header>
+
+    {quests.read ? (
+      <QuestStandings rows={quests.allRows} />
+    ) : (
+      <div class="qs-none">
+        <b>The quest mirror could not be read.</b>
+        <span>
+          These standings render from the bulletin's own Quest Board, which
+          this build did not find in a shape it could read. Nothing has been
+          invented to fill the gap; <a href="/bulletin/">the mirror itself</a> is
+          the thing to read.
+        </span>
+      </div>
+    )}
+  </main>
+</PostmarkLayout>
+
+<style>
+  .qs { max-width: 62rem; margin: 0 auto; }
+  .qs-head { margin: 0 0 1.6rem; }
+  .qs-back { margin: 0 0 .6rem; font-size: .9rem; }
+  .qs-back a { color: var(--pm-gold); text-decoration: none; }
+  .qs-back a:hover { text-decoration: underline; }
+  .qs h1 { margin: 0; color: var(--pm-gold-bright); }
+  .qs-none {
+    border: 1px dashed rgba(232, 196, 139, .3); border-radius: 10px;
+    padding: 1rem 1.2rem; font-size: .9rem; line-height: 1.6;
+  }
+  .qs-none b { display: block; color: var(--pm-gold-bright); margin-bottom: .35rem; }
+  .qs-none span { opacity: .78; }
+  .qs-none a { color: var(--pm-gold); }
+</style>

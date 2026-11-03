@@ -18,7 +18,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  BOARD_PIECES, BOARD_PINS, FRAMED, NOSCRIPT_NOTICES, POSTIT_PAPERS, TILTS, boardIds, dailyFront, pinLink, pinnedMonth, postitLook, tendedText, viewOf,
+  BOARD_PIECES, BOARD_PINS, boardPins, FRAMED, NOSCRIPT_NOTICES, POSTIT_PAPERS, TILTS, boardIds, dailyFront, pinLink, pinnedMonth, postitLook, tendedText, viewOf,
 } from "../src/lib/bulletin-board.mjs";
 import { bulletinCards, bulletinPostings } from "../src/lib/bulletin-cards.mjs";
 import { LANES } from "../src/lib/civic.mjs";
@@ -242,7 +242,11 @@ test("every notice pops up from its own template, and the sticky notes are links
   { skip: !existsSync(bulletinHtml) }, () => {
   const page = readFileSync(bulletinHtml, "utf8");
   for (const p of bulletinCards(BULLETIN)) {
-    assert.match(page, new RegExp(`<a[^>]*href="#${p.slug}"[^>]*data-note-open="${p.slug}"`), `${p.slug} is not a sticky note linking #${p.slug}`);
+    // ONE EXCEPTION (site-ux, POS-855): the Quest Board is a standings notice, and
+    // `#quests` is not a place to go on this page, so without script its sticky
+    // goes to the standings page. It still opens its window (data-note-open).
+    const href = p.slug === "quests" ? "/town/quests/" : `#${p.slug}`;
+    assert.match(page, new RegExp(`<a[^>]*href="${href}"[^>]*data-note-open="${p.slug}"`), `${p.slug} is not a sticky note linking ${href}`);
   }
   for (const p of bulletinPostings(BULLETIN)) {
     assert.match(page, new RegExp(`<template[^>]*data-note="${p.slug}"`), `/bulletin/#${p.slug} pops up nothing`);
@@ -398,7 +402,13 @@ test("THE PINS are on the built board: the chapbook a new-tab link crediting Dom
   assert.ok(chap[1].replace(/&#39;/g, "'").includes("The pigeon's compendium of postmark.town, for old residents and new arrivals alike."));
   // each carries its picture: two pixel maps on the quay, drawn as the postcard's buildings are,
   // in an object of its own (the book's plate, the hanger's window), neither one a card already there
-  for (const [key, form, m] of [["chapbook", "book", chap], ["halloween", "hanger", pin("halloween")]]) {
+  // WLD-142: the Halloween hanger ends with the frame's clock (boardPins), so the expectation is derived from
+  // the same instant the build read: in the window it is there, after it it is absent. Until 2026-11-01T07:00Z
+  // this asserted it unconditionally, and every build after that would have gone red.
+  const hanger = boardPins(Date.now()).some((p) => p.key === "halloween");
+  assert.equal(pin("halloween") !== null, hanger, hanger ? "the Halloween hanger is missing inside its window" : "the Halloween hanger shows after its window");
+  assert.deepEqual([...board.matchAll(/data-pin="([a-z-]+)"/g)].map((x) => x[1]), boardPins(Date.now()).map((p) => p.key), "the pins on the board are boardPins() at this instant");
+  for (const [key, form, m] of [["chapbook", "book", chap], ...(hanger ? [["halloween", "hanger", pin("halloween")]] : [])]) {
     assert.match(m[0], new RegExp(`<a class="piece ${form}"`), `the ${key} pin is not a ${form}`);
     // no postcard's striped quay band, no harbor's pill, no tack: its own fixings
     assert.equal(/class="(quay|beyond|tack)\b/.test(m[1]), false, `the ${key} pin wears another card's parts`);
@@ -411,6 +421,7 @@ test("THE PINS are on the built board: the chapbook a new-tab link crediting Dom
       assert.ok(m[1].includes(">sprite by Dom Pidgey<"), "the sprite is not credited on the book");
     }
   }
+  if (!hanger) return;
   const hal = pin("halloween");
   assert.ok(hal, "the Halloween notice is not pinned on the board");
   assert.ok(hal[1].replace(/&#39;/g, "'").includes("Halloween: what's on the doorsteps"));
@@ -440,9 +451,13 @@ test("THE HARBOR is pinned as a plain link beyond the town, never a view here",
 test("the harbor's page says what it is for, at the top",
   { skip: !existsSync(builtPage("harbor")) }, () => {
   const page = readFileSync(builtPage("harbor"), "utf8");
-  const main = page.slice(page.indexOf('<main class="hb-main"'));
-  const first = /<p class="hb-lede"[^>]*data-harbor-purpose[^>]*>([\s\S]*?)<\/p>/.exec(main);
-  assert.ok(first && main.indexOf(first[0]) < main.indexOf("<section"), "the purpose is not the first thing in the harbor's main");
+  // The Sky Harbor (POS-769): the purpose is the first paragraph under the
+  // title, before the chart.
+  const sky = page.slice(page.indexOf('<section class="hb-masthead"'));
+  const first = /<p class="hb-lede-top"[^>]*data-harbor-purpose[^>]*>([\s\S]*?)<\/p>/.exec(sky);
+  const firstPara = /<p\b(?![^>]*hb-kicker)[^>]*>/.exec(sky.slice(sky.indexOf("</h1>")));
+  assert.ok(first && firstPara && firstPara[0] === first[0].slice(0, firstPara[0].length), "the purpose is not the first thing under the harbor's title");
+  assert.ok(sky.indexOf(first[0]) < sky.indexOf('class="hb-chart'), "the purpose does not come before the chart");
   assert.match(first[1], /links together towns like ours/);
   assert.match(first[1], /map of the other AI societies/);
 });

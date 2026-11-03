@@ -63,6 +63,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 // its way back onto a page that is no longer supposed to carry one.
 import { livePots, loadPots, POT_FIXTURE } from "@/lib/funding.mjs";
 import PotCards from "@/components/PotCards.astro";
+import QuestStandings from "@/components/QuestStandings.astro";
 import { loadWorldState, notices, FIXTURE, BOARD_PLACE, ASK_MAX } from "@/lib/board.mjs";
 // `predicatesOf` and `HOW_IDEAS_ENTER_PLACE` are NOT imported here any more —
 // the 2026-09-01 minimalism ruling took both renders off the page (§ rule 1 and
@@ -537,6 +538,17 @@ const switchCss = [
                       does: a quest the daily mirror cannot measure says so
                       neutrally rather than showing a zero it did not earn.
 
+                      THE WORDS (POS-855, Rivet's trace of the board, 11-02).
+                      The number is how many rows on the BOARD show this quest
+                      ticked (`done`), over how many rows the board has (`of`,
+                      the parsed ranked rows, not the town's population), read
+                      from the bulletin's mirror: so the card says "on this
+                      board", says what was completed, and says it is a board
+                      snapshot rather than a live count. The unavailable branch
+                      is unchanged (null, or no denominator); it was "uncounted",
+                      a build word, and is now "Board count unavailable", which
+                      promises no "yet" and invents no count.
+
                       THE COMMENT LIVES OUT HERE, as a JSX comment rather than a
                       block comment inside the ternary, and that is mechanical:
                       the content laws in test/civic-hub.test.mjs strip JSX
@@ -547,13 +559,13 @@ const switchCss = [
                       about a page that was already correct. */}
                   {q.done != null && q.of ? (
                     <div class="m-bar-wrap">
-                      <div class="m-bar" role="img" aria-label={`${q.done} of ${q.of} residents finished this today`}>
+                      <div class="m-bar" role="img" aria-label={`${q.done} of ${q.of} on this board completed this (board snapshot)`}>
                         <i style={`width:${Math.max(2, pct(q.done / q.of))}%`}></i>
                       </div>
-                      <p class="m-barlab"><b>{q.done}</b> of {q.of} residents today</p>
+                      <p class="m-barlab"><b>{q.done}</b> of {q.of} on this board completed this <span class="m-dim">· board snapshot</span></p>
                     </div>
                   ) : (
-                    <p class="m-barlab m-dim">uncounted</p>
+                    <p class="m-barlab m-dim">Board count unavailable</p>
                   )}
                   <p class="m-foot"><span class="m-chip">{q.reward}</span></p>
                 </article>
@@ -601,17 +613,10 @@ const switchCss = [
               on the full board this block links — where it stands beside every
               other column rather than riding a heading. */}
           <p class="m-lab">Standings</p>
-          <ol class="q-stand">
-            {quests.rows.map((r) => (
-              <li class="q-row">
-                <span class="q-rank">{r.rank}</span>
-                <a class="q-who" href={`/residents/${r.resident}/`}>{r.resident}</a>
-                <span class="q-pair"><span class="q-k">reach out</span> {r.reachOut}</span>
-                <span class="q-pair"><span class="q-k">be reached</span> {r.beReached}</span>
-                <span class="q-all">{r.allTime}<span class="q-u">✦</span></span>
-              </li>
-            ))}
-          </ol>
+          {/* THE ROWS ARE ONE COMPONENT (#3514): the same rows render all of
+              them on /town/quests/, so the preview and the full board cannot
+              say two things about one resident. */}
+          <QuestStandings rows={quests.rows} />
           {/* FOUR SENTENCES BECAME ONE LINK. This explained, in order: how many
               residents are on the board, that the mirror is partial, that it
               regenerates each ferry crossing, where a resident's live progress
@@ -625,10 +630,15 @@ const switchCss = [
               whole rendered page has exactly one id, `board-modal-title`, and
               its notices are cards keyed by `data-card`, not ids — so this sent
               a reader to the top of another page with nothing to scroll to.
-              The full board is on THIS page, in this lane: the Quests grid
-              above these standings, under `id="quests"`. The link now names it.
-              The falsifier is test/anchor-links.test.mjs. */}
-          <p class="m-note"><a href="/town/#quests">the full board</a></p>
+              It was re-aimed at THIS page's Quests grid, `/town/#quests`.
+
+              AND THAT WAS THE SAME EIGHT ROWS (#3514, Lyra, 10-12): "the full
+              board" promised the whole standing and landed back on this capped
+              preview. The promise is kept, not renamed (Wright, 10-13): the
+              link goes to /town/quests/, which lists every row the mirror
+              carries, in its own order. The falsifiers are
+              test/anchor-links.test.mjs and test/quest-standings.test.mjs. */}
+          <p class="m-note"><a href="/town/quests/">the full board</a></p>
         </>
       ) : (
         <div class="m-none">
@@ -1275,8 +1285,9 @@ const switchCss = [
           or on a click (2026-09-02): the panel swaps where the reader is.
        2. THE "?" DIALOG. A native <dialog> needs showModal() called, and the
           deck needs a step. Both are enhancement by definition — with the
-          script off the "?" simply does nothing and the panel under it is the
-          whole page, unchanged.
+          script off the "?" is an ordinary link to the same slides as a plain
+          list (LaneHead.astro's <noscript>), revealed by :target; the panel
+          under it is the whole page, unchanged.
 
      WHAT LEFT WITH THE FOLDS: `reveal()` (there is nothing to open any more),
      the data-jump handler and its pushState (an in-page link is an ORDINARY
@@ -1363,6 +1374,11 @@ const switchCss = [
       }
       var ask = e.target.closest && e.target.closest("[data-tut]");
       if (!ask) return;
+      // The "?" is a link (so it works with no script); with script the fragment
+      // must never move — stopped BEFORE the showModal check, so a browser with
+      // no <dialog> does not navigate to a #help-<key> that, with script on, is
+      // not on the page, and lose the reader's lane.
+      e.preventDefault();
       var dialog = document.getElementById("tut-" + ask.getAttribute("data-tut"));
       // A browser with no <dialog> gets no modal and no error — the panel it
       // would have explained is right there, which is the fallback.
@@ -1370,6 +1386,38 @@ const switchCss = [
       step(dialog, 0);
       dialog.showModal();
     });
+
+    // THE "?" WAS A <button> AND ANSWERED SPACE; AS A LINK IT ANSWERS ONLY ENTER.
+    // So, with script on, it says what it now is (role="button" — it opens a
+    // dialog, it goes nowhere) and takes Space too. Set here and not in the
+    // markup, so a reader with no script keeps an honest link.
+    //
+    // SPACE ACTS ON KEYUP, as a native button does. Clicking on keydown opens
+    // the dialog, showModal() moves focus into it, and the Space keyup that
+    // follows can then land on a button INSIDE the dialog (Close, in Firefox)
+    // and shut it as it opens. So keydown only stops the page scrolling and
+    // notes that Space went down on THIS link; keyup on the same link clicks.
+    // Bound to the "?" links themselves, not to the page.
+    var asks = main.querySelectorAll("a[data-tut]");
+    for (var k = 0; k < asks.length; k++) {
+      (function (a) {
+        var spaceDown = false;
+        a.setAttribute("role", "button");
+        a.addEventListener("keydown", function (e) {
+          if (e.key !== " ") return;
+          e.preventDefault(); // no page scroll under the dialog
+          spaceDown = true;
+        });
+        a.addEventListener("keyup", function (e) {
+          if (e.key !== " ") return;
+          e.preventDefault();
+          if (!spaceDown) return; // Space went down somewhere else
+          spaceDown = false;
+          a.click();
+        });
+        a.addEventListener("blur", function () { spaceDown = false; });
+      })(asks[k]);
+    }
 
     // Arrow keys inside an open deck, because a slideshow that only takes
     // clicks is a slideshow a keyboard reader cannot walk.

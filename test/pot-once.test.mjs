@@ -26,7 +26,7 @@ import { seamFromTown, thankYouFromTown } from "../tools/extract-seam.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 const THANKS = {
-  pot: "meeps-home", min_usd: 10, how_url: null, art: null,
+  pot: "meeps-home", min_usd: 10, how_url: null, art: null, filled_line: null,
   card: "Fill this pot, and every household that gave $10 or more gets a Postmark sticker (a thank-you, never a purchase).",
   line: "As a thank-you, never a purchase: if this pot fills, every household whose gifts here total $10 or more gets a Postmark sticker, made by the town's Core Team. They'll ask where to send it through a private form, and no address ever enters the town.",
 };

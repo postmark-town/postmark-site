@@ -1,0 +1,230 @@
+// sky-harbor.test.mjs — the Sky Harbor reskin (POS-769, option B) keeps its
+// promises: the mock's chart for today's two chartered towns, a ship that
+// flies only when motion is welcome, Postmark as its postbox, fonts served
+// from the site, a ticket that invents no timetable, and the skyship icon on
+// the chip and the corkboard.
+//
+//   node --test test/sky-harbor.test.mjs
+
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, existsSync } from "node:fs";
+
+import { FRAMES, layoutTowns, shipPath, epithetOf } from "../src/lib/harbor-sky.mjs";
+import { ICONS } from "../src/lib/pixel-icons.mjs";
+
+const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const PAGE = read("town/pages/harbor/index.astro");
+const LAYOUT = read("src/layouts/HarborLayout.astro");
+const CSS = read("src/styles/harbor.css");
+
+// The mock's own paths (G:/Starstory/docs/2026-10-22/growth/skyharbor-mock/option-b.html).
+const MOCK = {
+  wide: {
+    "1f3d9": "M600 372 C700 300 850 250 930 300 C1010 350 990 420 900 430 C800 440 680 420 600 372",
+    "1f916": "M600 372 C500 300 350 250 270 300 C190 350 210 420 300 430 C400 440 520 420 600 372",
+  },
+  tall: {
+    "1f3d9": "M180 296 C230 326 306 330 308 392 C310 448 258 452 248 424 C236 390 214 340 180 296",
+    "1f916": "M180 296 C130 326 54 330 52 392 C50 448 102 452 112 424 C124 390 146 340 180 296",
+  },
+};
+const loopsOf = (k) => Object.fromEntries(layoutTowns(FRAMES[k], [{ slug: "1f3d9" }, { slug: "1f916" }]).map((t) => [t.slug, t.loop]));
+
+test("S1 · two chartered towns draw the mock's figure-eight exactly, wide and tall", () => {
+  assert.deepEqual(loopsOf("wide"), MOCK.wide);
+  assert.deepEqual(loopsOf("tall"), MOCK.tall);
+});
+
+test("S2 · the night mail flies every loop in turn and comes home; no towns, no flight", () => {
+  const placed = layoutTowns(FRAMES.wide, [{ slug: "1f3d9" }, { slug: "1f916" }]);
+  const path = shipPath(FRAMES.wide, placed);
+  assert.equal(path, MOCK.wide["1f3d9"] + " " + MOCK.wide["1f916"].replace(/^M600 372 /, ""));
+  assert.equal(shipPath(FRAMES.wide, []), "");
+  // a third town still gets a loop of its own that starts and ends at the dock
+  const three = layoutTowns(FRAMES.wide, [{ slug: "a" }, { slug: "b" }, { slug: "c" }]);
+  assert.equal(three.length, 3);
+  for (const t of three) assert.match(t.loop, /^M600 372 C.* 600 372$/);
+});
+
+test("S3 · motion holds still unless welcome: the ship never starts itself, CSS motion rides the media query", () => {
+  const begins = PAGE.match(/<animateMotion[^>]*>/g) ?? [];
+  assert.ok(begins.length >= 3, "the ship and its trails are drawn");
+  for (const a of begins) assert.match(a, /begin="indefinite"/, "an animation starts without the island's say");
+  assert.match(PAGE, /data-ship-parked/, "the ship has a parked pose for a still reader");
+  assert.match(PAGE, /matchMedia\("\(prefers-reduced-motion: reduce\)"\)/, "the island does not ask the reader's motion preference");
+  assert.match(PAGE, /pauseAnimations\(\)/, "the island cannot park a flying ship");
+  // every CSS animation lives inside the no-preference block, except the
+  // short open/close rise and the rule that switches it off
+  const welcome = /@media \(prefers-reduced-motion: no-preference\) \{([\s\S]*?)\n\}/.exec(CSS)?.[1] ?? "";
+  assert.ok(welcome.includes("hb-flicker") && welcome.includes("hb-twinkle"), "the motion block is missing");
+  const outside = CSS.replace(welcome, "");
+  for (const m of outside.matchAll(/animation:\s*([^;]+);/g)) {
+    assert.match(m[1], /^(hb-rise\b|none$)/, `a CSS animation runs outside the motion block: ${m[1]}`);
+  }
+});
+
+test("S4 · Postmark is its postbox, never the red-and-white lighthouse", () => {
+  assert.match(PAGE, /<symbol id="hb-postbox"/);
+  assert.match(PAGE, /<use href="#hb-postbox" x=\{d\.frame\.host\.x\}/, "the chart draws Postmark as a tower");
+  const postbox = /<symbol id="hb-postbox"[\s\S]*?<\/symbol>/.exec(PAGE)[0];
+  assert.match(postbox, /hb-g-pillar/, "the postbox lost its pillar");
+  assert.doesNotMatch(postbox, /hb-g-plum/, "the postbox is back in the season's plum");
+  assert.doesNotMatch(postbox, /--band/, "the postbox wears a lighthouse's bands");
+});
+
+test("S5 · Fraunces is served from the site under its licence; no third-party font call", () => {
+  for (const f of ["fraunces-latin-roman.woff2", "fraunces-latin-italic.woff2"]) {
+    assert.ok(existsSync(new URL(`../public/atelier/postmark/fonts/fraunces/${f}`, import.meta.url)), `${f} is missing`);
+    assert.ok(CSS.includes(`url("/fonts/fraunces/${f}")`), `${f} is not the face's source`);
+  }
+  const ofl = read("public/atelier/postmark/fonts/fraunces/OFL.txt");
+  assert.match(ofl, /Fraunces Project Authors/);
+  assert.match(ofl, /SIL Open Font License, Version 1\.1/);
+  for (const [name, src] of [["page", PAGE], ["layout", LAYOUT], ["css", CSS]]) {
+    assert.doesNotMatch(src, /fonts\.googleapis|fonts\.gstatic/, `the ${name} calls a font CDN`);
+  }
+});
+
+test("S6 · the ticket prints what crossed, dated, and never a timetable", () => {
+  // the mock's statuses, as it wrote them ("moored" alone is the chart's word for a chartered town)
+  assert.doesNotMatch(PAGE, /"Boarding"|>Boarding<|On time|>Moored<|[Ee]xample rows/, "the mock's invented rows came along");
+  assert.match(PAGE, /status: "carried"/, "a carried letter is not said as carried");
+  assert.match(PAGE, /status: "crossed"/, "a crossing is not said as crossed");
+  assert.match(PAGE, /"Letters carried between towns"/);
+  assert.match(PAGE, /"Crossings minted"/);
+});
+
+test("S7 · the harbor's chip and its corkboard piece fly the skyship", () => {
+  const nav = read("src/lib/nav.mjs");
+  assert.match(nav, /key: "harbor"[^\n]*icon: "skyship"/, "the harbor chip does not wear the skyship");
+  assert.equal(ICONS.skyship.length, 16);
+  assert.equal(ICONS.anchor, undefined, "the anchor drawing stayed behind");
+  const board = read("town/pages/bulletin/index.astro");
+  assert.match(board, /iconSvg\("skyship"\)/, "the corkboard's harbor piece does not fly the skyship");
+  assert.doesNotMatch(board, /iconSvg\("anchor"\)/);
+});
+
+test("S8 · a card's epithet is its charter's own first clause, or nothing", () => {
+  assert.equal(epithetOf("1f916, the forum — an agents-only public square across the water"), "the forum");
+  assert.equal(epithetOf("1f3d9, the city — an agents-only world"), "the city");
+  assert.equal(epithetOf("Postmark itself, charted in its own registry: the slow-mail town"), "");
+  assert.equal(epithetOf(""), "");
+});
+
+// Darko, 2026-10-23 00:56: "make sure the agent count is actually right".
+test("S9 · Postmark's own figure: offices apart, households counted, who acted in a day — from the roll, never typed in", async () => {
+  const { townFigure } = await import("../src/lib/harbor.mjs");
+  const now = Date.parse("2026-10-23T05:00:00Z");
+  const roll = [
+    { handle: "postmaster", is_office: true, address: { github: "keeminlee" }, last_active: "2026-10-23T04:00:00Z" },
+    { handle: "a", is_office: false, address: { github: "one" }, last_active: "2026-10-23T01:00:00Z" },
+    { handle: "b", is_office: false, address: { github: "one" }, last_active: "2026-10-20T01:00:00Z" },
+    { handle: "c", is_office: false, address: { github: "two" }, last_active: null },
+  ];
+  // households are MEASURED from the town's registry, once per house, the town's own house apart
+  const registry = { households: { "the-town": {}, one: {}, two: {}, three: {} } };
+  assert.deepEqual(townFigure(roll, now, registry), { residents: 3, households: 3, offices: 1, acted: 1 });
+  // no live registry: no household figure at all, never one inferred from GitHub accounts
+  assert.equal(townFigure(roll, now).households, null);
+  assert.equal(townFigure(roll, now, null).households, null);
+  // a roll that never says when anyone acted says no activity, never a zero
+  assert.equal(townFigure(roll.map(({ last_active, ...r }) => r), now).acted, null);
+  assert.match(PAGE, /import residentsRoll from "@\/data\/postmark\/residents\.json"/);
+  assert.match(PAGE, /const fig = townFigure\(residentsRoll, Date\.now\(\), householdsRead\?\.live === true \? householdRegistry : null\)/, "the household figure is not the live registry's");
+  assert.match(PAGE, /fig\.households != null \? `residents in \$\{fig\.households\} households` : "residents"/, "a missing registry still prints a household figure");
+  assert.match(PAGE, /plus \$\{fig\.offices\} town office/);
+  assert.match(PAGE, /about \$\{fig\.acted\} act in a day/);
+  assert.doesNotMatch(PAGE, /\b(279|273)\b|176 households|\b99 act/, "a Postmark count is typed into the page");
+});
+
+test("S10 · every listed and chartered town prints its activity line, dated, under its count", async () => {
+  const { activityOf } = await import("../src/lib/harbor.mjs");
+  assert.deepEqual(activityOf([{ slot: "activity", value: "about 150 post in a day, measured 2026-10-23" }]), { text: "about 150 post in a day", measured: "2026-10-23" });
+  assert.deepEqual(activityOf([{ slot: "activity", value: "3 or 4 agents act daily" }]), { text: "3 or 4 agents act daily", measured: "" });
+  assert.equal(activityOf([]), null);
+  assert.match(PAGE, /\{t\.activity && <span class="hb-activity">\{t\.activity\.text\}<\/span>\}/, "the lantern drops its activity");
+  assert.match(PAGE, /<span class="hb-measured">measured \{t\.activity\.measured\}<\/span>/, "the lantern's activity is undated");
+  assert.match(PAGE, /class="hb-t-small hb-t-activity">\s*\{t\.activity\.text\}/, "the chart drops a chartered town's activity");
+  assert.match(PAGE, /<p class="hb-card-activity">/, "the card drops the activity");
+});
+
+test("S11 · the far water's date comes from the marks' own dates: one when they agree, a span when they differ", async () => {
+  const { readSpan } = await import("../src/lib/harbor.mjs");
+  assert.equal(readSpan([]), "");
+  assert.equal(readSpan(["2026-10-23", "2026-10-23", undefined]), "2026-10-23");
+  assert.equal(readSpan(["2026-10-23", "2026-10-22"]), "2026-10-22–23");
+  assert.equal(readSpan(["2026-09-30", "2026-10-02"]), "2026-09-30–10-02");
+  assert.equal(readSpan(["2025-12-31", "2026-01-01"]), "2025-12-31–2026-01-01");
+  assert.match(PAGE, /const farRead = readSpan\(listed\.flatMap\(\(t\) => \[t\.count\?\.read, t\.activity\?\.measured\]\)\)/);
+  assert.doesNotMatch(PAGE, /read 2026-\d\d-\d\d/, "a read date is typed into the page");
+});
+
+
+// ── L · the harbor wears Postmark's DEFAULT palette, in every season (POS-769
+//    follow-up; Darko 2026-10-23: "just utilize the default non-seasonal
+//    postmark aesthetic for representing it in the harbor") ─────────────────
+import { SITE, VARIANTS, mix, contrast } from "../src/lib/halloween-skin.mjs";
+import { towerInks as towerInksL } from "../src/lib/harbor-sky.mjs";
+
+const POSTMARK_CSS = read("src/styles/postmark.css");
+const BULLETIN = read("town/pages/bulletin/index.astro");
+const SKY = read("src/lib/harbor-sky.mjs");
+const hexToken = (css, name) => new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`).exec(css)?.[1].toLowerCase();
+
+test("L1 · the harbor takes the site's tokens from postmark.css and redeclares none of them", () => {
+  assert.match(LAYOUT, /<html lang="en" class="pm">/, "the harbor's root does not carry the site's token class");
+  const order = [...LAYOUT.matchAll(/import "\.\.\/styles\/([\w.-]+\.css)";/g)].map((m) => m[1]);
+  assert.deepEqual(order, ["postmark.css", "harbor.css"], "the site's tokens must load before the harbor's rules");
+  const own = [...CSS.matchAll(/(--pm-[a-z0-9-]+)\s*:/g)].map((m) => m[1]);
+  assert.deepEqual(own, [], `harbor.css redeclares the site's tokens: ${own.join(", ")}`);
+  // and the site's tokens ARE the default (k = 0) the skin walks from
+  for (const [css, key] of [["pm-night", "night"], ["pm-harbor", "harbor"], ["pm-harbor-2", "harbor2"], ["pm-gold", "gold"], ["pm-gold-bright", "goldBright"],
+    ["pm-paper", "paper"], ["pm-paper-deep", "paperDeep"], ["pm-ink", "ink"], ["pm-ink-soft", "inkSoft"], ["pm-accent", "accent"], ["pm-wax", "wax"]]) {
+    assert.equal(hexToken(POSTMARK_CSS, css), SITE[key], `--${css} is not the site's default`);
+  }
+});
+
+test("L2 · the harbor reads no season: no skin, no mists, none of the skin's colours", () => {
+  for (const [name, src] of [["layout", LAYOUT], ["page", PAGE], ["css", CSS], ["sky", SKY]]) {
+    assert.doesNotMatch(src, /import[^;\n]*(halloween|mists-season)|<Halloween|siteMists\(|skinStrength\(|process\.env\.BUILD_CROSSING/i, `the ${name} reaches for the season`);
+  }
+  // every colour the skin's variants wear, and the plums and candle orange the page once typed in
+  const skin = new Set(Object.values(VARIANTS).flatMap((v) => Object.values(v).filter((x) => /^#/.test(x))));
+  for (const h of ["#1f1420", "#2a1b2a", "#513657", "#651a72", "#f39a3d", "#f2bc82", "#ffd98a", "#110b22", "#1b1336", "#251a3d", "#34224a", "#3b2733", "#4a1254", "#7a2588", "#e2768f", "#b44a6c", "#26235a", "#4a2a5c", "#6a3a5e", "#5b4270", "#634a78", "#3d2a52", "#8a6c9a"]) skin.add(h);
+  const chart = /\.chart \{[\s\S]*?\.beyond \{[\s\S]*?\}/.exec(BULLETIN)?.[0] ?? "";
+  assert.ok(chart.includes("var(--pm-harbor"), "the corkboard's harbor piece block was not found");
+  for (const [name, src] of [["layout", LAYOUT], ["page", PAGE], ["css", CSS], ["sky", SKY], ["corkboard piece", chart]]) {
+    const worn = (src.match(/#[0-9a-fA-F]{6}\b/g) || []).map((h) => h.toLowerCase()).filter((h) => skin.has(h));
+    assert.deepEqual(worn, [], `the ${name} wears the season's colours: ${worn.join(", ")}`);
+  }
+});
+
+test("L3 · a town's tower is coloured from the site's tokens, never a hex of its own", () => {
+  for (const [slug, i] of [["1f3d9", 0], ["1f916", 0], ["later-a", 0], ["later-b", 1]]) {
+    for (const v of Object.values(towerInksL(slug, i))) assert.doesNotMatch(v, /#[0-9a-f]{3,6}/i, `${slug} types a colour: ${v}`);
+  }
+});
+
+test("L4 · WCAG AA (4.5:1) on every text pair the harbor sets, measured from the site's own tokens", () => {
+  const T = { night: SITE.night, harbor: SITE.harbor, h2: SITE.harbor2, gold: SITE.gold, goldB: SITE.goldBright, paper: SITE.paper, paperD: SITE.paperDeep, ink: SITE.ink, inkS: SITE.inkSoft, wax: SITE.wax };
+  T.text = hexToken(CSS, "text"); T.textS = hexToken(CSS, "text-soft");
+  assert.ok(T.text && T.textS, "the harbor's text colours are not plain hex");
+  T.muted = mix(T.harbor, T.gold, 0.8);       // --muted: color-mix(gold 80%, harbor)
+  T.sky2 = mix(T.harbor, T.h2, 0.65);         // --sky-2: color-mix(harbor-2 65%, harbor)
+  T.paperLit = mix("#fffcf4", T.paper, 0.55); // --hb-paper-lit
+  assert.match(CSS, /--muted: color-mix\(in srgb, var\(--pm-gold\) 80%, var\(--pm-harbor\)\)/);
+  assert.match(CSS, /--sky-2: color-mix\(in srgb, var\(--pm-harbor-2\) 65%, var\(--pm-harbor\)\)/);
+  assert.match(CSS, /--hb-paper-lit: color-mix\(in srgb, var\(--pm-paper\) 55%, #fffcf4\)/);
+  const pairs = [
+    ["text", "night"], ["text", "sky2"], ["text", "harbor"], ["text", "h2"], ["textS", "sky2"], ["textS", "harbor"], ["textS", "h2"],
+    ["muted", "night"], ["muted", "sky2"], ["muted", "harbor"], ["muted", "h2"],
+    ["goldB", "sky2"], ["goldB", "harbor"], ["goldB", "h2"], ["gold", "sky2"], ["gold", "harbor"], ["paper", "sky2"], ["paper", "night"],
+    ["ink", "paper"], ["ink", "paperD"], ["ink", "paperLit"], ["inkS", "paper"], ["inkS", "paperD"], ["inkS", "paperLit"],
+    ["wax", "paper"], ["wax", "paperD"], ["wax", "paperLit"], ["ink", "gold"], ["ink", "goldB"], ["harbor", "gold"], ["harbor", "goldB"],
+  ];
+  for (const [fg, bg] of pairs) {
+    const r = contrast(T[fg], T[bg]);
+    assert.ok(r >= 4.5, `${fg} on ${bg} is ${r.toFixed(2)}:1`);
+  }
+});

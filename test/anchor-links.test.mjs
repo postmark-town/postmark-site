@@ -29,12 +29,12 @@
 // entry below saying so — a loud false alarm, which is the safe direction.
 //
 // ── WHAT IT DOES NOT READ, EACH WITH ITS REASON ──────────────────────────────
-//   · Computed hrefs — `href={`/bulletin/#${b.slug}`}` (town/pages/index.astro
-//     :443) and the four same-page `href={`#${…}`}` rails. A static read cannot
-//     resolve a template, so asserting on them would be theatre. Noted rather
-//     than silently dropped: the computed bulletin link is a live instance of
-//     the same class this file exists for — every bulletin teaser on the home
-//     page deep-links a card slug the bulletin renders no id for.
+//   · Computed hrefs — the same-page `href={`#${…}`}` rails. A static read
+//     cannot resolve a template, so asserting on them would be theatre. (The
+//     home page's bulletin teasers used to be one: `href={`/bulletin/#${b.slug}`}`
+//     deep-linked a card slug the bulletin renders no id for. That link is
+//     gone; each teaser now links the posting's own page, `noticePath(b.slug)`
+//     at town/pages/index.astro:383, a static page and no anchor at all.)
 //   · Links built in script, e.g. `var RECORDS = { "illuminator-name":
 //     "/bulletin/#name-the-illuminator" }` (town/pages/votes/index.astro:127).
 //     Same target as a real href below, so the class is already on the record.
@@ -237,10 +237,19 @@ test("the civic hub's quest link names the page that renders the board (#2506)",
   const hub = sourceOf(join(PAGES, "town", "index.astro"));
   assert.equal(hub.includes('href="/bulletin/#quests"'), false,
     "the hub links /bulletin/#quests again — the bulletin has no `quests` anchor, it never had one, and the board is on the hub itself");
-  assert.ok(hub.includes('href="/town/#quests"'),
-    "`the full board` no longer names /town/#quests — the Quests grid is the board and `id=\"quests\"` is where it lives");
+  // RE-AIMED AGAIN (#3514, Lyra): `/town/#quests` landed on the same eight
+  // standings rows the link sat under. "The full board" now opens
+  // /town/quests/, which lists every row. A link with no fragment is invisible
+  // to the fragment law above, so the page's existence is asked here.
+  assert.ok(hub.includes('<a href="/town/quests/">the full board</a>'),
+    "`the full board` no longer names /town/quests/, the page that lists every standings row");
+  assert.ok(existsSync(join(PAGES, "town", "quests", "index.astro")),
+    "/town/quests/ has no page, so `the full board` is a 404");
+  // and the full board's way back lands on an id that exists
+  const full = sourceOf(join(PAGES, "town", "quests", "index.astro"));
+  assert.ok(full.includes('href="/town/#quests"'), "/town/quests/ lost its way back to the Guild");
   assert.ok(idsIn(hub).has("quests"),
-    "the hub lost `id=\"quests\"`, so the link above now points at nothing on its own page");
+    "the hub lost `id=\"quests\"`, so the way back from the full board points at nothing");
 });
 
 test("no KNOWN_OPEN entry has gone stale — a declared miss must still be a miss that is written there", () => {

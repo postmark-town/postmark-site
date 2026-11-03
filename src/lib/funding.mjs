@@ -122,7 +122,10 @@ export const HOLO_NAME_LINE =
 // the pot it belongs to, a whole-dollar threshold and both sentences, else null. how_url is the private address route, null until it
 // exists (and https only); art is the sticker image's slot, null until the
 // design sitting (a site-relative path or https only). A torn link or image
-// drops itself, never the thank-you.
+// drops itself, never the thank-you. filled_line is the same thank-you said
+// once the pot HAS filled (POS-664): `line` reads "if this pot fills", the wrong
+// tense on a funded page, so that page says filled_line or nothing, never a
+// tense the site wrote for the town.
 export function thankYouOf(raw) {
   const t = raw && typeof raw === "object" ? raw : null;
   const str = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
@@ -132,6 +135,7 @@ export function thankYouOf(raw) {
   const art = str(t.art);
   return {
     pot: String(t.pot), min_usd: min, card: str(t.card), line: str(t.line),
+    filled_line: str(t.filled_line),
     how_url: how && /^https:\/\/\S+$/.test(how) ? how : null,
     art: art && (/^https:\/\/\S+$/.test(art) || /^\/[^/\s]\S*$/.test(art)) ? art : null,
   };
@@ -226,6 +230,55 @@ export function fundCapOf(pot) {
   const headroom = target == null ? null : Math.max(0, target - (pot?.received ?? 0));
   const cap = open && !uncapped ? headroom : null;
   return { cap, full: cap === 0, once: pot?.cadence === "once" };
+}
+
+/**
+ * A FILLED ONE-TIME POT (POS-664): a closes_at_fill pot whose row is closed
+ * and whose dollars reached its posted need. Both halves are the test: a
+ * one-time pot closed by hand short of its need was not funded, and the page
+ * never says "funded" over money that did not fill it.
+ */
+export function isFunded(pot) {
+  return pot?.status === "closed" && pot?.closesAtFill === true
+    && pot?.target != null && (pot?.received ?? 0) >= pot.target;
+}
+
+/**
+ * THE FUND PAGES, one per pot SLUG (town/pages/fund/[pot].astro's routes):
+ * `[{ pot, tabs, past }]`. A slug's page is its latest open or draft row. A
+ * closed row gets no page, since it cannot convert what arrives, with one
+ * exception: a FILLED one-time pot keeps its page as funded (POS-664), from its
+ * newest closed row, so a giver following a shared link reads "funded, thank
+ * you" and the roll instead of a 404. Its row IS the page, so it has no past.
+ * The tabs are the open pots, in the board's order.
+ */
+export function fundPages(board) {
+  const current = new Map();
+  for (const p of [...board.pots, ...board.drafts]) {
+    if (p.status === "closed") continue;
+    const held = current.get(p.pot);
+    if (!held || String(p.epoch ?? "") > String(held.epoch ?? "")) current.set(p.pot, p);
+  }
+  const funded = new Map();
+  for (const p of board.pots) {
+    if (p.status !== "closed" || current.has(p.pot)) continue;
+    const held = funded.get(p.pot);
+    if (!held || String(p.epoch ?? "") > String(held.epoch ?? "")) funded.set(p.pot, p);
+  }
+  for (const [slug, p] of funded) if (!isFunded(p)) funded.delete(slug);
+  const tabs = [...current.values()].filter((p) => p.status === "open").map((p) => ({
+    pot: p.pot, title: p.title ?? p.pot,
+    received: p.received ?? 0, target: p.target ?? null, staked: p.staked ?? 0,
+  }));
+  // PAST MONTHS (2026-10-01): every closed epoch of this pot, newest first. The
+  // board drops them (PotCards.astro); this page is where a sealed month is read.
+  const pastOf = (slug) => board.pots
+    .filter((p) => p.pot === slug && p.status === "closed")
+    .sort((a, b) => String(b.epoch).localeCompare(String(a.epoch)));
+  return [
+    ...[...current.values()].map((pot) => ({ pot, tabs, past: pastOf(pot.pot) })),
+    ...[...funded.values()].map((pot) => ({ pot, tabs, past: [] })),
+  ];
 }
 
 export function intakeFor(pot) {

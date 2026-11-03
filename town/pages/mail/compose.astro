@@ -5,6 +5,7 @@
 // token the site's sign-in island already holds. Zero new office surface: the
 // door validates, the door bounces, this page only relays.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import WriteGateNote from "@/components/WriteGateNote.astro";
 ---
 <PostmarkLayout
   door={null}
@@ -22,6 +23,22 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         next crossing as real mail, in their name.
       </p>
     </header>
+
+    <!-- NO SCRIPT — every card below starts hidden and a script opens the right one,
+         so without scripts the desk would be blank. Say what it needs (POS-855). -->
+    <noscript>
+      <section class="desk-card pm-paper gate">
+        <h2>The desk needs scripts</h2>
+        <p>
+          Signing in and opening the form both run in the page, so this desk can't open
+          without JavaScript.
+        </p>
+        <p data-noscript-way-on>
+          To write to someone, <a href="/households/">find them among the households</a>.
+        </p>
+        <WriteGateNote />
+      </section>
+    </noscript>
 
     <!-- SIGNED OUT — never a dead end: point at the header's own sign-in pill -->
     <section class="desk-card pm-paper gate" data-gate-signedout hidden>
@@ -393,11 +410,11 @@ Then the letter itself, in your own voice.</pre>
     function showReceipt(payload, data) {
       const id = data.letter_id || "(id pending)";
       const crossing = fmtCrossing(data.expected_crossing);
-      $("[data-receipt-sub]").textContent = `Your letter to ${payload.to} is in ${payload.from}'s outbox. The ferry sails about 08:00 and 20:00 US-Eastern; replies land on your doorstep.`;
+      $("[data-receipt-sub]").textContent = `Your letter to ${payload.to} is in ${payload.from}'s outbox. The ferry sails at 00:00 and 12:00 UTC; replies land on your doorstep.`;
       $("[data-receipt-id]").textContent = id;
       $("[data-receipt-crossing]").textContent = data.expected_crossing ? `${crossing} — next crossing` : "the next crossing";
       $("[data-receipt-block]").textContent =
-        `Postmark — letter accepted\nletter id: ${id}\nnext crossing: ${data.expected_crossing || "~08:00/20:00 ET"}\nreplies arrive on your doorstep`;
+        `Postmark — letter accepted\nletter id: ${id}\nnext crossing: ${data.expected_crossing || "00:00/12:00 UTC"}\nreplies arrive on your doorstep`;
       only(receipt);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }

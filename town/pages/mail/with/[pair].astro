@@ -19,6 +19,7 @@ import media from "@/data/postmark/media.json";
 import ledger from "@/data/postmark/ledger.json";
 import friendships from "@/data/postmark/friendships.json";
 import MailLetters from "@/components/MailLetters.astro";
+import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
 import { fmtDate, threadTitle } from "@/lib/pm.mjs";
 import { letterPartHref } from "@/lib/mail.mjs";
 import { pairViews, deliveredOnOf, pairLettersHtml } from "@/lib/mail-letter.mjs";
@@ -190,6 +191,18 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
       <div class="fr-actions">
         <button type="button" class="pm-btn send wb-off" data-open-composer>✍ Write back</button>
         <span class="turn">last word: <b>{lastSender}</b>, {fmtDate(last.date)}</span>
+      </div>
+      <!-- what writing needs, said once, under the first write-back button a reader
+           meets (the rail link and the foot button open the same desk) — POS-855 -->
+      <div class="fr-gate-note">
+        <WriteGateNote />
+        <!-- true for every reader, signed in or not: the page's own script grays all three
+             write-back controls (wb-off) unless the signed-in household holds `a` or `b`
+             (isPairViewer checks every handle of the household, so a housemate of either
+             writer can write back too: the line names households, not the two writers).
+             A signed-in outsider is also stopped, and the sign-in note above says nothing
+             about that. Static copy; the gate and the script are untouched. -->
+        <p class="fr-gate-who" data-write-gate-pair>Only the two households in this conversation can write back here.</p>
       </div>
     </section>
 
@@ -477,7 +490,7 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
         }
         sending = false; sendBtn.disabled = false; statusEl.hidden = true;
         if (res.status === 202) {
-          $("[data-c-done-sub]").textContent = `your letter to ${payload.to} is in ${payload.from}'s outbox; the ferry sails ~08:00/20:00 US-Eastern.`;
+          $("[data-c-done-sub]").textContent = `your letter to ${payload.to} is in ${payload.from}'s outbox; the ferry sails at 00:00 and 12:00 UTC.`;
           $("[data-c-done-id]").textContent = data.letter_id ?? "";
           return only("[data-c-done]");
         }
@@ -552,6 +565,8 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
     .fr-actions { display: flex; align-items: center; justify-content: center; gap: 1.2em; flex-wrap: wrap; margin-top: 1.1em; }
     .fr-actions .turn { font-family: var(--pm-mono); font-size: 0.8rem; color: var(--pm-ink-soft); }
     .fr-actions .turn b { color: var(--pm-wax); }
+    .fr-gate-note { display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .fr-gate-who { margin: 0.4em 0 0; max-width: 46ch; font-size: 0.85rem; line-height: 1.5; opacity: 0.85; }
 
     /* the budding-friendship milestone (decision 7 — the pair's achievement, on
        the pair page, not a personal quest card) */

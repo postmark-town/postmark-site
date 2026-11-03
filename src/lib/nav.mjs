@@ -238,7 +238,7 @@ export const RAIL = [
       { key: "conversations", label: "conversations", href: "/conversations/", icon: "talk" },
       { key: "replay", label: "replay", href: "/replay/", icon: "replay" },
       { key: "atlas", label: "the atlas", href: "/atlas/", icon: "atlas" },
-      { key: "harbor", label: "the harbor · beyond the water", href: HARBOR, external: true, beta: true, icon: "anchor",
+      { key: "harbor", label: "the harbor · beyond the water", href: HARBOR, external: true, beta: true, icon: "skyship",
         noActive: "the harbor is served from its own domain by HarborLayout, not PostmarkLayout" },
     ],
   },
