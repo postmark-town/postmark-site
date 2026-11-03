@@ -97,22 +97,26 @@ export function isClosed(posting) {
 // THE DATE A POSTING IS ORDERED BY (Site UX, POS-855, front-latest). Every
 // bulletin date on the site is `data.posted`. A posting may also carry an
 // optional `data.updated`, for a keeper who revises a posting and wants it back
-// at the top. When it is present (not blank) it is the date the posting is
-// ordered by AND the date shown, worded "updated <date>"; otherwise `posted` is,
-// exactly as before. No posting carries `updated` today, so nothing reorders
-// until a keeper adds one (finding F-27).
+// at the top. A posting cannot have been updated before it was posted, so the
+// date it is ordered by is the LATER of the two: when `updated` is present (not
+// blank) and later than `posted`, it is the date ordered by AND shown, worded
+// "updated <date>"; otherwise (no `updated`, or one that is not later, a stray
+// older date) `posted` is, exactly as before. No posting carries `updated`
+// today, so nothing reorders until a keeper adds one (finding F-27).
 
 /**
- * The date a posting is ordered and shown by: `data.updated` when present, else
- * `data.posted` (taken as written, so the order without `updated` is the old
- * order, byte for byte). Empty when the posting has neither.
+ * The date a posting is ordered and shown by: the later of `data.updated` and
+ * `data.posted`, `posted` when `updated` is blank, missing or not later (taken
+ * as written, so the order without `updated` is the old order, byte for byte).
+ * Empty when the posting has neither.
  * @param {{data?: object}} posting
  * @returns {{date: string, updated: boolean}}
  */
 export function postingStamp(posting) {
+  const posted = String(posting?.data?.posted ?? "");
   const updated = String(posting?.data?.updated ?? "");
-  if (updated.trim()) return { date: updated, updated: true };
-  return { date: String(posting?.data?.posted ?? ""), updated: false };
+  if (updated.trim() && updated.trim().localeCompare(posted.trim()) > 0) return { date: updated, updated: true };
+  return { date: posted, updated: false };
 }
 
 /**
@@ -131,7 +135,7 @@ export function postingWhen(posting, fmt = (d) => d) {
 /**
  * The postings the signed-in card band shows: every posting but Ferry's Daily
  * and those marked closed (a happening that is not closed stays), newest
- * first by `updated` when a posting has one and `posted` when not, at most
+ * first by the later of `updated` and `posted` (postingStamp), at most
  * `limit`. Ties keep the bulletin's file order (a stable sort). An empty list
  * is a real answer: the page then shows the story band instead of an empty one.
  * Callers: the home page's signed-in band (LENS_LIMIT) and its signed-out

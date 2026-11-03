@@ -74,8 +74,22 @@ test("an `updated` date is preferred over `posted` for the order", () => {
   ];
   assert.deepEqual(slugs(lensPostings(input)), ["zz-revised", "zz-middle", "zz-new-one"]);
   assert.deepEqual(slugs(latestPostings(input)), ["zz-revised", "zz-middle", "zz-new-one"]);
-  // an `updated` older than the posted date is still the date it is ordered by (the keeper said so)
-  assert.deepEqual(slugs(lensPostings([post("zz-a", { posted: "2031-05-06", updated: "2031-01-01" }), post("zz-b", { posted: "2031-05-01" })])), ["zz-b", "zz-a"]);
+});
+
+test("a stray `updated` older than `posted` does not sink the posting: the later of the two orders it and is shown", () => {
+  const fmt = (d) => `<${d}>`;
+  const stray = post("zz-stray", { posted: "2031-05-06", updated: "2031-01-01" });
+  const older = post("zz-older", { posted: "2031-05-01" });
+  assert.deepEqual(slugs(lensPostings([older, stray])), ["zz-stray", "zz-older"], "an older `updated` sank the posting");
+  assert.deepEqual(postingStamp(stray), { date: "2031-05-06", updated: false });
+  assert.equal(postingWhen(stray, fmt), "<2031-05-06>", "an older `updated` was shown as updated");
+  // the same day is not later: the plain posted date
+  const same = post("zz-same", { posted: "2031-05-06", updated: "2031-05-06" });
+  assert.equal(postingWhen(same, fmt), "<2031-05-06>");
+  // a posting with no posted date and an `updated` is dated by the `updated`
+  assert.deepEqual(postingStamp(post("zz-nopost", { updated: "2031-05-02" })), { date: "2031-05-02", updated: true });
+  // a later `updated` still wins
+  assert.equal(postingWhen(post("zz-up", { posted: "2031-05-06", updated: "2031-05-09" }), fmt), "updated <2031-05-09>");
 });
 
 test("a blank `updated` is no `updated`", () => {

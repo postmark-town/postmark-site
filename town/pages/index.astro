@@ -94,7 +94,7 @@ const lensCards = lensPostings(bulletin)
 // the signed-out "Latest on the bulletin": the newest three of the same
 // postings in the same order, as title and date, so a newcomer sees something
 // of what happened lately (POS-855). No postings, no list. The date is the one
-// the order uses: `updated` when a posting has one, else `posted`.
+// the order uses: `updated` when it is later than `posted`, else `posted`.
 const latest = latestPostings(bulletin)
   .map((b) => ({ slug: b.slug, title: postingTitle(b), when: postingWhen(b, fmtDate) }));
 
