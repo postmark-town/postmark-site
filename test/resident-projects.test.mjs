@@ -173,7 +173,9 @@ test("the list sits in 'What <name> has made', prints nothing when empty, and li
   assert.match(made, /href=\{p\.href\}/);
   assert.match(made, /fmtDate\(p\.date\)/);
   assert.match(made, /t\.madeProjects\.total > t\.madeProjects\.projects\.length &&/);
-  assert.match(made, /<a href="\/projects\/">all the town's projects →<\/a>/);
+  // the more-link says how many are missing ("3 more on the projects page →"): total minus what is listed
+  assert.match(made, /<a href="\/projects\/">\{t\.madeProjects\.total - t\.madeProjects\.projects\.length\} more on the projects page →<\/a>/);
+  assert.equal(made.includes("all the town's projects"), false, "the count-less more-link is back");
   // nothing else about projects is printed outside that guard: no heading of its own
   assert.equal(/pm-rule[^\n]*[Pp]rojects/.test(made), false, "a heading of its own would print when empty");
 });
