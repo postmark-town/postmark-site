@@ -257,17 +257,6 @@ export function ferryHeadline(markdown) {
   return null;
 }
 
-export function budgetItems(items, limit) {
-  const all = Array.isArray(items) ? items : [];
-  const cap = Math.max(0, Math.floor(Number(limit) || 0));
-  const shown = all.slice(0, cap);
-  return { items: shown, total: all.length, remainder: all.length - shown.length };
-}
-
-export function formatRemainder(remainder) {
-  return remainder > 0 ? `+${remainder} more` : null;
-}
-
 // `waitingCrossing` and its WAITING_CROSSING_STATUS string were retired on
 // 2026-09-09 with the git-built doorstep they served. The office now answers
 // this segment itself: `awaiting.outgoing` carries each queued letter by id
@@ -325,13 +314,6 @@ export function nextStepsSection(nextSteps, { skipKinds = [] } = {}) {
       `- *Not visible from this static page: ${unread.join("; ")}. The office door sees both — \`read_doorstep\` at the API.*`,
     ] : []),
   ];
-}
-
-export function freshnessFields(generatedAt, sourceCommit) {
-  return {
-    generated_at: generatedAt || "unknown",
-    source_commit: sourceCommit || "unknown",
-  };
 }
 
 // ── THE DOORSTEP MARKDOWN, RENDERED FROM THE OFFICE'S OWN ANSWER ─────────────

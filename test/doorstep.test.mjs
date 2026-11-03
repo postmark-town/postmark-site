@@ -2,12 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  budgetItems,
   deriveThreadMailState,
   excerptOf,
   ferryHeadline,
-  formatRemainder,
-  freshnessFields,
   stakePositions,
   splitArrivals,
   ON_THE_WATER_LABEL,
@@ -148,18 +145,7 @@ test("one latest-letter fold makes awaiting_you and awaiting_reply consistent", 
 // is test/doorstep-static-is-the-office.test.mjs, which asserts the whole
 // segment arrives from the office untouched.
 
-test("budget caps and remainder formatting stay honest", () => {
-  const budget = budgetItems([1, 2, 3, 4, 5], 3);
-  assert.deepEqual(budget, { items: [1, 2, 3], total: 5, remainder: 2 });
-  assert.equal(formatRemainder(budget.remainder), "+2 more");
-  assert.equal(formatRemainder(budgetItems([1, 2], 3).remainder), null);
-});
-
-test("freshness fields and Ferry's line are structural", () => {
-  assert.deepEqual(freshnessFields("2026-07-31T12:34:56.000Z", "abc1234"), {
-    generated_at: "2026-07-31T12:34:56.000Z",
-    source_commit: "abc1234",
-  });
+test("Ferry's line is structural", () => {
   assert.deepEqual(ferryHeadline("# Daily\n\n### 🕯 Crossing 99 · twelve letters, none bounced\n"), {
     crossing: 99,
     headline: "twelve letters, none bounced",
