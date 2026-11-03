@@ -236,8 +236,6 @@ export function serializes(kind, key) {
 // about placement, and a reader who wants the value has the record's path in the
 // inspector two rows down.
 
-export const IDEAL_CLASSES = ["lawful", "residue", "debt", "unread"];
-
 /**
  * One node's keys, sorted by where the law puts them.
  *
@@ -385,12 +383,6 @@ export function registryPaintOf(d, registeredSet, convergenceKinds = []) {
   if (d.kind !== "mark") return convergenceKinds.includes(d.kind) ? "spine" : "off";
   if (isClassNode(d)) return "declares";
   return d.class != null || registeredSet.has(String(d.subkind ?? "")) ? "names" : "unaddressable";
-}
-
-/** Does this node name a class-node — i.e. can the law address it at all? */
-export function namesRegisteredClass(d, registeredSet) {
-  if (!d || d.kind !== "mark") return null;
-  return d.class != null || registeredSet.has(String(d.subkind ?? ""));
 }
 
 // ── the keeping works · the town's asks (2026-08-17, the TDD-board sitting) ──

@@ -15,7 +15,7 @@ import registry from "@/data/postmark/households.json";
 import residents from "@/data/postmark/residents.json";
 import { buildHouses } from "./houses.mjs";
 
-export { houseName, nameplate, buildHouses } from "./houses.mjs";
+export { nameplate } from "./houses.mjs";
 
 // The site's one index, built once for the whole build (every resident page
 // asks it the same question).
@@ -23,7 +23,6 @@ const index = buildHouses(residents, registry);
 const byHandle = new Map(residents.map((r) => [r.handle, r]));
 
 export const houseOf = (handle) => index.houseOf.get(handle);
-export const houseBySlug = (slug) => index.bySlug.get(slug);
 export const declaredHouses = () => [...index.bySlug.values()];
 export const membersOf = (house) => house.residents.map((h) => byHandle.get(h)).filter(Boolean);
 // When a resident last acted is the office's fact, carried on their row
