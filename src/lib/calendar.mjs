@@ -148,10 +148,19 @@ export function whenLine(event) {
   }
   // Doors open is still before the start, so the number a reader wants is how
   // long until it begins; only once it is under way is it how long is left.
+  // durationWords reads the size of a gap, not its direction, so a start that has
+  // already passed (a negative count: the office read it after the start while the
+  // phase word was still announced/doors-open) must not reach it, or it would print
+  // "starts in" for a start that is behind us. No line is the honest one here: the
+  // office's phase badge still says what it said, and the page claims nothing more.
   if (event?.phase === "announced" || event?.phase === "doors-open") {
+    if (Number(event.starts_in_s) < 0) return "";
     const until = durationWords(event.starts_in_s);
     return until ? `starts in ${until}` : "";
   }
+  // The same direction problem at the other end: an under-way event whose end has
+  // already passed (negative ends_in_s) must not read "ends in <gap>". No line.
+  if (Number(event?.ends_in_s) < 0) return "";
   const left = durationWords(event?.ends_in_s);
   return left ? `ends in ${left}` : "";
 }
