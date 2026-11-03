@@ -60,16 +60,18 @@ export const DATA_FILES = [
 //   - OFF the box (CI, a local build, a checkout-less snapshot build) keeping
 //     the committed data IS the design. `deploy/site-refresh.sh`'s own header
 //     says CI builds the last-good static town. Exit 0, warn, proceed.
-//   - ON the release channel -- and `deploy/site-refresh.sh` L427 is the only
-//     caller that sets PUBLIC_CHANNEL=release -- the committed snapshot is a
-//     REGRESSION, not a fallback. The script's own section says "A failed build
+//   - ON the release channel -- which the office's `deploy/site-refresh.sh`
+//     sets in its `extract: the API-fed half` step (deploy.yml's "Refresh
+//     Postmark data from office API" step passes its lane's channel too) --
+//     the committed snapshot is a REGRESSION, not a fallback. The script's own section says "A failed build
 //     publishes NOTHING. The symlink still points at the last good", so a short
 //     fetch has to BE a failed build there, and the last good release stays up.
 //
 // The next tick then retries rather than reading `quiet`: the refresh key is
-// written at `deploy/site-refresh.sh` L624, inside the publish step and after
-// the atomic swap, so a run that dies at L428 leaves the key at its previous
-// value and the following :10/:40 tick sees the town as still moved.
+// written by `deploy/site-refresh.sh` in `build_once`'s publish step, after
+// the atomic swap, so a run that dies at the `|| die "fetch-town.mjs tripped"`
+// line leaves the key at its previous value and the following :10/:40 tick
+// sees the town as still moved.
 export const RELEASE_CHANNEL = "release";
 
 /**
@@ -1232,10 +1234,6 @@ export async function fetchHouseholdsRead({ apiBase, fetchImpl = fetch, retries 
     throw new Error(`/households: not the registry read the contract names (read "households", a pins object)`);
   const registry = body?.registry && typeof body.registry.households === "object" && !Array.isArray(body.registry.households) ? body.registry : null;
   return { missing: false, renames: renamesFromPins(pins), registry };
-}
-
-export function parseMaybeFrontmatter(text) {
-  return parseFrontmatter(text);
 }
 
 // ── THE DRAWING CHEST (POS-97, 2026-09-15) ───────────────────────────────────
