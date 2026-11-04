@@ -29,12 +29,12 @@
 // entry below saying so — a loud false alarm, which is the safe direction.
 //
 // ── WHAT IT DOES NOT READ, EACH WITH ITS REASON ──────────────────────────────
-//   · Computed hrefs — `href={`/bulletin/#${b.slug}`}` (town/pages/index.astro
-//     :443) and the four same-page `href={`#${…}`}` rails. A static read cannot
-//     resolve a template, so asserting on them would be theatre. Noted rather
-//     than silently dropped: the computed bulletin link is a live instance of
-//     the same class this file exists for — every bulletin teaser on the home
-//     page deep-links a card slug the bulletin renders no id for.
+//   · Computed hrefs — the same-page `href={`#${…}`}` rails. A static read
+//     cannot resolve a template, so asserting on them would be theatre. (The
+//     home page's bulletin teasers used to be one: `href={`/bulletin/#${b.slug}`}`
+//     deep-linked a card slug the bulletin renders no id for. That link is
+//     gone; each teaser now links the posting's own page, `noticePath(b.slug)`
+//     at town/pages/index.astro:383, a static page and no anchor at all.)
 //   · Links built in script, e.g. `var RECORDS = { "illuminator-name":
 //     "/bulletin/#name-the-illuminator" }` (town/pages/votes/index.astro:127).
 //     Same target as a real href below, so the class is already on the record.

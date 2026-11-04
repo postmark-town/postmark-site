@@ -11,6 +11,7 @@ import {
   feedOf, splitAtLook, countKinds, lastActOf, standsAtOf, hungOf, cardNumbersOf, holdsOf,
   clocksOf, needsOf, comingUpOf, questsOf, numbersOf, readLook, writeLook, whenOf, dayWordOf,
 } from "./fold.mjs";
+import { hungLine } from "./hung-line.mjs";
 import { editLinkShown } from "../profile-edit.mjs";
 
 const TOWN_REPO = "https://github.com/postmark-town/postmark/blob/main/";
@@ -356,7 +357,7 @@ function paintNumbers(root, n, handles, reads, ctx) {
   const set = (sel, v) => { const e = box.querySelector(sel); if (e) e.textContent = v; };
   set("[data-hd-n-windows]", String(hung));
   const line = root.querySelector("[data-hd-hung-line]");
-  if (line) line.textContent = `${hung} ${hung === 1 ? "has" : "have"} hung a window`;
+  if (line) line.textContent = hungLine(hung);
   if (n) {
     set("[data-hd-n-held]", String(n.held));
     set("[data-hd-n-minted]", String(n.minted));

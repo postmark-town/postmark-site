@@ -100,7 +100,8 @@ const read = (p) => readFileSync(join(ROOT, p), "utf8");
 
 test("[source pin] the page takes its lens band from lensPostings and draws none when it is empty", () => {
   const page = read("town/pages/index.astro");
-  assert.match(page, /import \{ lensPostings \} from "@\/lib\/bulletin-cards\.mjs"/);
+  // (front-latest added latestPostings and postingWhen to this import: the signed-out list and the dates)
+  assert.match(page, /import \{[^}]*\blensPostings\b[^}]*\} from "@\/lib\/bulletin-cards\.mjs"/);
   assert.match(page, /const lensCards = lensPostings\(bulletin\)/);
   assert.match(page, /\{lensCards\.length > 0 && \(\s*<section class="cardband for-lens"/, "the lens band renders even when empty");
   // the story band stays for a signed-in reader exactly when the lens band is absent
@@ -122,8 +123,10 @@ test("the built front page hangs exactly lensPostings' cards in the lens band",
   const page = readFileSync(built, "utf8");
   const want = slugs(lensPostings(BULLETIN));
   const band = /<section[^>]*class="[^"]*for-lens[^"]*"[\s\S]*?<\/section>/.exec(page)?.[0] ?? "";
-  const hung = [...band.matchAll(/href="\/bulletin\/#([^"]+)"/g)].map((m) => m[1]);
+  // each card goes to the posting's own page, /bulletin/<slug>/, not to a #slug on the board
+  const hung = [...band.matchAll(/href="\/bulletin\/([^"#\/]+)\/"/g)].map((m) => m[1]);
   assert.deepEqual(hung, want);
+  assert.equal(band.includes("/bulletin/#"), false, "a lens card links to a board address");
   assert.equal(band === "", want.length === 0, "the lens band's presence must match whether any posting remains");
   assert.equal(/class="[^"]*no-lens-cards[^"]*"/.test(page), want.length === 0, "the story band's no-lens-cards flag must match");
 });

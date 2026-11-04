@@ -34,7 +34,7 @@
 // A bare /stamps/ stays put: it is a real page again, not a doorway.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import { loadEconomy, readEconomy, HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
-import { livePots, loadPots, POT_FIXTURE } from "@/lib/funding.mjs";
+import { livePots, loadPots, POT_FIXTURE, usd, pct, num } from "@/lib/funding.mjs";
 import PotCards from "@/components/PotCards.astro";
 import { QUEST_REGISTRY, questKind, PAIR_RULE } from "@/lib/civic.mjs";
 
@@ -103,10 +103,6 @@ const thin = close({
   stakes,
   dollars: [{ who: "Cleo", usd: 50, earned: 900 }],
 });
-
-const usd = (n) => "$" + Number(n).toLocaleString("en-US");
-const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
-const num = (n) => Number(n).toLocaleString("en-US");
 
 // THE REGISTRY ROWS COME FROM civic.mjs, not from this file. The Quest Guild
 // renders the same rows as cards, and two quoted copies of one registry are two
@@ -982,7 +978,7 @@ node tools/stamp-mint.mjs --derive      # recompute, from the mail, what the led
         cumulative mint and every balance. The dials are at
         <a href="/docs/numbers/"> The Town's Numbers</a>, the open asks and pots at
         <a href="/town/#board"> the board</a>, and every household's own record on
-        <a href="/residents/"> their page</a>.
+        <a href="/households/"> their page</a>.
       </p>
           </div>
         </details>

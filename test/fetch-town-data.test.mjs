@@ -687,6 +687,68 @@ test("a roll that walks short of the door's own total refuses the build", async 
   );
 });
 
+// ── THE TOWN MOVED UNDER THE WALK (STAR-108, 2026-11-03) ─────────────────────
+//
+// The door pages an alphabetical roll by offset. On 11-03 the deploy read
+// `total` 336 on the first page, andy-the-cookie-monster joined at row 10
+// before the second, every later row shifted by one, and the walk came back
+// 337 rows long with one row twice: "walked 337 of 336", a refused release on a
+// roll that was whole a minute later. A walk the town moved under is walked again.
+
+/** A paged door over a roll that `move(call)` may change before each page is served. */
+function movingDoor(start, move = () => {}) {
+  const roll = [...start];
+  let call = 0;
+  const door = async (url) => {
+    const u = new URL(url);
+    move(call++, roll);
+    const limit = Number(u.searchParams.get("limit"));
+    const offset = Number(u.searchParams.get("offset"));
+    const residents = [...roll].sort().slice(offset, offset + limit).map((handle) => ({ handle }));
+    const body = { total: roll.length, shown: residents.length, residents };
+    return { ok: true, status: 200, headers: new Headers(), json: async () => body };
+  };
+  door.calls = () => call;
+  return door;
+}
+
+test("a resident who joins mid-walk costs one more walk, not a refused release", async () => {
+  // page 1 of walk 1 is served, then "aaron" joins ahead of the cursor: page 2
+  // repeats "cyd" and the walk never sees "aaron". The second walk is whole.
+  const door = movingDoor(["bea", "cyd", "dov", "eli"], (call, roll) => { if (call === 1) roll.push("aaron"); });
+  const { roll, total, walks } = await fetchResidentRoll({ apiBase: "https://example.test", fetchImpl: door, limit: 2 });
+  assert.equal(walks, 2);
+  assert.equal(total, 5);
+  assert.deepEqual(roll.map((r) => r.handle), ["aaron", "bea", "cyd", "dov", "eli"]);
+});
+
+test("a resident who leaves mid-walk is caught by the door's moving total, not published as a skip", async () => {
+  // "bea" leaves after page 1: every later row shifts up one, so walk 1 would
+  // skip "dov" and still match the new total of 3. The totals disagree
+  // (4, then 3), so the walk is walked again rather than trusted.
+  const door = movingDoor(["bea", "cyd", "dov", "eli"], (call, roll) => { if (call === 1) roll.splice(roll.indexOf("bea"), 1); });
+  const { roll, walks } = await fetchResidentRoll({ apiBase: "https://example.test", fetchImpl: door, limit: 2 });
+  assert.equal(walks, 2);
+  assert.deepEqual(roll.map((r) => r.handle), ["cyd", "dov", "eli"]);
+});
+
+test("a town that moves under every walk still refuses, and says it moved", async () => {
+  let n = 0;
+  const door = movingDoor(["bea", "cyd", "dov", "eli"], (call, roll) => { if (call % 2 === 1) roll.push(`a${n++}`); });
+  await assert.rejects(
+    fetchResidentRoll({ apiBase: "https://example.test", fetchImpl: door, limit: 2 }),
+    /moved under all 3 walks/,
+  );
+});
+
+test("a still town is walked once", async () => {
+  const door = movingDoor(["bea", "cyd", "dov"]);
+  const { walks, pages } = await fetchResidentRoll({ apiBase: "https://example.test", fetchImpl: door, limit: 2 });
+  assert.equal(walks, 1);
+  assert.equal(pages, 2);
+  assert.equal(door.calls(), 2);
+});
+
 // ── THE ROLL THAT FROZE AT 134 (postmark#2730, 2026-09-13) ─────────────────
 //
 // The office's keyless bucket is a burst of 240 refilling at 120 a minute per

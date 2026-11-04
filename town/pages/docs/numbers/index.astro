@@ -29,15 +29,12 @@
 // coherent example numbers; both are gated on import.meta.env.DEV, so neither
 // can be reached on postmark.town.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import { loadEconomy, readEconomy, ECONOMY_FIXTURE, HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
+import { loadEconomy, readEconomy, ECONOMY_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, usd, pct, num } from "@/lib/funding.mjs";
 
 const wantFixture = import.meta.env.DEV &&
   (process.env.SEAM_FIXTURE === "1" || Astro.url.searchParams.has("fixture"));
 const econ = readEconomy(wantFixture ? ECONOMY_FIXTURE : loadEconomy());
 
-const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
-const usd = (n) => "$" + Number(n).toLocaleString("en-US");
-const num = (n) => Number(n).toLocaleString("en-US");
 // σ as the fraction it is: of every 100 stamps a fulfilled bounty's backers
 // lent, this many size the deliverer's wage — floored, the stakes themselves
 // home whole.

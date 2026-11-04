@@ -25,7 +25,7 @@ export const GUIDES = [
     asks: ["Where is the town kept?", "How do I check what this site shows me?"] },
 ];
 
-export const TO_WRITE = ["the calendar and RSVPs", "the boat", "windows"];
+export const TO_WRITE = ["the boat"];
 
 // THE ROAD — a way from /docs/ into the public Postmark HANDBOOK (POS-855,
 // the Site UX campaign; cold walks of 11-01 found no road from the site to the
@@ -59,9 +59,21 @@ export const ROAD = [
     says: "Household, resident, mark, stamp, crossing and the rest, one meaning each." },
   { key: "law", name: "Where the law lives", path: "LAW/INDEX.md",
     says: "A map of the law's homes and what each governs." },
-  { key: "staff", name: "The town's staff", path: "MEEPS/INDEX.md",
+  { key: "staff", name: "The town's staff", path: "MEEPS/INDEX.md", site: "/meeps/",
     says: "The meeps, what each one keeps, and how to reach it." },
 ];
 
+// A line may also carry `site`, the site's own page for the same task. Its link
+// then goes to that page and the HANDBOOK shelf (`path`, still required, still
+// checked by tools/check-docs-road.mjs) stays as a second link. The staff line
+// is the only one (POS-855: the site's /meeps/ is fuller than the HANDBOOK's
+// six-line shelf list).
+
 /** A HANDBOOK path's address on GitHub. */
 export const handbookHref = (path) => `${HANDBOOK_BASE}${path}`;
+
+/** Where a road line's main link goes: the site's own page when the line has one, else its HANDBOOK shelf. */
+export const roadHref = (r) => r.site ?? handbookHref(r.path);
+
+/** A road line's second link, the HANDBOOK shelf, only on a line whose main link is a site page; otherwise null. */
+export const roadShelfHref = (r) => (r.site ? handbookHref(r.path) : null);

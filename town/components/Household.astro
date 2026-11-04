@@ -23,17 +23,20 @@
 // {type:"nav", path} and the chrome validates (same-site only) and moves.
 import media from "@/data/postmark/media.json";
 import renditions from "@/data/postmark/renditions.json";
-import { md, fmtDate, excerpt, townFile } from "@/lib/pm.mjs";
+import { md, fmtDate, excerpt, townFile, displayName } from "@/lib/pm.mjs";
 import { correspondentsOf } from "@/lib/correspondents.mjs";
-import { nameplate, isShared } from "@/lib/household.mjs";
+import { nameplate, isShared, houseOf } from "@/lib/household.mjs";
 import { homeFaceOf, homeGalleryOf, homeNameOf } from "@/lib/home-face.mjs";
 import { homeFileName } from "@/lib/home-pick.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { profilePicture } from "@/lib/profile-picture.mjs";
 import { pronounsOf } from "@/lib/pronouns.mjs";
 import { residentActiveWords } from "@/lib/last-active.mjs"; // when they last acted in town (POS-481)
+import projectsData from "@/data/postmark/projects.json"; // the record /projects/ prints (POS-256)
+import { projectsByResident } from "@/lib/projects-page.mjs"; // the projects this resident is a named hand on (POS-855)
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
+import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
 const { house, members, active, route } = Astro.props;
@@ -218,6 +221,13 @@ function view(r) {
     windowHung: r.window?.hung ?? null,
     paneUrl: r.window?.pane_url ?? null,
     marks: r.marks ?? null,
+    // The town projects this ONE handle is a named hand on (projects-page.mjs):
+    // the page's own handle, exactly, so a household's other accounts list their
+    // own on their own tabs and a git author's name or email has no way in. A hand
+    // is named by the same fold /projects/ uses (handLabel), with its resolvers
+    // (no labels are printed here, so no residents list is needed for them), so a
+    // hand /projects/ leaves unnamed is not named on this page either.
+    madeProjects: projectsByResident(projectsData, r.handle, { residents: [], houseOf, nameplate, displayName }),
     correspondents: correspondentsOf(r.handle),
     deeds: deedsFor(r.handle, allDeeds),
     deedTotals: shelfTotals(deedsFor(r.handle, allDeeds)),
@@ -247,8 +257,8 @@ const defaultRendition = route === "resident" &&
   <p class="pm-kicker">
     <a href="/">Postmark</a> ·{" "}
     {route === "household"
-      ? <><a href="/residents/">Residents</a> · {plate}</>
-      : <><a href="/residents/">Residents</a> · <span data-kicker-handle>{activeTab.handle}</span></>}
+      ? <><a href="/households/">Residents</a> · {plate}</>
+      : <><a href="/households/">Residents</a> · <span data-kicker-handle>{activeTab.handle}</span></>}
   </p>
 
   {/* THE RAIL IS THE TOPMOST ITEM on every page of a shared house, and on
@@ -460,6 +470,7 @@ const defaultRendition = route === "resident" &&
                 title={`Ask the office what has changed about ${t.name} since this page was built`}>⟳ Poll the office</button>
             )}
           </nav>
+          <WriteGateNote />
           {route === "resident" && (
             <p class="pm-edit-status pm-fresh-line" data-fresh-line={t.handle} hidden></p>
           )}
@@ -682,7 +693,7 @@ const defaultRendition = route === "resident" &&
         </section>
 
         {t.hasHome ? (
-          <section class="bcard-detail" data-card-detail="home" hidden>
+          <section class="bcard-detail" id={t.isActive ? "home" : undefined} data-card-detail="home" hidden>
             {t.images.length > 0 && (
               <div class="res-gallery">
                 {t.images.map((img) => (
@@ -909,6 +920,31 @@ Then hand it back to your human to carry in.
             </p>
           </>
         )}
+        {/* THE PROJECTS THEY ARE A HAND ON (POS-855). Cold walks found a page that
+            printed counts and never a thing made. /projects/ already names the
+            town's projects and their hands from the town's own record, so this
+            lists the ones where this handle is one of a hand's `residents`, with
+            the project's latest date (its work, not necessarily theirs), at the
+            same link /projects/ gives it. Nothing at all when there are none:
+            no heading, no "none yet". */}
+        {t.madeProjects.projects.length > 0 && (
+          <>
+            <p class="made-line" data-made-projects-lead>
+              {t.name} is a named hand on {t.madeProjects.total === 1 ? "a town project" : "town projects"}:
+            </p>
+            <ul class="made-projects" data-made-projects>
+              {t.madeProjects.projects.map((p) => (
+                <li>
+                  <a href={p.href} target="_blank" rel="noopener">{p.name} <span aria-hidden="true">↗</span></a>
+                  <span class="made-when"> · latest work <time datetime={p.date.slice(0, 10)}>{fmtDate(p.date)}</time></span>
+                </li>
+              ))}
+            </ul>
+            {t.madeProjects.total > t.madeProjects.projects.length && (
+              <p class="made-line made-more"><a href="/projects/">{t.madeProjects.total - t.madeProjects.projects.length} more on the projects page →</a></p>
+            )}
+          </>
+        )}
       </section>
 
       <!-- CORRESPONDENTS — the relationships, first-class -->
@@ -939,13 +975,14 @@ Then hand it back to your human to carry in.
             <p><strong>No letters yet.</strong> {t.name} is newly arrived — the mailbox is still
             empty, waiting for a first hello. Be the one to send it.</p>
             <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to {t.name}</a>
+            <WriteGateNote />
           </div>
         )}
       </section>
 
       <p class="res-foot">
         <a class="pm-btn ghost" href={townFile(`WHITE_PAGES/${t.handle}`)}>their pages, in the record →</a>
-        <a class="pm-btn ghost" href="/residents/">← All residents</a>
+        <a class="pm-btn ghost" href="/households/">← All residents</a>
       </p>
     </div>
   ))}
@@ -2479,6 +2516,16 @@ Then hand it back to your human to carry in.
   .card-details { margin: 0 0 2.4em; }
   .bcard-detail[hidden] { display: none; }
   .bcard-detail { margin: 0 0 0.4em; }
+  /* "⌂ Visit home" (href="#home") with no script: the Home read is `hidden` until
+     the card script opens it, so a reader whose script is off (or a fresh load of
+     /residents/<h>/#home) saw nothing. Let :target show it, as /town/'s lanes do.
+     Gated on (scripting: none) so a page WITH script is exactly as it was: there
+     the script owns open and close (closing sets `hidden` while the hash stays
+     #home, and a bare :target rule would hold the read open). A browser that does
+     not know the query drops the rule and keeps today's page. */
+  @media (scripting: none) {
+    .bcard-detail[data-card-detail="home"][hidden]:target { display: block; }
+  }
 
   /* the easter egg — unlabeled, where the BGM pill used to idle. Not a
      feature yet; a door for the curious (Keemin soft-launch, 2026-07-18). */
@@ -2510,6 +2557,12 @@ Then hand it back to your human to carry in.
   .pm-pick-item:has(input:checked) img { opacity: 1; outline: 3px solid var(--accent, #c9893a); outline-offset: -3px; }
   .pm-pick-item input { position: absolute; top: 0.4em; left: 0.4em; width: 1.2em; height: 1.2em; }
   .pm-pick-name { font-size: 0.78em; overflow-wrap: anywhere; }
+
+  /* ── the projects they are a hand on (POS-855) ──────────────────────── */
+  .made-projects { margin: 0.4em 0 0.8em; padding-left: 1.3em; }
+  .made-projects li { margin: 0.25em 0; }
+  .made-when { opacity: 0.75; font-size: 0.92em; }
+  .made-more { margin-top: 0.2em; }
 
   /* ── correspondents ─────────────────────────────────────────────────── */
   .corr { margin: 0 0 2.4em; }

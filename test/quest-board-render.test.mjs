@@ -319,8 +319,14 @@ test("the page actually calls the law: the partition, the block, and the hand li
   // is the founder's complaint restated. The heading says what the list is;
   // `uncounted` stays the word for a row nothing can count, and rides that
   // row's own note.
+  //
+  // POS-855 (11-02): the hub's card no longer says `uncounted`; a cold walk
+  // could not parse it, and Rivet's trace of the board gave the replacement,
+  // "Board count unavailable" (same branch: null, or no denominator). The pin
+  // below follows the word. The prose above is the 09-08 record and is left as
+  // written. test/quest-standings.test.mjs pins the card's strings in full.
   const hub = readFileSync(new URL("../town/pages/town/index.astro", import.meta.url), "utf8");
-  assert.match(hub, /class="m-barlab m-dim">uncounted</, "the hub's word moved — the note this board writes followed it and now says something else");
+  assert.match(hub, /class="m-barlab m-dim">Board count unavailable</, "the hub's word moved — the note this board writes followed it and now says something else");
   assert.match(SOURCE, /<span>Still to do<\/span>/);
   assert.doesNotMatch(SOURCE, /<span>Uncounted<\/span>/,
     "the block is headed by what the list IS; a heading naming a measurement failure over rows that were measured is the label the founder read and could not parse");

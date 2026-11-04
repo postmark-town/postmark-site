@@ -243,15 +243,16 @@
       // naming one resident while the page showed another's standpoint. Not a
       // special case for the fight, as it looked: two answers to one question.
       //
-      // THE LAW IS THE WORLD REPO'S, in spectator/act-as.mjs, which exists so
-      // both sides can import ONE resolver. This mirrors it rather than importing
-      // it for one reason only: the pinned postmark-world in node_modules does
-      // not carry that file yet, so importing it today breaks the build. The
-      // moment the pin (or the dev clone) moves past it, these six lines become
-      //     import { resolveActAsSelection } from "postmark-world/spectator/act-as.mjs";
-      // and the duplication goes. Until then the precedence below is copied
-      // deliberately and is named as a copy, which is the honest version of a
-      // thing that cannot yet be shared.
+      // THE LAW IS THE WORLD REPO'S: `resolveActAsSelection`, exported from
+      // postmark-world's spectator/viewer.mjs, which the viewer uses to pick the
+      // resident it acts as. This mirrors it rather than importing it, because
+      // viewer.mjs is the whole spectator viewer module (it pulls in the world's
+      // tools/ engine and the home-column code), not a small resolver the
+      // site can share. The mirror covers the `handle` half of the world
+      // function's answer and is not line for line: where the key holds no
+      // resident it gives null and the world gives "". The precedence below is
+      // copied deliberately and is named as a copy, which is the honest version
+      // of a thing that is not shared.
       const SPECTATOR = "__spectator__";
       const handles = Array.isArray(me?.handles) ? me.handles : [];
       const read = (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };

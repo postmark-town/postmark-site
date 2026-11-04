@@ -1475,10 +1475,11 @@ test("the journalling disclosure is on the plate, and only over your own seat", 
 
 test("the import list carries nothing it no longer calls", () => {
   // `briefWords` shortened the door's sentence to fit the small name box. The
-  // box was deleted; the import outlived its only caller by a few hours. It is
-  // still EXPORTED and still tested where it lives — unused here is not dead
-  // there — but a mount that imports what it never calls is a reader's false
-  // lead about where a function is used.
+  // box was deleted; the import outlived its only caller by a few hours. The
+  // function itself had no other caller and no test, so it has been deleted
+  // from world-cockpit.mjs too. These pins stay so the name does not come back
+  // into the import list, since a mount that imports what it never calls is a
+  // reader's false lead about where a function is used.
   assert.doesNotMatch(MOUNT, /^\s*pxToWorld, recentVoices, faceImageFor, briefWords,$/m,
     "not on the import line");
   assert.doesNotMatch(MOUNT, /briefWords\(/, "and not called anywhere in the file");

@@ -37,17 +37,14 @@ import { residentAvatar } from "../world-cockpit.mjs";
 import { profilePicture } from "../profile-picture.mjs";
 import { pronounsOf } from "../pronouns.mjs";
 import { SPRITES, paint, SPRITE_W, SPRITE_H } from "../civic-art.mjs";
-import { MEEPS } from "../meeps-quarter.mjs";
+import { MEEPS, favouriteColour } from "../meeps-quarter.mjs";
 
 const PANES = "https://panes.postmark.town";
 
 // A colour lands in a style attribute, and a resident wrote it. Only a plain
 // hex colour is a colour here; anything else is a resident who set nothing.
-const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
-export function accentOf(profile) {
-  const c = typeof profile?.color === "string" ? profile.color.trim() : "";
-  return HEX.test(c) ? c.toLowerCase() : null;
-}
+// meeps-quarter's favouriteColour holds the one rule.
+export const accentOf = (profile) => favouriteColour({ profile });
 
 const plain = (s) => String(s ?? "")
   .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
