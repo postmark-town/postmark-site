@@ -13,6 +13,7 @@ import {
 } from "./fold.mjs";
 import { hungLine } from "./hung-line.mjs";
 import { editLinkShown } from "../profile-edit.mjs";
+import { readNoteOf } from "../conversations-read.mjs";
 
 const TOWN_REPO = "https://github.com/postmark-town/postmark/blob/main/";
 const FEED_MAX = 14;       // fresh lines shown before "N more"
@@ -91,6 +92,7 @@ export function paintHouse(root, reads, ctx) {
 
   paintClocks(root, clocksOf(handles, reads.doorsteps), now);
   paintFeed(root, items, ctx);
+  paintReadNote(root, reads);
   const needs = needsOf(handles, reads.doorsteps);
   if (owner) paintNeeds(root, needs, ctx);
   paintNextBoat(root, owner ? needs.pending : [], ctx);
@@ -121,6 +123,15 @@ function paintClocks(root, clocks, now) {
   const c = clocks.crossing;
   if (c?.at) set("crossing", (c.n != null ? "No. " + c.n + " · " : "") + t(c.at), "a letter written before then rides it");
   box.hidden = false;
+}
+
+/** What the house said is read from the town's conversations; when that read was cut or failed, the page says so beside the feed. */
+function paintReadNote(root, reads) {
+  const box = root.querySelector("[data-hd-readnote]");
+  if (!box) return;
+  const words = readNoteOf(reads.conversationsStatus, "what the house said");
+  box.textContent = words ?? "";
+  box.hidden = !words;
 }
 
 function paintFeed(root, items, ctx) {

@@ -281,15 +281,106 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       var lineNotes = {};    // thread_of -> a sentence about why the lines went back to the newest page
       var anchorKey = null;  // the card whose lines just grew at the top: keep the reader on the line they were reading
 
+      // ── KEEPING THE READER'S PLACE ACROSS A CHANGE OF GENERATION (POS-779) ──────────────────
+      //
+      // A live thread that gains a voice changes generation, and lines pulled under the old one are never shown again.
+      // A reader who is looking at one of those lines (not at the newest page) would be thrown back to the bottom every
+      // time, so for that reader only the page RE-ANCHORS: it asks the office, under the CURRENT generation and with the
+      // ordinary earlier request, for the lines between the newest page and the line they were on. It stops as soon as it
+      // reaches that line, after REANCHOR_PAGES pages (80 lines each), or when the earlier lines run out, and it says
+      // which. Nothing from the old generation is kept: the lines are the office's current ones, so a merge, a late
+      // bridge, a moved anchor or a changed eligibility still shows exactly what the office says now. One chain per
+      // thread at a time; a change that lands while it runs restarts it from the office's answer (at most
+      // REANCHOR_TRIES times, then it gives up and says the thread is changing too fast to keep a place in).
+      var REANCHOR_PAGES = 4;
+      var REANCHOR_TRIES = 3;
+      var REANCHOR_JOBS = 3;       // threads re-anchoring at once, across the page
+      var seen = {};               // thread_of -> { line, rel }: the first line the reader could see at the last paint
+      var CHANGED_WORDS = "this conversation changed while you were reading it, so it shows its newest statements again";
+
+      function jobsRunning() {
+        var n = 0;
+        for (var k in expanded) if (expanded[k] && expanded[k].re) n += 1;
+        return n;
+      }
+
       function stateFor(t) {
         if (!t || !t.thread_of) return null;
         var s = expanded[t.thread_of];
         if (s && s.generation !== t.generation) {
-          delete expanded[t.thread_of];
-          lineNotes[t.thread_of] = "this conversation changed while you were reading it, so it shows its newest statements again";
+          var key = t.thread_of;
+          var re = s.re || null;
+          var at = seen[key] || null;
+          var want = re ? re.want : (at && at.line) || null;
+          var held = false;
+          if (!re) for (var i = 0; i < s.lines.length; i++) if (String(s.lines[i].act_id) === String(want)) { held = true; break; }
+          delete expanded[key];
+          if ((re || held) && want && t.earlier) {
+            if ((re ? re.tries : 0) >= REANCHOR_TRIES) {
+              lineNotes[key] = "this conversation is changing too quickly to keep your place in it, so it shows its newest statements";
+              return null;
+            }
+            if (!re && jobsRunning() >= REANCHOR_JOBS) { lineNotes[key] = CHANGED_WORDS; return null; }
+            return reanchor(t, want, re ? re.rel : (at ? at.rel : 0), re ? re.tries + 1 : 1);
+          }
+          lineNotes[key] = CHANGED_WORDS;
           return null;
         }
         return s || null;
+      }
+
+      function reanchor(t, want, rel, tries) {
+        var key = t.thread_of;
+        var s = expanded[key] = { generation: t.generation, lines: [], earlier: t.earlier, busy: true, error: null, token: 1,
+          re: { want: want, rel: rel, pages: 0, tries: tries }, epoch: t.epoch };
+        delete lineNotes[key];
+        var token = s.token;
+        function mine() { return expanded[key] === s && s.token === token; }
+        function reached() {
+          for (var i = 0; i < s.lines.length; i++) if (String(s.lines[i].act_id) === String(want)) return true;
+          for (var j = 0; j < (t.voices || []).length; j++) if (String(t.voices[j].act_id) === String(want)) return true;
+          return false;
+        }
+        function finish(note, error) {
+          s.busy = false;
+          var done = s.re; s.re = null;
+          if (error) s.error = error;
+          else if (note) lineNotes[key] = note;
+          if (!error && reached()) s.restoreTo = { line: want, rel: done.rel };
+          anchorKey = key;
+          redraw();
+        }
+        function step() {
+          if (!mine()) return;
+          if (reached()) return finish("this conversation grew while you were reading it; the earlier statements were read again to keep your place");
+          if (!s.earlier) return finish("this conversation changed while you were reading it; the line you were on is no longer part of it");
+          if (s.re.pages >= REANCHOR_PAGES) return finish("this conversation grew while you were reading it, and the line you were on is further back than this page reads again: use show earlier to go back to it");
+          s.re.pages += 1;
+          var q = "thread_of=" + encodeURIComponent(key) + "&before=" + encodeURIComponent(s.earlier) + "&generation=" + encodeURIComponent(s.generation)
+            + "&since=" + encodeURIComponent(t.epoch.since) + "&next=" + (t.epoch.next == null ? "open" : encodeURIComponent(t.epoch.next)) + "&limit=80";
+          fetch(API + "?" + q, { headers: { accept: "application/json" } })
+            .then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }, function () { return { status: r.status, body: null }; }); })
+            .then(function (res) {
+              if (!mine()) return;
+              var b = res.body, gen = s.generation;
+              if (res.status === 200 && b && b.regenerated && b.thread && b.thread.thread_of === key && b.thread.earlier && s.re.tries < REANCHOR_TRIES) {
+                // it moved again under the chain: start over from the office's own current answer
+                s.re.tries += 1; s.re.pages = 0; s.lines = []; s.generation = b.thread.generation; s.earlier = b.thread.earlier;
+                t = { thread_of: key, epoch: t.epoch, voices: b.thread.voices || [] };
+                return step();
+              }
+              if (res.status === 200 && b && Array.isArray(b.voices) && b.thread_of === key && b.generation === gen) {
+                s.lines = b.voices.concat(s.lines); s.earlier = b.earlier || null;
+                return step();
+              }
+              if (res.status === 200 && b && b.regenerated) return finish("this conversation is changing too quickly to keep your place in it, so it shows its newest statements");
+              if (res.status === 404) { delete expanded[key]; lineNotes[key] = "that conversation is no longer there to page back through"; redraw(); return; }
+              finish(null, "Couldn't read the earlier statements again just now. Try again.");
+            })
+            .catch(function () { if (mine()) finish(null, "Couldn't read the earlier statements again just now. Try again."); });
+        }
+        Promise.resolve().then(step);
+        return s;
       }
 
       // earlier lines first, then the newest page; a line is never listed twice (an act id is the line's identity)
@@ -428,7 +519,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           // the in-memory read has no way back: it says what it is showing and does not pretend there is a control
           card.appendChild(el("p", "c-earlier", "showing the latest " + sent + " of " + t.voice_count + " statements held in memory"));
         }
-        var lineNote = (held && held.error) || (t.thread_of && lineNotes[t.thread_of]) || null;
+        var lineNote = (held && held.error) || (held && held.re && "this conversation changed; reading the earlier statements you had open again…") || (t.thread_of && lineNotes[t.thread_of]) || null;
         if (lineNote) card.appendChild(el("p", "c-line-note" + (held && held.error ? " is-error" : ""), lineNote));
 
         var who = el("p", "c-people");
@@ -490,6 +581,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             if (r.bottom > box0.top) { rec.line = items[i].getAttribute("data-act"); rec.rel = r.top - box0.top; break; }
           }
           was[card.getAttribute("data-thread")] = rec;
+          if (rec.key && rec.line) seen[rec.key] = { line: rec.line, rel: rec.rel };
         });
         return was;
       }
@@ -504,6 +596,13 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           if (!list) return;
           var prior = was[card.getAttribute("data-thread")];
           if (!prior) { if (followsNew) list.scrollTop = list.scrollHeight; return; }
+          // a re-anchor just read the lines back: put the reader on the line they were on before the thread changed
+          var back = prior.key && expanded[prior.key] && expanded[prior.key].restoreTo;
+          if (back) {
+            delete expanded[prior.key].restoreTo;
+            var wasOn = list.querySelector('[data-act="' + String(back.line).replace(/[^0-9]/g, "") + '"]');
+            if (wasOn) { list.scrollTop += (wasOn.getBoundingClientRect().top - list.getBoundingClientRect().top) - back.rel; return; }
+          }
           // lines were just added at the TOP of this card's list (show earlier): keep the reader on the line they were reading
           if (anchorKey && prior.key === anchorKey && prior.line) {
             var again = list.querySelector('[data-act="' + String(prior.line).replace(/[^0-9]/g, "") + '"]');

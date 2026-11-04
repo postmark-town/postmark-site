@@ -42,6 +42,7 @@
 <script>
   import { mountCockpit } from "@/lib/world-cockpit-mount.mjs";
   import { cockpitShows, gridFrom } from "@/lib/world-cockpit.mjs";
+  import { readConversations } from "@/lib/conversations-read.mjs";
   import { APEX_PATH, orientingHandle, readDoor } from "@/lib/world-cockpit-door.mjs";
   import { KEYS, tokenIsFresh, officeBase } from "@/lib/auth.mjs";
 
@@ -126,14 +127,15 @@
      * The site's own conversations page has polled this same door since it
      * shipped; this is the second reader of one source, not a new surface.
      *
-     * Answers null on any failure, and the map simply draws no speech — the same
-     * degradation as every other read on this page.
+     * Answers `{ unavailable: true, read_status }` on a refusal or a failure (no speech is drawn, and the status says the record
+     * could not be read), and the body with a `read_status` otherwise.
      */
     async function readVoices() {
-      try {
-        const r = await fetch(OFFICE + "/world/conversations", { headers: { accept: "application/json" } });
-        return r.ok ? r.json() : null;
-      } catch { return null; }
+      // The first page is the newest 40 live threads; the map wants the last `fade_minutes` of speech, so the read follows the
+      // office's `next_threads` while the threads it reaches are still inside that window (capped), and says what it did.
+      // `read_status` is { state: ok | partial | legacy | unavailable, … }: a refused or cut read is never an empty town.
+      const { body, status } = await readConversations(fetch, OFFICE, { windowMs: 5 * 60_000, sections: ["live"] });
+      return body ? { ...body, read_status: status } : { unavailable: true, read_status: status };
     }
 
     /**
