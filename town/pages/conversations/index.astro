@@ -116,6 +116,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
          run, tonight). Rendered from the same payload the threads ride in. -->
     <div data-pinned hidden></div>
 
+    <!-- what the page could not do, in the office's own terms: the legacy read, a record it cannot read this minute -->
+    <p class="c-note" data-note role="status" hidden></p>
+
     <section class="c-live" aria-live="polite">
       <div class="c-rule"><span>This settlement</span></div>
       <div data-live><p class="c-loading">Listening…</p></div>
@@ -267,6 +270,87 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         return mono;
       }
 
+      // ── SHOW EARLIER: what the reader has pulled back, per thread (POS-779) ─────────────
+      //
+      // Keyed by `thread_of`, the act id of an admitted member: the thread's `id` is mutable (a regrouping changes it) and is
+      // not what a held page may rest on. Each entry remembers the GENERATION it was pulled under. The office changes a
+      // thread's generation when its membership changes (a merge, a late bridge, a moved anchor, growth), and from that
+      // moment nothing pulled under the old one is shown: `stateFor` drops it, and an answer that arrives for a request made
+      // under a generation the page no longer holds is thrown away unread. So no line is lost and none shown twice.
+      var expanded = {};     // thread_of -> { generation, lines, earlier, busy, error, token }
+      var lineNotes = {};    // thread_of -> a sentence about why the lines went back to the newest page
+      var anchorKey = null;  // the card whose lines just grew at the top: keep the reader on the line they were reading
+
+      function stateFor(t) {
+        if (!t || !t.thread_of) return null;
+        var s = expanded[t.thread_of];
+        if (s && s.generation !== t.generation) {
+          delete expanded[t.thread_of];
+          lineNotes[t.thread_of] = "this conversation changed while you were reading it, so it shows its newest statements again";
+          return null;
+        }
+        return s || null;
+      }
+
+      // earlier lines first, then the newest page; a line is never listed twice (an act id is the line's identity)
+      function mergedLines(t, s) {
+        var seen = {}, out = [];
+        function add(v) {
+          if (v.act_id != null) { if (seen[v.act_id]) return; seen[v.act_id] = true; }
+          out.push(v);
+        }
+        if (s) s.lines.forEach(add);
+        (t.voices || []).forEach(add);
+        return out;
+      }
+
+      function showEarlier(t) {
+        var s = stateFor(t);
+        var cursor = s ? s.earlier : t.earlier;
+        if (!t.thread_of || !cursor || !t.epoch) return;
+        if (!s) s = expanded[t.thread_of] = { generation: t.generation, lines: [], earlier: t.earlier, busy: false, error: null, token: 0 };
+        if (s.busy) return;
+        var key = t.thread_of, gen = s.generation, token = ++s.token;
+        s.busy = true; s.error = null; delete lineNotes[key];
+        anchorKey = key;
+        redraw();
+        var q = "thread_of=" + encodeURIComponent(key) + "&before=" + encodeURIComponent(cursor) + "&generation=" + encodeURIComponent(gen)
+          + "&since=" + encodeURIComponent(t.epoch.since) + "&next=" + (t.epoch.next == null ? "open" : encodeURIComponent(t.epoch.next)) + "&limit=80";
+        function mine() { return expanded[key] === s && s.token === token && s.generation === gen; }
+        fetch(API + "?" + q, { headers: { accept: "application/json" } })
+          .then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }, function () { return { status: r.status, body: null }; }); })
+          .then(function (res) {
+            if (!mine()) return;     // the thread moved on, or the page did: this answer belongs to nothing on screen
+            s.busy = false;
+            var b = res.body;
+            if (res.status === 200 && b && b.regenerated) {
+              delete expanded[key];
+              lineNotes[key] = "this conversation changed while you were reading it, so it shows its newest statements again";
+              tick();
+              return;
+            }
+            if (res.status === 200 && b && Array.isArray(b.voices) && b.thread_of === key && b.generation === gen) {
+              s.lines = b.voices.concat(s.lines);   // strictly before the oldest line held, oldest first
+              s.earlier = b.earlier || null;
+            } else if (res.status === 404) {
+              delete expanded[key];
+              lineNotes[key] = "that conversation is no longer there to page back through";
+              tick();
+              return;
+            } else {
+              s.error = "Couldn't load the earlier statements just now. Try again.";
+            }
+            anchorKey = key;
+            redraw();
+          })
+          .catch(function () {
+            if (!mine()) return;
+            s.busy = false;
+            s.error = "Couldn't load the earlier statements just now. Try again.";
+            redraw();
+          });
+      }
+
       function threadNode(t) {
         var card = el("article", "c-thread" + (t.live ? " is-live" : ""));
         // the id is how a card's scroll position survives the next rebuild
@@ -325,7 +409,27 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           meta.appendChild(perma);
         }
         card.appendChild(meta);
-        if (more_) card.appendChild(el("p", "c-earlier", "showing the latest " + sent + " of " + t.voice_count + " statements"));
+        // SHOW EARLIER (POS-779). The office sends a thread's newest statements and the count of all of them; the lines
+        // before them are one request away, paged back from the oldest line already held, for as long as the thread is
+        // still the thread the reader was shown (same generation). Lines held under another generation are dropped, not
+        // reconciled: a merge or a regrouping can change which earlier lines belong to it.
+        var held = stateFor(t);
+        var lines = mergedLines(t, held);
+        var cursor = held ? held.earlier : t.earlier;
+        card.setAttribute("data-key", t.thread_of || "");
+        if (t.thread_of && cursor) {
+          var left = t.voice_count - lines.length;
+          var btn = el("button", "c-show-earlier", held && held.busy ? "loading…" : "show earlier statements" + (left > 0 ? " (" + left + " more)" : ""));
+          btn.type = "button";
+          btn.disabled = !!(held && held.busy);
+          btn.addEventListener("click", function () { showEarlier(t); });
+          card.appendChild(btn);
+        } else if (more_ && !t.thread_of) {
+          // the in-memory read has no way back: it says what it is showing and does not pretend there is a control
+          card.appendChild(el("p", "c-earlier", "showing the latest " + sent + " of " + t.voice_count + " statements held in memory"));
+        }
+        var lineNote = (held && held.error) || (t.thread_of && lineNotes[t.thread_of]) || null;
+        if (lineNote) card.appendChild(el("p", "c-line-note" + (held && held.error ? " is-error" : ""), lineNote));
 
         var who = el("p", "c-people");
         (t.participants || []).forEach(function (h, i) {
@@ -335,8 +439,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         card.appendChild(who);
 
         var list = el("ol", "c-voices");
-        (t.voices || []).forEach(function (v) {
+        lines.forEach(function (v) {
           var li = el("li", "c-voice");
+          if (v.act_id != null) li.setAttribute("data-act", String(v.act_id));
           // face and name travel together in one cell, so the row stays the
           // three columns it already was: who · what they said · when
           var who = el("span", "c-voice-who");
@@ -375,7 +480,16 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         box.querySelectorAll("[data-thread]").forEach(function (card) {
           var list = card.querySelector(".c-voices");
           if (!list) return;
-          was[card.getAttribute("data-thread")] = { top: list.scrollTop, following: atBottom(list) };
+          var rec = { top: list.scrollTop, following: atBottom(list), key: card.getAttribute("data-key"), line: null, rel: 0 };
+          // the first line the reader can see, and where it sits: a thread that grows at the TOP is put back by that line,
+          // not by a height sum (sub-pixel wrapping and borders make a sum a few pixels wrong)
+          var box0 = list.getBoundingClientRect();
+          var items = list.children;
+          for (var i = 0; i < items.length; i++) {
+            var r = items[i].getBoundingClientRect();
+            if (r.bottom > box0.top) { rec.line = items[i].getAttribute("data-act"); rec.rel = r.top - box0.top; break; }
+          }
+          was[card.getAttribute("data-thread")] = rec;
         });
         return was;
       }
@@ -390,6 +504,14 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           if (!list) return;
           var prior = was[card.getAttribute("data-thread")];
           if (!prior) { if (followsNew) list.scrollTop = list.scrollHeight; return; }
+          // lines were just added at the TOP of this card's list (show earlier): keep the reader on the line they were reading
+          if (anchorKey && prior.key === anchorKey && prior.line) {
+            var again = list.querySelector('[data-act="' + String(prior.line).replace(/[^0-9]/g, "") + '"]');
+            if (again) {
+              list.scrollTop += (again.getBoundingClientRect().top - list.getBoundingClientRect().top) - prior.rel;
+              return;
+            }
+          }
           if (pinNext || prior.following) list.scrollTop = list.scrollHeight;
           else list.scrollTop = prior.top;
         });
@@ -416,13 +538,74 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       var moreObserver = typeof IntersectionObserver === "function"
         ? new IntersectionObserver(function (entries) {
             if (!entries.some(function (e) { return e.isIntersecting; })) return;
-            if (shown >= lastClosed.length) return;
+            // everything held is on screen: the scroll reaching the end asks the office for the next threads, if it has any
+            if (shown >= lastClosed.length) { if (sectionCursor("closed")) loadMoreThreads("closed"); return; }
             shown += CHUNK;
-            paint(closedBox, lastClosed, "No earlier settlement's conversations are kept yet.", false, true);
+            paint(closedBox, lastClosed, CLOSED_EMPTY, false, true, "closed");
           }, { rootMargin: "600px" })   // build them before they are needed, not as they appear
         : null;
 
-      function paint(box, threads, emptyWords, followsNew, lazy) {
+      // ── THE THREADS THE OFFICE HAS NOT SENT YET (POS-779) ────────────────────────────────
+      //
+      // A page of threads is bounded, and a list that was cut says so with a cursor (`next_threads`, one per section). The
+      // next pages are asked for by the reader (a button) or by the scroll reaching the end of the past, and are kept per
+      // section for as long as the cursor that started them is the page's own: the office changes a list's cursor when the
+      // list under it changes, and threads fetched after a cursor that no longer stands are dropped, never stitched on.
+      var pageNext = { live: null, closed: null };   // the cursors of the page just read
+      var extra = { live: null, closed: null };      // { origin, threads, next, busy, error }
+      var lastLive = [], lastClosedPage = [];
+
+      function sectionThreads(scope, page) {
+        var e = extra[scope];
+        if (e && e.origin !== pageNext[scope]) { extra[scope] = e = null; }
+        return e ? page.concat(e.threads) : page;
+      }
+      function sectionCursor(scope) {
+        var e = extra[scope];
+        return e ? e.next : pageNext[scope];
+      }
+      function loadMoreThreads(scope) {
+        var cursor = sectionCursor(scope);
+        if (!cursor) return;
+        var e = extra[scope] || (extra[scope] = { origin: pageNext[scope], threads: [], next: cursor, busy: false, error: null });
+        if (e.busy) return;
+        e.busy = true; e.error = null;
+        redraw();
+        fetch(API + "?next_threads=" + encodeURIComponent(cursor), { headers: { accept: "application/json" } })
+          .then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }, function () { return { status: r.status, body: null }; }); })
+          .then(function (res) {
+            if (extra[scope] !== e) return;     // the list moved on while this was in flight
+            e.busy = false;
+            var b = res.body;
+            if (res.status === 200 && b && Array.isArray(b.threads) && !b.regenerated) {
+              e.threads = e.threads.concat(b.threads); e.next = b.next_threads || null;
+            } else if (res.status === 200 && b && b.regenerated) {
+              extra[scope] = null; tick(); return;   // the list changed under the cursor: start again from the page
+            } else {
+              e.error = "Couldn't load more conversations just now. Try again.";
+            }
+            redraw();
+          })
+          .catch(function () { if (extra[scope] !== e) return; e.busy = false; e.error = "Couldn't load more conversations just now. Try again."; redraw(); });
+      }
+      function moreThreadsButton(scope) {
+        var e = extra[scope];
+        var b = el("button", "c-more", e && e.busy ? "loading…" : "show more conversations");
+        b.type = "button"; b.disabled = !!(e && e.busy);
+        b.addEventListener("click", function () { loadMoreThreads(scope); });
+        return b;
+      }
+
+      function redraw() {
+        var live = sectionThreads("live", lastLive), closed = sectionThreads("closed", lastClosedPage);
+        lastClosed = closed;
+        paint(liveBox, live, LIVE_EMPTY, true, false, "live");
+        paint(closedBox, closed, CLOSED_EMPTY, false, true, "closed");
+      }
+      var LIVE_EMPTY = "The town is quiet. Nobody has spoken since the last settlement.";
+      var CLOSED_EMPTY = "No earlier settlement's conversations are kept yet.";
+
+      function paint(box, threads, emptyWords, followsNew, lazy, scope) {
         var was = snapshotScroll(box);
         box.textContent = "";
         if (!threads || !threads.length) { box.appendChild(el("p", "c-empty", emptyWords)); return; }
@@ -430,6 +613,14 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         // the record behind a control that can never fire, so there is no cap.
         var limit = lazy && moreObserver ? Math.min(shown, threads.length) : threads.length;
         for (var i = 0; i < limit; i++) box.appendChild(threadNode(threads[i]));
+        if (limit >= threads.length && scope && sectionCursor(scope)) {
+          // every thread this page holds is on screen and the office has more behind a cursor: say so, with the way to ask
+          var ex = extra[scope];
+          var moreBtn = moreThreadsButton(scope);
+          box.appendChild(moreBtn);
+          if (ex && ex.error) box.appendChild(el("p", "c-line-note is-error", ex.error));
+          if (scope === "closed" && moreObserver) moreObserver.observe(moreBtn);
+        }
         if (limit < threads.length) {
           var rest = threads.length - limit;
           var more = el("button", "c-more");
@@ -440,7 +631,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           // decided not to run the observer today.
           more.addEventListener("click", function () {
             shown += CHUNK;
-            paint(box, threads, emptyWords, followsNew, lazy);
+            paint(box, threads, emptyWords, followsNew, lazy, scope);
           });
           box.appendChild(more);
           if (moreObserver) moreObserver.observe(more);
@@ -505,33 +696,59 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       }
       window.addEventListener("hashchange", function () { anchored = false; tick(); });
 
+      var painted = false;
+      var noteBox = document.querySelector("[data-note]");
+      function setNote(words) {
+        if (!noteBox) return;
+        noteBox.textContent = words || "";
+        noteBox.hidden = !words;
+      }
+
       function tick() {
         fetch(API, { headers: { accept: "application/json" } })
-          .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (d) {
-            if (!d) {
-              paint(liveBox, null, "The office isn't answering — the live door is /api/world/conversations.");
+          .then(function (r) {
+            return r.json().then(function (b) { return { ok: r.ok, status: r.status, body: b }; }, function () { return { ok: false, status: r.status, body: null }; });
+          })
+          .then(function (res) {
+            var d = res.body;
+            if (!res.ok || !d || !Array.isArray(d.live)) {
+              // What is on screen stays: a record that cannot be read this second is not an empty town. A 503 is the office
+              // saying so (a settlement was published under the read, or the read was too big); anything else is silence.
+              setNote(res.status === 503
+                ? "The record can't be read just now — what is shown is from a moment ago. The page will try again."
+                : "The office isn't answering — the live door is /api/world/conversations.");
+              if (!painted) paint(liveBox, null, "The office isn't answering — the live door is /api/world/conversations.");
               return;
             }
+            painted = true;
+            // The in-memory read says it is the short record; say it where a reader will see it.
+            setNote(d.incomplete_legacy
+              ? "This office is answering from its short in-memory record, not the town's full one: " + d.incomplete_legacy
+              : "");
             paintPinned(d.pinned);
-            // live threads follow the newest voice; a finished one is a record,
-            // so it opens at the first thing said rather than the last
-            paint(liveBox, d.live, "The town is quiet. Nobody has spoken since the last settlement.", true);
-            lastClosed = Array.isArray(d.closed) ? d.closed : [];
+            pageNext = { live: (d.next_threads && d.next_threads.live) || null, closed: (d.next_threads && d.next_threads.closed) || null };
+            lastLive = d.live;
+            lastClosedPage = Array.isArray(d.closed) ? d.closed : [];
+            lastClosed = sectionThreads("closed", lastClosedPage);
             // A link that names a thread must reach it even when the past is
             // only part-built — otherwise lazy rendering would quietly break
             // every /conversations/#<id> the map and the replay hand out.
             reachForHash(lastClosed);
-            paint(closedBox, lastClosed, "No earlier settlement's conversations are kept yet.", false, true);
+            // live threads follow the newest voice; a finished one is a record,
+            // so it opens at the first thing said rather than the last
+            redraw();
             if (!anchored) { anchored = true; anchorFromHash(); }
             pinNext = false;
+            anchorKey = null;
             if (dials && d.earshot_m) {
               dials.textContent = "Earshot is " + d.earshot_m + " metres; words stay hearable there until the next settlement."
-                + " This page refreshes every " + (POLL_MS / 1000) + " seconds.";
+                + " This page refreshes every " + (POLL_MS / 1000) + " seconds."
+                + (d.list && d.list.history_from ? " Conversations are grouped from the settlement of " + String(d.list.history_from).slice(0, 10) + ", the oldest this office has read; nothing before it is shown." : "");
             }
           })
           .catch(function () {
-            paint(liveBox, null, "The office isn't answering — the live door is /api/world/conversations.");
+            setNote("The office isn't answering — the live door is /api/world/conversations.");
+            if (!painted) paint(liveBox, null, "The office isn't answering — the live door is /api/world/conversations.");
           });
       }
 
@@ -888,6 +1105,17 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     }
     .convo .c-chip.live::before { content: "● "; }
     .convo .c-earlier { margin: 0 0 0.4rem; font-size: 0.82rem; color: #b9ad93; font-style: italic; }
+    /* "show earlier": a button at the head of the lines it would add to, never a hidden control */
+    .convo .c-show-earlier {
+      display: block; margin: 0.4rem 0 0.5rem; padding: 0.5em 0.9em; cursor: pointer;
+      border-radius: 10px; border: 1px dashed rgba(232, 196, 139, 0.35);
+      background: rgba(13, 20, 38, 0.4); color: rgba(232, 196, 139, 0.85);
+      font: 0.74rem/1 var(--pm-mono); letter-spacing: 0.05em;
+    }
+    .convo .c-show-earlier:hover:not(:disabled) { border-color: var(--pm-gold); color: var(--pm-gold-bright); }
+    .convo .c-show-earlier:disabled { cursor: progress; opacity: 0.6; }
+    .convo .c-note, .convo .c-line-note { margin: 0.4rem 0; font-size: 0.82rem; color: #d8c9a3; font-style: italic; }
+    .convo .c-line-note.is-error { color: #e9a38f; }
     .convo .c-meta {
       display: flex; flex-wrap: wrap; gap: 0.3em 0.8em; margin: 0.4em 0 0;
       font: 0.7rem/1.4 var(--pm-mono); letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.58);
