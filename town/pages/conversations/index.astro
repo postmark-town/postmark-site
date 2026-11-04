@@ -283,26 +283,46 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 
       // ── KEEPING THE READER'S PLACE ACROSS A CHANGE OF GENERATION (POS-779) ──────────────────
       //
-      // A live thread that gains a voice changes generation, and lines pulled under the old one are never shown again.
-      // A reader who is looking at one of those lines (not at the newest page) would be thrown back to the bottom every
-      // time, so for that reader only the page RE-ANCHORS: it asks the office, under the CURRENT generation and with the
-      // ordinary earlier request, for the lines between the newest page and the line they were on. It stops as soon as it
-      // reaches that line, after REANCHOR_PAGES pages (80 lines each), or when the earlier lines run out, and it says
-      // which. Nothing from the old generation is kept: the lines are the office's current ones, so a merge, a late
-      // bridge, a moved anchor or a changed eligibility still shows exactly what the office says now. One chain per
-      // thread at a time; a change that lands while it runs restarts it from the office's answer (at most
-      // REANCHOR_TRIES times, then it gives up and says the thread is changing too fast to keep a place in).
-      var REANCHOR_PAGES = 4;
+      // A live thread that gains a voice changes generation, and lines pulled under the old one are never shown again. A reader
+      // who is looking at one of those lines (not at the newest page) would be thrown back to the bottom at every voice, so for
+      // that reader only the page asks the office an ordinary earlier request, under the CURRENT generation, for the lines
+      // around the line they were on, and puts them back on that same line (the same act id, at the same offset inside the list):
+      //   · NEAR: the line was within NEAR_LINES of the newest page AND the request can certainly reach it (the lines between it
+      //     and the newest page, plus what the thread has grown by, plus some context, fit in one page): the request is made from
+      //     the newest page's own cursor, so the result is contiguous with the newest page;
+      //   · FAR: otherwise the request is made from a cut a little AFTER the reader's line, taken from the (at_ms, act id) of a
+      //     line the reader already had. A cut is only an untrusted sort boundary: the office decides, from its fresh view, which
+      //     lines are members and in what order, so no old row is reused. The window is NOT joined to the newest page, because
+      //     the lines between are not known: the card says so, "show later statements" reads on from the window, and "back to
+      //     the newest statements" ends it.
+      // A NEAR request that does not contain the line is not evidence that the line has gone (a burst of new voices moves the
+      // newest page's cursor further than one page reaches): it is followed by ONE FAR request. An answer that still does not
+      // contain the line is a reset to the newest statements that says the place could not be found again, not that the line
+      // is no longer part of the conversation. At most two requests per change (plus, if the office says the generation moved
+      // again, the same request under the generation it names, REANCHOR_TRIES times), whatever the depth or the burst. Ids are
+      // compared as strings and put into a cut as the office sent them; there is no arithmetic on an id.
       var REANCHOR_TRIES = 3;
       var REANCHOR_JOBS = 3;       // threads re-anchoring at once, across the page
+      var NEAR_LINES = 100;        // a reader this close to the newest page (in held lines) is tried contiguously first
+      var CONTEXT_AFTER = 40;      // a far window ends about this many lines after the reader's line
+      var WINDOW_LIMIT = 80;       // the office's default page
+      var AHEAD_STEP = 40;         // the cuts kept for reading on are this many held lines apart: each later window overlaps the last by half
       var seen = {};               // thread_of -> { line, rel }: the first line the reader could see at the last paint
+      var gotoNewest = {};         // thread_of -> true: the next paint puts this card's list at its newest line
       var CHANGED_WORDS = "this conversation changed while you were reading it, so it shows its newest statements again";
+      var LOST_WORDS = "this conversation changed while you were reading it and your place could not be found again, so it shows its newest statements";
 
+      function cutOf(v) { return v && v.at_ms != null && v.act_id != null ? String(v.at_ms) + ":" + String(v.act_id) : null; }
+      function indexOfAct(lines, act) {
+        for (var i = 0; i < lines.length; i++) if (String(lines[i].act_id) === String(act)) return i;
+        return -1;
+      }
       function jobsRunning() {
         var n = 0;
         for (var k in expanded) if (expanded[k] && expanded[k].re) n += 1;
         return n;
       }
+      function baseOf(t) { return { count: Number(t.voice_count) || 0, newest: (t.voices || []).length }; }
 
       function stateFor(t) {
         if (!t || !t.thread_of) return null;
@@ -312,16 +332,18 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           var re = s.re || null;
           var at = seen[key] || null;
           var want = re ? re.want : (at && at.line) || null;
-          var held = false;
-          if (!re) for (var i = 0; i < s.lines.length; i++) if (String(s.lines[i].act_id) === String(want)) { held = true; break; }
+          var rel = re ? re.rel : (at ? at.rel : 0);
+          var old = re ? re.old : { lines: s.lines, win: s.win || null, ahead: s.ahead || [], base: s.base || null, gaps: s.gaps || [] };
+          var i = want ? indexOfAct(old.lines, want) : -1;
           delete expanded[key];
-          if ((re || held) && want && t.earlier) {
-            if ((re ? re.tries : 0) >= REANCHOR_TRIES) {
+          if (want && i >= 0 && t.epoch) {
+            var tries = re ? re.tries : 0;
+            if (tries >= REANCHOR_TRIES) {
               lineNotes[key] = "this conversation is changing too quickly to keep your place in it, so it shows its newest statements";
               return null;
             }
             if (!re && jobsRunning() >= REANCHOR_JOBS) { lineNotes[key] = CHANGED_WORDS; return null; }
-            return reanchor(t, want, re ? re.rel : (at ? at.rel : 0), re ? re.tries + 1 : 1);
+            return reanchor(t, want, rel, tries + 1, old, i);
           }
           lineNotes[key] = CHANGED_WORDS;
           return null;
@@ -329,58 +351,130 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         return s || null;
       }
 
-      function reanchor(t, want, rel, tries) {
+      function backToNewest(t) {
+        var key = t && t.thread_of;
+        if (!key) return;
+        delete expanded[key]; delete lineNotes[key];
+        gotoNewest[key] = true;
+        redraw();
+      }
+
+      function reanchor(t, want, rel, tries, old, i) {
         var key = t.thread_of;
+        var dist = old.lines.length - i;                       // held lines from the reader's line to the end of what was held
+        var growth = old.base ? Math.max(0, (Number(t.voice_count) || 0) - old.base.count) : 0;
+        var need = dist + (old.base ? old.base.newest : WINDOW_LIMIT) + growth + CONTEXT_AFTER;   // the gap to the newest page, with context
+        var nearFirst = !old.win && !!t.earlier && dist - 1 <= NEAR_LINES && need <= 200;
+        var farCut = cutOf(old.lines[i + CONTEXT_AFTER + 1]) || (old.win && old.win.cut) || null;
+        // The cuts kept for reading on: one every AHEAD_STEP lines of the lines the reader ACTUALLY HELD after the far cut (so at most
+        // held / AHEAD_STEP strings, a bound that is the reader's own pulls, not a number picked here), in the order they were taken,
+        // each once, then the old window's own unused cuts. They are consumed as they are used and rebuilt from the lines on screen at
+        // each change, so nothing accumulates from poll to poll.
+        var ahead = [], haveCut = {};
+        function addHint(c) { if (c && !haveCut[c]) { haveCut[c] = true; ahead.push(c); } }
+        for (var k = i + CONTEXT_AFTER + 1 + AHEAD_STEP; k < old.lines.length; k += AHEAD_STEP) addHint(cutOf(old.lines[k]));
+        if (old.win && old.ahead) for (var a = 0; a < old.ahead.length; a++) addHint(old.ahead[a]);
         var s = expanded[key] = { generation: t.generation, lines: [], earlier: t.earlier, busy: true, error: null, token: 1,
-          re: { want: want, rel: rel, pages: 0, tries: tries }, epoch: t.epoch };
+          re: { want: want, rel: rel, tries: tries, old: old }, epoch: t.epoch, win: null, ahead: [], base: baseOf(t), gaps: (old.gaps || []).slice() };
         delete lineNotes[key];
         var token = s.token;
         function mine() { return expanded[key] === s && s.token === token; }
-        function reached() {
-          for (var i = 0; i < s.lines.length; i++) if (String(s.lines[i].act_id) === String(want)) return true;
-          for (var j = 0; j < (t.voices || []).length; j++) if (String(t.voices[j].act_id) === String(want)) return true;
-          return false;
-        }
-        function finish(note, error) {
-          s.busy = false;
-          var done = s.re; s.re = null;
+        function stop(note, error) {
+          s.busy = false; s.re = null;
           if (error) s.error = error;
-          else if (note) lineNotes[key] = note;
-          if (!error && reached()) s.restoreTo = { line: want, rel: done.rel };
-          anchorKey = key;
-          redraw();
+          if (note) lineNotes[key] = note;
+          anchorKey = key; redraw();
         }
-        function step() {
-          if (!mine()) return;
-          if (reached()) return finish("this conversation grew while you were reading it; the earlier statements were read again to keep your place");
-          if (!s.earlier) return finish("this conversation changed while you were reading it; the line you were on is no longer part of it");
-          if (s.re.pages >= REANCHOR_PAGES) return finish("this conversation grew while you were reading it, and the line you were on is further back than this page reads again: use show earlier to go back to it");
-          s.re.pages += 1;
-          var q = "thread_of=" + encodeURIComponent(key) + "&before=" + encodeURIComponent(s.earlier) + "&generation=" + encodeURIComponent(s.generation)
-            + "&since=" + encodeURIComponent(t.epoch.since) + "&next=" + (t.epoch.next == null ? "open" : encodeURIComponent(t.epoch.next)) + "&limit=80";
+        function reset(words) { delete expanded[key]; lineNotes[key] = words; anchorKey = key; redraw(); }
+        function go(mode, gen, earlierCursor) {
+          var useCut = mode === "near" ? earlierCursor : farCut;
+          if (!useCut) return reset(CHANGED_WORDS);
+          var limit = mode === "near" ? Math.min(200, need) : WINDOW_LIMIT;
+          var q = "thread_of=" + encodeURIComponent(key) + "&before=" + encodeURIComponent(useCut) + "&generation=" + encodeURIComponent(gen)
+            + "&since=" + encodeURIComponent(t.epoch.since) + "&next=" + (t.epoch.next == null ? "open" : encodeURIComponent(t.epoch.next)) + "&limit=" + limit;
           fetch(API + "?" + q, { headers: { accept: "application/json" } })
             .then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }, function () { return { status: r.status, body: null }; }); })
             .then(function (res) {
               if (!mine()) return;
-              var b = res.body, gen = s.generation;
-              if (res.status === 200 && b && b.regenerated && b.thread && b.thread.thread_of === key && b.thread.earlier && s.re.tries < REANCHOR_TRIES) {
-                // it moved again under the chain: start over from the office's own current answer
-                s.re.tries += 1; s.re.pages = 0; s.lines = []; s.generation = b.thread.generation; s.earlier = b.thread.earlier;
-                t = { thread_of: key, epoch: t.epoch, voices: b.thread.voices || [] };
-                return step();
+              var b = res.body;
+              if (res.status === 200 && b && b.regenerated && b.thread && b.thread.thread_of === key) {
+                // it moved again: the same request under the generation the office just named, a bounded number of times
+                if (s.re.tries >= REANCHOR_TRIES) return reset("this conversation is changing too quickly to keep your place in it, so it shows its newest statements");
+                s.re.tries += 1; s.generation = b.thread.generation; s.earlier = b.thread.earlier; s.base = baseOf(b.thread);
+                return go(mode, b.thread.generation, b.thread.earlier);
               }
               if (res.status === 200 && b && Array.isArray(b.voices) && b.thread_of === key && b.generation === gen) {
-                s.lines = b.voices.concat(s.lines); s.earlier = b.earlier || null;
-                return step();
+                if (indexOfAct(b.voices, want) < 0) {
+                  // not in this one sized answer: not evidence that it has gone. A near request tries once more from the cut after the line.
+                  if (mode === "near" && farCut) return go("far", gen, null);
+                  return reset(LOST_WORDS);
+                }
+                s.lines = b.voices; s.earlier = b.earlier || null;
+                s.win = mode === "near" ? null : { cut: useCut };
+                s.ahead = mode === "near" ? [] : ahead;
+                s.restoreTo = { line: want, rel: rel };
+                return stop(null);
               }
-              if (res.status === 200 && b && b.regenerated) return finish("this conversation is changing too quickly to keep your place in it, so it shows its newest statements");
-              if (res.status === 404) { delete expanded[key]; lineNotes[key] = "that conversation is no longer there to page back through"; redraw(); return; }
-              finish(null, "Couldn't read the earlier statements again just now. Try again.");
+              if (res.status === 404) return reset("that conversation is no longer there to page back through");
+              if (res.status === 200 && b && b.regenerated) return reset("this conversation is changing too quickly to keep your place in it, so it shows its newest statements");
+              stop(null, "Couldn't read the statements around your line again just now. Try again.");
             })
-            .catch(function () { if (mine()) finish(null, "Couldn't read the earlier statements again just now. Try again."); });
+            .catch(function () { if (mine()) stop(null, "Couldn't read the statements around your line again just now. Try again."); });
         }
-        Promise.resolve().then(step);
+        Promise.resolve().then(function () { if (mine()) go(nearFirst ? "near" : "far", t.generation, t.earlier); });
         return s;
+      }
+
+      // READING ON from a far window: ONE request per click, from a cut the reader already had (a line the office returned earlier,
+      // kept as an untrusted sort boundary) or, past the last of them, from the newest page's own cursor. Each answer is checked for
+      // OVERLAP with the lines already on screen: with an overlap the new lines continue the window with nothing skipped and nothing
+      // twice; at the newest page's cursor an overlap makes the window contiguous with the newest page again. Without an overlap
+      // the page does not pretend: the answer replaces the window and the card says some statements in between are not shown.
+      function showLater(t) {
+        var s = stateFor(t);
+        if (!s || !s.win || s.busy || !t.epoch) return;
+        var key = t.thread_of, gen = s.generation, token = ++s.token;
+        var fromAhead = s.ahead && s.ahead.length > 0;
+        var cut = fromAhead ? s.ahead[0] : t.earlier;
+        if (!cut) return;
+        var limit = fromAhead ? WINDOW_LIMIT : 200;
+        s.busy = true; s.error = null; delete lineNotes[key];
+        anchorKey = key; redraw();
+        var q = "thread_of=" + encodeURIComponent(key) + "&before=" + encodeURIComponent(cut) + "&generation=" + encodeURIComponent(gen)
+          + "&since=" + encodeURIComponent(t.epoch.since) + "&next=" + (t.epoch.next == null ? "open" : encodeURIComponent(t.epoch.next)) + "&limit=" + limit;
+        function mine() { return expanded[key] === s && s.token === token && s.generation === gen; }
+        fetch(API + "?" + q, { headers: { accept: "application/json" } })
+          .then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }, function () { return { status: r.status, body: null }; }); })
+          .then(function (res) {
+            if (!mine()) return;
+            s.busy = false;
+            var b = res.body;
+            if (res.status === 200 && b && b.regenerated) { delete expanded[key]; lineNotes[key] = CHANGED_WORDS; tick(); return; }
+            if (res.status === 404) { delete expanded[key]; lineNotes[key] = "that conversation is no longer there to page back through"; tick(); return; }
+            if (!(res.status === 200 && b && Array.isArray(b.voices) && b.thread_of === key && b.generation === gen)) {
+              s.error = "Couldn't read on just now. Try again."; anchorKey = key; redraw(); return;
+            }
+            var lastKnown = -1, at = -1;
+            for (var i = b.voices.length - 1; i >= 0 && lastKnown < 0; i--) { var j = indexOfAct(s.lines, b.voices[i].act_id); if (j >= 0) { lastKnown = j; at = i; } }
+            if (at >= 0) {
+              // overlap: the answer's lines after the last one already on screen continue the window
+              var more = b.voices.slice(at + 1);
+              s.lines = s.lines.concat(more);
+              if (fromAhead) { s.ahead.shift(); s.win = { cut: cut }; }
+              else { s.win = null; s.ahead = []; }          // reached the newest page's cursor with an overlap: contiguous with the newest page again
+            } else {
+              // No overlap: a different part of the conversation, not a continuation. The answer replaces what was on screen and the
+              // statements between are NOT shown: that is recorded as a gap (the act id of the last line that was on screen) and stays
+              // until it is actually closed (reading backward from these lines reaches that act) or the reader goes back to the newest.
+              // An answer from the newest page's own cursor ends right before the newest page, so it is contiguous with it: no window.
+              s.gaps = (s.gaps || []).concat([String(s.lines[s.lines.length - 1].act_id)]);
+              s.lines = b.voices; s.earlier = b.earlier || null;
+              if (fromAhead) { s.ahead.shift(); s.win = { cut: cut }; } else { s.win = null; s.ahead = []; }
+            }
+            anchorKey = null;
+            redraw();
+          })
+          .catch(function () { if (mine()) { s.busy = false; s.error = "Couldn't read on just now. Try again."; redraw(); } });
       }
 
       // earlier lines first, then the newest page; a line is never listed twice (an act id is the line's identity)
@@ -391,6 +485,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           out.push(v);
         }
         if (s) s.lines.forEach(add);
+        if (s && s.win) return out;      // a far window is NOT joined to the newest page: the lines between are not known
         (t.voices || []).forEach(add);
         return out;
       }
@@ -399,7 +494,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var s = stateFor(t);
         var cursor = s ? s.earlier : t.earlier;
         if (!t.thread_of || !cursor || !t.epoch) return;
-        if (!s) s = expanded[t.thread_of] = { generation: t.generation, lines: [], earlier: t.earlier, busy: false, error: null, token: 0 };
+        if (!s) s = expanded[t.thread_of] = { generation: t.generation, lines: [], earlier: t.earlier, busy: false, error: null, token: 0, base: baseOf(t) };
         if (s.busy) return;
         var key = t.thread_of, gen = s.generation, token = ++s.token;
         s.busy = true; s.error = null; delete lineNotes[key];
@@ -423,6 +518,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             if (res.status === 200 && b && Array.isArray(b.voices) && b.thread_of === key && b.generation === gen) {
               s.lines = b.voices.concat(s.lines);   // strictly before the oldest line held, oldest first
               s.earlier = b.earlier || null;
+              // reading backward from the lines after a gap reached the last line that was on screen before it: nothing is missing now
+              if (s.gaps && s.gaps.length && indexOfAct(b.voices, s.gaps[s.gaps.length - 1]) >= 0) s.gaps.pop();
             } else if (res.status === 404) {
               delete expanded[key];
               lineNotes[key] = "that conversation is no longer there to page back through";
@@ -509,7 +606,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var cursor = held ? held.earlier : t.earlier;
         card.setAttribute("data-key", t.thread_of || "");
         if (t.thread_of && cursor) {
-          var left = t.voice_count - lines.length;
+          // a far window has no count of what lies before it that the page can trust: it says "earlier" and the office decides when it ends
+          var left = held && held.win ? 0 : t.voice_count - lines.length;
           var btn = el("button", "c-show-earlier", held && held.busy ? "loading…" : "show earlier statements" + (left > 0 ? " (" + left + " more)" : ""));
           btn.type = "button";
           btn.disabled = !!(held && held.busy);
@@ -519,7 +617,29 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           // the in-memory read has no way back: it says what it is showing and does not pretend there is a control
           card.appendChild(el("p", "c-earlier", "showing the latest " + sent + " of " + t.voice_count + " statements held in memory"));
         }
-        var lineNote = (held && held.error) || (held && held.re && "this conversation changed; reading the earlier statements you had open again…") || (t.thread_of && lineNotes[t.thread_of]) || null;
+        if (held && (held.win || (held.gaps && held.gaps.length))) {
+          // what is NOT shown, said once and matching the actual state: an earlier part of the conversation (a window), and/or a gap
+          // the reader has not read. The ways on are the existing ones: later (only while there is a way), earlier, and the newest.
+          var hasGap = !!(held.gaps && held.gaps.length);
+          var words = held.win
+            ? (hasGap ? "You are reading an earlier part of this conversation; the statements after it are not shown here, and some statements before these are not shown either. "
+              : "You are reading an earlier part of this conversation; the statements after it are not shown here. ")
+            : "Some statements between the part you were reading and these are not shown here; show earlier statements reads them, backward. ";
+          var win = el("p", "c-window", words);
+          if (held.win) {
+            var later = el("button", "c-later", held.busy ? "loading…" : "show later statements");
+            later.type = "button"; later.disabled = !!held.busy;
+            later.addEventListener("click", function () { showLater(t); });
+            win.appendChild(later);
+            win.appendChild(document.createTextNode(" "));
+          }
+          var back = el("button", "c-back-newest", "back to the newest statements");
+          back.type = "button";
+          back.addEventListener("click", function () { backToNewest(t); });
+          win.appendChild(back);
+          card.appendChild(win);
+        }
+        var lineNote = (held && held.error) || (held && held.re && "this conversation changed; reading the statements around your line again…") || (t.thread_of && lineNotes[t.thread_of]) || null;
         if (lineNote) card.appendChild(el("p", "c-line-note" + (held && held.error ? " is-error" : ""), lineNote));
 
         var who = el("p", "c-people");
@@ -594,6 +714,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         box.querySelectorAll("[data-thread]").forEach(function (card) {
           var list = card.querySelector(".c-voices");
           if (!list) return;
+          var wantKey = card.getAttribute("data-key");
+          if (wantKey && gotoNewest[wantKey]) { delete gotoNewest[wantKey]; list.scrollTop = list.scrollHeight; return; }
           var prior = was[card.getAttribute("data-thread")];
           if (!prior) { if (followsNew) list.scrollTop = list.scrollHeight; return; }
           // a re-anchor just read the lines back: put the reader on the line they were on before the thread changed
@@ -1215,6 +1337,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     .convo .c-show-earlier:disabled { cursor: progress; opacity: 0.6; }
     .convo .c-note, .convo .c-line-note { margin: 0.4rem 0; font-size: 0.82rem; color: #d8c9a3; font-style: italic; }
     .convo .c-line-note.is-error { color: #e9a38f; }
+    .convo .c-window { margin: 0.4rem 0 0.2rem; font-size: 0.82rem; color: #d8c9a3; font-style: italic; }
+    .convo .c-later { font: inherit; font-style: normal; background: none; border: 1px dashed currentColor; border-radius: 4px; color: #e8c48b; padding: 0.1rem 0.5rem; cursor: pointer; }
+    .convo .c-back-newest { font: inherit; font-style: normal; background: none; border: 1px dashed currentColor; border-radius: 4px; color: #e8c48b; padding: 0.1rem 0.5rem; cursor: pointer; }
     .convo .c-meta {
       display: flex; flex-wrap: wrap; gap: 0.3em 0.8em; margin: 0.4em 0 0;
       font: 0.7rem/1.4 var(--pm-mono); letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.58);

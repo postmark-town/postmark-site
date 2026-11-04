@@ -14,6 +14,7 @@ import {
 import { hungLine } from "./hung-line.mjs";
 import { editLinkShown } from "../profile-edit.mjs";
 import { readNoteOf } from "../conversations-read.mjs";
+import { speechUnknown, saidChipCount, emptyFeedWords, noActWords } from "./speech-status.mjs";
 
 const TOWN_REPO = "https://github.com/postmark-town/postmark/blob/main/";
 const FEED_MAX = 14;       // fresh lines shown before "N more"
@@ -91,8 +92,8 @@ export function paintHouse(root, reads, ctx) {
   root.dataset.hdView = owner ? "owner" : "public";
 
   paintClocks(root, clocksOf(handles, reads.doorsteps), now);
-  paintFeed(root, items, ctx);
-  paintReadNote(root, reads);
+  const drewWords = paintFeed(root, items, ctx, reads);
+  paintReadNote(root, reads, drewWords);
   const needs = needsOf(handles, reads.doorsteps);
   if (owner) paintNeeds(root, needs, ctx);
   paintNextBoat(root, owner ? needs.pending : [], ctx);
@@ -126,15 +127,18 @@ function paintClocks(root, clocks, now) {
 }
 
 /** What the house said is read from the town's conversations; when that read was cut or failed, the page says so beside the feed. */
-function paintReadNote(root, reads) {
+function paintReadNote(root, reads, alreadySaid = false) {
   const box = root.querySelector("[data-hd-readnote]");
   if (!box) return;
-  const words = readNoteOf(reads.conversationsStatus, "what the house said");
+  // the feed's own empty sentence already says it, in the same words: one primary message, not a second one beneath it
+  const words = alreadySaid ? null : readNoteOf(reads.conversationsStatus, "what the house said");
   box.textContent = words ?? "";
   box.hidden = !words;
 }
 
-function paintFeed(root, items, ctx) {
+function paintFeed(root, items, ctx, reads) {
+  const unknown = speechUnknown(reads);
+  let drewWords = false;
   const list = root.querySelector("[data-hd-feed]");
   if (!list) return;
   const filterKind = ctx.filter?.kind ?? "all";
@@ -154,7 +158,7 @@ function paintFeed(root, items, ctx) {
   for (const chip of root.querySelectorAll("[data-hd-filter]")) {
     const k = chip.dataset.hdFilter;
     const c = chip.querySelector("[data-hd-count]");
-    if (c) c.textContent = k === "all" ? "" : " · " + (n[k] ?? 0);
+    if (c) c.textContent = k === "all" ? "" : k === "said" ? saidChipCount(n.said, unknown) : " · " + (n[k] ?? 0);
     chip.classList.toggle("is-on", k === filterKind);
     chip.setAttribute("aria-pressed", k === filterKind ? "true" : "false");
   }
@@ -164,6 +168,7 @@ function paintFeed(root, items, ctx) {
     meta.textContent = looked == null
       ? `a first look from this browser · ${fresh.length} in the last day`
       : `you looked ${whenOf(looked, ctx.now)} · ${fresh.length} new`;
+    if (unknown) meta.textContent += " · what was said can't be read just now";
   }
 
   list.textContent = "";
@@ -172,9 +177,11 @@ function paintFeed(root, items, ctx) {
   const cap = ctx.expanded ? shown.length : ctx.phone ? 5 : FEED_MAX;
   shown.slice(0, cap).forEach((i) => list.appendChild(feedLine(i, ctx)));
   if (!shown.length) {
-    list.appendChild(el("li", "hd-empty", ctx.owner
+    const unreadable = filterKind === "all" || filterKind === "said" ? emptyFeedWords(reads) : null;   // a letters-only filter says nothing about speech
+    drewWords = !!unreadable;
+    list.appendChild(el("li", "hd-empty", unreadable ?? (ctx.owner
       ? (looked == null ? "Nothing on the house’s record in the last day." : "Nothing new since you last looked.")
-      : "Nothing on the house’s record lately."));
+      : "Nothing on the house’s record lately.")));
   }
   const oldies = ctx.owner ? before.filter(pass).slice(0, BEFORE_MAX) : [];
   if (oldies.length) {
@@ -189,6 +196,7 @@ function paintFeed(root, items, ctx) {
     more.hidden = rest <= 0;
     more.textContent = rest > 0 ? `${rest} more ▾` : "";
   }
+  return drewWords;
 }
 
 function paintNeeds(root, needs, ctx) {
@@ -281,7 +289,7 @@ function paintCards(root, items, reads, ctx) {
     if (act) {
       const what = act.kind === "said" ? "said" + (act.place ? ", in " + act.place : "") : "a letter to " + (act.other ?? "someone");
       set("[data-hd-last]", whenOf(act.at, ctx.now) + " — " + what);
-    } else set("[data-hd-last]", "nothing on the record lately");
+    } else set("[data-hd-last]", noActWords(reads));
     row("stands", stands ? (stands.moving ? "walking toward " : "") + stands.place : null);
     row("doing", act?.text ? "“" + clip(act.text, 120) + "”" : null);
     if (live) live.hidden = false;

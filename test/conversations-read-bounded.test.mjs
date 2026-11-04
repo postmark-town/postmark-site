@@ -122,7 +122,7 @@ test("the household dashboard reads through it and paints its status beside the 
   assert.match(reads, /readConversations\(fetch, api, \{ windowMs: 86_400_000 \}\)/);
   assert.match(reads, /conversations: said\.body, conversationsStatus: said\.status/);
   const paint = src("../src/lib/household-dashboard/paint.mjs");
-  assert.match(paint, /paintReadNote\(root, reads\);/);
+  assert.match(paint, /paintReadNote\(root, reads, drewWords\);/);
   assert.match(paint, /readNoteOf\(reads\.conversationsStatus, "what the house said"\)/);
   assert.match(src("../src/components/household-dashboard/HouseDashboard.astro"), /data-hd-readnote role="status" hidden/);
 });
