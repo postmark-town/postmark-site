@@ -15,7 +15,15 @@
 //     offset is ever worked out here.
 //   · PHASE IS THE OFFICE'S. The page shows the word the office sent and never
 //     works a phase out from the times. The "starts in / ends in" lines are the
-//     office's own seconds from its `as_of`, and the page says that instant.
+//     office's own seconds from its `as_of`, and the page says that instant
+//     beside each line (CalendarCard's "as of"), because the page is built and
+//     the count does not tick. A live countdown was the larger change and the
+//     riskier: it could pass the start while the badge, which is the office's
+//     word, still says the event is coming.
+//   · THE ZONE IS SAID ONCE per page (ZONE_FLOOR, then zoneLine() once the
+//     island has localised): the markup is UTC, the island makes it the
+//     reader's own, and the one sentence is true for a reader with the island
+//     and for one without.
 
 export const GROUPS = Object.freeze([
   { key: "now", label: "Now", empty: "Nothing is open right now." },
@@ -23,8 +31,14 @@ export const GROUPS = Object.freeze([
   { key: "ended", label: "Lately", empty: "Nothing has ended in the last seven days." },
 ]);
 
+// The phase "announced" is the office's word for an event that is on the list
+// and whose doors have not opened (the phase before "doors-open"); it is not
+// about the host's announcements (an event's `announcements`, POS-281), which
+// are a separate list on the event's page. The badge says "coming up" so that
+// it cannot be read against a page that says "No announcements yet". The key
+// stays the office's: the gate (rsvp.mjs OPEN_PHASES) and the dashboard read it.
 export const PHASE_WORDS = Object.freeze({
-  announced: "announced",
+  announced: "coming up",
   "doors-open": "doors open",
   underway: "under way",
   ended: "ended",
@@ -58,19 +72,50 @@ export function eventHref(id) {
   return p ? `/calendar/${p.host}/${p.slug}/` : null;
 }
 
+// A coordinate is a number or a numeric string. Number(null) and Number("") are
+// 0, which is how an event with no recorded point used to print "(0, 0)" and
+// link to the middle of the World; here they are no coordinate at all.
+function coord(v) {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+// The office keeps a place's name as a slug ("the-snug-harbour") for some
+// events: lower-case words joined by hyphens. That is made readable; a name
+// with a space, a capital or no hyphen is a person's wording and is left alone.
+function readableName(name) {
+  const s = typeof name === "string" ? name.trim() : "";
+  if (!s) return null;
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)+$/.test(s)) return s;
+  return s.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
 /**
- * Where the event is, as a link into the World. A mark's name is linked at the
- * mark's centre and a bare point reads "(x, y)"; both land through the World's
- * own `/world/?at=x,y` arrival (town/pages/world.astro, ARRIVING AT A PLACE).
+ * Where the event is, as a link into the World. `name` is the place's readable
+ * name (its own name, else the leaf of its mark's id), `point` its coordinates
+ * as "(x, y)", and `label` what the link says: the name, else the point, else
+ * null, and a null label means the page prints no place at all (never a
+ * stand-in). A point of exactly (0, 0) on a place with no mark is the missing
+ * point read as a number, not somewhere anyone chose, so it is no point; a
+ * mark's own centre is trusted. The link lands through the World's own
+ * `/world/?at=x,y` arrival (town/pages/world.astro, ARRIVING AT A PLACE).
  */
 export function placeOf(place) {
-  const x = Number(place?.x);
-  const y = Number(place?.y);
-  const at = Number.isFinite(x) && Number.isFinite(y);
+  const mark = typeof place?.mark === "string" && place.mark.trim() ? place.mark.trim() : null;
+  let x = coord(place?.x);
+  let y = coord(place?.y);
+  if (x === null || y === null || (!mark && x === 0 && y === 0)) { x = null; y = null; }
+  const at = x !== null;
   const point = at ? `(${x}, ${y})` : null;
+  const name = readableName(place?.name) ?? (mark ? readableName(mark.split("/").pop()) : null);
   return {
-    label: place?.name ?? point ?? "somewhere not recorded",
-    bare: !place?.name,
+    label: name ?? point,
+    name,
+    bare: !name,
     href: at ? `/world/?at=${x},${y}` : null,
     point,
   };
@@ -103,10 +148,19 @@ export function whenLine(event) {
   }
   // Doors open is still before the start, so the number a reader wants is how
   // long until it begins; only once it is under way is it how long is left.
+  // durationWords reads the size of a gap, not its direction, so a start that has
+  // already passed (a negative count: the office read it after the start while the
+  // phase word was still announced/doors-open) must not reach it, or it would print
+  // "starts in" for a start that is behind us. No line is the honest one here: the
+  // office's phase badge still says what it said, and the page claims nothing more.
   if (event?.phase === "announced" || event?.phase === "doors-open") {
+    if (Number(event.starts_in_s) < 0) return "";
     const until = durationWords(event.starts_in_s);
     return until ? `starts in ${until}` : "";
   }
+  // The same direction problem at the other end: an under-way event whose end has
+  // already passed (negative ends_in_s) must not read "ends in <gap>". No line.
+  if (Number(event?.ends_in_s) < 0) return "";
   const left = durationWords(event?.ends_in_s);
   return left ? `ends in ${left}` : "";
 }
@@ -123,6 +177,14 @@ export function utcText(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return String(iso ?? "");
   return `${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}, ${two(d.getUTCHours())}:${two(d.getUTCMinutes())} UTC`;
+}
+
+/** The one zone sentence as the markup bakes it: true with the island and without it. */
+export const ZONE_FLOOR = "Times are in UTC. With JavaScript on, they change to your own time zone.";
+
+/** The same sentence once the island has put the times into the reader's zone. */
+export function zoneLine(zone) {
+  return zone ? `Times are in your time zone (${zone}).` : "Times are in your own time zone.";
 }
 
 /** The options the island hands the reader's browser, in one place so the floor and the island stay one family. */

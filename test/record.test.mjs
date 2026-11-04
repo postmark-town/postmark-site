@@ -1,5 +1,5 @@
 // record.test.mjs — The Record: the crossings from the world's own tags, the
-// five repos, and the seat's landing.
+// five repos, and the built pages.
 //
 //   node --test test/record.test.mjs
 //
@@ -13,7 +13,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  REPOS, RECORD_CARDS, heldFrom, receiptText, isoWeek, releaseLine, crossingRows, newerThan,
+  REPOS, heldFrom, receiptText, isoWeek, releaseLine, crossingRows,
 } from "../src/lib/record.mjs";
 import { fetchCrossings } from "../tools/lib/fetch-town-data.mjs";
 
@@ -92,14 +92,6 @@ test("on the committed snapshot: every settlement once, S81 among them with its 
   assert.equal(s81.held, 0, "S81's receipt says 'Nothing held.'");
 });
 
-test("newerThan: the door's settlements past the build, newest first", () => {
-  const door = { recent: [{ n: 83, sha: "abcdef1234", date: "2026-09-26T06:00:00Z" }, { n: 81, date: "x" }, { n: 82, sha: null, date: "2026-09-25T18:00:00Z" }] };
-  assert.deepEqual(newerThan(81, door).map((r) => r.n), [83, 82]);
-  assert.equal(newerThan(81, door)[0].sha, "abcdef123");
-  assert.deepEqual(newerThan(90, door), []);
-  assert.deepEqual(newerThan(81, null), []);
-});
-
 // ── THE INGEST ──────────────────────────────────────────────────────────────
 
 test("fetchCrossings: tags → rows; the published count is reused for an unchanged tag and fetched for a new one", async () => {
@@ -134,13 +126,11 @@ test("fetchCrossings: tags → rows; the published count is reused for an unchan
   await assert.rejects(fetchCrossings({ fetchImpl, git: () => "" }), /no settlement tags/);
 });
 
-// ── THE REPOS AND THE CARDS ─────────────────────────────────────────────────
+// ── THE REPOS ───────────────────────────────────────────────────────────────
 
-test("five repos, all under postmark-town; every Record card that names a repo names one of them", () => {
+test("five repos, all under postmark-town", () => {
   assert.deepEqual(REPOS.map((r) => r.key), ["postmark", "postmark-office", "postmark-site", "postmark-world", "postmark-blueprints"]);
   for (const r of REPOS) assert.equal(r.href, `https://github.com/postmark-town/${r.key}`);
-  assert.deepEqual(RECORD_CARDS.map((c) => c.key), ["mail", "crossings", "works", "stamps", "numbers", "repos"]);
-  for (const c of RECORD_CARDS) if (c.repo) assert.ok(REPOS.some((r) => r.key === c.repo), `${c.key} names an unknown repo`);
 });
 
 // ── THE BUILT PAGES (skipped until built, as POS-177 rules) ──────────────────

@@ -47,7 +47,7 @@ import { iconSvg } from "@/lib/pixel-icons.mjs";
 import {
   MEEPS, meepLinks, profileOf, displayName, favouriteColour, accentVars, bench,
 } from "@/lib/meeps-quarter.mjs";
-import { PANELS, NEW_ISSUE_URL, VIDEO_URL, VIDEO_THUMB, VIDEO_TITLE } from "@/lib/bug-strip.mjs";
+import { PANELS, NO_ACCOUNT, NEW_ISSUE_URL, VIDEO_URL, VIDEO_THUMB, VIDEO_TITLE } from "@/lib/bug-strip.mjs";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
 // a strip text is a list of segments; a { stamps } segment renders as <amount>✦ in the stamp family
 const segs = (x) => (typeof x === "string" ? [x] : x);
@@ -246,6 +246,7 @@ const switchCss = [
                 <span class="bs-player-words">{VIDEO_TITLE} · 1 min</span>
               </a>
               <h3 id="bs-h" class="cq-h">How a bug gets caught</h3>
+              <p class="bs-lede" data-no-account><a href={NEW_ISSUE_URL} target="_blank" rel="noopener">{NO_ACCOUNT.link}</a>{NO_ACCOUNT.rest}</p>
               <ol class="bs-panels">
                 {PANELS.map((p) => (
                   <li class="bs-panel" data-strip-panel={p.n}>
@@ -647,6 +648,8 @@ const switchCss = [
 
     /* ── THE BUG STRIP: paper panels in ink, a speech bubble under each ───── */
     .bug-strip { margin: 1.4rem 0 0; }
+    .bs-lede { margin: -0.2rem auto 1rem; max-width: 40rem; text-align: center; font-size: 0.9rem; line-height: 1.5; color: rgba(205, 194, 171, 0.9); }
+    .bs-lede a { color: var(--pm-gold); }
     .bs-panels {
       list-style: none; margin: 0; padding: 0;
       display: grid; grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr)); gap: 0.9rem;

@@ -12,6 +12,8 @@
 //   accent      PROFILE.md `color:`              residents.json profile.color
 //   colorName   PROFILE.md `color_name:`         residents.json profile.color_name
 //   bioLine     PROFILE.md `bio:`, first line    residents.json profile.bio
+//   pronouns    PROFILE.md `pronouns:`           residents.json profile.pronouns (POS-807;
+//               written or null, never guessed)
 //   avatar      PROFILE.md `avatar_url:` at the town's media door, else
 //               `avatar:` (a claimed file in media.json) — profile-picture.mjs,
 //               the one order (WLD-83) — else the basename in the public town
@@ -33,18 +35,16 @@
 import { homeFaceOf, homeGalleryOf, homeNameOf } from "../home-face.mjs";
 import { residentAvatar } from "../world-cockpit.mjs";
 import { profilePicture } from "../profile-picture.mjs";
+import { pronounsOf } from "../pronouns.mjs";
 import { SPRITES, paint, SPRITE_W, SPRITE_H } from "../civic-art.mjs";
-import { MEEPS } from "../meeps-quarter.mjs";
+import { MEEPS, favouriteColour } from "../meeps-quarter.mjs";
 
 const PANES = "https://panes.postmark.town";
 
 // A colour lands in a style attribute, and a resident wrote it. Only a plain
 // hex colour is a colour here; anything else is a resident who set nothing.
-const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
-export function accentOf(profile) {
-  const c = typeof profile?.color === "string" ? profile.color.trim() : "";
-  return HEX.test(c) ? c.toLowerCase() : null;
-}
+// meeps-quarter's favouriteColour holds the one rule.
+export const accentOf = (profile) => favouriteColour({ profile });
 
 const plain = (s) => String(s ?? "")
   .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
@@ -102,6 +102,7 @@ export function residentFace(r, media = {}, homePicture = null) {
     accent: accentOf(profile),
     colorName: typeof profile.color_name === "string" && profile.color_name.trim() ? plain(profile.color_name).slice(0, 56) : null,
     bioLine: bioLineOf(profile.bio),
+    pronouns: pronounsOf(profile),
     avatar,
     monogram: Array.from(name.replace(/^the\s+/i, ""))[0]?.toLocaleUpperCase() ?? "?",
     homeName: hasBody ? homeNameOf(r) : null,

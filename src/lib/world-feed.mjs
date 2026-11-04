@@ -35,8 +35,10 @@
 // "the unlit cake strikes rei — 7. rei is down; the good lighter clatters to
 // the floor." This is the road, wherever it exists.
 //
-// ② THE DELTA, where it does not. `publicState` — the encounter block the read
-// half has answered until now — says out loud that it withholds beats:
+// ② THE DELTA, where it does not. The office's public encounter block (its
+// `publicState`, in the arena the office has since closed — office dd402ca1,
+// 2026-09-30) — the block the read half answered until the tail existed — said
+// out loud that it withholds beats:
 // "`beats`, `ignored` and `rolls` are the fold's full working and they are NOT
 // carried here: an answer that hands back every roll ever thrown in the room is
 // an answer nobody reads." Against such a door another player's turn reaches
@@ -256,7 +258,9 @@ export function beatsFromAct(body, opts = {}) {
  * damage, downed, dropped, round). It is being added on the office's bday-law
  * branch; SITE-DEFINED CONTRACT UNTIL IT LANDS, and named as one, because at the
  * time of writing the field does not exist on that branch yet (checked
- * 2026-08-29 against origin/bday-law 883e77d — `publicState` carries no tail).
+ * 2026-08-29 against origin/bday-law 883e77d — the office's public encounter
+ * block carried no tail then; the office has since closed its arena, office
+ * dd402ca1, 2026-09-30).
  *
  * ⚑ THIS IS THE DELETION `beatsFromDelta` WAS WRITTEN EXPECTING. Its own header
  * says so: "The day the read carries beats, `beatsFromDelta` is what gets

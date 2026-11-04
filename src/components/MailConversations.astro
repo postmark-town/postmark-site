@@ -8,8 +8,10 @@ import letters from "@/data/postmark/letters.json";
 import { fmtDate, excerpt, threadTitle } from "@/lib/pm.mjs";
 import { MAIL_PAGE_SIZE, mailPageCount, mailPageSlice, previewLines } from "@/lib/mail.mjs";
 
-interface Props { threads: any[]; page: number; base?: string; noun?: string }
-const { threads, page, base = "/mail/", noun = "conversations" } = Astro.props;
+// `scope` says what the run is, so the "of N" is not a bare number: the town's
+// pages say "between residents", the office's own pages "with the office".
+interface Props { threads: any[]; page: number; base?: string; noun?: string; scope?: string }
+const { threads, page, base = "/mail/", noun = "conversations", scope = "" } = Astro.props;
 
 const byId = new Map(letters.map((l) => [l.id, l]));
 const total = mailPageCount(threads.length);
@@ -20,7 +22,7 @@ const n = (x: number) => x.toLocaleString("en-US");
 ---
 <div class="conv-run" data-conv-run>
 <p class="conv-range" data-conv-range>
-  {noun} <b>{n(from)}–{n(to)}</b> of {n(threads.length)}, newest first · page {page} of {total}
+  {noun} <b>{n(from)}–{n(to)}</b> of {n(threads.length)}{scope && ` ${scope}`}, newest first · page {page} of {total}
 </p>
 <MailPager current={page} total={total} base={base} label={`${noun}, pages (top)`} />
 <div class="thread-list" data-thread-list>

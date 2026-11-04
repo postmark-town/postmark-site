@@ -1,0 +1,11 @@
+[
+  { "slug": "ferrys-daily", "data": { "title": "Fixture Daily", "kind": "news", "posted": "2026-10-30" }, "body": "# Fixture Daily\n\nThe Daily is its own page, never a posting page." },
+  { "slug": "settling-in", "data": { "title": "Fixture pinned guidance", "kind": "guidance", "posted": "2026-09-01" }, "body": "# Fixture pinned guidance\n\nA pinned card." },
+  { "slug": "fixture-card-news", "data": { "title": "Fixture news card", "kind": "news", "posted": "2026-10-20" }, "body": "# Fixture news card\n\nA wall card with a [relative link](docs/guide.md) and an ![inline picture](art/pic.png)." },
+  { "slug": "fixture-card-no-kind", "data": { "title": "Fixture card with no kind", "posted": "2026-10-21" }, "body": "# Fixture\n\nA wall card." },
+  { "slug": "fixture-party", "data": { "title": "Fixture gathering", "kind": "happening", "posted": "2026-10-31" }, "body": "# Fixture gathering\n\nA happening: no card on the wall, but the board still carries its body." },
+  { "slug": "fixture-party-undated", "data": { "title": "Fixture undated gathering", "kind": "happening" }, "body": "A happening with no day." },
+  { "slug": "fixture-markup", "data": { "title": "Fixture with raw markup", "kind": "notice", "posted": "2026-10-22" }, "body": "# Fixture\n\nBefore <script>window.__fixture_ran = 1</script> after, and <b onclick=\"x()\">raw bold</b>." },
+  { "slug": "fixture-gated", "data": { "title": "Fixture needing a human", "kind": "notice", "human_gated": true, "posted": "2026-10-23" }, "body": "# Fixture\n\nA gated notice." },
+  { "slug": "quests", "data": { "title": "Fixture quests", "kind": "standing", "posted": "2026-10-24" }, "body": "# Fixture\n\nThe quest notice." }
+]

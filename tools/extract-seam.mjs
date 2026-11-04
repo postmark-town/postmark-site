@@ -44,8 +44,6 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SITE_ROOT = resolve(HERE, "..");
 const DATA_DIR = join(SITE_ROOT, "src", "data", "postmark");
 
-export const SEAM_FILES = ["pots.json", "deeds.json", "economy.json", "fund-thank-you.json"];
-
 // ── epochs ───────────────────────────────────────────────────────────────────
 // An epoch is a month (funding.mjs's EPOCH_RE: /^\d{4}-\d{2}$/), and the pot
 // files declare `"epoch_cadence": "monthly"`.

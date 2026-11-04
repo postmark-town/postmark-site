@@ -19,7 +19,7 @@
 // scoped rules never reach a component's elements. The civic scale variables
 // (--civic-body, --civic-label) are inherited where the page defines them
 // (/town/) and fall back to the same numbers where it does not (/stamps/).
-import { potGist, giverLabel, loadThankYou, thanksFor } from "@/lib/funding.mjs";
+import { potGist, giverLabel, loadThankYou, thanksFor, usd, pct } from "@/lib/funding.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
 import PotSprite from "@/components/PotSprite.astro";
@@ -35,8 +35,6 @@ const PATRONS_SHOWN = 3;
 // THE THANK-YOU (Darko, 2026-10-17 13:41): one pot's, Kickstarter-style, said
 // on that pot's card only.
 const thanks = loadThankYou();
-const usd = (n) => "$" + Number(n).toLocaleString("en-US");
-const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
 ---
 <div class="pot-cards">
   {potBoard.pots.length === 0 ? (

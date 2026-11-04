@@ -7,8 +7,8 @@
 // picture is cropped and the roofs move (halloween-sprinkle.mjs § PERCHES).
 //
 // Before the Mists this renders nothing, and the page is the page it was.
-import { siteMists } from "@/lib/mists-season.mjs";
+import { halloweenMists, hwGuard } from "@/lib/mists-season.mjs";
 import { homeCrowsHTML } from "@/lib/halloween-sprinkle.mjs";
-const HTML = homeCrowsHTML(siteMists());
+const HTML = hwGuard(homeCrowsHTML(halloweenMists()));
 ---
 {HTML && <Fragment set:html={HTML} />}

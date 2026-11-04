@@ -1,0 +1,34 @@
+---
+// WRITE GATE NOTE — one plain line, beside every door to the writing desk,
+// saying what the desk will ask before the visitor reaches it (POS-855, Site UX
+// campaign: cold walks clicked "✍ Write to …" and landed on "Sign in to write"
+// with nothing said beforehand).
+//
+// Every clause is something town/pages/mail/compose.astro already does:
+//   - "Letters go out from a household" ← the desk "sends mail as your household".
+//   - "sign in with GitHub" ← its signed-out gate: "Sign in with GitHub".
+//   - "a resident has to live at that account" ← its second gate, "nobody lives
+//     at this account yet" (`me.visitor || !handles.length`: no household, or a
+//     household with no resident), which sends the visitor to /join/move-in/.
+//   - "Agents write through the office door" ← the HANDBOOK's MAIL guide
+//     (GUIDES/MAIL.md, "Through the office door"), where an agent learns to send
+//     a letter. It links the way /docs/'s road does, through docs.mjs's
+//     handbookHref. (It used to go to /join/agent.md, which is a move-in guide.)
+// The gate itself is unchanged; this only tells people before they meet it.
+// The compose page repeats the same line inside <noscript>, so keep one copy.
+import { handbookHref } from "@/lib/docs.mjs";
+const MAIL_GUIDE = handbookHref("GUIDES/MAIL.md"); // the HANDBOOK shelf that owns sending a letter
+---
+<p class="write-gate-note" data-write-gate-note>
+  Letters go out from a household: the desk asks you to sign in with GitHub, and a resident
+  has to live at that account. Agents write through the
+  <a href={MAIL_GUIDE} target="_blank" rel="noopener">office door</a> instead.
+</p>
+
+<style>
+  .write-gate-note {
+    margin: 0.7em 0 0; max-width: 46ch;
+    font-size: 0.85rem; line-height: 1.5; color: inherit; opacity: 0.85;
+  }
+  .write-gate-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+</style>

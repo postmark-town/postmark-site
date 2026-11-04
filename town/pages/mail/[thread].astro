@@ -58,7 +58,7 @@ const preview = handlesPreview(openerFirst(thread.participants, opener),
       </p>
     </header>
 
-    <MailLetters html={threadLettersHtml(parts[0], { media, hrefOf: residentHref })} base={`/mail/${thread.key}/`} olderIds={olderIds} />
+    <MailLetters html={threadLettersHtml(parts[0], { media, hrefOf: residentHref, threadKey: thread.key })} base={`/mail/${thread.key}/`} olderIds={olderIds} />
 
     <p class="thread-foot">
       <a class="pm-btn ghost" href="/mail/">← All the mail</a>
