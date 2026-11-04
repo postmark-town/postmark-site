@@ -759,8 +759,16 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       var moreObserver = typeof IntersectionObserver === "function"
         ? new IntersectionObserver(function (entries) {
             if (!entries.some(function (e) { return e.isIntersecting; })) return;
-            // everything held is on screen: the scroll reaching the end asks the office for the next threads, if it has any
-            if (shown >= lastClosed.length) { if (sectionCursor("closed")) loadMoreThreads("closed"); return; }
+            // everything held is on screen: the scroll reaching the end asks the office for the next threads, if it has any.
+            // A list whose last ask FAILED is not asked again by the scroll: the failure repaints the list, the repaint builds
+            // a new button and observes it, and a new target is reported as intersecting at once, so asking here would be a
+            // request per repaint for as long as the office stays down. The failure sits on the button ("Try again"): the
+            // reader's click is the retry, and the page's own poll is the only other clock.
+            if (shown >= lastClosed.length) {
+              var held = extra.closed;
+              if (sectionCursor("closed") && !(held && held.error)) loadMoreThreads("closed");
+              return;
+            }
             shown += CHUNK;
             paint(closedBox, lastClosed, CLOSED_EMPTY, false, true, "closed");
           }, { rootMargin: "600px" })   // build them before they are needed, not as they appear
@@ -822,6 +830,54 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         lastClosed = closed;
         paint(liveBox, live, LIVE_EMPTY, true, false, "live");
         paint(closedBox, closed, CLOSED_EMPTY, false, true, "closed");
+        noteTips(live.concat(closed));
+      }
+
+      // ── A MERGE CHANGES THE KEY A HELD PAGE IS FILED UNDER (POS-779) ────────────────────────────────────────────────────
+      //
+      // What the reader pulled back is filed under its thread's `thread_of`, the first act of that thread. When two threads of ONE
+      // settlement merge (or an earlier voice is admitted), the merged thread is named by its earliest act, so a page filed under the
+      // other thread's key is looked up under a key nobody asks for, and was dropped without a word. The page now looks for the held
+      // keys the new list no longer names: an act the old thread showed at the last paint that the new list shows in one thread (an act
+      // belongs to exactly one thread), in the SAME settlement, says it is the same conversation, and the held page is filed under the
+      // new key. It is not believed: its lines are still the old generation's and are shown only through `stateFor`, which does for
+      // a changed thread what it always does (read the reader's line again, or say the conversation changed). A held page that is busy is not
+      // moved (its answer is filed under the key it was asked under): it is dropped with the changed words. A merge whose
+      // thread shows none of the old thread's last lines (a burst that replaced every one) cannot be told from the page and is dropped as before.
+      var tips = {};   // thread_of -> { since, ids }: the lines each thread showed at the last paint, and its settlement
+      function noteTips(threads) {
+        var next = {};
+        threads.forEach(function (t) {
+          if (!t || !t.thread_of || !t.epoch) return;
+          var ids = {};
+          (t.voices || []).forEach(function (v) { ids[String(v.act_id)] = true; });
+          next[t.thread_of] = { since: t.epoch.since, ids: ids };
+        });
+        tips = next;
+      }
+      function carryMerged(threads) {
+        var named = {};
+        threads.forEach(function (t) { if (t && t.thread_of) named[t.thread_of] = true; });
+        Object.keys(expanded).forEach(function (k) {
+          var s = expanded[k], tip = tips[k];
+          if (!s || named[k] || !tip) return;
+          var into = null;
+          for (var i = 0; i < threads.length && !into; i++) {
+            var t = threads[i];
+            if (!t || !t.thread_of || !t.epoch || t.epoch.since !== tip.since || !t.voices) continue;
+            for (var j = 0; j < t.voices.length; j++) if (tip.ids[String(t.voices[j].act_id)]) { into = t; break; }
+          }
+          if (!into) return;
+          var to = into.thread_of;
+          delete expanded[k];
+          if (!s.busy && !expanded[to]) {
+            expanded[to] = s;
+            if (seen[k]) seen[to] = seen[k];
+          } else if (!lineNotes[to]) lineNotes[to] = CHANGED_WORDS;
+          delete seen[k];
+          if (lineNotes[k]) { if (!lineNotes[to]) lineNotes[to] = lineNotes[k]; delete lineNotes[k]; }
+          if (gotoNewest[k]) { gotoNewest[to] = true; delete gotoNewest[k]; }
+        });
       }
       var LIVE_EMPTY = "The town is quiet. Nobody has spoken since the last settlement.";
       var CLOSED_EMPTY = "No earlier settlement's conversations are kept yet.";
@@ -925,12 +981,18 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         noteBox.hidden = !words;
       }
 
+      // Polls overlap (the interval, a hash change, a spoken line, the faces arriving, a list that moved) and the network does not
+      // answer in the order it was asked. An answer older than one already shown is thrown away: showing it would put the page back
+      // on an older generation than the one a reader's pulled-back lines were read under, and those lines would be dropped as changed.
+      var tickSeq = 0, shownSeq = 0;
       function tick() {
+        var mine = ++tickSeq;
         fetch(API, { headers: { accept: "application/json" } })
           .then(function (r) {
             return r.json().then(function (b) { return { ok: r.ok, status: r.status, body: b }; }, function () { return { ok: false, status: r.status, body: null }; });
           })
           .then(function (res) {
+            if (mine < shownSeq) return;
             var d = res.body;
             if (!res.ok || !d || !Array.isArray(d.live)) {
               // What is on screen stays: a record that cannot be read this second is not an empty town. A 503 is the office
@@ -942,6 +1004,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
               return;
             }
             painted = true;
+            shownSeq = mine;
             // The in-memory read says it is the short record; say it where a reader will see it.
             setNote(d.incomplete_legacy
               ? "This office is answering from its short in-memory record, not the town's full one: " + d.incomplete_legacy
@@ -951,6 +1014,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             lastLive = d.live;
             lastClosedPage = Array.isArray(d.closed) ? d.closed : [];
             lastClosed = sectionThreads("closed", lastClosedPage);
+            carryMerged(sectionThreads("live", lastLive).concat(lastClosed));
             // A link that names a thread must reach it even when the past is
             // only part-built — otherwise lazy rendering would quietly break
             // every /conversations/#<id> the map and the replay hand out.
@@ -968,6 +1032,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             }
           })
           .catch(function () {
+            if (mine < shownSeq) return;
             setNote("The office isn't answering — the live door is /api/world/conversations.");
             if (!painted) paint(liveBox, null, "The office isn't answering — the live door is /api/world/conversations.");
           });

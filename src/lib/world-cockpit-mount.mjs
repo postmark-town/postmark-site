@@ -4522,7 +4522,10 @@ export function mountCockpit(o) {
   async function pullVoices() {
     if (!o.readVoices) return;
     const body = await o.readVoices().catch(() => null);
-    if (!body) return;
+    // A read that FAILED keeps what the map holds: `readVoices` answers `{ unavailable: true, read_status }` for a refusal or a
+    // failure (a truthy answer that carries no threads), and drawing that as "nobody spoke" would wipe every bubble the reader
+    // is looking at. A read that SUCCEEDED and found nothing in the window (`live: []`) is the quiet town and does clear them.
+    if (!body || body.unavailable === true) return;
     // ⚑ ONE CLOCK READING FOR THE WHOLE POLL, and it is a correctness rule.
     //
     // `recentVoices` turns each voice's timestamp into an AGE against the now it
