@@ -67,6 +67,33 @@ export function profilePayload(values, saved = {}, { clearPronouns = false } = {
   return body;
 }
 
+// ── THE BIO'S CAP, SHOWN AND ENFORCED BEFORE THE REQUEST (POS-862) ───────────────────────────────
+//
+// The office's rule (postmark-office src/edit.mjs profileValue): trim, then count Unicode CODE POINTS
+// (`[...value].length`), at most PROFILE_CAPS.bio = 400; the office stays the judge (422). The page
+// used to set the native `maxlength`, which silently discards the rest of a long paste. It now keeps
+// the whole draft, shows `count / 400`, and refuses the Save itself (no request) while it is over.
+export const BIO_MAX = 400;
+
+/** The bio's length as the office counts it: code points after trimming. */
+export const bioCount = (value) => [...String(value ?? "").trim()].length;
+
+/** The refusal the Save shows while the bio is over the cap, or null when it may go. */
+export function bioProblem(value) {
+  const n = bioCount(value);
+  return n > BIO_MAX ? `your bio is ${n} characters and the limit is ${BIO_MAX} — shorten it by ${n - BIO_MAX} and save again. Nothing was sent.` : null;
+}
+
+/** Paint the live count beside the bio box; marks the box invalid while over. Returns `{ count, over }`. */
+export function paintBioCount({ textarea, counter }, value) {
+  const count = bioCount(value);
+  const over = count > BIO_MAX;
+  counter.textContent = `${count} / ${BIO_MAX}${over ? ` — ${count - BIO_MAX} too many` : ""}`;
+  counter.dataset.over = over ? "1" : "";
+  textarea.setAttribute("aria-invalid", over ? "true" : "false");
+  return { count, over };
+}
+
 /** The PATCH /profile/{handle} request the form sends (the same door the sheet setter's second step uses). */
 export function profileRequest(base, handle, payload, token) {
   return {

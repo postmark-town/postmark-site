@@ -20,7 +20,7 @@ import {
   LANES, DEFAULT_LANE, standing, ideas, isIdea, toIdea, questStandings, questCards, marketplace,
   loadPlaceMarks, readPen, markFields, plaque, predicatesOf, placeName,
   markStakes, stakeOf, ideaDashboard, boardDashboard, worldPin,
-  markBody, QUEST_REGISTRY, loadWorldState,
+  markBody, loadWorldState,
   THINK_TANK_PLACE, IDEA_CLASS, TITLE_MAX, BLUEPRINTS_REPO,
 } from "../src/lib/civic.mjs";
 import { TUTORIALS, MAX_SLIDES, tutorialFor } from "../src/lib/civic-tutorial.mjs";

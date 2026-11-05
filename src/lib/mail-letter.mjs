@@ -21,8 +21,10 @@ const resident = (h, hrefOf) => {
 // `thread` (a pair page's marks: { tkey, hue, divider }) adds the thread's
 // colour, its name above the letterhead and the rule where the thread changes;
 // `delivered` is the ledger's delivery date, worn as "✓ delivered"; `hrefOf`
-// is the build's resident links (resident-pages.mjs § residentHref).
-export function letterHtml(l, { media = {}, thread = null, delivered = null, hrefOf = null } = {}) {
+// is the build's resident links (resident-pages.mjs § residentHref); `subject`
+// heads the paper with the letter's own subject, threadTitle(l.id), the label
+// the pair page's rail derives for it, unchanged.
+export function letterHtml(l, { media = {}, thread = null, delivered = null, hrefOf = null, subject = false } = {}) {
   const tos = (l.toList && l.toList.length ? l.toList : [l.to]).filter(Boolean);
   const shown = (l.attachments ?? []).filter((at) => media[at]);
   const hue = thread ? ` style="--h:${thread.hue}"` : "";
@@ -31,6 +33,7 @@ export function letterHtml(l, { media = {}, thread = null, delivered = null, hre
     thread?.divider ? `<div class="fr-newthread"${hue} aria-hidden="true">— ${thread.divider} —</div>` : "",
     `<article class="pm-letter pm-paper${thread ? " fr-letter" : ""}" id="${esc(l.id)}"${hue}${thread ? ` data-tkey="${esc(thread.tkey)}"` : ""}>`,
     thread ? `<div class="fr-threadline">${esc(threadTitle(thread.tkey))}</div>` : "",
+    subject ? `<div class="fr-subject">${esc(threadTitle(l.id))}</div>` : "",
     `<div class="pm-letterhead"><span class="route">${resident(l.from, hrefOf)} → ${tos.map((h) => resident(h, hrefOf)).join(", ")}</span>`,
     `<span class="when">${esc(fmtDate(l.date))}`,
     delivered ? `<span class="fr-sailed" title="carried by the ferry, sealed in the town ledger">✓ delivered ${esc(fmtDate(delivered))}</span>` : "",
@@ -82,6 +85,11 @@ export function pairLettersHtml(view, ls, { media, deliveredOn, hrefOf = null })
   return ls.map((l) => letterHtml(l, { media, thread: view.markOf.get(l.id), delivered: deliveredOn.get(l.id), hrefOf })).join("");
 }
 
-export function threadLettersHtml(ls, { media, hrefOf = null }) {
-  return ls.map((l) => letterHtml(l, { media, hrefOf })).join("");
+// A thread page, its older parts and their chunks: each letter wears its own
+// subject (the page's <h1> is the thread's), except a letter whose subject is
+// the thread's own title, which would only repeat the <h1> above it. `threadKey`
+// is the thread's key; without it every letter wears its subject.
+export function threadLettersHtml(ls, { media, hrefOf = null, threadKey = null }) {
+  const title = threadKey == null ? null : threadTitle(threadKey);
+  return ls.map((l) => letterHtml(l, { media, hrefOf, subject: threadTitle(l.id) !== title })).join("");
 }

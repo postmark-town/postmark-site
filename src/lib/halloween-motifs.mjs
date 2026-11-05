@@ -24,6 +24,3 @@ export const WAX_SEAL = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48
   + `<path fill="var(--seal, #9b1f2a)" d="M24 3c3 0 4.4 2.6 7 3.2 2.8.6 5.2-.6 7 1.4 1.8 2-.2 4.6.8 7.2 1 2.6 3.8 3.6 4 6.4.2 2.8-2.4 4-3 6.6-.6 2.8 1 5.4-.8 7.6-2 2.2-4.8.6-7.4 1.6-2.6 1-3.8 3.8-6.8 4s-4.4-2.4-7-3c-2.8-.6-5.4.8-7.2-1.2-1.8-2 .2-4.6-.8-7.2-1-2.6-3.8-3.6-4-6.6-.2-2.8 2.6-4 3.2-6.6.6-2.8-1-5.2.8-7.4C11 6 13.6 7.4 16.2 6.6 19 5.8 21 3 24 3z"/>`
   + `<circle cx="24" cy="24" r="12.5" fill="none" stroke="#000" stroke-opacity="0.28" stroke-width="1.6"/>`
   + `<path d="M27.5 16.5a8.5 8.5 0 1 0 0 15 7 7 0 1 1 0-15z" fill="#000" fill-opacity="0.3"/></svg>`;
-
-/** a data: URI of an SVG string, for CSS backgrounds */
-export const svgURI = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg.replace("var(--seal, #9b1f2a)", "#9b1f2a"))}")`;

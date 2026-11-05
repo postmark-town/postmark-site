@@ -128,12 +128,12 @@ The mechanism, its three guardrails, and why it needs no box-side step:
 ```
 town/                       the pages (Astro srcDir) + scripts/world-engine-island.mjs
 src/layouts/                PostmarkLayout · BaseLayout · HarborLayout
-src/lib/                    the pages' logic — pm · auth · rail · mail · funding · civic · docs and the rest
+src/lib/                    the pages' logic — pm · auth · nav · mail · funding · civic · docs and the rest
 src/components/             shared pieces — JoinFunnel · KeysCard · PotCards · household-dashboard/ and the rest
 src/styles/                 postmark.css · global.css · harbor.css · the join stylesheets
 src/data/postmark/          GENERATED — the data layer
 public/atelier/postmark/    GENERATED (mostly) — the served asset tree
-tools/                      extract-town · fetch-town · sync-renditions · sync-postmark-atlas · extract-seam ·
+tools/                      extract-town · fetch-town · sync-renditions · extract-seam ·
                             resolve-world-pin · build-stamp · clean-dist · train-week-check · lib/
 astro.config.town.mjs       the build
 ```

@@ -102,3 +102,48 @@ test("one component, two renders: the preview gets the head, the full board gets
     "/town/quests/ names the bulletin read it draws from");
   assert.match(full, /quests\.read \?/, "an unreadable mirror must say so on the full board too");
 });
+
+// ── POS-855: what the numbers say (Rivet's trace of the board, 11-02) ─────────
+// Cold walks could not read the quest pages' numbers. Three fixes, copy and
+// markup only: the standings' last column is COMPLETIONS (not stamps); a card
+// with no board count says so in words; a card's count is "of the rows on this
+// board", not "of residents today". Source reads, like the rest of this file.
+// ⚑ THE FLIP: put the ✦ back after `{r.allTime}`, or the old card strings back,
+// and the matching test below goes red.
+
+// the card branch of the hub, with JSX comments out (the comment above it quotes the words it replaced)
+const stripJsxComments = (s) => s.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ");
+const cardAt = hub.indexOf("questRows.map");
+const cardEnd = hub.indexOf("{PAIR_RULE}", cardAt);
+const card = stripJsxComments(hub.slice(cardAt, cardEnd));
+
+test("the standings' last column is completions, not stamps: no ✦, a legend, and the unit in words", () => {
+  const cell = /<span class="q-all">([\s\S]*?)<\/span>\s*<\/li>/.exec(markup);
+  assert.ok(cell, "the row lost its `q-all` cell");
+  assert.equal(cell[1].includes("✦"), false, "the all-time number wears a ✦ again: it reads as a stamp balance, and it is a completions count");
+  assert.equal(markup.includes("✦"), false, "a ✦ is back in the standings markup");
+  assert.match(cell[1], /\{r\.allTime\}/, "the all-time number is no longer drawn");
+  assert.match(cell[1], /<span class="q-sr">all-time completions <\/span>/, "the number lost its unit for a screen reader");
+  assert.match(markup, /<p class="q-legend">All-time completions of Reach out and Be reached\.<\/p>/, "the legend is gone or reworded");
+  // the legend sits under the list, so both renders (the preview and the full board) carry it
+  assert.ok(markup.indexOf("</ol>") < markup.indexOf('class="q-legend"'), "the legend moved off the list");
+  // the visually-hidden text must stay out of the visual row
+  assert.match(style, /\.q-sr \{[^}]*clip: rect\(0, 0, 0, 0\);/, "the screen-reader text is no longer visually hidden");
+});
+
+test("a quest card with no board count says 'Board count unavailable', and the branch is the one it was", () => {
+  assert.match(card, /\{q\.done != null && q\.of \? \(/, "the card's count-or-nothing branch changed: null must stay distinct from a known zero");
+  assert.match(card, /<p class="m-barlab m-dim">Board count unavailable<\/p>/, "the unavailable card lost its words");
+  assert.equal(/>\s*uncounted\s*</.test(card), false, "`uncounted` is back on the quest card");
+});
+
+test("a quest card's count reads against the board's rows, and its aria-label says the same", () => {
+  assert.match(card, /<b>\{q\.done\}<\/b> of \{q\.of\} on this board completed this <span class="m-dim">· board snapshot<\/span>/,
+    "the card's count line lost 'on this board', 'completed this' or the snapshot qualifier");
+  assert.match(card, /aria-label=\{`\$\{q\.done\} of \$\{q\.of\} on this board completed this \(board snapshot\)`\}/,
+    "the bar's aria-label no longer matches the visible line");
+  assert.equal(/residents today|finished this today/.test(card), false,
+    "the card says 'residents today' again: the denominator is the board's rows, and 'today' implies a live count");
+  // the numbers themselves are untouched
+  assert.match(card, /Math\.max\(2, pct\(q\.done \/ q\.of\)\)/, "the bar's width changed");
+});

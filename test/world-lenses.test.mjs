@@ -24,7 +24,7 @@ import {
   SERIALIZATION_MAP, serializes, serializationOf, idealClassOf,
   fieldCensus, classRegistry, lawMeasures, standingLattice, standingTierOf, STORE_BOUNDARY,
   isRecordNode, recordTree, RECORD_SEGMENT,
-  isMachinery, wearsRegistryBadge, isContinuation, classFilters, filterBucketOf,
+  isMachinery, wearsRegistryBadge, isContinuation, classFilters,
   keepingWorks,
 } from "../src/lib/world-lenses.mjs";
 

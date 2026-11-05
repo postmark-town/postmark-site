@@ -23,6 +23,12 @@ const { html, base = "", olderIds = [] } = Astro.props;
        on the card's top-left edge (visible at 390 wide, and on prod before this) */
     margin: 0; padding: 0.9em 1.4em 0;
   }
+  /* a thread page's letter wears its own subject above the letterhead (POS-855) */
+  .mail-letters :global(.fr-subject) {
+    margin: 0; padding: 0.9em 1.4em 0;
+    font-weight: 700; font-size: 0.95rem; line-height: 1.35; color: var(--pm-ink);
+  }
+  .mail-letters :global(.fr-subject + .pm-letterhead) { padding-top: 0.5em; }
   /* the unified stream reads as curated, not collapsed — a quiet rule where
      the thread changes (git-event legibility, 2026-07-19) */
   .mail-letters :global(.fr-newthread) {

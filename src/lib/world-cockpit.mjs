@@ -166,16 +166,6 @@ export function dialLine(card) {
  * a dial is missing, say nothing rather than showing a bare field name"). So an
  * act whose class states no dials returns the empty string, and the surface
  * renders no line at all rather than an empty one with a caption over it.
- */
-/**
- * @param {object} card
- * @param {{brief?: boolean, weapon?: object|null}} [opts] `brief` returns only
- *   the FIRST phrase — the headline, for a seat that has a seat's worth of
- *   room. `weapon` is `weaponFor`'s answer, and it completes the founder's own
- *   example sentence: "d20 vs 12 to hit · d8 damage · +3 with the good lighter".
- *   It is appended only to the act the weapon says it augments, so an act that
- *   throws the same damage die and gets no help from what you are holding does
- *   not claim any.
  *
  * ⚑ WHY BRIEF EXISTS AND ELLIPSIS DOES NOT. The seat's line was capped in CSS
  * and clipped with an ellipsis, which read "d20 vs 8 to hit · d…" — measured at
@@ -185,6 +175,15 @@ export function dialLine(card) {
  * worse than a short one: it costs the same room and tells the reader there is
  * something they are not being shown. So the seat gets a whole short phrase and
  * the card gets the whole line, and neither of them is cut.
+ *
+ * @param {object} card
+ * @param {{brief?: boolean, weapon?: object|null}} [opts] `brief` returns only
+ *   the FIRST phrase — the headline, for a seat that has a seat's worth of
+ *   room. `weapon` is `weaponFor`'s answer, and it completes the founder's own
+ *   example sentence: "d20 vs 12 to hit · d8 damage · +3 with the good lighter".
+ *   It is appended only to the act the weapon says it augments, so an act that
+ *   throws the same damage die and gets no help from what you are holding does
+ *   not claim any.
  */
 export function dialSpeak(card, { brief = false, weapon = null } = {}) {
   const d = card?.dials;
@@ -545,41 +544,6 @@ export function humanWords(face) {
   return stance ? `the door calls this standing "${stance}"` : "where ground allows";
 }
 
-/**
- * THE SHORT FORM OF A DOOR'S SENTENCE — for a hover, which is not a panel.
- *
- * The founder, live on the dev board 2026-08-29: hovering the human face showed
- * two overlapping cards, the second of them a recitation — the door's sentence
- * naming every verb that ground's class grants, in full, hanging off a 2.3em
- * circle. His ruling: one hover, one concise card, the name and one short line;
- * the long form belongs on the panel.
- *
- * ⚑ THE VERBS ARE NOT QUOTED HERE, and the omission is the point rather than
- * squeamishness: this file may not name a verb (world-cockpit.test.mjs reads
- * its source and fails if it does, because a bar with a verb list is a bar that
- * stopped rendering the door). Writing the founder's sentence out verbatim in
- * this comment tripped that guard — correctly. The shape is described instead.
- *
- * ⚑ IT CUTS, IT NEVER REWRITES. The door's words are law quoted at the reader,
- * and a site that paraphrased them would be writing law again — the thing this
- * whole surface exists not to do. So this takes a PREFIX of the door's own
- * sentence and marks the cut with an ellipsis, and the full sentence is still
- * shown, verbatim, on the standpoint plate.
- *
- * The cut lands on a clause boundary where there is one before the cap, because
- * a sentence guillotined mid-word reads as a bug rather than as a summary.
- */
-export function briefWords(said, cap = 72) {
-  const s = String(said ?? "").trim();
-  if (!s || s.length <= cap) return s;
-  const head = s.slice(0, cap);
-  // The boundaries a sentence in this town actually uses, longest-first: an em
-  // dash is where a clause turns, and it is where these recitations begin.
-  const cut = Math.max(head.lastIndexOf(" — "), head.lastIndexOf("; "), head.lastIndexOf(", "));
-  const kept = cut > cap * 0.4 ? head.slice(0, cut) : head.replace(/\s+\S*$/, "");
-  return `${kept.trim()}…`;
-}
-
 /** The innermost parcel in the containment spine that one of these handles holds,
  *  or null. A parcel's `by` is its household's own resident — the same reading the
  *  world's ids carry everywhere (`vermillion/the-pando-peak-parcel`). */
@@ -779,9 +743,10 @@ export function encounterOf(answer) {
  *     encounter_detail.hands[<who>].weapon = { thing, bonus, for? }
  *
  * `thing` is the mark id, `bonus` the number it adds. The office already builds
- * exactly this shape internally — `weaponInHand` answers
- * `{ thing, bonus, says }` off the held grant — so the field is that answer
- * carried out to a caller rather than a new idea.
+ * exactly this shape internally — its arena helper that looked up the held
+ * weapon answered `{ thing, bonus, says }` off the held grant — so the field
+ * is that answer carried out to a caller rather than a new idea. (That helper
+ * went with the arena when the office closed it, office dd402ca1, 2026-09-30.)
  *
  * ⚑ `augments` IS WHICH ACT THE BONUS HELPS — the ruled name (Wright with lane
  * bday-law, 2026-08-29). A weapon helps ONE act: the office finds it by looking
@@ -1049,9 +1014,11 @@ export function blockedReason(answer, { acting = null } = {}) {
     // their own clock and nothing here drives them — which is the distinction
     // that keeps this from being "stop gating".
     //
-    // The office says the same thing on the read half (`actingBlocked`); this
-    // is the derivation for a door that has not spoken, and the two agree on
-    // purpose.
+    // The office's read half said the same thing through `acting_blocked` on
+    // the standpoint; the office has since closed the arena and no longer
+    // computes that field (office dd402ca1, 2026-09-30). This is the derivation
+    // for a door that has not spoken, and it was written to agree with that
+    // field on purpose.
     const order = enc.order ?? [];
     let i = order.findIndex((a) => a.current);
     let guard = 0;
@@ -1181,8 +1148,9 @@ export function looseThings(answer) {
  * What stands against this standpoint, if the door named one.
  *
  * CONTRACT: `answer.encounter_detail.adversary = { id, hp, of, body }` — the
- * office's `publicState` block (arena.mjs). It carries NO position, deliberately
- * or not; `adversaryPlacement` below joins it to `nearby` for that, which is the
+ * office's public encounter block, which the office built in its arena before
+ * the arena was closed (office dd402ca1, 2026-09-30). It carries NO position,
+ * deliberately or not; `adversaryPlacement` below joins it to `nearby` for that, which is the
  * only route the answer offers.
  */
 export function adversaryOf(answer) {
@@ -1313,12 +1281,13 @@ export function prefillFor(card, answer, { only = null } = {}) {
   // ground to walk to — a relation between you and somewhere, never a thing to
   // hit.
   //
-  // A field about somewhere you stand relative to takes no target. Where the
-  // door says you are stepping OUT of it, the answer is knowable and worth
-  // filling — it is the ground you are in, which the standpoint already names.
-  // Anywhere else the honest prefill is none: the whole point of entering or
-  // walking is that the destination is the reader's choice, and this function's
-  // own rule is that a prefill happens only where there is no choice to make.
+  // A field about somewhere you stand relative to takes no target, and gets no
+  // prefill either: the whole point of entering or walking is that the
+  // destination is the reader's choice, and this function's own rule is that a
+  // prefill happens only where there is no choice to make. The field for
+  // stepping out looked like the exception, since the ground you are in seems
+  // knowable, and the note below is why it is not.
+  //
   // ⚑ AND A PLACE FIELD IS LEFT EMPTY, INCLUDING THE ONE THAT LOOKED KNOWABLE.
   //
   // The first pass filled a stepping-out field with the standpoint's own
@@ -1350,8 +1319,6 @@ export function prefillFor(card, answer, { only = null } = {}) {
 /** A field the door describes as naming somewhere you stand relative to, rather
  *  than something you aim at. The door's words, read — never a verb list. */
 const GROUND_SHAPED = /\b(?:step(?:ping)? (?:in|out)|out of|to enter|walk(?:ing)? to|you are within|stand inside)\b/i;
-/** …and the one such relation whose answer the standpoint already knows. */
-const LEAVING = /\bout of\b/i;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ONE ACT FLOW (founder-ruled 2026-08-29, live-testing)
@@ -1407,8 +1374,9 @@ export function aimKind(card) {
 }
 
 /**
- * The ground this standpoint is innermost within — for the panel to SHOW, and
- * for nothing else.
+ * The room this standpoint has entered (its portal) as `{ id, label }`, or null
+ * when it has entered nothing — for the panel to SHOW and for the mount to
+ * recognise the room once it has been left, and never to send.
  *
  * ⚑ IT IS NEVER SENT, and that is a receipt rather than a preference. The
  * founder's ruling is that a crossing-out act with one lawful answer should not
@@ -1420,7 +1388,8 @@ export function aimKind(card) {
  * the site holds only the second.
  *
  * The door already published the right answer in the field's own words: OMIT it
- * and the innermost one is used. So the panel names the room in its TO row so a
+ * and the innermost one is used. So the panel's one plain `step out of <room>`
+ * line (the mount's `flowRowsHtml`, with no FROM or TO row) names the room so a
  * reader can see what they are about to leave, and the act is dispatched with
  * the field absent, which is what the door asked for and what actually works.
  */
@@ -1439,10 +1408,13 @@ export function leavingName(answer) {
   // `portalOf` already reads it — one reader, so the exit card and the chip
   // cannot name two different rooms.
   //
-  // ⚑ AND `within` IS NOT MERELY WRONG HERE, IT IS SPOKEN FOR: the exit-prefill
-  // work leans on it as the containment chain it is. The two must not be
-  // conflated, which is why this reaches for the portal rather than filtering
-  // the chain down to something room-shaped.
+  // ⚑ AND `within` IS NOT MERELY WRONG HERE, IT IS SPOKEN FOR: other readers
+  // lean on it as the containment chain it is — `ownParcelIn` (the innermost
+  // parcel your household owns, for the human face), the mount's `leadsTo` (the
+  // room one step outward, for the exit seat's dial line) and the mount's
+  // `frameScene` (the innermost ground's extent, for the camera floor). The two
+  // must not be conflated, which is why this reaches for the portal rather than
+  // filtering the chain down to something room-shaped.
   const portal = portalOf(answer);
   return portal
     ? { id: portal.id, label: portal.id.split("/").pop().replace(/-/g, " ") }
@@ -1520,31 +1492,6 @@ export function aimable(slot, answer, { only = null } = {}) {
 }
 
 /**
- * What an armed act may be aimed at, and where each one stands.
- *
- * The candidates are `actCandidates`' — what stands against you, who is down
- * beside you, what is lying on the floor, all three the door's own words. What
- * is added here is the POSITION, because a target that highlights has to
- * highlight somewhere.
- *
- * A TARGET THE ANSWER CANNOT PLACE IS STILL A TARGET. `nearby` is a budgeted
- * field of view and `present` is banded, so a downed ally can be perfectly real
- * and carry no coordinate this read. Dropping them would make the lifting act
- * unreachable exactly when someone is down and out of frame — so an unplaced
- * target keeps its row and is offered by name instead. `at` is null and the
- * caller draws no ring; nothing here pretends to a coordinate it does not hold,
- * which is the same rule `adversaryPlacement` already follows.
- *
- * `only` NARROWS THE SET TO PARTICULAR ROLES (founder-caught 2026-08-29, live:
- * the act that spends a whole turn getting an ally back on their feet was
- * offering the creature as its target, because every aimed act was offered every
- * candidate). It takes the ROLES `actCandidates` tags — never act names, which
- * this file still does not hold: the caller knows which of its acts is choosy
- * and says so in roles, and this end of the seam only knows what each candidate
- * is standing as. Omitted or empty, the whole set is offered exactly as before,
- * so an act nobody has ruled on is unchanged.
- */
-/**
  * EVERY COMBATANT WITH HIT POINTS, placed where the answer places them.
  *
  * FOUNDER-RULED 2026-08-29, live at the board: hp bars on ALL the tokens in an
@@ -1590,6 +1537,31 @@ export function combatantBars(answer) {
   return out;
 }
 
+/**
+ * What an armed act may be aimed at, and where each one stands.
+ *
+ * The candidates are `actCandidates`' — what stands against you, who is down
+ * beside you, what is lying on the floor, all three the door's own words. What
+ * is added here is the POSITION, because a target that highlights has to
+ * highlight somewhere.
+ *
+ * A TARGET THE ANSWER CANNOT PLACE IS STILL A TARGET. `nearby` is a budgeted
+ * field of view and `present` is banded, so a downed ally can be perfectly real
+ * and carry no coordinate this read. Dropping them would make the lifting act
+ * unreachable exactly when someone is down and out of frame — so an unplaced
+ * target keeps its row and is offered by name instead. `at` is null and the
+ * caller draws no ring; nothing here pretends to a coordinate it does not hold,
+ * which is the same rule `adversaryPlacement` already follows.
+ *
+ * `only` NARROWS THE SET TO PARTICULAR ROLES (founder-caught 2026-08-29, live:
+ * the act that spends a whole turn getting an ally back on their feet was
+ * offering the creature as its target, because every aimed act was offered every
+ * candidate). It takes the ROLES `actCandidates` tags — never act names, which
+ * this file still does not hold: the caller knows which of its acts is choosy
+ * and says so in roles, and this end of the seam only knows what each candidate
+ * is standing as. Omitted or empty, the whole set is offered exactly as before,
+ * so an act nobody has ruled on is unchanged.
+ */
 export function aimTargets(answer, { only = null } = {}) {
   const roles = Array.isArray(only) && only.length ? new Set(only) : null;
   const nearby = Array.isArray(answer?.nearby) ? answer.nearby : [];

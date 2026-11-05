@@ -77,6 +77,24 @@ export function boardIds(inner = {}) {
 export const NOSCRIPT_NOTICES = "the-notices";
 
 /**
+ * The address a history entry's `from` stands for, in the form the page's
+ * "back" controls compare it in. A move records the hash it left (`here()`),
+ * and a control asks "is that where I lead?" (`backTo("notices")`); two
+ * spellings name the same place, so each folds to the one the controls use:
+ * "board" is the board ("", no hash), and NOSCRIPT_NOTICES, the address the
+ * no-script link and the posting pages' back link arrive on, is the notices.
+ * Without the second, a reader who arrived on #the-notices, opened a notice
+ * and closed it was pushed a new entry rather than sent back. Anything else
+ * (a piece's hash, a deep address, a notice slug, "") is returned as it came.
+ * @param {string} from  the `from` a pushState entry recorded, without its "#"
+ */
+export function backAddress(from) {
+  if (from === "board") return "";
+  if (from === NOSCRIPT_NOTICES) return BOARD_PIECES.find((p) => p.key === "notices").hash;
+  return from;
+}
+
+/**
  * What an address on /bulletin/ opens: `{ view, inner, note }`. `view` is a
  * piece's key, or null for the board; `inner` is the fragment to reach inside
  * a framed view; `note` is the notice to pop up over the notices' sub-board.

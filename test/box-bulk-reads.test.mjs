@@ -13,7 +13,7 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
