@@ -1006,7 +1006,7 @@ test("STAR-133 · the run's own deadline still wins over the restart wait", asyn
   let clock = 0;
   const gate = createRateGate({ now: () => clock, sleep: (ms) => { clock += ms; return Promise.resolve(); }, budgetMs: 30_000 });
   const fetchImpl = async () => { throw refusedConn(); };
-  await assert.rejects(() => apiGet("/town", { apiBase: "http://127.0.0.1:4390", fetchImpl, retries: 3, gate }), /refused the connection for 3\d s/);
+  await assert.rejects(() => apiGet("/town", { apiBase: "http://127.0.0.1:4390", fetchImpl, retries: 3, gate }), /refused the connection for 3\d s, and the run's 30 s fetch budget ended the wait/);
   assert.ok(clock >= 30_000 && clock < 33_000, `it stops at the run's 30 s deadline (waited ${clock} ms)`);
 });
 

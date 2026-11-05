@@ -303,7 +303,8 @@ export async function apiGet(path, { apiBase, fetchImpl = fetch, retries = 3, ti
         refusedSince ??= clock();
         const waited = clock() - refusedSince;
         if (waited < restartBudgetMs && !(gate && gate.expired())) { await nap(restartNapMs); continue; }
-        throw carryStatus(new Error(`GET ${path} refused: the office refused the connection for ${Math.round(waited / 1000)} s, past the ${Math.round(restartBudgetMs / 1000)} s a restart is given (${lastError?.message ?? lastError})`), lastError);
+        const limit = waited >= restartBudgetMs ? `past the ${Math.round(restartBudgetMs / 1000)} s a restart is given` : `and the run's ${Math.round(gate.budgetMs / 1000)} s fetch budget ended the wait`;
+        throw carryStatus(new Error(`GET ${path} refused: the office refused the connection for ${Math.round(waited / 1000)} s, ${limit} (${lastError?.message ?? lastError})`), lastError);
       }
       if (gate && refused) {
         // The gate already holds the wait, for every lane. Keep asking until
