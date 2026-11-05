@@ -71,7 +71,7 @@ import { loadWorldState, notices, FIXTURE, BOARD_PLACE, ASK_MAX } from "@/lib/bo
 // import kept "just in case" is how a struck block finds its way back, which
 // this page has now been taught twice (HOLO_LINE was the first).
 import {
-  LANES, DEFAULT_LANE, standing, ideas, questStandings, questCards, questBoardFrom, marketplace, PAIR_RULE,
+  LANES, DEFAULT_LANE, standing, ideas, questStandings, questCards, questBoardFrom, townDay, marketplace, PAIR_RULE,
   readPen, loadPlaceMarks, plaque, markStakes, stakeOf,
   ideaDashboard, boardDashboard, worldPin,
   BLUEPRINTS_REPO, THINK_TANK_PLACE,
@@ -168,7 +168,8 @@ const tankStages = byStage(thinkTank.ideas);
 const quests = questStandings(bulletin);
 // The cards are the town's quest posts (POS-294): the office's GET
 // /posts?class=quest, baked as quest-posts.json.
-const questRows = questCards(quests, questBoardFrom(questPosts));
+// A quest with an `ends` is offered through that town day (POS-857), the day this build ran in.
+const questRows = questCards(quests, questBoardFrom(questPosts, { today: townDay() }));
 const market = marketplace(bulletin);
 
 // THE FIVE PLAQUES, per lane, read from the record. No sentence below is typed
