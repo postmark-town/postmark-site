@@ -243,9 +243,24 @@ function carryStatus(error, from) {
   return error;
 }
 
-export async function apiGet(path, { apiBase, fetchImpl = fetch, retries = 3, timeoutMs = 15000, maxRetryAfterMs = 60_000, gate = null } = {}) {
+// -- A REFUSED CONNECTION IS A RESTART, AND IT IS WAITED OUT (STAR-133, 2026-11-05) --
+//
+// The box reads the office at its own door, 127.0.0.1:4390, so while a deploy restarts the office the port is
+// simply shut: `fetch failed`, cause ECONNREFUSED, not an HTTP answer. That used to spend the three tries 250 and
+// 500 ms apart and trip the whole refresh in under a second, while the office was back six seconds later (11-05:
+// restart 14:46:42Z, listening 14:46:49Z; 11-02 00:42Z the same), so every 12-hour fix cut barked the sentinel DOWN
+// for a refresh or two. Only a REFUSED connection is waited out: up to `restartBudgetMs` (120 s), never past the
+// run's deadline, without spending `retries`. A reset, a hang-up, a timeout or any HTTP status keeps its three
+// tries exactly as before ("a dead upstream is not a budget"), and an office refusing for longer than 120 s is an
+// outage: it trips in the same run, so the sentinel still barks within one refresh.
+export const RESTART_BUDGET_MS = 120_000;
+const isRefusedConnection = (error) => error?.cause?.code === "ECONNREFUSED" || error?.code === "ECONNREFUSED";
+
+export async function apiGet(path, { apiBase, fetchImpl = fetch, retries = 3, timeoutMs = 15000, maxRetryAfterMs = 60_000, gate = null, restartBudgetMs = RESTART_BUDGET_MS, restartNapMs = 2_000 } = {}) {
   const base = normApiBase(apiBase);
   const nap = (ms) => (gate ? gate.sleep(ms) : new Promise((resolve) => setTimeout(resolve, ms)));
+  const clock = () => (gate ? gate.now() : Date.now());
+  let refusedSince = null; // when the office first refused the connection, for this call
   let lastError = null;
   let hardAttempts = 0;   // the `retries` budget. Refusals do not spend it.
   for (;;) {
@@ -279,10 +294,17 @@ export async function apiGet(path, { apiBase, fetchImpl = fetch, retries = 3, ti
         asOf: res.headers?.get?.("x-postmark-as-of") ?? null,
       };
       if (gate) gate.succeed();
+      if (refusedSince !== null) console.log(`fetch-town: GET ${path}: the office refused the connection for ${Math.round((clock() - refusedSince) / 1000)} s (a restart), then answered`);
       return out;
     } catch (error) {
       clearTimeout(timer);
       lastError = error;
+      if (isRefusedConnection(error)) {
+        refusedSince ??= clock();
+        const waited = clock() - refusedSince;
+        if (waited < restartBudgetMs && !(gate && gate.expired())) { await nap(restartNapMs); continue; }
+        throw carryStatus(new Error(`GET ${path} refused: the office refused the connection for ${Math.round(waited / 1000)} s, past the ${Math.round(restartBudgetMs / 1000)} s a restart is given (${lastError?.message ?? lastError})`), lastError);
+      }
       if (gate && refused) {
         // The gate already holds the wait, for every lane. Keep asking until
         // the RUN's budget is spent; a count cannot outlast a queue.
