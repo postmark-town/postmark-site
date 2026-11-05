@@ -961,14 +961,32 @@ export const QUEST_REGISTRY = {
 // A closed quest is not drawn: finished is the class's word for "no longer
 // asked". A post whose terms the office could not read has no card, rather
 // than a card with its stored title and nothing else.
-export function questBoardFrom(questPosts) {
+//
+// A QUEST WITH AN END IS OFFERED THROUGH IT (POS-857; Wright for Darko, 2026-11-01: an optional
+// registry `ends`, the writer's inclusive cutoff). A post's `terms.ends` is a town date; the card
+// is drawn on that day and not after. `today` is the town's day (townDay below), passed by the
+// page so the boundary is a plain string compare and a test can hold it still. The post itself is
+// not touched: an open post past its end is only not offered, and /town/quests/ (the standings)
+// does not call this. No `today`, or no `ends`, keeps the card.
+export function questBoardFrom(questPosts, { today = null } = {}) {
+  const offered = (p) => !(typeof today === "string" && typeof p.terms.ends === "string" && p.terms.ends < today);
   const open = (Array.isArray(questPosts?.posts) ? questPosts.posts : [])
-    .filter((p) => p?.class === "quest" && p.state === "open" && p.terms);
+    .filter((p) => p?.class === "quest" && p.state === "open" && p.terms && offered(p));
   const card = (p) => ({ title: p.terms.title, source: p.terms.source, reward: p.terms.reward, target: p.terms.target ?? null });
   return {
     daily: open.filter((p) => p.terms.cadence === "daily").map(card),
     milestone: open.filter((p) => p.terms.cadence === "milestone").map(card),
   };
+}
+
+/**
+ * The town's day, as the town's mint rule reckons it: the calendar day in TOWN_TZ, default
+ * America/New_York, en-CA ("2026-09-30"); never the server's or UTC's day. This mirrors the
+ * town's tools/quest-progress.mjs townDay (same env name and default); it is the site's private
+ * copy of that one policy, not a new one.
+ */
+export function townDay(now = new Date(), tz = process.env.TOWN_TZ ?? "America/New_York") {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(now);
 }
 
 // WHOSE BAR IS IT (POS-327, Little Bird 10-04: "I see that often as a point of
