@@ -385,56 +385,136 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         });
       }
 
-      // ── how much of the past to actually build ──────────────────────────────
+      // ── SHOW EARLIER (POS-779) ────────────────────────────────────────────
       //
       // "Gone quiet" is the whole of the town's finished speech and it only ever
-      // grows. Building every card on every 7-second poll made this page 15,348
-      // pixels tall on the day it was measured, and the cost is paid again on
-      // each tick whether or not anybody scrolls — a growth bomb with a fuse
-      // measured in months of town life.
-      //
-      // So the past renders a chunk at a time, and the reader's own scroll asks
-      // for the next one. Nothing is hidden: the sentinel below says how many
-      // conversations are still further down, and reaching it builds them.
-      // Deliberately NOT applied to "Happening now" — live threads are few, they
-      // are the point of the page, and a reader must never have to scroll to
-      // discover that the town is talking.
-      var CHUNK = 8;
-      var shown = CHUNK;
-      var lastClosed = [];
+      // grows, so the page holds ONE PAGE of it at a time (40, the same count the
+      // World map reads and links to). The 7-second poll asks the office for the
+      // newest page and what is happening now; that answer is the office's MEMORY,
+      // which may hold a page of finished threads, fewer, or none. So "Show
+      // earlier" is offered whenever the poll says it is memory, and asks the
+      // office for the page behind the cursor the poll handed back (`earlier.before`,
+      // or the end of time when memory shows no finished thread): the office reads
+      // that page from the town's RECORD where it keeps one. The answer REPLACES
+      // the page held, so the cards never accumulate however far back a reader
+      // goes; "Newer" walks the same cursors back. While an earlier page is held
+      // the poll still refreshes what is happening now, and leaves the page alone.
+      // The record reaches back only as far as the settlements the office has read:
+      // when its answer says older voices are not grouped (its `disclosed` list),
+      // the page says plainly that older history isn't available.
+      // SHOW-EARLIER:BEGIN
+      var CLOSED_PAGE = 40;
+      var EVER = "9999-12-31T23:59:59.999Z"; // a cursor later than any voice: the record's newest page
+      var OLDER_NOTE = /before the oldest settlement this office has read/; // the office's own words (world2-serve.mjs), read off `disclosed`
+      var closedList = [];     // the ONE page of finished conversations held
+      var earlierInfo = null;  // the office's `earlier` for that page: { source, remaining, before }
+      var cursor = null;       // the held page's cursor: null is the newest page (the poll's)
+      var trail = [];          // the cursors of the pages left behind, newest last (null: the newest page)
+      var pageToken = 0;       // a newer ask retires an older answer
+      var pageBusy = false;
+      var pageNote = null;
+      // An ask for earlier that came back EMPTY is remembered for the page and the ask it was made on, not for the tab: it holds while the
+      // same page (cursor), the same ask (the cursor the poll hands back) and the same settlement stand, and lapses when any of them moves
+      // (new history after a settlement, a different page), so a truthful "nothing behind this" is never made permanent.
+      var exhausted = null;    // { from, ask, since, text }
+      var newestSince = null;  // the settlement the newest poll names (`settlement_since`)
+      var olderLine = null;    // the office's line about voices older than its known settlements, learned from a record answer
+      function pageUrl(c) {
+        return API + "?closed=" + CLOSED_PAGE + (c ? "&before=" + encodeURIComponent(c) : "");
+      }
+      // The poll's page of finished conversations: held only while the reader is on the newest page.
+      function holdNewest(body) {
+        newestSince = body && body.settlement_since != null ? String(body.settlement_since) : null;
+        if (cursor !== null || pageBusy) return false;
+        closedList = Array.isArray(body.closed) ? body.closed : [];
+        earlierInfo = body.earlier && typeof body.earlier === "object" ? body.earlier : null;
+        return true;
+      }
+      // What a record answer says about the limit of its reach, kept on the page (a poll does not clear it).
+      function learnLimit(d) {
+        if (!d.earlier || d.earlier.source !== "record") return;
+        var lines = Array.isArray(d.disclosed) ? d.disclosed.filter(function (x) { return OLDER_NOTE.test(String(x)); }) : [];
+        olderLine = lines.length ? String(lines[0]) : null;
+      }
+      function askCursor() { return (earlierInfo && earlierInfo.before) || EVER; }
+      function isExhausted() {
+        return !!exhausted && exhausted.from === cursor && exhausted.ask === askCursor() && exhausted.since === newestSince;
+      }
+      function goPage(target, leaving, asking) {
+        if (pageBusy) return;
+        pageBusy = true; pageNote = null;
+        var mine = ++pageToken;
+        redraw();
+        fetch(pageUrl(target), { headers: { accept: "application/json" } })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (mine !== pageToken) return;
+            pageBusy = false;
+            if (!d || !Array.isArray(d.closed)) { pageNote = "The office couldn't be reached for that page, so the page stands."; redraw(); return; }
+            learnLimit(d);
+            if (asking && !d.closed.length) {
+              // only the office's own source says what "nothing" means: the record has nothing earlier; its short memory may simply not hold it
+              var memoryOnly = !d.earlier || d.earlier.source !== "record";
+              exhausted = { from: cursor, ask: target, since: newestSince,
+                text: memoryOnly ? "This is only the office's short memory, so older history may not be available." : "There is nothing earlier than this." };
+              redraw();
+              return;
+            }
+            leaving(); // the move is real only once the answer is
+            cursor = target;
+            closedList = d.closed;
+            earlierInfo = d.earlier && typeof d.earlier === "object" ? d.earlier : null;
+            redraw();
+          })
+          .catch(function () {
+            if (mine !== pageToken) return;
+            pageBusy = false;
+            pageNote = "The office couldn't be reached for that page, so the page stands.";
+            redraw();
+          });
+      }
+      function canShowEarlier() {
+        if (!earlierInfo || isExhausted()) return false;
+        return (earlierInfo.remaining > 0 && !!earlierInfo.before) || earlierInfo.source === "memory";
+      }
+      function showEarlier() {
+        if (!canShowEarlier()) return;
+        var from = cursor;
+        goPage(askCursor(), function () { trail.push(from); }, true);
+      }
+      function showNewer() {
+        if (!trail.length) return;
+        var back = trail[trail.length - 1];
+        goPage(back, function () { trail.pop(); }, false);
+      }
+      // The finished conversations: the page held, and the controls that move to the page behind or ahead of it.
+      function redraw() {
+        paint(closedBox, closedList, "No conversations have finished yet.", false);
+        var nav = el("div", "c-pager");
+        if (trail.length) {
+          var newer = el("button", "c-more", "Newer conversations");
+          newer.type = "button"; newer.disabled = pageBusy;
+          newer.addEventListener("click", showNewer);
+          nav.appendChild(newer);
+        }
+        if (canShowEarlier()) {
+          var older = el("button", "c-more", pageBusy ? "Looking…" : "Show earlier");
+          older.type = "button"; older.disabled = pageBusy;
+          older.addEventListener("click", showEarlier);
+          nav.appendChild(older);
+        }
+        if (olderLine) nav.appendChild(el("p", "c-fine", "Older history isn't available: " + olderLine + "."));
+        if (isExhausted()) nav.appendChild(el("p", "c-fine", exhausted.text));
+        if (pageNote) nav.appendChild(el("p", "c-fine", pageNote));
+        if (nav.childNodes.length) closedBox.appendChild(nav);
+      }
+      // SHOW-EARLIER:END
 
-      var moreObserver = typeof IntersectionObserver === "function"
-        ? new IntersectionObserver(function (entries) {
-            if (!entries.some(function (e) { return e.isIntersecting; })) return;
-            if (shown >= lastClosed.length) return;
-            shown += CHUNK;
-            paint(closedBox, lastClosed, "No conversations have finished yet.", false, true);
-          }, { rootMargin: "600px" })   // build them before they are needed, not as they appear
-        : null;
-
-      function paint(box, threads, emptyWords, followsNew, lazy) {
+      function paint(box, threads, emptyWords, followsNew) {
         var was = snapshotScroll(box);
         box.textContent = "";
         if (!threads || !threads.length) { box.appendChild(el("p", "c-empty", emptyWords)); return; }
-        // Without an observer (an old browser) the cap would strand the rest of
-        // the record behind a control that can never fire, so there is no cap.
-        var limit = lazy && moreObserver ? Math.min(shown, threads.length) : threads.length;
-        for (var i = 0; i < limit; i++) box.appendChild(threadNode(threads[i]));
-        if (limit < threads.length) {
-          var rest = threads.length - limit;
-          var more = el("button", "c-more");
-          more.type = "button";
-          more.textContent = rest === 1 ? "1 earlier conversation" : rest + " earlier conversations";
-          // A button, not a bare sentinel: the observer serves the reader who
-          // scrolls, and this serves the reader who tabs, or whose browser has
-          // decided not to run the observer today.
-          more.addEventListener("click", function () {
-            shown += CHUNK;
-            paint(box, threads, emptyWords, followsNew, lazy);
-          });
-          box.appendChild(more);
-          if (moreObserver) moreObserver.observe(more);
-        }
+        for (var i = 0; i < threads.length; i++) box.appendChild(threadNode(threads[i]));
         restoreScroll(box, was, followsNew);
       }
 
@@ -476,15 +556,6 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // again on any later hash change. One shot, deliberately: re-scrolling on
       // every poll would yank a reader who has moved on.
       var anchored = false;
-      // Build far enough into the past that the named thread exists. It reads the
-      // ARRAY rather than the DOM on purpose: the card is exactly what does not
-      // exist yet, so asking the document would always answer no.
-      function reachForHash(threads) {
-        var id = decodeURIComponent((location.hash || "").slice(1));
-        if (!id || !threads.length) return;
-        var i = threads.findIndex(function (t) { return String(t.id) === id; });
-        if (i >= shown) shown = i + 1;
-      }
       function anchorFromHash() {
         var id = decodeURIComponent((location.hash || "").slice(1));
         if (!id) return;
@@ -496,7 +567,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       window.addEventListener("hashchange", function () { anchored = false; tick(); });
 
       function tick() {
-        fetch(API, { headers: { accept: "application/json" } })
+        fetch(pageUrl(null), { headers: { accept: "application/json" } })
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (d) {
             if (!d) {
@@ -507,12 +578,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             // live threads follow the newest voice; a finished one is a record,
             // so it opens at the first thing said rather than the last
             paint(liveBox, d.live, "The town is quiet. Nobody is within earshot of anybody, or nobody has anything to say.", true);
-            lastClosed = Array.isArray(d.closed) ? d.closed : [];
-            // A link that names a thread must reach it even when the past is
-            // only part-built — otherwise lazy rendering would quietly break
-            // every /conversations/#<id> the map and the replay hand out.
-            reachForHash(lastClosed);
-            paint(closedBox, lastClosed, "No conversations have finished yet.", false, true);
+            // the newest page of finished conversations: held only while the reader is on it
+            holdNewest(d);
+            redraw();
             if (!anchored) { anchored = true; anchorFromHash(); }
             pinNext = false;
             if (dials && d.earshot_m) {
@@ -848,8 +916,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     .convo .c-thread.is-live { border-color: rgba(232, 196, 139, 0.42); }
     /* the card a map link landed on — lit until the reader moves on */
     .convo .c-thread.is-anchored { border-color: var(--pm-gold-bright); }
-    /* the sentinel: it says what is still down there rather than being an
-       invisible tripwire, so the record never looks like it simply ends */
+    /* the pager's buttons ("Show earlier", "Newer conversations"): they say what is
+       still down there rather than letting the record look like it simply ends */
     .convo .c-more {
       display: block; width: 100%; margin: 0.9rem 0 0; padding: 0.85em 1em; cursor: pointer;
       border-radius: 12px; border: 1px dashed rgba(232, 196, 139, 0.3);
@@ -857,6 +925,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       font: 0.76rem/1 var(--pm-mono); letter-spacing: 0.06em;
     }
     .convo .c-more:hover { border-color: var(--pm-gold); color: var(--pm-gold-bright); }
+    .convo .c-more:disabled { cursor: progress; opacity: 0.6; }
     .convo .c-thread-head { display: flex; align-items: baseline; gap: 0.8em; flex-wrap: wrap; }
     .convo .c-place { margin: 0; font-size: 1.05rem; color: var(--pm-gold-bright); }
     /* the place words are a door to the map — underlined on hover only, so the
