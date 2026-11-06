@@ -388,23 +388,33 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // ── SHOW EARLIER (POS-779) ────────────────────────────────────────────
       //
       // "Gone quiet" is the whole of the town's finished speech and it only ever
-      // grows, so the page holds ONE PAGE of it at a time. The 7-second poll asks
-      // the office for the newest page (the office's own memory, cheap); "Show
-      // earlier" asks it for the page behind the one held, by the cursor the
-      // office handed back (`earlier.before`), which the office reads from the
-      // town's record where it keeps one. The answer REPLACES the page held, so
-      // the cards on the page never grow past one page however far back a reader
+      // grows, so the page holds ONE PAGE of it at a time (40, the same count the
+      // World map reads and links to). The 7-second poll asks the office for the
+      // newest page and what is happening now; that answer is the office's MEMORY,
+      // which may hold a page of finished threads, fewer, or none. So "Show
+      // earlier" is offered whenever the poll says it is memory, and asks the
+      // office for the page behind the cursor the poll handed back (`earlier.before`,
+      // or the end of time when memory shows no finished thread): the office reads
+      // that page from the town's RECORD where it keeps one. The answer REPLACES
+      // the page held, so the cards never accumulate however far back a reader
       // goes; "Newer" walks the same cursors back. While an earlier page is held
       // the poll still refreshes what is happening now, and leaves the page alone.
+      // The record reaches back only as far as the settlements the office has read:
+      // when its answer says older voices are not grouped (its `disclosed` list),
+      // the page says plainly that older history isn't available.
       // SHOW-EARLIER:BEGIN
-      var CLOSED_PAGE = 20;
+      var CLOSED_PAGE = 40;
+      var EVER = "9999-12-31T23:59:59.999Z"; // a cursor later than any voice: the record's newest page
+      var OLDER_NOTE = /before the oldest settlement this office has read/; // the office's own words (world2-serve.mjs), read off `disclosed`
       var closedList = [];     // the ONE page of finished conversations held
-      var earlierInfo = null;  // the office's `earlier` for that page: { source, remaining, before, note }
-      var cursor = null;       // the held page's cursor: null is the newest page
+      var earlierInfo = null;  // the office's `earlier` for that page: { source, remaining, before }
+      var cursor = null;       // the held page's cursor: null is the newest page (the poll's)
       var trail = [];          // the cursors of the pages left behind, newest last (null: the newest page)
       var pageToken = 0;       // a newer ask retires an older answer
       var pageBusy = false;
       var pageNote = null;
+      var noMore = false;      // an ask for earlier came back empty: there is nothing behind this
+      var olderLine = null;    // the office's line about voices older than its known settlements, learned from a record answer
       function pageUrl(c) {
         return API + "?closed=" + CLOSED_PAGE + (c ? "&before=" + encodeURIComponent(c) : "");
       }
@@ -415,7 +425,13 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         earlierInfo = body.earlier && typeof body.earlier === "object" ? body.earlier : null;
         return true;
       }
-      function goPage(target, leaving) {
+      // What a record answer says about the limit of its reach, kept on the page (a poll does not clear it).
+      function learnLimit(d) {
+        if (!d.earlier || d.earlier.source !== "record") return;
+        var lines = Array.isArray(d.disclosed) ? d.disclosed.filter(function (x) { return OLDER_NOTE.test(String(x)); }) : [];
+        olderLine = lines.length ? String(lines[0]) : null;
+      }
+      function goPage(target, leaving, asking) {
         if (pageBusy) return;
         pageBusy = true; pageNote = null;
         var mine = ++pageToken;
@@ -426,6 +442,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             if (mine !== pageToken) return;
             pageBusy = false;
             if (!d || !Array.isArray(d.closed)) { pageNote = "The office couldn't be reached for that page, so the page stands."; redraw(); return; }
+            learnLimit(d);
+            if (asking && !d.closed.length) { noMore = true; pageNote = "There is nothing earlier than this."; redraw(); return; }
             leaving(); // the move is real only once the answer is
             cursor = target;
             closedList = d.closed;
@@ -439,26 +457,20 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             redraw();
           });
       }
+      function canShowEarlier() {
+        if (noMore || !earlierInfo) return false;
+        return (earlierInfo.remaining > 0 && !!earlierInfo.before) || earlierInfo.source === "memory";
+      }
       function showEarlier() {
-        if (!earlierInfo || !earlierInfo.before) return;
+        if (!canShowEarlier()) return;
         var from = cursor;
-        goPage(earlierInfo.before, function () { trail.push(from); });
+        goPage(earlierInfo.before || EVER, function () { trail.push(from); }, true);
       }
       function showNewer() {
         if (!trail.length) return;
         var back = trail[trail.length - 1];
-        goPage(back, function () { trail.pop(); });
+        goPage(back, function () { trail.pop(); }, false);
       }
-      // SHOW-EARLIER:END
-
-      function paint(box, threads, emptyWords, followsNew) {
-        var was = snapshotScroll(box);
-        box.textContent = "";
-        if (!threads || !threads.length) { box.appendChild(el("p", "c-empty", emptyWords)); return; }
-        for (var i = 0; i < threads.length; i++) box.appendChild(threadNode(threads[i]));
-        restoreScroll(box, was, followsNew);
-      }
-
       // The finished conversations: the page held, and the controls that move to the page behind or ahead of it.
       function redraw() {
         paint(closedBox, closedList, "No conversations have finished yet.", false);
@@ -469,15 +481,24 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           newer.addEventListener("click", showNewer);
           nav.appendChild(newer);
         }
-        if (earlierInfo && earlierInfo.remaining > 0 && earlierInfo.before) {
+        if (canShowEarlier()) {
           var older = el("button", "c-more", pageBusy ? "Looking…" : "Show earlier");
           older.type = "button"; older.disabled = pageBusy;
           older.addEventListener("click", showEarlier);
           nav.appendChild(older);
         }
-        var note = pageNote || (earlierInfo && earlierInfo.source === "memory" && !(earlierInfo.remaining > 0) ? earlierInfo.note : null);
-        if (note) nav.appendChild(el("p", "c-fine", note));
+        if (olderLine) nav.appendChild(el("p", "c-fine", "Older history isn't available: " + olderLine + "."));
+        if (pageNote) nav.appendChild(el("p", "c-fine", pageNote));
         if (nav.childNodes.length) closedBox.appendChild(nav);
+      }
+      // SHOW-EARLIER:END
+
+      function paint(box, threads, emptyWords, followsNew) {
+        var was = snapshotScroll(box);
+        box.textContent = "";
+        if (!threads || !threads.length) { box.appendChild(el("p", "c-empty", emptyWords)); return; }
+        for (var i = 0; i < threads.length; i++) box.appendChild(threadNode(threads[i]));
+        restoreScroll(box, was, followsNew);
       }
 
       // Pinned notices: the office's durable word over an area. Every string
