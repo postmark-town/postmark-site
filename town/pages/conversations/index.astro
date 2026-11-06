@@ -413,13 +413,18 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       var pageToken = 0;       // a newer ask retires an older answer
       var pageBusy = false;
       var pageNote = null;
-      var noMore = false;      // an ask for earlier came back empty: there is nothing behind this
+      // An ask for earlier that came back EMPTY is remembered for the page and the ask it was made on, not for the tab: it holds while the
+      // same page (cursor), the same ask (the cursor the poll hands back) and the same settlement stand, and lapses when any of them moves
+      // (new history after a settlement, a different page), so a truthful "nothing behind this" is never made permanent.
+      var exhausted = null;    // { from, ask, since, text }
+      var newestSince = null;  // the settlement the newest poll names (`settlement_since`)
       var olderLine = null;    // the office's line about voices older than its known settlements, learned from a record answer
       function pageUrl(c) {
         return API + "?closed=" + CLOSED_PAGE + (c ? "&before=" + encodeURIComponent(c) : "");
       }
       // The poll's page of finished conversations: held only while the reader is on the newest page.
       function holdNewest(body) {
+        newestSince = body && body.settlement_since != null ? String(body.settlement_since) : null;
         if (cursor !== null || pageBusy) return false;
         closedList = Array.isArray(body.closed) ? body.closed : [];
         earlierInfo = body.earlier && typeof body.earlier === "object" ? body.earlier : null;
@@ -430,6 +435,10 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         if (!d.earlier || d.earlier.source !== "record") return;
         var lines = Array.isArray(d.disclosed) ? d.disclosed.filter(function (x) { return OLDER_NOTE.test(String(x)); }) : [];
         olderLine = lines.length ? String(lines[0]) : null;
+      }
+      function askCursor() { return (earlierInfo && earlierInfo.before) || EVER; }
+      function isExhausted() {
+        return !!exhausted && exhausted.from === cursor && exhausted.ask === askCursor() && exhausted.since === newestSince;
       }
       function goPage(target, leaving, asking) {
         if (pageBusy) return;
@@ -443,7 +452,14 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             pageBusy = false;
             if (!d || !Array.isArray(d.closed)) { pageNote = "The office couldn't be reached for that page, so the page stands."; redraw(); return; }
             learnLimit(d);
-            if (asking && !d.closed.length) { noMore = true; pageNote = "There is nothing earlier than this."; redraw(); return; }
+            if (asking && !d.closed.length) {
+              // only the office's own source says what "nothing" means: the record has nothing earlier; its short memory may simply not hold it
+              var memoryOnly = !d.earlier || d.earlier.source !== "record";
+              exhausted = { from: cursor, ask: target, since: newestSince,
+                text: memoryOnly ? "This is only the office's short memory, so older history may not be available." : "There is nothing earlier than this." };
+              redraw();
+              return;
+            }
             leaving(); // the move is real only once the answer is
             cursor = target;
             closedList = d.closed;
@@ -458,13 +474,13 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           });
       }
       function canShowEarlier() {
-        if (noMore || !earlierInfo) return false;
+        if (!earlierInfo || isExhausted()) return false;
         return (earlierInfo.remaining > 0 && !!earlierInfo.before) || earlierInfo.source === "memory";
       }
       function showEarlier() {
         if (!canShowEarlier()) return;
         var from = cursor;
-        goPage(earlierInfo.before || EVER, function () { trail.push(from); }, true);
+        goPage(askCursor(), function () { trail.push(from); }, true);
       }
       function showNewer() {
         if (!trail.length) return;
@@ -488,6 +504,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           nav.appendChild(older);
         }
         if (olderLine) nav.appendChild(el("p", "c-fine", "Older history isn't available: " + olderLine + "."));
+        if (isExhausted()) nav.appendChild(el("p", "c-fine", exhausted.text));
         if (pageNote) nav.appendChild(el("p", "c-fine", pageNote));
         if (nav.childNodes.length) closedBox.appendChild(nav);
       }

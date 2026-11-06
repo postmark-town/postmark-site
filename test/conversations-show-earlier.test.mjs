@@ -51,7 +51,11 @@ function office({ record = 45, memory = record, store = true } = {}) {
   const all = Array.from({ length: record }, (_, i) => ({ id: `t${record - i}`, latest: new Date(Date.UTC(2026, 10, 1) + (record - i) * 3600_000).toISOString(), voice_count: 3 }));
   const mem = all.slice(0, memory);
   const asked = [];
-  const answer = (url) => {
+  const o = { all, asked, since: "2026-11-01T06:00:00.000Z" };
+  // history that arrives later: a thread newer than every other, in the record and in memory; and a settlement
+  o.addThread = (id) => { const t = { id, latest: new Date(Date.UTC(2026, 10, 2) + all.length * 3600_000).toISOString(), voice_count: 3 }; all.unshift(t); mem.unshift(t); };
+  o.settle = (iso) => { o.since = iso; };
+  o.answer = (url) => {
     asked.push(url);
     const u = new URL("http://x" + url);
     const before = u.searchParams.get("before");
@@ -60,10 +64,10 @@ function office({ record = 45, memory = record, store = true } = {}) {
     const older = before ? from.filter((t) => Date.parse(t.latest) < Date.parse(before)) : from;
     const closed = older.slice(0, n);
     const source = before && store ? "record" : "memory";
-    return { closed, live: [], earlier: { source, remaining: older.length - closed.length, before: closed.length ? closed[closed.length - 1].latest : null },
+    return { closed, live: [], settlement_since: o.since, earlier: { source, remaining: older.length - closed.length, before: closed.length ? closed[closed.length - 1].latest : null },
       ...(source === "record" ? { disclosed: ["two eras answer this read", LIMIT] } : {}) };
   };
-  return { all, asked, answer };
+  return o;
 }
 
 /** The page's block, with its own `redraw`, over a fetch the test drives. `painted` is each call of `paint`: the ids held. */
@@ -78,7 +82,7 @@ function rig(off, { fail = false } = {}) {
   const paint = (b, threads) => { b.children.length = 0; painted.push((threads ?? []).map((t) => t.id)); };
   const make = new Function("API", "fetch", "paint", "closedBox", "document", `${elSrc}\n${block}
     return { get closedList() { return closedList; }, get earlierInfo() { return earlierInfo; }, get cursor() { return cursor; }, get trail() { return trail; },
-             get pageNote() { return pageNote; }, get olderLine() { return olderLine; }, get noMore() { return noMore; },
+             get pageNote() { return pageNote; }, get olderLine() { return olderLine; }, isExhausted,
              pageUrl, holdNewest, showEarlier, showNewer, redraw, canShowEarlier, CLOSED_PAGE, EVER };`);
   const state = make(API, fetchStub, paint, box, { createElement: node });
   const poll = () => { state.holdNewest(off.answer(state.pageUrl(null))); state.redraw(); };
@@ -132,7 +136,9 @@ test("partial memory (6 of 14): the 8 older threads are reached from memory's ow
   assert.equal(state.closedList.length, 6);
 });
 
-test("an office with no record: Show earlier comes back empty, the page stands and says there is nothing earlier", async () => {
+const MEMORY_END = "This is only the office's short memory, so older history may not be available.";
+
+test("an office with no record: Show earlier comes back empty, the page stands, and the end is said to be only memory (not 'nothing earlier')", async () => {
   const off = office({ record: 6, store: false });
   const { state, box, poll, painted } = rig(off);
   poll();
@@ -140,10 +146,89 @@ test("an office with no record: Show earlier comes back empty, the page stands a
   state.showEarlier();
   await flush();
   assert.deepEqual(ids(state.closedList), held, "the page stands");
-  assert.equal(state.noMore, true);
+  assert.equal(state.isExhausted(), true);
   assert.deepEqual(labels(box), [], "no button to press again");
-  assert.ok(texts(box).includes("There is nothing earlier than this."), "and it says so: " + JSON.stringify(texts(box)));
+  const said = texts(box);
+  assert.ok(said.includes(MEMORY_END), "it says plainly this is only the office's memory: " + JSON.stringify(said));
+  assert.ok(!said.some((t) => /nothing earlier/i.test(t)), "and does not claim there is nothing earlier");
   assert.ok(painted.at(-1).length === held.length);
+});
+
+test("a record with nothing earlier says so plainly, and that is a different sentence from the memory one", async () => {
+  const off = office({ record: 6, memory: 6, store: true });
+  const clean = off.answer;
+  off.answer = (url) => { const b = clean(url); if (b.earlier.source === "record") b.closed = []; return b; }; // the record holds nothing behind the memory page
+  const { state, box, poll } = rig(off);
+  poll(); state.showEarlier(); await flush();
+  assert.equal(state.isExhausted(), true);
+  assert.ok(texts(box).includes("There is nothing earlier than this."), JSON.stringify(texts(box)));
+  assert.ok(!texts(box).includes(MEMORY_END));
+});
+
+test("exhaustion belongs to the page, the ask and the settlement: unchanged polls keep it; a new settlement, new history or another page restores the entry", async () => {
+  // unchanged exhausted cursor stays exhausted through repeated identical polls, and asks nothing more
+  const off = office({ record: 6, store: false });
+  const { state, box, poll } = rig(off);
+  poll(); state.showEarlier(); await flush();
+  const asks = off.asked.length;
+  for (let i = 0; i < 4; i++) poll();
+  assert.equal(state.isExhausted(), true, "identical polls do not undo a truthful exhausted result");
+  assert.deepEqual(labels(box), []);
+  assert.equal(off.asked.length - asks, 4, "each poll is one ask (the poll itself), and none is a press");
+  // a settlement: the same page, a new settlement, entry restored
+  off.settle("2026-11-01T18:00:00.000Z");
+  poll();
+  assert.equal(state.isExhausted(), false, "after a settlement the earlier answer is no longer the last word");
+  assert.deepEqual(labels(box), ["Show earlier"]);
+  assert.ok(!texts(box).includes(MEMORY_END), "and the stale sentence is gone");
+  // pressed again on the same settlement: exhausted again, for that settlement
+  state.showEarlier(); await flush();
+  assert.equal(state.isExhausted(), true);
+});
+
+test("new history changes the ask: an empty memory that later holds a finished thread offers Show earlier again", async () => {
+  const off = office({ record: 3, memory: 0, store: false });
+  const { state, box, poll } = rig(off);
+  poll(); state.showEarlier(); await flush();
+  assert.equal(state.isExhausted(), true, "exhausted on the end-of-time ask");
+  assert.deepEqual(labels(box), []);
+  off.addThread("t-new");
+  poll();
+  assert.equal(state.closedList.length, 1);
+  assert.equal(state.isExhausted(), false, "a finished thread now gives the poll a cursor of its own: a new ask");
+  assert.deepEqual(labels(box), ["Show earlier"]);
+});
+
+test("exhaustion is for the page it was found on: another cursor never inherits it, and the same page finds it again", async () => {
+  const off = office({ record: 95, memory: 95 });
+  // the record's first page behind the poll says one more thread stands behind it, and then the ask for it comes back empty
+  const real = off.answer;
+  let behindC1 = null; // the cursor behind the record's first page, learned from its first answer
+  off.answer = (url) => {
+    const b = real(url);
+    if (b.earlier.source !== "record") return b;
+    if (behindC1 !== null && new URL("http://x" + url).searchParams.get("before") === behindC1) return { ...b, closed: [] };
+    if (behindC1 === null) behindC1 = b.earlier.before;
+    return { ...b, earlier: { ...b.earlier, remaining: 1 } };
+  };
+  const { state, box, poll } = rig(off);
+  poll();
+  state.showEarlier(); await flush();            // page 1 of the record (cursor c1), claiming one thread more behind it
+  const c1 = state.cursor;
+  assert.ok(c1 !== null);
+  state.showEarlier(); await flush();            // the ask behind c1 is empty: exhausted for c1
+  assert.equal(state.isExhausted(), true);
+  assert.deepEqual(labels(box), ["Newer conversations"], "no way further behind this page");
+  assert.ok(texts(box).includes("There is nothing earlier than this."));
+  state.showNewer(); await flush();              // the newest page is a different cursor
+  assert.equal(state.cursor, null);
+  assert.equal(state.isExhausted(), false, "the answer found behind c1 does not hide entry from the newest page");
+  assert.deepEqual(labels(box), ["Show earlier"]);
+  state.showEarlier(); await flush();            // back to c1 (the same ask, the same settlement)
+  assert.equal(state.cursor, c1);
+  state.showEarlier();                           // c1's ask is the same one that was empty: it stands exhausted, and asks nothing new
+  await flush();
+  assert.equal(state.isExhausted(), true);
 });
 
 test("the limit of the reach is ON THE PAGE: drawn from the record's own disclosed line, at the end and on the way, and kept through live polls", async () => {
