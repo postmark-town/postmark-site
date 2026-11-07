@@ -63,6 +63,106 @@ export function bulletinCards(bulletin) {
     .filter((p) => !isHappening(p));
 }
 
+// ── THE HOME PAGE'S SIGNED-IN CARD BAND (Site UX campaign, POS-855, D7) ──────
+// The signed-in reader's front door shows the newest postings as teaser cards.
+// It used to take the six newest of everything but Ferry's Daily, which hung
+// the calendar's happenings (a trick-or-treat night, an ended invitation) on
+// the front door after their day.
+//
+// THE RULE (D7, as amended 11-01 18:15). The band keeps the wall's "not the
+// Daily" and does NOT drop happenings wholesale: the wall unpins them, so this
+// band is the only door some of them have. It skips a posting whose OWN
+// frontmatter marks it closed — `data.status`, the structured field the
+// postings carry. "closed", "ended" and "past" mean finished: the town's word
+// for a finished posting is `past` (Wright, 00:18Z); the other two are kept as
+// the plain words. Any other word (open, live, resting) has no finished
+// meaning, so it never hides a card: hiding a happening takes away its only
+// door. Nothing is guessed from a date.
+
+/** How many cards the lens band hangs at most. */
+export const LENS_LIMIT = 6;
+
+/**
+ * The `data.status` words that mean the posting is over: it is not a current
+ * posting. Anything else, or no status at all, is current. `past` is the town's
+ * own word for a finished posting (Wright, 00:18Z).
+ */
+export const CLOSED_STATUSES = Object.freeze(["closed", "ended", "past"]);
+
+/** A posting is closed when its own `status` says so. */
+export function isClosed(posting) {
+  return CLOSED_STATUSES.includes(String(posting?.data?.status ?? "").trim().toLowerCase());
+}
+
+// THE DATE A POSTING IS ORDERED BY (Site UX, POS-855, front-latest). Every
+// bulletin date on the site is `data.posted`. A posting may also carry an
+// optional `data.updated`, for a keeper who revises a posting and wants it back
+// at the top. A posting cannot have been updated before it was posted, so the
+// date it is ordered by is the LATER of the two: when `updated` is present (not
+// blank) and later than `posted`, it is the date ordered by AND shown, worded
+// "updated <date>"; otherwise (no `updated`, or one that is not later, a stray
+// older date) `posted` is, exactly as before. No posting carries `updated`
+// today, so nothing reorders until a keeper adds one (finding F-27).
+
+/**
+ * The date a posting is ordered and shown by: the later of `data.updated` and
+ * `data.posted`, `posted` when `updated` is blank, missing or not later (taken
+ * as written, so the order without `updated` is the old order, byte for byte).
+ * Empty when the posting has neither.
+ * @param {{data?: object}} posting
+ * @returns {{date: string, updated: boolean}}
+ */
+export function postingStamp(posting) {
+  const posted = String(posting?.data?.posted ?? "");
+  const updated = String(posting?.data?.updated ?? "");
+  if (updated.trim() && updated.trim().localeCompare(posted.trim()) > 0) return { date: updated, updated: true };
+  return { date: posted, updated: false };
+}
+
+/**
+ * The words that date a posting for a reader: "<date>", or "updated <date>"
+ * when the posting is ordered by `updated`; empty when it has no date. `fmt`
+ * words the date itself (the pages pass pm.mjs's fmtDate).
+ * @param {{data?: object}} posting
+ * @param {(iso: string) => string} [fmt]
+ */
+export function postingWhen(posting, fmt = (d) => d) {
+  const { date, updated } = postingStamp(posting);
+  if (!date) return "";
+  return updated ? `updated ${fmt(date.trim())}` : fmt(date);
+}
+
+/**
+ * The postings the signed-in card band shows: every posting but Ferry's Daily
+ * and those marked closed (a happening that is not closed stays), newest
+ * first by the later of `updated` and `posted` (postingStamp), at most
+ * `limit`. Ties keep the bulletin's file order (a stable sort). An empty list
+ * is a real answer: the page then shows the story band instead of an empty one.
+ * Callers: the home page's signed-in band (LENS_LIMIT) and its signed-out
+ * "Latest on the bulletin" list (latestPostings); nothing else.
+ * @param {Array<{slug: string, data?: object}>} bulletin  bulletin.json
+ * @param {number} [limit]
+ */
+export function lensPostings(bulletin, limit = LENS_LIMIT) {
+  return (bulletin ?? [])
+    .filter((p) => !NOT_A_CARD.has(p.slug) && !isClosed(p))
+    .sort((a, b) => postingStamp(b).date.localeCompare(postingStamp(a).date))
+    .slice(0, limit);
+}
+
+/** How many postings the signed-out front page lists under the story. */
+export const LATEST_LIMIT = 3;
+
+/**
+ * The signed-out front page's "Latest on the bulletin": the first LATEST_LIMIT
+ * of lensPostings, so it is the same postings in the same order the signed-in
+ * band opens with, never a second rule.
+ * @param {Array<{slug: string, data?: object}>} bulletin  bulletin.json
+ */
+export function latestPostings(bulletin) {
+  return lensPostings(bulletin, LATEST_LIMIT);
+}
+
 // ── PINNED FOR EVERYONE (Keemin, 2026-09-27) ────────────────────────────────
 // "For the notices, we should have a couple of them always pinned at the top:
 // PSAs are an obvious choice … pin 1-2 more durable ones. These should be

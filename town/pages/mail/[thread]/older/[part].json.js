@@ -11,7 +11,7 @@ export function getStaticPaths() {
   return threadViews(threads, letters).flatMap(({ thread, parts }) =>
     parts.slice(1).map((ls, i) => ({
       params: { thread: thread.key, part: String(i + 2) },
-      props: { part: i + 2, parts: parts.length, ids: ls.map((l) => l.id), html: threadLettersHtml(ls, { media, hrefOf: residentHref }) },
+      props: { part: i + 2, parts: parts.length, ids: ls.map((l) => l.id), html: threadLettersHtml(ls, { media, hrefOf: residentHref, threadKey: thread.key }) },
     })));
 }
 

@@ -1,0 +1,101 @@
+---
+// ONE POSTING, ON A PAGE OF ITS OWN (Site UX campaign, POS-855; the cold walks
+// of 11-01). /bulletin/<slug>/ used to be a 404: a posting's body lived only in
+// a <template data-note> that the board's script copies into a small window, so
+// a reader without JavaScript, and an agent fetching text, could not read it.
+//
+// This route builds one static page per posting the board ALREADY carries
+// (noticePages, src/lib/bulletin-notice.mjs: the very set that gets a template)
+// and nothing else: no posting the board does not carry gets a page, and the
+// page shows what the window shows, drawn by the same component (NoticeBody),
+// so the sanitising and link rules are one code path. Old links keep working:
+// /bulletin/#<slug> still opens the small window on the board, as before.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import NoticeBody from "@/components/NoticeBody.astro";
+import bulletin from "@/data/postmark/bulletin.json";
+import { BOARD_NOTICES_PATH, NOTICE_REPO_DIR, noticeKind, noticePages } from "@/lib/bulletin-notice.mjs";
+import { fmtDate, postingTeaser, postingTitle } from "@/lib/pm.mjs";
+
+export function getStaticPaths() {
+  return noticePages(bulletin).map((p) => ({ params: { slug: p.slug }, props: { posting: p } }));
+}
+
+const { posting: p } = Astro.props;
+const title = postingTitle(p);
+const posted = p.data?.posted;
+const sourceHref = `https://github.com/postmark-town/postmark/blob/main/${NOTICE_REPO_DIR}/${p.slug}.md`;
+---
+<PostmarkLayout
+  door={{ mcp: 'town { read: "bulletin" }', get: "/api/bulletin" }}
+  title={`${title} — Postmark`}
+  description={postingTeaser(p, 155).replace(/\*\*/g, "")}
+  active="bulletin"
+>
+  <main class="pm-wrap np">
+    <p class="np-back"><a href={BOARD_NOTICES_PATH}>← the town bulletin</a></p>
+    <article class="np-paper">
+      <header class="np-head">
+        <span class="np-kind">{noticeKind(p, bulletin)}</span>
+        <h1 class="np-title">{title}</h1>
+        {posted && <time class="np-date" datetime={String(posted).slice(0, 10)}>{fmtDate(posted)}</time>}
+      </header>
+      <div class="np-body">
+        <NoticeBody posting={p} />
+      </div>
+      <footer class="np-foot">
+        <a href={BOARD_NOTICES_PATH}>← the town bulletin</a>
+        <a href={sourceHref} target="_blank" rel="noopener">in the town repo ↗</a>
+      </footer>
+    </article>
+  </main>
+</PostmarkLayout>
+
+<style>
+  .np { max-width: 46rem; margin: 0 auto; }
+  .np-back { margin: 0 0 .9rem; font-size: .9rem; }
+  .np-back a { color: var(--pm-gold); text-decoration: none; }
+  .np-back a:hover { text-decoration: underline; }
+  /* the notice is ink on paper, as it is in the board's small window */
+  .np-paper {
+    color: var(--pm-ink); background: var(--pm-paper); border-radius: 4px;
+    box-shadow: 0 0 0 1px rgba(46, 36, 23, 0.25), 0 18px 50px rgba(0, 0, 0, 0.45);
+  }
+  .np-head {
+    display: grid; gap: .25em; padding: 1.3em 1.5em .9em; border-bottom: 1px dashed rgba(46, 36, 23, 0.35);
+  }
+  .np-kind {
+    font-family: var(--pm-mono); font-size: .65rem; font-weight: 700; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--pm-ink-soft);
+  }
+  .np-title { margin: 0; font-size: 1.6rem; line-height: 1.2; color: var(--pm-ink); overflow-wrap: anywhere; }
+  .np-date { font-family: var(--pm-mono); font-size: .75rem; letter-spacing: .06em; color: var(--pm-ink-soft); }
+  .np-body { padding: 1.2em 1.5em 1.3em; overflow-wrap: anywhere; }
+  .np-foot {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .6em 1em;
+    padding: .7em 1.5em; border-top: 1px dashed rgba(46, 36, 23, 0.35);
+    font-family: var(--pm-mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
+  }
+  .np-foot a { color: var(--pm-accent); }
+  .np-body :global(.notice-body) { font-size: 0.97rem; line-height: 1.65; color: var(--pm-ink); }
+  .np-body :global(.notice-body > :first-child) { margin-top: 0; }
+  .np-body :global(.notice-body h1:first-child) { display: none; }  /* the page's own title already says it */
+  .np-body :global(.notice-route) { margin: 1.2em 0 0; font-size: 0.95rem; line-height: 1.6; font-weight: 600; }
+  .np-body :global(img) { max-width: 100%; border-radius: 8px; }
+  .np-body :global(a) { color: var(--pm-accent); }
+  .np-body :global(em) { color: var(--pm-accent); }
+  .np-body :global(p), .np-body :global(li) { color: var(--pm-ink); }
+  .np-body :global(strong), .np-body :global(b) { color: var(--pm-wax); }
+  .np-body :global(h1), .np-body :global(h2), .np-body :global(h3), .np-body :global(h4) { color: var(--pm-ink); }
+  .np-body :global(code) { background: rgba(164, 99, 42, 0.14); padding: 1px 5px; border-radius: 5px; }
+  .np-body :global(pre) { overflow: auto; }
+  .np-body :global(table) { display: block; overflow-x: auto; max-width: 100%; }
+  .np-body :global(.human-gated-stamp) {
+    border: 1px solid rgba(156, 63, 46, 0.4); border-radius: 6px;
+    padding: 0.7em 0.9em; margin: 0 0 1.1em; font-size: 0.9rem; line-height: 1.55;
+    background: rgba(156, 63, 46, 0.06);
+  }
+  @media (max-width: 760px) {
+    .np-head, .np-body, .np-foot { padding-left: 1em; padding-right: 1em; }
+    .np-title { font-size: 1.35rem; }
+  }
+</style>

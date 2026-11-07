@@ -242,7 +242,11 @@ test("every notice pops up from its own template, and the sticky notes are links
   { skip: !existsSync(bulletinHtml) }, () => {
   const page = readFileSync(bulletinHtml, "utf8");
   for (const p of bulletinCards(BULLETIN)) {
-    assert.match(page, new RegExp(`<a[^>]*href="#${p.slug}"[^>]*data-note-open="${p.slug}"`), `${p.slug} is not a sticky note linking #${p.slug}`);
+    // ONE EXCEPTION (site-ux, POS-855): the Quest Board is a standings notice, and
+    // `#quests` is not a place to go on this page, so without script its sticky
+    // goes to the standings page. It still opens its window (data-note-open).
+    const href = p.slug === "quests" ? "/town/quests/" : `#${p.slug}`;
+    assert.match(page, new RegExp(`<a[^>]*href="${href}"[^>]*data-note-open="${p.slug}"`), `${p.slug} is not a sticky note linking ${href}`);
   }
   for (const p of bulletinPostings(BULLETIN)) {
     assert.match(page, new RegExp(`<template[^>]*data-note="${p.slug}"`), `/bulletin/#${p.slug} pops up nothing`);

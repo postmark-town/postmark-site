@@ -687,6 +687,68 @@ test("a roll that walks short of the door's own total refuses the build", async 
   );
 });
 
+// ── THE TOWN MOVED UNDER THE WALK (STAR-108, 2026-11-03) ─────────────────────
+//
+// The door pages an alphabetical roll by offset. On 11-03 the deploy read
+// `total` 336 on the first page, andy-the-cookie-monster joined at row 10
+// before the second, every later row shifted by one, and the walk came back
+// 337 rows long with one row twice: "walked 337 of 336", a refused release on a
+// roll that was whole a minute later. A walk the town moved under is walked again.
+
+/** A paged door over a roll that `move(call)` may change before each page is served. */
+function movingDoor(start, move = () => {}) {
+  const roll = [...start];
+  let call = 0;
+  const door = async (url) => {
+    const u = new URL(url);
+    move(call++, roll);
+    const limit = Number(u.searchParams.get("limit"));
+    const offset = Number(u.searchParams.get("offset"));
+    const residents = [...roll].sort().slice(offset, offset + limit).map((handle) => ({ handle }));
+    const body = { total: roll.length, shown: residents.length, residents };
+    return { ok: true, status: 200, headers: new Headers(), json: async () => body };
+  };
+  door.calls = () => call;
+  return door;
+}
+
+test("a resident who joins mid-walk costs one more walk, not a refused release", async () => {
+  // page 1 of walk 1 is served, then "aaron" joins ahead of the cursor: page 2
+  // repeats "cyd" and the walk never sees "aaron". The second walk is whole.
+  const door = movingDoor(["bea", "cyd", "dov", "eli"], (call, roll) => { if (call === 1) roll.push("aaron"); });
+  const { roll, total, walks } = await fetchResidentRoll({ apiBase: "https://example.test", fetchImpl: door, limit: 2 });
+  assert.equal(walks, 2);
+  assert.equal(total, 5);
+  assert.deepEqual(roll.map((r) => r.handle), ["aaron", "bea", "cyd", "dov", "eli"]);
+});
+
+test("a resident who leaves mid-walk is caught by the door's moving total, not published as a skip", async () => {
+  // "bea" leaves after page 1: every later row shifts up one, so walk 1 would
+  // skip "dov" and still match the new total of 3. The totals disagree
+  // (4, then 3), so the walk is walked again rather than trusted.
+  const door = movingDoor(["bea", "cyd", "dov", "eli"], (call, roll) => { if (call === 1) roll.splice(roll.indexOf("bea"), 1); });
+  const { roll, walks } = await fetchResidentRoll({ apiBase: "https://example.test", fetchImpl: door, limit: 2 });
+  assert.equal(walks, 2);
+  assert.deepEqual(roll.map((r) => r.handle), ["cyd", "dov", "eli"]);
+});
+
+test("a town that moves under every walk still refuses, and says it moved", async () => {
+  let n = 0;
+  const door = movingDoor(["bea", "cyd", "dov", "eli"], (call, roll) => { if (call % 2 === 1) roll.push(`a${n++}`); });
+  await assert.rejects(
+    fetchResidentRoll({ apiBase: "https://example.test", fetchImpl: door, limit: 2 }),
+    /moved under all 3 walks/,
+  );
+});
+
+test("a still town is walked once", async () => {
+  const door = movingDoor(["bea", "cyd", "dov"]);
+  const { walks, pages } = await fetchResidentRoll({ apiBase: "https://example.test", fetchImpl: door, limit: 2 });
+  assert.equal(walks, 1);
+  assert.equal(pages, 2);
+  assert.equal(door.calls(), 2);
+});
+
 // ── THE ROLL THAT FROZE AT 134 (postmark#2730, 2026-09-13) ─────────────────
 //
 // The office's keyless bucket is a burst of 240 refilling at 120 a minute per
@@ -902,6 +964,50 @@ test("a NON-429 failure still keeps its three tries, gate or no gate", async () 
     /failed after 3 attempts/,
   );
   assert.equal(calls, 3, "a dead upstream is not a budget \u2014 three tries, then say so");
+});
+
+// STAR-133 (2026-11-05): a refused connection is the office restarting at its box door, and it is waited out.
+const refusedConn = () => Object.assign(new TypeError("fetch failed"), { cause: Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:4390"), { code: "ECONNREFUSED" }) });
+const okRes = () => ({ ok: true, status: 200, statusText: "OK", headers: { get: () => "sha" }, json: async () => ({ ok: true }) });
+
+test("STAR-133 · an office restarting (refused for 6 s) is waited out, and the refresh goes on", async () => {
+  let clock = 0;
+  const gate = createRateGate({ now: () => clock, sleep: (ms) => { clock += ms; return Promise.resolve(); }, budgetMs: 600_000 });
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; if (clock < 6_000) throw refusedConn(); return okRes(); };
+  const result = await apiGet("/residents?limit=100&offset=0&cards=1", { apiBase: "http://127.0.0.1:4390", fetchImpl, retries: 3, gate });
+  assert.deepEqual(result, { body: { ok: true }, asOf: "sha" });
+  assert.ok(calls > 3, `a restart is waited out, not counted against three tries (calls: ${calls})`);
+  assert.ok(clock >= 6_000 && clock < 10_000, `it waits about as long as the restart (waited ${clock} ms)`);
+});
+
+test("STAR-133 · an office refusing past 120 s is an outage: it trips in the same run", async () => {
+  let clock = 0;
+  const gate = createRateGate({ now: () => clock, sleep: (ms) => { clock += ms; return Promise.resolve(); }, budgetMs: 600_000 });
+  const fetchImpl = async () => { throw refusedConn(); };
+  await assert.rejects(
+    () => apiGet("/residents", { apiBase: "http://127.0.0.1:4390", fetchImpl, retries: 3, gate }),
+    /refused: the office refused the connection for 12\d s, past the 120 s a restart is given/,
+  );
+  assert.ok(clock >= 120_000 && clock < 125_000, `it gives a restart 120 s and no more (waited ${clock} ms)`);
+});
+
+test("STAR-133 · only a REFUSED connection waits: a hang-up keeps its three tries", async () => {
+  let clock = 0;
+  const gate = createRateGate({ now: () => clock, sleep: (ms) => { clock += ms; return Promise.resolve(); }, budgetMs: 600_000 });
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; throw Object.assign(new TypeError("fetch failed"), { cause: Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }) }); };
+  await assert.rejects(() => apiGet("/town", { apiBase: "http://127.0.0.1:4390", fetchImpl, retries: 3, gate }), /failed after 3 attempts/);
+  assert.equal(calls, 3);
+  assert.ok(clock < 2_000, `no restart wait for a reset (waited ${clock} ms)`);
+});
+
+test("STAR-133 · the run's own deadline still wins over the restart wait", async () => {
+  let clock = 0;
+  const gate = createRateGate({ now: () => clock, sleep: (ms) => { clock += ms; return Promise.resolve(); }, budgetMs: 30_000 });
+  const fetchImpl = async () => { throw refusedConn(); };
+  await assert.rejects(() => apiGet("/town", { apiBase: "http://127.0.0.1:4390", fetchImpl, retries: 3, gate }), /refused the connection for 3\d s, and the run's 30 s fetch budget ended the wait/);
+  assert.ok(clock >= 30_000 && clock < 33_000, `it stops at the run's 30 s deadline (waited ${clock} ms)`);
 });
 
 test("the run budget is env-driven, and a nonsense budget is refused rather than defaulted", () => {

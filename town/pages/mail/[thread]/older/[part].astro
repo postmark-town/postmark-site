@@ -52,7 +52,7 @@ const preview = handlesPreview(openerFirst(thread.participants, opener),
       <a class="pm-btn ghost" href={letterPartHref(part - 1, base)}>↓ newer letters</a>
       {part < parts && <a class="pm-btn ghost" href={letterPartHref(part + 1, base)}>↑ older letters</a>}
     </nav>
-    <MailLetters html={threadLettersHtml(ls, { media, hrefOf: residentHref })} />
+    <MailLetters html={threadLettersHtml(ls, { media, hrefOf: residentHref, threadKey: thread.key })} />
     <nav class="older-steps" aria-label="parts of this conversation">
       <a class="pm-btn ghost" href={letterPartHref(part - 1, base)}>↓ newer letters</a>
       {part > 2 && <a class="pm-btn ghost" href={base}>the newest letters →</a>}

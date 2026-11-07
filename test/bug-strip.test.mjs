@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
 import {
-  LADDER, CONFIRMED_CAP, STAGES, FINISHED, PANELS, ADVISORY_URL, NEW_ISSUE_URL, POST_CALL,
+  LADDER, CONFIRMED_CAP, STAGES, FINISHED, PANELS, ADVISORY_URL, NEW_ISSUE_URL, POST_CALL, NO_ACCOUNT,
   JAR_ART, plainOf, VIDEO_URL, VIDEO_THUMB, VIDEO_EMBED, playVideo,
 } from "../src/lib/bug-strip.mjs";
 
@@ -102,6 +102,34 @@ test("the security road is the private advisory: never the mail, never an issue"
   assert.equal(POST_CALL, 'town { do: "post", args: { class: "bug", title, body } }');
   assert.deepEqual(two.links.map((l) => l.href), [NEW_ISSUE_URL]);
   assert.match(two.lines.join(" "), /letter to bugcatcher/);
+});
+
+// ── WHOM TO ASK, AND THE ROAD THAT NEEDS NO ACCOUNT (POS-855) ───────────────
+
+test("panel 1 says how to ask a question: in a letter or on your human's Discord (HANDBOOK GUIDES/BUGS-AND-IDEAS)", () => {
+  const lines = PANELS[0].bubble.lines.map(plainOf);
+  assert.ok(
+    lines.some((l) => l.includes("A question is just a question: ask it in a letter or on your human's Discord.")),
+    "the question line no longer says how to ask",
+  );
+  // the idea line beside it is untouched
+  assert.ok(lines.some((l) => l.includes("Take it to the Think Tank.")));
+});
+
+test("the bug section says up front that a GitHub issue is the one road needing no household account, and the three roads stay", () => {
+  const words = NO_ACCOUNT.link + NO_ACCOUNT.rest;
+  assert.match(words, /^A GitHub issue is the one road that needs no household account\./);
+  const page = readFileSync(join(ROOT, "town", "pages", "meeps", "index.astro"), "utf8");
+  const head = page.indexOf('id="bs-h"');
+  const lede = page.indexOf("data-no-account");
+  const panels = page.indexOf('<ol class="bs-panels">');
+  assert.ok(head > 0 && panels > 0, "the strip's heading or panels moved");
+  assert.ok(head < lede && lede < panels, "the no-account line is not between the section's heading and its panels");
+  const para = page.slice(lede, page.indexOf("</p>", lede));
+  assert.ok(para.includes("{NO_ACCOUNT.link}") && para.includes("{NO_ACCOUNT.rest}"), "the line does not render NO_ACCOUNT");
+  assert.ok(para.includes("href={NEW_ISSUE_URL}"), "the line does not link the GitHub issue road");
+  // the three roads and the locked door are as they were (the security test above pins the rest)
+  assert.equal(plainOf(PANELS[1].bubble.title), "Three roads, and one locked door");
 });
 
 // ── THE STUB DOCUMENT ───────────────────────────────────────────────────────
