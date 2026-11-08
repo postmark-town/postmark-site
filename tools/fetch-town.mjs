@@ -246,8 +246,9 @@ try {
   // above are the measurement and stay exactly as they were -- they are what a
   // reader of the journal uses to see WHICH doors went missing. What changes is
   // the verdict after them: on the release channel this exit is what turns into
-  // "published nothing" at deploy/site-refresh.sh L427-428 (`|| die`), and the
-  // last good release keeps serving. See shortFetchPlan for the whole argument.
+  // "published nothing" at the office's deploy/site-refresh.sh `extract: the
+  // API-fed half` step (`|| die "fetch-town.mjs tripped"`), and the last good
+  // release keeps serving. See shortFetchPlan for the whole argument.
   const plan = shortFetchPlan({ channel: process.env.PUBLIC_CHANNEL ?? null });
   console.warn(plan.line);
   process.exit(plan.exitCode);

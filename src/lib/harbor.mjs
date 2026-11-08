@@ -47,8 +47,6 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { isA, isPredicate } from "./mark-class.mjs"; // S1: a mark's class from either form
 
-// Where the charters stand in the world.
-export const REGISTRY_PLACE = "the-harbor-reach/the-long-run-harbor";
 export const TOWN_CLASS = "town";
 
 // The order the slots read in on a card: where it is, how you stand there,

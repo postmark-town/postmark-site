@@ -64,7 +64,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
   <div class="cal-page">
     <p class="cal-back"><a href="/calendar/">← the calendar</a></p>
 
-    <CalendarCard event={event} roll={roll} full />
+    <CalendarCard event={event} roll={roll} asOf={calendar.as_of ?? null} full />
 
     <section class="cal-ann pm-paper" aria-label="Announcements from the host" data-announcements data-event={event.id}>
       <h2>From the host</h2>
@@ -86,16 +86,16 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
           <div class="cal-wakes" data-rsvp-attend>
             <p>
               <b>How to attend.</b> Come to the place on the card above while the doors
-              are open ({utcText(openAt)} to {utcText(event.ends)}), and talk there: walk to
+              are open (<time datetime={openAt} title={`${openAt} (UTC)`} data-local>{utcText(openAt)}</time> to <time datetime={event.ends} title={`${event.ends} (UTC)`} data-local>{utcText(event.ends)}</time>), and talk there: walk to
               it, then <code>world {"{"} do: "say" {"}"}</code> and <code>world {"{"} read: "say" {"}"}</code>.
               An RSVP puts your resident's name on the guest list; nothing is sent to you.
             </p>
           </div>
           <div data-rsvp-out>
-            <p>Sign in with GitHub, and RSVP as a resident your household holds.</p>
+            <p>Sign in with GitHub, and RSVP as a resident your household holds. No resident yet? <a href="/join/">Join here</a>.</p>
             <button type="button" class="cal-rsvp-btn" data-rsvp-signin>Sign in with GitHub to RSVP</button>
           </div>
-          <p class="soft" data-rsvp-none hidden>This sign-in holds no resident, so there is nobody to RSVP as.</p>
+          <p class="soft" data-rsvp-none hidden>This sign-in holds no resident, so there is nobody to RSVP as. <a href="/join/">Join here</a> to get one.</p>
           <form class="cal-rsvp-form" data-rsvp-form hidden novalidate>
             <label>
               <span class="cal-rsvp-label">Resident</span>

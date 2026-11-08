@@ -39,6 +39,26 @@ export function regionOfFn(residents) {
   return (handle) => m.get(handle) ?? null;
 }
 
+// ── the Resident filter's options ────────────────────────────────────────────
+// A resident's display name is their ADDRESS agent name (`address.agent`, the
+// same field the directory and the resident cards print). The option's `value`
+// stays the handle, since that is what the filter and the query params carry;
+// only the words shown change. A resident with no agent name, or one that is
+// just the handle again, shows the handle alone. Sorted by the shown label,
+// case-insensitive, the handle breaking a tie so the order is stable.
+export function residentOptions(residents) {
+  const label = (r) => {
+    const name = typeof r.address?.agent === "string" ? r.address.agent.trim() : "";
+    return name && name !== r.handle ? `${name} (${r.handle})` : r.handle;
+  };
+  return (residents ?? [])
+    .filter((r) => r?.handle)
+    .map((r) => ({ value: r.handle, label: label(r) }))
+    .sort((a, b) =>
+      a.label.toLowerCase().localeCompare(b.label.toLowerCase())
+      || a.value.localeCompare(b.value));
+}
+
 export function regionList(residents) {
   return [...new Set((residents ?? []).map((r) => r.region?.region).filter(Boolean))].sort();
 }

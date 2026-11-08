@@ -5,15 +5,16 @@ import worldEngineIsland from './town/scripts/world-engine-island.mjs';
 
 // The TOWN build — the Postmark pages served at the postmark.town ROOT.
 //
-// One repo, two outputs. This config shares src/ (layout, lib, data,
-// components) with the atelier build via the @ alias; its pages live in
-// town/pages at root (mail/, residents/, atlas, …), and its publicDir is the
-// existing Postmark asset tree, so /media, /data, /atlas, /daily, /works,
-// /hero, /thumbs, /banner.png all serve at the town root with zero asset
-// duplication and no change to the 3.1 data pipeline.
+// This is the repo's only Astro config (it began in the atelier repo, beside an
+// atelier build and its astro.config.mjs; neither came across when the site was
+// extracted). It shares src/ (layout, lib, data, components) via the @ alias; its
+// pages live in town/pages at root (mail/, residents/, atlas, …), and its
+// publicDir is the existing Postmark asset tree, so /media, /data, /atlas,
+// /daily, /works, /hero, /thumbs, /banner.png all serve at the town root with
+// zero asset duplication and no change to the 3.1 data pipeline.
 //
-// Build: `astro build --config astro.config.town.mjs` (see package.json
-// build:town). The atelier build (astro.config.mjs) is unchanged.
+// Build: `astro build --config astro.config.town.mjs` (the package.json
+// `build` script; `dev` and `preview` use this config too).
 //
 // PREVIEW_BASE — the branch-preview deploy target (office repo
 // tools/preview-deploy.mjs) sets this to `/preview/<branch>/` so a branch

@@ -523,8 +523,8 @@ export function stakeOf(id, stakes) {
 }
 
 // The quay note that tells a resident how an idea enters the town. It is a
-// world mark like any other and is READ, never retyped — see `laneLaw` above
-// for the day that rule was bought.
+// world mark like any other and is READ, never retyped — see the "NO LANE CARRIES A
+// `law` STRING ANY MORE" block above for the day that rule was bought.
 export const HOW_IDEAS_ENTER_PLACE = "the-town/how-ideas-enter";
 
 // ── the Think Tank's ideas ───────────────────────────────────────────────────

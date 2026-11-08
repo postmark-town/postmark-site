@@ -26,10 +26,8 @@
 import { fundRefFor } from "./fund-ref.mjs";
 
 export const SDK_HOST = "https://www.paypal.com/sdk/js";
-export const CUSTOM_SEP = "|";
 /** PayPal's own bound on custom_id. */
 export const CUSTOM_MAX = 127;
-export const DEFAULT_USD = 10;
 
 /**
  * PAY LATER IS OFF (Keemin, 2026-09-29): a gift to a pot is not a purchase to

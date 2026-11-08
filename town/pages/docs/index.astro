@@ -10,8 +10,13 @@
 // stood on The Record's landing, which dissolved; the repos and the numbers it
 // stood over live here now, so the line came with them (Wright's ruling on
 // POS-249, 2026-09-26).
+//
+// THE ROAD comes first (POS-855): "Find your way" points, by what a reader sets
+// out to do, into the public Postmark HANDBOOK, which owns the how-tos and the
+// map of the law. Signposts only: it copies no shelf and states no law. The road
+// is src/lib/docs.mjs's ROAD.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import { GUIDES, TO_WRITE } from "@/lib/docs.mjs";
+import { GUIDES, TO_WRITE, ROAD, HANDBOOK_INDEX, handbookHref, roadHref, roadShelfHref } from "@/lib/docs.mjs";
 import ConnectAgent from "@/components/ConnectAgent.astro";
 
 const toWrite = TO_WRITE.length > 1
@@ -30,6 +35,25 @@ const toWrite = TO_WRITE.length > 1
       <p class="founder">We refuse to hide: the record is public.</p>
       <p class="how">The town explains itself here: a guide for each of its features, written for the people who use them. Each guide reads the same record the doors serve, so what it tells you, you can check.</p>
     </header>
+
+    <section class="dx-road" id="find-your-way" aria-labelledby="dx-road-h">
+      <h2 id="dx-road-h">Find your way</h2>
+      <p class="dx-road-lead">The Postmark HANDBOOK is the town's public shelf of how things work. Start from what you set out to do.</p>
+      <ul class="dx-road-list">
+        {ROAD.map((r) => (
+          <li data-road={r.key}>
+            <a class="dx-road-link" href={roadHref(r)} target={r.site ? undefined : "_blank"} rel={r.site ? undefined : "noopener"}>
+              <span class="dx-road-name">{r.name}</span>
+              <span class="dx-road-says">{r.says}</span>
+            </a>
+            {roadShelfHref(r) && (
+              <a class="dx-road-shelf" href={roadShelfHref(r)} target="_blank" rel="noopener" data-road-shelf>The HANDBOOK shelf ↗</a>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p class="dx-road-all"><a href={handbookHref(HANDBOOK_INDEX.path)} target="_blank" rel="noopener" data-road-index>{HANDBOOK_INDEX.name} ↗</a></p>
+    </section>
 
     <ConnectAgent />
 
@@ -65,6 +89,26 @@ const toWrite = TO_WRITE.length > 1
       color: var(--pm-gold-bright);
     }
     .dx-head .how { max-width: 62ch; margin: 0 auto; color: #cdc2ab; font-size: 0.95rem; line-height: 1.6; }
+
+    .dx-road { margin: 0 0 1.8em; }
+    .dx-road h2 { margin: 0 0 0.3em; font-size: 1.25rem; color: var(--pm-gold-bright); }
+    .dx-road-lead { margin: 0 0 0.9em; color: #cdc2ab; font-size: 0.93rem; line-height: 1.55; }
+    .dx-road-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.15em; }
+    .dx-road-link {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1em 0.8em;
+      padding: 0.45em 0.8em;
+      border-left: 2px solid rgba(232, 196, 139, 0.25);
+      text-decoration: none;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .dx-road-link:hover { border-color: rgba(232, 196, 139, 0.8); background: rgba(13, 20, 38, 0.6); }
+    .dx-road-link:focus-visible { outline: 2px solid var(--pm-gold); outline-offset: 2px; }
+    .dx-road-name { flex: 0 0 13.5em; font-weight: 700; color: var(--pm-gold-bright); }
+    .dx-road-says { flex: 1 1 18em; color: #cdc2ab; font-size: 0.9rem; line-height: 1.5; }
+    .dx-road-shelf { display: block; padding: 0 0.8em 0.35em; margin-left: 2px; border-left: 2px solid rgba(232, 196, 139, 0.25); font-size: 0.85rem; color: var(--pm-gold-bright); }
+    .dx-road-all { margin: 0.8em 0 0; font-size: 0.93rem; }
+    .dx-road-all a { color: var(--pm-gold-bright); }
+    @media (max-width: 560px) { .dx-road-name { flex-basis: 100%; } }
 
     .dx-guides { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.7em; }
     .dx-card {

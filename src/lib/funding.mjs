@@ -420,6 +420,13 @@ import { firstCloseLabel, epochLabel } from "./fund-close.mjs";
 import { nameplate, houseHref } from "./houses.mjs"; // a gift's household (POS-550), pure: no data aliases
 export { firstCloseLabel, epochLabel };
 
+// The money and percent formatters the funding surfaces share (the stamps and
+// numbers docs, the fund pages, PotCards, the town page), defined once here
+// instead of as one-liners in each frontmatter. Build-time only.
+export const usd = (n) => "$" + Number(n).toLocaleString("en-US");
+export const pct = (p) => Math.round(Math.max(0, Math.min(1, p)) * 100);
+export const num = (n) => Number(n).toLocaleString("en-US");
+
 // The pot file's `status`. A pot is not live until the founder opens it — see
 // livePots() for why `draft` never reaches the board.
 export const POT_STATUSES = ["draft", "open", "closed"];
