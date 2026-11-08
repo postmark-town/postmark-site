@@ -15,11 +15,14 @@
 // holds a resident of this house, exactly as the dashboard's Needs you does, and what they hold is read
 // with the owner's bearer by the same call. A template can place a private slot; it can never see what is in it.
 //
+// THE HOLO EXPANSION IS NOT HERE. test/funding.test.mjs holds that a built page teaches it exactly once, and this
+// component is drawn twice on the page (once on the stage, once inside a preview <template>). The one note rides
+// Hearth.astro, below the stage, and the stage's script shows it when the stamps slot shows a holo count.
+//
 // RESIDENT WORDS ARE TEXT: names, bios, titles go through Astro's escaping here, never set:html.
 import ResidentCard from "../household-dashboard/ResidentCard.astro";
 import { correspondentsOf } from "@/lib/correspondents.mjs";
 import { fmtDate } from "@/lib/pm.mjs";
-import { HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
 
 interface Props {
   name: string;
@@ -78,7 +81,6 @@ const closer = name === "closer"
         <div><dt>residents</dt><dd>{faces.length}</dd></div>
         <div><dt>windows hung</dt><dd data-hd-n-windows>—</dd></div>
       </dl>
-      <p class="dash-holo-note" data-dash-holo-note hidden>✧ holo is {HOLO_NAME_LINE} It is {HOLO_LINE} — and since 2026-09-17 it spends like any stamp: the word names its source and its ink.</p>
     </div>
   </section>
 )}

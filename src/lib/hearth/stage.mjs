@@ -42,6 +42,7 @@ export function mountHearth(root) {
   const styleEl = root.querySelector("[data-hearth-css]");
   const note = root.querySelector("[data-hearth-note]");
   const picker = root.querySelector("[data-hearth-pick]");
+  const holoNote = root.querySelector("[data-hearth-holo]");
 
   let storage = null;
   try { storage = window.localStorage; } catch { storage = null; }
@@ -72,6 +73,9 @@ export function mountHearth(root) {
     paintExtras(stage, reads, extras, ctx);
     stopCount();
     stopCount = startCountdown(stage, reads, ctx);
+    // the page's one holo expansion shows when the stamps slot shows a holo count
+    const wrap = stage.querySelector("[data-hd-n-holo-wrap]");
+    if (holoNote) holoNote.hidden = !wrap || wrap.hidden;
   }
 
   async function load() {

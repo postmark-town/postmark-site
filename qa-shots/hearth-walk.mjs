@@ -133,6 +133,7 @@ const run = async () => {
       check("① the house slot names the house", /dreme|mynd/i.test((await text(page, "[data-hearth-slot=house]")) ?? ""), await text(page, "[data-hearth-slot=house]"));
       check("① a card for every resident", (await page.locator("[data-hearth-slot=residents] [data-hd-card]").count()) === A.length, await page.locator("[data-hearth-slot=residents] [data-hd-card]").count());
       check("① the feed is painted from the fixture reads, not frozen", (await page.locator("[data-hd-feed] .hd-line").count()) > 0);
+      check("① the page teaches the holo expansion once, below the stage, shown because the house holds holo", (await page.locator("[data-hearth-holo]").count()) === 1 && (await visible(page, "[data-hearth-holo]")) && ((await page.content()).match(/short for holographic stamp/g) ?? []).length === 1);
       check("① stamps are the doorsteps' sum", /\d/.test((await text(page, "[data-hd-n-held]")) ?? ""), await text(page, "[data-hd-n-held]"));
       check("① posts: only the house's own", (await page.locator("[data-hx-posts] li").count()) === 2 && !(await text(page, "[data-hx-posts]"))?.includes("not this house"), await text(page, "[data-hx-posts]"));
       check("① closest correspondents slot is drawn (public record; its tab is not the open one)", (await page.locator("[data-hearth-slot=closer] .hx-list li, [data-hearth-slot=closer] .hd-empty").count()) >= 1);

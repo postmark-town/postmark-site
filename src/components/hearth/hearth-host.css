@@ -193,4 +193,6 @@
 .hearth-picker { display: inline-flex; align-items: center; gap: 0.5em; font-family: var(--pm-mono); font-size: 0.72rem; }
 .hearth-picker select { font: inherit; background: rgba(13, 20, 38, 0.8); color: #f4e9d7; border: 1px solid rgba(232, 196, 139, 0.4); border-radius: 6px; padding: 3px 8px; max-width: 100%; }
 .hearth-note { margin: 0; font-size: 0.85rem; opacity: 0.85; }
+.hearth-holo-note { margin: 1.2em 0 0; font-size: 0.8rem; opacity: 0.85; }
+.hearth-holo-note[hidden] { display: none; }
 .hearth-note[hidden] { display: none; }

@@ -27,6 +27,7 @@ import { residentFace } from "@/lib/household-dashboard/faces.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { entries, defaultEntry as entry } from "@/lib/hearth/registry.mjs";
 import { SLOT_NAMES } from "@/lib/hearth/slots.mjs";
+import { HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
 
 interface Props {
   house: any;
@@ -85,6 +86,9 @@ const slotProps = { house, faces, plate, slug, bulletin };
   ) : (
     <p class="hearth-note">No Hearth design is registered yet.</p>
   )}
+
+  {/* the house's holo expansion, once for the page (test/funding.test.mjs); shown when the stamps slot shows a holo count */}
+  <p class="hearth-holo-note" data-hearth-holo hidden>✧ holo is {HOLO_NAME_LINE} It is {HOLO_LINE} — and since 2026-09-17 it spends like any stamp: the word names its source and its ink.</p>
 
   {SLOT_NAMES.map((name) => (
     <template data-hearth-slot-tpl={name}><HearthSlot name={name} {...slotProps} /></template>
