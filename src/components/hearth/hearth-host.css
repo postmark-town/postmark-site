@@ -1,0 +1,196 @@
+/* hearth-host.css — the site's own look for the parts a Hearth template places (POS-959).
+ *
+ * Every rule is under `.hearth-stage` (the template's stage) or `.hearth-bar` (the site's own chrome
+ * above it). A template's stylesheet is scoped to ITS stage by sanitize-css.mjs, so it can set the
+ * theme variables below and lay out the slot markers' wrappers, and cannot reach anything outside.
+ *
+ * THE THEME THE TEMPLATE MAY SET (documented in PROJECTS/household-hearths/README.md), as custom
+ * properties on its root: --hx-ink --hx-warm --hx-accent --hx-glass --hx-hair --hx-coral --hx-ok
+ * --hx-paper --hx-paper-ink --hx-radius. The host reads every colour from them, so a template
+ * re-themes the site's parts without touching their structure.
+ *
+ * The dashboard's class names (`hd-*`) are kept for the parts paintHouse draws, so one painter
+ * serves both pages; they are the site's, and the sanitizer namespaces a template's own classes
+ * `u-` so neither can land on the other.
+ */
+
+/* ── the stage ── */
+.hearth-stage {
+  --hx-ink: #cdc2ab; --hx-warm: #f4e9d7; --hx-accent: #e8c48b;
+  --hx-glass: rgba(13, 20, 38, 0.62); --hx-hair: rgba(232, 196, 139, 0.22);
+  --hx-coral: #e0846b; --hx-ok: #9be29b;
+  --hx-paper: #f4ecd9; --hx-paper-ink: #2a2118; --hx-radius: 12px;
+  --hd-hair: var(--hx-hair); --hd-glass: var(--hx-glass); --hd-warm: var(--hx-warm); --hd-moon: var(--hx-ink); --hd-coral: var(--hx-coral); --hd-ok: var(--hx-ok);
+  position: relative; display: block; contain: layout paint; isolation: isolate;
+  color: var(--hx-ink); min-width: 0;
+}
+.hearth-stage [hidden] { display: none !important; }
+.hearth-stage[data-hd-view="public"] [data-private] { display: none !important; }
+.hearth-stage[data-hd-view="owner"] [data-public] { display: none !important; }
+.hearth-stage a { color: var(--hx-accent); }
+.hearth-stage img { max-width: 100%; height: auto; }
+.hearth-stage .hd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.hearth-stage .hd-label { margin: 0; font-family: var(--pm-mono); text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.66rem; color: var(--hx-accent); }
+.hearth-stage .hd-meta { font-family: var(--pm-mono); font-size: 0.68rem; color: var(--hx-ink); margin: 0.2em 0 0.5em; }
+.hearth-stage .hd-empty { list-style: none; font-style: italic; color: var(--hx-ink); opacity: 0.8; padding: 0.4em 0; margin: 0; }
+.hearth-stage .hd-calm { color: var(--hx-ok); list-style: none; }
+
+/* every slot's wrapper is a plain block; a template lays it out */
+.hearth-stage .hx { min-width: 0; }
+.hearth-stage .hx h2 { margin: 0; font-size: 1.3rem; color: var(--hx-warm); }
+.hearth-stage .hx h3 { margin: 0 0 0.3em; font-size: 1rem; color: var(--hx-warm); }
+.hearth-stage .hx-list { list-style: none; margin: 0.3em 0 0; padding: 0; }
+.hearth-stage .hx-list > li { padding: 0.45em 0; border-top: 1px dashed var(--hx-hair); font-size: 0.93rem; overflow-wrap: anywhere; }
+.hearth-stage .hx-list > li:first-child { border-top: 0; }
+.hearth-stage .hx-note, .hearth-stage .hx-when, .hearth-stage .hx-state, .hearth-stage .hx-with { font-family: var(--pm-mono); font-size: 0.7rem; color: var(--hx-ink); opacity: 0.85; }
+.hearth-stage .hx-note { margin: 0.5em 0 0; }
+.hearth-stage .hx-kind { display: inline-block; font-family: var(--pm-mono); font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; margin-right: 0.5em; padding: 0 0.5em; border: 1px solid var(--hx-hair); border-radius: 999px; color: var(--hx-accent); }
+.hearth-stage .hx-who { color: var(--hx-warm); font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--hd-c, var(--hx-hair)); }
+.hearth-stage .hx-mark.is-refused .hx-verdict { color: var(--hx-coral); }
+.hearth-stage .hx-mark.is-locked .hx-verdict { color: var(--hx-ok); }
+
+/* ── the house ── */
+.hearth-stage .hx-house { padding: 0.2em 0 0.8em; }
+.hearth-stage .hx-name { margin: 0.1em 0 0; font-size: clamp(1.7rem, 4.4vw, 2.5rem); color: var(--hx-warm); line-height: 1.05; }
+.hearth-stage .hd-sub { margin: 0.35em 0 0; font-size: 0.95rem; }
+.hearth-stage .hd-sub b { color: var(--hx-warm); font-weight: 400; }
+.hearth-stage .hd-sub [data-hd-share-sub]::before { content: " · "; }
+.hearth-stage .hx-public { margin: 0.8em 0 0; background: var(--hx-glass); border: 1px dashed var(--hx-hair); border-radius: var(--hx-radius); padding: 0.7em 0.9em; font-size: 0.9rem; }
+.hearth-stage .hx-public b { color: var(--hx-warm); }
+.hearth-stage .hd-link-btn { all: unset; cursor: pointer; color: var(--hx-accent); }
+.hearth-stage .hd-link-btn:hover, .hearth-stage .hd-link-btn:focus-visible { text-decoration: underline; }
+
+/* ── the clocks and the countdown ── */
+.hearth-stage .hd-clocks { display: flex; gap: 0.6em; flex-wrap: wrap; }
+.hearth-stage .hd-clock { background: var(--hx-glass); border: 1px solid var(--hx-hair); border-radius: var(--hx-radius); padding: 0.55em 0.85em; min-width: 12.5em; }
+.hearth-stage .hd-clock p { margin: 0; }
+.hearth-stage .hd-clock .v { color: var(--hx-warm); font-size: 1rem; }
+.hearth-stage .hd-clock .n { font-size: 0.78rem; opacity: 0.8; }
+.hearth-stage .hx-left { font-family: var(--pm-mono); font-size: 0.8rem; color: var(--hx-accent); margin-top: 0.2em; }
+
+/* ── panels, the feed and its chips ── */
+.hearth-stage .hd-panel { background: var(--hx-glass); border: 1px solid var(--hx-hair); border-radius: var(--hx-radius); padding: 1em 1.1em 0.8em; }
+.hearth-stage .hd-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.4em 0.8em; flex-wrap: wrap; margin-bottom: 0.4em; }
+.hearth-stage .hd-ghost { font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid var(--hx-hair); border-radius: 999px; padding: 3px 10px; color: var(--hx-accent); background: transparent; cursor: pointer; }
+.hearth-stage .hd-filters { display: flex; gap: 0.35em; flex-wrap: wrap; margin: 0.3em 0 0.6em; }
+.hearth-stage .hd-chip { font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.06em; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--hx-hair); color: var(--hx-ink); background: transparent; cursor: pointer; }
+.hearth-stage .hd-chip.is-on { background: rgba(232, 196, 139, 0.14); color: var(--hx-accent); border-color: rgba(232, 196, 139, 0.5); }
+.hearth-stage .hd-select { padding: 0 4px 0 8px; display: inline-flex; align-items: center; }
+.hearth-stage .hd-select select { all: unset; cursor: pointer; font: inherit; padding: 3px 2px; }
+.hearth-stage .hd-select select option { color: #111; }
+.hearth-stage .hd-feed { list-style: none; margin: 0; padding: 0; }
+.hearth-stage .hd-line { display: grid; grid-template-columns: 4.6em 1.4em minmax(0, 1fr); gap: 0 0.6em; padding: 0.62em 0 0.62em 0.5em; border-top: 1px dashed var(--hx-hair); border-left: 2px solid var(--hd-c, transparent); }
+.hearth-stage .hd-line:first-child { border-top: 0; }
+.hearth-stage .hd-t { font-family: var(--pm-mono); font-size: 0.66rem; opacity: 0.8; padding-top: 0.25em; }
+.hearth-stage .hd-g { text-align: center; }
+.hearth-stage .g-letter, .hearth-stage .g-locked, .hearth-stage .g-other { color: var(--hx-accent); }
+.hearth-stage .g-said { color: #aabef9; }
+.hearth-stage .g-refused { color: var(--hx-coral); }
+.hearth-stage .g-stamps { color: #f0a35e; }
+.hearth-stage .hd-l { font-size: 0.95rem; min-width: 0; overflow-wrap: anywhere; }
+.hearth-stage .hd-q { display: block; font-style: italic; opacity: 0.92; font-size: 0.9rem; margin-top: 0.1em; }
+.hearth-stage .hd-why { display: block; font-family: var(--pm-mono); font-size: 0.66rem; color: var(--hx-coral); margin-top: 0.2em; }
+.hearth-stage .hd-ok { color: var(--hx-ok); }
+.hearth-stage .hd-mark, .hearth-stage .hd-other { color: var(--hx-accent); font-weight: 400; }
+.hearth-stage .hd-sep { list-style: none; font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.7; padding: 0.8em 0 0.2em; border-top: 1px solid var(--hx-hair); }
+.hearth-stage .is-old { opacity: 0.62; }
+.hearth-stage .hd-boat { margin: 0.7em 0 0; padding-top: 0.6em; border-top: 1px dashed var(--hx-hair); font-size: 0.85rem; }
+.hearth-stage .hd-more { display: block; margin: 0.3em auto 0; font-family: var(--pm-mono); font-size: 0.68rem; background: none; border: 0; color: var(--hx-accent); cursor: pointer; }
+.hearth-stage .hd-who { color: var(--hx-warm); font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--hd-c, rgba(232, 196, 139, 0.25)); white-space: nowrap; }
+.hearth-stage .hd-who.is-neutral { border-bottom-color: rgba(205, 194, 171, 0.3); }
+.hearth-stage .hd-who-face { display: inline-grid; place-items: center; width: 1.25em; height: 1.25em; margin-right: 0.3em; border-radius: 50%; overflow: hidden; vertical-align: -0.2em; background: rgba(205, 194, 171, 0.15); box-shadow: 0 0 0 1.5px var(--hd-c, rgba(205, 194, 171, 0.35)); font-family: var(--pm-mono); font-size: 0.7em; font-weight: 400; }
+.hearth-stage .hd-who-face img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ── Needs you: a paper note, the house's own sign-in only ── */
+.hearth-stage .hd-needs { background: var(--hx-paper); color: var(--hx-paper-ink); border-radius: var(--hx-radius); padding: 1em 1.1em 0.9em; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
+.hearth-stage .hd-needs h2 { color: var(--hx-paper-ink); }
+.hearth-stage .hd-needs .hd-meta { color: inherit; opacity: 0.75; }
+.hearth-stage .hd-needs ul { list-style: none; margin: 0.6em 0 0; padding: 0; }
+.hearth-stage .hd-needs li { padding: 0.65em 0; border-top: 1px dashed rgba(42, 33, 24, 0.25); }
+.hearth-stage .hd-needs li:first-child { border-top: 0; }
+.hearth-stage .hd-needs .k { font-family: var(--pm-mono); font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: #8a2f1f; }
+.hearth-stage .hd-needs .hd-calm { color: #3a7d3a; }
+.hearth-stage .hd-needs p { margin: 0.15em 0 0.25em; font-size: 0.93rem; }
+.hearth-stage .hd-needs a, .hearth-stage .hd-needs .hd-who { color: var(--hx-paper-ink); font-size: 0.9rem; }
+
+/* ── the residents' cards ── */
+.hearth-stage .hx-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(17em, 1fr)); gap: 1em; }
+.hearth-stage .hd-card { position: relative; background: linear-gradient(135deg, color-mix(in srgb, var(--hd-c, transparent) 12%, transparent), transparent 60%), var(--hx-glass); border: 1px solid var(--hx-hair); border-left: 4px solid var(--hd-c); border-radius: var(--hx-radius); padding: 0.9em 1em; display: flex; flex-direction: column; gap: 0.55em; min-width: 0; }
+.hearth-stage .hd-card.is-neutral { border-left: 1px solid var(--hx-hair); background: var(--hx-glass); }
+.hearth-stage .hd-card-head { display: flex; align-items: center; gap: 0.7em; }
+.hearth-stage .hd-face { flex: none; width: 3.1em; height: 3.1em; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: rgba(205, 194, 171, 0.12); box-shadow: 0 0 0 2px var(--hd-c, rgba(205, 194, 171, 0.3)); color: var(--hx-warm); font-size: 1.3rem; text-decoration: none; }
+.hearth-stage .hd-face img { width: 100%; height: 100%; object-fit: cover; }
+.hearth-stage .hd-face svg { width: 86%; height: 86%; image-rendering: pixelated; }
+.hearth-stage .hd-face-wrap { position: relative; flex: none; display: grid; }
+.hearth-stage .hd-sprite-mini { position: absolute; right: -0.9em; bottom: -0.5em; width: 1.9em; height: 1.9em; image-rendering: pixelated; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
+.hearth-stage .hd-card-id { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.hearth-stage .hd-face-wrap:has(.hd-sprite-mini) + .hd-card-id { padding-left: 1em; }
+.hearth-stage .hd-card-name { font-size: 1.2rem; font-weight: 700; color: var(--hx-warm); text-decoration: none; }
+.hearth-stage .hd-card-pronouns, .hearth-stage .hd-card-sub { font-family: var(--pm-mono); font-size: 0.66rem; opacity: 0.82; overflow-wrap: anywhere; }
+.hearth-stage .hd-card-edit { font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.06em; color: var(--hx-accent); text-decoration: underline; }
+.hearth-stage .hd-pill-new { align-self: flex-start; font-family: var(--pm-mono); font-size: 0.58rem; background: rgba(232, 196, 139, 0.16); color: var(--hx-accent); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.hearth-stage .hd-card-self { margin: 0; font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.2em; }
+.hearth-stage .hd-swatch { font-family: var(--pm-mono); font-size: 0.64rem; display: inline-flex; align-items: center; gap: 0.45em; }
+.hearth-stage .hd-swatch i { width: 0.8em; height: 0.8em; border-radius: 3px; background: var(--hd-c); display: inline-block; }
+.hearth-stage .hd-bio { font-style: italic; opacity: 0.92; }
+.hearth-stage .hd-card-live { margin: 0; display: grid; grid-template-columns: 5.6em minmax(0, 1fr); gap: 0.28em 0.7em; font-size: 0.9rem; }
+.hearth-stage .hd-card-live dt { font-family: var(--pm-mono); font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--hx-accent); padding-top: 0.3em; }
+.hearth-stage .hd-card-live dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.hearth-stage .hd-doing { font-style: italic; }
+.hearth-stage .hd-home { display: flex; gap: 0.35em; height: 4.2em; }
+.hearth-stage .hd-home img { height: 100%; border-radius: 6px; object-fit: cover; border: 1px solid var(--hx-hair); min-width: 0; }
+.hearth-stage .hd-home-face { flex: 2 1 0; }
+.hearth-stage .hd-home-more { flex: 1 1 0; }
+.hearth-stage .hd-card-foot { margin-top: auto; display: flex; gap: 0.9em; flex-wrap: wrap; font-family: var(--pm-mono); font-size: 0.66rem; padding-top: 0.4em; border-top: 1px dashed var(--hx-hair); }
+.hearth-stage .hd-stamp::before { content: "✦ "; color: #f0a35e; }
+
+/* ── the numbers ── */
+.hearth-stage .hd-nums { margin: 0.4em 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5em, 1fr)); gap: 0.6em; }
+.hearth-stage .hd-nums > div { display: flex; flex-direction: column; }
+.hearth-stage .hd-nums dd { margin: 0; font-size: 1.2rem; color: var(--hx-warm); order: 1; }
+.hearth-stage .hd-nums dd.st { color: #f7c78a; }
+.hearth-stage .hd-nums dt { order: 2; font-family: var(--pm-mono); font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--hx-accent); }
+.hearth-stage .dash-holo-note { margin: 0.6em 0 0; font-size: 0.8rem; }
+
+/* ── around town, the map, the chart ── */
+.hearth-stage .hx-boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15em, 1fr)); gap: 1em; margin-top: 0.4em; }
+.hearth-stage .hx-places { display: grid; grid-template-columns: repeat(auto-fill, minmax(11em, 1fr)); gap: 0.6em; margin-top: 0.4em; }
+.hearth-stage .hx-place { background: var(--hx-glass); border: 1px solid var(--hx-hair); border-radius: var(--hx-radius); padding: 0.6em 0.8em; }
+.hearth-stage .hx-place.is-unknown { opacity: 0.7; border-style: dashed; }
+.hearth-stage .hx-place-name { margin: 0 0 0.3em; font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--hx-accent); }
+.hearth-stage .hx-place-who { margin: 0; display: flex; flex-wrap: wrap; gap: 0.4em; }
+.hearth-stage .hx-bars { display: grid; gap: 0.4em; margin-top: 0.4em; }
+.hearth-stage .hx-bar-row { display: grid; grid-template-columns: minmax(6em, 10em) minmax(0, 1fr) 3.5em; gap: 0.6em; align-items: center; }
+.hearth-stage .hx-bar { height: 0.8em; background: rgba(205, 194, 171, 0.12); border-radius: 999px; overflow: hidden; }
+.hearth-stage .hx-bar i { display: block; height: 100%; background: var(--hx-accent); border-radius: 999px; }
+.hearth-stage .hx-bar-n { font-family: var(--pm-mono); font-size: 0.8rem; text-align: right; color: var(--hx-warm); }
+
+/* ── the behaviors ── */
+.hearth-stage .hx-tablist { display: flex; flex-wrap: wrap; gap: 0.3em; border-bottom: 1px solid var(--hx-hair); margin-bottom: 0.8em; }
+.hearth-stage .hx-tab { font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.06em; padding: 0.4em 0.9em; background: transparent; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--hx-ink); cursor: pointer; }
+.hearth-stage .hx-tab[aria-selected="true"] { color: var(--hx-accent); background: var(--hx-glass); border-color: var(--hx-hair); }
+.hearth-stage .hx-acc-head { display: block; width: 100%; text-align: left; font-family: var(--pm-mono); font-size: 0.78rem; letter-spacing: 0.06em; padding: 0.6em 0.8em; margin-top: 0.4em; background: var(--hx-glass); border: 1px solid var(--hx-hair); border-radius: 8px; color: var(--hx-warm); cursor: pointer; }
+.hearth-stage .hx-acc-head::after { content: "＋"; float: right; }
+.hearth-stage .hx-acc-head[aria-expanded="true"]::after { content: "－"; }
+.hearth-stage .hx-sort { display: inline-flex; align-items: center; gap: 0.4em; font-family: var(--pm-mono); font-size: 0.7rem; margin: 0.3em 0; }
+.hearth-stage .hx-sort-select { font: inherit; background: var(--hx-glass); color: var(--hx-ink); border: 1px solid var(--hx-hair); border-radius: 6px; padding: 2px 6px; }
+
+@media (max-width: 760px) {
+  .hearth-stage .hd-line { grid-template-columns: 1.2em minmax(0, 1fr); gap: 0.1em 0.45em; }
+  .hearth-stage .hd-t { grid-column: 1 / -1; padding-top: 0; }
+  .hearth-stage .hd-clock { min-width: 0; flex: 1 1 9em; }
+  .hearth-stage .hd-card-live { grid-template-columns: 5.2em minmax(0, 1fr); }
+  .hearth-stage .hx-bar-row { grid-template-columns: minmax(5em, 8em) minmax(0, 1fr) 3em; }
+}
+
+/* ── the site's own chrome above the stage: never part of a template ── */
+.hearth { --hx-chrome-ink: #cdc2ab; color: var(--hx-chrome-ink); }
+.hearth-bar { display: grid; gap: 0.6em; padding: 0.4em 0 1em; margin-bottom: 1.2em; border-bottom: 1px solid rgba(232, 196, 139, 0.22); }
+.hearth-bar h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2.1rem); color: #f4e9d7; line-height: 1.1; }
+.hearth-kicker { margin: 0; font-family: var(--pm-mono); text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.66rem; color: rgba(232, 196, 139, 0.8); }
+.hearth-tools { display: flex; flex-wrap: wrap; gap: 0.6em 1.2em; align-items: center; font-size: 0.9rem; }
+.hearth-tools a { color: #e8c48b; }
+.hearth-picker { display: inline-flex; align-items: center; gap: 0.5em; font-family: var(--pm-mono); font-size: 0.72rem; }
+.hearth-picker select { font: inherit; background: rgba(13, 20, 38, 0.8); color: #f4e9d7; border: 1px solid rgba(232, 196, 139, 0.4); border-radius: 6px; padding: 3px 8px; max-width: 100%; }
+.hearth-note { margin: 0; font-size: 0.85rem; opacity: 0.85; }
+.hearth-note[hidden] { display: none; }

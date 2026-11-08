@@ -1,0 +1,98 @@
+---
+// Hearth — a household's public face, drawn from a registered template with the site's live parts
+// in its slots (POS-959, Darko 2026-11-08 15:43 EST: "a), and let's try to get this out as a hotfix").
+//
+// The Household Hearth sitting ruled the shape (POS-845, 2026-11-01): HTML and CSS in the page, with
+// the site's live parts in slots; templates live in the town repo at PROJECTS/household-hearths/,
+// submitted by PR; about six approved behaviors. This page is that, whole and small:
+//
+//   - EVERY HOUSEHOLD HAS ONE: it opens on Postmark's default entry.
+//   - ANY REGISTERED ENTRY PREVIEWS ON ANY HOUSEHOLD: the picker, or `?entry=<id>`. Preview only: it is
+//     not saved, nothing is written to the office, and the address is the whole state. A persistent
+//     choice and its picker are their own issue (blocked by this one).
+//   - THE TEMPLATE IS SANITIZED AT BUILD (lib/hearth/sanitize-html.mjs, sanitize-css.mjs): no script, no
+//     event handler, no frame, no external load. What is on this page for an entry is what those
+//     modules wrote, nothing the template typed.
+//   - THE SLOTS ARE THE SITE'S OWN: HearthSlot.astro draws each, the dashboard's reads fill them, and
+//     private ones (Needs you, Mail) show only to the house's own sign-in, as on the household page.
+//     A template places a slot; it never receives what is in it.
+//
+// The page is server-rendered with the default entry (so the house's public face is there without a
+// script); lib/hearth/stage.mjs then reads the house, paints the live parts, and swaps entries for a preview.
+import HearthSlot from "./HearthSlot.astro";
+import "./hearth-host.css";
+import media from "@/data/postmark/media.json";
+import bulletinAll from "@/data/postmark/bulletin.json";
+import { residentFace } from "@/lib/household-dashboard/faces.mjs";
+import { homePictureOf } from "@/lib/home-picture.mjs";
+import { entries, defaultEntry as entry } from "@/lib/hearth/registry.mjs";
+import { SLOT_NAMES } from "@/lib/hearth/slots.mjs";
+
+interface Props {
+  house: any;
+  members: any[];
+  plate: string;
+}
+const { house, members, plate } = Astro.props;
+const slug = house.path ?? house.slug ?? "";
+const faces = members.map((r) => residentFace(r, media, homePictureOf(r.handle)));
+const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
+  name: f.name, accent: f.accent, avatar: f.avatar, monogram: f.monogram, windowHung: f.windowHung,
+}]));
+
+// the bulletin's open notices, newest first: public, baked, the same file the bulletin page reads
+const bulletin = (bulletinAll as any[])
+  .filter((b) => b?.data?.status === "open" && b.slug && b.data?.title)
+  .sort((a, b) => String(b.data.posted ?? "").localeCompare(String(a.data.posted ?? "")))
+  .slice(0, 3)
+  .map((b) => ({ slug: String(b.slug), title: String(b.data.title), posted: b.data.posted ? String(b.data.posted) : null }));
+
+const forClient = entries.map((e) => ({ id: e.id, title: e.title, author: e.author, line: e.line, css: e.css, html: e.html }));
+const json = (v: unknown) => JSON.stringify(v).split("<").join("\\u003c").split("\u2028").join("\\u2028").split("\u2029").join("\\u2029");
+const slotProps = { house, faces, plate, slug, bulletin };
+---
+<section class="hearth" data-hearth data-hearth-slug={slug} aria-label={`${plate}, the Hearth`}>
+  <script type="application/json" data-hearth-faces set:html={json({ handles: faces.map((f) => f.handle), faces: facesByHandle })} />
+  <script type="application/json" data-hearth-entries set:html={json(forClient)} />
+
+  <header class="hearth-bar">
+    <p class="hearth-kicker">The Hearth · a household in Postmark</p>
+    <h1>{plate || "a shared household"}</h1>
+    <div class="hearth-tools">
+      <a href={`/households/${slug}/`}>The household’s page →</a>
+      {entries.length > 1 && (
+        <label class="hearth-picker">
+          <span>Preview this house in</span>
+          <select data-hearth-pick aria-label="Preview this household in another Hearth design">
+            {entries.map((e) => <option value={e.id} selected={entry && e.id === entry.id}>{e.title}{e.author ? ` — ${e.author}` : ""}</option>)}
+          </select>
+        </label>
+      )}
+    </div>
+    <p class="hearth-note" data-hearth-note hidden></p>
+    {entries.length > 1 && <p class="hearth-note">A preview shows how this house would look in another design. It is not saved, and nothing is written.</p>}
+  </header>
+
+  {entry ? (
+    <>
+      <style is:inline data-hearth-css set:html={entry.css}></style>
+      <div class="hearth-stage" data-hearth-stage data-hearth-entry={entry.id} data-hd data-hd-view="public" data-hd-slug={slug}>
+        {entry.segments.map((s: any) => s.slot
+          ? <HearthSlot name={s.slot} {...slotProps} />
+          : <Fragment set:html={s.html} />)}
+      </div>
+    </>
+  ) : (
+    <p class="hearth-note">No Hearth design is registered yet.</p>
+  )}
+
+  {SLOT_NAMES.map((name) => (
+    <template data-hearth-slot-tpl={name}><HearthSlot name={name} {...slotProps} /></template>
+  ))}
+</section>
+
+<script>
+  import { mountHearth } from "@/lib/hearth/stage.mjs";
+  const root = document.querySelector<HTMLElement>("[data-hearth]");
+  if (root) mountHearth(root);
+</script>
