@@ -63,7 +63,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 // its way back onto a page that is no longer supposed to carry one.
 import { livePots, loadPots, POT_FIXTURE, usd, pct } from "@/lib/funding.mjs";
 import PotCards from "@/components/PotCards.astro";
-import QuestStandings from "@/components/QuestStandings.astro";
+import HallOfFame from "@/components/HallOfFame.astro";
+import { loadHall, hallView } from "@/lib/hall-of-fame.mjs";
+import { letterAddresses } from "@/lib/mail.mjs";
+import threads from "@/data/postmark/threads.json";
+import letters from "@/data/postmark/letters.json";
 import { loadWorldState, notices, FIXTURE, BOARD_PLACE, ASK_MAX } from "@/lib/board.mjs";
 // `predicatesOf` and `HOW_IDEAS_ENTER_PLACE` are NOT imported here any more —
 // the 2026-09-01 minimalism ruling took both renders off the page (§ rule 1 and
@@ -170,6 +174,9 @@ const quests = questStandings(bulletin);
 // /posts?class=quest, baked as quest-posts.json.
 // A quest with an `ends` is offered through that town day (POS-857), the day this build ran in.
 const questRows = questCards(quests, questBoardFrom(questPosts, { today: townDay() }));
+// FERRY'S HALL OF FAME (POS-967): this month's top five, from the same view the
+// full board draws, in the town's month (townDay), never the runner's.
+const hallPreview = hallView(loadHall(), { today: townDay(), limit: 5, letterBook: letterAddresses(threads, letters) });
 const market = marketplace(bulletin);
 
 // THE FIVE PLAQUES, per lane, read from the record. No sentence below is typed
@@ -595,71 +602,25 @@ const switchCss = [
             world for renderings that are not this one. */}
 
 
-      {/* ── TODAY'S STANDINGS, LAST ────────────────────────────────────────
-          Founder-ruled 2026-08-31: "the standings go below everything else."
-          Since 2026-09-26 the pots open the lane (POS-258), so the lane reads
-          what the town needs money for, then what it is asking of you, and
-          only then how everybody else is doing. A leaderboard read first
-          makes a page about ranking; read last it is a footnote about a day.
+      {/* ── FERRY'S HALL OF FAME, LAST ─────────────────────────────────────
+          POS-967. This block was "Standings": the bulletin's quest mirror, with
+          an all-time number that was daily quest COMPLETIONS (POS-855), not
+          stamps. Darko, 2026-11-08 17:08: "the hall of fame should replace/
+          revamp the 'Standings' section in the quest guild which is stale". It
+          is replaced here, not joined by a sidebar, and the old rows are gone.
 
-          The block itself is unchanged, and deliberately so: this is a MOVE,
-          not a rewrite. Same reader, same four kinds of nothing, same links. */}
-      {quests.read ? (
-        <>
-          {/* "Today's standings · 11 quest completions today" → "Standings".
-              The completions figure is not a label, it is a number, and it is
-              on the full board this block links — where it stands beside every
-              other column rather than riding a heading. */}
-          <p class="m-lab">Standings</p>
-          {/* THE ROWS ARE ONE COMPONENT (#3514): the same rows render all of
-              them on /town/quests/, so the preview and the full board cannot
-              say two things about one resident. */}
-          <QuestStandings rows={quests.rows} />
-          {/* FOUR SENTENCES BECAME ONE LINK. This explained, in order: how many
-              residents are on the board, that the mirror is partial, that it
-              regenerates each ferry crossing, where a resident's live progress
-              lives, and where earning is taught. Every clause was true and the
-              whole paragraph was a footnote about the machinery under a table
-              the reader can simply read. The one thing it owed them is where
-              the rest of the standing is, and that is a link.
-
-              AND THE LINK POINTED AT NOTHING (#2506, fixed 2026-09-14). It read
-              `/bulletin/#quests`. The bulletin carries no `quests` anchor — its
-              whole rendered page has exactly one id, `board-modal-title`, and
-              its notices are cards keyed by `data-card`, not ids — so this sent
-              a reader to the top of another page with nothing to scroll to.
-              It was re-aimed at THIS page's Quests grid, `/town/#quests`.
-
-              AND THAT WAS THE SAME EIGHT ROWS (#3514, Lyra, 10-12): "the full
-              board" promised the whole standing and landed back on this capped
-              preview. The promise is kept, not renamed (Wright, 10-13): the
-              link goes to /town/quests/, which lists every row the mirror
-              carries, in its own order. The falsifiers are
-              test/anchor-links.test.mjs and test/quest-standings.test.mjs. */}
-          <p class="m-note"><a href="/town/quests/">the full board</a></p>
-        </>
-      ) : (
-        <div class="m-none">
-          <b>The quest mirror could not be read.</b>
-          {/* THE SAME DEAD ANCHOR, AND A DIFFERENT DESTINATION (#2506, 2026-09-14).
-              This link also read `/bulletin/#quests`, and the sweep proposed both
-              become `/town/#quests`. That is right for the link above and WRONG
-              here, because the two links do not name the same thing. Above, "the
-              full board" is this page's own Quests grid. Here, "the mirror
-              itself" is the bulletin's Quest Board — the SOURCE this block just
-              said it could not read. Sending the reader to `/town/#quests` would
-              send them to the lane they are standing in, to the block that just
-              told them it is empty. So this one keeps its page and drops the
-              fragment the bulletin never had. */}
-          <span>
-            These standings render from the bulletin's own Quest Board, which
-            this build did not find in a shape it could read — a build-input
-            problem, not a town with no questers. Nothing has been invented to
-            fill the gap; <a href="/bulletin/">the mirror itself</a> is
-            the thing to read.
-          </span>
-        </div>
-      )}
+          The placement is the standings' own, and the founder's 2026-08-31
+          ruling still holds for it ("the standings go below everything else"):
+          the pots open the lane, then the asks, and only then who is doing how
+          much. One component draws it here (the top few) and on /town/quests/
+          (the board), so the preview and the full page cannot disagree about a
+          row. The falsifiers are test/hall-of-fame.test.mjs and
+          test/anchor-links.test.mjs. */}
+      {/* THREE WORDS, because "labels name, they don't narrate" (RULE 3,
+          test/civic-hub.test.mjs); Ferry's name rides in the title=. */}
+      <p class="m-lab" title="Ferry's Hall of Fame">Hall of Fame</p>
+      <HallOfFame view={hallPreview} />
+      {hallPreview.state === "ok" && <p class="m-note"><a href="/town/quests/">the full Hall of Fame</a></p>}
 
       {/* ── ONE AS-OF PER PANEL ──────────────────────────────────────────────
           THE LAW IS UNCHANGED and the placement is what moved. Every derived
