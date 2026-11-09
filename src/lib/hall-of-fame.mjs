@@ -15,11 +15,23 @@
 //   hallView         the VIEW: the emission, the town's clock and a letter
 //                    address book in, the rows a page draws out.
 //
-// WHAT "EARNED" MEANS HERE IS THE TOWN'S OWN WORD FOR IT. foldPrimaryMint
-// (stamp-mint.mjs): every arrow-bearing `MINT → <handle>` row, "earned,
-// arrow-bearing (correspondence, votes, gifts, issuance, friendship)". A
-// transfer between two residents moves stamps, it does not earn them, and a
-// balance is what a resident HOLDS, so neither is a source here.
+// WHAT "EARNED" MEANS HERE: WHAT WAS MINTED OR PAID TO THEM THIS MONTH (the
+// accepted description of POS-967, and Rivet's scope FIX at ccadf0d2). Two kinds
+// of credit, both public rows of the town's stamp-ledger:
+//
+//   MINTED  every arrow-bearing `MINT → <handle>` row (foldPrimaryMint's own
+//           shape: correspondence, votes, gifts, quests, bug-ladder rungs,
+//           issuance, friendship ...), plus a keeping mint.
+//   PAID    every settled `transfer` row, `<payer> → <handle> · n · via: mail:<id>`,
+//           the ledger's record of a delivered `pays:` letter. The recipient is
+//           credited, from the payer's letter. The foldPrimaryMint definition is
+//           the OWNERSHIP read's, and it leaves pays out on purpose; this display
+//           is not that read, so it does not inherit that choice.
+//
+// WHAT IS NOT EARNED: a `void` (arrow-free, it moves no stamps: a pay the town
+// refused), a stake and its return or unstake (stamps going to escrow and coming
+// back are the resident's own), a burn, and a balance, which is what a resident
+// HOLDS. The payer is not debited here: a board of earnings has no negative side.
 //
 // HOLO IS APART, ALWAYS. A `holo · <handle> · <n> · pot:… ·` row is arrow-free
 // by design (a mint is not a movement) and is the pot's mint to its givers. It
@@ -70,10 +82,11 @@ export const prevMonth = (month) => {
 export const monthOfDay = (day) => (DAY_RE.test(String(day ?? "")) ? String(day).slice(0, 7) : null);
 
 // ── what a source is called, from the row's own kind ─────────────────────────
-// Every arrow-bearing MINT row lands in exactly one of these; a row whose kind
-// the classifier does not know lands in `other` rather than vanishing, because
-// a breakdown that drops a credit stops adding up to the total.
+// Every credit lands in exactly one of these; a MINT row whose kind the
+// classifier does not know lands in `other` rather than vanishing, because a
+// breakdown that drops a credit stops adding up to the total.
 const SOURCE_LABELS = Object.freeze({
+  pay: "Payments received",
   "letters-sent": "Letters sent",
   "letters-received": "Letters received",
   votes: "Votes cast",
@@ -122,6 +135,9 @@ function sourceOf(c) {
       return { group: "issuance", ref: null, label: c.purpose };
     case "keeping-mint":
       return { group: "keeping", ref: { type: "pot", id: c.pot }, label: c.pot };
+    case "transfer":
+      // the record is the payer's `pays:` letter; the payer is named in the label
+      return { group: "pay", ref: { type: "letter", id: c.id }, label: `from ${c.from} · ${c.id}` };
     default:
       return { group: "other", ref: null, label: c.kind };
   }
@@ -180,11 +196,14 @@ export function hallFromLedger({ mint, entries, asOf }) {
       continue;
     }
 
-    // the earned credit: the same shape foldPrimaryMint keys on, plus the one
-    // arrow-free earned row the town names (a keeping mint)
+    // the credit: a mint (the shape foldPrimaryMint keys on, plus the town's one
+    // arrow-free earned row, a keeping mint) or a settled pay (a transfer row).
+    // A pay's recipient is a handle: never the BURN or MINT account or a stake
+    // escrow, which the classifier files under other kinds before it reaches here.
     let handle; let n;
     if (arrow) { handle = arrow[2]; n = Number(arrow[3]); }
     else if (c.kind === "keeping-mint") { handle = c.handle; n = c.n; }
+    else if (c.kind === "transfer" && c.n > 0 && c.to !== "BURN" && c.to !== "MINT" && !c.to.startsWith("stake:")) { handle = c.to; n = c.n; }
     else continue;
     if (e.sig && burned.has(e.sig)) continue;
 

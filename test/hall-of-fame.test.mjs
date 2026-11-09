@@ -63,9 +63,17 @@ function ledger() {
   add(mint.giftLine({ date: day("11", "05"), handle: "alice", n: 20, slug: "sidequest-prize", by: "keemin" }), { who: "alice", n: 20, earned: true });
   add(mint.questPayLine({ date: day("11", "06"), handle: "alice", quest: Object.keys(mint.QUEST_PAY)[0], household: HH }), { who: "alice", n: mint.QUEST_PAY[Object.keys(mint.QUEST_PAY)[0]].amount, earned: true });
 
-  // bob: a bug-ladder rung, and a transfer FROM alice (moves stamps, earns none)
+  // bob: a bug-ladder rung, and a settled pay FROM alice (Rivet's scope FIX at
+  // ccadf0d2: "minted or paid to them this month"; until 2026-11-09 this
+  // fixture said the transfer earned nothing)
   add(mint.stageMintLine({ date: day("11", "07"), handle: "bob", n: 5, post: "bob/the-bug", stage: "diagnosed" }), { who: "bob", n: 5, earned: true });
-  add(mint.transferLine({ date: day("11", "08"), from: "alice", to: "bob", n: 7, id: "alice-2026-11-08-to-bob-thanks" }));
+  add(mint.transferLine({ date: day("11", "08"), from: "alice", to: "bob", n: 7, id: "alice-2026-11-08-to-bob-thanks" }), { who: "bob", n: 7, earned: true });
+  // ivy: PAID AND NEVER MINTED this month, the regression the scope FIX names
+  add(mint.transferLine({ date: day("11", "10"), from: "alice", to: "ivy", n: 9, id: "alice-2026-11-10-to-ivy-for-the-map" }), { who: "ivy", n: 9, earned: true });
+  // what is NOT a credit: a pay the town voided (arrow-free, moves nothing), and
+  // a stake coming back from escrow (the resident's own stamps returning)
+  add(mint.voidLine({ date: day("11", "10"), id: "alice-2026-11-10-to-jo-refused", from: "alice", to: "jo", n: 4, reason: "insufficient" }));
+  add(mint.returnLine({ date: day("11", "10"), topic: "vote:topic-x", candidate: "cand-y", handle: "kit", n: 6 }));
 
   // carol: October only — out of November, and the whole of October's board
   add(mint.giftLine({ date: day("10", "31"), handle: "carol", n: 50, slug: "october-prize", by: "keemin" }), { who: "carol", n: 50, month: "2026-10", earned: true });
@@ -114,7 +122,7 @@ const novBoard = (hall) => hall.months["2026-11"];
 
 // ── the fold ─────────────────────────────────────────────────────────────────
 
-test("LAW foldPrimaryMint: each person's earned is the sum of their MINT rows this month, and the breakdown adds up to it", { skip: SKIP }, () => {
+test("each person's earned is the sum of what was minted or paid to them this month, and the breakdown adds up to it", { skip: SKIP }, () => {
   const rows = ledger();
   const nov = novBoard(fold(rows));
   const want = expectEarned(rows, "2026-11");
@@ -128,7 +136,7 @@ test("LAW foldPrimaryMint: each person's earned is the sum of their MINT rows th
 
 test("the ranks are highest-first, ties by handle, and two runs agree byte for byte", { skip: SKIP }, () => {
   const a = fold();
-  assert.deepEqual(novBoard(a).people.map((p) => p.handle), ["alice", "gina", "bob", "dave", "hank"]);
+  assert.deepEqual(novBoard(a).people.map((p) => p.handle), ["alice", "bob", "gina", "ivy", "dave", "hank"]);
   const earned = novBoard(a).people.map((p) => p.earned);
   assert.deepEqual(earned, [...earned].sort((x, y) => y - x), "highest first");
   // a tie at the same total is broken by handle: erin-style twins
@@ -141,14 +149,38 @@ test("the ranks are highest-first, ties by handle, and two runs agree byte for b
   assert.equal(JSON.stringify(fold()), JSON.stringify(fold()), "the fold is deterministic for one ledger");
 });
 
-test("an October mint is October's, a row after the as-of day is nobody's, and a transfer earns nothing", { skip: SKIP }, () => {
+test("an October mint is October's, a row after the as-of day is nobody's", { skip: SKIP }, () => {
   const hall = fold();
   assert.equal(novBoard(hall).people.some((p) => p.handle === "carol"), false, "carol's 10-31 gift is not November's");
   assert.equal(hall.months["2026-10"].people.find((p) => p.handle === "carol")?.earned, 50, "and it is October's, whole");
   assert.equal(novBoard(hall).people.find((p) => p.handle === "alice").earned, expectEarned(ledger(), "2026-11").get("alice"),
     "alice's 11-25 gift of 99 has not happened as of 11-20");
-  // bob received 7 by transfer: his earned is the stage rung alone
-  assert.equal(novBoard(hall).people.find((p) => p.handle === "bob").earned, 5, "a transfer moves stamps, it does not earn them");
+});
+
+// UNTIL 2026-11-09 (Rivet's scope FIX at ccadf0d2) THIS FILE ASSERTED "a transfer
+// earns nothing": bob's stage rung alone was his 5. The accepted description is
+// "what was minted or paid to them this month", so a settled pay is a credit.
+test("a settled pay credits its recipient, with its payer and letter; a pay with no mint earns; a void and a stake return do not", { skip: SKIP }, () => {
+  const nov = novBoard(fold());
+  const bob = nov.people.find((p) => p.handle === "bob");
+  assert.equal(bob.earned, 12, "bob: the 5 rung and the 7 pay, not the 5 alone");
+  assert.deepEqual(bob.sources.map((s) => [s.label, s.n]), [["Payments received", 7], ["Bug-ladder rungs", 5]]);
+  assert.deepEqual(bob.sources[0].records[0], { date: "2026-11-08", n: 7, ref: { type: "letter", id: "alice-2026-11-08-to-bob-thanks" }, label: "from alice · alice-2026-11-08-to-bob-thanks" });
+  // THE REGRESSION: paid, never minted this month. Rivet: "a paid recipient with no new mint"
+  const ivy = nov.people.find((p) => p.handle === "ivy");
+  assert.equal(ivy.earned, 9);
+  assert.deepEqual(ivy.sources.map((s) => s.label), ["Payments received"]);
+  // the payer is not debited on a board of earnings, and a pay is not double-counted as a mint
+  assert.equal(nov.people.find((p) => p.handle === "alice").sources.some((s) => s.label === "Payments received"), false);
+  // not credits: the void (jo), the stake return (kit)
+  for (const h of ["jo", "kit"]) assert.equal(nov.people.some((p) => p.handle === h), false, `${h} was not paid or minted anything`);
+  // CONTROL: the same pay with the transfer line removed leaves ivy off the board, so the
+  // credit above came from the transfer row and nothing else
+  const without = fold(ledger().filter((r) => !r.canonical.includes("to-ivy-for-the-map")));
+  assert.equal(novBoard(without).people.some((p) => p.handle === "ivy"), false);
+  // a pay to the BURN account or a stake escrow is no one's credit
+  const odd = [mint.transferLine({ date: "2026-11-05", from: "alice", to: "BURN", n: 3, id: "x-1" })].map((canonical) => ({ canonical }));
+  assert.equal(hallFromLedger({ mint, entries: entriesOf(odd), asOf: NOW }).months["2026-11"].earners, 0);
 });
 
 test("holo is apart: carried in its own field, never added into earned, never counted as a plain source", { skip: SKIP }, () => {
@@ -346,7 +378,7 @@ test("the component draws a row per earner with the plain total, a breakdown, an
   const aliceTotal = view.rows.find((r) => r.handle === "alice").earned;
   const html = await render(view);
   // Astro appends its scope class to every element of a scoped component
-  assert.equal((html.match(/<li class="hof-row[^"]*">/g) ?? []).length, 5, "alice, gina, bob, dave, hank");
+  assert.equal((html.match(/<li class="hof-row[^"]*">/g) ?? []).length, 6, "alice, bob, gina, ivy, dave, hank");
   assert.match(html, /<span class="hof-who[^"]*">alice<\/span>/);
   assert.match(html, new RegExp(`stamps earned this month </span>${aliceTotal}<span class="hof-u[^"]*">✦</span>`), "alice's plain total");
   // dave: the plain 3 and the holo 30 are two elements, the second in the holo ink
@@ -367,7 +399,7 @@ test("the preview render: the first rows, 'top N of M', and no holo board", { sk
   const hall = readHall(fold());
   const html = await render(hallView(hall, { today: NOW, limit: 2 }));
   assert.equal((html.match(/<li class="hof-row[^"]*">/g) ?? []).length, 2);
-  assert.match(html, /top 2 of 5/);
+  assert.match(html, /top 2 of 6/);
   assert.equal(html.includes("hof-holo-board"), false);
 });
 
