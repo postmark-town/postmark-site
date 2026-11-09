@@ -148,7 +148,8 @@ test("built: every household page's entry region sits inside the host's clipping
 
 test("a design cannot take the band's Needs you away: the page host hides the design's own copy, once, and the band is the one shown", () => {
   const css = read("src/components/hearth/hearth-host.css");
-  assert.match(css, /\.hearth-stage \[data-hearth-slot="needs-you"\], \.hearth-stage \[data-hd-boat\] \{ display: none !important; \}/);
+  // Truey's review: the design's private mail summary repeated the band's waiting letters, so it stands down too
+  assert.match(css, /\.hearth-stage \[data-hearth-slot="needs-you"\], \.hearth-stage \[data-hearth-slot="mail"\], \.hearth-stage \[data-hd-boat\] \{ display: none !important; \}/);
 });
 
 // ── the old address forwards ────────────────────────────────────────────────

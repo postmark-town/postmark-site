@@ -282,8 +282,9 @@ const run = async () => {
       await page.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 15000 });
       check("④ the owner sees Needs you in the band, from the fixture's stances", /awaiting the house/.test((await text(page, "[data-hband] [data-hd-needs-box]")) ?? ""), await text(page, "[data-hband] [data-hd-needs-box]"));
       check("④ and only once: the design's own Needs you slot stands down", !(await visible(page, "[data-hearth-slot=needs-you]")) && (await page.locator("[data-hd-needs-box]:visible").count()) === 1);
-      await page.waitForSelector("[data-hearth-slot=mail]:not([hidden])", { timeout: 15000 });
-      check("④ the owner sees the private mail summary", /waiting for the crossing/.test((await text(page, "[data-hearth-slot=mail]")) ?? ""), await text(page, "[data-hearth-slot=mail]"));
+      await page.waitForSelector("[data-hearth-slot=mail]:not([hidden])", { state: "attached", timeout: 15000 });   // painted for the owner, though the host stands it down
+      // POS-984 (review): the design's mail summary is painted (the markup is the design's) but stands down, so the waiting letters show once, in the band
+      check("④ the private mail summary is painted from the owner's reads, and stands down: the band's boat line carries the waiting letters once", /waiting for the crossing/.test((await text(page, "[data-hearth-slot=mail]")) ?? "") && !(await visible(page, "[data-hearth-slot=mail]")) && (await visible(page, "[data-hband] [data-hd-boat]")) && (await page.locator("[data-hearth-slot=mail]:visible, [data-hd-boat]:visible").count()) === 1, await text(page, "[data-hearth-slot=mail]"));
       check("④ the bearer went only to the house's own doorsteps", log.filter((l) => l.auth).every((l) => A.some((h) => l.path.startsWith(`/doorstep/${h}`)) || l.path === "/me"), JSON.stringify(log.filter((l) => l.auth).map((l) => l.path)));
       await shot(page, "04-default-owner-desktop", { fullPage: true });
       await cleanUnderPolicy(page, "④ (signed in)");

@@ -185,9 +185,10 @@
 
 /* ── the site's own band stands in for a design's private copies (POS-984) ──
  * The band above every design (household-dashboard/HouseBand.astro) carries the house's Needs you and its
- * "on the next boat" line. A design may still place <hearth-needs-you> and a feed with a boat line (its markers
- * stay valid); on the one page the band is where they are shown, once. */
-.hearth-stage [data-hearth-slot="needs-you"], .hearth-stage [data-hd-boat] { display: none !important; }
+ * "on the next boat" line (the letters waiting for the crossing). A design may still place <hearth-needs-you>,
+ * <hearth-mail> and a feed with a boat line (their markers stay valid); the private mail summary repeats what the band
+ * says, so on the one page the band is where they are shown, once. */
+.hearth-stage [data-hearth-slot="needs-you"], .hearth-stage [data-hearth-slot="mail"], .hearth-stage [data-hd-boat] { display: none !important; }
 
 /* ── the host's frame around the design (POS-984) ──
  * A template's `:root`, `html` and `body` rules land on its own stage, where `margin` and `transform` are allowed, and the
