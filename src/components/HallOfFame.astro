@@ -1,0 +1,175 @@
+---
+// HallOfFame.astro — Ferry's Hall of Fame. ONE COPY, TWO RENDERS (POS-967).
+//
+// It REPLACES QuestStandings.astro, the Quest Guild's standings (Darko,
+// 2026-11-08 17:08: "the hall of fame should replace/revamp the 'Standings'
+// section in the quest guild which is stale"). The Town page draws the first
+// few rows and links the full one; /town/quests/ draws the whole board. Both
+// draw it here, so the preview and the full board can never disagree about a
+// row. The rows come from hallView (src/lib/hall-of-fame.mjs), which reads the
+// town's own stamp-ledger; this file only draws what it is handed.
+//
+// WHAT A ROW IS: the resident, the stamps they EARNED this calendar month (the
+// town's month), and under a tap the sources those stamps came from, adding up
+// to the total, each linking to its public record where one exists. Holo is a
+// different ink and a different number (the same `pm-holo-ink` PotCards and the
+// household dashboard wear), never added into the plain count.
+//
+// THE BREAKDOWN IS A NATIVE <details>: it opens by tap or keyboard with no
+// script, and the resident's own link sits inside the panel, not in the
+// summary, so a tap on the row never navigates by accident.
+//
+// The styles ride with the markup, scoped to this file (PotCards.astro's
+// reason: a page's scoped rules never reach a component's elements).
+const { view } = Astro.props;
+const plural = (n, one, many) => (n === 1 ? one : many);
+// Strings are composed here, whole: Astro drops a space that sits between two
+// expressions or between an element and an expression ("28stamps", "1row").
+const fromLine = (r) => `Where ${r.earned} ${plural(r.earned, "stamp", "stamps")} came from`;
+const rowsOf = (n) => ` · ${n} ${plural(n, "row", "rows")}`;
+const legend = `Stamps earned in ${view.monthLabel}, highest first${view.earners > view.rows.length ? ` · top ${view.rows.length} of ${view.earners}` : ""}. Tap a name to see where they came from.`;
+---
+{view.state === "unavailable" ? (
+  <div class="hof-none">
+    <b>The Hall of Fame could not be read.</b>
+    <span>
+      {view.asOf
+        ? <>The town's stamp record this build holds is as of {view.asOf}, which is before this month, so nothing is drawn for it. </>
+        : <>This build did not find the town's stamp record in a shape it could read. </>}
+      Nothing has been invented to fill the gap.
+    </span>
+  </div>
+) : view.state === "empty" ? (
+  <p class="hof-quiet">Nobody has earned a stamp yet this month.</p>
+) : (
+  <>
+    <ol class="hof" data-hof>
+      {view.rows.map((r) => (
+        <li class="hof-row">
+          <details class="hof-det">
+            <summary class="hof-sum">
+              <span class="hof-rank">{r.rank}</span>
+              <span class="hof-who">{r.handle}</span>
+              <span class="hof-all"><span class="hof-sr">stamps earned this month </span>{r.earned}<span class="hof-u">✦</span></span>
+              {r.holo > 0 && <span class="hof-holo pm-holo-ink"><span class="hof-sr">holo this month </span>✧ {r.holo}</span>}
+            </summary>
+            <div class="hof-panel">
+              <p class="hof-from">{fromLine(r)}</p>
+              <ul class="hof-src">
+                {r.sources.map((s) => (
+                  <li>
+                    <p class="hof-src-h"><span class="hof-src-n">{s.n}<span class="hof-u">✦</span></span>{" "}{s.label}<span class="hof-src-c">{rowsOf(s.count)}</span></p>
+                    <ul class="hof-rec">
+                      {s.records.map((x) => (
+                        <li>{x.href ? <a href={x.href}>{x.label}</a> : <span>{x.label}</span>}<span class="hof-rec-d">{` · ${x.date}`}</span></li>
+                      ))}
+                      {s.more > 0 && <li class="hof-more">+ {s.more} more</li>}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+              {r.holo > 0 && (
+                <div class="hof-holo-blk">
+                  <p class="hof-from"><span class="hof-holo pm-holo-ink">{`✧ ${r.holo} holo`}</span>{" "}<span class="hof-apart">{`counted apart, not in the ${r.earned}`}</span></p>
+                  <ul class="hof-rec">
+                    {r.holoPots.map((h) => (
+                      <li><a href={h.href}>{h.pot}</a><span class="hof-rec-d">{` · ${h.n} from ${h.count} ${plural(h.count, "row", "rows")}`}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p class="hof-res"><a href={r.href}>{r.handle}'s page →</a></p>
+            </div>
+          </details>
+        </li>
+      ))}
+    </ol>
+    <p class="hof-legend">{legend}</p>
+    {view.holoRows.length > 0 && (
+      <div class="hof-holo-board">
+        <p class="hof-from"><span class="hof-holo pm-holo-ink">✧ holo this month</span>{" "}<span class="hof-apart">apart from the stamps above, never summed with them</span></p>
+        <ul class="hof-rec">
+          {view.holoRows.map((h) => (
+            <li>
+              <a href={h.href}>{h.handle}</a>{" "}
+              <span class="hof-holo pm-holo-ink">{`✧ ${h.holo}`}</span>
+              <span class="hof-rec-d">{` · ${h.holoPots.map((p) => p.pot).join(", ")}`}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+  </>
+)}
+
+<style>
+  .hof { list-style: none; margin: 0; padding: 0; }
+  .hof-row { border-bottom: 1px solid rgba(232, 196, 139, 0.08); }
+  .hof-det > summary { list-style: none; cursor: pointer; }
+  .hof-det > summary::-webkit-details-marker { display: none; }
+  .hof-sum {
+    display: grid; grid-template-columns: 2em minmax(0, 1fr) auto auto; align-items: baseline; gap: 0.9em;
+    padding: 0.55em 0; font-size: var(--civic-body, .9rem);
+  }
+  .hof-sum:focus-visible { outline: 2px solid var(--pm-gold); outline-offset: 2px; }
+  .hof-rank { font-family: var(--pm-mono); font-size: var(--civic-label, .7rem); color: rgba(205, 194, 171, 0.5); }
+  .hof-who { color: var(--pm-gold); min-width: 0; overflow-wrap: anywhere; }
+  .hof-det[open] .hof-who, .hof-sum:hover .hof-who { color: var(--pm-gold-bright); }
+  .hof-all { font-family: var(--pm-mono); color: var(--pm-stamp-bright); text-align: right; white-space: nowrap; }
+  .hof-u { margin-left: 0.15em; }
+  .hof-holo {
+    font-family: var(--pm-mono); font-size: var(--civic-label, .7rem); white-space: nowrap;
+    padding: 0.05em 0.5em; border-radius: 999px;
+  }
+  .hof-sr {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  .hof-panel { padding: 0.2em 0 0.9em 2.9em; font-size: var(--civic-label, .78rem); color: rgba(205, 194, 171, 0.8); }
+  .hof-from {
+    margin: 0.2em 0 0.4em; font-family: var(--pm-mono); font-size: var(--civic-label, .7rem);
+    letter-spacing: 0.06em; text-transform: uppercase; color: rgba(205, 194, 171, 0.55);
+  }
+  .hof-apart { text-transform: none; letter-spacing: 0.02em; }
+  .hof-src, .hof-rec { list-style: none; margin: 0; padding: 0; }
+  .hof-src > li { margin: 0 0 0.6em; }
+  .hof-src-h { margin: 0 0 0.15em; color: rgba(232, 214, 180, 0.92); }
+  .hof-src-n { font-family: var(--pm-mono); color: var(--pm-stamp-bright); margin-right: 0.35em; }
+  .hof-src-c, .hof-rec-d { color: rgba(205, 194, 171, 0.5); }
+  .hof-rec > li { padding: 0.05em 0 0.05em 0.9em; min-width: 0; overflow-wrap: anywhere; }
+  .hof-rec a, .hof-res a { color: var(--pm-gold); text-decoration: none; }
+  .hof-rec a:hover, .hof-res a:hover { color: var(--pm-gold-bright); text-decoration: underline; }
+  .hof-more { color: rgba(205, 194, 171, 0.5); }
+  .hof-holo-blk { margin-top: 0.4em; }
+  .hof-res { margin: 0.7em 0 0; }
+  .hof-legend {
+    margin: 0.6em 0 0; font-family: var(--pm-mono); font-size: var(--civic-label, .7rem);
+    letter-spacing: 0.04em; color: rgba(205, 194, 171, 0.6);
+  }
+  .hof-holo-board { margin-top: 1.4em; }
+  .hof-holo-board .hof-rec > li { padding-left: 0; }
+  .hof-none {
+    border: 1px dashed rgba(232, 196, 139, .3); border-radius: 10px;
+    padding: 1rem 1.2rem; font-size: .9rem; line-height: 1.6;
+  }
+  .hof-none b { display: block; color: var(--pm-gold-bright); margin-bottom: .35rem; }
+  .hof-none span { opacity: .78; }
+  .hof-quiet { margin: 0; color: rgba(205, 194, 171, 0.7); font-size: .9rem; }
+
+  /* THE PHONE ROW: rank, name and the plain total on the first line; the holo
+     chip, when there is one, on its own line under the name, so a long handle
+     wraps instead of pushing the number off the edge. The panel drops its
+     indent so the records get the width. */
+  @media (max-width: 720px) {
+    .hof-sum {
+      grid-template-columns: 1.6em minmax(0, 1fr) auto;
+      grid-template-areas: "rank who all" ".    holo holo";
+      row-gap: 0.15em;
+    }
+    .hof-sum .hof-rank { grid-area: rank; }
+    .hof-sum .hof-who { grid-area: who; }
+    .hof-sum .hof-all { grid-area: all; }
+    .hof-sum .hof-holo { grid-area: holo; justify-self: start; }
+    .hof-panel { padding-left: 1.6em; }
+  }
+</style>

@@ -475,8 +475,10 @@ test("THE LAW: the Guild reads the pots, then the quest cards, then the standing
   const head = guild.indexOf("<LaneHead");
   const cards = guild.indexOf("questRows.map");
   const pots = guild.indexOf('<div id="pots"');
-  // the standings rows are one component since #3514 (the full board draws them too)
-  const standings = guild.indexOf("<QuestStandings");
+  // the standings rows are one component since #3514 (the full board draws them too).
+  // Until 2026-11-09 (POS-967) this block was <QuestStandings>; Ferry's Hall of
+  // Fame replaced it and keeps its place: still last, still one component.
+  const standings = guild.indexOf("<HallOfFame");
   assert.ok(head > 0 && cards > 0 && pots > 0 && standings > 0,
     `the Guild lost a block — head:${head} cards:${cards} pots:${pots} standings:${standings}`);
   assert.ok(head < pots, "the lane's head still opens it");
