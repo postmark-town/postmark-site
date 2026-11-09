@@ -1,0 +1,202 @@
+---
+// HearthSlot — the site's own part for one slot a Hearth template names (POS-959).
+//
+// A template writes `<hearth-residents>`; the sanitizer leaves a placeholder; THIS draws what stands there.
+// It is the one place a slot's markup lives: the page draws it inline for the entry it opens on, and again
+// inside a <template> per slot, which the preview clones when someone looks at another entry. Same
+// component, so the two cannot differ.
+//
+// What is drawn here is the STATIC half: the house's baked public facts (its name, residents, closest
+// correspondents, the bulletin). The live half is filled by the page's script from the reads the dashboard
+// already makes (household-dashboard/reads.mjs) and painted by the dashboard's own paintHouse and by
+// hearth/paint.mjs. The `data-hd-*` and `data-hx-*` hooks are the contract between the two.
+//
+// PRIVATE SLOTS carry `data-private` and ship hidden. The page shows them only when the reader's sign-in
+// holds a resident of this house, exactly as the dashboard's Needs you does, and what they hold is read
+// with the owner's bearer by the same call. A template can place a private slot; it can never see what is in it.
+//
+// THE HOLO EXPANSION IS NOT HERE. test/funding.test.mjs holds that a built page teaches it exactly once, and this
+// component is drawn twice on the page (once on the stage, once inside a preview <template>). The one note rides
+// Hearth.astro, below the stage, and the stage's script shows it when the stamps slot shows a holo count.
+//
+// RESIDENT WORDS ARE TEXT: names, bios, titles go through Astro's escaping here, never set:html.
+import ResidentCard from "../household-dashboard/ResidentCard.astro";
+import { correspondentsOf } from "@/lib/correspondents.mjs";
+import { fmtDate } from "@/lib/pm.mjs";
+
+interface Props {
+  name: string;
+  house: any;
+  faces: any[];
+  plate: string;
+  slug: string;
+  bulletin?: any[];
+}
+const { name, house, faces, plate, slug, bulletin = [] } = Astro.props;
+const seat = (h: string) => `/households/${slug}/?resident=${encodeURIComponent(h)}`;
+const closer = name === "closer"
+  ? faces.map((f) => ({ f, rows: correspondentsOf(f.handle).slice(0, 3) })).filter((x) => x.rows.length)
+  : [];
+---
+{name === "house" && (
+  <section class="hx hx-house" data-hearth-slot="house" aria-label="the house">
+    <p class="hd-label">a household in Postmark{house.since && <> · since {fmtDate(house.since)}</>}</p>
+    <p class="hx-name">{plate || "a shared household"}</p>
+    <p class="hd-sub">
+      <b>{`${faces.length} ${faces.length === 1 ? "resident" : "residents"}`}</b>
+      <span data-hd-share-sub hidden></span>
+    </p>
+    <p class="hx-public" data-public>
+      <b>You are reading {plate}’s public record.</b> Everything here is what the town already publishes about this house.
+      What only the house’s own sign-in sees is not drawn here, and nothing stands in for it.
+      <button type="button" class="hd-link-btn" data-hd-signin hidden>Is this your house? Sign in with GitHub →</button>
+    </p>
+  </section>
+)}
+
+{name === "residents" && (
+  <section class="hx hx-residents" data-hearth-slot="residents" aria-label="the residents">
+    <div class="hx-cards">
+      {faces.map((f) => <ResidentCard face={f} href={seat(f.handle)} compact />)}
+    </div>
+  </section>
+)}
+
+{name === "needs-you" && (
+  <aside class="hx hx-needs hd-needs" data-hearth-slot="needs-you" data-private data-hd-needs-box hidden aria-labelledby="hx-needs-h">
+    <h2 id="hx-needs-h">Needs you</h2>
+    <p class="hd-meta">what is waiting on a word from this house</p>
+    <ul data-hd-needs></ul>
+  </aside>
+)}
+
+{name === "stamps" && (
+  <section class="hx hx-stamps hd-panel" data-hearth-slot="stamps" data-hd-numbers hidden aria-labelledby="hx-stamps-h">
+    <h2 id="hx-stamps-h">The house in numbers</h2>
+    <div class="dash-stamps">
+      <dl class="hd-nums">
+        <div><dt>stamps held</dt><dd class="st" data-hd-n-held>—</dd></div>
+        <div><dt>minted, all-time</dt><dd class="st" data-hd-n-minted>—</dd></div>
+        <div data-hd-n-holo-wrap hidden><dt>holo</dt><dd data-hd-n-holo>—</dd></div>
+        <div><dt>residents</dt><dd>{faces.length}</dd></div>
+        <div><dt>windows hung</dt><dd data-hd-n-windows>—</dd></div>
+      </dl>
+    </div>
+  </section>
+)}
+
+{name === "posts" && (
+  <section class="hx hx-posts" data-hearth-slot="posts" aria-labelledby="hx-posts-h">
+    <h2 id="hx-posts-h">Posts</h2>
+    <p class="hd-meta">the ideas and bugs this house’s residents put up</p>
+    <ul class="hx-list" data-hx-posts><li class="hd-empty">reading the town’s posts…</li></ul>
+    <p class="hx-note" data-hx-posts-note hidden></p>
+  </section>
+)}
+
+{name === "marks" && (
+  <section class="hx hx-marks" data-hearth-slot="marks" aria-labelledby="hx-marks-h">
+    <h2 id="hx-marks-h">Marks</h2>
+    <p class="hd-meta">what the crossings decided about this house’s marks</p>
+    <ul class="hx-list" data-hx-marks><li class="hd-empty">reading the house’s record…</li></ul>
+  </section>
+)}
+
+{name === "closer" && (
+  <section class="hx hx-closer" data-hearth-slot="closer" aria-labelledby="hx-closer-h">
+    <h2 id="hx-closer-h">Closest correspondents</h2>
+    <p class="hd-meta">who each resident has written with most, by letters that crossed</p>
+    {closer.length === 0
+      ? <p class="hd-empty">No letters have crossed between these residents and others yet.</p>
+      : <ul class="hx-list">
+          {closer.map(({ f, rows }) => (
+            <li>
+              <a class="hx-who" href={seat(f.handle)}>{f.name}</a>
+              <span class="hx-with"> with {rows.map((r, i) => <>{i > 0 && ", "}<a href={`/residents/${encodeURIComponent(r.handle)}/`}>{r.name}</a> ({r.count})</>)}</span>
+            </li>
+          ))}
+        </ul>}
+  </section>
+)}
+
+{name === "happened" && (
+  <section class="hx hx-happened hd-panel hd-feed-panel" data-hearth-slot="happened" aria-labelledby="hx-happened-h">
+    <div class="hd-head">
+      <h2 id="hx-happened-h"><span data-private>Since you last looked</span><span data-public>Lately, across the house</span></h2>
+      <span class="hd-meta" data-private><span data-hd-looked></span> <button type="button" class="hd-ghost" data-hd-seen>mark all seen</button></span>
+    </div>
+    <div class="hd-filters" role="group" aria-label="show">
+      <button type="button" class="hd-chip is-on" data-hd-filter="all" aria-pressed="true">everything</button>
+      <button type="button" class="hd-chip" data-hd-filter="letter" aria-pressed="false">letters<span data-hd-count></span></button>
+      <button type="button" class="hd-chip" data-hd-filter="said" aria-pressed="false">said<span data-hd-count></span></button>
+      <button type="button" class="hd-chip" data-hd-filter="mark" aria-pressed="false">marks<span data-hd-count></span></button>
+      <button type="button" class="hd-chip" data-hd-filter="stamps" aria-pressed="false">stamps<span data-hd-count></span></button>
+      <label class="hd-chip hd-select">
+        <span class="hd-sr">whose</span>
+        <select data-hd-who>
+          <option value="all">all residents</option>
+          {faces.map((f) => <option value={f.handle}>{f.name}</option>)}
+        </select>
+      </label>
+    </div>
+    <ol class="hd-feed" data-hd-feed>
+      <li class="hd-empty" data-hd-loading>reading the house’s record…</li>
+    </ol>
+    <button type="button" class="hd-more" data-hd-more hidden></button>
+    <p class="hd-boat" data-private data-hd-boat hidden></p>
+    <noscript><p class="hd-empty">The house’s record is read live from the town; this part of the page needs scripts.</p></noscript>
+  </section>
+)}
+
+{name === "mail" && (
+  <section class="hx hx-mail" data-hearth-slot="mail" data-private data-hx-mail hidden aria-labelledby="hx-mail-h">
+    <h2 id="hx-mail-h">Mail</h2>
+    <p class="hd-meta">private to this house: what is new, what waits on a word, what rides the next crossing</p>
+    <ul class="hx-list" data-hx-mail-list></ul>
+  </section>
+)}
+
+{name === "around-town" && (
+  <section class="hx hx-town" data-hearth-slot="around-town" aria-labelledby="hx-town-h">
+    <h2 id="hx-town-h">Around town</h2>
+    <div class="hx-boards">
+      <div class="hx-board">
+        <h3>On the calendar</h3>
+        <ul class="hx-list" data-hx-town-events><li class="hd-empty">reading the calendar…</li></ul>
+      </div>
+      <div class="hx-board">
+        <h3>The bulletin</h3>
+        {bulletin.length === 0
+          ? <p class="hd-empty">Nothing is posted on the bulletin.</p>
+          : <ul class="hx-list">
+              {bulletin.map((b) => (
+                <li><a href={`/bulletin/${encodeURIComponent(b.slug)}/`}>{b.title}</a>{b.posted && <span class="hx-when"> · {fmtDate(b.posted)}</span>}</li>
+              ))}
+            </ul>}
+      </div>
+    </div>
+  </section>
+)}
+
+{name === "map" && (
+  <section class="hx hx-map" data-hearth-slot="map" aria-labelledby="hx-map-h">
+    <h2 id="hx-map-h">Where they stand</h2>
+    <p class="hd-meta">the residents’ places in the world right now, from the walkers’ roll</p>
+    <div class="hx-places" data-hx-map><p class="hd-empty">reading the world…</p></div>
+  </section>
+)}
+
+{name === "stamps-chart" && (
+  <section class="hx hx-chart" data-hearth-slot="stamps-chart" aria-labelledby="hx-chart-h">
+    <h2 id="hx-chart-h">Stamps held</h2>
+    <p class="hd-meta">each resident’s stamps, as their doorstep counts them</p>
+    <div class="hx-bars" data-hx-chart><p class="hd-empty">reading the stamps…</p></div>
+  </section>
+)}
+
+{name === "countdown" && (
+  <section class="hx hx-countdown hd-clocks" data-hearth-slot="countdown" data-hd-clocks hidden aria-label="the next crossing and settlement">
+    <div class="hd-clock" data-hd-clock="crossing" hidden><p class="hd-label">the next crossing</p><p class="v"></p><p class="n"></p><p class="hx-left" data-hx-left="crossing"></p></div>
+    <div class="hd-clock" data-hd-clock="settlement" hidden><p class="hd-label">the keeper’s settlement</p><p class="v"></p><p class="n"></p><p class="hx-left" data-hx-left="settlement"></p></div>
+  </section>
+)}

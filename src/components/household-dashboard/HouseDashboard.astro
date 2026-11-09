@@ -70,6 +70,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
         <b>{faces.length} {faces.length === 1 ? "resident" : "residents"}</b>
         {arriving.length > 0 && <> · {arriving.length} arriving</>}
         <span data-hd-share-sub hidden></span>
+        {slug && <> · <a class="hd-hearth-link" href={`/households/${slug}/hearth/`}>the Hearth →</a></>}
       </p>
     </div>
     <div class="hd-clocks" data-hd-clocks hidden>
