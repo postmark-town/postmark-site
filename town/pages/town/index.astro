@@ -85,6 +85,7 @@ import houseRegistry from "@/data/postmark/households.json";
 import meeps from "@/data/postmark/meeps.json";
 import bulletin from "@/data/postmark/bulletin.json";
 import questPosts from "@/data/postmark/quest-posts.json";
+import questRegistry from "@/data/postmark/quest-registry.json"; // POS-954: the town's quest registry, the office board's own source (monthly quests)
 import ideaPosts from "@/data/postmark/idea-posts.json";
 
 const TOWN = "https://github.com/postmark-town/postmark/blob/main";
@@ -169,7 +170,8 @@ const quests = questStandings(bulletin);
 // The cards are the town's quest posts (POS-294): the office's GET
 // /posts?class=quest, baked as quest-posts.json.
 // A quest with an `ends` is offered through that town day (POS-857), the day this build ran in.
-const questRows = questCards(quests, questBoardFrom(questPosts, { today: townDay() }));
+// A MONTHLY quest is drawn from the registry the office's board reads (POS-954): no post need name it (civic.mjs § questBoardFrom).
+const questRows = questCards(quests, questBoardFrom(questPosts, { today: townDay(), registry: questRegistry }));
 const market = marketplace(bulletin);
 
 // THE FIVE PLAQUES, per lane, read from the record. No sentence below is typed
