@@ -39,10 +39,9 @@ if (existsSync(srcDir)) {
     const author = e.name;
     if (author === author.toUpperCase()) continue; // STARTER etc. — infrastructure, not submissions
     const dir = join(srcDir, author);
-    // THE FILE BOUNDARY (POS-959, review of #393): this job holds a write key and commits what it copies to a public
-    // repo, and git can store a symlink as a file. A rendition file is read only if it is a regular file whose canonical
-    // path stays inside its own folder (tools/lib/source-file.mjs); anything else is REFUSED BY NAME and the folder
-    // skipped. The copy is made from the bytes read through that check, never from the path.
+    // THE FILE BOUNDARY (POS-959): a rendition file is read only if it is a regular file whose canonical path stays inside
+    // its own folder (tools/lib/source-file.mjs); anything else is REFUSED BY NAME and the folder skipped. The copy is made
+    // from the bytes read through that check, never from the path.
     let htmlBytes, raw;
     try {
       if (!dirInside(dir, srcDir)) throw new RefusedFile(`${author}/`, "resolves outside PROJECTS/resident-page-renditions: refused");

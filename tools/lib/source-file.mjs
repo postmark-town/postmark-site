@@ -1,19 +1,16 @@
-// source-file.mjs — read ONE file of a town entry, only if it is really that file (POS-959).
+// source-file.mjs — read ONE file of a town entry, only if it is really that entry's own file (POS-959).
 //
-// The intake tools (sync-hearths.mjs, sync-renditions.mjs) run inside a job that holds a write key and commits what
-// it copies to a PUBLIC repo. A town entry is a folder a resident's pull request fills, and git can store a SYMLINK
-// as a file: `hearth.html -> ../../../.git/config` reads, through a plain readFileSync, as whatever that path holds
-// on the runner, including the job's own token. So an entry file is read only when
+// The intake tools (sync-hearths.mjs, sync-renditions.mjs) copy what a town entry's folder holds into this repo. An entry
+// file is therefore read only when
 //
 //   1. lstat says it is a regular file (not a link, not a directory, not a device or a pipe), AND
-//   2. its canonical path stays inside the entry's own folder (no link anywhere in the path leads out), AND
-//   3. it is opened with O_NOFOLLOW and the OPEN handle is still a regular file (so a link swapped in between the
-//      check and the read is refused too), AND
+//   2. its canonical path stays inside the entry's own folder, AND
+//   3. it is opened with O_NOFOLLOW and the OPEN handle is still a regular file, AND
 //   4. it is small (an entry is markup, not a payload).
 //
 // Anything else is REFUSED BY NAME (RefusedFile: which file, why), never read, never copied. A file that simply is not
-// there is `null`, as before. The caller skips the whole entry and says so; nothing of a refused file reaches any output.
-// Narrow on purpose: this is the one guard, used by both intake tools; it is not an intake framework.
+// there is `null`, as before. The caller skips the whole entry and says so. Narrow on purpose: this is the one guard, used
+// by both intake tools; it is not an intake framework.
 
 import { lstatSync, openSync, fstatSync, readSync, closeSync, realpathSync, constants } from "node:fs";
 import { basename, join, sep } from "node:path";

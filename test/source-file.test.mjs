@@ -1,9 +1,9 @@
-// source-file.test.mjs — the intake tools read a town entry's files only if they are really those files (POS-959).
+// source-file.test.mjs — the intake tools read a town entry's files only if they are really that entry's own (POS-959).
 //
-// The review of #393 found that sync-hearths.mjs followed symlinks: an entry's `hearth.html -> ../../../.git/config`
-// copied the runner's persisted token into a committed, public data file. The same class stood in sync-renditions.mjs.
-// This holds the one guard (tools/lib/source-file.mjs) and both tools to it, with FAKE sentinels only: no real
-// credential, key or runner path is read anywhere here. Every protected file is a scratch file this test makes.
+// The one guard (tools/lib/source-file.mjs) and both intake tools (sync-hearths.mjs, sync-renditions.mjs) are held to it:
+// a regular file inside its own entry folder is read; a link, a directory, a pipe, an oversize file or anything resolving
+// outside the folder is refused by name and the entry skipped. FAKE sentinels only: no real credential, key or runner path
+// is read anywhere here; every protected file is a scratch file this test makes.
 
 import test from "node:test";
 import assert from "node:assert/strict";

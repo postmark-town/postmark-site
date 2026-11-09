@@ -13,10 +13,8 @@
 // hearth.md (front matter: title, author; then one public line). A folder named in capitals (STARTER) is
 // infrastructure, not an entry. A folder with no hearth.html is said out loud and skipped, never silently.
 //
-// THE FILE BOUNDARY (POS-959, review of #393): this job holds a write key and commits what it copies to a public repo,
-// and git can store a symlink as a file. An entry file is read only if it is a regular file whose canonical path stays
-// inside its own folder (tools/lib/source-file.mjs); anything else is REFUSED BY NAME and the whole entry skipped,
-// so no byte of a protected file can reach hearths.json.
+// THE FILE BOUNDARY (POS-959): an entry file is read only if it is a regular file whose canonical path stays inside its
+// own folder (tools/lib/source-file.mjs); anything else is REFUSED BY NAME and the whole entry skipped.
 
 import { readdirSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
