@@ -163,6 +163,7 @@ jobs:
             src/data/postmark/pots.json
             src/data/postmark/deeds.json
             src/data/postmark/economy.json
+            src/data/postmark/hall-of-fame.json
           if-no-files-found: error
           retention-days: 3
 
@@ -336,7 +337,7 @@ jobs:
         run: |
           # every file is checked before any is copied, so a refusal leaves the
           # committed seam whole
-          for f in pots.json deeds.json economy.json; do
+          for f in pots.json deeds.json economy.json hall-of-fame.json; do
             src="$SEAM_DIR/$f"
             if [ ! -f "$src" ] || [ -L "$src" ]; then
               echo "::error::the town-seam artifact has no regular file $f"
@@ -345,7 +346,7 @@ jobs:
             SRC="$src" node -e 'JSON.parse(require("node:fs").readFileSync(process.env.SRC, "utf8"))' \
               || { echo "::error::the town-seam artifact's $f is not JSON"; exit 1; }
           done
-          for f in pots.json deeds.json economy.json; do
+          for f in pots.json deeds.json economy.json hall-of-fame.json; do
             cp "$SEAM_DIR/$f" "src/data/postmark/$f"
           done
           echo "funding seam taken from the town-seam artifact (its log names the Town sha)"
