@@ -188,7 +188,7 @@
 .hearth-bar { display: grid; gap: 0.6em; padding: 0.4em 0 1em; margin-bottom: 1.2em; border-bottom: 1px solid rgba(232, 196, 139, 0.22); }
 .hearth-bar h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2.1rem); color: #f4e9d7; line-height: 1.1; }
 .hearth-kicker { margin: 0; font-family: var(--pm-mono); text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.66rem; color: rgba(232, 196, 139, 0.8); }
-.hearth-tools { display: flex; flex-wrap: wrap; gap: 0.6em 1.2em; align-items: center; font-size: 0.9rem; }
+.hearth-tools { display: flex; flex-wrap: wrap; gap: 0.6em 1.2em; align-items: flex-start; font-size: 0.9rem; }
 .hearth-tools a { color: #e8c48b; }
 .hearth-picker { display: inline-flex; align-items: center; gap: 0.5em; font-family: var(--pm-mono); font-size: 0.72rem; }
 .hearth-picker select { font: inherit; background: rgba(13, 20, 38, 0.8); color: #f4e9d7; border: 1px solid rgba(232, 196, 139, 0.4); border-radius: 6px; padding: 3px 8px; max-width: 100%; }
@@ -196,3 +196,14 @@
 .hearth-holo-note { margin: 1.2em 0 0; font-size: 0.8rem; opacity: 0.85; }
 .hearth-holo-note[hidden] { display: none; }
 .hearth-note[hidden] { display: none; }
+
+/* the picker band (POS-962): the preview select every visitor has, and the save controls the house's signed-in human has */
+.hearth-pickerband { display: flex; flex-direction: column; gap: 0.5em; align-items: flex-start; }
+.hearth-owner { display: flex; flex-direction: column; gap: 0.5em; align-items: flex-start; }
+.hearth-owner[hidden], .hearth-pickerband [hidden] { display: none; }
+.hearth-owner-acts, .hearth-confirm { display: flex; flex-wrap: wrap; gap: 0.5em; align-items: center; }
+.hearth-confirm { border: 1px solid rgba(232, 196, 139, 0.45); border-radius: 8px; padding: 0.6em 0.8em; background: rgba(13, 20, 38, 0.6); }
+.hearth-confirm p { margin: 0; flex: 1 1 100%; font-size: 0.9rem; }
+.hearth-pickerband button { font: inherit; font-family: var(--pm-mono); font-size: 0.78rem; padding: 0.4em 0.9em; border-radius: 999px; cursor: pointer; border: 1px solid rgba(232, 196, 139, 0.6); background: rgba(13, 20, 38, 0.8); color: #f4e9d7; }
+.hearth-pickerband button:disabled { opacity: 0.5; cursor: default; }
+@media (max-width: 520px) { .hearth-pickerband { align-items: stretch; } .hearth-pickerband button { flex: 1 1 100%; } }

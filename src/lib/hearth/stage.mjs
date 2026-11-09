@@ -3,6 +3,8 @@
 // The page is server-rendered with the default entry, so the house's baked public face is there
 // without a script. This runs after, and does four things:
 //
+//   CHOOSE   asks lib/hearth/choice.mjs which entry to draw: the house's SAVED choice (the office keeps it; read signed out), else the
+//            default; a preview (`?entry=`, the picker) draws another without saving it. The picker's save is the one write (POS-962).
 //   COMPOSE  puts a registered entry's sanitized markup on the stage and each slot's own part in
 //            its place (the same markup HearthSlot.astro rendered into a <template> per slot),
 //            sets the entry's sanitized stylesheet, and mounts the approved behaviors. The preview
@@ -18,10 +20,12 @@
 // `data-hd-view` is `public` until the reader's sign-in holds a resident of this house.
 
 import { KEYS, tokenIsFresh } from "../auth.mjs";
-import { readHouse, readHearthExtras } from "../household-dashboard/reads.mjs";
+import { readHouse, readHearthExtras, officeOrigin } from "../household-dashboard/reads.mjs";
 import { paintHouse, writeLook } from "../household-dashboard/paint.mjs";
 import { paintExtras, startCountdown } from "./paint.mjs";
 import { mountBehaviors } from "./behaviors.mjs";
+import { resolveHearth, readSavedHearth } from "./choice.mjs";
+import { mountHearthPicker } from "./picker.mjs";
 
 const DEFAULT = "default";
 
@@ -126,27 +130,42 @@ export function mountHearth(root) {
     const sel = e.target instanceof Element ? e.target.closest("[data-hd-who]") : null;
     if (sel) { ctx.filter.who = sel.value; draw(); }
   });
-  picker?.addEventListener("change", () => {
-    const id = picker.value;
+  // THE PICKER (POS-962): a preview draws another entry and keeps only the address (never a save); the save is picker.mjs's, behind a second yes.
+  const pickerRoot = root.querySelector("[data-hearth-picker]");
+  const api = officeOrigin();
+  let mounted = null;
+  let readOk = false;
+  const onDraw = (id) => {
     try {
       const url = new URL(location.href);
-      if (id === DEFAULT) url.searchParams.delete("entry"); else url.searchParams.set("entry", id);
+      const savedId = mounted?.picker.view().savedId ?? null;
+      if (id === (savedId ?? DEFAULT)) url.searchParams.delete("entry"); else url.searchParams.set("entry", id);
       history.replaceState(null, "", url);
-    } catch { /* the preview still shows; only the address is not kept */ }
+    } catch { /* the entry still shows; only the address is not kept */ }
     compose(id);
-  });
+  };
   phone.addEventListener?.("change", draw);
-  document.addEventListener("pm:lens", () => { load(); });
+  document.addEventListener("pm:lens", () => { load(); mounted?.refresh(); });
 
   let asked = null;
   try { asked = new URL(location.href).searchParams.get("entry"); } catch { asked = null; }
-  // the page was drawn on the server with the entry it opens on; asked for that same one, there is nothing to redraw
+  // the page was drawn on the server with the entry it opens on (the default); asked for that same one, there is nothing to redraw
   const first = pickEntry(entries, asked || DEFAULT);
   if (first && stage.dataset.hearthEntry === first.id) {
     mountBehaviors(stage);
-    if (picker) picker.value = first.id;
     root.dataset.hearthShowing = first.id;
     say(asked && asked !== first.id ? `No Hearth entry is registered as “${asked.slice(0, 40)}”; showing ${first.title}.` : "");
   } else compose(asked || DEFAULT, { asked });
   load();
+
+  // THE SAVED CHOICE: the office keeps it and reads it signed out, so a reload (and every other visitor) draws what the house chose.
+  // resolveHearth answers which entry to draw; a preview in the address still wins on this visit, and is not saved.
+  readSavedHearth({ handles, slug, api }).then((saved) => {
+    readOk = saved !== undefined;
+    const r = resolveHearth({ entries, saved, asked });
+    if (r.id && r.id !== root.dataset.hearthShowing) compose(r.id);
+    if (r.note) say(r.note);
+    if (pickerRoot) mounted = mountHearthPicker(pickerRoot, { entries, slug, saved: saved ?? null, token, api, signedIn: () => readOk && mine().length > 0, onDraw });
+    if (picker && r.id) picker.value = r.id;
+  });
 }
