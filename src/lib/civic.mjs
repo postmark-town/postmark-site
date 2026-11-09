@@ -986,11 +986,13 @@ export function questBoardFrom(questPosts, { today = null, registry = null } = {
   const open = posts.filter((p) => p.state === "open" && offered(p.terms.ends));
   const card = (t) => ({ title: t.title, source: t.source, reward: t.reward, target: t.target ?? null });
   const postOf = new Map(posts.filter((p) => typeof p.fields?.quest === "string").map((p) => [p.fields.quest, p]));
-  const defined = (Array.isArray(registry?.quests) ? registry.quests : [])
-    .filter((q) => REGISTRY_CADENCES.includes(q?.cadence) && q.subtype !== "bounty" && typeof q.title === "string" && q.title)
-    .filter((q) => { const p = postOf.get(q.id); return (!p || p.state === "open") && offered(q.ends ?? p?.terms?.ends); });
-  const definedIds = new Set(defined.map((q) => q.id));
-  const posted = (cadence) => open.filter((p) => p.terms.cadence === cadence && !definedIds.has(p.fields?.quest));
+  const carried = (Array.isArray(registry?.quests) ? registry.quests : [])
+    .filter((q) => REGISTRY_CADENCES.includes(q?.cadence) && q.subtype !== "bounty" && typeof q.title === "string" && q.title);
+  const defined = carried.filter((q) => { const p = postOf.get(q.id); return (!p || p.state === "open") && offered(q.ends ?? p?.terms?.ends); });
+  // MEMBERSHIP IS THE REGISTRY'S, NOT WHAT WAS DRAWN: a quest the registry carries is the registry's to offer or to end. A row
+  // dropped for its `ends` (or a closed post) must not come back through its open post, which may carry no `ends` of its own.
+  const carriedIds = new Set(carried.map((q) => q.id));
+  const posted = (cadence) => open.filter((p) => p.terms.cadence === cadence && !carriedIds.has(p.fields?.quest));
   return {
     daily: open.filter((p) => p.terms.cadence === "daily").map((p) => card(p.terms)),
     monthly: [...defined.map(card), ...posted("monthly").map((p) => card(p.terms))],

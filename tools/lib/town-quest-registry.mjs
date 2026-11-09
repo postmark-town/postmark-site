@@ -12,9 +12,8 @@
 //
 // Pure projection first, so `node --test` proves each rule without a checkout; the one function that touches the disk is last.
 
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { readEntryFile } from "./source-file.mjs";
 
 export const QUEST_REGISTRY_FILE = "quest-registry.json";
 export const QUEST_REGISTRY_SOURCE = "postmark-town/postmark quest-registry.json";
@@ -40,11 +39,19 @@ function headOf(townRoot) {
   catch { return null; }
 }
 
-/** `{ source, quests }` read from `<townRoot>/quest-registry.json`. Throws when the file is missing or is not a registry. */
+/**
+ * `{ source, quests }` read from `<townRoot>/quest-registry.json`. Throws when the file is missing, is refused, or is not a registry.
+ *
+ * THE FILE IS READ ONLY IF IT IS REALLY THE CHECKOUT'S OWN (the intake boundary Wright ruled for this job's town-checkout
+ * reads, POS-959; review of #394): through tools/lib/source-file.mjs § readEntryFile, the one reviewed guard: a regular file
+ * (not a link, directory, device or pipe), whose canonical path stays inside the checkout, opened with O_NOFOLLOW and still a
+ * regular file once open, and small. Anything else is REFUSED BY NAME (RefusedFile) and never read; the caller (fetch-town.mjs)
+ * keeps the committed snapshot and says why. An absent file is not a refusal: it is the plain "no registry here".
+ */
 export function readQuestRegistryFromCheckout(townRoot) {
-  const file = join(townRoot, QUEST_REGISTRY_FILE);
-  if (!existsSync(file)) throw new Error(`no ${QUEST_REGISTRY_FILE} in the town checkout`);
-  const { quests } = projectQuestRegistry(JSON.parse(readFileSync(file, "utf8")));
+  const text = readEntryFile(townRoot, QUEST_REGISTRY_FILE);
+  if (text === null) throw new Error(`no ${QUEST_REGISTRY_FILE} in the town checkout`);
+  const { quests } = projectQuestRegistry(JSON.parse(text));
   const at = headOf(townRoot);
   return { source: `${QUEST_REGISTRY_SOURCE}${at ? ` @ ${at}` : ""}`, quests };
 }

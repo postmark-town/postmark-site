@@ -13,12 +13,14 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { questBoardFrom, questCards, QUEST_KIND } from "../src/lib/civic.mjs";
 import { projectQuestRegistry, readQuestRegistryFromCheckout, QUEST_REGISTRY_FILE } from "../tools/lib/town-quest-registry.mjs";
+import { RefusedFile, MAX_ENTRY_FILE_BYTES } from "../tools/lib/source-file.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -135,4 +137,61 @@ test("SNAPSHOT: the committed registry the page imports is the projection's shap
   for (const q of snap.quests) assert.equal("derivation" in q, false, `${q.id}: the builders' note is not copied`);
   const guild = questBoardFrom({ posts: [] }, { registry: snap });
   assert.ok(titles(guild.monthly).includes("Bring a neighbour"), "the Guild's monthly cards, with no post at all, name Bring a neighbour");
+});
+
+// ── review of #394 (88f38db7), the two corrections ───────────────────────────────────────────────────────────────
+
+test("an expired registry row is not revived by its OPEN post (a post with no `ends` of its own): membership is the registry's", () => {
+  const reg = { quests: [row("short-lived", "monthly", { ends: "2026-03-15" }), row("lasting", "monthly")] };
+  const stale = { posts: [post("short-lived", "monthly"), post("lasting", "monthly")] };   // open, and neither carries an `ends`
+  assert.deepEqual(titles(questBoardFrom(stale, { registry: reg, today: "2026-03-15" }).monthly), ["Title of short-lived", "Title of lasting"], "offered through the ends day, once each");
+  assert.deepEqual(titles(questBoardFrom(stale, { registry: reg, today: "2026-03-16" }).monthly), ["Title of lasting"], "the day after, the open post does not bring it back");
+  // controls: the registry-less path and a post the registry does not carry still draw as before
+  assert.deepEqual(titles(questBoardFrom(stale, { today: "2026-03-16" }).monthly), ["Title of short-lived", "Title of lasting"], "no registry: the posts alone, as before");
+  const other = { posts: [post("posted-only", "monthly"), post("short-lived", "monthly")] };
+  assert.deepEqual(titles(questBoardFrom(other, { registry: reg, today: "2026-03-16" }).monthly), ["Title of lasting", "Title of posted-only"], "a post the registry does not carry is still drawn");
+  // and a closed post's registry row is likewise not revived by anything
+  const shut = { posts: [post("lasting", "monthly", { state: "closed" })] };
+  assert.deepEqual(titles(questBoardFrom(shut, { registry: reg, today: "2026-03-14" }).monthly), ["Title of short-lived"]);
+});
+
+// The intake boundary (Wright's 00:44 ruling for this job's town-checkout reads): the registry file is read only if it is
+// really the checkout's own regular file. FAKE sentinels only: every protected file is a scratch file this test makes.
+const SENTINEL = "FAKE-PROTECTED-SENTINEL-not-a-real-token-7a3e91";
+const scratchDir = () => mkdtempSync(join(tmpdir(), "quest-guild-intake-"));
+
+test("a registry that is a symbolic link out of the checkout is refused by name and never read", () => {
+  const outside = scratchDir(), checkout = scratchDir();
+  try {
+    writeFileSync(join(outside, "secret.json"), JSON.stringify({ quests: [{ id: "x", title: SENTINEL, cadence: "monthly" }] }));
+    symlinkSync(join(outside, "secret.json"), join(checkout, QUEST_REGISTRY_FILE));
+    assert.throws(() => readQuestRegistryFromCheckout(checkout), (e) => e instanceof RefusedFile && /symbolic link/.test(e.message) && !e.message.includes(SENTINEL));
+  } finally { rmSync(outside, { recursive: true, force: true }); rmSync(checkout, { recursive: true, force: true }); }
+});
+
+test("a registry that is a directory, a pipe or an oversize file is refused by name; a link to a file INSIDE the checkout is refused too", () => {
+  const checkout = scratchDir();
+  try {
+    mkdirSync(join(checkout, QUEST_REGISTRY_FILE));
+    assert.throws(() => readQuestRegistryFromCheckout(checkout), (e) => e instanceof RefusedFile && /not a regular file/.test(e.message), "a directory");
+    rmSync(join(checkout, QUEST_REGISTRY_FILE), { recursive: true, force: true });
+    execFileSync("mkfifo", [join(checkout, QUEST_REGISTRY_FILE)]);
+    assert.throws(() => readQuestRegistryFromCheckout(checkout), (e) => e instanceof RefusedFile && /not a regular file/.test(e.message), "a pipe (never opened, so never blocked on)");
+    rmSync(join(checkout, QUEST_REGISTRY_FILE), { force: true });
+    writeFileSync(join(checkout, QUEST_REGISTRY_FILE), Buffer.alloc(MAX_ENTRY_FILE_BYTES + 1, 32));
+    assert.throws(() => readQuestRegistryFromCheckout(checkout), (e) => e instanceof RefusedFile && /over the/.test(e.message), "oversize");
+    rmSync(join(checkout, QUEST_REGISTRY_FILE), { force: true });
+    writeFileSync(join(checkout, "real.json"), JSON.stringify({ quests: [] }));
+    symlinkSync(join(checkout, "real.json"), join(checkout, QUEST_REGISTRY_FILE));
+    assert.throws(() => readQuestRegistryFromCheckout(checkout), (e) => e instanceof RefusedFile && /symbolic link/.test(e.message), "even a link that stays inside is a link");
+  } finally { rmSync(checkout, { recursive: true, force: true }); }
+});
+
+test("CONTROL: the same checkout with a plain regular registry file reads, so the refusals above are the guard's and not a broken reader", () => {
+  const checkout = scratchDir();
+  try {
+    writeFileSync(join(checkout, QUEST_REGISTRY_FILE), JSON.stringify({ quests: [row("water-the-commons", "monthly")] }));
+    assert.deepEqual(readQuestRegistryFromCheckout(checkout).quests.map((q) => q.id), ["water-the-commons"]);
+    assert.throws(() => readQuestRegistryFromCheckout(join(checkout, "no-such-dir")), "a checkout that is not there is an error too (the fetch keeps the snapshot on any throw)");
+  } finally { rmSync(checkout, { recursive: true, force: true }); }
 });
