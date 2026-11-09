@@ -1,0 +1,29 @@
+---
+// A declared household's Hearth: its public face, drawn from a registered template (POS-959).
+//
+// Beside the household's own page (`../[slug].astro`, the household seat the rail opens on), not in
+// place of it: that page, the resident views and the rail are untouched. The same houses have a door
+// here and the same slugs 404: only DECLARED houses have one, and a slug nobody declared is not a
+// Hearth. Every one opens on Postmark's default entry; `?entry=<id>` and the picker preview any
+// registered entry, and are only a preview (see components/hearth/Hearth.astro).
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import Hearth from "@/components/hearth/Hearth.astro";
+import { declaredHouses, membersOf, nameplate } from "@/lib/household.mjs";
+
+export function getStaticPaths() {
+  return declaredHouses().map((house) => ({ params: { slug: house.path }, props: { house } }));
+}
+
+const { house } = Astro.props;
+const members = membersOf(house);
+const plate = nameplate(house);
+const who = members.map((m) => m.address?.agent ?? m.handle).join(", ");
+---
+<PostmarkLayout
+  door={{ mcp: 'town { read: "residents" }', get: "/api/residents" }}
+  title={`${plate} — the Hearth of a household in Postmark`}
+  description={`${plate}'s Hearth — ${members.length} ${members.length === 1 ? "resident" : "residents"} of Postmark: ${who}.`}
+  active="household"
+>
+  <Hearth house={house} members={members} plate={plate} />
+</PostmarkLayout>
