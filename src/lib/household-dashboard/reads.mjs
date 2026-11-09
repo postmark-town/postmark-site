@@ -65,3 +65,15 @@ export async function readHouse(handles, { token = null, mine = [] } = {}) {
   return { doorsteps, outboxes, quests, walkers, conversations, calendar };
 }
 
+
+/**
+ * What the Hearth reads beyond the dashboard's reads (POS-959): the town's
+ * public posts by class, which the `posts` slot filters to the house's own.
+ * Public and keyless, like every read above; a door that does not answer is
+ * null, and the slot says it could not read, never that there is nothing.
+ */
+export async function readHearthExtras() {
+  const api = officeOrigin();
+  const [idea, bug] = await Promise.all(["idea", "bug"].map((c) => getJSON(`${api}/posts?class=${c}&limit=100`)));
+  return { posts: { idea, bug } };
+}
