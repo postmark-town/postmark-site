@@ -2,6 +2,7 @@
 import { defineConfig } from 'astro/config';
 import { fileURLToPath } from 'node:url';
 import worldEngineIsland from './town/scripts/world-engine-island.mjs';
+import hearthCsp from './town/scripts/hearth-csp.mjs';
 
 // The TOWN build — the Postmark pages served at the postmark.town ROOT.
 //
@@ -48,7 +49,8 @@ export default defineConfig({
   prefetch: { prefetchAll: true, defaultStrategy: 'hover' },
   // stage the told-world viewer + engine at /world-engine/** from the postmark-world
   // package (build output + dev middleware) so /world serves the SAME file locally
-  integrations: [worldEngineIsland()],
+  // hearthCsp: the Hearth pages' own security policy, written into their built html (POS-959); no other page is touched
+  integrations: [worldEngineIsland(), hearthCsp()],
   // NO `redirects` HERE. Every moved URL lives in ONE table, `MOVED` in
   // src/lib/nav.mjs, and town/pages/[...moved].astro builds its forwarding
   // pages — because this config's meta refresh drops the #fragment, and letters

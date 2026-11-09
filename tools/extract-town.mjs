@@ -34,6 +34,7 @@ import { execFileSync } from "node:child_process";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { readTown } from "./lib/town.mjs";
+import { refuseLinkedCheckout } from "./lib/plain-checkout.mjs";
 import { emitSeam } from "./extract-seam.mjs";
 import { threadTitle } from "./lib/ids.mjs";
 import { letterAddresses, letterHref } from "../src/lib/mail.mjs";
@@ -86,6 +87,7 @@ if (!existsSync(join(TOWN, "WHITE_PAGES"))) {
   console.error(`FATAL: not a town checkout (no WHITE_PAGES): ${TOWN}`);
   process.exit(1);
 }
+refuseLinkedCheckout(TOWN);
 
 const town = readTown(TOWN);
 console.log(`town read: ${town.residents.length} residents, ${town.letters.length} letters, ${town.threads.length} threads`);

@@ -89,6 +89,11 @@ jobs:
       - name: Sync approved renditions
         run: node tools/sync-renditions.mjs --town .postmark-checkout
 
+      # Registered Hearth entries (POS-959): the town repo is their review gate, as for renditions; this copies
+      # merged entries into src/data/postmark/hearths.json, which the commit step below already stages.
+      - name: Sync registered Hearth entries
+        run: node tools/sync-hearths.mjs --town .postmark-checkout
+
       - name: Commit + deploy if the town changed
         run: |
           git add public/atelier/postmark/atlas public/atelier/postmark/daily \

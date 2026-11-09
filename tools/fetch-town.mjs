@@ -12,6 +12,7 @@ import { buildOfficeData, fetchBlueprints, fetchRollcall, fetchCrossings, jsonTe
 import { worldPin } from "./lib/world-pin-publish.mjs";
 import { readProjectsFromCheckout } from "./lib/town-projects.mjs";
 import { readQuestRegistryFromCheckout } from "./lib/town-quest-registry.mjs";
+import { refuseLinkedCheckout } from "./lib/plain-checkout.mjs";
 import { writeIfChanged } from "./lib/mirror.mjs";
 import { bakeWorld } from "./lib/world-settlement.mjs";
 
@@ -41,6 +42,7 @@ const PUBLIC_API = (process.env.POSTMARK_PUBLIC_API || DEFAULT_API).replace(/\/+
 const LETTER_CACHE = process.env.POSTMARK_LETTER_CACHE || null;
 const TOWN_ARG = arg("--town", null);
 const TOWN = TOWN_ARG ? resolve(TOWN_ARG) : null;
+if (TOWN) refuseLinkedCheckout(TOWN);
 
 function writeDataFile(name, value) {
   const text = jsonText(value);
