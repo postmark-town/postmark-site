@@ -25,6 +25,7 @@ import { whichDesign } from "../src/lib/hearth/which-design.mjs";
 import { prepareEntry, prepareEntries } from "../src/lib/hearth/entries.mjs";
 import { DEFAULT_ENTRY } from "../src/lib/hearth/slots.mjs";
 import { householdHome } from "../src/lib/house-home.mjs";
+import { notYours, meAnswered } from "../src/lib/hearth/not-yours.mjs";
 import { housePath } from "../src/lib/houses.mjs";
 import { ENTRY_OPEN, ENTRY_CLOSE, withoutEntryRegion } from "../tools/lib/hearth-csp.mjs";
 
@@ -144,6 +145,23 @@ test("built: every household page's entry region sits inside the host's clipping
     assert.ok(frame > html.indexOf("data-hband ") && frame < html.indexOf(ENTRY_OPEN), `${slug}: band, then the frame, then the entry's region`);
     assert.ok(html.indexOf(ENTRY_CLOSE) < html.indexOf("</div>", html.indexOf(ENTRY_CLOSE)) && /<div class="hearth-frame">\s*<\/div>/.test(withoutEntryRegion(html)), `${slug}: the frame is the host's: taking the region out leaves it empty`);
   }
+});
+
+// review, small: "This isn't your house" waits for /me. A first sign-in's owner has a token and no handles yet, and must never read it.
+test("notYours: only a signed-in reader whose /me has answered and who holds none of this house's residents; a first sign-in's owner never sees it", () => {
+  assert.equal(notYours({ signedIn: true, answered: true, owner: false }), true, "signed in, answered, not one of ours");
+  assert.equal(notYours({ signedIn: true, answered: false, owner: false }), false, "signed in, /me not answered yet: no verdict, so the owner never sees a flash");
+  assert.equal(notYours({ signedIn: true, answered: true, owner: true }), false, "the house's own human");
+  assert.equal(notYours({ signedIn: false, answered: true, owner: false }), false, "a visitor has the sign-in line instead");
+  assert.equal(notYours({ signedIn: false, answered: false, owner: false }), false);
+  const store = (v) => ({ getItem: (k) => (k === "pm.oauth.handles" ? v : "WRONG-KEY") });
+  assert.equal(meAnswered(store(null)), false, "the layout has not stored the handles");
+  assert.equal(meAnswered(store("[]")), true, "an answer with no handles is still an answer");
+  assert.equal(meAnswered(store('["wick"]')), true);
+  assert.equal(meAnswered({ getItem() { throw new Error("storage refused"); } }), false, "storage that throws is no answer");
+  const stage = read("src/lib/hearth/stage.mjs");
+  assert.match(stage, /n\.hidden = !notYours\(\{ signedIn: !!token\(\), answered: meAnswered\(sessionStorage\), owner: ctx\.owner \}\);/, "PIN: the stage asks the one function, with the layout's own key");
+  assert.match(read("src/layouts/PostmarkLayout.astro"), /sessionStorage\.setItem\("pm\.oauth\.handles", JSON\.stringify\(handles\)\);[\s\S]{0,1200}document\.dispatchEvent\(new CustomEvent\("pm:lens"/, "PIN: the layout stores the handles before it announces them, so pm:lens always finds the answer");
 });
 
 test("a design cannot take the band's Needs you away: the page host hides the design's own copy, once, and the band is the one shown", () => {

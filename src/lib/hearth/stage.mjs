@@ -23,6 +23,7 @@ import { paintHouse, writeLook } from "../household-dashboard/paint.mjs";
 import { paintExtras, startCountdown } from "./paint.mjs";
 import { mountBehaviors } from "./behaviors.mjs";
 import { whichDesign } from "./which-design.mjs";
+import { notYours, meAnswered } from "./not-yours.mjs";
 import { DEFAULT_ENTRY as DEFAULT } from "./slots.mjs";
 
 export function mountHearth(root) {
@@ -68,7 +69,8 @@ export function mountHearth(root) {
     ctx.owner = ctx.mine.length > 0;
     for (const b of root.querySelectorAll("[data-hd-signin]")) b.hidden = !document.querySelector("[data-auth-signin]") || !!token();
     // signed in, but not as anyone of this house: say so, rather than an unanswered question (the band's own line)
-    for (const n of root.querySelectorAll("[data-hband-notyours]")) n.hidden = !(token() && !ctx.owner);
+    // (not before /me has answered: a first sign-in's owner would see it flash, lib/hearth/not-yours.mjs)
+    for (const n of root.querySelectorAll("[data-hband-notyours]")) n.hidden = !notYours({ signedIn: !!token(), answered: meAnswered(sessionStorage), owner: ctx.owner });
     if (band) paintHouse(band, reads, ctx);
     paintHouse(stage, reads, ctx);
     paintExtras(stage, reads, extras, ctx);

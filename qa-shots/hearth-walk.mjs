@@ -78,20 +78,22 @@ function answer(url, headers) {
 
 let injectEntry = null;   // a prepared entry added to the page's registered list, for the hostile-template scenario
 
-async function newPage(browser, { signedIn = false, viewport = { width: 1280, height: 900 } } = {}) {
+// `pendingMe`: a first sign-in. The token is there and the tab has not been told its handles; GET /me answers after that many ms.
+async function newPage(browser, { signedIn = false, pendingMe = 0, viewport = { width: 1280, height: 900 } } = {}) {
   const ctx = await browser.newContext({ viewport });
   await ctx.addInitScript(() => {
     window.__cspv = [];
     document.addEventListener("securitypolicyviolation", (e) => window.__cspv.push(`${e.violatedDirective} ${String(e.blockedURI).slice(0, 60)}`));
   });
   if (signedIn) {
-    await ctx.addInitScript(([tok, handles]) => {
+    await ctx.addInitScript(([tok, handles, first]) => {
       // init scripts run in EVERY frame, and the household page now carries the residents' sandboxed window frames (POS-984),
       // whose opaque origin refuses storage: the sign-in is the top page's
       if (window.top !== window) return;
       localStorage.setItem("pm.oauth.token", JSON.stringify({ access_token: tok, obtained: Date.now(), expires_in: 3600 }));
-      sessionStorage.setItem("pm.oauth.handles", JSON.stringify(handles));
-    }, [OWNER_TOKEN, A]);
+      // a first sign-in has not been told its handles yet: /me answers later and the layout stores them then
+      if (!first) sessionStorage.setItem("pm.oauth.handles", JSON.stringify(handles));
+    }, [OWNER_TOKEN, A, pendingMe > 0]);
   }
   await ctx.route("**/*", async (route) => {
     const req = route.request();
@@ -99,6 +101,7 @@ async function newPage(browser, { signedIn = false, viewport = { width: 1280, he
     const local = url.hostname === "127.0.0.1" || url.hostname === "localhost";
     const office = url.hostname === "postmark.town" || (local && url.pathname.startsWith("/api/"));
     if (office) {
+      if (pendingMe > 0 && url.pathname.replace(/^\/api(?=\/)/, "") === "/me") await new Promise((r) => setTimeout(r, pendingMe));
       const a = answer(req.url(), req.headers());
       log.push({ path: url.pathname.replace(/^\/api(?=\/)/, "") + url.search, auth: req.headers().authorization ?? null, status: a.status });
       return route.fulfill({ status: a.status, contentType: "application/json", body: JSON.stringify(a.body), headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" } });
@@ -161,10 +164,15 @@ const run = async () => {
         ["a margin pulling the design up, and a background to paint with", "rooted-margin", ":root { margin-top: -900px; background: #0b0f1c; }"],
         ["a transform lifting the design", "rooted-transform", "html { transform: translateY(-900px); background: #0b0f1c; }"],
         ["body, the same trick", "rooted-body", "body { margin-top: -900px; background: #0b0f1c; position: relative; top: -50px; }"],
+        // INK, not boxes (review, advisory): an outline paints outside the stage's box, over whatever is near, and elementFromPoint cannot see it,
+        // so this case is judged by PIXELS: the band, photographed, is byte for byte what it is under the control design
+        ["an outline of 900px of magenta round the design (ink that elementFromPoint cannot see)", "rooted-outline", ":root { outline: 900px solid #ff00ff; }"],
+        ["a box-shadow of 900px of magenta round the design", "rooted-shadow", ":root { box-shadow: 0 0 0 900px #ff00ff; }"],
       ];
+      let controlPixels = null;
       for (const [what, id, css] of rules) {
         const e = prepareEntry({ id, title: id, author: "nobody", line: "A rooted rule.", html: "<hearth-house></hearth-house><hearth-residents></hearth-residents>", css });
-        const kept = id === "rooted-none" || /margin-top\s*:\s*-900px|translateY\(-900px\)/.test(e.css);
+        const kept = id === "rooted-none" || /margin-top\s*:\s*-900px|translateY\(-900px\)|outline:900px|box-shadow:0 0 0 900px/.test(e.css);
         check(`⑫ ${what}: the sanitizer lets the rule through (so this test can see the failure)`, e.ok && kept && !e.problems.some((p) => /margin|transform|top/.test(p)), e.css.slice(0, 160) + " " + JSON.stringify(e.problems));
         injectEntry = e;
         const page = await newPage(browser, { signedIn: true });
@@ -174,9 +182,19 @@ const run = async () => {
         await page.waitForSelector("[data-hband] [data-quests]:not([hidden])", { timeout: 15000 }).catch(() => {});
         check(`⑫ ${what}: the design drawn is the hostile one`, (await page.locator("[data-hearth-stage]").getAttribute("data-hearth-entry")) === id);
         const moved = await page.evaluate(() => { const s = document.querySelector("[data-hearth-stage]").getBoundingClientRect().top; const f = (document.querySelector(".hearth-frame") ?? document.querySelector("[data-hearth-stage]")).getBoundingClientRect().top; return Math.round(f - s); });
-        if (id !== "rooted-none") check(`⑫ ${what}: the rule took effect: the design's own box sits ${moved}px above where it was put`, moved > 300, moved);
+        const ink = await page.evaluate(() => { const c = getComputedStyle(document.querySelector("[data-hearth-stage]")); return { outline: c.outlineWidth + " " + c.outlineStyle, shadow: c.boxShadow }; });
+        if (/outline|shadow/.test(id)) check(`⑫ ${what}: the rule took effect on the design's own box (${JSON.stringify(ink)})`, /900px/.test(id === "rooted-outline" ? ink.outline : ink.shadow), JSON.stringify(ink));
+        else if (id !== "rooted-none") check(`⑫ ${what}: the rule took effect: the design's own box sits ${moved}px above where it was put`, moved > 300, moved);
         const at = await pointAt(page);
         check(`⑫ ${what}: the band's controls are still the top thing at their own points (Needs you, Managing the house, the quests, the likeness answer)`, asBand(at), JSON.stringify(at));
+        // the pixels of the band itself: the control's, twice (the probe is stable), then every hostile design's must equal it
+        await page.mouse.move(0, 0);
+        const band = page.locator("[data-hband]");
+        const pixels = await band.screenshot({ animations: "disabled", caret: "initial" });
+        if (id === "rooted-none") {
+          controlPixels = pixels;
+          check("⑫ the pixel probe is stable: the control's band photographed twice is the same picture", pixels.equals(await band.screenshot({ animations: "disabled", caret: "initial" })), pixels.length);
+        } else check(`⑫ ${what}: the band's pixels are exactly the control's (no ink of the design's reached it)`, !!controlPixels && pixels.equals(controlPixels), `${pixels.length} bytes vs ${controlPixels?.length}`);
         await shot(page, `16-rooted-${id}-desktop`, { fullPage: false });
         await page.context().close();
         injectEntry = null;
@@ -506,6 +524,33 @@ const run = async () => {
       await o.waitForURL((u) => u.pathname === `/households/${A_SLUG}/`, { timeout: 15000 });
       check("⑪ and it lands on the household page", await o.locator("[data-hearth-stage]").count() === 1);
       await o.context().close();
+
+      // a FIRST sign-in (review, small): the token is there, GET /me has not answered, and nobody knows yet whether this is the house's own
+      // human. "This isn't your house" must not flash for the owner, and must still come for another house's sign-in once /me has answered.
+      const watchNotYours = (p) => p.addInitScript(() => {
+        window.__notYoursShown = false;
+        new MutationObserver(() => { const n = document.querySelector("[data-hband-notyours]"); if (n && !n.hidden) window.__notYoursShown = true; })
+          .observe(document, { subtree: true, attributes: true, childList: true, attributeFilter: ["hidden"] });
+      });
+      const first = await newPage(browser, { signedIn: true, pendingMe: 2500 });
+      await watchNotYours(first);
+      await first.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await first.waitForSelector("[data-hearth-stage]");
+      await first.waitForTimeout(900);
+      check("⑪ first sign-in, /me still pending: the band says nothing about whose house this is", !(await visible(first, "[data-hband] [data-hband-notyours]")) && !(await visible(first, "[data-hband] [data-hd-signin]")) && !(await visible(first, "[data-hband] [data-hd-needs-box]")));
+      await first.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 20000 });
+      await first.waitForTimeout(400);
+      check("⑪ and once /me has answered, the owner's band is there and 'This isn't your house' never showed, not even for a frame", (await visible(first, "[data-hband] [data-hb-edit]")) && (await first.evaluate(() => window.__notYoursShown)) === false);
+      await first.context().close();
+      const other = await newPage(browser, { signedIn: true, pendingMe: 2500 });
+      await watchNotYours(other);
+      await other.goto(`${BASE}/households/${B_SLUG}/`, { waitUntil: "load" });
+      await other.waitForSelector("[data-hearth-stage]");
+      await other.waitForTimeout(900);
+      check("⑪ another house's first sign-in, /me still pending: no verdict yet", !(await visible(other, "[data-hband] [data-hband-notyours]")) && (await other.evaluate(() => window.__notYoursShown)) === false);
+      await other.waitForSelector("[data-hband] [data-hband-notyours]:not([hidden])", { timeout: 20000 });
+      check("⑪ and once /me has answered, it says plainly that this is not their house", /isn’t your house/.test((await text(other, "[data-hband] [data-hband-notyours]")) ?? ""));
+      await other.context().close();
 
       // the owner on a phone: the band first, whole
       const ph = await newPage(browser, { signedIn: true, viewport: { width: 390, height: 800 } });
