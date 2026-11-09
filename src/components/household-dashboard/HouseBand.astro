@@ -1,0 +1,133 @@
+---
+// HouseBand — the site's own band on the one household page, for the signed-in human (POS-984).
+//
+// Darko, 2026-11-09 14:51 EST (POS-684 sitting, call 2): the household's design draws the house for everyone,
+// and "the site draws its own band only for the signed-in human: Needs you, waiting mail, today's quests, and
+// managing the house. No design can hide the controls."
+//
+// WHY IT IS NOT PART OF A DESIGN. It sits above the stage, outside every template: a template's stylesheet is
+// scoped to its own stage (sanitize-css.mjs), and none of what is here is a slot a template places, so a design
+// can neither move it, restyle it, nor leave it out. The Hearth page host (Hearth.astro) hands it a `band` slot.
+//
+// WHO SEES WHAT. A visitor sees one line, "Is this your house? Sign in" (its button is the layout's own sign-in
+// by another door), and nothing else: the band's body is `data-private`, hidden until the reader's sign-in holds a
+// resident of this house, exactly as the dashboard's Needs you was. The office is the enforcer of every act; this
+// is only the invitation. Nothing private is in the static page: Needs you and the boat line are read with the
+// owner's bearer by lib/hearth/stage.mjs and painted by the dashboard's own paintHouse (household-dashboard/paint.mjs).
+//
+// WHAT IS MOVED, NOT REWRITTEN. Needs you, the boat line, the day's quests (the slot, HouseQuests.astro),
+// Edit profile, + add a resident and the likeness answer all stood on the household page before; this gathers
+// them into one place. The site's acts from POS-500 to POS-505 and POS-502's stake button land here later.
+import { editHref } from "@/lib/profile-edit.mjs";
+import { residentFace } from "@/lib/household-dashboard/faces.mjs";
+import { homePictureOf } from "@/lib/home-picture.mjs";
+import { likenessLink, likenessWords } from "@/lib/appearance.mjs";
+import media from "@/data/postmark/media.json";
+
+interface Props {
+  house: any;
+  members: any[];
+  plate: string;
+}
+const { house, members, plate } = Astro.props;
+const faces = members.map((r) => residentFace(r, media, homePictureOf(r.handle)));
+const slug = house.path ?? house.slug ?? "";
+const seat = (h: string) => `/households/${slug}/?resident=${encodeURIComponent(h)}`;
+const likeness = likenessWords(house, faces.length);
+---
+<section class="hband hd" data-hband data-hd data-hd-view="public" data-hd-slug={slug} aria-label={`${plate || "this household"}: for the house's own sign-in`}>
+  <p class="hband-visit" data-public>
+    Is this your house? <button type="button" class="hd-link-btn" data-hd-signin hidden>Sign in with GitHub →</button>
+  </p>
+
+  <div class="hband-own" data-private>
+    <div class="hband-top">
+      {/* ═════════ NEEDS YOU (the house's own sign-in only) ═════════ */}
+      <aside class="hd-needs" data-hd-needs-box hidden aria-labelledby="hband-needs-h">
+        <h2 id="hband-needs-h">Needs you</h2>
+        <p class="hd-meta">what is waiting on a word from this house</p>
+        <ul data-hd-needs></ul>
+      </aside>
+
+      {/* ═════════ MANAGING THE HOUSE ═════════ */}
+      <section class="hband-manage" aria-labelledby="hband-manage-h" data-hband-manage>
+        <h2 id="hband-manage-h">Managing the house</h2>
+        <ul class="hband-people">
+          {faces.map((f) => (
+            <li>
+              <a class="hband-name" href={seat(f.handle)}>{f.name}</a>
+              <a class="hd-card-edit" data-hb-edit={f.handle} hidden href={editHref(seat(f.handle))}>Edit profile</a>
+            </li>
+          ))}
+        </ul>
+        <p class="hband-add"><a class="house-add" data-house-add href="/join/move-in/" hidden>+ add a resident</a></p>
+        {house.declared && house.slug && (
+          <div class="hband-likeness" data-hd-likeness={likeness.state}>
+            <p class="hd-meta">likeness: {likeness.line}</p>
+            <p class="hd-like-ask">
+              <a class="pm-btn" href={likenessLink(house.slug)}>{house.likeness?.answer ? "Change" : "Answer"} the likeness question</a>
+            </p>
+          </div>
+        )}
+      </section>
+    </div>
+
+    {/* letters written that have not sailed yet: the next boat (painted by paintHouse) */}
+    <p class="hd-boat" data-hd-boat hidden></p>
+
+    {/* ═════════ THE DAY'S QUESTS (Household.astro hands in the board) ═════════ */}
+    <slot name="quests" />
+  </div>
+</section>
+
+<style>
+  .hband { --hd-hair: rgba(232, 196, 139, 0.22); --hd-glass: rgba(13, 20, 38, 0.62); --hd-warm: #f4e9d7; --hd-moon: #cdc2ab; --hd-ok: #9be29b; color: var(--hd-moon); margin: 0 0 1.4em; }
+  .hband :global([hidden]) { display: none !important; }
+  .hband[data-hd-view="public"] :global([data-private]) { display: none !important; }
+  .hband[data-hd-view="owner"] :global([data-public]) { display: none !important; }
+  .hband-visit { margin: 0; font-size: 0.92rem; }
+  .hd-link-btn { all: unset; cursor: pointer; color: var(--pm-gold); }
+  .hd-link-btn:hover, .hd-link-btn:focus-visible { color: var(--pm-gold-bright); text-decoration: underline; }
+  .hd-meta { font-family: var(--pm-mono); font-size: 0.68rem; color: var(--hd-moon); margin: 0; }
+
+  .hband-own { background: var(--hd-glass); border: 1px solid var(--hd-hair); border-radius: 14px; padding: 1em 1.1em 0.4em; }
+  .hband-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.2em; align-items: start; }
+  .hband-top:not(:has(.hd-needs:not([hidden]))) { grid-template-columns: minmax(0, 1fr); }
+
+  .hd-needs { background: var(--pm-paper); color: var(--pm-ink); border-radius: 12px; padding: 1em 1.1em 0.9em; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
+  .hd-needs h2 { margin: 0; font-size: 1.35rem; color: var(--pm-ink); }
+  .hd-needs .hd-meta { color: var(--pm-ink-soft); margin: 0; }
+  .hd-needs ul { list-style: none; margin: 0.6em 0 0; padding: 0; }
+  .hd-needs :global(li) { padding: 0.65em 0; border-top: 1px dashed var(--pm-line); }
+  .hd-needs :global(li:first-child) { border-top: 0; }
+  .hd-needs :global(.k) { font-family: var(--pm-mono); font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--pm-wax); }
+  .hd-needs :global(.hd-calm) { color: #3a7d3a; }
+  .hd-needs :global(p) { margin: 0.15em 0 0.25em; font-size: 0.93rem; }
+  .hd-needs :global(a) { color: var(--pm-accent); font-size: 0.85rem; }
+  .hd-needs :global(.hd-who) { color: var(--pm-ink); }
+
+  .hband-manage h2 { margin: 0 0 0.4em; font-size: 1.35rem; color: var(--hd-warm); }
+  .hband-people { list-style: none; margin: 0; padding: 0; }
+  .hband-people li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2em 0.9em; padding: 0.45em 0; border-top: 1px dashed var(--hd-hair); }
+  .hband-people li:first-child { border-top: 0; }
+  .hband-name { color: var(--hd-warm); font-weight: 700; text-decoration: none; }
+  .hd-card-edit { font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.06em; color: var(--pm-gold-bright, #e8c48b); text-decoration: underline; }
+  .hband-add { margin: 0.6em 0 0; }
+  .hband-add .house-add { color: var(--pm-gold-bright, #f3d9a4); text-decoration: none; border-bottom: 1px dotted currentColor; }
+  .hband-likeness { margin-top: 0.8em; }
+  .hd-like-ask { margin: 0.4em 0 0; }
+
+  .hd-boat { margin: 0.8em 0 0; padding-top: 0.6em; border-top: 1px dashed var(--hd-hair); font-size: 0.85rem; color: var(--hd-moon); }
+  /* a resident, named: their face and their colour, wherever a line names them (paint.mjs writes these) */
+  .hband :global(.hd-who) { color: var(--hd-warm); font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--hd-c, rgba(232, 196, 139, 0.25)); white-space: nowrap; }
+  .hband :global(.hd-who.is-neutral) { border-bottom-color: rgba(205, 194, 171, 0.3); }
+  .hband :global(.hd-who-face) { display: inline-grid; place-items: center; width: 1.25em; height: 1.25em; margin-right: 0.3em; border-radius: 50%; overflow: hidden; vertical-align: -0.2em; background: rgba(205, 194, 171, 0.15); box-shadow: 0 0 0 1.5px var(--hd-c, rgba(205, 194, 171, 0.35)); font-family: var(--pm-mono); font-size: 0.7em; font-weight: 400; }
+  .hband :global(.hd-who-face img) { width: 100%; height: 100%; object-fit: cover; }
+  /* the quests keep their own look (Household.astro, namespaced under [data-quests]); here they only need room */
+  .hband :global([data-quests]) { margin: 1.2em 0 0.6em; }
+
+  @media (max-width: 760px) {
+    .hband-top { grid-template-columns: minmax(0, 1fr); }
+    .hband-own { padding: 0.9em 0.8em 0.3em; }
+  }
+</style>

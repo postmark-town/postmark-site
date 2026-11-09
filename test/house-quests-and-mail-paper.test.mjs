@@ -21,28 +21,31 @@ const built = (...segs) => existsSync(join(DIST, ...segs));
 const page = (...segs) => readFileSync(join(DIST, ...segs), "utf8");
 const at = (html, needle) => { const i = html.indexOf(needle); assert.ok(i >= 0, `the page carries ${needle}`); return i; };
 
-test("a resident page of a shared house opens on the rail and carries no quest board",
+// POS-984 (Darko, 2026-11-09 14:34 EST): a declared house has ONE page, /households/<slug>/. Until 2026-11-09 these two
+// asserted a resident page of a shared house carried the seat's board (hidden, behind the Household tab) and that the
+// seat put the quests between "Since you last looked" and the residents. The seat is the Hearth now, and the quests sit
+// in the site's band above it, for the signed-in human; a resident's page of a declared house carries no seat at all.
+test("a resident page of a shared house opens on the rail, whose first chip is a link to the household page, and carries no quest board",
   { skip: !built("residents", "wright", "index.html") }, () => {
     const html = page("residents", "wright", "index.html");
     const house = html.slice(at(html, "data-house "));
     const rail = at(house, "data-house-tabs");
     assert.ok(rail < at(house, "data-house-plate"), "the rail stands above the nameplate");
     assert.ok(rail < at(house, "data-profile-bubble"), "the rail stands above the profile");
-    // the board is on the household seat only; the page's one copy of it is
-    // inside the seat's dashboard, never before the rail
-    const board = house.indexOf("data-quests ");
-    assert.ok(board > rail, "no quest board above the rail");
-    assert.ok(board > at(house, "data-hd "), "the board is inside the household dashboard");
+    assert.match(house.slice(rail, rail + 400), /<a class="pm-chip is-first" data-house-link href="\/households\/starforge\/"/, "the rail's first chip goes to the household's page");
+    assert.equal(house.includes("data-house-tab=\"__house\""), false, "no second copy of the seat on a resident's page");
+    assert.equal(house.indexOf("data-quests "), -1, "the board is on the household page only");
   });
 
-test("the household seat puts the day's quests between Since you last looked and the residents",
+test("the household page puts the day's quests in the band above the design, and the design below",
   { skip: !built("households", "starforge", "index.html") }, () => {
     const html = page("households", "starforge", "index.html");
-    const feed = at(html, 'id="hd-feed-h"');
+    const band = at(html, "data-hband ");
     const board = at(html, "data-quests ");
-    const residents = at(html, 'id="hd-res-h"');
-    assert.ok(feed < board && board < residents, "feed → quests → residents");
+    const stage = at(html, "data-hearth-stage ");
+    assert.ok(band < board && board < stage, "band → quests → the design");
     assert.equal(html.includes("data-hd-quests"), false, "the dashboard's old small quest panel is gone");
+    assert.equal(html.includes('id="hd-feed-h"'), false, "the old dashboard's feed is not on the one page: the design draws the house");
   });
 
 test("a solo resident's page has no board (a house of one has no seat)",
@@ -85,14 +88,13 @@ test("The Mail's letter cards are on the letter paper", () => {
 // Keemin, 2026-09-27: "solo residents should still have a household page now
 // that households are the primary key right". A declared house of one opens on
 // its seat: the rail, the dashboard, and the board in its slot.
-test("a declared house of one has its household page: rail, dashboard, board",
+test("a declared house of one has its household page: rail, band with the board, then the design",
   { skip: !built("households", "casa-nera", "index.html") }, () => {
     const html = page("households", "casa-nera", "index.html");
     const house = html.slice(at(html, "data-house "));
-    assert.ok(at(house, "data-house-tabs") < at(house, "data-hd "), "the rail tops the page");
-    const feed = at(house, 'id="hd-feed-h"');
+    assert.ok(at(house, "data-house-tabs") < at(house, "data-hband "), "the rail tops the page");
     const board = at(house, "data-quests ");
-    assert.ok(feed < board && board < at(house, 'id="hd-res-h"'), "feed → quests → the resident");
+    assert.ok(at(house, "data-hband ") < board && board < at(house, "data-hearth-stage "), "band → quests → the design");
     assert.equal(/data-shared/.test(house.slice(0, 200)), false, "a house of one is not marked shared, so its whole board shows");
   });
 

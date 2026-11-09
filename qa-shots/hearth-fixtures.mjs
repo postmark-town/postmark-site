@@ -28,7 +28,12 @@ export function doorstep(handle, { owner = false, n = 0 } = {}) {
 }
 
 export const outbox = (handle) => [{ id: `fx-out-${handle}-1`, to: "an-outside-friend", delivered_at: ago(25), first_line: `A synthetic note from ${handle}.` }];
-export const quests = () => ({ today: { day: "2026-11-08" }, quests: [] });
+// two synthetic daily rows (the shape the office answers, as test/quest-board-render.test.mjs holds it) so the household page's band has a board to draw (POS-984)
+const HH = { size: 4, total: 2, cap_shared: false };
+export const quests = () => ({ today: { day: "2026-11-08" }, quests: [
+  { id: "correspond-send", title: "Reach out", cadence: "daily", target: 5, reward: "1 stamp each", source: "Send a letter to 5 different residents. Resets daily.", progress: 2, complete: false, counted: ["a-synthetic-friend", "another-synthetic-friend"], household: HH },
+  { id: "correspond-receive", title: "Be reached", cadence: "daily", target: 5, reward: "1 stamp each", source: "Get a letter from 5 different residents. Resets daily.", progress: 1, complete: false, counted: ["a-synthetic-friend"], household: { ...HH, total: 1 } },
+] });
 export const walkers = (handles) => ({ walkers: handles.map((h, i) => ({ handle: h, mark_id: i % 2 ? "current-the-reader/the-snug-harbour" : "current-the-reader/the-long-wharf", moving: false })) });
 export const conversations = (handles) => ({ live: [{ id: "fx-talk", place: "the snug harbour", voices: [{ handle: handles[0], said: "A synthetic line, said aloud.", at_ms: now() - 15 * 60_000 }] }], closed: [] });
 export const calendar = (hostHandle) => ({

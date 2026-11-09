@@ -34,6 +34,8 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 
 const SOURCE = readFileSync(new URL("../town/components/Household.astro", import.meta.url), "utf8");
+// the board's markup moved out of Household.astro whole into its own component (POS-984): the driver script stays here
+const QUESTS_MARKUP = readFileSync(new URL("../town/components/HouseQuests.astro", import.meta.url), "utf8");
 
 // ── the slice ────────────────────────────────────────────────────────────────
 
@@ -306,9 +308,9 @@ test("the page actually calls the law: the partition, the block, and the hand li
   }
 
   // the markup the builders append into has to exist, and ship hidden
-  assert.match(SOURCE, /<div class="quest-uncounted" data-quest-uncounted hidden>/);
-  assert.match(SOURCE, /<ul class="quest-un-list" data-quest-uncounted-list><\/ul>/);
-  assert.match(SOURCE, /<p class="quest-arrived" data-quest-arrived hidden><\/p>/);
+  assert.match(QUESTS_MARKUP, /<div class="quest-uncounted" data-quest-uncounted hidden>/);
+  assert.match(QUESTS_MARKUP, /<ul class="quest-un-list" data-quest-uncounted-list><\/ul>/);
+  assert.match(QUESTS_MARKUP, /<p class="quest-arrived" data-quest-arrived hidden><\/p>/);
 
   // THE WORD IS STILL THE TOWN'S, AND THE BLOCK IS NO LONGER THE PLACE FOR IT
   // (2026-09-08). The civic hub has rendered `uncounted` beside its own
@@ -327,8 +329,8 @@ test("the page actually calls the law: the partition, the block, and the hand li
   // written. test/quest-standings.test.mjs pins the card's strings in full.
   const hub = readFileSync(new URL("../town/pages/town/index.astro", import.meta.url), "utf8");
   assert.match(hub, /class="m-barlab m-dim">Board count unavailable</, "the hub's word moved — the note this board writes followed it and now says something else");
-  assert.match(SOURCE, /<span>Still to do<\/span>/);
-  assert.doesNotMatch(SOURCE, /<span>Uncounted<\/span>/,
+  assert.match(QUESTS_MARKUP, /<span>Still to do<\/span>/);
+  assert.doesNotMatch(QUESTS_MARKUP, /<span>Uncounted<\/span>/,
     "the block is headed by what the list IS; a heading naming a measurement failure over rows that were measured is the label the founder read and could not parse");
 
   // and the styles are is:global under [data-quests], because the rows are
@@ -539,9 +541,9 @@ test("the page routes the three lists, and the Not-read block ships hidden and h
     assert.match(SOURCE, re, `${what} — the law is defined but not called`);
   }
 
-  assert.match(SOURCE, /<div class="quest-notread" data-quest-notread hidden>/);
-  assert.match(SOURCE, /<ul class="quest-nr-list" data-quest-notread-list><\/ul>/);
-  assert.match(SOURCE, /<span>Not read here<\/span>/);
+  assert.match(QUESTS_MARKUP, /<div class="quest-notread" data-quest-notread hidden>/);
+  assert.match(QUESTS_MARKUP, /<ul class="quest-nr-list" data-quest-notread-list><\/ul>/);
+  assert.match(QUESTS_MARKUP, /<span>Not read here<\/span>/);
 
   for (const sel of ["quest-notread", "quest-nr-list", "quest-nr-row", "quest-nr-title", "quest-nr-kind", "quest-nr-note"]) {
     assert.ok(SOURCE.includes(`[data-quests] .${sel}`),

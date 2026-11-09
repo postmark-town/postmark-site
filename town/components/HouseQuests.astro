@@ -1,0 +1,87 @@
+---
+// HouseQuests — the day's quests of the household seat, moved out of Household.astro whole (POS-984).
+//
+// The board is the house's own: Household.astro's quest driver fills it from GET /api/quests and reads the
+// markers below (data-quests and friends); its styles are Household.astro's, namespaced under [data-quests].
+// It sat as the `quests` slot of HouseDashboard. On the one household page (a declared house) it sits in the
+// site's band for the signed-in human (HouseBand.astro), and HouseDashboard keeps it for an undeclared
+// shared house. Two seats draw it, so it is one component and not two copies. Nothing in the markup changed.
+---
+  {/* ── THE DAY'S QUESTS: the household seat's, between Since you last
+       looked and Your residents (Keemin, 2026-09-27: "We should remove the
+       daily quest progress cards from the individual resident pages, and
+       put them between 'Since you last looked' and 'your residents'. Let's
+       use the standard stamp purple colors for them"). They sat ABOVE the
+       rail on every resident page from the 2026-08-07 ruling until then.
+       The board is the house's here: the driver below draws it for the
+       seat only, the hand goes quiet and the counted lines show the whole
+       house's day. A solo's board is on its house page's seat.
+
+       Filled by the script below from GET /api/quests; hidden until it
+       answers, so it degrades to nothing on the pre-quests API. */}
+<section class="quests" data-quests hidden>
+  <div class="pm-rule night"><span data-quests-day>Today</span></div>
+  <div class="quest-cards" data-quest-cards></div>
+  {/* WHAT IS LEFT — the town's law (tools/quest-progress.mjs BOARD_LAW,
+      2026-09-01) puts EVERY registry row on this board, and the rows the
+      daily fold cannot measure carry `progress: null`. They keep their
+      pointer here and lose the apparatus of a measurement: no bar, no count,
+      no hand.
+
+      THE HEADING CHANGED ON 2026-09-08, and the reason is the founder's, on
+      his own page: "It's confusing because most of this is already done? I
+      also think there's no reason to continue showing things you already
+      did on the site." This block used to be called `Uncounted` and hold
+      every row the DAILY fold could not count — which, on his board, was a
+      card he had rewritten, a home he had founded, a window he had hung, a
+      first letter he sent in June and a friendship the stamp ledger had paid
+      him for ten times, all rendered identically to a row he had never
+      started, because the door answered every one of them `complete: null`.
+
+      The office now answers those rows from the record, so this list holds
+      what is LEFT rather than what was unmeasurable, and the heading says
+      so. `uncounted` is still the town's word for a row nothing can count —
+      the civic hub's and this page's — and it still appears here, on the
+      rows that genuinely earn it, in the note each of them now carries.
+
+      It ships HIDDEN and is revealed only when there is a row to put in it. */}
+  <div class="quest-uncounted" data-quest-uncounted hidden>
+    <div class="pm-rule night"><span>Still to do</span></div>
+    <ul class="quest-un-list" data-quest-uncounted-list></ul>
+  </div>
+  {/* ── NOT READ HERE (#2773, 2026-09-14) ────────────────────────────────────
+      Reported by the founder on his own page: it "still claims you have yet
+      to complete things that you definitely have." Under Still to do was
+      *Leave your home mark*, for a resident whose home mark had stood in the
+      World for weeks. The office answers that one row `complete: null` — "the
+      world lives outside the town checkout and outside this index" — and this
+      page filed every row that was not `complete: true` under Still to do. So
+      a row THE DOOR DID NOT READ looked exactly like a row the resident had
+      not done, and the page told a placed resident to go get placed.
+
+      The town already ruled this in words, and this panel had simply never
+      learned it — tools/onboarding.test.mjs, verbatim: "an unknown row is
+      never rendered as an unfinished step — telling a placed resident to go
+      get placed is the #1864 defect."
+
+      SO THE THIRD STATE GETS ITS OWN HEADING instead of borrowing the second
+      one's. Not read here says exactly what happened: this surface did not
+      look, and the row carries the door's own note naming the surface that
+      can answer it. A row the door did not read AND said nothing about is not
+      rendered at all — a heading over "we don't know and we won't say where
+      to find out" is the shrug this block exists to stop being.
+
+      Ships HIDDEN, like the block above, and is revealed only when a row
+      lands in it. */}
+  <div class="quest-notread" data-quest-notread hidden>
+    <div class="pm-rule night"><span>Not read here</span></div>
+    <ul class="quest-nr-list" data-quest-notread-list></ul>
+  </div>
+  {/* THE ARRIVED LINE — every settled row, folded into one sentence and out
+      of the way. The founder's second clause, met literally: what you have
+      already done stops taking up the page. The rows are not hidden from a
+      reader who wants them; they ride the line's `title=`, with the day each
+      was met where the record dates it, per the hub's 2026-09-01 ruling that
+      a qualifier is either a title= or it dies. */}
+  <p class="quest-arrived" data-quest-arrived hidden></p>
+</section>

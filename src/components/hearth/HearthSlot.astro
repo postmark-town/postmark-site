@@ -49,7 +49,8 @@ const closer = name === "closer"
     <p class="hx-public" data-public>
       <b>You are reading {plate}’s public record.</b> Everything here is what the town already publishes about this house.
       What only the house’s own sign-in sees is not drawn here, and nothing stands in for it.
-      <button type="button" class="hd-link-btn" data-hd-signin hidden>Is this your house? Sign in with GitHub →</button>
+      {/* the sign-in line is the site's own, in the band above every design (HouseBand.astro, POS-984): a design that
+          leaves this slot out must not lose it */}
     </p>
   </section>
 )}

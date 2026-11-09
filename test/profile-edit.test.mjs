@@ -66,9 +66,14 @@ test("the card's Edit profile link is offered for a resident the sign-in holds, 
 });
 
 // a card is a stub with one link; paintEditLinks is the real function the dashboard calls
-const stubRoot = (handles) => {
+const stubRoot = (handles, bandLinks = []) => {
   const links = Object.fromEntries(handles.map((h) => [h, { hidden: true }]));
-  return { links, querySelector: (sel) => { const m = /data-hd-card="([^"]+)"/.exec(sel); return m ? { querySelector: () => links[m[1]] } : null; } };
+  return {
+    links,
+    querySelector: (sel) => { const m = /data-hd-card="([^"]+)"/.exec(sel); return m ? { querySelector: () => links[m[1]] } : null; },
+    // the band's links (POS-984): `[data-hb-edit]`, one per resident, outside any card
+    querySelectorAll: (sel) => (sel === "[data-hb-edit]" ? bandLinks : []),
+  };
 };
 test("the dashboard shows Edit profile on the owner's own cards only, driven through the real painter", () => {
   globalThis.CSS = { escape: (s) => s };
@@ -82,6 +87,17 @@ test("the dashboard shows Edit profile on the owner's own cards only, driven thr
   const back = stubRoot(["wick"]); back.links.wick.hidden = false;
   paintEditLinks(back, { handles: ["wick"], mine: [] });
   assert.equal(back.links.wick.hidden, true, "a sign-out hides it again");
+});
+
+test("the band's Edit profile links (Managing the house) follow the same rule through the real painter: the owner's own residents only (POS-984)", () => {
+  globalThis.CSS = { escape: (s) => s };
+  const mk = () => ["wick", "fennel"].map((h) => ({ hidden: true, dataset: { hbEdit: h } }));
+  const band = mk();
+  paintEditLinks(stubRoot([], band), { handles: ["wick", "fennel"], mine: ["wick"] });
+  assert.deepEqual(band.map((l) => l.hidden), [false, true], "wick's link shows, a housemate this sign-in does not act for stays hidden");
+  const out = mk(); out.forEach((l) => { l.hidden = false; });
+  paintEditLinks(stubRoot([], out), { handles: ["wick", "fennel"], mine: [] });
+  assert.deepEqual(out.map((l) => l.hidden), [true, true], "signed out: a sign-out hides them again");
 });
 
 test("the link carries the ask, and the page opens the editor for the resident named", () => {

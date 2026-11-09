@@ -14,6 +14,10 @@
 // primary key right"): the dashboard with one resident, under a rail of
 // [Household][that resident]. Only the solo's own resident page stays folded.
 //
+// THE ONE HOUSEHOLD PAGE (POS-984, Darko 2026-11-09 14:34 EST): the house seat here is the Hearth, the house drawn
+// in its design for everyone, under the site's own band for the signed-in human (Household.astro hands both to the
+// seat). /households/<slug>/hearth/ forwards here, `?entry=` included.
+//
 // The key this page hands the layout is `household`, which is nobody's own seat
 // key, and that is deliberate — it is one of the `alsoKeys` of The Households
 // seat (`alsoKeys: ["household", "residents"]` in src/lib/nav.mjs), so the rail

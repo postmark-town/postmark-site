@@ -183,11 +183,17 @@
   .hearth-stage .hx-bar-row { grid-template-columns: minmax(5em, 8em) minmax(0, 1fr) 3em; }
 }
 
+/* ── the site's own band stands in for a design's private copies (POS-984) ──
+ * The band above every design (household-dashboard/HouseBand.astro) carries the house's Needs you and its
+ * "on the next boat" line. A design may still place <hearth-needs-you> and a feed with a boat line (its markers
+ * stay valid); on the one page the band is where they are shown, once. */
+.hearth-stage [data-hearth-slot="needs-you"], .hearth-stage [data-hd-boat] { display: none !important; }
+
 /* ── the site's own chrome above the stage: never part of a template ── */
 .hearth { --hx-chrome-ink: #cdc2ab; color: var(--hx-chrome-ink); }
-.hearth-bar { display: grid; gap: 0.6em; padding: 0.4em 0 1em; margin-bottom: 1.2em; border-bottom: 1px solid rgba(232, 196, 139, 0.22); }
-.hearth-bar h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2.1rem); color: #f4e9d7; line-height: 1.1; }
-.hearth-kicker { margin: 0; font-family: var(--pm-mono); text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.66rem; color: rgba(232, 196, 139, 0.8); }
+.hearth .hd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.hearth-bar { display: grid; gap: 0.6em; padding: 0 0 0.8em; margin-bottom: 1em; }
+.hearth-bar:not(:has(.hearth-tools > *, .hearth-note:not([hidden]))) { padding: 0; margin: 0; }
 .hearth-tools { display: flex; flex-wrap: wrap; gap: 0.6em 1.2em; align-items: center; font-size: 0.9rem; }
 .hearth-tools a { color: #e8c48b; }
 .hearth-picker { display: inline-flex; align-items: center; gap: 0.5em; font-family: var(--pm-mono); font-size: 0.72rem; }

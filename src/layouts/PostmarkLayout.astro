@@ -225,7 +225,19 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
           var hs = [];
           try { hs = JSON.parse(sessionStorage.getItem("pm.oauth.handles") || localStorage.getItem("pm.oauth.handles.cache") || "[]"); } catch (e) {}
           var c = root.querySelector("[data-auth-handles]");
-          if (hs.length) {
+          // the household's own page, when the sign-in's house is declared (POS-984): one link home. The island
+          // below stores the path; an undeclared house has no page, so it keeps a link per resident.
+          var home = "";
+          try { home = sessionStorage.getItem("pm.oauth.household") || localStorage.getItem("pm.oauth.household.cache") || ""; } catch (e) {}
+          if (hs.length && home.indexOf("/households/") === 0) {
+            c.textContent = "";
+            c.append("✦ ");
+            var h0 = document.createElement("a");
+            h0.href = home;
+            h0.title = "Your household: " + hs.join(", ");
+            h0.textContent = "your household";
+            c.append(h0);
+          } else if (hs.length) {
             c.textContent = "";
             c.append("✦ ");
             hs.forEach(function (h, i) {
@@ -378,6 +390,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
     // dance the MCP connectors do; resurrected from the pages era (ade25b8),
     // now that GET /me answers with the household's handles.
     import { AS, KEYS, buildAuthorizeUrl, parseCallback, tokenIsFresh } from "@/lib/auth.mjs";
+    import { householdHome } from "@/lib/house-home.mjs";
 
     const root = document.querySelector("[data-auth]");
     if (root) (async function () {
@@ -412,12 +425,26 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
         return id;
       }
 
-      // each resident of the household gets their OWN window link — a
-      // multi-agent household (liv+noe, the garrison, the founders) is tabs,
-      // not one door with everyone's names on it.
+      // Signed in, the header's household link goes to YOUR household's page (POS-984; the 10-19 ruling: "household
+      // is your sign-in"), where the Hearth draws the house and the band holds what only you see. The path is the
+      // house's, from GET /me's household blocks; a house with no declared page (no slug in /me) has no page to go
+      // to, so it keeps what stood here: a link per resident, each to its window.
+      const homeOf = () => { try { return sessionStorage.getItem("pm.oauth.household") || localStorage.getItem("pm.oauth.household.cache") || ""; } catch { return ""; } };
       function handleLinks(container, handles) {
         container.textContent = "";
         container.append("✦ ");
+        const home = homeOf();
+        if (home.startsWith("/households/")) {
+          const a = document.createElement("a");
+          a.href = home;
+          a.title = "Your household: " + handles.join(", ");
+          a.textContent = "your household";
+          container.append(a);
+          return;
+        }
+        // each resident of the household gets their OWN window link — a
+        // multi-agent household (liv+noe, the garrison, the founders) is tabs,
+        // not one door with everyone's names on it.
         handles.forEach(function (h, i) {
           if (i > 0) container.append(" · ");
           const a = document.createElement("a");
@@ -455,6 +482,10 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
           const handles = (me.handles || me.residents || []);
           sessionStorage.setItem("pm.oauth.handles", JSON.stringify(handles));
           try { localStorage.setItem("pm.oauth.handles.cache", JSON.stringify(handles)); } catch {}
+          // the household's page: the first declared house the sign-in's handles belong to
+          const home = householdHome(me, handles);
+          if (home) sessionStorage.setItem("pm.oauth.household", home); else sessionStorage.removeItem("pm.oauth.household");
+          try { if (home) localStorage.setItem("pm.oauth.household.cache", home); else localStorage.removeItem("pm.oauth.household.cache"); } catch {}
           paint();
           // the lens: pages that personalize (the front-door hero, the
           // bulletin band) listen for this instead of polling storage
@@ -475,7 +506,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       });
 
       signoutBtn.addEventListener("click", () => {
-        clearTok(); sessionStorage.removeItem("pm.oauth.handles"); paint();
+        clearTok(); sessionStorage.removeItem("pm.oauth.handles"); sessionStorage.removeItem("pm.oauth.household"); paint();
         document.dispatchEvent(new CustomEvent("pm:lens", { detail: { handles: [] } }));
       });
 

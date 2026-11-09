@@ -250,6 +250,9 @@ export function paintEditLinks(root, ctx) {
     const link = root.querySelector(`[data-hd-card="${CSS.escape(h)}"]`)?.querySelector("[data-hd-edit]");
     if (link) link.hidden = !editLinkShown(ctx.mine, h);
   }
+  // the household page's band lists every resident under "Managing the house" (HouseBand.astro, POS-984),
+  // with the same invitation and the same rule
+  for (const link of root.querySelectorAll("[data-hb-edit]")) link.hidden = !editLinkShown(ctx.mine, link.dataset.hbEdit);
 }
 
 function paintCards(root, items, reads, ctx) {

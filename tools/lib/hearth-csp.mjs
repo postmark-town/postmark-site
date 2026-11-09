@@ -12,25 +12,36 @@
 // no per-request nonce, and a nonce baked into a static file is a public constant, so hashes are the honest
 // choice here.
 //
-// WHO IS TRUSTED, AND WHY IT IS NOT DERIVED FROM THE PAGE ITSELF. The authority comes from a page that carries NO
-// entry content: the same house's own household page (households/<slug>/index.html), built from the same layout. Its
-// inline scripts are what the site already runs for that house; the Hearth page may run those and nothing more. The
-// Hearth page's own inline scripts are only CHECKED against that set: a script that is not in it (whatever put it
-// there: an entry, the stage, a sanitizer gap) gets NO authority and FAILS THE BUILD, as does an inline event handler or
-// a javascript: URL. Hashing whatever the output happens to contain would hand authority to any code that reached the
-// build; this does the opposite. A page with no trusted reference cannot be given a policy at all. There is no 'unsafe-inline', no
-// 'unsafe-eval', no 'unsafe-hashes' (so an `onerror=` attribute is dead too), no `data:`/`blob:` script source.
-// Everything else the page needs from the network is the site's own origin and the office's API. A template
-// cannot reach any other host: frames, plugins, base-URI and form posts are shut.
+// WHO IS TRUSTED, AND WHY IT IS NOT DERIVED FROM THE ENTRY. The authority comes from the page with the ENTRY'S REGION
+// TAKEN OUT: Hearth.astro marks everything an entry contributes (its stylesheet and its stage) between two comments,
+// <!--hearth-entry--> and <!--/hearth-entry-->, exactly once. The inline scripts outside the region are what the site's
+// own host already runs for that house; the page may run those and nothing more. Every inline script on the page is
+// CHECKED against that set: a script that is not in it (whatever put it there: an entry, a sanitizer gap) gets NO
+// authority and FAILS THE BUILD, as does an inline event handler or a javascript: URL. Hashing whatever the output
+// happens to contain would hand authority to code an entry carried; this does the opposite. A page whose region is not
+// marked exactly once cannot be given a policy at all. (Until POS-984 the authority was a SEPARATE entry-free page, the
+// household's own, beside the Hearth's. The Hearth IS the household page now, so the same page, minus the entry's
+// region, is the reference.) There is no 'unsafe-inline', no 'unsafe-eval', no 'unsafe-hashes' (so an `onerror=`
+// attribute is dead too), no `data:`/`blob:` script source.
+// Everything else the page needs from the network is the site's own origin, the office's API and the isolated
+// panes origin the residents' windows run on. A template cannot reach any other host: plugins, base-URI and form
+// posts are shut, and the only frames are the panes' (the household page's resident tabs hang each resident's
+// sandboxed window there; a template cannot embed one, the sanitizer removes frames).
 //
 // WHAT IT DOES NOT TRY. `style-src` keeps 'unsafe-inline': a Hearth's stylesheet is an inline <style> the
 // sanitizer wrote (no url(), no @import, no loads), and the site's own components set styles. A style cannot
 // run script. A meta policy cannot carry frame-ancestors, report-uri or sandbox; those are not claimed.
 //
 // Pure: html in, html out. The Astro integration (town/scripts/hearth-csp.mjs) applies it to the built
-// households/<slug>/hearth/index.html files after the build and touches no other page.
+// households/<slug>/index.html files after the build and touches no other page.
 
 import { createHash } from "node:crypto";
+
+/** The two comments Hearth.astro puts around everything an entry contributes. Exactly one pair per page. */
+export const ENTRY_OPEN = "<!--hearth-entry-->";
+export const ENTRY_CLOSE = "<!--/hearth-entry-->";
+/** The isolated origin each resident's sandboxed window runs on (Household.astro's PANES). */
+export const PANES_ORIGIN = "https://panes.postmark.town";
 
 const JSON_TYPES = /^(application\/(ld\+)?json|importmap|speculationrules)$/i;
 
@@ -54,11 +65,11 @@ export function hearthPolicy(hashes) {
     "default-src 'self'",
     `script-src ${scripts.join(" ")}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: https:",
+    "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    "connect-src 'self' https://postmark.town",
+    `connect-src 'self' https://postmark.town ${PANES_ORIGIN}`,
     "media-src 'self'",
-    "frame-src 'none'",
+    `frame-src ${PANES_ORIGIN}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -78,15 +89,30 @@ export class HearthPolicyError extends Error {
   constructor(message) { super(message); this.name = "HearthPolicyError"; }
 }
 
+const occurrences = (text, needle) => text.split(needle).length - 1;
+
 /**
- * The hashes of a TRUSTED reference page's inline scripts: a page built from the same layout that carries no entry
- * content. A Hearth page is never a reference (it cannot vouch for itself or another Hearth).
+ * The page with the entry's region taken out: what the site's own host contributes and no entry does. The region is
+ * marked exactly once (ENTRY_OPEN before ENTRY_CLOSE), or this throws: a page that cannot say where its entry is cannot
+ * say what is not the entry.
  */
-export function trustedHashes(referenceHtml) {
-  const ref = String(referenceHtml ?? "");
-  if (!ref) throw new HearthPolicyError("no trusted reference page for the Hearth page's policy");
-  if (/data-hearth(?:-stage|-entries|=)/.test(ref)) throw new HearthPolicyError("a Hearth page cannot be the trusted reference");
-  return new Set(inlineScripts(ref).map((s) => s.hash));
+export function withoutEntryRegion(html) {
+  const src = String(html ?? "");
+  const opens = occurrences(src, ENTRY_OPEN), closes = occurrences(src, ENTRY_CLOSE);
+  if (opens !== 1 || closes !== 1) throw new HearthPolicyError(`the page's entry region must be marked exactly once; found ${opens} opening and ${closes} closing marker(s)`);
+  const a = src.indexOf(ENTRY_OPEN), b = src.indexOf(ENTRY_CLOSE);
+  if (b < a) throw new HearthPolicyError("the page's entry region closes before it opens");
+  return src.slice(0, a) + src.slice(b + ENTRY_CLOSE.length);
+}
+
+/**
+ * The hashes of the TRUSTED host's inline scripts: the page's own, with the entry's region taken out. An entry's
+ * contribution never counts as the host (see the header: this is the authority, and the page is checked against it).
+ */
+export function trustedHashes(pageHtml) {
+  const page = String(pageHtml ?? "");
+  if (!page) throw new HearthPolicyError("no page to take the trusted host's scripts from");
+  return new Set(inlineScripts(withoutEntryRegion(page)).map((s) => s.hash));
 }
 
 /**
@@ -117,30 +143,31 @@ export function withHearthPolicy(html, trusted) {
   return src.slice(0, at) + meta + src.slice(at);
 }
 
-/** The built pages the policy governs: dist/households/<slug>/hearth/index.html, as paths relative to dist. */
+/**
+ * The built pages the policy governs: dist/households/<slug>/index.html, the household's one page (the Hearth, POS-984),
+ * as paths relative to dist. The forwarding page beside it (households/<slug>/hearth/index.html) carries no entry and
+ * no policy.
+ */
 export function hearthPages(listDir, join, exists) {
   const out = [];
   for (const slug of listDir("households")) {
-    const rel = join("households", slug, "hearth", "index.html");
+    const rel = join("households", slug, "index.html");
     if (exists(rel)) out.push(rel);
   }
   return out;
 }
 
 /**
- * Apply the policy to every built Hearth page under `dest` (the build output), each against ITS OWN house's entry-free
- * household page as the trusted reference. Throws (the build fails) if a reference is missing or a page carries code the
- * reference does not. Returns the pages written. Touches no other file.
+ * Apply the policy to every built household page under `dest` (the build output), each checked against the trusted
+ * host's own scripts: its page with the entry's region taken out. Throws (the build fails) if a page's region is not
+ * marked exactly once, or it carries code the host does not. Returns the pages written. Touches no other file.
  */
 export function applyHearthPolicy(dest, { readFile, writeFile, listDir, exists, join }) {
   const pages = hearthPages((rel) => (exists(join(dest, rel)) ? listDir(join(dest, rel)) : []), join, (rel) => exists(join(dest, rel)));
   const out = [];
   for (const rel of pages) {
-    const slug = rel.split(/[\\/]/)[1];
-    const refRel = join("households", slug, "index.html");
-    if (!exists(join(dest, refRel))) throw new HearthPolicyError(`${rel}: no trusted reference page (${refRel}) in the build`);
-    const trusted = trustedHashes(readFile(join(dest, refRel)));
-    writeFile(join(dest, rel), withHearthPolicy(readFile(join(dest, rel)), trusted));
+    const html = readFile(join(dest, rel));
+    writeFile(join(dest, rel), withHearthPolicy(html, trustedHashes(html)));
     out.push(rel);
   }
   return out;

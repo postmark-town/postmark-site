@@ -19,13 +19,19 @@
 //
 // The page is server-rendered with the default entry (so the house's public face is there without a
 // script); lib/hearth/stage.mjs then reads the house, paints the live parts, and swaps entries for a preview.
+//
+// ONE PAGE (POS-984, Darko 2026-11-09 14:34 EST, POS-684 sitting): this is no longer a page of its own. It is the
+// house seat of the household page (/households/<slug>/, drawn by town/components/Household.astro), for everyone.
+// /households/<slug>/hearth/ forwards there. Which design it draws is lib/hearth/which-design.mjs's answer.
+// The site's band for the signed-in human rides in through the `band` slot.
 import HearthSlot from "./HearthSlot.astro";
 import "./hearth-host.css";
 import media from "@/data/postmark/media.json";
 import bulletinAll from "@/data/postmark/bulletin.json";
 import { residentFace } from "@/lib/household-dashboard/faces.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
-import { entries, defaultEntry as entry } from "@/lib/hearth/registry.mjs";
+import { entries } from "@/lib/hearth/registry.mjs";
+import { whichDesign } from "@/lib/hearth/which-design.mjs";
 import { SLOT_NAMES } from "@/lib/hearth/slots.mjs";
 import { HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
 
@@ -36,6 +42,9 @@ interface Props {
 }
 const { house, members, plate } = Astro.props;
 const slug = house.path ?? house.slug ?? "";
+// the ONE question the page asks about its design (POS-984): the server draws the design the page opens on, and the
+// browser asks the same function for a preview (?entry=)
+const entry = whichDesign(entries);
 const faces = members.map((r) => residentFace(r, media, homePictureOf(r.handle)));
 const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   name: f.name, accent: f.accent, avatar: f.avatar, monogram: f.monogram, windowHung: f.windowHung,
@@ -56,11 +65,13 @@ const slotProps = { house, faces, plate, slug, bulletin };
   <script type="application/json" data-hearth-faces set:html={json({ handles: faces.map((f) => f.handle), faces: facesByHandle })} />
   <script type="application/json" data-hearth-entries set:html={json(forClient)} />
 
+  {/* the site's own band for the house's signed-in human (HouseBand.astro): above the design, outside it, so no
+      design can hide or break it. Visitors get its sign-in line only. */}
+  <slot name="band" />
+
   <header class="hearth-bar">
-    <p class="hearth-kicker">The Hearth · a household in Postmark</p>
-    <h1>{plate || "a shared household"}</h1>
+    <h1 class="hd-sr">{plate || "a shared household"}</h1>
     <div class="hearth-tools">
-      <a href={`/households/${slug}/`}>The household’s page →</a>
       {entries.length > 1 && (
         <label class="hearth-picker">
           <span>Preview this house in</span>
@@ -74,6 +85,10 @@ const slotProps = { house, faces, plate, slug, bulletin };
     {entries.length > 1 && <p class="hearth-note">A preview shows how this house would look in another design. It is not saved, and nothing is written.</p>}
   </header>
 
+  {/* THE ENTRY'S REGION, marked for the build's security policy (tools/lib/hearth-csp.mjs): everything an entry
+      contributes to this page is between the two comments, and nothing the host runs is. The policy trusts the
+      inline scripts OUTSIDE the region and fails the build on any inside it. */}
+<!--hearth-entry-->
   {entry ? (
     <>
       <style is:inline data-hearth-css set:html={entry.css}></style>
@@ -86,6 +101,7 @@ const slotProps = { house, faces, plate, slug, bulletin };
   ) : (
     <p class="hearth-note">No Hearth design is registered yet.</p>
   )}
+<!--/hearth-entry-->
 
   {/* the house's holo expansion, once for the page (test/funding.test.mjs); shown when the stamps slot shows a holo count */}
   <p class="hearth-holo-note" data-hearth-holo hidden>✧ holo is {HOLO_NAME_LINE} It is {HOLO_LINE} — and since 2026-09-17 it spends like any stamp: the word names its source and its ink.</p>

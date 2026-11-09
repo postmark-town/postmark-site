@@ -3,10 +3,15 @@
 // Darko (2026-11-01 15:54 EST) ruled "inline scripts forbidden by the page's security policy"; Wright (2026-11-09 00:38) ruled the shape: a
 // Hearth-scoped meta policy in the repo, hashes for the TRUSTED HOST's scripts, the page's only policy, no edge or global one.
 //
-// THE AUTHORITY IS NOT THE PAGE'S OWN CONTENT. The permitted hashes come from the same house's entry-free household page; the Hearth page's
-// inline scripts are only checked against them, and code the trusted host does not carry gets no authority and FAILS THE BUILD. The
+// THE AUTHORITY IS NOT THE ENTRY'S CONTENT. The permitted hashes come from the page with the ENTRY'S REGION taken out (Hearth.astro marks
+// everything an entry contributes between <!--hearth-entry--> and <!--/hearth-entry-->, exactly once); the page's inline scripts, entry
+// included, are only checked against them, and code the trusted host does not carry gets no authority and FAILS THE BUILD. The
 // BUILD-INPUT tests below hold that: they hand the policy writer pages with entry-controlled executable code in them and require the
 // build to stop, instead of hashing it. (qa-shots/hearth-walk.mjs proves the effective policy in a real browser.)
+//
+// POS-984 (Darko, 2026-11-09 14:34 EST): the Hearth IS the household page now, at households/<slug>/index.html. Until 2026-11-09 this file held
+// a SEPARATE entry-free household page as the reference, and the policy governed households/<slug>/hearth/index.html; the same page, minus
+// the region, is the reference now, and the forwarder at hearth/ carries no policy.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -15,7 +20,8 @@ import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import {
-  inlineScripts, hearthPolicy, withHearthPolicy, trustedHashes, applyHearthPolicy, hearthPages, inlineExecutableMarkup, HearthPolicyError,
+  inlineScripts, hearthPolicy, withHearthPolicy, trustedHashes, applyHearthPolicy, hearthPages, inlineExecutableMarkup, withoutEntryRegion,
+  ENTRY_OPEN, ENTRY_CLOSE, PANES_ORIGIN, HearthPolicyError,
 } from "../tools/lib/hearth-csp.mjs";
 import { prepareEntry } from "../src/lib/hearth/entries.mjs";
 
@@ -26,9 +32,9 @@ const sha = (t) => "sha256-" + createHash("sha256").update(t, "utf8").digest("ba
 
 const HOST_SCRIPTS = ["var host = 1;", "window.pmBell = true;"];
 const HOST_MODULE = 'import "./host.js";';
-const referencePage = (extra = "") => `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>house</title><script>${HOST_SCRIPTS[0]}</script><script type="module">${HOST_MODULE}</script><script src="/_astro/a.js" type="module"></script></head><body><script>${HOST_SCRIPTS[1]}</script>${extra}</body></html>`;
-const hearthPage = (stage = "<p>entry</p>", extraHead = "") => `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>hearth</title>${extraHead}<script>${HOST_SCRIPTS[0]}</script><script type="module">${HOST_MODULE}</script><script src="/_astro/hearth.js" type="module"></script><script type="application/json" data-hearth-entries>[{"html":"<script>x</script>"}]</script></head><body><script>${HOST_SCRIPTS[1]}</script><div class="hearth-stage" data-hearth-stage>${stage}</div></body></html>`;
-const TRUSTED = trustedHashes(referencePage());
+// the household page as Hearth.astro builds it: the host's scripts outside, and everything an entry contributes (its stylesheet and its stage) between the two markers
+const hearthPage = (stage = "<p>entry</p>", extraHead = "") => `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>hearth</title>${extraHead}<script>${HOST_SCRIPTS[0]}</script><script type="module">${HOST_MODULE}</script><script src="/_astro/hearth.js" type="module"></script><script type="application/json" data-hearth-entries>[{"html":"<script>x</script>"}]</script></head><body><script>${HOST_SCRIPTS[1]}</script><section data-hearth>${ENTRY_OPEN}<style data-hearth-css>.a{}</style><div class="hearth-stage" data-hearth-stage>${stage}</div>${ENTRY_CLOSE}</section></body></html>`;
+const TRUSTED = trustedHashes(hearthPage());
 
 // ── what a script is, and the policy text ──────────────────────────────────
 
@@ -50,20 +56,38 @@ test("the policy: scripts are 'self' and hashes only: no inline, eval, hashes-of
   const dirs = Object.fromEntries(p.split("; ").map((d) => [d.split(" ")[0], d.split(" ").slice(1).join(" ")]));
   assert.equal(dirs["default-src"], "'self'");
   assert.equal(dirs["object-src"], "'none'");
-  assert.equal(dirs["frame-src"], "'none'");
+  // POS-984: the household page carries each resident's sandboxed window (an iframe on the isolated panes origin, its tab fetches that origin's windows.json)
+  // and the profile editor's avatar preview (a blob: image). Until 2026-11-09 this asserted frame-src 'none', connect-src "'self' https://postmark.town" and img-src without blob:.
+  assert.equal(PANES_ORIGIN, "https://panes.postmark.town");
+  assert.equal(dirs["frame-src"], PANES_ORIGIN, "the only frames are the isolated panes origin's: a template cannot embed anything else");
   assert.equal(dirs["base-uri"], "'self'");
   assert.equal(dirs["form-action"], "'self'");
-  assert.equal(dirs["connect-src"], "'self' https://postmark.town", "the page may reach its own origin and the office's API, and nothing else");
+  assert.equal(dirs["connect-src"], `'self' https://postmark.town ${PANES_ORIGIN}`, "the page may reach its own origin, the office's API and the panes' window list, and nothing else");
+  assert.equal(dirs["img-src"], "'self' data: blob: https:");
   assert.ok(!/\*/.test(p) && !/["<>]/.test(p));
 });
 
 // ── the trusted host: positive authority, independent of the page ─────────
 
-test("trustedHashes: the entry-free reference page's inline scripts; a missing reference or a Hearth page cannot be one", () => {
+test("trustedHashes: the page's inline scripts OUTSIDE the entry's region, and never one inside it; no page, no authority", () => {
   assert.deepEqual([...TRUSTED].sort(), [sha(HOST_SCRIPTS[0]), sha(HOST_MODULE), sha(HOST_SCRIPTS[1])].sort());
+  const carrying = trustedHashes(hearthPage(`<p>x</p><script>window.__entry = 1</script>`));
+  assert.ok(!carrying.has(sha("window.__entry = 1")), "a script an entry carries is never the host's");
+  assert.deepEqual([...carrying].sort(), [...TRUSTED].sort());
   assert.throws(() => trustedHashes(""), HearthPolicyError);
-  assert.throws(() => trustedHashes(undefined), /no trusted reference/);
-  assert.throws(() => trustedHashes(hearthPage()), /cannot be the trusted reference/, "a Hearth page cannot vouch for itself or another");
+  assert.throws(() => trustedHashes(undefined), /no page to take the trusted host's scripts from/);
+});
+
+test("withoutEntryRegion: the region is marked exactly once, in order; anything else cannot say what the entry is, so it stops the build", () => {
+  const page = hearthPage("<p>mine</p>");
+  const out = withoutEntryRegion(page);
+  assert.ok(!out.includes("<p>mine</p>") && !out.includes("hearth-stage") && !out.includes(ENTRY_OPEN) && !out.includes(ENTRY_CLOSE), "the whole region goes, markers included");
+  assert.ok(out.includes("<section data-hearth></section>") && out.includes(`<script>${HOST_SCRIPTS[1]}</script>`), "and nothing else does");
+  assert.throws(() => withoutEntryRegion("<p>no markers</p>"), /found 0 opening and 0 closing/);
+  assert.throws(() => withoutEntryRegion(hearthPage(`${ENTRY_OPEN}`)), /found 2 opening and 1 closing/, "an entry that writes the opening marker doubles it");
+  assert.throws(() => withoutEntryRegion(hearthPage(`${ENTRY_CLOSE}<script>alert(1)</script>${ENTRY_OPEN}`)), /found 2 opening and 2 closing/, "an entry that writes both cannot end its region early");
+  assert.throws(() => withoutEntryRegion(`<p>${ENTRY_CLOSE}</p><p>${ENTRY_OPEN}</p>`), /closes before it opens/);
+  assert.throws(() => trustedHashes(hearthPage(`${ENTRY_CLOSE}<script>alert(1)</script>${ENTRY_OPEN}`)), HearthPolicyError, "so an entry cannot move a script out of its region by faking the end of it");
 });
 
 test("withHearthPolicy: the host's own inline scripts get the policy; the meta sits right after the charset, before any script", () => {
@@ -132,38 +156,41 @@ const io = {
   exists: fs.existsSync,
   join: path.join,
 };
+const FORWARDER = `<!doctype html><html><head><meta charset="utf-8"><script>location.replace("/x/" + location.search)</script></head><body>forwarding</body></html>`;
+const slashes = (list) => list.map((p) => p.split(path.sep).join("/"));
 function scratchBuild(houses) {
   const dest = fs.mkdtempSync(path.join(os.tmpdir(), "pos959-csp-"));
   const put = (rel, text) => { fs.mkdirSync(path.dirname(path.join(dest, rel)), { recursive: true }); fs.writeFileSync(path.join(dest, rel), text); };
   put("index.html", "<html><head></head><body>front</body></html>");
+  put("residents/wick/index.html", hearthPage());   // a page with the same scripts that is not a household page: it is never touched
   for (const [slug, h] of Object.entries(houses)) {
-    if (h.reference !== null) put(`households/${slug}/index.html`, h.reference ?? referencePage());
-    put(`households/${slug}/hearth/index.html`, h.hearth ?? hearthPage());
+    put(`households/${slug}/index.html`, h.page ?? hearthPage());
+    put(`households/${slug}/hearth/index.html`, FORWARDER);
   }
   return { dest, read: (rel) => fs.readFileSync(path.join(dest, rel), "utf8") };
 }
 
-test("applyHearthPolicy: each Hearth page is checked against ITS house's reference, written, and nothing else is touched", () => {
+test("applyHearthPolicy: each household page is checked against ITS OWN host scripts, written, and nothing else is touched (the forwarder and the resident pages included)", () => {
   const b = scratchBuild({ a: {}, b: {} });
-  const before = b.read("households/a/index.html") + b.read("index.html");
-  assert.deepEqual(applyHearthPolicy(b.dest, io).sort(), ["households/a/hearth/index.html", "households/b/hearth/index.html"]);
-  assert.match(b.read("households/a/hearth/index.html"), /Content-Security-Policy/);
-  assert.equal(b.read("households/a/index.html") + b.read("index.html"), before, "the household page and the rest of the site are untouched");
+  const before = b.read("households/a/hearth/index.html") + b.read("index.html") + b.read("residents/wick/index.html");
+  assert.deepEqual(slashes(applyHearthPolicy(b.dest, io)).sort(), ["households/a/index.html", "households/b/index.html"]);
+  assert.match(b.read("households/a/index.html"), /Content-Security-Policy/);
+  assert.match(b.read("households/b/index.html"), /Content-Security-Policy/);
+  assert.equal(b.read("households/a/hearth/index.html") + b.read("index.html") + b.read("residents/wick/index.html"), before, "the forwarder, the front door and the resident pages are untouched");
 });
 
-test("applyHearthPolicy: a Hearth page with code its house's reference lacks, or no reference at all, STOPS the build and writes nothing for it", () => {
-  const bad = scratchBuild({ a: { hearth: hearthPage(`<script>alert(1)</script>`) } });
-  const was = bad.read("households/a/hearth/index.html");
+test("applyHearthPolicy: a household page carrying code outside the host's, or no marked region at all, STOPS the build and writes nothing for it", () => {
+  const bad = scratchBuild({ a: { page: hearthPage(`<script>alert(1)</script>`) } });
+  const was = bad.read("households/a/index.html");
   assert.throws(() => applyHearthPolicy(bad.dest, io), HearthPolicyError);
-  assert.equal(bad.read("households/a/hearth/index.html"), was, "not written");
-  assert.throws(() => applyHearthPolicy(scratchBuild({ a: { reference: null } }).dest, io), /no trusted reference page/);
-  // a reference that is itself a Hearth page is no reference
-  assert.throws(() => applyHearthPolicy(scratchBuild({ a: { reference: hearthPage() } }).dest, io), /cannot be the trusted reference/);
+  assert.equal(bad.read("households/a/index.html"), was, "not written");
+  assert.throws(() => applyHearthPolicy(scratchBuild({ a: { page: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>no region</body></html>" } }).dest, io), /entry region must be marked exactly once/);
+  assert.throws(() => applyHearthPolicy(scratchBuild({ a: { page: hearthPage(`${ENTRY_CLOSE}<script>alert(1)</script>${ENTRY_OPEN}`) } }).dest, io), /entry region must be marked exactly once/, "an entry that fakes the end of its region stops the build");
 });
 
-test("hearthPages: only households/<slug>/hearth/index.html", () => {
-  const tree = { households: ["a", "b", "c"], "households/a/hearth/index.html": 1, "households/b/index.html": 1, "households/c/hearth/index.html": 1 };
-  assert.deepEqual(hearthPages((d) => tree[d] ?? [], (...p) => p.join("/"), (p) => p in tree), ["households/a/hearth/index.html", "households/c/hearth/index.html"]);
+test("hearthPages: only households/<slug>/index.html; the forwarder at hearth/ is not one", () => {
+  const tree = { households: ["a", "b", "c"], "households/a/index.html": 1, "households/a/hearth/index.html": 1, "households/b/hearth/index.html": 1, "households/c/index.html": 1 };
+  assert.deepEqual(hearthPages((d) => tree[d] ?? [], (...p) => p.join("/"), (p) => p in tree), ["households/a/index.html", "households/c/index.html"]);
 });
 
 test("the integration is wired, fails the build on a refusal, and touches only the Hearth pages", () => {
@@ -185,29 +212,36 @@ function everyPage(dir, out = []) {
   return out;
 }
 
-test("built: every Hearth page carries exactly one policy, before its scripts, and every inline script it allows is one its OWN house's entry-free page also runs", { skip: !built }, () => {
-  const slugs = fs.readdirSync(path.join(DIST, "households")).filter((s) => fs.existsSync(path.join(DIST, "households", s, "hearth", "index.html")));
-  assert.ok(slugs.length > 10, "there are Hearth pages in the build");
+test("built: every household page carries exactly one policy, before its scripts, allows only inline scripts its own host (outside the entry's region) runs, and carries none inside the region", { skip: !built }, () => {
+  const slugs = fs.readdirSync(path.join(DIST, "households")).filter((s) => fs.existsSync(path.join(DIST, "households", s, "index.html")));
+  assert.ok(slugs.length > 10, "there are household pages in the build");
   for (const slug of slugs) {
-    const p = path.join(DIST, "households", slug, "hearth", "index.html");
+    const p = path.join(DIST, "households", slug, "index.html");
     const html = fs.readFileSync(p, "utf8");
     const metas = [...html.matchAll(/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/g)];
     assert.equal(metas.length, 1, `${slug}: one policy`);
     assert.ok(html.indexOf(metas[0][0]) < html.search(/<script\b/), `${slug}: policy before the first script`);
     const scripts = /script-src ([^;]*)/.exec(metas[0][1])[1];
     assert.ok(!/unsafe-inline|unsafe-eval/.test(scripts), `${slug}: no inline allowance for script`);
-    const reference = trustedHashes(fs.readFileSync(path.join(DIST, "households", slug, "index.html"), "utf8"));
+    const host = trustedHashes(html);
+    const region = html.slice(html.indexOf(ENTRY_OPEN), html.indexOf(ENTRY_CLOSE));
+    assert.ok(region.includes("hearth-stage"), `${slug}: the region holds the design's stage`);
+    assert.deepEqual(inlineScripts(region), [], `${slug}: nothing an entry contributes is executable`);
     const allowed = [...scripts.matchAll(/'(sha256-[^']+)'/g)].map((m) => m[1]);
     assert.ok(allowed.length > 0);
-    for (const h of allowed) assert.ok(reference.has(h), `${slug}: ${h} is allowed but the house's own entry-free page does not run it`);
+    for (const h of allowed) assert.ok(host.has(h), `${slug}: ${h} is allowed but the page's host does not run it`);
     for (const s of inlineScripts(html)) assert.ok(allowed.includes(s.hash), `${slug}: an inline script has no allowance`);
     assert.deepEqual(inlineExecutableMarkup(html), { handlers: 0, jsUrls: 0 }, `${slug}: no inline handler or javascript: URL`);
   }
 });
 
-test("built: NO other page carries a policy: the household page, the rail and every other route are untouched", { skip: !built }, () => {
-  const others = everyPage(DIST).filter((p) => !/\/households\/[^/]+\/hearth\/index\.html$/.test(p));
+test("built: NO other page carries a policy: the forwarder beside each household page, the resident pages and every other route are untouched", { skip: !built }, () => {
+  const households = fs.readdirSync(path.join(DIST, "households")).filter((s) => fs.existsSync(path.join(DIST, "households", s, "index.html")));
+  const governed = new Set(households.map((s) => `households/${s}/index.html`));
+  const rel = (p) => path.relative(DIST, p).split(path.sep).join("/");
+  const others = everyPage(DIST).filter((p) => !governed.has(rel(p)));
   assert.ok(others.length > 1000, "the rest of the site is in the build");
-  const withPolicy = others.filter((p) => /http-equiv="?Content-Security-Policy/i.test(fs.readFileSync(p, "utf8")));
+  assert.ok(others.some((p) => /^households\/[^/]+\/hearth\/index\.html$/.test(rel(p))), "the forwarders are among the pages checked");
+  const withPolicy = others.filter((p) => /http-equiv="?Content-Security-Policy/i.test(fs.readFileSync(p, "utf8"))).map(rel);
   assert.deepEqual(withPolicy, []);
 });

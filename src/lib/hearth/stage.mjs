@@ -22,16 +22,14 @@ import { readHouse, readHearthExtras } from "../household-dashboard/reads.mjs";
 import { paintHouse, writeLook } from "../household-dashboard/paint.mjs";
 import { paintExtras, startCountdown } from "./paint.mjs";
 import { mountBehaviors } from "./behaviors.mjs";
-
-const DEFAULT = "default";
-
-export function pickEntry(entries, id) {
-  return entries.find((e) => e.id === id) ?? entries.find((e) => e.id === DEFAULT) ?? entries[0] ?? null;
-}
+import { whichDesign } from "./which-design.mjs";
+import { DEFAULT_ENTRY as DEFAULT } from "./slots.mjs";
 
 export function mountHearth(root) {
   const stage = root.querySelector("[data-hearth-stage]");
   if (!stage) return;
+  // the site's own band (HouseBand.astro) sits above the stage, outside every template: painted from the same reads
+  const band = root.querySelector("[data-hband]");
   const json = (sel) => { try { return JSON.parse(root.querySelector(sel)?.textContent || "null"); } catch { return null; } };
   const data = json("[data-hearth-faces]") ?? {};
   const entries = json("[data-hearth-entries]") ?? [];
@@ -68,7 +66,8 @@ export function mountHearth(root) {
     ctx.phone = phone.matches;
     ctx.mine = mine();
     ctx.owner = ctx.mine.length > 0;
-    for (const b of stage.querySelectorAll("[data-hd-signin]")) b.hidden = !document.querySelector("[data-auth-signin]") || !!token();
+    for (const b of root.querySelectorAll("[data-hd-signin]")) b.hidden = !document.querySelector("[data-auth-signin]") || !!token();
+    if (band) paintHouse(band, reads, ctx);
     paintHouse(stage, reads, ctx);
     paintExtras(stage, reads, extras, ctx);
     stopCount();
@@ -93,7 +92,7 @@ export function mountHearth(root) {
   function say(text) { if (note) { note.textContent = text ?? ""; note.hidden = !text; } }
 
   function compose(id, { asked = null } = {}) {
-    const entry = pickEntry(entries, id);
+    const entry = whichDesign(entries, { entry: id });
     if (!entry) { say("No Hearth entry is registered."); return; }
     if (styleEl) styleEl.textContent = entry.css;
     const tpl = document.createElement("template");
@@ -122,6 +121,9 @@ export function mountHearth(root) {
     if (t.closest("[data-hd-seen]")) { writeLook(storage, slug, Date.now()); ctx.expanded = false; draw(); return; }
     if (t.closest("[data-hd-signin]")) document.querySelector("[data-auth-signin]")?.click();
   });
+  band?.addEventListener("click", (e) => {
+    if (e.target instanceof Element && e.target.closest("[data-hd-signin]")) document.querySelector("[data-auth-signin]")?.click();
+  });
   stage.addEventListener("change", (e) => {
     const sel = e.target instanceof Element ? e.target.closest("[data-hd-who]") : null;
     if (sel) { ctx.filter.who = sel.value; draw(); }
@@ -137,11 +139,13 @@ export function mountHearth(root) {
   });
   phone.addEventListener?.("change", draw);
   document.addEventListener("pm:lens", () => { load(); });
+  // the household page keeps this seat and a tab per resident: coming back to the seat draws it against the clock again
+  document.addEventListener("pm:tab", (e) => { if (e.detail?.handle === "__house") draw(); });
 
   let asked = null;
   try { asked = new URL(location.href).searchParams.get("entry"); } catch { asked = null; }
   // the page was drawn on the server with the entry it opens on; asked for that same one, there is nothing to redraw
-  const first = pickEntry(entries, asked || DEFAULT);
+  const first = whichDesign(entries, { entry: asked });
   if (first && stage.dataset.hearthEntry === first.id) {
     mountBehaviors(stage);
     if (picker) picker.value = first.id;
