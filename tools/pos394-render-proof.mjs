@@ -81,6 +81,11 @@ export const SOURCES = Object.freeze([
   "src/components/HalloweenMotif.astro", "src/components/HalloweenSkin.astro", "src/components/PageFreshness.astro",
   "src/components/ResidentCard.astro",
   "src/components/household-dashboard/HouseDashboard.astro", "src/components/household-dashboard/ResidentCard.astro",
+  // POS-984: a declared house's household page is the Hearth under the site's band, and the quests board is its own component
+  "src/components/household-dashboard/HouseBand.astro", "src/components/hearth/Hearth.astro", "src/components/hearth/HearthSlot.astro",
+  "src/components/hearth/hearth-host.css", "town/components/HouseQuests.astro", "src/lib/house-home.mjs",
+  "src/lib/hearth/behaviors.mjs", "src/lib/hearth/entries.mjs", "src/lib/hearth/fold.mjs", "src/lib/hearth/paint.mjs", "src/lib/hearth/registry.mjs",
+  "src/lib/hearth/sanitize-css.mjs", "src/lib/hearth/sanitize-html.mjs", "src/lib/hearth/slots.mjs", "src/lib/hearth/stage.mjs", "src/lib/hearth/which-design.mjs",
   "src/layouts/BaseLayout.astro", "src/layouts/PostmarkLayout.astro",
   "src/lib/appearance.mjs", "src/lib/auth.mjs", "src/lib/civic-art.mjs", "src/lib/correspondents.mjs", "src/lib/docs.mjs", "src/lib/door-line.mjs",
   "src/lib/freshness.mjs", "src/lib/halloween-frame.mjs", "src/lib/halloween-motifs.mjs", "src/lib/halloween-navy.mjs",
@@ -135,7 +140,8 @@ const OLD = Object.freeze({
 });
 const EDIT = Object.freeze({
   chrome: { path: "town/components/Household.astro", from: "      <p class=\"house-meta\">\n", to: "      <p class=\"house-meta\">\n" + OLD.chrome },
-  hdsub: { path: "src/components/household-dashboard/HouseDashboard.astro", from: "      <p class=\"hd-sub\">\n", to: "      <p class=\"hd-sub\">\n" + OLD.hdsub },
+  // POS-984: the household page's hd-sub is the Hearth's house slot now (HouseDashboard keeps its own only for an undeclared shared house's resident pages, which this proof's declared house does not reach)
+  hdsub: { path: "src/components/hearth/HearthSlot.astro", from: "    <p class=\"hd-sub\">\n", to: "    <p class=\"hd-sub\">\n" + OLD.hdsub },
   desc: { path: "town/pages/households/[slug].astro",
     from: "  description={`${plate} — ${members.length} ${members.length === 1 ? \"resident\" : \"residents\"} of Postmark: ${who}.`}\n", to: OLD.desc },
   fold: { path: "src/lib/houses.mjs", from: "      // no `human` (POS-394): the fold is public, and the private name never enters it\n", to: OLD.fold },
@@ -152,13 +158,14 @@ const EDIT = Object.freeze({
 export const MUTANTS = Object.freeze({
   "household-299": { emitter: "Household.astro:299 (chrome), prop path", edits: [EDIT.chrome],
     mustRed: { householdSeat: [C.NEVER], residentWrapper: [C.NEVER] } },
-  "dashboard-68": { emitter: "HouseDashboard.astro:68 (hd-sub), prop path", edits: [EDIT.hdsub],
-    mustRed: { householdSeat: [C.NEVER, C.HDHUMAN], residentWrapper: [C.NEVER] } },
+  // until POS-984 the hd-sub emitter was HouseDashboard.astro:68, mounted on every route, so it also reddened residentWrapper;
+  // the household's own page draws the Hearth's house slot, and a resident's page of a declared house carries no seat
+  "dashboard-68": { emitter: "HearthSlot.astro (the house slot's hd-sub), prop path", edits: [EDIT.hdsub],
+    mustRed: { householdSeat: [C.NEVER, C.HDHUMAN] } },
   "fold+48": { emitter: "houses.mjs fold + households/[slug].astro:48 (description), built page", edits: [EDIT.fold, EDIT.desc],
     mustRed: { householdPage: [C.NEVER, C.DESC] } },
-  "fold+68": { emitter: "houses.mjs fold + HouseDashboard.astro:68 (hd-sub), built page", edits: [EDIT.fold, EDIT.hdsub],
-    mustRed: { householdPage: [C.NEVER, C.HDHUMAN], residentPage: [C.NEVER],
-      householdSeat: [C.NEVER, C.HDHUMAN], residentWrapper: [C.NEVER] } },
+  "fold+68": { emitter: "houses.mjs fold + HearthSlot.astro (the house slot's hd-sub), built page", edits: [EDIT.fold, EDIT.hdsub],
+    mustRed: { householdPage: [C.NEVER, C.HDHUMAN], householdSeat: [C.NEVER, C.HDHUMAN] } },
   "fold+299": { emitter: "houses.mjs fold + Household.astro:299 (chrome), built pages", edits: [EDIT.fold, EDIT.chrome],
     mustRed: { householdPage: [C.NEVER], residentPage: [C.NEVER], householdSeat: [C.NEVER], residentWrapper: [C.NEVER] } },
 });
@@ -176,6 +183,9 @@ const DATA = {
   "households.json": { schema_version: 1, households: { "brass-hollow": { human: SENTINEL, since: "2026-08-01", residents: HOUSE.residents } } },
   "residents.json": MEMBERS,
   "media.json": {},
+  // POS-984: the Hearth draws the household page from a registered design and the bulletin; one invented default entry, an empty bulletin
+  "hearths.json": [{ id: "default", title: "Invented default", author: "pos394", line: "An invented entry for the POS-394 render proof.", html: "<hearth-house></hearth-house><hearth-residents></hearth-residents>", css: "" }],
+  "bulletin.json": [],
   "renditions.json": [],
   "letters.json": [],
   // Household.astro lists a resident's projects (POS-855); an invented, empty record
