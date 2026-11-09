@@ -4,7 +4,7 @@
 // house draws for everyone, unset keeps the default, a PREVIEW NEVER SAVES, another household cannot change it. Fixtures only; the office is a
 // fake here and the real one is tested in the office repo (test/household-hearth.test.mjs).
 //
-//   § 1  resolveHearth: saved, default, preview, unregistered, unavailable
+//   § 1  whichDesign (the ONE selector): saved, default, preview, unregistered, unavailable
 //   § 2  the read (signed out) and the write (signed in)
 //   § 3  the picker: a preview never saves; the save takes a second yes; refusals; the default
 //   § 4  the wiring: the only write is the confirmed save
@@ -17,39 +17,41 @@ import { readFileSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveHearth, readSavedHearth, saveHearth, savedHearthFrom } from "../src/lib/hearth/choice.mjs";
+import { designNote, readSavedHearth, saveHearth, savedHearthFrom } from "../src/lib/hearth/choice.mjs";
+import { whichDesign } from "../src/lib/hearth/which-design.mjs";
 import { createPicker } from "../src/lib/hearth/picker.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ENTRIES = [{ id: "default", title: "Postmark" }, { id: "ledger", title: "The Ledger" }, { id: "orchard", title: "Orchard" }];
 
-// ── § 1 resolveHearth ───────────────────────────────────────────────────────
+// ── § 1 whichDesign: the ONE selector (POS-984's seam), with the saved choice inside it ──────────────
 
 test("§ 1 unset keeps the default; a saved registered entry is what everyone draws", () => {
-  const unset = resolveHearth({ entries: ENTRIES, saved: null });
-  assert.deepEqual([unset.id, unset.source, unset.savedId], ["default", "default", null]);
-  const saved = resolveHearth({ entries: ENTRIES, saved: "ledger" });
-  assert.deepEqual([saved.id, saved.source, saved.savedId], ["ledger", "saved", "ledger"]);
-  assert.equal(resolveHearth({ entries: ENTRIES, saved: "default" }).savedId, null, "the default's own id is the same as nothing");
+  assert.equal(whichDesign(ENTRIES, { saved: null }).id, "default");
+  assert.equal(whichDesign(ENTRIES, {}).id, "default", "no input at all: the default, as before POS-962");
+  assert.equal(whichDesign(ENTRIES, { entry: null, saved: "ledger" }).id, "ledger");
+  assert.equal(whichDesign(ENTRIES, { saved: "default" }).id, "default");
+  assert.equal(whichDesign([], { saved: "ledger" }), null, "no entries at all: nothing to draw");
 });
 
-test("§ 1 a preview draws another entry and changes nothing saved; asking for the saved one is just the saved one", () => {
-  const p = resolveHearth({ entries: ENTRIES, saved: "ledger", asked: "orchard" });
-  assert.deepEqual([p.id, p.source, p.savedId], ["orchard", "preview", "ledger"], "the preview is drawn; the saved answer is unchanged");
-  assert.equal(resolveHearth({ entries: ENTRIES, saved: null, asked: "orchard" }).savedId, null, "a preview on an unset house leaves it unset");
-  assert.equal(resolveHearth({ entries: ENTRIES, saved: "ledger", asked: "ledger" }).source, "saved");
-  assert.equal(resolveHearth({ entries: ENTRIES, saved: "ledger", asked: "default" }).id, "default", "previewing the default on a house that chose another");
+test("§ 1 a preview draws another entry and decides nothing saved; the preview wins only for the one who asked", () => {
+  assert.equal(whichDesign(ENTRIES, { entry: "orchard", saved: "ledger" }).id, "orchard");
+  assert.equal(whichDesign(ENTRIES, { entry: "default", saved: "ledger" }).id, "default", "previewing the default on a house that chose another");
+  assert.equal(whichDesign(ENTRIES, { entry: "ledger", saved: "ledger" }).id, "ledger");
+  assert.equal(whichDesign(ENTRIES, { entry: null, saved: "ledger" }).id, "ledger", "the next visitor, with no preview, draws the saved choice");
+  const before = JSON.stringify(ENTRIES);
+  whichDesign(ENTRIES, { entry: "orchard", saved: "ledger" });
+  assert.equal(JSON.stringify(ENTRIES), before, "the selector only reads");
 });
 
-test("§ 1 an unregistered saved id or preview draws the saved/default, said in a note; an unavailable read says so, never 'nothing chosen'", () => {
-  const unknownSaved = resolveHearth({ entries: ENTRIES, saved: "newer-than-this-build" });
-  assert.deepEqual([unknownSaved.id, unknownSaved.source, unknownSaved.savedId], ["default", "default", null]);
-  assert.match(unknownSaved.note, /not in this version of the site yet/);
-  const badAsk = resolveHearth({ entries: ENTRIES, saved: "ledger", asked: "<script>" });
-  assert.equal(badAsk.id, "ledger"); assert.match(badAsk.note, /No Hearth entry is registered/);
-  const down = resolveHearth({ entries: ENTRIES, saved: undefined });
-  assert.deepEqual([down.id, down.unavailable], ["default", true]); assert.match(down.note, /could not be read/);
-  assert.equal(resolveHearth({ entries: [], saved: "x" }).entry, null, "no entries at all: nothing to draw, said by the caller");
+test("§ 1 an unregistered saved id or preview draws the saved/default; designNote says why; an unavailable read says so, never 'nothing chosen'", () => {
+  assert.equal(whichDesign(ENTRIES, { saved: "newer-than-this-build" }).id, "default");
+  assert.match(designNote(ENTRIES, { saved: "newer-than-this-build" }), /not in this version of the site yet/);
+  assert.equal(whichDesign(ENTRIES, { entry: "<script>", saved: "ledger" }).id, "ledger");
+  assert.match(designNote(ENTRIES, { entry: "<script>", saved: "ledger" }), /No Hearth entry is registered as “<script>”; showing The Ledger/);
+  assert.equal(whichDesign(ENTRIES, { saved: undefined }).id, "default");
+  assert.match(designNote(ENTRIES, { saved: undefined }), /could not be read/);
+  for (const quiet of [{ saved: null }, { saved: "ledger" }, { entry: "orchard", saved: "ledger" }]) assert.equal(designNote(ENTRIES, quiet), "", JSON.stringify(quiet));
 });
 
 // ── § 2 the read and the write ──────────────────────────────────────────────
@@ -157,6 +159,7 @@ test("§ 4 the only code that writes the choice is choice.mjs § saveHearth, rea
   assert.deepEqual(writers, ["src/lib/hearth/choice.mjs"]);
   const picker = read("src/lib/hearth/picker.mjs");
   assert.equal((picker.match(/await save\(/g) ?? []).length, 1, "one call to the write, in confirm()");
-  assert.match(read("src/lib/hearth/stage.mjs"), /resolveHearth\(\{ entries, saved, asked \}\)/, "the stage asks the one resolver");
+  assert.match(read("src/lib/hearth/stage.mjs"), /whichDesign\(entries, \{ entry: asked, saved \}\)/, "the stage asks the one selector");
+  assert.equal(/pickEntry/.test(read("src/lib/hearth/stage.mjs")), false, "and has no selection policy of its own");
   assert.match(read("src/components/hearth/Hearth.astro"), /<HearthPicker /);
 });

@@ -3,8 +3,8 @@
 // The page is server-rendered with the default entry, so the house's baked public face is there
 // without a script. This runs after, and does four things:
 //
-//   CHOOSE   asks lib/hearth/choice.mjs which entry to draw: the house's SAVED choice (the office keeps it; read signed out), else the
-//            default; a preview (`?entry=`, the picker) draws another without saving it. The picker's save is the one write (POS-962).
+//   CHOOSE   asks the ONE selector, which-design.mjs § whichDesign, which entry to draw: a preview (`?entry=`, the picker), else the house's SAVED
+//            choice (the office keeps it; read signed out, choice.mjs), else the default. A preview is never saved; the picker's save is the one write (POS-962).
 //   COMPOSE  puts a registered entry's sanitized markup on the stage and each slot's own part in
 //            its place (the same markup HearthSlot.astro rendered into a <template> per slot),
 //            sets the entry's sanitized stylesheet, and mounts the approved behaviors. The preview
@@ -24,14 +24,11 @@ import { readHouse, readHearthExtras, officeOrigin } from "../household-dashboar
 import { paintHouse, writeLook } from "../household-dashboard/paint.mjs";
 import { paintExtras, startCountdown } from "./paint.mjs";
 import { mountBehaviors } from "./behaviors.mjs";
-import { resolveHearth, readSavedHearth } from "./choice.mjs";
+import { whichDesign } from "./which-design.mjs";
+import { designNote, readSavedHearth } from "./choice.mjs";
 import { mountHearthPicker } from "./picker.mjs";
 
-const DEFAULT = "default";
-
-export function pickEntry(entries, id) {
-  return entries.find((e) => e.id === id) ?? entries.find((e) => e.id === DEFAULT) ?? entries[0] ?? null;
-}
+import { DEFAULT_ENTRY as DEFAULT } from "./slots.mjs";
 
 export function mountHearth(root) {
   const stage = root.querySelector("[data-hearth-stage]");
@@ -97,7 +94,7 @@ export function mountHearth(root) {
   function say(text) { if (note) { note.textContent = text ?? ""; note.hidden = !text; } }
 
   function compose(id, { asked = null } = {}) {
-    const entry = pickEntry(entries, id);
+    const entry = whichDesign(entries, { entry: id });
     if (!entry) { say("No Hearth entry is registered."); return; }
     if (styleEl) styleEl.textContent = entry.css;
     const tpl = document.createElement("template");
@@ -150,7 +147,7 @@ export function mountHearth(root) {
   let asked = null;
   try { asked = new URL(location.href).searchParams.get("entry"); } catch { asked = null; }
   // the page was drawn on the server with the entry it opens on (the default); asked for that same one, there is nothing to redraw
-  const first = pickEntry(entries, asked || DEFAULT);
+  const first = whichDesign(entries, { entry: asked });
   if (first && stage.dataset.hearthEntry === first.id) {
     mountBehaviors(stage);
     root.dataset.hearthShowing = first.id;
@@ -162,10 +159,11 @@ export function mountHearth(root) {
   // resolveHearth answers which entry to draw; a preview in the address still wins on this visit, and is not saved.
   readSavedHearth({ handles, slug, api }).then((saved) => {
     readOk = saved !== undefined;
-    const r = resolveHearth({ entries, saved, asked });
-    if (r.id && r.id !== root.dataset.hearthShowing) compose(r.id);
-    if (r.note) say(r.note);
+    const drawn = whichDesign(entries, { entry: asked, saved });
+    if (drawn && drawn.id !== root.dataset.hearthShowing) compose(drawn.id);
+    const note = designNote(entries, { entry: asked, saved });
+    if (note) say(note);
     if (pickerRoot) mounted = mountHearthPicker(pickerRoot, { entries, slug, saved: saved ?? null, token, api, signedIn: () => readOk && mine().length > 0, onDraw });
-    if (picker && r.id) picker.value = r.id;
+    if (picker && drawn) picker.value = drawn.id;
   });
 }

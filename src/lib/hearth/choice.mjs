@@ -1,49 +1,31 @@
-// choice.mjs — WHICH registered Hearth a house draws: the ONE function, and the saved choice's read and write (POS-962).
+// choice.mjs — the household's saved Hearth: its read, its write, and what to SAY about them (POS-962).
 //
 // The office keeps a household's choice (households.hearth, office migration 093): the id of a registered entry, public, NULL when the house chose
-// nothing. This module is the site's whole side of it, in three small pure-ish functions, and the page asks `resolveHearth` and nothing else:
+// nothing. WHICH DESIGN TO DRAW is not decided here: that is ONE function, `whichDesign(entries, { entry, saved })` in which-design.mjs (the POS-984
+// seam), and this module has no selection policy. It holds the transport and the words:
 //
-//   resolveHearth({ entries, saved, asked })   which entry to DRAW, and why   (pure: no fetch, no DOM)
-//   readSavedHearth({ handles, ... })          the saved choice, signed out    (GET /households?h=, public)
-//   saveHearth({ slug, id, token, ... })       the signed-in human's save      (PATCH /households/<slug>/hearth)
+//   readSavedHearth({ handles, slug, api })    the saved choice, signed out   (GET /households?h=, public)  -> id | null | undefined
+//   saveHearth({ slug, id, token, api })       the signed-in human's save     (PATCH /households/<slug>/hearth)
+//   designNote(entries, { entry, saved })      the line to say beside the drawing, or ""
 //
-// THE CALLER CONTRACT (POS-984's household page, and the Hearth page today):
-//
-//   1. `saved` is what readSavedHearth answered: an id (a string), null (the house chose nothing), or undefined (the read failed: say so, do not
-//      guess "nothing"). `asked` is the preview in the address (`?entry=<id>`) or the picker's current preview, or null.
-//   2. resolveHearth answers { entry, id, source, savedId, unavailable, note }. Draw `entry`. `source` is "preview" (asked, registered: a
-//      preview, NOT saved), "saved" (the house's own choice), or "default". `savedId` is what is actually saved (never the preview).
-//   3. A PREVIEW IS NEVER SAVED. Nothing here turns `asked` into a write; the only write is saveHearth, called by the picker's confirmed button.
-//   4. After a successful save call resolveHearth again with `saved` = the id saveHearth answered and `asked` = null.
-//
-// What is saved is an ID. A saved id this build does not know (an entry registered after this build) draws the default, said in `note`; an id
-// asked in the address that is not registered draws the saved/default, said in `note`. The office, not the picker, decides who may save.
+// THE SAVED-CHOICE CONTRACT for a caller of whichDesign (the household page and the Hearth page):
+//   saved = await readSavedHearth(...)   // an id (string), null (chose nothing), or undefined (the read FAILED: say so, do not guess "nothing")
+//   draw  = whichDesign(entries, { entry: asked, saved })      // asked = ?entry= / the picker's preview, or null
+//   say   = designNote(entries, { entry: asked, saved })
+// A PREVIEW IS NEVER SAVED: nothing here turns `entry` into a write; the only write is saveHearth, called by the picker's confirmed button.
+// After a successful save call whichDesign again with saved = the id saveHearth answered and entry = null. The office, not the picker, decides who may save.
 
 import { DEFAULT_ENTRY, ENTRY_ID } from "./slots.mjs";
 
-const entryOf = (entries, id) => (typeof id === "string" ? entries.find((e) => e.id === id) ?? null : null);
-
-/** The default entry, or the first there is. */
-const defaultOf = (entries) => entryOf(entries, DEFAULT_ENTRY) ?? entries[0] ?? null;
-
-/**
- * @param {{ entries: {id:string,title?:string}[], saved?: string|null|undefined, asked?: string|null }} p
- * @returns {{ entry: object|null, id: string|null, source: "preview"|"saved"|"default", savedId: string|null, unavailable: boolean, note: string }}
- */
-export function resolveHearth({ entries = [], saved, asked = null } = {}) {   // `saved` has NO default: undefined means "the read failed", not "chose nothing"
-  const unavailable = saved === undefined;
-  const savedEntry = unavailable ? null : entryOf(entries, saved);
-  const savedId = savedEntry && savedEntry.id !== DEFAULT_ENTRY ? savedEntry.id : null;
-  let note = "";
-  if (!unavailable && saved !== null && saved !== DEFAULT_ENTRY && !savedEntry) note = "This house's saved Hearth is not in this version of the site yet; showing the default.";
-  if (unavailable) note = "The house's saved Hearth could not be read just now; showing the default.";
-
-  const preview = asked ? entryOf(entries, asked) : null;
-  if (asked && !preview) note = `No Hearth entry is registered as “${String(asked).slice(0, 40)}”; showing ${(savedEntry ?? defaultOf(entries))?.title ?? "the default"}.`;
-  if (preview && preview.id !== (savedEntry ?? defaultOf(entries))?.id) return { entry: preview, id: preview.id, source: "preview", savedId, unavailable, note: "" };
-
-  const drawn = savedEntry ?? defaultOf(entries);
-  return { entry: drawn, id: drawn?.id ?? null, source: savedId ? "saved" : "default", savedId, unavailable, note };
+/** The line to say beside the drawing: a saved id this build does not know, a preview that is not registered, a failed read. "" when there is nothing to say. */
+export function designNote(entries = [], { entry = null, saved } = {}) {   // `saved` has NO default: undefined means "the read failed"
+  const known = (id) => entries.find((e) => e.id === id);
+  const savedKnown = saved ? known(saved) : null;
+  const fallback = savedKnown ?? known(DEFAULT_ENTRY) ?? entries[0];
+  if (entry && !known(entry)) return `No Hearth entry is registered as “${String(entry).slice(0, 40)}”; showing ${fallback?.title ?? "the default"}.`;
+  if (saved === undefined) return "The house's saved Hearth could not be read just now; showing the default.";
+  if (saved && saved !== DEFAULT_ENTRY && !savedKnown) return "This house's saved Hearth is not in this version of the site yet; showing the default.";
+  return "";
 }
 
 /** The saved id in a GET /households answer for this house, or null (chose nothing, or no such key). undefined when the answer is not a registry. */
