@@ -16,8 +16,13 @@
 // The houses are two real PUBLIC households from the site's baked registry (their names and members are
 // already on the public Households page); everything LIVE about them is the fixtures'.
 //
-//   npx astro dev --config astro.config.town.mjs --port 4399 --host 127.0.0.1 &
+//   npm run build && npx astro preview --config astro.config.town.mjs --port 4399 --host 127.0.0.1 &
 //   node qa-shots/hearth-walk.mjs
+//
+// IT RUNS AGAINST THE BUILT SITE (astro preview), not `astro dev`: the Hearth page's security policy is written into
+// the built html (town/scripts/hearth-csp.mjs), so only a build has it. Every scenario also listens for
+// `securitypolicyviolation`: the host's own scripts and controls must run clean under the policy, and scenario ⑩ proves
+// the policy itself stops an injected inline handler and an injected inline script (the layer beneath the sanitizer).
 //
 // Playwright is resolved from the PLAYWRIGHT env, else the world checkout's (installed, not installed here).
 import fs from "node:fs";
@@ -73,6 +78,10 @@ let injectEntry = null;   // a prepared entry added to the page's registered lis
 
 async function newPage(browser, { signedIn = false, viewport = { width: 1280, height: 900 } } = {}) {
   const ctx = await browser.newContext({ viewport });
+  await ctx.addInitScript(() => {
+    window.__cspv = [];
+    document.addEventListener("securitypolicyviolation", (e) => window.__cspv.push(`${e.violatedDirective} ${String(e.blockedURI).slice(0, 60)}`));
+  });
   if (signedIn) {
     await ctx.addInitScript(([tok, handles]) => {
       localStorage.setItem("pm.oauth.token", JSON.stringify({ access_token: tok, obtained: Date.now(), expires_in: 3600 }));
@@ -108,6 +117,7 @@ async function newPage(browser, { signedIn = false, viewport = { width: 1280, he
   return page;
 }
 
+const cleanUnderPolicy = async (page, label) => check(`${label}: the host runs clean under the page's security policy (no violation)`, (await page.evaluate(() => window.__cspv ?? [])).length === 0, JSON.stringify(await page.evaluate(() => window.__cspv ?? [])));
 const shot = (page, name, opts = {}) => page.screenshot({ path: path.join(OUT, name + ".png"), ...opts });
 const ready = async (page) => {
   await page.waitForSelector("[data-hearth-stage]");
@@ -128,7 +138,8 @@ const run = async () => {
       const page = await newPage(browser);
       await page.goto(`${BASE}/households/${A_SLUG}/hearth/`, { waitUntil: "load" });
       await ready(page);
-      check("① no dev error overlay", (await page.locator("vite-error-overlay").count()) === 0);
+      const policy = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content");
+      check("① the Hearth page carries its security policy: scripts are self and hashes only", !!policy && /script-src 'self' 'sha256-/.test(policy) && !/script-src[^;]*unsafe-inline/.test(policy), policy?.slice(0, 120));
       check("① opens on Postmark's default", (await page.locator("[data-hearth]").getAttribute("data-hearth-showing")) === "default");
       check("① the house slot names the house", /dreme|mynd/i.test((await text(page, "[data-hearth-slot=house]")) ?? ""), await text(page, "[data-hearth-slot=house]"));
       check("① a card for every resident", (await page.locator("[data-hearth-slot=residents] [data-hd-card]").count()) === A.length, await page.locator("[data-hearth-slot=residents] [data-hd-card]").count());
@@ -151,6 +162,7 @@ const run = async () => {
       await page.getByRole("tab", { name: "Marks" }).press("ArrowRight");
       check("① tabs: ArrowRight moves on to the next tab", (await page.locator('.hx-tab[aria-selected="true"]').innerText()) === "Closest correspondents");
       await shot(page, "02-default-tabs-desktop");
+      await cleanUnderPolicy(page, "①");
       // member links still work
       const first = A[0];
       await page.locator(`[data-hearth-slot=residents] [data-hd-card="${first}"] .hd-card-name`).click();
@@ -184,6 +196,7 @@ const run = async () => {
       await page.selectOption("[data-hearth-pick]", "default");
       await page.waitForFunction(() => document.querySelector("[data-hearth-stage]")?.dataset.hearthEntry === "default");
       check("② back to the default clears the address", !new URL(page.url()).searchParams.has("entry"), page.url());
+      await cleanUnderPolicy(page, "②");
       await page.context().close();
     }
 
@@ -212,6 +225,7 @@ const run = async () => {
       check("④ the owner sees the private mail summary", /waiting for the crossing/.test((await text(page, "[data-hearth-slot=mail]")) ?? ""), await text(page, "[data-hearth-slot=mail]"));
       check("④ the bearer went only to the house's own doorsteps", log.filter((l) => l.auth).every((l) => A.some((h) => l.path.startsWith(`/doorstep/${h}`)) || l.path === "/me"), JSON.stringify(log.filter((l) => l.auth).map((l) => l.path)));
       await shot(page, "04-default-owner-desktop", { fullPage: true });
+      await cleanUnderPolicy(page, "④ (signed in)");
       log.length = 0;
       await page.goto(`${BASE}/households/${B_SLUG}/hearth/`, { waitUntil: "load" });
       await ready(page);
@@ -293,6 +307,7 @@ const run = async () => {
       check("⑧ the private slots it placed stay the house's: the owner sees them, the template received nothing", (await visible(page, "[data-hearth-slot=needs-you]")) && !(await page.evaluate(() => JSON.stringify(window.__pwned ?? "")).then((v) => /awaiting|waiting/.test(v))));
       check("⑧ nothing went to the hostile host", unanswered.slice(before).every((u) => !/evil\.example/.test(u)) && log.every((l) => !/evil/.test(l.path)), unanswered.slice(before).join(" "));
       await shot(page, "08-hostile-template-desktop", { fullPage: true });
+      await cleanUnderPolicy(page, "⑧");
       await page.context().close();
       injectEntry = null;
     }
@@ -321,9 +336,43 @@ const run = async () => {
         await heads.nth(1).click();
         check("⑨ accordion with data-single: opening one closes the other", (await heads.nth(0).getAttribute("aria-expanded")) === "false" && (await heads.nth(1).getAttribute("aria-expanded")) === "true");
         await shot(page, "09-starter-kit-desktop", { fullPage: true });
+        await cleanUnderPolicy(page, "⑨");
         await page.context().close();
         injectEntry = null;
       }
+    }
+
+    // ── ⑩ the policy is a SECOND layer: what a sanitizer bug would let through still does not run ──
+    {
+      const before = unanswered.length;
+      const page = await newPage(browser, { signedIn: true });
+      await page.goto(`${BASE}/households/${A_SLUG}/hearth/`, { waitUntil: "load" });
+      await ready(page);
+      await page.evaluate(() => {
+        window.__cspv = [];
+        const stage = document.querySelector("[data-hearth-stage]");
+        const host = document.createElement("div");
+        host.id = "csp-probe";
+        // what an unsanitized template could carry: an inline handler that fires, and a javascript: link
+        host.innerHTML = '<img src="/media/does-not-exist.png" onerror="window.__pwned=\'handler\'"><a id="jslink" href="javascript:window.__pwned=\'href\'">run</a>';
+        stage.appendChild(host);
+        // an inline script written in by script, an external one from another host, eval, and Function
+        const sc = document.createElement("script"); sc.textContent = "window.__pwned='inline'"; stage.appendChild(sc);
+        const ext = document.createElement("script"); ext.src = "https://evil.example/x.js"; stage.appendChild(ext);
+        // string-to-code (a string timer): DevTools-run code is exempt from the eval rule itself, but a timer the PAGE runs is not
+        setTimeout("window.__pwned='timer'", 0);
+      });
+      await page.locator("#jslink").click();                  // a real click on the javascript: link
+      await page.waitForTimeout(700);
+      const st = await page.evaluate(() => ({ pwned: window.__pwned ?? null, v: window.__cspv }));
+      check("⑩ no injected code ran: handler, javascript: link, inline script, external script, string timer", st.pwned === null, JSON.stringify(st));
+      check("⑩ the policy says so: inline handler, inline script, javascript: link, the string timer and the external script were each refused", ["inline", "eval", "evil.example"].every((k) => st.v.some((x) => x.includes(k))), JSON.stringify(st.v));
+      check("⑩ the external script's host was never contacted", unanswered.slice(before).every((u) => !/evil\.example/.test(u)), unanswered.slice(before).join(" "));
+      await page.evaluate(() => { window.__cspv = []; document.getElementById("csp-probe")?.remove(); });
+      await page.getByRole("tab", { name: "Marks" }).click();
+      check("⑩ and the host's own controls still answer a real click after all that", await visible(page, "[data-hx-marks]"));
+      await cleanUnderPolicy(page, "⑩ (after the probe)");
+      await page.context().close();
     }
 
     // ── ⑦ no request left the machine ───────────────────────────────────────────
