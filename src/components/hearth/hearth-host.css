@@ -189,6 +189,13 @@
  * stay valid); on the one page the band is where they are shown, once. */
 .hearth-stage [data-hearth-slot="needs-you"], .hearth-stage [data-hd-boat] { display: none !important; }
 
+/* ── the host's frame around the design (POS-984) ──
+ * A template's `:root`, `html` and `body` rules land on its own stage, where `margin` and `transform` are allowed, and the
+ * stage's own `contain: paint` clips its children, not itself. This frame clips the stage (paint containment) and is its
+ * own formatting context (a negative margin cannot collapse out through it), so a design can only move itself inside it,
+ * never over the site's band above. */
+.hearth-frame { contain: paint; display: flow-root; }
+
 /* ── the site's own chrome above the stage: never part of a template ── */
 .hearth { --hx-chrome-ink: #cdc2ab; color: var(--hx-chrome-ink); }
 .hearth .hd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

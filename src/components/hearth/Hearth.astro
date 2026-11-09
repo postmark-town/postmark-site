@@ -88,6 +88,11 @@ const slotProps = { house, faces, plate, slug, bulletin };
   {/* THE ENTRY'S REGION, marked for the build's security policy (tools/lib/hearth-csp.mjs): everything an entry
       contributes to this page is between the two comments, and nothing the host runs is. The policy trusts the
       inline scripts OUTSIDE the region and fails the build on any inside it. */}
+  {/* THE HOST'S FRAME around the region (POS-984, Truey's review of ba023e9d9): a design's `:root`/`html`/`body` rule is
+      rewritten onto its own stage, where a margin or a transform could move the stage up over the band above it, and the
+      stage's own `contain: paint` clips its children, not itself. This box clips the stage, and keeps a negative margin
+      from collapsing out through it, so the most a design can move is itself, inside its own frame. */}
+  <div class="hearth-frame">
 <!--hearth-entry-->
   {entry ? (
     <>
@@ -102,6 +107,7 @@ const slotProps = { house, faces, plate, slug, bulletin };
     <p class="hearth-note">No Hearth design is registered yet.</p>
   )}
 <!--/hearth-entry-->
+  </div>
 
   {/* the house's holo expansion, once for the page (test/funding.test.mjs); shown when the stamps slot shows a holo count */}
   <p class="hearth-holo-note" data-hearth-holo hidden>✧ holo is {HOLO_NAME_LINE} It is {HOLO_LINE} — and since 2026-09-17 it spends like any stamp: the word names its source and its ink.</p>

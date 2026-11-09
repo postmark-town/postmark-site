@@ -67,6 +67,8 @@ export function mountHearth(root) {
     ctx.mine = mine();
     ctx.owner = ctx.mine.length > 0;
     for (const b of root.querySelectorAll("[data-hd-signin]")) b.hidden = !document.querySelector("[data-auth-signin]") || !!token();
+    // signed in, but not as anyone of this house: say so, rather than an unanswered question (the band's own line)
+    for (const n of root.querySelectorAll("[data-hband-notyours]")) n.hidden = !(token() && !ctx.owner);
     if (band) paintHouse(band, reads, ctx);
     paintHouse(stage, reads, ctx);
     paintExtras(stage, reads, extras, ctx);
@@ -151,6 +153,6 @@ export function mountHearth(root) {
     if (picker) picker.value = first.id;
     root.dataset.hearthShowing = first.id;
     say(asked && asked !== first.id ? `No Hearth entry is registered as “${asked.slice(0, 40)}”; showing ${first.title}.` : "");
-  } else compose(asked || DEFAULT, { asked });
+  } else compose(asked, { asked });   // whichDesign answers for "nothing asked": the default today, a saved choice later (POS-962 folds it into the one function)
   load();
 }

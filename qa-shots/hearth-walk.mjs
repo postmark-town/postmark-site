@@ -137,6 +137,58 @@ const run = async () => {
   const browser = await chromium.launch();
   process.on("uncaughtException", async (e) => { console.error(e); await browser.close(); process.exit(1); });
   try {
+    // ── ⑫ A DESIGN CANNOT PAINT OVER THE BAND (POS-984, Truey's review of ba023e9d9) ──
+    // A `:root`, `html` or `body` rule is rewritten onto the design's own stage, where `margin` and `transform` are allowed and no
+    // `!important` is needed, and the stage's `contain: paint` clips its children, not itself. The hostile rules below carry NO
+    // `!important` on purpose (the `!important` ones are refused by the sanitizer, so a test written with them cannot see this).
+    // The host's frame (`.hearth-frame { contain: paint }`) is what keeps the band on top; WALK_ONLY=rooted runs just this.
+    {
+      const pointAt = (page) => page.evaluate(() => {
+        const out = {};
+        for (const [name, sel] of [["Needs you", "[data-hband] #hband-needs-h"], ["Managing the house", "#hband-manage-h"], ["the quests", "[data-hband] [data-quests] [data-quests-day]"], ["the likeness answer", "[data-hband] .hd-like-ask a"]]) {
+          const e = document.querySelector(sel);
+          if (!e) { out[name] = "absent"; continue; }
+          e.scrollIntoView({ block: "center", behavior: "instant" });
+          const r = e.getBoundingClientRect();
+          const top = document.elementFromPoint(r.left + Math.min(20, r.width / 2), r.top + r.height / 2);
+          out[name] = top && document.querySelector("[data-hband]").contains(top) ? "band" : top?.closest("[data-hearth-stage]") ? "stage" : String(top?.tagName);
+        }
+        return out;
+      });
+      const asBand = (o) => Object.values(o).every((v) => v === "band");
+      const rules = [
+        ["control, no rule", "rooted-none", ".u-nothing { color: red }"],
+        ["a margin pulling the design up, and a background to paint with", "rooted-margin", ":root { margin-top: -900px; background: #0b0f1c; }"],
+        ["a transform lifting the design", "rooted-transform", "html { transform: translateY(-900px); background: #0b0f1c; }"],
+        ["body, the same trick", "rooted-body", "body { margin-top: -900px; background: #0b0f1c; position: relative; top: -50px; }"],
+      ];
+      for (const [what, id, css] of rules) {
+        const e = prepareEntry({ id, title: id, author: "nobody", line: "A rooted rule.", html: "<hearth-house></hearth-house><hearth-residents></hearth-residents>", css });
+        const kept = id === "rooted-none" || /margin-top\s*:\s*-900px|translateY\(-900px\)/.test(e.css);
+        check(`⑫ ${what}: the sanitizer lets the rule through (so this test can see the failure)`, e.ok && kept && !e.problems.some((p) => /margin|transform|top/.test(p)), e.css.slice(0, 160) + " " + JSON.stringify(e.problems));
+        injectEntry = e;
+        const page = await newPage(browser, { signedIn: true });
+        await page.goto(`${BASE}/households/${A_SLUG}/?entry=${id}`, { waitUntil: "load" });
+        await ready(page);
+        await page.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 15000 });
+        await page.waitForSelector("[data-hband] [data-quests]:not([hidden])", { timeout: 15000 }).catch(() => {});
+        check(`⑫ ${what}: the design drawn is the hostile one`, (await page.locator("[data-hearth-stage]").getAttribute("data-hearth-entry")) === id);
+        const moved = await page.evaluate(() => { const s = document.querySelector("[data-hearth-stage]").getBoundingClientRect().top; const f = (document.querySelector(".hearth-frame") ?? document.querySelector("[data-hearth-stage]")).getBoundingClientRect().top; return Math.round(f - s); });
+        if (id !== "rooted-none") check(`⑫ ${what}: the rule took effect: the design's own box sits ${moved}px above where it was put`, moved > 300, moved);
+        const at = await pointAt(page);
+        check(`⑫ ${what}: the band's controls are still the top thing at their own points (Needs you, Managing the house, the quests, the likeness answer)`, asBand(at), JSON.stringify(at));
+        await shot(page, `16-rooted-${id}-desktop`, { fullPage: false });
+        await page.context().close();
+        injectEntry = null;
+      }
+      if (process.env.WALK_ONLY === "rooted") {
+        await browser.close();
+        const bad = results.filter((r) => !r.pass);
+        console.log(`\n${results.length - bad.length}/${results.length} checks passed (WALK_ONLY=rooted)`);
+        process.exit(bad.length ? 1 : 0);
+      }
+    }
+
     // ── ① the default Hearth, a public reader, house A ─────────────────────────
     {
       log.length = 0;
@@ -242,6 +294,8 @@ const run = async () => {
       check("④ the same sign-in on ANOTHER house's Hearth shows no private slot", !(await visible(page, "[data-hearth-slot=needs-you]")) && !(await visible(page, "[data-hearth-slot=mail]")));
       check("④ and sends no bearer to that house's doorsteps", log.filter((l) => l.path.startsWith("/doorstep/")).every((l) => l.auth === null), JSON.stringify(log.filter((l) => l.auth && l.path.startsWith("/doorstep/"))));
       check("④ the other house's page carries none of the owner's private words", !(await page.content()).includes("waiting for the crossing"));
+      // POS-984 (review, paper cut): a signed-in reader of ANOTHER house is told so, plainly, not asked a bare question
+      check("④ and says plainly that this is not their house, with no sign-in button and no bare question", (await visible(page, "[data-hband] [data-hband-notyours]")) && /isn’t your house/.test((await text(page, "[data-hband] [data-hband-notyours]")) ?? "") && !(await visible(page, "[data-hband] [data-hd-signin]")), await text(page, "[data-hband] .hband-visit"));
       await page.context().close();
     }
 

@@ -59,6 +59,9 @@ test("PIN the seam: the server and the browser both ask whichDesign, and nothing
   const stage = read("src/lib/hearth/stage.mjs");
   assert.equal((stage.match(/whichDesign\(entries, \{ entry: /g) ?? []).length, 2, "compose() and the first draw each ask the one function");
   assert.ok(!/\bpickEntry\(/.test(stage), "the stage keeps no choice of its own");
+  // Truey's review of ba023e9d9: the first draw must not hand the default over what whichDesign answers (a saved choice later)
+  assert.ok(!/asked \|\| DEFAULT/.test(stage), "nothing passes the default explicitly: whichDesign answers for 'nothing asked'");
+  assert.match(stage, /\} else compose\(asked, \{ asked \}\);/);
 });
 
 test("built: every household page is drawn in the design whichDesign names (the default, with no preview asked)", { skip: !built }, () => {
@@ -90,6 +93,10 @@ test("built: the band sits above the design, outside the entry's region; its bod
     // the visitor's line is outside the private body and there is exactly one sign-in button on the page
     const visit = html.indexOf("Is this your house?");
     assert.ok(visit > band && visit < own, `${slug}: the visitor line is the band's, before its private body`);
+    // the question is the sign-in button's own text, so a reader without the button never reads a bare question (review, paper cut)
+    assert.match(html.slice(visit - 160, visit), /<button[^>]*data-hd-signin[^>]*>$/, `${slug}: the question is inside the sign-in button`);
+    assert.match(html, /<p class="hband-notyours"[^>]*data-hband-notyours hidden[^>]*>This isn’t your house/, `${slug}: a signed-in reader of another house is told so, and it ships hidden`);
+    assert.ok(html.includes("Signing in with GitHub needs scripts"), `${slug}: without scripts it says sign-in needs them`);
     assert.equal((html.match(/data-hd-signin/g) ?? []).length, 1, `${slug}: one sign-in line, so a design that leaves its house slot out loses nothing`);
     // nothing private is in the static page: Needs you ships hidden and empty, the edit links hidden
     assert.match(html.slice(html.indexOf("data-hd-needs-box")), /^data-hd-needs-box hidden/, `${slug}: Needs you ships hidden`);
@@ -113,6 +120,30 @@ test("the band is out of a design's reach: through the real sanitizer, a stylesh
   assert.ok(!/(^|[^-\w])\.hband\b/.test(e.css), "no rule carries the band's own class");
   assert.ok(!/data-hband/.test(e.css), "no rule carries the band's hook");
   assert.ok(e.problems.some((p) => /data-hband/.test(p)), "the attribute selector on the band's hook is refused, by name");
+});
+
+// Truey's review of ba023e9d9: a `:root`, `html` or `body` rule is rewritten onto the design's own stage, where `margin` and `transform` are
+// allowed (and need no `!important`), and the stage's `contain: paint` clips its children, not itself: a design could move up over the band.
+// The host's frame around the region clips the stage itself. qa-shots/hearth-walk.mjs scenario ⑫ proves it in a browser (red without the rule).
+test("the sanitizer lets a rooted margin or transform through, so the host's frame is what keeps a design off the band: the frame wraps the region and clips", () => {
+  for (const css of [":root { margin-top: -900px; background: #0b0f1c; }", "html { transform: translateY(-900px); }", "body { margin-top: -900px; position: relative; top: -50px; }"]) {
+    const e = prepareEntry({ id: "rooted", title: "r", html: "<p>a</p>", css });
+    assert.ok(e.ok && /margin-top:-900px|translateY\(-900px\)/.test(e.css) && e.css.startsWith('.hearth-stage[data-hearth-entry="rooted"]{'), `the rule lands on the stage itself: ${e.css}`);
+  }
+  const host = read("src/components/hearth/hearth-host.css");
+  assert.match(host, /\.hearth-frame \{ contain: paint; display: flow-root; \}/, "the frame clips the stage and is its own formatting context");
+  const page = read("src/components/hearth/Hearth.astro");
+  const open = page.indexOf('<div class="hearth-frame">');
+  assert.ok(open > 0 && open < page.indexOf("<!--hearth-entry-->") && page.indexOf("<!--/hearth-entry-->") < page.indexOf("</div>", page.indexOf("<!--/hearth-entry-->")), "the frame stands around both markers");
+});
+
+test("built: every household page's entry region sits inside the host's clipping frame, which the entry does not write", { skip: !built }, () => {
+  for (const slug of slugsBuilt()) {
+    const html = dist("households", slug, "index.html");
+    const frame = html.indexOf('<div class="hearth-frame">');
+    assert.ok(frame > html.indexOf("data-hband ") && frame < html.indexOf(ENTRY_OPEN), `${slug}: band, then the frame, then the entry's region`);
+    assert.ok(html.indexOf(ENTRY_CLOSE) < html.indexOf("</div>", html.indexOf(ENTRY_CLOSE)) && /<div class="hearth-frame">\s*<\/div>/.test(withoutEntryRegion(html)), `${slug}: the frame is the host's: taking the region out leaves it empty`);
+  }
 });
 
 test("a design cannot take the band's Needs you away: the page host hides the design's own copy, once, and the band is the one shown", () => {
