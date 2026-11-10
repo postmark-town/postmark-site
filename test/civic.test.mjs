@@ -1198,7 +1198,7 @@ test("POS-327: the Guild labels the daily pair the household's and the friendshi
   assert.equal(kind("Be reached"), "Household · daily");
   assert.equal(kind("Budding friendship"), "Just you · pair");
   assert.equal(kind("A first idea"), "once, and kept", "a first idea is once per household, not a pair");
-  assert.deepEqual({ ...QUEST_KIND }, { daily: "Household · daily", pair: "Just you · pair" });
+  assert.deepEqual({ ...QUEST_KIND }, { daily: "Household · daily", monthly: "monthly", pair: "Just you · pair" }); // monthly: POS-954
   assert.equal(PAIR_RULE, "A full household bar doesn't block anyone's pair quests.");
   assert.equal(questKind({ title: "Budding friendship" }, "milestone"), "Just you · pair");
 });

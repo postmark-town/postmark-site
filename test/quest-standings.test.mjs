@@ -94,13 +94,26 @@ test("the dashboards keep their own rows: the modifier is the standings' only", 
   assert.ok(/<li class="q-row d-row">/.test(hub), "the dashboards' rows moved; re-check what this test protects");
 });
 
-test("one component, two renders: the preview gets the head, the full board gets every row (#3514)", () => {
-  assert.match(hub, /<QuestStandings rows=\{quests\.rows\} \/>/, "the Town page's preview is not the component's capped rows");
-  assert.match(full, /<QuestStandings rows=\{quests\.allRows\} \/>/, "/town/quests/ does not render every row");
-  assert.match(full, /questStandings\(bulletin\)/, "the full board reads the same mirror as the preview");
-  assert.match(full, /door=\{\{ mcp: 'town \{ read: "bulletin" \}', get: "\/api\/bulletin" \}\}/,
-    "/town/quests/ names the bulletin read it draws from");
-  assert.match(full, /quests\.read \?/, "an unreadable mirror must say so on the full board too");
+// UNTIL 2026-11-09 (POS-967) THIS ASSERTED: "one component, two renders: the
+// preview gets the head, the full board gets every row (#3514)", with both
+// pages drawing <QuestStandings> from the bulletin's quest mirror. Darko
+// (2026-11-08 17:08): "the hall of fame should replace/revamp the 'Standings'
+// section in the quest guild which is stale". It is inverted, not deleted: the
+// stale standings are gone from BOTH renders, and one new component draws both.
+// The behaviour of the Hall itself is test/hall-of-fame.test.mjs.
+test("the stale standings are gone from both renders; one Hall of Fame component draws the preview and the full board (POS-967)", () => {
+  const stripped = (s) => s.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, " ").replace(/^---[\s\S]*?^---/m, (fm) => fm.replace(/^\s*\/\/.*$/gm, ""));
+  for (const [name, src] of [["the Town page", stripped(hub)], ["/town/quests/", stripped(full)]]) {
+    assert.equal(/<QuestStandings/.test(src), false, `${name} still draws the stale standings`);
+    assert.equal(/import QuestStandings/.test(src), false, `${name} still imports the stale standings`);
+    assert.match(src, /<HallOfFame view=\{/, `${name} does not draw Ferry's Hall of Fame`);
+  }
+  assert.match(hub, /<HallOfFame view=\{hallPreview\} \/>/, "the Town page's preview is not the capped view");
+  assert.match(hub, /hallView\(loadHall\(\), \{ today: townDay\(\), limit: 5,/, "the preview is not the top five in the town's day");
+  assert.match(full, /hallView\(loadHall\(\), \{ today: townDay\(\),/, "the full board does not read the same view in the town's day");
+  assert.equal(/limit:/.test(full), false, "the full board is capped by the view, not by a page");
+  assert.match(full, /<h1>Ferry's Hall of Fame<\/h1>/);
+  assert.equal(full.includes("Quest standings"), false, "the page is still titled for the stale standings");
 });
 
 // ── POS-855: what the numbers say (Rivet's trace of the board, 11-02) ─────────
