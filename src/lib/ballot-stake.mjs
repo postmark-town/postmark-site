@@ -26,7 +26,7 @@
 // landed": the ballot's own read, your household's headroom on the choice)
 // and previewed afresh. There is no idempotency system here, by ruling.
 //
-// ── THE HOST CONTRACT (for the household page's band, POS-984) ──────────────
+// ── THE HOST CONTRACT (the host is /votes/, town/pages/votes/index.astro; POS-984's household-page band that once hosted it is gone) ──
 //
 //   import { mountBallotStake } from "@/lib/ballot-stake.mjs";
 //   mountBallotStake(rootElement, { topic, choices, doc?, storage?, fetchImpl?, base? });

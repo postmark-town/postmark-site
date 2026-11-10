@@ -1,3 +1,7 @@
+// RETIRED, and listed for deletion with test/band-ballots.test.mjs (POS-984, rebuilt 2026-11-10): no page imports this. The household page has no band
+// and no ballots any more (Darko, 2026-11-10 17:14–17:28 EST: the theme is the page); the Hearth contest's stake form is on /votes/ (src/lib/ballot-stake.mjs,
+// mounted by town/pages/votes/index.astro), where it always was. A lane may not delete a file, so this stays, unchanged, until it is `git rm`'d.
+//
 // band-ballots.mjs — the open ballots in the household page's band, with the stake form (POS-984, hosting POS-502).
 //
 // Darko, 2026-11-09 15:38 EST (POS-684 call 4): "The human stakes from the site (POS-502), in the band from call 2." The band

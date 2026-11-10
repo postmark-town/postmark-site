@@ -426,7 +426,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       }
 
       // Signed in, the header's household link goes to YOUR household's page (POS-984; the 10-19 ruling: "household
-      // is your sign-in"), where the Hearth draws the house and the band holds what only you see. The path is the
+      // is your sign-in"), where the Hearth draws the house and is the whole page. The path is the
       // house's, from GET /me's household blocks; a house with no declared page (no slug in /me) has no page to go
       // to, so it keeps what stood here: a link per resident, each to its window.
       const homeOf = () => { try { return sessionStorage.getItem("pm.oauth.household") || localStorage.getItem("pm.oauth.household.cache") || ""; } catch { return ""; } };

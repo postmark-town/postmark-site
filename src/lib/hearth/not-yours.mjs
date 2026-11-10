@@ -1,11 +1,11 @@
-// not-yours.mjs — when the band says "This isn't your house" (POS-984).
+// not-yours.mjs — when the house slot says "This isn't your house" (POS-984).
 //
-// A signed-in reader of ANOTHER house is told so, plainly (HouseBand.astro). But "signed in" alone is not enough to say it: the
+// A signed-in reader of ANOTHER house is told so, plainly (HearthSlot.astro's house slot). But "signed in" alone is not enough to say it: the
 // layout's GET /me answers a moment after the page opens, and until it has, nobody knows whether this sign-in holds a resident of
 // this house. An owner signing in for the first time would read "this isn't your house" for that moment. So the line shows only
 // once /me has answered: the layout stores the handles it was told in sessionStorage ("pm.oauth.handles", an empty list included)
 // as it answers, and a sign-out removes the key. A page opened before it has answered shows nothing yet, and shows the line, or
-// the owner's band, when the layout's `pm:lens` lands.
+// the owner's own parts, when the layout's `pm:lens` lands.
 //
 // Pure: the reader's facts in, a boolean out.
 

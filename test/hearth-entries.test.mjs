@@ -170,15 +170,19 @@ test("the stage reads with the reader's bearer only on residents the sign-in hol
 // POS-984 (Darko, 2026-11-09 14:34 EST): the Hearth is the household's page, not a page beside it. Until 2026-11-09 this asserted the Hearth had its
 // own route and that the household page linked to it ("the Hearth →"). /households/<slug>/hearth/ forwards now (test/household-one-page.test.mjs
 // runs the forwarder), the household page draws the Hearth as its seat, and nothing links to a second page.
-test("the Hearth is the household page's seat, not a page beside it: the old route forwards, the seat draws the Hearth, and no link to a second page remains", () => {
+test("the Hearth is the household page, not a page beside it: the old route forwards, the household page draws the Hearth, and no link to a second page remains", () => {
   const route = read("town/pages/households/[slug]/hearth.astro");
   assert.match(route, /declaredHouses\(\)\.map/, "only declared houses have the old address; any other slug 404s");
   assert.match(route, /location\.replace\(to \+ location\.search \+ location\.hash\)/, "it forwards, and the preview's query rides across");
   assert.ok(!/Hearth \/>|<Hearth\b/.test(route), "the old route draws nothing of its own");
   assert.ok(fs.existsSync(path.join(ROOT, "town/pages/households/[slug].astro")), "the household page stays");
+  // the rebuild of 2026-11-10 (Darko, 17:14–17:28 EST): the household page is HouseholdPage.astro, the Hearth under the shell with one strip, and no band; Household.astro is the resident page's wrapper
+  const page = read("town/components/HouseholdPage.astro");
+  assert.match(page, /<Hearth house=\{house\} members=\{members\} plate=\{plate\}>/, "the household page is the Hearth");
+  assert.ok(!/HouseBand|band/.test(page.replace(/\/\/[^\n]*/g, "")), "with no band");
+  assert.match(read("town/pages/households/[slug].astro"), /<HouseholdPage house=\{house\} members=\{members\} plate=\{plate\} \/>/, "and the household's address draws it");
   const house = read("town/components/Household.astro");
-  assert.match(house, /<Hearth house=\{house\} members=\{members\} plate=\{plate\}>/, "the household's seat is the Hearth");
-  assert.match(house, /<HouseBand slot="band" house=\{house\}/, "with the site's band in its band slot");
+  assert.ok(!/<Hearth\b|HouseBand/.test(house), "the resident wrapper draws neither");
   assert.ok(!/hearth\/`|\/hearth\//.test(read("src/components/household-dashboard/HouseDashboard.astro")), "the dashboard no longer links to a second page");
   assert.ok(!/The household’s page →/.test(read("src/components/hearth/Hearth.astro")), "and the Hearth no longer links back to one");
 });

@@ -14,14 +14,16 @@
 //   from getStaticPaths() over an invented registry whose house HAS a private
 //   human; the child reads only those three files —
 //     householdPage    /households/brass-hollow/ (town/pages/households/[slug].astro,
-//                      layout <title>/description, Household seat + HouseDashboard)
+//                      layout <title>/description, HouseholdPage + the Hearth's house slot)
 //     residentPage     /residents/wren-pos394/ and /residents/moss-pos394/
 //                      (town/pages/residents/[handle].astro, Household wrapper)
 //   CONTAINER (experimental_AstroContainer; it cannot carry Astro.site, so it
 //   renders no whole page — astro 6.4.0 dist/container/index.js:17-70) —
-//     householdSeat    town/components/Household.astro, route "household", handed
-//                      a house that STILL CARRIES the private human (the prop
-//                      boundary), with HouseDashboard's hd-sub line; FRAGMENT
+//     householdSeat    town/components/HouseholdPage.astro (the household page's
+//                      fragment: POS-984 retired the household route of
+//                      Household.astro), handed a house that STILL CARRIES the
+//                      private human (the prop boundary), with the Hearth's house
+//                      slot's hd-sub line; FRAGMENT (the case keeps its name)
 //     residentWrapper  the same, route "resident" (shared chrome); FRAGMENT
 //     residentCard     src/components/ResidentCard.astro (the directory card)
 //
@@ -81,11 +83,11 @@ export const SOURCES = Object.freeze([
   "src/components/HalloweenMotif.astro", "src/components/HalloweenSkin.astro", "src/components/PageFreshness.astro",
   "src/components/ResidentCard.astro",
   "src/components/household-dashboard/HouseDashboard.astro", "src/components/household-dashboard/ResidentCard.astro",
-  // POS-984: a declared house's household page is the Hearth under the site's band, and the quests board is its own component
-  "src/components/household-dashboard/HouseBand.astro", "src/components/hearth/Hearth.astro", "src/components/hearth/HearthSlot.astro",
+  // POS-984: a declared house's household page is the Hearth (HouseholdPage.astro) and nothing else of the site's but its strip; the quests board is still HouseDashboard's, for an undeclared shared house
+  "town/components/HouseholdPage.astro", "src/components/hearth/Hearth.astro", "src/components/hearth/HearthSlot.astro",
   "src/components/hearth/hearth-host.css", "town/components/HouseQuests.astro", "src/lib/house-home.mjs",
   "src/lib/hearth/behaviors.mjs", "src/lib/hearth/entries.mjs", "src/lib/hearth/fold.mjs", "src/lib/hearth/paint.mjs", "src/lib/hearth/registry.mjs",
-  "src/lib/hearth/sanitize-css.mjs", "src/lib/hearth/sanitize-html.mjs", "src/lib/hearth/slots.mjs", "src/lib/hearth/stage.mjs", "src/lib/hearth/not-yours.mjs", "src/lib/hearth/band-ballots.mjs", "src/lib/ballot-stake.mjs", "src/lib/hearth/choice.mjs", "src/lib/hearth/picker.mjs", "src/components/hearth/HearthPicker.astro", "src/lib/hearth/which-design.mjs",
+  "src/lib/hearth/sanitize-css.mjs", "src/lib/hearth/sanitize-html.mjs", "src/lib/hearth/slots.mjs", "src/lib/hearth/stage.mjs", "src/lib/hearth/not-yours.mjs", "src/lib/hearth/choice.mjs", "src/lib/hearth/picker.mjs", "src/components/hearth/HearthPicker.astro", "src/lib/hearth/which-design.mjs",
   "src/layouts/BaseLayout.astro", "src/layouts/PostmarkLayout.astro",
   "src/lib/appearance.mjs", "src/lib/auth.mjs", "src/lib/civic-art.mjs", "src/lib/correspondents.mjs", "src/lib/docs.mjs", "src/lib/door-line.mjs",
   "src/lib/freshness.mjs", "src/lib/halloween-frame.mjs", "src/lib/halloween-motifs.mjs", "src/lib/halloween-navy.mjs",
@@ -150,14 +152,17 @@ const EDIT = Object.freeze({
 // pair that stays green, any extra red (privacy or not), or any crash/refusal/
 // missing page is not the falsifier working. A built page only sees a human if
 // the fold carries one, so the page emitters are measured with the old fold
-// line restored alongside. The house is shared (two members), so Household
-// mounts HouseDashboard on every route (Household.astro:65,79,328-330): the
-// hd-sub emitter reaches the resident wrapper and resident pages too. A fold+
-// mutant also re-inserts its template clause, so the prop-path fragments (handed
-// a house with a human) redden with it (CI 38358098533).
+// line restored alongside. Until POS-984 the house was shared (two members), so Household
+// mounted HouseDashboard on every route and the hd-sub emitter reached the resident wrapper
+// and resident pages too; a declared house's resident pages carry no seat now, and the
+// household's own page is HouseholdPage.astro (no Household.astro), so the chrome emitter
+// (Household.astro's plate) reaches only the resident surfaces, and the hd-sub emitter only
+// the household page. A fold+ mutant also re-inserts its template clause, so the prop-path
+// fragments (handed a house with a human) redden with it (CI 38358098533).
 export const MUTANTS = Object.freeze({
+  // until POS-984 the chrome emitter was also on the household route, so it reddened householdSeat; that fragment is HouseholdPage.astro now, which has no plate chrome
   "household-299": { emitter: "Household.astro:299 (chrome), prop path", edits: [EDIT.chrome],
-    mustRed: { householdSeat: [C.NEVER], residentWrapper: [C.NEVER] } },
+    mustRed: { residentWrapper: [C.NEVER] } },
   // until POS-984 the hd-sub emitter was HouseDashboard.astro:68, mounted on every route, so it also reddened residentWrapper;
   // the household's own page draws the Hearth's house slot, and a resident's page of a declared house carries no seat
   "dashboard-68": { emitter: "HearthSlot.astro (the house slot's hd-sub), prop path", edits: [EDIT.hdsub],
@@ -167,7 +172,7 @@ export const MUTANTS = Object.freeze({
   "fold+68": { emitter: "houses.mjs fold + HearthSlot.astro (the house slot's hd-sub), built page", edits: [EDIT.fold, EDIT.hdsub],
     mustRed: { householdPage: [C.NEVER, C.HDHUMAN], householdSeat: [C.NEVER, C.HDHUMAN] } },
   "fold+299": { emitter: "houses.mjs fold + Household.astro:299 (chrome), built pages", edits: [EDIT.fold, EDIT.chrome],
-    mustRed: { householdPage: [C.NEVER], residentPage: [C.NEVER], householdSeat: [C.NEVER], residentWrapper: [C.NEVER] } },
+    mustRed: { residentPage: [C.NEVER], residentWrapper: [C.NEVER] } },
 });
 
 // ── invented fixtures (no real record, row, name or value) ──────────────────
@@ -600,10 +605,12 @@ async function childContainer([P, T, denyTopJson]) {
     try {
       const container = await experimental_AstroContainer.create();
       const Household = (await server.ssrLoadModule("/town/components/Household.astro")).default;
+      const HouseholdPage = (await server.ssrLoadModule("/town/components/HouseholdPage.astro")).default;
       const Card = (await server.ssrLoadModule("/src/components/ResidentCard.astro")).default;
       {
-        const props = { house: HOUSE, members: MEMBERS, active: "__house", route: "household" };
-        const html = await container.renderToString(Household, { props });
+        // the household page's own component (POS-984), handed the house WITH the private human; the page hands it the plate it computed
+        const props = { house: HOUSE, members: MEMBERS, plate: "Brass Hollow" };
+        const html = await container.renderToString(HouseholdPage, { props });
         const sub = hdsubOf(html);
         out.cases.householdSeat = { bytes: html.length, checks: {
           [C.PROP]: JSON.stringify(props).includes(SENTINEL), [C.NEVER]: clean(html), [C.MEMBERS]: both(html),

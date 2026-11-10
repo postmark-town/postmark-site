@@ -1,38 +1,39 @@
 ---
-// Hearth — a household's public face, drawn from a registered template with the site's live parts
-// in its slots (POS-959, Darko 2026-11-08 15:43 EST: "a), and let's try to get this out as a hotfix").
+// Hearth — the household page's body: the house, drawn in the household's chosen design, and one thin strip of the site's own above it.
 //
-// The Household Hearth sitting ruled the shape (POS-845, 2026-11-01): HTML and CSS in the page, with
-// the site's live parts in slots; templates live in the town repo at PROJECTS/household-hearths/,
-// submitted by PR; about six approved behaviors. This page is that, whole and small:
+// THE PAGE IS THE DESIGN (POS-984, Darko 2026-11-10 17:14 EST, on dev: "My intent is for the resident-submitted household hearth theme to be
+// the only thing for the household dashboard"; 17:28: "such that the resident designed submissions take up the vast majority of the visual
+// space in the household page, and we literally just have the bare minimum that … we couldn't include in the template"). Under the site's
+// shell this is all there is: the strip (below), then the design. There is no second pane, no copy of what a design draws, no rail of residents
+// (the design draws each resident once, and its card links to that resident's own page).
 //
-//   - EVERY HOUSEHOLD HAS ONE: it opens on Postmark's default entry.
-//   - ANY REGISTERED ENTRY PREVIEWS ON ANY HOUSEHOLD: `?entry=<id>` (or the signed-in human's picker, in the band). Preview only: it is
-//     not saved, nothing is written to the office, and the address is the whole state.
-//   - A HOUSEHOLD'S OWN CHOICE (POS-962) is kept by the office and read signed out: lib/hearth/choice.mjs
-//     answers which entry to draw (the saved one, else the default), and the picker (HearthPicker.astro, in the
-//     site's band: HouseBand.astro) lets the signed-in human save one, behind a second yes. A preview never saves.
-//     Visitors see the house's kept choice and no picker.
-//   - THE TEMPLATE IS SANITIZED AT BUILD (lib/hearth/sanitize-html.mjs, sanitize-css.mjs): no script, no
-//     event handler, no frame, no external load. What is on this page for an entry is what those
-//     modules wrote, nothing the template typed.
-//   - THE SLOTS ARE THE SITE'S OWN: HearthSlot.astro draws each, the dashboard's reads fill them, and
-//     private ones (Needs you, Mail) show only to the house's own sign-in, as on the household page.
-//     A template places a slot; it never receives what is in it.
+// THE STRIP (`hearth-bar`), the only thing here that is the site's and not a design's. One line on a desktop, two on a phone:
+//   - the breadcrumb the page hands in (`crumbs`);
+//   - the Hearth dropdown (HearthPicker.astro), for EVERY reader: anyone may preview any registered design on this house (`?entry=` does the same),
+//     and only the house's own signed-in human gets the save, behind a second yes (the office decides who may);
+//   - for the house's own signed-in human only: "+ add a resident", and the likeness answer.
+// Why these two are the site's and not a template slot: each is an act of the house's human that must stay reachable whichever design the house
+// chose, and a design may leave any slot out (that is the household's choice of design). A consent answer (likeness) that a theme could omit
+// would be a consent the human could not change. Both are one link each: they take no room a design could use.
+// And the one plain line that says the page is still part-read ("still reading 1 resident…", paintReading), which is about the page, not a design.
 //
-// The page is server-rendered with the default entry (so the house's public face is there without a
-// script); lib/hearth/stage.mjs then reads the house, paints the live parts, and swaps entries for a preview.
+// WHAT A DESIGN IS (unchanged by this page): HTML and CSS in the page, sanitized at build (lib/hearth/sanitize-html.mjs, sanitize-css.mjs): no script,
+// no event handler, no frame, no external load. The slots are the site's own (HearthSlot.astro draws each; the dashboard's reads fill them);
+// private ones (Needs you, Mail, the boat line) show only to the house's own sign-in. A design places a slot; it never receives what is in it.
 //
-// ONE PAGE (POS-984, Darko 2026-11-09 14:34 EST, POS-684 sitting): this is no longer a page of its own. It is the
-// house seat of the household page (/households/<slug>/, drawn by town/components/Household.astro), for everyone.
-// /households/<slug>/hearth/ forwards there. Which design it draws is lib/hearth/which-design.mjs's answer.
-// The site's band for the signed-in human rides in through the `band` slot.
+//   - EVERY HOUSEHOLD HAS ONE: it opens on Postmark's default entry, or its saved choice (POS-962; lib/hearth/choice.mjs).
+//   - ANY REGISTERED ENTRY PREVIEWS ON ANY HOUSEHOLD: `?entry=<id>` or the dropdown. A preview is not saved: nothing is written to the office.
+//
+// The page is server-rendered with the design it opens on (so the house's public face is there without a script); lib/hearth/stage.mjs then reads
+// the house, paints the live parts, and swaps designs for a preview. Which design to draw is lib/hearth/which-design.mjs's answer, and nothing else's.
 import HearthSlot from "./HearthSlot.astro";
+import HearthPicker from "./HearthPicker.astro";
 import "./hearth-host.css";
 import media from "@/data/postmark/media.json";
 import bulletinAll from "@/data/postmark/bulletin.json";
 import { residentFace } from "@/lib/household-dashboard/faces.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
+import { likenessLink, likenessWords } from "@/lib/appearance.mjs";
 import { entries } from "@/lib/hearth/registry.mjs";
 import { whichDesign } from "@/lib/hearth/which-design.mjs";
 import { SLOT_NAMES } from "@/lib/hearth/slots.mjs";
@@ -46,14 +47,17 @@ interface Props {
 const { house, members, plate } = Astro.props;
 const slug = house.path ?? house.slug ?? "";
 // the ONE question the page asks about its design (POS-984): the server draws the design the page opens on, and the
-// browser asks the same function for a preview (?entry=)
-// BAKED (review of 80af398fb): the build's households.json is the registry GET /households answers, so a house's saved choice (`hearth`, office migration 093)
+// browser asks the same function for a preview
+// BAKED: the build's households.json is the registry GET /households answers, so a house's saved choice (`hearth`, office migration 093)
 // is here once the office carries it, and the server draws it: no flash of the default. The browser read (stage.mjs) corrects a stale one.
 const entry = whichDesign(entries, { saved: house.hearth ?? null });
 const faces = members.map((r) => residentFace(r, media, homePictureOf(r.handle)));
 const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   name: f.name, accent: f.accent, avatar: f.avatar, monogram: f.monogram, windowHung: f.windowHung,
 }]));
+// the dropdown lists the registered designs and starts on the one the server draws
+const pickable = entries.map((e) => ({ id: e.id, title: e.title, author: e.author }));
+const likeness = likenessWords(house, faces.length);
 
 // the bulletin's open notices, newest first: public, baked, the same file the bulletin page reads
 const bulletin = (bulletinAll as any[])
@@ -70,23 +74,32 @@ const slotProps = { house, faces, plate, slug, bulletin };
   <script type="application/json" data-hearth-faces set:html={json({ handles: faces.map((f) => f.handle), faces: facesByHandle })} />
   <script type="application/json" data-hearth-entries set:html={json(forClient)} />
 
-  {/* the site's own band for the house's signed-in human (HouseBand.astro): above the design, outside it, so no
-      design can hide or break it. Visitors get its sign-in line only. */}
-  <slot name="band" />
-
-  <header class="hearth-bar">
+  <header class="hearth-bar" data-hearth-bar>
+    <nav class="hearth-crumbs" aria-label="Where this page is"><slot name="crumbs" /></nav>
+    <div class="hearth-tools">
+      <p class="hearth-reading" data-hd-reading role="status" hidden></p>
+      <HearthPicker entries={pickable} selected={entry?.id ?? null} />
+      {/* the house's own human only (stage.mjs shows them when the reader's sign-in holds a resident of this house; they ship hidden) */}
+      <p class="hearth-own" data-hearth-own hidden>
+        <a class="house-add" data-house-add href="/join/move-in/">+ add a resident</a>
+        {house.declared && house.slug && (
+          <span class="hearth-likeness" data-hd-likeness={likeness.state} title={likeness.line}>
+            likeness: {likeness.state} · <a href={likenessLink(house.slug)}>{house.likeness?.answer ? "Change" : "Answer"} the likeness question</a>
+          </span>
+        )}
+      </p>
+    </div>
     <h1 class="hd-sr">{plate || "a shared household"}</h1>
-    {/* the picker lives in the site's band, for the house's signed-in human (HouseBand.astro, POS-984 folding POS-962): visitors see the house's kept choice, with no picker */}
     <p class="hearth-note" data-hearth-note hidden></p>
   </header>
 
   {/* THE ENTRY'S REGION, marked for the build's security policy (tools/lib/hearth-csp.mjs): everything an entry
       contributes to this page is between the two comments, and nothing the host runs is. The policy trusts the
       inline scripts OUTSIDE the region and fails the build on any inside it. */}
-  {/* THE HOST'S FRAME around the region (POS-984, Truey's review of ba023e9d9): a design's `:root`/`html`/`body` rule is
-      rewritten onto its own stage, where a margin or a transform could move the stage up over the band above it, and the
-      stage's own `contain: paint` clips its children, not itself. This box clips the stage, and keeps a negative margin
-      from collapsing out through it, so the most a design can move is itself, inside its own frame. */}
+  {/* THE HOST'S FRAME around the region: a design's `:root`/`html`/`body` rule is rewritten onto its own stage, where a margin or a
+      transform could move the stage up over the strip above it, and the stage's own `contain: paint` clips its children, not itself.
+      This box clips the stage, and keeps a negative margin from collapsing out through it, so the most a design can move is itself,
+      inside its own frame. */}
   <div class="hearth-frame">
 <!--hearth-entry-->
   {entry ? (

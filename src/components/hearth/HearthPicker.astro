@@ -1,17 +1,20 @@
 ---
-// HearthPicker — the household's Hearth picker, one composable piece (POS-962).
+// HearthPicker — the household page's Hearth dropdown, one composable piece (POS-962; on the one page by POS-984, in the strip by the rebuild of 2026-11-10).
 //
-// Markup only; lib/hearth/picker.mjs (mountHearthPicker) binds it. It holds the PREVIEW select every visitor has (a preview is only a preview:
+// Markup only; lib/hearth/picker.mjs (mountHearthPicker) binds it. It holds the PREVIEW select every reader has (a preview is only a preview:
 // nothing is saved, nothing is written) and the SAVE controls, which show only to the signed-in human of the house; the office makes the real
-// decision at the write. Drop it into any host that mounts it: the Hearth page header today, the household page's band (POS-984).
+// decision at the write. It is on the household page only, nowhere else on the site (Darko, 2026-11-10 17:28 EST).
+//
+// THE SELECT SHIPS DISABLED and is enabled when the picker mounts (stage.mjs, once the house's saved choice has been read, or has failed to be):
+// until then it would answer a change with nothing. The words that explain it are its title, not a paragraph: the strip takes as little room as it can.
 interface Props { entries: { id: string; title: string; author?: string | null }[]; selected?: string | null; }
 const { entries, selected = null } = Astro.props;
 ---
 <div class="hearth-pickerband" data-hearth-picker>
   {entries.length > 1 && (
-    <label class="hearth-picker">
-      <span>Preview this house in</span>
-      <select data-hearth-pick aria-label="Preview this household in another Hearth design">
+    <label class="hearth-picker" title="A preview shows how this house would look in another design, and nothing is saved. Only the house’s signed-in human can save a choice, and it takes a second yes.">
+      <span>Hearth</span>
+      <select data-hearth-pick disabled aria-label="Preview this household in another Hearth design">
         {entries.map((e) => <option value={e.id} selected={selected === e.id}>{e.title}{e.author ? ` — ${e.author}` : ""}</option>)}
       </select>
     </label>
@@ -30,5 +33,4 @@ const { entries, selected = null } = Astro.props;
     </div>
     <p class="hearth-note" data-hearth-said role="status" hidden></p>
   </div>
-  {entries.length > 1 && <p class="hearth-note">A preview shows how this house would look in another design. Only the house’s signed-in human can save a choice, and it takes a second yes.</p>}
 </div>

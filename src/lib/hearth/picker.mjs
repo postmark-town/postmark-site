@@ -1,6 +1,6 @@
 // picker.mjs — the Hearth picker for the signed-in human, composable (POS-962).
 //
-// Two halves, so the logic is testable without a browser and the band host can wire the parts it wants:
+// Two halves, so the logic is testable without a browser and the page's strip can wire the parts it wants:
 //
 //   createPicker(opts)        a small state machine: what is previewed, what is saved, what the controls say. PURE: the one write is the
 //                             `save` function it is handed (choice.mjs § saveHearth), and only `confirm()` ever calls it.
@@ -10,8 +10,9 @@
 // site's own words (the site confirms the human's act: "Make X the Hearth everyone sees…?"). Who may save is the OFFICE's decision, made on the
 // server at the write; `signedIn` here only decides whether the controls show, and a refused write puts the office's words on the page.
 //
-// CALLER CONTRACT, for the household page's band host (POS-984):
-//   const picker = createPicker({ entries, slug, saved, save, onDraw });       // saved: id | null | undefined (choice.mjs § readSavedHearth)
+// CALLER CONTRACT, for the household page's strip (Hearth.astro, POS-984):
+//   const picker = createPicker({ entries, slug, saved, save, onDraw, shown }); // saved: id | null | undefined (choice.mjs § readSavedHearth); shown: the design on screen now, if not the kept one
+//   `signedIn` (a boolean or a function) is only whether the save controls show; a visitor's picker still previews, and its ask() and clear() do nothing.
 //   picker.preview(id)            -> draw `id` (not saved)           picker.ask() -> the confirm question      picker.confirm() -> the save
 //   picker.clear()                -> ask to go back to the default   picker.view() -> { ...labels and flags to render }
 //   `onDraw(id)` is called whenever the drawn entry changes (a preview, a successful save, a clear): redraw the house with whichDesign.
@@ -21,10 +22,11 @@ import { saveHearth } from "./choice.mjs";
 
 const titleOf = (entries, id) => entries.find((e) => e.id === id)?.title ?? id;
 
-export function createPicker({ entries = [], slug, saved = null, save, onDraw = () => {}, signedIn = false } = {}) {
+export function createPicker({ entries = [], slug, saved = null, save, onDraw = () => {}, signedIn = false, shown: drawn = null } = {}) {
   const isIn = () => (typeof signedIn === "function" ? Boolean(signedIn()) : Boolean(signedIn));   // the sign-in can change under a mounted picker
   let savedId = saved && saved !== DEFAULT_ENTRY && entries.some((e) => e.id === saved) ? saved : null;   // what is actually saved
-  let shown = savedId ?? DEFAULT_ENTRY;                                                                     // what is drawn
+  // what is drawn: the design the page is already showing when the picker mounts (a `?entry=` preview is on screen before the picker binds), else the kept one
+  let shown = drawn && entries.some((e) => e.id === drawn) ? drawn : (savedId ?? DEFAULT_ENTRY);
   let asking = null;                                                                                        // { id } while the human is being asked
   let busy = false;
   let said = "";                                                                                            // the office's word, or ours, after an act
@@ -89,9 +91,9 @@ export function createPicker({ entries = [], slug, saved = null, save, onDraw = 
 }
 
 /** Bind a `[data-hearth-picker]` element (HearthPicker.astro) to a picker. Returns the picker and a `refresh()`. */
-export function mountHearthPicker(root, { entries, slug, saved, token, api, signedIn, onDraw, fetchImpl } = {}) {
+export function mountHearthPicker(root, { entries, slug, saved, token, api, signedIn, onDraw, shown, fetchImpl } = {}) {
   const picker = createPicker({
-    entries, slug, saved, signedIn, onDraw,
+    entries, slug, saved, signedIn, onDraw, shown,
     save: ({ slug: s, id }) => saveHearth({ slug: s, id, token: typeof token === "function" ? token() : token, api, fetchImpl }),
   });
   const q = (sel) => root.querySelector(sel);
@@ -102,11 +104,13 @@ export function mountHearthPicker(root, { entries, slug, saved, token, api, sign
     yes: q("[data-hearth-confirm-yes]"), no: q("[data-hearth-confirm-no]"), said: q("[data-hearth-said]"),
   };
   const set = (el, text) => { if (el) { el.textContent = text; el.hidden = !text; } };
+  if (select) select.disabled = false;   // the page ships it disabled: it answers a change only once the picker is bound (HearthPicker.astro)
   const paint = () => {
     const v = picker.view();
     if (select) select.value = v.shown;
     if ($.owner) $.owner.hidden = !v.controls;
-    set($.savedLine, v.savedLine); set($.previewLine, v.previewLine); set($.said, v.said);
+    // the kept line is said only when the house has KEPT a choice: "No Hearth chosen" is what the dropdown already shows (the strip takes as little room as it can)
+    set($.savedLine, v.savedId ? v.savedLine : ""); set($.previewLine, v.previewLine); set($.said, v.said);
     if ($.save) { $.save.hidden = !v.canSave; $.save.disabled = !v.canSave; }
     if ($.clear) { $.clear.hidden = !v.canClear; $.clear.disabled = !v.canClear; }
     if ($.confirm) $.confirm.hidden = !v.asking;

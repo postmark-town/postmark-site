@@ -3,9 +3,8 @@
 //
 // The board is the house's own: Household.astro's quest driver fills it from GET /api/quests and reads the
 // markers below (data-quests and friends); its styles are Household.astro's, namespaced under [data-quests].
-// It sat as the `quests` slot of HouseDashboard. On the one household page (a declared house) it sits in the
-// site's band for the signed-in human (HouseBand.astro), and HouseDashboard keeps it for an undeclared
-// shared house. Two seats draw it, so it is one component and not two copies. Nothing in the markup changed.
+// It is the `quests` slot of HouseDashboard, the seat of an undeclared shared house. A declared house's page (the Hearth,
+// HouseholdPage.astro) draws no quests: they were stale once the quest log grew (Darko, 2026-11-10 17:14 EST, POS-984).
 ---
   {/* ── THE DAY'S QUESTS: the household seat's, between Since you last
        looked and Your residents (Keemin, 2026-09-27: "We should remove the

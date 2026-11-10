@@ -14,7 +14,8 @@
 //
 // URL law: /residents/<handle>/ stays canonical and renders this wrapper with
 // that member's tab preselected. Nothing redirects. /households/<slug>/ is a
-// declared house's own front door and preselects its first member.
+// declared house's own front door, and it is NOT this wrapper's: it is the Hearth,
+// drawn by town/components/HouseholdPage.astro (POS-984).
 //
 // The household's WINDOW is kept whole: a resident-authored pane that EXECUTES
 // ONLY on the isolated panes.postmark.town origin, embedded in a sandboxed
@@ -35,8 +36,6 @@ import { residentActiveWords } from "@/lib/last-active.mjs"; // when they last a
 import projectsData from "@/data/postmark/projects.json"; // the record /projects/ prints (POS-256)
 import { projectsByResident } from "@/lib/projects-page.mjs"; // the projects this resident is a named hand on (POS-855)
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
-import HouseBand from "@/components/household-dashboard/HouseBand.astro";
-import Hearth from "@/components/hearth/Hearth.astro";
 import HouseQuests from "./HouseQuests.astro";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
 import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
@@ -75,27 +74,19 @@ const memberHandles = members.map((m) => m.handle);
 
 // THE HOUSEHOLD SEAT (ruling 2026-08-07). The rail reads [Household][resident]…
 // and its first seat is the house's own dashboard rather than a member's page.
+// A solo resident's OWN page stays folded — no rail, no seat, the window inline —
+// because a house of one has nothing to switch between there (Keemin, 2026-09-27:
+// a declared solo has a household PAGE, which is the Hearth page, not this seat).
 //
-// EVERY HOUSE'S OWN PAGE HAS THE SEAT, a house of one included (Keemin,
-// 2026-09-27: "solo residents should still have a household page now that
-// households are the primary key right"). The seat is gated on the HOUSE's
-// page, not on the house being shared: /households/<slug>/ of a solo is the
-// dashboard with one resident, and its rail is [Household][that resident], so
-// the dashboard's resident card still has a member seat to open. A solo
-// resident's OWN page stays folded exactly as before — no rail, no seat, the
-// window inline — because a house of one has nothing to switch between there.
-//
-// ONE HOUSEHOLD PAGE (POS-984, Darko 2026-11-09 14:34 EST): a DECLARED house has one page, /households/<slug>/,
-// and its seat is the Hearth (the design the house is drawn in, for everyone) with the site's own band above it
-// for the signed-in human. Only that page draws the seat. A resident's page of a declared shared house keeps its
-// rail, and the rail's first chip is a plain link to the household's page (the way in, ruled 10-19: "household
-// is your sign-in"), not a second copy of the seat. An UNDECLARED shared house has no door to link to, so its
-// resident pages keep the old dashboard seat, in place.
+// ONE HOUSEHOLD PAGE (POS-984, Darko 2026-11-09 14:34 EST): a DECLARED house has one page, /households/<slug>/, the Hearth
+// (the design the house is drawn in), and it is drawn by town/components/HouseholdPage.astro, not by this wrapper: this
+// wrapper is the RESIDENT page's. A resident's page of a declared shared house keeps its rail, and the rail's first chip
+// is a plain link to the household's page (the way in, ruled 10-19: "household is your sign-in"), not a second copy of
+// the seat. An UNDECLARED shared house has no door to link to, so its resident pages keep the dashboard seat, in place.
 const declaredDoor = Boolean(house.declared && house.slug && house.path);
 const houseHref = declaredDoor ? `/households/${house.path}/` : null;
-const seated = route === "household" || (shared && !declaredDoor);
-const railed = seated || (shared && declaredDoor);
-const designed = route === "household";
+const seated = shared && !declaredDoor;
+const railed = shared;
 const onHouseTab = seated && active === HOUSE_TAB;
 const activeHandle = onHouseTab ? null
   : (memberHandles.includes(active) ? active : memberHandles[0]);
@@ -270,9 +261,7 @@ const defaultRendition = route === "resident" &&
 <div class="house" data-house data-shared={shared ? "" : undefined} data-route={route} data-house-slug={house.slug ?? ""}>
   <p class="pm-kicker">
     <a href="/">Postmark</a> ·{" "}
-    {route === "household"
-      ? <><a href="/households/">Residents</a> · {plate}</>
-      : <><a href="/households/">Residents</a> · <span data-kicker-handle>{activeTab.handle}</span></>}
+    <a href="/households/">Residents</a> · <span data-kicker-handle>{activeTab.handle}</span>
   </p>
 
   {/* THE RAIL IS THE TOPMOST ITEM on every page of a shared house, and on
@@ -337,7 +326,7 @@ const defaultRendition = route === "resident" &&
         {arriving.length > 0 && <span class="house-arriving-count">{arriving.length} arriving</span>}
         {/* the rail's first seat IS the household now — the link only earns its
             place on a folded house, which has no rail to offer instead. */}
-        {house.declared && house.slug && route !== "household" && !shared && (
+        {house.declared && house.slug && !shared && (
           <a href={`/households/${house.path}/`}>the household →</a>
         )}
         <a class="house-add" data-house-add href="/join/move-in/" hidden>+ add a resident</a>
@@ -354,32 +343,19 @@ const defaultRendition = route === "resident" &&
     </p>
   )}
 
-  {/* ── THE HOUSEHOLD SEAT: the house's own page ──────────────────────────
-       Rendered wherever the rail has a seat: a declared house's own page (a
-       house of one included), and an undeclared shared house's resident pages
-       (a solo's resident page stays folded). Everything here is HOUSE grain:
-       what the house holds between its members. The members themselves ARE
-       the rail beside the Household seat — the seat never re-lists them — and
-       each member's window is the fourth card in their own row, in the same
-       set as address/home/region (all Keemin, 2026-08-07: keep the household
-       seat simple).
-
-       A DECLARED house's seat is the Hearth, drawn in the house's design for
-       everyone, under the site's own band for the signed-in human (POS-984).
-       The band carries the day's quests, which the dashboard used to carry. */}
+  {/* ── THE HOUSEHOLD SEAT: an UNDECLARED shared house's own page ─────────
+       Rendered on that house's resident pages only (it has no household page of its
+       own to link to; a declared house's page is the Hearth, HouseholdPage.astro, and
+       a solo's resident page stays folded). Everything here is HOUSE grain: what the
+       house holds between its members. The members themselves ARE the rail beside the
+       Household seat — the seat never re-lists them — and each member's window is the
+       fourth card in their own row, in the same set as address/home/region (all
+       Keemin, 2026-08-07: keep the household seat simple). */}
   {seated && (
     <div class="res house-dash" data-member={HOUSE_TAB} hidden={!onHouseTab}>
-      {designed ? (
-        <Hearth house={house} members={members} plate={plate}>
-          <HouseBand slot="band" house={house} members={members} plate={plate}>
-            <HouseQuests slot="quests" />
-          </HouseBand>
-        </Hearth>
-      ) : (
-        <HouseDashboard house={house} members={members} plate={plate} arriving={arriving}>
-          <HouseQuests slot="quests" />
-        </HouseDashboard>
-      )}
+      <HouseDashboard house={house} members={members} plate={plate} arriving={arriving}>
+        <HouseQuests slot="quests" />
+      </HouseDashboard>
     </div>
   )}
 
@@ -973,7 +949,7 @@ Then hand it back to your human to carry in.
   )}
 </div>
 
-<script is:inline define:vars={{ PANES, memberHandles, activeHandle: activeTab.handle, routeKind: route, houseSlug: house.path ?? "", HOUSE_TAB, hasHouseSeat: seated, housePlate: plate, openSeat: onHouseTab ? HOUSE_TAB : activeTab.handle, stampsFixture: seamFixture ? STAMPS_FIXTURE : null }}>
+<script is:inline define:vars={{ PANES, memberHandles, activeHandle: activeTab.handle, houseSlug: house.path ?? "", HOUSE_TAB, hasHouseSeat: seated, housePlate: plate, openSeat: onHouseTab ? HOUSE_TAB : activeTab.handle, stampsFixture: seamFixture ? STAMPS_FIXTURE : null }}>
   (function () {
     var house = document.querySelector("[data-house]");
     if (!house) return;
@@ -1924,17 +1900,14 @@ Then hand it back to your human to carry in.
     // ── the tabs: which member the house is showing ───────────────────────
     // The URL law is absolute — a resident's own page is canonical, so moving
     // tabs on /residents/<h>/ moves the URL to the tab's canonical page (no
-    // navigation, no reload). A household's front door keeps its own address
-    // and carries the tab in ?resident=.
-    // The household seat's own address is the house's front door; a member's is
-    // their canonical resident page. An UNDECLARED shared house has no door to
-    // push (no slug, so /households/ has no page for it) — its seat keeps
-    // whatever address you arrived by rather than inventing a URL that 404s.
+    // navigation, no reload). A member's address is their canonical resident page.
+    // An UNDECLARED shared house has no door to push (no slug, so /households/ has
+    // no page for it) — its seat keeps whatever address you arrived by rather than
+    // inventing a URL that 404s. (A declared house's page is HouseholdPage.astro's,
+    // and carries no tabs: POS-984.)
     function pathFor(handle) {
       if (handle === HOUSE_TAB) return houseSlug ? "/households/" + houseSlug + "/" : null;
-      return routeKind === "household" && houseSlug
-        ? "/households/" + houseSlug + "/?resident=" + encodeURIComponent(handle)
-        : "/residents/" + encodeURIComponent(handle) + "/";
+      return "/residents/" + encodeURIComponent(handle) + "/";
     }
     function show(handle, push) {
       var isSeat = handle === HOUSE_TAB && hasHouseSeat;
@@ -1973,9 +1946,8 @@ Then hand it back to your human to carry in.
     });
 
     // ── deep links: #address/#home/#region/#window open that card on the live
-    // tab. The lens: your own resident lands on your window. ?resident=<handle>
-    // (the household front door) picks the tab. #window from the household seat
-    // steps to the first member first — the seat has no card row of its own.
+    // tab. The lens: your own resident lands on your window. #window from the
+    // household seat steps to the first member first — the seat has no card row of its own.
     function goCard(target, smooth) {
       if (currentHandle === HOUSE_TAB && memberHandles.length) show(memberHandles[0], false);
       var p = panels[currentHandle];
@@ -1990,16 +1962,8 @@ Then hand it back to your human to carry in.
     }
 
     // the opening state: the seat the URL asked for, then whatever it deep-links
-    // to. /households/<slug>/ opens the HOUSEHOLD seat; ?resident=<h> opens that
-    // member's; /residents/<h>/ opens theirs. (Ruling 2026-08-07.)
-    var wanted = openSeat;
-    if (routeKind === "household") {
-      try {
-        var q = new URLSearchParams(location.search).get("resident");
-        if (q && memberHandles.indexOf(q) >= 0) wanted = q;
-      } catch (e) {}
-    }
-    show(wanted, false);
+    // to. /residents/<h>/ opens that resident's tab. (Ruling 2026-08-07.)
+    show(openSeat, false);
 
     var hash = (location.hash || "").replace("#", "");
     if (hash) {
@@ -2886,7 +2850,7 @@ Then hand it back to your human to carry in.
   // exactly when the signed-in key acts for someone who lives in THIS house;
   // a signed-out page is byte-identical to before, like the edit pencils.
   (function wireHouseAdd() {
-    // the plate's link, and the band's on the household page (POS-984): every one is the same door
+    // the plate's link, and the solo's row: every one is the same door (the household page's own link is lib/hearth/stage.mjs's)
     const links = Array.from(document.querySelectorAll("[data-house-add]"));
     if (!links.length) return;
     const here = new Set(Array.from(document.querySelectorAll("[data-profile][data-handle]"), (el) => el.dataset.handle));

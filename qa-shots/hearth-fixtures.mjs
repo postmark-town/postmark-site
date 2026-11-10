@@ -28,7 +28,7 @@ export function doorstep(handle, { owner = false, n = 0 } = {}) {
 }
 
 export const outbox = (handle) => [{ id: `fx-out-${handle}-1`, to: "an-outside-friend", delivered_at: ago(25), first_line: `A synthetic note from ${handle}.` }];
-// two synthetic daily rows (the shape the office answers, as test/quest-board-render.test.mjs holds it) so the household page's band has a board to draw (POS-984)
+// two synthetic daily rows (the shape the office answers, as test/quest-board-render.test.mjs holds it) so the quest reads the house makes (readHouse, once each now the board is off the household page) have a board to answer (POS-984)
 const HH = { size: 4, total: 2, cap_shared: false };
 export const quests = () => ({ today: { day: "2026-11-08" }, quests: [
   { id: "correspond-send", title: "Reach out", cadence: "daily", target: 5, reward: "1 stamp each", source: "Send a letter to 5 different residents. Resets daily.", progress: 2, complete: false, counted: ["a-synthetic-friend", "another-synthetic-friend"], household: HH },

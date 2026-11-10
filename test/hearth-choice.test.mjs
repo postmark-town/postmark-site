@@ -195,8 +195,10 @@ test("§ 4 the only code that writes the choice is choice.mjs § saveHearth, rea
   assert.equal((picker.match(/await save\(/g) ?? []).length, 1, "one call to the write, in confirm()");
   assert.match(read("src/lib/hearth/stage.mjs"), /whichDesign\(entries, \{ entry: asked, saved \}\)/, "the stage asks the one selector");
   assert.equal(/pickEntry/.test(read("src/lib/hearth/stage.mjs")), false, "and has no selection policy of its own");
-  // POS-984 folding this in: until 2026-11-09 this asserted the picker stood in Hearth.astro's header, for everyone. It is the signed-in human's, so it stands in the
-  // site's band (HouseBand.astro, inside its private body); Hearth.astro carries none, and a visitor has no picker.
-  assert.match(read("src/components/household-dashboard/HouseBand.astro"), /<HearthPicker /);
-  assert.doesNotMatch(read("src/components/hearth/Hearth.astro"), /<HearthPicker /);
+  // POS-984 rebuild (Darko, 2026-11-10 17:28 EST): until then this asserted the picker stood in the site's band, in its private body, for the signed-in human only
+  // (and before that, in Hearth.astro's header for everyone). It is the dropdown in the one strip Hearth.astro draws now, for EVERY reader: anyone may preview.
+  // What stays the signed-in human's is the SAVE, which `signedIn` gates in picker.mjs, and the office decides at the write.
+  assert.match(read("src/components/hearth/Hearth.astro"), /<HearthPicker entries=\{pickable\}/);
+  assert.equal((read("src/components/hearth/Hearth.astro").match(/<HearthPicker /g) ?? []).length, 1, "one dropdown on the page");
+  for (const f of ["town/components/Household.astro", "town/components/HouseholdPage.astro", "town/pages/households/[slug].astro"]) assert.doesNotMatch(read(f), /<HearthPicker /, `${f} draws no second one`);
 });

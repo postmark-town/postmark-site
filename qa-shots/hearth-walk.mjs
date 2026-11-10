@@ -37,7 +37,8 @@ const PW = process.env.PLAYWRIGHT ?? "/home/seat/trees-world/wld-27-world/node_m
 const { chromium } = createRequire(import.meta.url)(PW);
 const BASE = process.env.BASE ?? "http://127.0.0.1:4399";
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-// POS-984: the walk now covers the ONE household page (/households/<slug>/), owner and visitor; the screenshots land beside it by default
+// POS-984 (rebuilt 2026-11-10): the walk covers the ONE household page (/households/<slug>/), owner and visitor: the Hearth under the shell with one thin strip
+// (the dropdown, the owner's two links, the reading line) and no band; the screenshots land beside it by default
 const OUT = process.env.OUT ?? path.join(os.tmpdir(), "pos984-walk");   // never inside a pool tree
 fs.mkdirSync(OUT, { recursive: true });
 const households = JSON.parse(fs.readFileSync(path.join(ROOT, "src/data/postmark/households.json"), "utf8")).households;
@@ -173,25 +174,25 @@ const run = async () => {
   const browser = await chromium.launch();
   process.on("uncaughtException", async (e) => { console.error(e); await browser.close(); process.exit(1); });
   try {
-    // ── ⑫ A DESIGN CANNOT PAINT OVER THE BAND (POS-984, Truey's review of ba023e9d9) ──
+    // ── ⑫ A DESIGN CANNOT PAINT OVER THE STRIP (POS-984, Truey's review of ba023e9d9; the strip is what the band was) ──
     // A `:root`, `html` or `body` rule is rewritten onto the design's own stage, where `margin` and `transform` are allowed and no
     // `!important` is needed, and the stage's `contain: paint` clips its children, not itself. The hostile rules below carry NO
     // `!important` on purpose (the `!important` ones are refused by the sanitizer, so a test written with them cannot see this).
-    // The host's frame (`.hearth-frame { contain: paint }`) is what keeps the band on top; WALK_ONLY=rooted runs just this.
+    // The host's frame (`.hearth-frame { contain: paint }`) is what keeps the strip on top; WALK_ONLY=rooted runs just this.
     {
       const pointAt = (page) => page.evaluate(() => {
         const out = {};
-        for (const [name, sel] of [["Needs you", "[data-hband] #hband-needs-h"], ["Managing the house", "#hband-manage-h"], ["the quests", "[data-hband] [data-quests] [data-quests-day]"], ["the likeness answer", "[data-hband] .hd-like-ask a"]]) {
+        for (const [name, sel] of [["the breadcrumb", "[data-hearth-bar] .hearth-crumbs a"], ["the Hearth dropdown", "[data-hearth-bar] [data-hearth-pick]"], ["+ add a resident", "[data-hearth-bar] [data-house-add]"], ["the likeness answer", "[data-hearth-bar] .hearth-likeness a"]]) {
           const e = document.querySelector(sel);
           if (!e) { out[name] = "absent"; continue; }
           e.scrollIntoView({ block: "center", behavior: "instant" });
           const r = e.getBoundingClientRect();
           const top = document.elementFromPoint(r.left + Math.min(20, r.width / 2), r.top + r.height / 2);
-          out[name] = top && document.querySelector("[data-hband]").contains(top) ? "band" : top?.closest("[data-hearth-stage]") ? "stage" : String(top?.tagName);
+          out[name] = top && document.querySelector("[data-hearth-bar]").contains(top) ? "strip" : top?.closest("[data-hearth-stage]") ? "stage" : String(top?.tagName);
         }
         return out;
       });
-      const asBand = (o) => Object.values(o).every((v) => v === "band");
+      const asBand = (o) => Object.values(o).every((v) => v === "strip");
       const rules = [
         ["control, no rule", "rooted-none", ".u-nothing { color: red }"],
         ["a margin pulling the design up, and a background to paint with", "rooted-margin", ":root { margin-top: -900px; background: #0b0f1c; }"],
@@ -211,23 +212,32 @@ const run = async () => {
         const page = await newPage(browser, { signedIn: true });
         await page.goto(`${BASE}/households/${A_SLUG}/?entry=${id}`, { waitUntil: "load" });
         await ready(page);
-        await page.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 15000 });
-        await page.waitForSelector("[data-hband] [data-quests]:not([hidden])", { timeout: 15000 }).catch(() => {});
+        await page.waitForSelector("[data-hearth-bar] [data-hearth-own]:not([hidden])", { timeout: 15000 });   // the owner's two links are shown: the strip is whole
+        await page.waitForFunction(() => document.querySelector("[data-hd-reading]")?.hidden === true, null, { timeout: 15000 });   // and the reading line has gone, so the strip photographs the same twice
         check(`⑫ ${what}: the design drawn is the hostile one`, (await page.locator("[data-hearth-stage]").getAttribute("data-hearth-entry")) === id);
         const moved = await page.evaluate(() => { const s = document.querySelector("[data-hearth-stage]").getBoundingClientRect().top; const f = (document.querySelector(".hearth-frame") ?? document.querySelector("[data-hearth-stage]")).getBoundingClientRect().top; return Math.round(f - s); });
         const ink = await page.evaluate(() => { const c = getComputedStyle(document.querySelector("[data-hearth-stage]")); return { outline: c.outlineWidth + " " + c.outlineStyle, shadow: c.boxShadow }; });
         if (/outline|shadow/.test(id)) check(`⑫ ${what}: the rule took effect on the design's own box (${JSON.stringify(ink)})`, /900px/.test(id === "rooted-outline" ? ink.outline : ink.shadow), JSON.stringify(ink));
         else if (id !== "rooted-none") check(`⑫ ${what}: the rule took effect: the design's own box sits ${moved}px above where it was put`, moved > 300, moved);
         const at = await pointAt(page);
-        check(`⑫ ${what}: the band's controls are still the top thing at their own points (Needs you, Managing the house, the quests, the likeness answer)`, asBand(at), JSON.stringify(at));
-        // the pixels of the band itself: the control's, twice (the probe is stable), then every hostile design's must equal it
+        check(`⑫ ${what}: the strip's controls are still the top thing at their own points (the breadcrumb, the dropdown, + add a resident, the likeness answer)`, asBand(at), JSON.stringify(at));
+        // the pixels of the strip itself: the control's, twice (the probe is stable), then every hostile design's must equal it. The strip is photographed at the top of the page,
+        // so a design that makes the page longer or shorter cannot move it by a sub-pixel (pointAt scrolled it to the middle of the screen, where the design's height decides its offset)
+        await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
         await page.mouse.move(0, 0);
-        const band = page.locator("[data-hband]");
-        const pixels = await band.screenshot({ animations: "disabled", caret: "initial" });
+        // The parts photographed are the strip's own words that do not name the design on show: the breadcrumb, and the owner's two links. (The dropdown's width and the
+        // "Previewing <id>" line legitimately differ per design: they say which design is drawn. The dropdown is held by pointAt above, at its own point.)
+        const shoot = async () => ({
+          crumbs: await page.locator("[data-hearth-bar] .hearth-crumbs").screenshot({ animations: "disabled", caret: "initial" }),
+          own: await page.locator("[data-hearth-bar] [data-hearth-own]").screenshot({ animations: "disabled", caret: "initial" }),
+        });
+        const pixels = await shoot();
+        fs.writeFileSync(path.join(OUT, `16-strip-${id}-own.png`), pixels.own);
         if (id === "rooted-none") {
           controlPixels = pixels;
-          check("⑫ the pixel probe is stable: the control's band photographed twice is the same picture", pixels.equals(await band.screenshot({ animations: "disabled", caret: "initial" })), pixels.length);
-        } else check(`⑫ ${what}: the band's pixels are exactly the control's (no ink of the design's reached it)`, !!controlPixels && pixels.equals(controlPixels), `${pixels.length} bytes vs ${controlPixels?.length}`);
+          const again = await shoot();
+          check("⑫ the pixel probe is stable: the control's breadcrumb and owner links photographed twice are the same pictures", pixels.crumbs.equals(again.crumbs) && pixels.own.equals(again.own), `${pixels.crumbs.length} + ${pixels.own.length} bytes`);
+        } else check(`⑫ ${what}: the strip's breadcrumb and owner links are pixel for pixel the control's (no ink of the design's reached them)`, !!controlPixels && pixels.crumbs.equals(controlPixels.crumbs) && pixels.own.equals(controlPixels.own), `${pixels.crumbs.length}+${pixels.own.length} bytes vs ${controlPixels?.crumbs.length}+${controlPixels?.own.length}`);
         await shot(page, `16-rooted-${id}-desktop`, { fullPage: false });
         await page.context().close();
         injectEntry = null;
@@ -275,16 +285,16 @@ const run = async () => {
       const first = A[0];
       await page.locator(`[data-hearth-slot=residents] [data-hd-card="${first}"] .hd-card-name`).click();
       await page.waitForLoadState("load");
-      check("① a resident's name opens their seat on the household page", page.url().includes(`/households/${A_SLUG}/?resident=${encodeURIComponent(first)}`), page.url());
+      check("① a resident's card opens that resident's own page (the household page draws each resident once and carries no tab of theirs)", new URL(page.url()).pathname === `/residents/${first}/`, page.url());
       await page.context().close();
     }
 
-    // ── ② preview any entry: ledger on house A, by the picker (the signed-in human's, in the band) and by the URL ───
+    // ── ② preview any entry: ledger on house A, by the dropdown (in the strip; here as the signed-in human) and by the URL ───
     {
       const page = await newPage(browser, { signedIn: true });
       await page.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await ready(page);
-      await page.waitForSelector("[data-hband] [data-hearth-owner]:not([hidden])", { timeout: 15000 });   // POS-984/POS-962: the picker is the owner's, in the band
+      await page.waitForFunction(() => document.querySelector("[data-hearth-pick]")?.disabled === false, null, { timeout: 15000 });   // the dropdown is bound once the choice read has answered
       await page.selectOption("[data-hearth-pick]", "ledger");
       await page.waitForFunction(() => document.querySelector("[data-hearth-stage]")?.dataset.hearthEntry === "ledger");
       check("② the picker previews the second entry without a reload", (await page.locator("[data-hearth-stage]").getAttribute("data-hearth-entry")) === "ledger");
@@ -330,13 +340,12 @@ const run = async () => {
       const page = await newPage(browser, { signedIn: true });
       await page.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await ready(page);
-      // POS-984: Needs you is the SITE's band above the design; the design's own copy of the slot stands down, so it is shown once
-      await page.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 15000 });
-      check("④ the owner sees Needs you in the band, from the fixture's stances", /awaiting the house/.test((await text(page, "[data-hband] [data-hd-needs-box]")) ?? ""), await text(page, "[data-hband] [data-hd-needs-box]"));
-      check("④ and only once: the design's own Needs you slot stands down", !(await visible(page, "[data-hearth-slot=needs-you]")) && (await page.locator("[data-hd-needs-box]:visible").count()) === 1);
-      await page.waitForSelector("[data-hearth-slot=mail]:not([hidden])", { state: "attached", timeout: 15000 });   // painted for the owner, though the host stands it down
-      // POS-984 (review): the design's mail summary is painted (the markup is the design's) but stands down, so the waiting letters show once, in the band
-      check("④ the private mail summary is painted from the owner's reads, and stands down: the band's boat line carries the waiting letters once", /waiting for the crossing/.test((await text(page, "[data-hearth-slot=mail]")) ?? "") && !(await visible(page, "[data-hearth-slot=mail]")) && (await visible(page, "[data-hband] [data-hd-boat]")) && (await page.locator("[data-hearth-slot=mail]:visible, [data-hd-boat]:visible").count()) === 1, await text(page, "[data-hearth-slot=mail]"));
+      // POS-984 (rebuilt): Needs you is the DESIGN's own slot, shown to the house's own sign-in only (there is no band, and no second copy of it)
+      await page.waitForSelector("[data-hearth-slot=needs-you]:not([hidden])", { timeout: 15000 });
+      check("④ the owner sees the design's own Needs you, from the fixture's stances", /awaiting the house/.test((await text(page, "[data-hearth-slot=needs-you]")) ?? "") && (await visible(page, "[data-hearth-slot=needs-you]")), await text(page, "[data-hearth-slot=needs-you]"));
+      check("④ and only once: one Needs you on the page, the design's", (await page.locator("[data-hd-needs-box]:visible").count()) === 1);
+      await page.waitForSelector("[data-hearth-slot=mail]:not([hidden])", { state: "attached", timeout: 15000 });
+      check("④ the design's private mail summary is painted from the owner's reads and shown, and so is the waiting-mail (boat) line in what happened", /waiting for the crossing/.test((await text(page, "[data-hearth-slot=mail]")) ?? "") && (await visible(page, "[data-hearth-slot=mail]")) && (await visible(page, "[data-hd-boat]")), `${await text(page, "[data-hearth-slot=mail]")} | ${await text(page, "[data-hd-boat]")}`);
       check("④ the bearer went only to the house's own doorsteps", log.filter((l) => l.auth).every((l) => A.some((h) => l.path.startsWith(`/doorstep/${h}`)) || l.path === "/me"), JSON.stringify(log.filter((l) => l.auth).map((l) => l.path)));
       await shot(page, "04-default-owner-desktop", { fullPage: true });
       await cleanUnderPolicy(page, "④ (signed in)");
@@ -348,7 +357,9 @@ const run = async () => {
       check("④ and sends no bearer to that house's doorsteps", log.filter((l) => l.path.startsWith("/doorstep/")).every((l) => l.auth === null), JSON.stringify(log.filter((l) => l.auth && l.path.startsWith("/doorstep/"))));
       check("④ the other house's page carries none of the owner's private words", !(await page.content()).includes("waiting for the crossing"));
       // POS-984 (review, paper cut): a signed-in reader of ANOTHER house is told so, plainly, not asked a bare question
-      check("④ and says plainly that this is not their house, with no sign-in button and no bare question", (await visible(page, "[data-hband] [data-hband-notyours]")) && /isn’t your house/.test((await text(page, "[data-hband] [data-hband-notyours]")) ?? "") && !(await visible(page, "[data-hband] [data-hd-signin]")), await text(page, "[data-hband] .hband-visit"));
+      await page.waitForSelector("[data-hx-notyours]:not([hidden])", { timeout: 15000 });
+      check("④ and says plainly that this is not their house (in the design's house slot), with no sign-in button and no bare question", (await visible(page, "[data-hx-notyours]")) && /isn’t your house/.test((await text(page, "[data-hx-notyours]")) ?? "") && !(await visible(page, "[data-hd-signin]")), await text(page, "[data-hearth-slot=house] .hx-public"));
+      check("④ and the strip shows that reader no owner link: no + add a resident, no likeness answer, no save controls", !(await visible(page, "[data-hearth-bar] [data-house-add]")) && !(await visible(page, "[data-hearth-bar] .hearth-likeness")) && !(await visible(page, "[data-hearth-owner]")));
       await page.context().close();
     }
 
@@ -402,9 +413,9 @@ const run = async () => {
       const state = await page.evaluate(() => {
         const stage = document.querySelector("[data-hearth-stage]");
         const attrs = [...stage.querySelectorAll("*")].flatMap((e) => [...e.attributes].map((a) => a.name));
-        // POS-984/POS-962: the header bar holds no picker any more; the site's chrome to protect is the owner's picker in the band, and the nav
-const bar = document.querySelector("[data-hband] [data-hearth-pick]");
-        // the owner's band sits above the bar now, so the bar can start below the fold: elementFromPoint answers null off-screen
+        // POS-984 (rebuilt): the site's chrome to protect is the strip's dropdown, and the nav
+        const bar = document.querySelector("[data-hearth-bar] [data-hearth-pick]");
+        // the strip can start off-screen on a phone: elementFromPoint answers null off-screen
         bar.scrollIntoView({ block: "center", behavior: "instant" });   // the site's CSS smooth-scrolls otherwise, and the rect below would be read mid-flight
         const r = bar.getBoundingClientRect();
         const top = document.elementFromPoint(r.left + 40, r.top + r.height / 2);
@@ -423,8 +434,8 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       check("⑧ the stage is the hostile entry, and holds no script, frame, form, input, style, link or svg", state.entry === "hostile" && state.banned === 0, JSON.stringify(state));
       check("⑧ no event handler and no javascript: link on the stage", state.handlers.length === 0 && state.links === 0, JSON.stringify(state.handlers));
       check("⑧ its CSS could not cover or hide the site's own chrome (bar, picker, nav)", state.barShown && state.barOnTop && state.pickerShown && state.navShown, JSON.stringify(state));
-      check("⑧ the private slots it placed stay the house's: the owner sees Needs you in the site's band, the template received nothing", (await visible(page, "[data-hband] [data-hd-needs-box]")) && !(await page.evaluate(() => JSON.stringify(window.__pwned ?? "")).then((v) => /awaiting|waiting/.test(v))));
-      check("⑧ and the site's band is on top, whole, under that template's every trick", await page.evaluate(() => { const b = document.querySelector("[data-hband]"); b.scrollIntoView({ block: "start", behavior: "instant" }); const r = b.getBoundingClientRect(); const top = document.elementFromPoint(r.left + 30, r.top + Math.min(r.height - 4, 30)); return getComputedStyle(b).display !== "none" && r.height > 40 && b.contains(top); }));
+      check("⑧ the private slots it placed stay the house's: the owner's Needs you is the site's own slot, drawn by the site, and the template received nothing", (await visible(page, "[data-hearth-slot=needs-you]")) && !(await page.evaluate(() => JSON.stringify(window.__pwned ?? "")).then((v) => /awaiting|waiting/.test(v))));
+      check("⑧ and the site's strip is on top, whole, under that template's every trick", await page.evaluate(() => { const b = document.querySelector("[data-hearth-bar]"); b.scrollIntoView({ block: "start", behavior: "instant" }); const r = b.getBoundingClientRect(); const top = document.elementFromPoint(r.left + 30, r.top + Math.min(r.height - 4, 10)); return getComputedStyle(b).display !== "none" && r.height > 15 && b.contains(top); }));
       check("⑧ nothing went to the hostile host", unanswered.slice(before).every((u) => !/evil\.example/.test(u)) && log.every((l) => !/evil/.test(l.path)), unanswered.slice(before).join(" "));
       await shot(page, "08-hostile-template-desktop", { fullPage: true });
       await cleanUnderPolicy(page, "⑧");
@@ -495,33 +506,34 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       await page.context().close();
     }
 
-    // ── ⑪ ONE PAGE (POS-984): the Hearth draws the house for everyone; the site's band is the signed-in human's ──
+    // ── ⑪ ONE PAGE (POS-984, rebuilt): the Hearth draws the house for everyone and is the whole page; one thin strip is the site's ──
     {
-      // a visitor: the design and the sign-in line, and nothing of the band's body
+      // a visitor: the design (with its own sign-in line in the house slot), the dropdown, and nothing of an owner's
       const v = await newPage(browser);
       await v.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await ready(v);
-      check("⑪ a visitor sees the design (the house slot) and the band's sign-in line", (await visible(v, "[data-hearth-slot=house]")) && /Is this your house\?/.test((await text(v, "[data-hband] .hband-visit")) ?? "") && (await visible(v, "[data-hband] [data-hd-signin]")));
-      check("⑪ and none of the band's private body: Needs you, the boat, the quests, managing the house", !(await visible(v, "[data-hband] .hband-own")) && !(await visible(v, "[data-hband] [data-hd-needs-box]")) && !(await visible(v, "[data-quests]")) && !(await visible(v, "[data-hband-manage]")));
+      check("⑪ a visitor sees the design (the house slot), and its sign-in line, which is the design's own", (await visible(v, "[data-hearth-slot=house]")) && /Is this your house\?/.test((await text(v, "[data-hearth-slot=house] .hx-public")) ?? "") && (await visible(v, "[data-hearth-slot=house] [data-hd-signin]")));
+      check("⑪ and the strip: the breadcrumb and the Hearth dropdown, enabled, for a visitor too", (await visible(v, "[data-hearth-bar] .hearth-crumbs")) && (await visible(v, "[data-hearth-bar] [data-hearth-pick]")) && (await v.locator("[data-hearth-pick]").isEnabled()));
+      check("⑪ and none of an owner's: no band, no Needs you, no boat line, no quests, no managing the house, no + add a resident, no likeness answer, no save", !(await v.locator("[data-hband]").count()) && !(await visible(v, "[data-hd-needs-box]")) && !(await visible(v, "[data-hd-boat]")) && !(await visible(v, "[data-quests]")) && !(await visible(v, "[data-house-add]")) && !(await visible(v, ".hearth-likeness")) && !(await visible(v, "[data-hearth-owner]")) && !(await visible(v, "[data-hearth-save]")));
       check("⑪ exactly one sign-in line on the page", (await v.locator("[data-hd-signin]:visible").count()) === 1);
+      check("⑪ no pill rail above the Hearth: no Household chip, no chip per resident, no tablist", (await v.locator("[data-house-tabs], [data-house-tab], .pm-chiprow, [role=tablist].house-tabs").count()) === 0);
       await shot(v, "10-one-page-visitor-desktop", { fullPage: true });
       await cleanUnderPolicy(v, "⑪ (visitor)");
       await v.context().close();
 
-      // the owner, desktop: the band above the design
+      // the owner, desktop: the strip, then the design
       log.length = 0;
       const o = await newPage(browser, { signedIn: true });
       await o.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await ready(o);
-      await o.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 15000 });
-      await o.waitForSelector("[data-hband] [data-hb-edit]:not([hidden])", { timeout: 15000 });
-      check("⑪ the owner's band: Needs you, one Edit profile per resident, + add a resident, the likeness answer", (await visible(o, "[data-hband] [data-hd-needs-box]")) && (await o.locator("[data-hband] [data-hb-edit]:visible").count()) === A.length && (await visible(o, "[data-hband] [data-house-add]")) && /likeness question/.test((await text(o, "[data-hband-manage]")) ?? ""), await text(o, "[data-hband-manage]"));
-      check("⑪ the visitor's sign-in line is gone for the owner", !(await visible(o, "[data-hband] .hband-visit")));
-      await o.waitForSelector("[data-hband] [data-hd-boat]:not([hidden])", { timeout: 15000 }).catch(() => {});
-      check("⑪ letters waiting for the boat are in the band", await visible(o, "[data-hband] [data-hd-boat]"), await text(o, "[data-hband] [data-hd-boat]"));
-      await o.waitForSelector("[data-hband] [data-quests]:not([hidden])", { timeout: 15000 }).catch(() => {});
-      check("⑪ today's quests are in the band, above the design", (await visible(o, "[data-hband] [data-quests]")) && await o.evaluate(() => { const q = document.querySelector("[data-quests]"); const s = document.querySelector("[data-hearth-stage]"); return !!(q.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING); }));
-      check("⑪ the band is above the design", await o.evaluate(() => document.querySelector("[data-hband]").getBoundingClientRect().bottom <= document.querySelector("[data-hearth-stage]").getBoundingClientRect().top + 1));
+      await o.waitForSelector("[data-hearth-slot=needs-you]:not([hidden])", { timeout: 15000 });
+      await o.waitForSelector("[data-hearth-bar] [data-hearth-own]:not([hidden])", { timeout: 15000 });
+      check("⑪ the owner's strip: + add a resident and the likeness answer, beside the dropdown", (await visible(o, "[data-hearth-bar] [data-house-add]")) && /likeness question/.test((await text(o, "[data-hearth-bar] .hearth-likeness")) ?? "") && (await visible(o, "[data-hearth-bar] [data-hearth-pick]")), await text(o, "[data-hearth-bar] [data-hearth-own]"));
+      check("⑪ the likeness answer links to the office's own page for THIS house", ((await o.locator("[data-hearth-bar] .hearth-likeness a").getAttribute("href")) ?? "").includes(`/oauth/likeness?household=${A_SLUG}`), await o.locator("[data-hearth-bar] .hearth-likeness a").getAttribute("href"));
+      check("⑪ the design draws Needs you and the waiting-mail line for its owner, and Edit profile on each resident's card", (await visible(o, "[data-hearth-slot=needs-you]")) && (await visible(o, "[data-hd-boat]")) && (await o.locator("[data-hearth-slot=residents] [data-hd-edit]:visible").count()) === A.length);
+      check("⑪ the visitor's sign-in line is gone for the owner", (await o.locator("[data-hd-signin]:visible").count()) === 0);
+      check("⑪ no band, no quests, no ballots, no managing the house on the owner's page either", !(await o.locator("[data-hband], [data-quests], [data-hband-ballots], .bs-form, [data-hb-ballot]").count()) && !(await o.content()).includes("Managing the house"));
+      check("⑪ the strip is above the design", await o.evaluate(() => document.querySelector("[data-hearth-bar]").getBoundingClientRect().bottom <= document.querySelector("[data-hearth-stage]").getBoundingClientRect().top + 1));
       check("⑪ the header's household link goes to YOUR household, not a resident's window", await (async () => {
         await o.waitForFunction(() => document.querySelector("[data-auth-handles] a")?.textContent === "your household", null, { timeout: 15000 }).catch(() => {});
         const links = await o.locator("[data-auth-handles] a").evaluateAll((as) => as.map((a) => [a.textContent, a.getAttribute("href")]));
@@ -530,25 +542,29 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       await shot(o, "11-one-page-owner-desktop", { fullPage: true });
       await cleanUnderPolicy(o, "⑪ (owner)");
 
-      // the resident tabs keep working, on the same page, under the page's policy: the chip, the address, the window's frame, the editor
-      await o.locator(`[data-house-tab="${A[0]}"]`).click();
-      check("⑪ a resident's chip opens their tab in place, ?resident= in the address, the seat hidden", new URL(o.url()).searchParams.get("resident") === A[0] && !(await visible(o, "[data-hearth-stage]")) && (await visible(o, `[data-member="${A[0]}"] [data-profile-bubble]`)), o.url());
-      check("⑪ their window's frame is on the page (the panes origin is the policy's one frame source)", (await o.locator(`[data-member="${A[0]}"] [data-win-frame]`).count()) >= 1);
-      await o.locator(`[data-member="${A[0]}"] [data-profile-edit-open]`).click({ timeout: 10000 }).catch(() => {});
-      check("⑪ the profile editor opens for the owner on that tab", await visible(o, `[data-member="${A[0]}"] [data-profile-edit-form]`));
-      await shot(o, "12-one-page-resident-tab-desktop");
-      await cleanUnderPolicy(o, "⑪ (a resident's tab, the editor open)");
-      await o.locator('[data-house-tab="__house"]').click();
-      check("⑪ and the Household chip brings the seat back, address clean", (await visible(o, "[data-hearth-stage]")) && !new URL(o.url()).searchParams.has("resident"), o.url());
-      await o.goto(`${BASE}/households/${A_SLUG}/?resident=${encodeURIComponent(A[1] ?? A[0])}`, { waitUntil: "load" });
-      check("⑪ a deep link ?resident=<h> opens that tab straight away", await o.evaluate((h) => !document.querySelector(`[data-member="${h}"]`).hidden && document.querySelector('[data-member="__house"]').hidden, A[1] ?? A[0]));
+      // a resident's card is a link to that resident's own page, whose editor opens from the card's Edit profile
+      await o.locator(`[data-hearth-slot=residents] [data-hd-card="${A[0]}"] [data-hd-edit]`).click();
+      await o.waitForURL((u) => u.pathname === `/residents/${A[0]}/`, { timeout: 15000 });
+      check("⑪ a card's Edit profile goes to that resident's own page with the editor's ask", new URL(o.url()).searchParams.get("edit") === "profile", o.url());
+      await o.locator(`[data-member="${A[0]}"] [data-profile-edit-form]:not([hidden])`).waitFor({ timeout: 15000 }).catch(() => {});
+      check("⑪ and the profile editor opens for the owner there", await visible(o, `[data-member="${A[0]}"] [data-profile-edit-form]`));
+      await shot(o, "12-one-page-resident-own-page-desktop");
+
+      // ?resident=<h> (the old address of a tab) redirects to the resident's own page; the rest of the query and the fragment ride across
+      await o.goto(`${BASE}/households/${A_SLUG}/?resident=${encodeURIComponent(A[1] ?? A[0])}&edit=profile#home`, { waitUntil: "load" });
+      await o.waitForURL((u) => u.pathname === `/residents/${A[1] ?? A[0]}/`, { timeout: 15000 });
+      check("⑪ a deep link ?resident=<h> redirects to /residents/<h>/, the ask for the editor and the fragment riding across", new URL(o.url()).search === "?edit=profile" && new URL(o.url()).hash === "#home", o.url());
+      await o.goto(`${BASE}/households/${A_SLUG}/?resident=not-of-this-house`, { waitUntil: "load" });
+      await ready(o);
+      check("⑪ a handle that is not of this house is not followed: the household page shows", new URL(o.url()).pathname === `/households/${A_SLUG}/` && (await o.locator("[data-hearth-stage]").count()) === 1, o.url());
 
       // the old address forwards, the preview's query riding across
       await o.goto(`${BASE}/households/${A_SLUG}/hearth/?entry=ledger`, { waitUntil: "load" });
       await o.waitForURL((u) => u.pathname === `/households/${A_SLUG}/`, { timeout: 15000 });
       await ready(o);
       check("⑪ /hearth/ forwards to the one page and ?entry=ledger still previews there", new URL(o.url()).searchParams.get("entry") === "ledger" && (await o.locator("[data-hearth]").getAttribute("data-hearth-showing")) === "ledger", o.url());
-      check("⑪ the band stays whole under a previewed design", (await visible(o, "[data-hband] [data-hb-edit]")) && (await o.locator("[data-hband] [data-hd-needs-box]:visible").count()) === 1);
+      await o.waitForSelector("[data-hearth-bar] [data-hearth-own]:not([hidden])", { timeout: 15000 });
+      check("⑪ the strip stays whole under a previewed design", (await visible(o, "[data-hearth-bar] [data-house-add]")) && (await visible(o, "[data-hearth-bar] [data-hearth-pick]")) && (await o.locator("[data-hd-needs-box]").count()) === 1);
       await shot(o, "13-one-page-owner-ledger-preview-desktop", { fullPage: true });
 
       // a resident's page links to its household
@@ -564,7 +580,7 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       // human. "This isn't your house" must not flash for the owner, and must still come for another house's sign-in once /me has answered.
       const watchNotYours = (p) => p.addInitScript(() => {
         window.__notYoursShown = false;
-        new MutationObserver(() => { const n = document.querySelector("[data-hband-notyours]"); if (n && !n.hidden) window.__notYoursShown = true; })
+        new MutationObserver(() => { for (const n of document.querySelectorAll("[data-hx-notyours]")) if (!n.hidden) window.__notYoursShown = true; })
           .observe(document, { subtree: true, attributes: true, childList: true, attributeFilter: ["hidden"] });
       });
       const first = await newPage(browser, { signedIn: true, pendingMe: 2500 });
@@ -572,27 +588,27 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       await first.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await first.waitForSelector("[data-hearth-stage]");
       await first.waitForTimeout(900);
-      check("⑪ first sign-in, /me still pending: the band says nothing about whose house this is", !(await visible(first, "[data-hband] [data-hband-notyours]")) && !(await visible(first, "[data-hband] [data-hd-signin]")) && !(await visible(first, "[data-hband] [data-hd-needs-box]")));
-      await first.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 20000 });
+      check("⑪ first sign-in, /me still pending: the page says nothing about whose house this is, and shows no owner link or private slot", !(await visible(first, "[data-hx-notyours]")) && !(await visible(first, "[data-hd-signin]")) && !(await visible(first, "[data-hd-needs-box]")) && !(await visible(first, "[data-hearth-bar] [data-house-add]")));
+      await first.waitForSelector("[data-hearth-slot=needs-you]:not([hidden])", { timeout: 20000 });
       await first.waitForTimeout(400);
-      check("⑪ and once /me has answered, the owner's band is there and 'This isn't your house' never showed, not even for a frame", (await visible(first, "[data-hband] [data-hb-edit]")) && (await first.evaluate(() => window.__notYoursShown)) === false);
+      check("⑪ and once /me has answered, the owner's own parts are there and 'This isn't your house' never showed, not even for a frame", (await visible(first, "[data-hearth-bar] [data-house-add]")) && (await visible(first, "[data-hearth-slot=needs-you]")) && (await first.evaluate(() => window.__notYoursShown)) === false);
       await first.context().close();
       const other = await newPage(browser, { signedIn: true, pendingMe: 2500 });
       await watchNotYours(other);
       await other.goto(`${BASE}/households/${B_SLUG}/`, { waitUntil: "load" });
       await other.waitForSelector("[data-hearth-stage]");
       await other.waitForTimeout(900);
-      check("⑪ another house's first sign-in, /me still pending: no verdict yet", !(await visible(other, "[data-hband] [data-hband-notyours]")) && (await other.evaluate(() => window.__notYoursShown)) === false);
-      await other.waitForSelector("[data-hband] [data-hband-notyours]:not([hidden])", { timeout: 20000 });
-      check("⑪ and once /me has answered, it says plainly that this is not their house", /isn’t your house/.test((await text(other, "[data-hband] [data-hband-notyours]")) ?? ""));
+      check("⑪ another house's first sign-in, /me still pending: no verdict yet", !(await visible(other, "[data-hx-notyours]")) && (await other.evaluate(() => window.__notYoursShown)) === false);
+      await other.waitForSelector("[data-hx-notyours]:not([hidden])", { timeout: 20000 });
+      check("⑪ and once /me has answered, it says plainly that this is not their house", /isn’t your house/.test((await text(other, "[data-hx-notyours]")) ?? ""));
       await other.context().close();
 
-      // the owner on a phone: the band first, whole
+      // the owner on a phone: the strip, then the design, whole
       const ph = await newPage(browser, { signedIn: true, viewport: { width: 390, height: 800 } });
       await ph.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await ready(ph);
-      await ph.waitForSelector("[data-hband] [data-hb-edit]:not([hidden])", { timeout: 15000 });
-      check("⑪ the owner's band at 390px: no sideways scroll", (await ph.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 1);
+      await ph.waitForSelector("[data-hearth-bar] [data-hearth-own]:not([hidden])", { timeout: 15000 });
+      check("⑪ the owner's page at 390px: no sideways scroll", (await ph.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 1);
       await shot(ph, "14-one-page-owner-phone", { fullPage: true });
       await ph.context().close();
       const vp = await newPage(browser, { viewport: { width: 390, height: 800 } });
@@ -603,78 +619,38 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       await vp.context().close();
     }
 
-    // ── ⑬ THE BAND HOSTS THE BALLOT STAKE (POS-984 hosting POS-502): the owner stakes from the household page ──
+    // ── ⑬ THE HOUSEHOLD PAGE HAS NO BALLOT; /votes/ HAS THE STAKE FORM (POS-984, rebuilt: Darko, 2026-11-10 17:14–17:28 EST) ──
+    // Until then the band hosted POS-502's stake form for the owner. The form is /votes/'s alone, and mounts there only for a signed-in household.
     {
       tally = { "the-ledger": 11, "starter-kit": 3 };
       ballotOpen = true;
-      // a visitor: nothing about the ballot is read, drawn or loaded
+      // the household page, visitor and owner: nothing about a ballot is read, drawn or loaded
+      for (const [who, signedIn] of [["a visitor", false], ["the house's own human", true]]) {
+        log.length = 0;
+        const p = await newPage(browser, { signedIn });
+        await p.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+        await ready(p);
+        if (signedIn) await p.waitForSelector("[data-hearth-slot=needs-you]:not([hidden])", { timeout: 15000 });
+        await p.waitForTimeout(800);
+        check(`⑬ ${who}: the household page shows no ballot and no stake form, and never reads /votes`, (await p.locator(".bs-form, [data-hb-ballot], [data-hband-ballots]").count()) === 0 && !log.some((l) => l.path.startsWith("/votes")), JSON.stringify(log.filter((l) => l.path.startsWith("/votes"))));
+        await p.context().close();
+      }
+      // /votes/: the open ballot, and the stake form for a signed-in household only
       log.length = 0;
-      const v = await newPage(browser);
-      await v.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
-      await ready(v);
-      await v.waitForTimeout(800);
-      check("⑬ a visitor sees no ballot and no stake form, and the page never read the ballot", !(await visible(v, "[data-hband-ballots]")) && (await v.locator(".bs-form, [data-hb-ballot]").count()) === 0 && !log.some((l) => l.path.startsWith("/votes")), JSON.stringify(log.filter((l) => l.path.startsWith("/votes"))));
-      await v.context().close();
-
-      // another house's sign-in: not the owner, so the same
-      log.length = 0;
-      const n = await newPage(browser, { signedIn: true });
-      await n.goto(`${BASE}/households/${B_SLUG}/`, { waitUntil: "load" });
-      await ready(n);
-      await n.waitForSelector("[data-hband-notyours]:not([hidden])", { timeout: 15000 });
-      await n.waitForTimeout(500);
-      check("⑬ a signed-in reader of ANOTHER house sees no stake form either, and loads no ballot", (await n.locator(".bs-form, [data-hb-ballot]").count()) === 0 && !log.some((l) => l.path.startsWith("/votes")));
-      await n.context().close();
-
-      // the owner: the ballot in the band, the form, a preview, a confirm, a receipt, and the band refreshing
-      log.length = 0;
-      const o = await newPage(browser, { signedIn: true });
-      await o.addInitScript(() => { window.__staked = []; document.addEventListener("pm:ballot-staked", (e) => window.__staked.push(e.detail)); });
-      await o.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
-      await ready(o);
-      await o.waitForSelector("[data-hband] [data-hband-ballots]:not([hidden]) .bs-form:not([hidden])", { timeout: 20000 });
-      check("⑬ the owner's band lists the open ballot with its choices' stamps and the cap", /Hearth Contest/.test((await text(o, "[data-hband-ballots]")) ?? "") && (await text(o, '[data-hb-staked="the-ledger"]')) === "11" && (await text(o, '[data-hb-staked="starter-kit"]')) === "3" && /cap 20/.test((await text(o, "[data-hband-ballots]")) ?? ""), await text(o, "[data-hband-ballots]"));
-      check("⑬ the closed ballot is not staked on: one block, for the staking one", (await o.locator("[data-hb-ballot]").count()) === 1);
-      check("⑬ the stake form is in the band, above the design, with the owner's residents and the ballot's choices", await o.evaluate((names) => {
-        const f = document.querySelector("[data-hband] .bs-form"); const s = document.querySelector("[data-hearth-stage]");
-        const from = [...f.querySelectorAll('[name="from"] option')].map((x) => x.value); const on = [...f.querySelectorAll('[name="candidate"] option')].map((x) => x.value);
-        return !!(f.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING) && JSON.stringify(from) === JSON.stringify(names.A) && JSON.stringify(on) === JSON.stringify(["the-ledger", "starter-kit"]);
-      }, { A }));
-      await shot(o, "17-band-ballot-owner-desktop", { fullPage: false });
-      await o.selectOption('[data-hband] [name="from"]', A[0]);
-      await o.selectOption('[data-hband] [name="candidate"]', "the-ledger");
-      await o.fill('[data-hband] [name="stamps"]', "5");
-      await o.click("[data-hband] .bs-preview");
-      await o.waitForSelector("[data-hband] .bs-confirm:not([hidden])", { timeout: 10000 });
-      check("⑬ a preview says what would happen and offers the confirm; nothing is staked yet", /would stake 5 of 5 on the-ledger/.test((await text(o, "[data-hband] .bs-out")) ?? "") && (await text(o, '[data-hb-staked="the-ledger"]')) === "11" && log.filter((l) => l.path === "/household").length === 1);
-      const doorstepsBefore = log.filter((l) => l.path.startsWith("/doorstep/")).length;
-      await o.click("[data-hband] .bs-confirm");
-      await o.waitForSelector("[data-hband] .bs-out.staked", { timeout: 10000 });
-      check("⑬ a confirm gives the receipt", /staked 5 of 5 on the-ledger/.test((await text(o, "[data-hband] .bs-out")) ?? ""), await text(o, "[data-hband] .bs-out"));
-      check("⑬ the stake raised pm:ballot-staked, with the topic, the choice and the resident", JSON.stringify(await o.evaluate(() => window.__staked)) === JSON.stringify([{ topic: "hearth-contest", candidate: "the-ledger", from: A[0] }]), JSON.stringify(await o.evaluate(() => window.__staked)));
-      await o.waitForFunction(() => document.querySelector('[data-hb-staked="the-ledger"]')?.textContent === "16", null, { timeout: 10000 }).catch(() => {});
-      check("⑬ the band refreshed: the choice now holds 16, and the receipt is still on screen", (await text(o, '[data-hb-staked="the-ledger"]')) === "16" && /staked 5 of 5 on the-ledger/.test((await text(o, "[data-hband] .bs-out")) ?? ""), await text(o, '[data-hb-staked="the-ledger"]'));
-      check("⑬ and the house was read again (the doorsteps, so Needs you, the cards and the numbers follow)", log.filter((l) => l.path.startsWith("/doorstep/")).length > doorstepsBefore, `${doorstepsBefore} → ${log.filter((l) => l.path.startsWith("/doorstep/")).length}`);
-      const stakes = log.filter((l) => l.path === "/household");
-      check("⑬ exactly one preview and one confirm went to the office, each with the owner's bearer", stakes.length === 2 && stakes.every((l) => l.auth === `Bearer ${OWNER_TOKEN}`), JSON.stringify(stakes));
-      await shot(o, "18-band-ballot-staked-desktop", { fullPage: false });
-      await cleanUnderPolicy(o, "⑬ (the stake form, a preview and a confirm)");
-      await o.context().close();
-
-      // no open ballot: the band draws nothing about it
-      ballotOpen = false;
-      const none = await newPage(browser, { signedIn: true });
-      await none.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
-      await ready(none);
-      await none.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 15000 });
-      await none.waitForTimeout(800);
-      check("⑬ with no staking ballot the band shows no ballot section and no form", !(await visible(none, "[data-hband-ballots]")) && (await none.locator(".bs-form").count()) === 0);
-      await none.context().close();
-      ballotOpen = true;
+      const vv = await newPage(browser);
+      await vv.goto(`${BASE}/votes/`, { waitUntil: "load" });
+      await vv.waitForSelector("[data-stake-slot] .bs-gate, [data-stake-slot] .bs-head", { timeout: 20000 });
+      check("⑬ /votes/ lists the open ballot, and a visitor's stake slot has no form to fill in", /Hearth Contest/i.test((await text(vv, "[data-votes]")) ?? "") && !(await visible(vv, ".bs-form")), await text(vv, "[data-stake-slot]"));
+      await vv.context().close();
+      const vo = await newPage(browser, { signedIn: true });
+      await vo.goto(`${BASE}/votes/`, { waitUntil: "load" });
+      await vo.waitForSelector(".bs-form:not([hidden])", { timeout: 20000 });
+      check("⑬ and the signed-in household's own residents are in the form there: the stake is still the site's (POS-502)", await vo.evaluate((names) => [...document.querySelectorAll('.bs-form [name="from"] option')].map((x) => x.value).join() === names.join(), A));
+      await vo.context().close();
     }
 
-    // ── ⑭ A SAVED HEARTH (POS-962 folded into the one page): visitors see the kept design and no picker; ?entry= previews over it without saving;
-    //     the signed-in human's picker, in the band, saves behind a second yes ──
+    // ── ⑭ A SAVED HEARTH (POS-962 folded into the one page): visitors see the kept design, and the dropdown PREVIEWS for them (anyone may); ?entry= previews over it
+    //     without saving; only the signed-in human's controls, in the strip, save, behind a second yes ──
     {
       const patches = () => log.filter((l) => l.path === `/households/${A_SLUG}/hearth`);
       const showing = (p) => p.locator("[data-hearth]").getAttribute("data-hearth-showing");
@@ -686,7 +662,8 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       await ready(v);
       await settleOn(v, "ledger");
       check("⑭ a visitor sees the house's kept design (the ledger), drawn after the public read", (await showing(v)) === "ledger" && (await v.locator("[data-hearth-stage]").getAttribute("data-hearth-entry")) === "ledger");
-      check("⑭ and no picker: no select, no save controls, nothing to change it with", !(await visible(v, "[data-hearth-picker]")) && !(await visible(v, "[data-hearth-pick]")) && !(await visible(v, "[data-hearth-save]")) && !(await visible(v, "[data-hearth-owner]")));
+      await v.waitForFunction(() => document.querySelector("[data-hearth-pick]")?.disabled === false, null, { timeout: 15000 });
+      check("⑭ the dropdown is there for a visitor, enabled, on the kept design; and no save controls, no owner block, nothing to change the kept choice with", (await visible(v, "[data-hearth-pick]")) && (await v.locator("[data-hearth-pick]").isEnabled()) && (await v.locator("[data-hearth-pick]").inputValue()) === "ledger" && !(await visible(v, "[data-hearth-save]")) && !(await visible(v, "[data-hearth-clear]")) && !(await visible(v, "[data-hearth-owner]")));
       check("⑭ the choice was read signed out: no bearer on the households read", log.filter((l) => l.path.startsWith("/households") && l.auth).length === 0 && log.some((l) => l.path.startsWith("/households?h=")), JSON.stringify(log.filter((l) => l.path.startsWith("/households"))));
       await shot(v, "19-saved-hearth-visitor-desktop", { fullPage: false });
       await cleanUnderPolicy(v, "⑭ (a visitor, a saved Hearth)");
@@ -698,47 +675,48 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       await v.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await settleOn(v, "ledger");
       check("⑭ without the preview in the address the kept design is back: the preview was never saved", (await showing(v)) === "ledger" && savedHearth === "ledger");
-      // FORCED (review of 80af398fb): the controls are hidden for a non-owner, and the stage must not even BIND them. Drive the hidden select and buttons through the DOM
-      // as a script would: a change, then a click on save and on the confirm. Nothing may be drawn, nothing written, and the address stays as it was.
+      // A VISITOR PREVIEWS (Darko, 17:28 EST: "anyone can preview another Hearth with it"): a real choice in the dropdown draws that design, keeps only the address, says it is
+      // not saved, and sends nothing; no save control appears for them.
+      log.length = 0;
+      await v.selectOption("[data-hearth-pick]", "default");
+      await v.waitForFunction(() => document.querySelector("[data-hearth]")?.dataset.hearthShowing === "default", null, { timeout: 15000 });
+      check("⑭ a visitor's dropdown previews the default over the kept design: drawn, ?entry=default in the address, 'not saved' said, nothing sent, and still no save control", new URL(v.url()).searchParams.get("entry") === "default" && /Previewing .*not saved/.test((await text(v, "[data-hearth-bar] [data-hearth-preview-line]")) ?? "") && patches().length === 0 && !(await visible(v, "[data-hearth-save]")) && !(await visible(v, "[data-hearth-owner]")) && savedHearth === "ledger", `${v.url()} ${await text(v, "[data-hearth-bar] [data-hearth-preview-line]")}`);
+      // FORCED (review of 80af398fb): the save controls are hidden for a non-owner. Drive them through the DOM as a script would: a click on save and on the confirm.
+      // Nothing may be asked or written, and the address stays as it was.
       const force = async (p) => {
         const before = await showing(p);
-        const target = before === "ledger" ? "default" : "ledger";
-        await p.evaluate((to) => {
-          const s = document.querySelector("[data-hearth-pick]");
-          if (s) { s.value = to; s.dispatchEvent(new Event("change", { bubbles: true })); }
-          for (const sel of ["[data-hearth-save]", "[data-hearth-confirm-yes]"]) document.querySelector(sel)?.click();
-        }, target);
+        await p.evaluate(() => { for (const sel of ["[data-hearth-save]", "[data-hearth-clear]", "[data-hearth-confirm-yes]"]) document.querySelector(sel)?.click(); });
         await p.waitForTimeout(700);
-        return { before, after: await showing(p), hasEntry: new URL(p.url()).searchParams.has("entry"), bound: await p.evaluate(() => document.querySelector("[data-hearth-picker]")?.dataset.hearthSaved !== undefined) };
+        return { before, after: await showing(p), address: new URL(p.url()).search, asked: await p.evaluate(() => { const c = document.querySelector("[data-hearth-confirm]"); return !!c && !c.hidden; }) };
       };
       log.length = 0;
       const fv = await force(v);
-      check("⑭ a visitor's FORCED change and save draw nothing, change no address, send nothing, and the picker was never bound", fv.after === fv.before && !fv.hasEntry && !fv.bound && patches().length === 0, JSON.stringify({ ...fv, patches: patches().length }));
+      check("⑭ a visitor's FORCED save and confirm ask nothing, change nothing, and send NOTHING", fv.after === fv.before && !fv.asked && fv.address === "?entry=default" && patches().length === 0, JSON.stringify({ ...fv, patches: patches().length }));
       await v.context().close();
 
-      // the signed-in human of ANOTHER house has no controls, on house A's page
+      // the signed-in human of ANOTHER house: the dropdown, and no owner controls, on house B's page
       const x = await newPage(browser, { signedIn: true });
       await x.goto(`${BASE}/households/${B_SLUG}/`, { waitUntil: "load" });
       await ready(x);
-      await x.waitForSelector("[data-hband-notyours]:not([hidden])", { timeout: 15000 });
+      await x.waitForSelector("[data-hx-notyours]:not([hidden])", { timeout: 15000 });
       await x.waitForTimeout(500);
-      check("⑭ a signed-in reader of another house has no picker either", !(await visible(x, "[data-hearth-picker]")) && !(await visible(x, "[data-hearth-owner]")));
+      check("⑭ a signed-in reader of another house has the dropdown to preview with, and no save controls, no add-a-resident, no likeness answer", (await visible(x, "[data-hearth-pick]")) && !(await visible(x, "[data-hearth-owner]")) && !(await visible(x, "[data-hearth-bar] [data-house-add]")) && !(await visible(x, "[data-hearth-bar] .hearth-likeness")));
       log.length = 0;
       const fx = await force(x);
-      check("⑭ and that reader's FORCED change and save, with their own valid bearer, draw nothing and send NOTHING to any house", fx.after === fx.before && !fx.hasEntry && !fx.bound && log.filter((l) => l.path.includes("/hearth") && l.path.startsWith("/households/")).length === 0, JSON.stringify({ ...fx, sent: log.filter((l) => l.path.startsWith("/households/")) }));
+      check("⑭ and that reader's FORCED save and confirm, with their own valid bearer, ask nothing and send NOTHING to any house", fx.after === fx.before && !fx.asked && log.filter((l) => l.path.includes("/hearth") && l.path.startsWith("/households/")).length === 0, JSON.stringify({ ...fx, sent: log.filter((l) => l.path.startsWith("/households/")) }));
       await x.context().close();
 
-      // the owner: the picker in the band, a preview (nothing sent), a second yes, the save
+      // the owner: the dropdown and the save controls in the strip, a preview (nothing sent), a second yes, the save
       log.length = 0;
       const o = await newPage(browser, { signedIn: true });
       await o.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await ready(o);
-      await o.waitForSelector("[data-hband] [data-hearth-owner]:not([hidden])", { timeout: 20000 });
+      await o.waitForSelector("[data-hearth-bar] [data-hearth-owner]:not([hidden])", { timeout: 20000 });
       await settleOn(o, "ledger");
-      check("⑭ the owner's picker is in the band, above the design, and says what is kept", /This house’s Hearth: The ledger\./.test((await text(o, "[data-hband] [data-hearth-saved]")) ?? "") && await o.evaluate(() => !!(document.querySelector("[data-hband] [data-hearth-picker]").compareDocumentPosition(document.querySelector("[data-hearth-stage]")) & Node.DOCUMENT_POSITION_FOLLOWING)));
+      check("⑭ the owner's controls are in the strip, above the design, and say what is kept", /^This house’s Hearth: The ledger\.$/.test((await text(o, "[data-hearth-bar] p[data-hearth-saved]")) ?? "") && await o.evaluate(() => !!(document.querySelector("[data-hearth-bar] [data-hearth-picker]").compareDocumentPosition(document.querySelector("[data-hearth-stage]")) & Node.DOCUMENT_POSITION_FOLLOWING)));
       await o.selectOption("[data-hearth-pick]", "default");
       await o.waitForFunction(() => document.querySelector("[data-hearth]")?.dataset.hearthShowing === "default");
-      check("⑭ the picker previews the default over the kept choice, in the address, and says it is not saved", new URL(o.url()).searchParams.get("entry") === "default" && /Previewing .*not saved/.test((await text(o, "[data-hband] [data-hearth-preview-line]")) ?? "") && patches().length === 0);
+      check("⑭ the dropdown previews the default over the kept choice, in the address, and says it is not saved", new URL(o.url()).searchParams.get("entry") === "default" && /Previewing .*not saved/.test((await text(o, "[data-hearth-bar] [data-hearth-preview-line]")) ?? "") && patches().length === 0);
       await o.click("[data-hearth-save]");
       check("⑭ 'Make this our Hearth' only raises a question; nothing is sent", (await visible(o, "[data-hearth-confirm]")) && /back to the default Hearth for everyone/.test((await text(o, "[data-hearth-question]")) ?? "") && patches().length === 0, await text(o, "[data-hearth-question]"));
       await o.click("[data-hearth-confirm-no]");
@@ -772,17 +750,18 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       await ready(f);
       await f.waitForFunction(() => /could not be read just now; showing the default/.test(document.querySelector("[data-hearth-note]")?.textContent ?? ""), null, { timeout: 15000 });
       check("⑮ the choice read fails: the default is drawn (not the kept design, not a blank), and the page says the read failed", (await f.locator("[data-hearth]").getAttribute("data-hearth-showing")) === "default" && (await visible(f, "[data-hearth-note]")), await text(f, "[data-hearth-note]"));
-      check("⑮ and offers no picker to a visitor on a failed read", !(await visible(f, "[data-hearth-picker]")));
+      await f.waitForFunction(() => document.querySelector("[data-hearth-pick]")?.disabled === false, null, { timeout: 15000 });
+      check("⑮ and the dropdown still previews for a visitor on a failed read (it starts from what the build carried), with no save control", (await visible(f, "[data-hearth-pick]")) && (await f.locator("[data-hearth-pick]").isEnabled()) && !(await visible(f, "[data-hearth-owner]")) && !(await visible(f, "[data-hearth-save]")));
       await shot(f, "21-saved-hearth-read-failed-desktop", { fullPage: false });
       await f.context().close();
-      // the same, as the house's OWN human (review: the wording is "no picker on a failed read", for the owner too): the band's Hearth section, select and note stay away
+      // the same, as the house's OWN human: the SAVE is not offered on a failed read (the kept choice is not known, so nothing is offered to save over it); the dropdown still previews
       const fo = await newPage(browser, { signedIn: true });
       await fo.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await ready(fo);
-      await fo.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 15000 });
+      await fo.waitForSelector("[data-hearth-slot=needs-you]:not([hidden])", { timeout: 15000 });
       await fo.waitForFunction(() => /could not be read just now/.test(document.querySelector("[data-hearth-note]")?.textContent ?? ""), null, { timeout: 15000 });
       await fo.waitForTimeout(600);
-      check("⑮ as the owner too: the default is drawn, the page says the read failed, and the band shows no Hearth section, no select and no picker note", (await fo.locator("[data-hearth]").getAttribute("data-hearth-showing")) === "default" && !(await visible(fo, "[data-hband-hearth]")) && !(await visible(fo, "[data-hearth-pick]")) && !(await visible(fo, "[data-hearth-preview-line]")) && !(await visible(fo, "[data-hearth-owner]")), await text(fo, "[data-hband-hearth]"));
+      check("⑮ as the owner too: the default is drawn, the page says the read failed, and the strip offers no save and no saved line (the dropdown still previews)", (await fo.locator("[data-hearth]").getAttribute("data-hearth-showing")) === "default" && (await visible(fo, "[data-hearth-pick]")) && !(await visible(fo, "[data-hearth-owner]")) && !(await visible(fo, "[data-hearth-save]")) && !(await visible(fo, "p[data-hearth-saved]")), await text(fo, "[data-hearth-bar]"));
       await shot(fo, "22-saved-hearth-read-failed-owner-desktop", { fullPage: false });
       await fo.context().close();
       fail = new Set();
@@ -844,7 +823,7 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       await v.goto(`${BASE}/households/${A_SLUG}/?entry=ledger`, { waitUntil: "load" });   // the ledger design draws the stamps chart and the residents map, which the default does not
       await v.waitForFunction((h) => document.querySelector("[data-hd-reading]")?.textContent === "still reading 1 resident…" && document.querySelectorAll('[data-hd-feed] .hd-line.is-letter').length > 0 && !!document.querySelector(`[data-hd-card="${h}"] [data-hd-last]`)?.textContent.trim(), others[0], { timeout: 15000 });
       const mid = await reading(v);
-      check("⑰ while builder's doorstep is shut, the band says plainly that one resident is still being read (the failed one is not counted)", mid?.shown === true && mid.text === "still reading 1 resident…", JSON.stringify(mid));
+      check("⑰ while builder's doorstep is shut, the strip says plainly that one resident is still being read (the failed one is not counted)", mid?.shown === true && mid.text === "still reading 1 resident…", JSON.stringify(mid));
       check("⑰ the others are on the page: their letters are in the feed", (await letters(v, others[0])) > 0 && (await letters(v, others[1])) > 0, `${await letters(v, others[0])} ${await letters(v, others[1])}`);
       check("⑰ the resident still out has painted nothing of theirs, and their card says it is reading", (await letters(v, slowH)) === 0 && (await last(v, slowH))?.trim() === "still reading…", `${await letters(v, slowH)} ${await last(v, slowH)}`);
       check("⑰ the cards of those already read do not say they are reading", !/still reading/.test((await last(v, others[0])) ?? "") && !/still reading/.test((await last(v, others[1])) ?? "") && !/still reading/.test((await last(v, downH)) ?? ""), `${await last(v, others[0])} | ${await last(v, downH)}`);
@@ -862,11 +841,12 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       const after = await labels(v);
       check("⑰ and the chart has nothing still reading; the failed one is still 'not read'", after.filter((b) => /still reading/.test(b)).length === 0 && after.filter((b) => /: not read$/.test(b)).length === 1, JSON.stringify(after));
       // the total work is unchanged: every endpoint the page needs was asked for exactly once, and nothing else was added
-      // (/quests/<h> is asked twice on this page, as it was before this change: once by readHouse and once by the quest board's own read in town/components/Household.astro)
+      // (/quests/<h> was asked twice on this page until 2026-11-10: once by readHouse and once by the quest board's own read in town/components/Household.astro. The board is off the
+      // household page (the day's quests are stale, Darko 17:14 EST), so it is asked once, by readHouse alone.)
       const once = [...A.flatMap((h) => [`/doorstep/${h}`, `/mail/${h}?box=outbox`]), "/world/walkers", "/world/conversations", "/calendar"];
       const questReads = (h) => requested.filter((r) => r === `/quests/${h}`).length;
       const ofHouse = requested.filter((r) => /^\/(doorstep|mail|world|calendar)/.test(r));
-      check("⑰ the house's reads are the same calls: each doorstep, outbox, walkers, conversations and calendar read once and nothing added; /quests as it was (readHouse's and the board's)", once.every((p) => requested.filter((r) => r === p).length === 1) && ofHouse.length === once.length && A.every((h) => questReads(h) === 2), JSON.stringify(requested.filter((r) => /^\/(doorstep|mail|quests|world|calendar)/.test(r))));
+      check("⑰ the house's reads are the same calls: each doorstep, outbox, walkers, conversations and calendar read once and nothing added; /quests once each (readHouse's: the board's own read went with the board)", once.every((p) => requested.filter((r) => r === p).length === 1) && ofHouse.length === once.length && A.every((h) => questReads(h) === 1), JSON.stringify(requested.filter((r) => /^\/(doorstep|mail|quests|world|calendar)/.test(r))));
       await cleanUnderPolicy(v, "⑰ (read whole, visitor)");
       await v.context().close();
 
@@ -875,22 +855,127 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       holds.set(`/doorstep/${slowH}`, g2);
       const o = await newPage(browser, { signedIn: true });
       await o.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
-      await o.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 15000 });
-      await o.waitForFunction(() => /Still reading|awaiting|never arrived/.test(document.querySelector("[data-hband] [data-hd-needs]")?.textContent ?? "") && document.querySelector("[data-hd-reading]")?.textContent === "still reading 1 resident…", null, { timeout: 15000 });
-      const needsMid = (await text(o, "[data-hband] [data-hd-needs]")) ?? "";
+      await o.waitForSelector("[data-hearth-slot=needs-you]:not([hidden])", { timeout: 15000 });
+      await o.waitForFunction(() => /Still reading|awaiting|never arrived/.test(document.querySelector("[data-hearth-slot=needs-you] [data-hd-needs]")?.textContent ?? "") && document.querySelector("[data-hd-reading]")?.textContent === "still reading 1 resident…", null, { timeout: 15000 });
+      const needsMid = (await text(o, "[data-hearth-slot=needs-you] [data-hd-needs]")) ?? "";
       check("⑰ owner, builder still out: Needs you does not say 'Nothing needs you right now'", !/Nothing needs you right now/.test(needsMid), needsMid.slice(0, 160));
       check("⑰ owner, builder still out: the mail slot paints what is read and says the counts may be short because one is still being read", /Still reading 1 resident, so these counts may be short\./.test((await text(o, "[data-hx-mail-list]")) ?? ""), await text(o, "[data-hx-mail-list]"));
       await cleanUnderPolicy(o, "⑰ (part-read, owner)");
       await shot(o, "17-reading-owner-desktop", { fullPage: true });
       g2.go();
       await noLongerReading(o);
-      await o.waitForFunction(() => /awaiting the house’s word/.test(document.querySelector("[data-hband] [data-hd-needs]")?.textContent ?? ""), null, { timeout: 15000 });
-      const needsDone = (await text(o, "[data-hband] [data-hd-needs]")) ?? "";
+      await o.waitForFunction(() => /awaiting the house’s word/.test(document.querySelector("[data-hearth-slot=needs-you] [data-hd-needs]")?.textContent ?? ""), null, { timeout: 15000 });
+      const needsDone = (await text(o, "[data-hearth-slot=needs-you] [data-hd-needs]")) ?? "";
       check("⑰ owner, once builder lands: Needs you holds builder's stances and cassian's bounce, with no filler", /awaiting the house’s word/.test(needsDone) && !/Still reading/.test(needsDone) && !/Still reading/.test((await text(o, "[data-hx-mail-list]")) ?? ""), needsDone.slice(0, 160));
       await cleanUnderPolicy(o, "⑰ (read whole, owner)");
       await o.context().close();
       holds.clear();
       fail = new Set();
+    }
+
+    // ── ⑱ THE THEME GETS THE ROOM, THE DROPDOWN IS ON THE HOUSEHOLD PAGE ONLY, AND EVERY INK IS LEGIBLE (POS-984, rebuilt 2026-11-10) ──
+    // Darko, 17:28 EST: "as much room as possible, such that the resident designed submissions take up the vast majority of the visual space"; and the cream-on-cream
+    // names of the old band: "a colour from one background used on another". The contrast below is READ FROM THE RENDERED PAGE: for every visible text in the page's own
+    // part (the strip and the design), its computed colour (with its alpha and every ancestor's opacity) over the surfaces behind it, against the lightest and the darkest
+    // stop of the page's night. The site has ONE colour scheme (`color-scheme: dark`); the browser is asked for both and the answer must not move.
+    {
+      // (a) the dropdown is on the household page only
+      const pg = await newPage(browser);
+      const dd = async (route) => { await pg.goto(`${BASE}${route}`, { waitUntil: "load" }); return pg.locator("[data-hearth-pick], [data-hearth-picker]").count(); };
+      const elsewhere = {};
+      for (const route of ["/", "/households/", "/votes/", `/residents/${A[0]}/`, "/join/", "/mail/"]) elsewhere[route] = await dd(route);
+      check("⑱ the Hearth dropdown is on no other page of the site (the front page, the households directory, /votes/, a resident's page, join, the mail)", Object.values(elsewhere).every((n) => n === 0), JSON.stringify(elsewhere));
+      check("⑱ and it is on the household page: exactly one", (await dd(`/households/${A_SLUG}/`)) === 2 /* the strip's wrapper and its select */ && (await pg.locator("[data-hearth-pick]").count()) === 1);
+      await pg.context().close();
+
+      // (b) the share of the first screen the design gets: the page's whole body is the design, below one thin strip
+      const share = async (viewport, signedIn) => {
+        const p = await newPage(browser, { viewport, signedIn });
+        await p.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+        await ready(p);
+        if (signedIn) await p.waitForSelector("[data-hearth-bar] [data-hearth-own]:not([hidden])", { timeout: 15000 });
+        await p.waitForTimeout(600);
+        const m = await p.evaluate(() => {
+          const vh = window.innerHeight;
+          const stage = document.querySelector("[data-hearth-stage]").getBoundingClientRect();
+          const bar = document.querySelector("[data-hearth-bar]").getBoundingClientRect();
+          const head = document.querySelector(".pm-townhead").getBoundingClientRect();
+          const px = Math.max(0, Math.min(stage.bottom, vh) - Math.max(stage.top, 0));
+          return { vh, strip: Math.round(bar.height), shell: Math.round(head.bottom), themePct: +(px / vh * 100).toFixed(1), belowShellPct: +(px / (vh - head.bottom) * 100).toFixed(1) };
+        });
+        await shot(p, `23-first-screen-${viewport.width}-${signedIn ? "owner" : "visitor"}`, { fullPage: false });
+        await p.context().close();
+        return m;
+      };
+      const D = { width: 1280, height: 900 }, P = { width: 390, height: 800 };
+      const dv = await share(D, false), dO = await share(D, true), pv = await share(P, false), pO = await share(P, true);
+      record("⑱ MEASURED: the design's share of the first screen (1280×900 / 390×800, visitor / owner)", true, JSON.stringify({ desktopVisitor: dv, desktopOwner: dO, phoneVisitor: pv, phoneOwner: pO }));
+      check("⑱ the design is the vast majority of the first desktop screen, owner or visitor (at least 80% of the window; the shell's header is the rest bar one thin strip)", dv.themePct >= 80 && dO.themePct >= 78, `${dv.themePct}% / ${dO.themePct}%`);
+      check("⑱ and the strip is one thin line on a desktop (at most 70px, owner included) and at most three on a phone (at most 130px)", dv.strip <= 70 && dO.strip <= 70 && pv.strip <= 130 && pO.strip <= 130, `${dv.strip} ${dO.strip} ${pv.strip} ${pO.strip}`);
+      check("⑱ the design starts on the phone's first screen (at least 45% of it, below the shell's own stacked header)", pv.themePct >= 45 && pO.themePct >= 45, `${pv.themePct}% / ${pO.themePct}%`);
+
+      // (c) legible: the rendered contrast of every visible text, both designs, visitor and owner, both schemes
+      const measure = (page) => page.evaluate(() => {
+        const NIGHTS = [[28, 44, 79], [13, 20, 38], [7, 11, 21]];   // the page body's gradient stops (PostmarkLayout: #1c2c4f → #0d1426 → #070b15)
+        const num = (s) => s.split(/[\s,\/]+/).filter(Boolean).map((x) => (x.endsWith("%") ? parseFloat(x) / 100 : Number(x)));
+        const parse = (s) => {
+          let m = /^rgba?\(([^)]+)\)/.exec(s); if (m) { const [r, g, b, a = 1] = num(m[1]); return { r, g, b, a }; }
+          m = /^color\(srgb ([^)]+)\)/.exec(s); if (m) { const [r, g, b, a = 1] = num(m[1]); return { r: r * 255, g: g * 255, b: b * 255, a }; }
+          return null;
+        };
+        const over = (fg, bg) => ({ r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a) });
+        const lin = (c) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+        const lum = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+        const ratio = (a, b) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+        const out = { checked: 0, worst: null, fails: [] };
+        const root = document.querySelector("[data-hearth]");
+        for (const el of root.querySelectorAll("*")) {
+          if (el.closest("template, script, style, noscript, [hidden], svg")) continue;
+          const cs = getComputedStyle(el);
+          if (cs.display === "none" || cs.visibility === "hidden" || el.getClientRects().length === 0) continue;
+          const text = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join(" ").trim();
+          if (!text) continue;
+          if (cs.clip === "rect(0px, 0px, 0px, 0px)" || (cs.position === "absolute" && el.offsetWidth <= 1)) continue;   // the visually-hidden text (.hd-sr)
+          const fg = parse(cs.color); if (!fg) continue;
+          let opacity = 1; const chain = [];
+          for (let e = el; e && e !== document.documentElement; e = e.parentElement) { const c = getComputedStyle(e); opacity *= Number(c.opacity); const bgc = parse(c.backgroundColor); if (bgc && bgc.a > 0) chain.unshift(bgc); }
+          const size = parseFloat(cs.fontSize), bold = Number(cs.fontWeight) >= 700;
+          const need = size >= 24 || (size >= 18.66 && bold) ? 3 : 4.5;
+          let worst = Infinity;
+          for (const n of NIGHTS) {
+            let bg = { r: n[0], g: n[1], b: n[2] };
+            for (const layer of chain) bg = over(layer, bg);
+            const ink = over({ ...fg, a: fg.a * opacity }, bg);
+            worst = Math.min(worst, ratio(ink, bg));
+          }
+          out.checked += 1;
+          if (!out.worst || worst < out.worst.ratio) out.worst = { ratio: +worst.toFixed(2), tag: el.tagName.toLowerCase() + (el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : ""), text: text.slice(0, 40) };
+          if (worst < need) out.fails.push({ ratio: +worst.toFixed(2), need, tag: el.tagName.toLowerCase() + (el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : ""), text: text.slice(0, 40), color: cs.color });
+        }
+        return out;
+      });
+      for (const [design, query] of [["the default design", ""], ["the ledger design", "?entry=ledger"]]) {
+        for (const signedIn of [false, true]) {
+          for (const colorScheme of ["dark", "light"]) {
+            const p = await newPage(browser, { signedIn, viewport: D });
+            await p.emulateMedia({ colorScheme });
+            await p.goto(`${BASE}/households/${A_SLUG}/${query}`, { waitUntil: "load" });
+            await ready(p);
+            if (signedIn) {
+              await p.waitForSelector("[data-hearth-bar] [data-hearth-own]:not([hidden])", { timeout: 15000 });
+              // the ledger keeps Needs you and the mail in a closed accordion panel: open it, so the owner's private parts are read too
+              if (query) await p.getByRole("button", { name: "Needs you and mail" }).click();
+              await p.waitForSelector("[data-hearth-slot=needs-you]:not([hidden])", { timeout: 15000 });
+            }
+            await p.waitForFunction(() => document.querySelector("[data-hd-reading]")?.hidden === true, null, { timeout: 15000 });
+            await p.waitForTimeout(500);
+            const r = await measure(p);
+            check(`⑱ legible: ${design}, ${signedIn ? "the owner's page (Needs you, the mail, the strip's links)" : "a visitor's"}, browser asked for ${colorScheme}: every one of ${r.checked} visible texts reads at AA (4.5:1; 3:1 for large text), worst ${r.worst?.ratio}:1 (${r.worst?.tag} “${r.worst?.text}”)`, r.checked > 20 && r.fails.length === 0, JSON.stringify(r.fails.slice(0, 6)));
+            await shot(p, `24-legible-${design.includes("ledger") ? "ledger" : "default"}-${signedIn ? "owner" : "visitor"}-${colorScheme}`, { fullPage: false });
+            await p.context().close();
+          }
+        }
+      }
     }
 
     // ── ⑦ no request left the machine ───────────────────────────────────────────

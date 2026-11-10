@@ -1,8 +1,8 @@
 // house-home.mjs — where "your household" goes, from what GET /me says (POS-984).
 //
 // Darko, 2026-10-19: "household is your sign-in". Signed in, the header's household link goes to the household's
-// own page, /households/<slug>/, where the Hearth draws the house and the band holds what only the signed-in human
-// sees. A resident's window is no longer the way in.
+// own page, /households/<slug>/, where the Hearth draws the house and is the whole page (what only the signed-in human
+// sees is drawn by the design's own private slots). A resident's window is no longer the way in.
 //
 // The office's /me answers `households: { <handle>: { key, slug, residents } }` (postmark-office src/households.mjs,
 // householdLookupOf), a garnish: it may be absent, and `slug` is null for a house nobody declared. A house with no

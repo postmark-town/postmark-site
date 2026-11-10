@@ -1,14 +1,14 @@
-// stage.mjs — the Hearth page's script: compose an entry, read the house, paint the slots (POS-959).
+// stage.mjs — the household page's script: compose a design, read the house, paint the slots (POS-959; the one page, POS-984).
 //
-// The page is server-rendered with the default entry, so the house's baked public face is there
-// without a script. This runs after, and does four things:
+// The page is server-rendered with the design it opens on, so the house's baked public face is there
+// without a script. This runs after, and does five things:
 //
-//   CHOOSE   asks the ONE selector, which-design.mjs § whichDesign, which entry to draw: a preview (`?entry=`, the picker), else the house's SAVED
-//            choice (the office keeps it; read signed out, choice.mjs), else the default. A preview is never saved; the picker's save is the one write (POS-962).
+//   CHOOSE   asks the ONE selector, which-design.mjs § whichDesign, which entry to draw: a preview (`?entry=`, the dropdown), else the house's SAVED
+//            choice (the office keeps it; read signed out, choice.mjs), else the default. A preview is never saved; the dropdown's save is the one write (POS-962).
 //   COMPOSE  puts a registered entry's sanitized markup on the stage and each slot's own part in
 //            its place (the same markup HearthSlot.astro rendered into a <template> per slot),
-//            sets the entry's sanitized stylesheet, and mounts the approved behaviors. The preview
-//            picker and `?entry=<id>` call it: ANY registered entry on ANY household. A preview is
+//            sets the entry's sanitized stylesheet, and mounts the approved behaviors. The dropdown
+//            and `?entry=<id>` call it: ANY registered entry on ANY household, for ANY reader. A preview is
 //            only that: nothing is saved, no office write is made, the URL is the whole state.
 //   READ     the reads the household page already makes (reads.mjs), with the reader's bearer only
 //            on the doorsteps of residents the reader's own sign-in holds, never anyone else's. The first
@@ -17,18 +17,21 @@
 //            numbers, the cards, the clocks), then hearth/paint.mjs for the rest.
 //   BEHAVE   behaviors.mjs on the template's own markup.
 //
+// THE STRIP (`[data-hearth-bar]`, Hearth.astro) is the site's, above the stage and outside every design. It holds the Hearth dropdown, the
+// house's-own-human links (add a resident, the likeness answer) and the one line that says the page is part-read. This file wires it: the
+// dropdown binds for every reader, the save controls and the links show for the house's own sign-in only.
+//
 // The stage root carries `data-hd` and the house's slug so paintHouse works on it unchanged; its
 // `data-hd-view` is `public` until the reader's sign-in holds a resident of this house.
 
 import { KEYS, tokenIsFresh } from "../auth.mjs";
 import { readHouse, readHearthExtras, officeOrigin } from "../household-dashboard/reads.mjs";
-import { paintHouse, writeLook } from "../household-dashboard/paint.mjs";
+import { paintHouse, paintReading, writeLook } from "../household-dashboard/paint.mjs";
 import { readingOf } from "../household-dashboard/fold.mjs";
 import { paintExtras, startCountdown } from "./paint.mjs";
 import { mountBehaviors } from "./behaviors.mjs";
 import { whichDesign } from "./which-design.mjs";
 import { notYours, meAnswered } from "./not-yours.mjs";
-import { mountBandBallots } from "./band-ballots.mjs";
 import { designNote, readSavedHearth } from "./choice.mjs";
 import { mountHearthPicker } from "./picker.mjs";
 
@@ -37,15 +40,16 @@ import { DEFAULT_ENTRY as DEFAULT } from "./slots.mjs";
 export function mountHearth(root) {
   const stage = root.querySelector("[data-hearth-stage]");
   if (!stage) return;
-  // the site's own band (HouseBand.astro) sits above the stage, outside every template: painted from the same reads
-  const band = root.querySelector("[data-hband]");
+  // the site's own strip (Hearth.astro) sits above the stage, outside every template
+  const bar = root.querySelector("[data-hearth-bar]");
   const json = (sel) => { try { return JSON.parse(root.querySelector(sel)?.textContent || "null"); } catch { return null; } };
   const data = json("[data-hearth-faces]") ?? {};
   const entries = json("[data-hearth-entries]") ?? [];
   const handles = data.handles ?? [];
   const faces = data.faces ?? {};
   const slug = root.dataset.hearthSlug || handles.join("+");
-  const seatHref = (h) => (root.dataset.hearthSlug ? `/households/${root.dataset.hearthSlug}/?resident=${encodeURIComponent(h)}` : `/residents/${encodeURIComponent(h)}/`);
+  // a resident's card, name and mentions go to that resident's own page: the household page draws each resident once and carries no pages of theirs
+  const seatHref = (h) => `/residents/${encodeURIComponent(h)}/`;
   const styleEl = root.querySelector("[data-hearth-css]");
   const note = root.querySelector("[data-hearth-note]");
   const picker = root.querySelector("[data-hearth-pick]");
@@ -68,14 +72,21 @@ export function mountHearth(root) {
   const phone = window.matchMedia("(max-width: 760px)");
   const ctx = { handles, faces, slug, seatHref, storage, filter: { kind: "all", who: "all" }, expanded: false };
   let reads = null, extras = null, extrasAsked = false, readFor = "", stopCount = () => {};
-  let ballots = null;   // the band's open ballots and their stake form (band-ballots.mjs): mounted once, for the house's own sign-in only
   // THE SAVED CHOICE (POS-962). `baked` is the build's own copy (Hearth.astro bakes house.hearth from households.json, the registry readSavedHearth reads): the first
-  // draw starts from it, so a house with a saved choice does not flash the default. The browser read corrects a stale one. `mounted` is the signed-in human's picker.
+  // draw starts from it, so a house with a saved choice does not flash the default. The browser read corrects a stale one. `mounted` is the dropdown, bound.
   const baked = root.dataset.hearthBaked || null;
   let knownSaved = baked;
   let mounted = null, readOk = false, savedRead, savedDone = false;
 
+  // THE STRIP'S OWN PARTS, for the house's own human only: "+ add a resident" and the likeness answer ship hidden. They do not wait for the
+  // reads (which can be slow): the reader's sign-in is known as soon as the layout's /me has answered. The office is still the enforcer of every act.
+  function paintStrip() {
+    const owner = mine().length > 0;
+    for (const e of bar?.querySelectorAll("[data-hearth-own]") ?? []) e.hidden = !owner;
+  }
+
   function draw() {
+    paintStrip();
     if (!reads) return;
     ctx.now = Date.now();
     ctx.phone = phone.matches;
@@ -83,15 +94,10 @@ export function mountHearth(root) {
     ctx.owner = ctx.mine.length > 0;
     ctx.reading = readingOf(reads);       // what is still out: every painter says "still reading" for it, never "nothing" or "did not answer"
     for (const b of root.querySelectorAll("[data-hd-signin]")) b.hidden = !document.querySelector("[data-auth-signin]") || !!token();
-    // signed in, but not as anyone of this house: say so, rather than an unanswered question (the band's own line)
+    // signed in, but not as anyone of this house: say so, rather than an unanswered question (the house slot's own line)
     // (not before /me has answered: a first sign-in's owner would see it flash, lib/hearth/not-yours.mjs)
-    for (const n of root.querySelectorAll("[data-hband-notyours]")) n.hidden = !notYours({ signedIn: !!token(), answered: meAnswered(sessionStorage), owner: ctx.owner });
-    if (band) paintHouse(band, reads, ctx);
-    // POS-502 in the band: only the house's own human loads the ballots and the stake form; a visitor never does
-    if (band && ctx.owner && !ballots) {
-      const section = band.querySelector("[data-hband-ballots]");
-      if (section) ballots = mountBandBallots(section);
-    }
+    for (const n of root.querySelectorAll("[data-hx-notyours]")) n.hidden = !notYours({ signedIn: !!token(), answered: meAnswered(sessionStorage), owner: ctx.owner });
+    if (bar) paintReading(bar, ctx.reading);
     mountPicker();
     paintHouse(stage, reads, ctx);
     paintExtras(stage, reads, extras, ctx);
@@ -104,7 +110,7 @@ export function mountHearth(root) {
 
   // THE FIRST READ PAINTS AS IT ARRIVES (POS-984). The reads are one per resident, and on a busy box the slowest decides when a page that waits for all of them
   // shows anything, so the stage paints each time a resident's reads settle or a house-wide read lands (readHouse's onProgress). A resident whose read failed
-  // is drawn as not read and never holds the others back. A read of a page that is already whole (a stake, a sign-in) is swapped in once, when it finishes, so
+  // is drawn as not read and never holds the others back. A read of a page that is already whole (a sign-in) is swapped in once, when it finishes, so
   // nothing that was on the page empties meanwhile; one that replaces a part-read page starts over, as the page has nothing complete to keep.
   let loadSeq = 0;
   async function load() {
@@ -158,23 +164,23 @@ export function mountHearth(root) {
     if (t.closest("[data-hd-seen]")) { writeLook(storage, slug, Date.now()); ctx.expanded = false; draw(); return; }
     if (t.closest("[data-hd-signin]")) document.querySelector("[data-auth-signin]")?.click();
   });
-  band?.addEventListener("click", (e) => {
-    if (e.target instanceof Element && e.target.closest("[data-hd-signin]")) document.querySelector("[data-auth-signin]")?.click();
-  });
   stage.addEventListener("change", (e) => {
     const sel = e.target instanceof Element ? e.target.closest("[data-hd-who]") : null;
     if (sel) { ctx.filter.who = sel.value; draw(); }
   });
-  // THE PICKER (POS-962): a preview draws another entry and keeps only the address (never a save); the save is picker.mjs's, behind a second yes.
+  // THE DROPDOWN (POS-962): a preview draws another entry and keeps only the address (never a save); the save is picker.mjs's, behind a second yes.
+  // It binds for EVERY reader, once, after the choice read has answered (or failed): anyone may preview. What only the house's own human has is the SAVE
+  // controls, which picker.mjs shows when `signedIn()` holds: a sign-in that holds one of this house's residents, and never on a failed read (the kept
+  // choice is not known then, so nothing is offered to save over it). A visitor's ask() and clear() do nothing.
   const pickerRoot = root.querySelector("[data-hearth-picker]");
   const api = officeOrigin();
-  // The picker is the house's signed-in human's, and MOUNTS only for them, the way the ballots do (draw(), behind the owner, and again on pm:lens through load()):
-  // for anyone else it is never bound, so a forced change or click does nothing. It also waits for the choice read to have answered: on a failed read there is no picker.
   function mountPicker() {
-    if (mounted || !pickerRoot || !savedDone || !readOk || mine().length === 0) return;
-    const section = pickerRoot.closest("[data-hband-hearth]");
-    if (section) section.hidden = false;
-    mounted = mountHearthPicker(pickerRoot, { entries, slug, saved: savedRead ?? null, token, api, signedIn: () => readOk && mine().length > 0, onDraw });
+    if (mounted || !pickerRoot || !savedDone) return;
+    mounted = mountHearthPicker(pickerRoot, {
+      entries, slug, saved: readOk ? (savedRead ?? null) : baked, token, api,
+      shown: root.dataset.hearthShowing,
+      signedIn: () => readOk && mine().length > 0, onDraw,
+    });
   }
   const onDraw = (id) => {
     try {
@@ -186,12 +192,8 @@ export function mountHearth(root) {
     compose(id);
   };
   phone.addEventListener?.("change", draw);
-  document.addEventListener("pm:lens", () => { load(); mounted?.refresh(); });
-  // a confirmed stake (the form raises pm:ballot-staked, bubbling): the band re-reads the ballot's stamps in place, and the house is
-  // read again so Needs you, the cards and the numbers show the resident's new balance
-  root.addEventListener("pm:ballot-staked", () => { ballots?.refresh(); readFor = ""; load(); });
-  // the household page keeps this seat and a tab per resident: coming back to the seat draws it against the clock again
-  document.addEventListener("pm:tab", (e) => { if (e.detail?.handle === "__house") draw(); });
+  document.addEventListener("pm:lens", () => { load(); mounted?.refresh(); paintStrip(); });
+  paintStrip();
 
   let asked = null;
   try { asked = new URL(location.href).searchParams.get("entry"); } catch { asked = null; }

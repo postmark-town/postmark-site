@@ -23,8 +23,10 @@ const at = (html, needle) => { const i = html.indexOf(needle); assert.ok(i >= 0,
 
 // POS-984 (Darko, 2026-11-09 14:34 EST): a declared house has ONE page, /households/<slug>/. Until 2026-11-09 these two
 // asserted a resident page of a shared house carried the seat's board (hidden, behind the Household tab) and that the
-// seat put the quests between "Since you last looked" and the residents. The seat is the Hearth now, and the quests sit
-// in the site's band above it, for the signed-in human; a resident's page of a declared house carries no seat at all.
+// seat put the quests between "Since you last looked" and the residents. The seat is the Hearth now; a resident's page of
+// a declared house carries no seat at all. Until 2026-11-10 the quests sat in the site's band above the Hearth, for the
+// signed-in human; the band is gone and the day's quests are off the household page (Darko, 17:14 EST: stale since the
+// quest log grew), so they remain only on an UNDECLARED shared house's seat (HouseDashboard), on its resident pages.
 test("a resident page of a shared house opens on the rail, whose first chip is a link to the household page, and carries no quest board",
   { skip: !built("residents", "wright", "index.html") }, () => {
     const html = page("residents", "wright", "index.html");
@@ -37,13 +39,12 @@ test("a resident page of a shared house opens on the rail, whose first chip is a
     assert.equal(house.indexOf("data-quests "), -1, "the board is on the household page only");
   });
 
-test("the household page puts the day's quests in the band above the design, and the design below",
+test("the household page carries no day's quests and no band: the design draws the house",
   { skip: !built("households", "starforge", "index.html") }, () => {
     const html = page("households", "starforge", "index.html");
-    const band = at(html, "data-hband ");
-    const board = at(html, "data-quests ");
-    const stage = at(html, "data-hearth-stage ");
-    assert.ok(band < board && board < stage, "band → quests → the design");
+    at(html, "data-hearth-stage ");
+    assert.equal(html.includes("data-quests "), false, "no quest board on the household page");
+    assert.equal(html.includes("data-hband"), false, "and no band to host one");
     assert.equal(html.includes("data-hd-quests"), false, "the dashboard's old small quest panel is gone");
     assert.equal(html.includes('id="hd-feed-h"'), false, "the old dashboard's feed is not on the one page: the design draws the house");
   });
@@ -88,14 +89,15 @@ test("The Mail's letter cards are on the letter paper", () => {
 // Keemin, 2026-09-27: "solo residents should still have a household page now
 // that households are the primary key right". A declared house of one opens on
 // its seat: the rail, the dashboard, and the board in its slot.
-test("a declared house of one has its household page: rail, band with the board, then the design",
+test("a declared house of one has its household page: the strip, then the design, with no rail, no band and no board",
   { skip: !built("households", "casa-nera", "index.html") }, () => {
     const html = page("households", "casa-nera", "index.html");
     const house = html.slice(at(html, "data-house "));
-    assert.ok(at(house, "data-house-tabs") < at(house, "data-hband "), "the rail tops the page");
-    const board = at(house, "data-quests ");
-    assert.ok(at(house, "data-hband ") < board && board < at(house, "data-hearth-stage "), "band → quests → the design");
-    assert.equal(/data-shared/.test(house.slice(0, 200)), false, "a house of one is not marked shared, so its whole board shows");
+    assert.ok(at(house, "data-hearth-bar") < at(house, "data-hearth-stage "), "the strip tops the design");
+    assert.equal(house.includes("data-house-tabs"), false, "no rail of residents: the design draws each resident once");
+    assert.equal(house.includes("data-hband"), false, "no band");
+    assert.equal(house.includes("data-quests "), false, "no board");
+    assert.equal(/data-shared/.test(house.slice(0, 200)), false, "a house of one is not marked shared");
   });
 
 test("a solo resident's own page stays folded: no rail, no dashboard",

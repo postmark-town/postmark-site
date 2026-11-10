@@ -239,7 +239,7 @@ function page() {
   return { root, reading, box, needs, feed, cards };
 }
 
-test("§ 4 part-read: the band says how many residents are still out, the feed is not 'nothing', Needs you is not the calm line", () => {
+test("§ 4 part-read: the page says (in the strip) how many residents are still out, the feed is not 'nothing', Needs you is not the calm line", () => {
   const p = page();
   const reads = { doorsteps: { a: { stamps: { assets: 1 } } }, outboxes: { a: [] }, quests: {}, pending: ["b"], waiting: [] };
   paintHouse(p.root, reads, { ...base, reading: readingOf(reads) });
@@ -356,6 +356,9 @@ test("§ 5 (text pin) the stage asks for progress on the first read and draws th
   assert.match(stage, /ctx\.reading = readingOf\(reads\);/);
   assert.ok(stage.indexOf("ctx.reading = readingOf(reads);") < stage.indexOf("paintHouse(stage, reads, ctx)"), "the reading state is set before the stage paints");
   assert.ok(!/await Promise\.all\(\[\s*readHouse/.test(stage), "the stage no longer awaits the house's reads together with the posts");
-  const band = readFileSync(resolve(ROOT, "src/components/household-dashboard/HouseBand.astro"), "utf8");
-  assert.match(band, /<p class="hband-reading" data-hd-reading role="status" hidden><\/p>/, "the band carries the one reading line, outside every design");
+  // until 2026-11-10 the band carried this line; the household page's strip does now, still outside every design, and the stage paints it into the strip
+  const strip = readFileSync(resolve(ROOT, "src/components/hearth/Hearth.astro"), "utf8");
+  assert.match(strip, /<p class="hearth-reading" data-hd-reading role="status" hidden><\/p>/, "the strip carries the one reading line, outside every design");
+  assert.ok(strip.indexOf('data-hd-reading') < strip.indexOf("<!--hearth-entry-->"), "above, and outside, the entry's region");
+  assert.match(stage, /if \(bar\) paintReading\(bar, ctx\.reading\);/, "the stage paints it, from the same reading state");
 });

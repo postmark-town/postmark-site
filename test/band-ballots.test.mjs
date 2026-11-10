@@ -162,12 +162,19 @@ test("a confirmed stake, through the real form: the form raises pm:ballot-staked
 
 // ── the wiring (source pins, labelled as such; the browser walk reads the behaviour) ──
 
-test("PIN the stage: the ballots mount only for the house's own sign-in, once; a stake re-reads the ballot and the house", () => {
+// Until 2026-11-10 these two held the band's wiring: the stage mounted the ballots for the house's own sign-in, and the built page shipped the section.
+// The band is gone (Darko, 17:14–17:28 EST: the theme is the page; the stake form is off the household page and on /votes/), so they are inverted:
+// nothing a household page loads carries the ballots, and /votes/ is where the form is mounted.
+test("PIN the household page carries no ballots: the stage imports neither module, and /votes/ is where the stake form is mounted", () => {
   const stage = read("src/lib/hearth/stage.mjs");
-  assert.match(stage, /import \{ mountBandBallots \} from "\.\/band-ballots\.mjs";/);
-  assert.match(stage, /if \(band && ctx\.owner && !ballots\) \{\s*const section = band\.querySelector\("\[data-hband-ballots\]"\);\s*if \(section\) ballots = mountBandBallots\(section\);/, "an owner, once, into the band's own section");
-  assert.equal((stage.match(/mountBandBallots\(/g) ?? []).length, 1, "one call site, the owner's");
-  assert.match(stage, /root\.addEventListener\("pm:ballot-staked", \(\) => \{ ballots\?\.refresh\(\); readFor = ""; load\(\); \}\);/);
+  assert.ok(!/band-ballots|ballot-stake|mountBandBallots|pm:ballot-staked/.test(stage), "the household page's script has no ballots and no stake form");
+  for (const f of ["src/components/hearth/Hearth.astro", "town/components/HouseholdPage.astro", "town/components/Household.astro", "town/pages/households/[slug].astro"]) {
+    assert.ok(!/band-ballots|ballot-stake|data-hb-|hband/.test(read(f)), `${f} names no ballots and no band`);
+  }
+  const votes = read("town/pages/votes/index.astro");
+  assert.match(votes, /import \{ mountBallotStake \} from "@\/lib\/ballot-stake\.mjs";/, "the form is /votes/'s");
+  assert.match(votes, /mountBallotStake\(slot, \{ topic: t\.topic, choices: t\.candidates \}\)/, "mounted under each STAKING ballot");
+  assert.match(votes, /if \(t\.status !== "staking"\) return;/);
 });
 
 test("PIN the words stay text: the band's ballots build no markup from office words, and the form's one module does not either", () => {
@@ -177,13 +184,12 @@ test("PIN the words stay text: the band's ballots build no markup from office wo
   }
 });
 
-test("built: the band ships the ballots section empty and hidden, inside the private body, above the quests and outside the entry region; a visitor's page carries no form", { skip: !built }, () => {
-  for (const slug of fs.readdirSync(path.join(DIST, "households")).filter((s) => fs.existsSync(path.join(DIST, "households", s, "index.html")))) {
+test("built: no household page carries a ballots section or a stake form, and /votes/ still ships the slot the form mounts into", { skip: !built }, () => {
+  const slugs = fs.readdirSync(path.join(DIST, "households")).filter((s) => fs.existsSync(path.join(DIST, "households", s, "index.html")));
+  assert.ok(slugs.length > 10, `household pages read: ${slugs.length}`);
+  for (const slug of slugs) {
     const html = fs.readFileSync(path.join(DIST, "households", slug, "index.html"), "utf8");
-    const own = html.indexOf('class="hband-own" data-private');
-    const sec = html.indexOf("data-hband-ballots ");
-    assert.ok(own > 0 && sec > own && sec < html.indexOf("data-quests ") && sec < html.indexOf("<!--hearth-entry-->"), `${slug}: in the private band, above the quests, outside the region`);
-    assert.match(html.slice(sec, sec + 160), /^data-hband-ballots hidden/, `${slug}: ships hidden`);
-    assert.ok(!/class="bs[ "]|bs-form|bs-confirm|data-hb-stake|data-hb-ballot/.test(html), `${slug}: no stake form in the static page: it is drawn at runtime, for the owner only (a resident’s own prose may say stake-vote, so the form’s markers are what is looked for)`);
+    assert.ok(!/data-hband|hband-|data-hb-ballot|data-hb-stake|class="bs[ "]|bs-form|bs-confirm/.test(html), `${slug}: no band, no ballots section and no stake form (a resident’s own prose may say stake-vote, so the form’s markers are what is looked for)`);
   }
+  assert.ok(fs.readFileSync(path.join(DIST, "votes", "index.html"), "utf8").includes("data-votes"), "/votes/ is built, with the box the tally and the form are drawn into");
 });

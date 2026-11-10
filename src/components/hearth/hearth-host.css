@@ -109,7 +109,7 @@
 .hearth-stage .hd-needs li { padding: 0.65em 0; border-top: 1px dashed rgba(42, 33, 24, 0.25); }
 .hearth-stage .hd-needs li:first-child { border-top: 0; }
 .hearth-stage .hd-needs .k { font-family: var(--pm-mono); font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: #8a2f1f; }
-.hearth-stage .hd-needs .hd-calm { color: #3a7d3a; }
+.hearth-stage .hd-needs .hd-calm { color: #2d6a2d; }   /* the calm green, darkened to read on the paper (it was 4.3:1 there; the 1.4 lift in --hx-ok is for the dark glass) */
 .hearth-stage .hd-needs p { margin: 0.15em 0 0.25em; font-size: 0.93rem; }
 .hearth-stage .hd-needs a, .hearth-stage .hd-needs .hd-who { color: var(--hx-paper-ink); font-size: 0.9rem; }
 
@@ -183,39 +183,54 @@
   .hearth-stage .hx-bar-row { grid-template-columns: minmax(5em, 8em) minmax(0, 1fr) 3em; }
 }
 
-/* ── the site's own band stands in for a design's private copies (POS-984) ──
- * The band above every design (household-dashboard/HouseBand.astro) carries the house's Needs you and its
- * "on the next boat" line (the letters waiting for the crossing). A design may still place <hearth-needs-you>,
- * <hearth-mail> and a feed with a boat line (their markers stay valid); the private mail summary repeats what the band
- * says, so on the one page the band is where they are shown, once. */
-.hearth-stage [data-hearth-slot="needs-you"], .hearth-stage [data-hearth-slot="mail"], .hearth-stage [data-hd-boat] { display: none !important; }
-
 /* ── the host's frame around the design (POS-984) ──
  * A template's `:root`, `html` and `body` rules land on its own stage, where `margin` and `transform` are allowed, and the
  * stage's own `contain: paint` clips its children, not itself. This frame clips the stage (paint containment) and is its
  * own formatting context (a negative margin cannot collapse out through it), so a design can only move itself inside it,
- * never over the site's band above. */
+ * never over the site's strip above. */
 .hearth-frame { contain: paint; display: flow-root; }
 
-/* ── the site's own chrome above the stage: never part of a template ── */
-.hearth { --hx-chrome-ink: #cdc2ab; color: var(--hx-chrome-ink); }
+/* ── the site's own strip above the stage: never part of a template (POS-984) ──
+ * One thin row: where you are, the Hearth dropdown, and (for the house's own human) two links. Every ink here is a token, and each is paired with
+ * the surface it sits on: the strip's ink is read on the page's night (the site has one colour scheme, the dark `color-scheme: dark` of global.css,
+ * and no light one), the field's ink on the field. No ink is borrowed from another surface; the contrast of every pair is held by the walk (qa-shots/hearth-walk.mjs ⑱). */
+.hearth {
+  --hx-chrome-ink: #cdc2ab;             /* text on the page's night */
+  --hx-chrome-link: #e8c48b;            /* links on the page's night */
+  --hx-chrome-field: #0d1426;           /* a field's surface ... */
+  --hx-chrome-field-ink: #f4e9d7;       /* ... and the ink that is read on it */
+  --hx-chrome-line: rgba(232, 196, 139, 0.45);
+  color: var(--hx-chrome-ink);
+}
 .hearth .hd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.hearth-bar { display: grid; gap: 0.6em; padding: 0 0 0.8em; margin-bottom: 1em; }
-.hearth-bar:not(:has(.hearth-note:not([hidden]))) { padding: 0; margin: 0; }
-.hearth-picker { display: inline-flex; align-items: center; gap: 0.5em; font-family: var(--pm-mono); font-size: 0.72rem; }
-.hearth-picker select { font: inherit; background: rgba(13, 20, 38, 0.8); color: #f4e9d7; border: 1px solid rgba(232, 196, 139, 0.4); border-radius: 6px; padding: 3px 8px; max-width: 100%; }
-.hearth-note { margin: 0; font-size: 0.85rem; opacity: 0.85; }
-.hearth-holo-note { margin: 1.2em 0 0; font-size: 0.8rem; opacity: 0.85; }
+.hearth-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.3em 1.4em; margin: 0 0 0.7em; padding: 0 0 0.5em; border-bottom: 1px dashed var(--hx-chrome-line); font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.04em; }
+.hearth-bar [hidden] { display: none !important; }
+.hearth-crumbs { margin: 0; text-transform: uppercase; letter-spacing: 0.14em; color: var(--hx-chrome-link); }
+.hearth-crumbs a { color: var(--hx-chrome-link); text-decoration: none; }
+.hearth-crumbs a:hover, .hearth-crumbs a:focus-visible { text-decoration: underline; }
+.hearth-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.3em 1.2em; }
+.hearth-reading { margin: 0; color: var(--hx-chrome-ink); }
+.hearth-own { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2em 1.2em; margin: 0; }
+.hearth-own a { color: var(--hx-chrome-link); text-underline-offset: 2px; }
+.hearth-own .house-add { text-decoration: none; border-bottom: 1px dotted currentColor; }
+.hearth-picker { display: inline-flex; align-items: center; gap: 0.5em; }
+.hearth-picker select { font: inherit; background: var(--hx-chrome-field); color: var(--hx-chrome-field-ink); border: 1px solid var(--hx-chrome-line); border-radius: 6px; padding: 2px 8px; max-width: 100%; }
+.hearth-picker select:disabled { opacity: 0.6; }
+.hearth-note { margin: 0; font-size: 0.85rem; }
+.hearth-bar .hearth-note { font: inherit; }   /* a note in the strip speaks in the strip's own small type */
+.hearth-bar > .hearth-note { flex: 1 1 100%; }
+.hearth-holo-note { margin: 1.2em 0 0; font-size: 0.8rem; }
 .hearth-holo-note[hidden] { display: none; }
 .hearth-note[hidden] { display: none; }
 
-/* the picker band (POS-962): the preview select every visitor has, and the save controls the house's signed-in human has */
-.hearth-pickerband { display: flex; flex-direction: column; gap: 0.5em; align-items: flex-start; }
-.hearth-owner { display: flex; flex-direction: column; gap: 0.5em; align-items: flex-start; }
+/* the dropdown (POS-962): the preview select every reader has, and the save controls the house's signed-in human has. It sits inline in the strip;
+ * what a preview or a save has to say appears beside it only while it has something to say. */
+.hearth-pickerband { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3em 0.9em; }
+.hearth-owner { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3em 0.9em; }
 .hearth-owner[hidden], .hearth-pickerband [hidden] { display: none; }
 .hearth-owner-acts, .hearth-confirm { display: flex; flex-wrap: wrap; gap: 0.5em; align-items: center; }
-.hearth-confirm { border: 1px solid rgba(232, 196, 139, 0.45); border-radius: 8px; padding: 0.6em 0.8em; background: rgba(13, 20, 38, 0.6); }
-.hearth-confirm p { margin: 0; flex: 1 1 100%; font-size: 0.9rem; }
-.hearth-pickerband button { font: inherit; font-family: var(--pm-mono); font-size: 0.78rem; padding: 0.4em 0.9em; border-radius: 999px; cursor: pointer; border: 1px solid rgba(232, 196, 139, 0.6); background: rgba(13, 20, 38, 0.8); color: #f4e9d7; }
+.hearth-confirm { border: 1px solid var(--hx-chrome-line); border-radius: 8px; padding: 0.4em 0.7em; background: var(--hx-chrome-field); color: var(--hx-chrome-field-ink); }
+.hearth-confirm p { margin: 0; font-size: 0.8rem; }
+.hearth-pickerband button { font: inherit; padding: 0.2em 0.8em; border-radius: 999px; cursor: pointer; border: 1px solid var(--hx-chrome-line); background: var(--hx-chrome-field); color: var(--hx-chrome-field-ink); }
 .hearth-pickerband button:disabled { opacity: 0.5; cursor: default; }
-@media (max-width: 520px) { .hearth-pickerband { align-items: stretch; } .hearth-pickerband button { flex: 1 1 100%; } }
+@media (max-width: 520px) { .hearth-bar { font-size: 0.68rem; } .hearth-tools, .hearth-pickerband, .hearth-owner { justify-content: flex-start; } }
