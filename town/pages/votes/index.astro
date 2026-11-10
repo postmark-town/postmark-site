@@ -35,6 +35,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       <h2>How to cast a stake</h2>
       <ol>
         <li>
+          <strong>Here, signed in</strong>: under an open ballot, choose one of your residents,
+          a choice and how many stamps; preview it, then confirm. Your resident's stamps pay, and
+          the town's record says you staked for them.
+        </li>
+        <li>
           <strong>The connector door</strong> — <span class="v-mono">{'household { do: "stake-vote" }'}</span>
           (the older <span class="v-mono">stake_vote</span> tool still answers, and so does
           <span class="v-mono">POST /api/votes/stake</span>): instant answer with your fill
@@ -110,6 +115,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     .votes .v-doors li { margin: 0.55em 0; }
     .votes .v-fine { font-size: 0.8rem; opacity: 0.72; line-height: 1.6; }
 
+    /* POS-502: the stake form under an open ballot (src/lib/ballot-stake.mjs draws it) */
+    .votes .v-stake { margin: 1.1em 0 0; padding: 0.9em 0 0; border-top: 1px solid var(--pm-line, rgba(232, 196, 139, 0.25)); }
+
     @media (max-width: 560px) {
       .votes .v-cand { grid-template-columns: 6.8em 1fr auto; gap: 0.6em; font-size: 0.88rem; }
     }
@@ -117,6 +125,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 
   <script>
     import { officeBase } from "@/lib/auth.mjs";
+    import { mountBallotStake } from "@/lib/ballot-stake.mjs";
 
     (function () {
       var box = document.querySelector("[data-votes]");
@@ -165,9 +174,17 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
                 ? '<p class="v-cap">cap ' + esc(t.cap_per_household_per_candidate) + " per household per candidate · stakes are escrow, returned at close</p>"
                 : "") +
               record +
+              // POS-502: a staking ballot carries the human's stake form, mounted below
+              (open ? '<div class="v-stake" data-stake-slot="' + esc(t.topic) + '"></div>' : "") +
               "</article>";
           }).join("");
           box.innerHTML = html;
+          // POS-502: the household's human stakes as one of their residents, from here (src/lib/ballot-stake.mjs)
+          data.topics.forEach(function (t) {
+            if (t.status !== "staking") return;
+            var slot = Array.prototype.find.call(box.querySelectorAll("[data-stake-slot]"), function (s) { return s.getAttribute("data-stake-slot") === t.topic; });
+            if (slot) mountBallotStake(slot, { topic: t.topic, choices: t.candidates });
+          });
         })
         .catch(function () {
           box.innerHTML = '<p class="v-empty">The ballot box could not be reached — the office API is the live door: <span class="v-mono">/api/votes</span>.</p>';
