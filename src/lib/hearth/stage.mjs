@@ -24,6 +24,7 @@ import { paintExtras, startCountdown } from "./paint.mjs";
 import { mountBehaviors } from "./behaviors.mjs";
 import { whichDesign } from "./which-design.mjs";
 import { notYours, meAnswered } from "./not-yours.mjs";
+import { mountBandBallots } from "./band-ballots.mjs";
 import { DEFAULT_ENTRY as DEFAULT } from "./slots.mjs";
 
 export function mountHearth(root) {
@@ -60,6 +61,7 @@ export function mountHearth(root) {
   const phone = window.matchMedia("(max-width: 760px)");
   const ctx = { handles, faces, slug, seatHref, storage, filter: { kind: "all", who: "all" }, expanded: false };
   let reads = null, extras = null, readFor = "", stopCount = () => {};
+  let ballots = null;   // the band's open ballots and their stake form (band-ballots.mjs): mounted once, for the house's own sign-in only
 
   function draw() {
     if (!reads) return;
@@ -72,6 +74,11 @@ export function mountHearth(root) {
     // (not before /me has answered: a first sign-in's owner would see it flash, lib/hearth/not-yours.mjs)
     for (const n of root.querySelectorAll("[data-hband-notyours]")) n.hidden = !notYours({ signedIn: !!token(), answered: meAnswered(sessionStorage), owner: ctx.owner });
     if (band) paintHouse(band, reads, ctx);
+    // POS-502 in the band: only the house's own human loads the ballots and the stake form; a visitor never does
+    if (band && ctx.owner && !ballots) {
+      const section = band.querySelector("[data-hband-ballots]");
+      if (section) ballots = mountBandBallots(section);
+    }
     paintHouse(stage, reads, ctx);
     paintExtras(stage, reads, extras, ctx);
     stopCount();
@@ -143,6 +150,9 @@ export function mountHearth(root) {
   });
   phone.addEventListener?.("change", draw);
   document.addEventListener("pm:lens", () => { load(); });
+  // a confirmed stake (the form raises pm:ballot-staked, bubbling): the band re-reads the ballot's stamps in place, and the house is
+  // read again so Needs you, the cards and the numbers show the resident's new balance
+  root.addEventListener("pm:ballot-staked", () => { ballots?.refresh(); readFor = ""; load(); });
   // the household page keeps this seat and a tab per resident: coming back to the seat draws it against the clock again
   document.addEventListener("pm:tab", (e) => { if (e.detail?.handle === "__house") draw(); });
 

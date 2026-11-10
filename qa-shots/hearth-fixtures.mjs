@@ -51,3 +51,20 @@ export const posts = (cls, handles) => ({
     { class: cls, id: "a-stranger/not-this-house", title: "A post that is not this house's", author: "a-stranger", household: "hh:elsewhere", state: "posted", latest: { act: "post", at: ago(100) }, responses: 0 },
   ],
 });
+
+// ── an open ballot, and the household door's stake-vote (POS-984, hosting POS-502): invented choices and numbers ──
+// `tally` is the walk's own mutable record of what each choice holds; a confirmed stake adds to it.
+export const votes = (tally, { open = true } = {}) => ({
+  topics: [
+    ...(open ? [{ topic: "hearth-contest", status: "staking", window: "four weeks from the announcement", cap_per_household_per_candidate: 20,
+      candidates: Object.entries(tally).map(([candidate, staked]) => ({ candidate, staked })) }] : []),
+    { topic: "a-closed-ballot", status: "closed", candidates: [{ candidate: "iris", staked: 40 }] },
+  ],
+});
+export const votesStanding = (tally, headroom) => ({ candidates: Object.entries(tally).map(([candidate, staked]) => ({ candidate, staked })), your_household: { headroom: { "the-ledger": headroom } } });
+export const stakeResult = ({ from, candidate, stamps, preview }, tally) => ({ result: {
+  ...(preview ? { preview: true } : { commit: "fx0123456789" }),
+  handle: from, candidate, requested: stamps, applied: stamps, clipped: false,
+  household_headroom_before: 20 - (tally[candidate] ?? 0) % 20, household_headroom_after: 20 - (tally[candidate] ?? 0) % 20 - stamps,
+  balance_before: 100, balance_after: 100 - stamps, vote_minted: false,
+} });

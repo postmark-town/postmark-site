@@ -27,6 +27,7 @@
 // Playwright is resolved from the PLAYWRIGHT env, else the world checkout's (installed, not installed here).
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as fx from "./hearth-fixtures.mjs";
@@ -37,7 +38,7 @@ const { chromium } = createRequire(import.meta.url)(PW);
 const BASE = process.env.BASE ?? "http://127.0.0.1:4399";
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 // POS-984: the walk now covers the ONE household page (/households/<slug>/), owner and visitor; the screenshots land beside it by default
-const OUT = process.env.OUT ?? path.join(ROOT, "qa-shots", "pos984");
+const OUT = process.env.OUT ?? path.join(os.tmpdir(), "pos984-walk");   // never inside a pool tree
 fs.mkdirSync(OUT, { recursive: true });
 const households = JSON.parse(fs.readFileSync(path.join(ROOT, "src/data/postmark/households.json"), "utf8")).households;
 const A_SLUG = "dreme-mynd", B_SLUG = "fox-hearth";
@@ -53,7 +54,10 @@ const log = [];            // every call the page made to the office: { path, au
 const unanswered = [];     // requests that left the machine unanswered
 let fail = new Set();      // path prefixes the fixture office answers 500 to, for the "missing data" scenario
 
-function answer(url, headers) {
+// the walk's open ballot: what each choice holds, and whether the office lists a staking ballot at all
+let tally = { "the-ledger": 11, "starter-kit": 3 };
+let ballotOpen = true;
+function answer(url, headers, method = "GET", postData = null) {
   const u = new URL(url);
   const p = u.pathname.replace(/^\/api(?=\/)/, "");
   const auth = headers.authorization ?? null;
@@ -72,6 +76,15 @@ function answer(url, headers) {
   if (p === "/calendar") return { status: 200, body: fx.calendar(A[0]) };
   if (p === "/posts") return { status: 200, body: fx.posts(u.searchParams.get("class"), A) };
   // GET /me, as the office answers it: the handles, and the household block per handle (postmark-office src/households.mjs householdLookupOf)
+  if (p === "/votes") return { status: 200, body: fx.votes(tally, { open: ballotOpen }) };
+  if (p.startsWith("/votes/")) return { status: 200, body: fx.votesStanding(tally, 20 - (tally["the-ledger"] ?? 0) % 20) };
+  if (p === "/household" && method === "POST") {
+    const b = JSON.parse(postData ?? "{}"); const args = b.args ?? {};
+    if (auth !== `Bearer ${OWNER_TOKEN}` || !A.includes(args.from)) return { status: 403, body: { error: "bounce", code: 403, defect: "not your resident" } };
+    const r = fx.stakeResult(args, tally);
+    if (!args.preview) tally = { ...tally, [args.candidate]: (tally[args.candidate] ?? 0) + Number(args.stamps) };
+    return { status: 200, body: r };
+  }
   if (p === "/me") return auth === `Bearer ${OWNER_TOKEN}` ? { status: 200, body: { handles: A, households: Object.fromEntries(A.map((h) => [h, { key: A_SLUG, slug: A_SLUG, residents: [...A].sort() }])) } } : { status: 401, body: {} };
   return { status: 404, body: { error: "fixture: no such door " + p } };
 }
@@ -102,7 +115,7 @@ async function newPage(browser, { signedIn = false, pendingMe = 0, viewport = { 
     const office = url.hostname === "postmark.town" || (local && url.pathname.startsWith("/api/"));
     if (office) {
       if (pendingMe > 0 && url.pathname.replace(/^\/api(?=\/)/, "") === "/me") await new Promise((r) => setTimeout(r, pendingMe));
-      const a = answer(req.url(), req.headers());
+      const a = answer(req.url(), req.headers(), req.method(), req.postData());
       log.push({ path: url.pathname.replace(/^\/api(?=\/)/, "") + url.search, auth: req.headers().authorization ?? null, status: a.status });
       return route.fulfill({ status: a.status, contentType: "application/json", body: JSON.stringify(a.body), headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" } });
     }
@@ -566,6 +579,76 @@ const run = async () => {
       check("⑪ the visitor's page at 390px: no sideways scroll", (await vp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 1);
       await shot(vp, "15-one-page-visitor-phone", { fullPage: true });
       await vp.context().close();
+    }
+
+    // ── ⑬ THE BAND HOSTS THE BALLOT STAKE (POS-984 hosting POS-502): the owner stakes from the household page ──
+    {
+      tally = { "the-ledger": 11, "starter-kit": 3 };
+      ballotOpen = true;
+      // a visitor: nothing about the ballot is read, drawn or loaded
+      log.length = 0;
+      const v = await newPage(browser);
+      await v.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await ready(v);
+      await v.waitForTimeout(800);
+      check("⑬ a visitor sees no ballot and no stake form, and the page never read the ballot", !(await visible(v, "[data-hband-ballots]")) && (await v.locator(".bs-form, [data-hb-ballot]").count()) === 0 && !log.some((l) => l.path.startsWith("/votes")), JSON.stringify(log.filter((l) => l.path.startsWith("/votes"))));
+      await v.context().close();
+
+      // another house's sign-in: not the owner, so the same
+      log.length = 0;
+      const n = await newPage(browser, { signedIn: true });
+      await n.goto(`${BASE}/households/${B_SLUG}/`, { waitUntil: "load" });
+      await ready(n);
+      await n.waitForSelector("[data-hband-notyours]:not([hidden])", { timeout: 15000 });
+      await n.waitForTimeout(500);
+      check("⑬ a signed-in reader of ANOTHER house sees no stake form either, and loads no ballot", (await n.locator(".bs-form, [data-hb-ballot]").count()) === 0 && !log.some((l) => l.path.startsWith("/votes")));
+      await n.context().close();
+
+      // the owner: the ballot in the band, the form, a preview, a confirm, a receipt, and the band refreshing
+      log.length = 0;
+      const o = await newPage(browser, { signedIn: true });
+      await o.addInitScript(() => { window.__staked = []; document.addEventListener("pm:ballot-staked", (e) => window.__staked.push(e.detail)); });
+      await o.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await ready(o);
+      await o.waitForSelector("[data-hband] [data-hband-ballots]:not([hidden]) .bs-form:not([hidden])", { timeout: 20000 });
+      check("⑬ the owner's band lists the open ballot with its choices' stamps and the cap", /Hearth Contest/.test((await text(o, "[data-hband-ballots]")) ?? "") && (await text(o, '[data-hb-staked="the-ledger"]')) === "11" && (await text(o, '[data-hb-staked="starter-kit"]')) === "3" && /cap 20/.test((await text(o, "[data-hband-ballots]")) ?? ""), await text(o, "[data-hband-ballots]"));
+      check("⑬ the closed ballot is not staked on: one block, for the staking one", (await o.locator("[data-hb-ballot]").count()) === 1);
+      check("⑬ the stake form is in the band, above the design, with the owner's residents and the ballot's choices", await o.evaluate((names) => {
+        const f = document.querySelector("[data-hband] .bs-form"); const s = document.querySelector("[data-hearth-stage]");
+        const from = [...f.querySelectorAll('[name="from"] option')].map((x) => x.value); const on = [...f.querySelectorAll('[name="candidate"] option')].map((x) => x.value);
+        return !!(f.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING) && JSON.stringify(from) === JSON.stringify(names.A) && JSON.stringify(on) === JSON.stringify(["the-ledger", "starter-kit"]);
+      }, { A }));
+      await shot(o, "17-band-ballot-owner-desktop", { fullPage: false });
+      await o.selectOption('[data-hband] [name="from"]', A[0]);
+      await o.selectOption('[data-hband] [name="candidate"]', "the-ledger");
+      await o.fill('[data-hband] [name="stamps"]', "5");
+      await o.click("[data-hband] .bs-preview");
+      await o.waitForSelector("[data-hband] .bs-confirm:not([hidden])", { timeout: 10000 });
+      check("⑬ a preview says what would happen and offers the confirm; nothing is staked yet", /would stake 5 of 5 on the-ledger/.test((await text(o, "[data-hband] .bs-out")) ?? "") && (await text(o, '[data-hb-staked="the-ledger"]')) === "11" && log.filter((l) => l.path === "/household").length === 1);
+      const doorstepsBefore = log.filter((l) => l.path.startsWith("/doorstep/")).length;
+      await o.click("[data-hband] .bs-confirm");
+      await o.waitForSelector("[data-hband] .bs-out.staked", { timeout: 10000 });
+      check("⑬ a confirm gives the receipt", /staked 5 of 5 on the-ledger/.test((await text(o, "[data-hband] .bs-out")) ?? ""), await text(o, "[data-hband] .bs-out"));
+      check("⑬ the stake raised pm:ballot-staked, with the topic, the choice and the resident", JSON.stringify(await o.evaluate(() => window.__staked)) === JSON.stringify([{ topic: "hearth-contest", candidate: "the-ledger", from: A[0] }]), JSON.stringify(await o.evaluate(() => window.__staked)));
+      await o.waitForFunction(() => document.querySelector('[data-hb-staked="the-ledger"]')?.textContent === "16", null, { timeout: 10000 }).catch(() => {});
+      check("⑬ the band refreshed: the choice now holds 16, and the receipt is still on screen", (await text(o, '[data-hb-staked="the-ledger"]')) === "16" && /staked 5 of 5 on the-ledger/.test((await text(o, "[data-hband] .bs-out")) ?? ""), await text(o, '[data-hb-staked="the-ledger"]'));
+      check("⑬ and the house was read again (the doorsteps, so Needs you, the cards and the numbers follow)", log.filter((l) => l.path.startsWith("/doorstep/")).length > doorstepsBefore, `${doorstepsBefore} → ${log.filter((l) => l.path.startsWith("/doorstep/")).length}`);
+      const stakes = log.filter((l) => l.path === "/household");
+      check("⑬ exactly one preview and one confirm went to the office, each with the owner's bearer", stakes.length === 2 && stakes.every((l) => l.auth === `Bearer ${OWNER_TOKEN}`), JSON.stringify(stakes));
+      await shot(o, "18-band-ballot-staked-desktop", { fullPage: false });
+      await cleanUnderPolicy(o, "⑬ (the stake form, a preview and a confirm)");
+      await o.context().close();
+
+      // no open ballot: the band draws nothing about it
+      ballotOpen = false;
+      const none = await newPage(browser, { signedIn: true });
+      await none.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await ready(none);
+      await none.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 15000 });
+      await none.waitForTimeout(800);
+      check("⑬ with no staking ballot the band shows no ballot section and no form", !(await visible(none, "[data-hband-ballots]")) && (await none.locator(".bs-form").count()) === 0);
+      await none.context().close();
+      ballotOpen = true;
     }
 
     // ── ⑦ no request left the machine ───────────────────────────────────────────

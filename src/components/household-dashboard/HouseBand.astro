@@ -80,6 +80,12 @@ const likeness = likenessWords(house, faces.length);
     {/* letters written that have not sailed yet: the next boat (painted by paintHouse) */}
     <p class="hd-boat" data-hd-boat hidden></p>
 
+    {/* ═════════ OPEN BALLOTS, and the stake form (POS-502, hosted here by POS-984) ═════════
+         Drawn by lib/hearth/band-ballots.mjs for the house's own sign-in only; hidden until the office lists a staking ballot. */}
+    <section class="hband-ballots" data-hband-ballots hidden aria-labelledby="hband-ballots-h">
+      <h2 id="hband-ballots-h">Open ballots</h2>
+    </section>
+
     {/* ═════════ THE DAY'S QUESTS (Household.astro hands in the board) ═════════ */}
     <slot name="quests" />
   </div>
@@ -123,6 +129,16 @@ const likeness = likenessWords(house, faces.length);
   .hband-likeness { margin-top: 0.8em; }
   .hd-like-ask { margin: 0.4em 0 0; }
 
+  /* the open ballots (band-ballots.mjs draws the blocks; ballot-stake.mjs draws the form and brings its own look) */
+  .hband-ballots { margin: 1em 0 0; padding-top: 0.8em; border-top: 1px dashed var(--hd-hair); }
+  .hband-ballots h2 { margin: 0 0 0.5em; font-size: 1.15rem; color: var(--hd-warm); }
+  .hband-ballots :global(.hb-ballot) { margin: 0 0 1.1em; }
+  .hband-ballots :global(.hb-name) { margin: 0 0 0.2em; font-size: 1rem; color: var(--hd-warm); }
+  .hband-ballots :global(.hb-window), .hband-ballots :global(.hb-cap) { margin: 0.2em 0; font-family: var(--pm-mono); font-size: 0.68rem; color: var(--hd-moon); }
+  .hband-ballots :global(.hb-choices) { list-style: none; margin: 0.4em 0; padding: 0; display: grid; gap: 0.2em; }
+  .hband-ballots :global(.hb-choice) { display: flex; justify-content: space-between; gap: 1em; font-size: 0.9rem; border-bottom: 1px dotted var(--hd-hair); padding: 0.15em 0; }
+  .hband-ballots :global(.hb-n) { font-family: var(--pm-mono); color: var(--pm-stamp-bright, #f7c78a); }
+  .hband-ballots :global(.hb-stake) { margin-top: 0.7em; padding-top: 0.7em; border-top: 1px solid var(--hd-hair); }
   .hd-boat { margin: 0.8em 0 0; padding-top: 0.6em; border-top: 1px dashed var(--hd-hair); font-size: 0.85rem; color: var(--hd-moon); }
   /* a resident, named: their face and their colour, wherever a line names them (paint.mjs writes these) */
   .hband :global(.hd-who) { color: var(--hd-warm); font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--hd-c, rgba(232, 196, 139, 0.25)); white-space: nowrap; }
