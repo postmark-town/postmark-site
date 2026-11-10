@@ -1,18 +1,23 @@
-// notification-bell.test.mjs — the mail bell rechecks right after each crossing while a page is open (POS-991, postmark#4436).
+// notification-bell.test.mjs — the mail bell looks again after each crossing while a page is open, on the PUBLISHED bake (POS-991, postmark#4436).
 //
 //   node --test test/notification-bell.test.mjs
 //
-// LAW (Wright, 2026-11-09 owner answer on #4436 and his 2026-11-10 queue ruling): "while a signed-in page is open, the bell
-// rechecks right after each crossing (00:00 and 12:00 UTC), so mail that just landed shows within a minute or so", and "treat
-// the household cache as stale from the moment a crossing passes". The report: mail at 7 p.m. Eastern (a crossing), the bell an
-// hour later, because the page looked once and trusted a 30-minute cache.
+// LAW (Wright, 2026-11-10 14:21:51Z, taking back his "within a minute" because it was written without measuring): "the published
+// bake governs". After a crossing, while the page is open, the bell "looks again on a bounded schedule (for example every few
+// minutes, up to about an hour) until it sees rows from that crossing. Then it stops. It never treats an older bake or the young
+// local cache as fresh." And "the fixture should publish late (after the crossing, at a later bake)". The report: mail at 7 p.m.
+// Eastern (a crossing), the bell an hour later, because the page looked once and trusted a 30-minute cache. The bell reads the
+// site's BAKED letters.json, which the site's refresh publishes later (the :10/:40 timer plus a build of minutes).
+//
+// CHOSEN (the brief's example, stated): a follow-up every FIVE minutes, up to an hour after the crossing, or until mail it did
+// not have shows up (the bake carrying the crossing has been published); a page loaded inside the window joins it.
 //
 // WHY THIS FILE RUNS THE LAYOUT'S OWN SCRIPT rather than a copy or a helper: the bell is an inline script in
 // src/layouts/PostmarkLayout.astro (one /me, one receivedMail, one render), so a test of a time-formatting helper could stay
-// green with the recheck deleted. This file slices the marked region ("BELL SCRIPT" to "END BELL SCRIPT") out of the real
+// green with the schedule deleted. This file slices the marked region ("BELL SCRIPT" to "END BELL SCRIPT") out of the real
 // layout, strips its one import (the auth contract is injected), and runs it in a `vm` against a deterministic fake clock,
-// fake timers, a fake localStorage, a fake letters.json, and the smallest DOM the bell touches. Move the markers and the slice
-// fails loudly; delete the recheck or the cache rule and the scenario goes red (the flips at the end do exactly that).
+// fake timers, a fake localStorage, a fake letters.json that PUBLISHES LATE, and the smallest DOM the bell touches. Move the
+// markers and the slice fails loudly; remove any piece of the fix and its oracle goes red (the flips at the end do exactly that).
 //
 // EVERYTHING IS INVENTED: the household, the handles and the letters. No network, no real token, no live mail.
 
@@ -47,7 +52,6 @@ class El {
   contains() { return false; }
 }
 
-const HALF = 12 * 60 * 60 * 1000;
 const at = (iso) => Date.parse(iso);
 
 function world({ now, letters, storage = {}, household = "hh:moss-house", handles = ["moss"] }) {
@@ -114,64 +118,110 @@ function world({ now, letters, storage = {}, household = "hh:moss-house", handle
 
 const letter = (id, from, to = "moss", date = "2026-11-10") => ({ id, from, to, box: "inbox", date });
 const MOSS_HOUSE = "hh:moss-house";
+const CACHE = "pm.notif.mailcache." + MOSS_HOUSE;
+const MIN = 60 * 1000;
+const HOURS12 = 12 * 60 * MIN;
+const NOON = at("2026-11-10T12:00:00Z");
+const MIDNIGHT = at("2026-11-11T00:00:00Z");
 
-// ── the scenario: the production script, a fake clock, a fixture that changes at the crossing ────────────────────────
+// ── the oracle: LATE PUBLICATION. The mail is delivered at the crossing; the bake that carries it is published LATER ──
 
-async function scenario(source) {
-  const t0 = at("2026-11-10T11:50:00Z");                              // the page is open, ten minutes before the noon crossing
-  const w = world({ now: t0, letters: [letter("L1", "ash")] });
+async function lateBake(source) {
+  const w = world({ now: at("2026-11-10T11:50:00Z"), letters: [letter("L1", "ash")] });
   await w.start(source);
   assert.equal(w.unread(), 1, "the page opened: one unread correspondent");
   assert.equal(w.lettersFetches().length, 1, "read once, at load");
-  const youngCache = JSON.parse(w.store.get("pm.notif.mailcache." + MOSS_HOUSE));
-  assert.equal(youngCache.ts, t0, "the cache was just filled: it is young");
+  const preCache = w.store.get(CACHE);
+  assert.equal(JSON.parse(preCache).ts, NOON - 10 * MIN, "the cache is young, filled ten minutes before the crossing");
 
-  // new mail lands AT the crossing, while the page stays open
-  w.state.letters = [letter("L1", "ash"), letter("L2", "birch", "moss", "2026-11-10T12:00:00Z")];
-  await w.advanceTo(at("2026-11-10T11:59:59Z"));
+  await w.advanceTo(NOON - 1000);
   assert.equal(w.lettersFetches().length, 1, "nothing is read before the crossing (no poll)");
+  // the crossing passes; the mail is delivered, but the site's published bake still holds the OLD letters.json
+  await w.advanceTo(NOON + 4 * MIN);
+  assert.equal(w.lettersFetches().length, 1, "no look inside the first five minutes after the crossing");
+  await w.advanceTo(NOON + 5 * MIN + 1000);
+  assert.equal(w.lettersFetches().length, 2, "the first follow-up, five minutes after the crossing");
+  assert.equal(w.lettersFetches()[1].opts.cache, "no-cache", "a forced look: the browser's own cache must revalidate");
+  assert.equal(w.unread(), 1, "it read the OLD bake: nothing new to show");
+  assert.equal(w.store.get(CACHE), preCache, "and an unchanged older bake was NOT stamped fresh: the cache is exactly as it was");
+  await w.advanceTo(NOON + 10 * MIN + 1000);
+  assert.equal(w.lettersFetches().length, 3, "the second follow-up, still the old bake");
   assert.equal(w.unread(), 1);
-  await w.advanceTo(at("2026-11-10T12:00:50Z"));                      // fifty seconds after the crossing
-  assert.equal(w.lettersFetches().length, 2, "the bell looked again just after the crossing, though its cache was twenty minutes young");
-  assert.equal(w.lettersFetches()[1].opts.cache, "no-cache", "and asked the browser to revalidate the file");
-  assert.equal(w.unread(), 2, "the newly delivered mail shows without navigation: two unread correspondents");
-  assert.ok(w.rows().some((r) => r.includes("birch")), "the new correspondent has its row in the panel's list");
 
-  // the next crossing is scheduled: midnight, and the one after
+  // ANOTHER TAB (an old bake read at +11 min) fills a young post-crossing cache before the next forced look
+  await w.advanceTo(NOON + 11 * MIN);
+  w.store.set(CACHE, JSON.stringify({ ts: w.clock.now, rows: [{ id: "L1", from: "ash", to: "moss", date: "2026-11-10" }] }));
+  // the bake carrying the crossing's mail is published at +12 min
+  await w.advanceTo(NOON + 12 * MIN);
+  w.state.letters = [letter("L1", "ash"), letter("L2", "birch", "moss", "2026-11-10T12:00:00Z")];
+  await w.advanceTo(NOON + 15 * MIN + 1000);                           // the next forced look
+  assert.equal(w.lettersFetches().length, 4, "the third follow-up went to the network though a young local cache stood");
+  assert.equal(w.unread(), 2, "the late bake's mail shows without navigation");
+  assert.ok(w.rows().some((r) => r.includes("birch")), "the new correspondent has its row");
+  assert.equal(JSON.parse(w.store.get(CACHE)).rows.length, 2, "and the cache now carries the new rows");
+
+  // delivery seen: the follow-ups STOP until the next crossing
+  await w.advanceTo(NOON + 59 * MIN);
+  assert.equal(w.lettersFetches().length, 4, "no more looks this window once the mail was seen");
+  // the next crossing: its window opens, and its own follow-ups run (the bake carrying it is published by +5 min this time)
   w.state.letters = [...w.state.letters, letter("L3", "cedar", "moss", "2026-11-11T00:00:00Z")];
-  await w.advanceTo(at("2026-11-10T23:59:59Z"));
-  assert.equal(w.lettersFetches().length, 2, "no read between crossings");
-  await w.advanceTo(at("2026-11-11T00:00:50Z"));
-  assert.equal(w.lettersFetches().length, 3, "the next crossing is rechecked too");
-  assert.equal(w.unread(), 3, "and its mail shows");
-  assert.equal(w.timers.length, 1, "exactly one timer stands: the crossing after that");
-  assert.equal(w.timers[0].at, at("2026-11-11T12:00:00Z") + 45 * 1000, "at the next crossing plus the grace");
+  await w.advanceTo(MIDNIGHT + 5 * MIN + 1000);
+  assert.equal(w.lettersFetches().length, 5, "the next crossing's first follow-up");
+  assert.equal(w.unread(), 3, "its mail shows");
+  assert.equal(w.timers.length, 1, "exactly one timer stands");
+  assert.equal(w.timers[0].at, MIDNIGHT + HOURS12 + 5 * MIN, "for the crossing after that, plus five minutes");
   return true;
 }
 
-test("THE SCENARIO on the layout's own script: a page open across a crossing shows newly delivered mail without navigation, and the next crossing stays scheduled", async () => {
-  assert.equal(await scenario(bellSource()), true);
+// ── the oracle: the BOUND. No delivery at all: the follow-ups stop an hour after the crossing, the next crossing is scheduled ──
+
+async function noDelivery(source) {
+  const w = world({ now: at("2026-11-10T11:50:00Z"), letters: [letter("L1", "ash")] });
+  await w.start(source);
+  await w.advanceTo(NOON + 90 * MIN);                                  // an hour and a half after the crossing
+  assert.deepEqual(w.lettersFetches().slice(1).map((f) => (f.at - NOON) / MIN), [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60],
+    "twelve follow-ups, five minutes apart, up to an hour after the crossing, and no more");
+  assert.equal(w.unread(), 1, "the unchanged rows are still on screen");
+  assert.equal(w.timers.length, 1, "one timer stands: the next crossing's first look");
+  assert.equal(w.timers[0].at, MIDNIGHT + 5 * MIN, "at the next crossing plus five minutes");
+  return true;
+}
+
+test("LATE PUBLICATION on the layout's own script: the bake carrying a crossing's mail is published after it; follow-ups find it, a young cache from another tab does not hide it, and they stop", async () => {
+  assert.equal(await lateBake(bellSource()), true);
 });
 
-test("a page LOADED just after a crossing does not trust a cache filled just before it", async () => {
+test("THE BOUND: with no delivery the follow-ups run every five minutes up to an hour after the crossing, then stop, and the next crossing is scheduled", async () => {
+  assert.equal(await noDelivery(bellSource()), true);
+});
+
+async function loadedInWindow(source) {
   const w = world({
-    now: at("2026-11-10T12:00:10Z"), letters: [letter("L1", "ash"), letter("L2", "birch")],
-    storage: { ["pm.notif.mailcache." + MOSS_HOUSE]: JSON.stringify({ ts: at("2026-11-10T11:59:00Z"), rows: [{ id: "L1", from: "ash", to: "moss", date: "2026-11-10" }] }) },
+    now: NOON + 20 * MIN, letters: [letter("L1", "ash")],
+    storage: { [CACHE]: JSON.stringify({ ts: NOON - MIN, rows: [{ id: "L1", from: "ash", to: "moss", date: "2026-11-10" }] }) },
   });
-  await w.start(bellSource());
-  assert.equal(w.lettersFetches().length, 1, "the pre-crossing cache (filled a minute before the crossing) is stale from the moment the crossing passed");
-  assert.equal(w.unread(), 2);
-  // the control: the same cache, filled AFTER the crossing, is still honoured within its TTL
+  await w.start(source);
+  assert.equal(w.lettersFetches().length, 1, "the pre-crossing cache is stale from the moment the crossing passed: read at load");
+  w.state.letters = [letter("L1", "ash"), letter("L2", "birch")];       // the bake lands after the page loaded
+  await w.advanceTo(NOON + 26 * MIN);
+  assert.equal(w.lettersFetches().length, 2, "the next grid point after the load (+25 min)");
+  assert.equal(w.unread(), 2, "the late bake's mail shows");
+  return true;
+}
+
+test("a page LOADED inside the window joins it: a cache filled just before the crossing is not trusted, and the follow-ups carry on from there", async () => {
+  assert.equal(await loadedInWindow(bellSource()), true);
+  // the control: a cache filled AFTER the crossing, within the TTL, still answers a plain load
   const c = world({
-    now: at("2026-11-10T12:20:00Z"), letters: [letter("L1", "ash"), letter("L2", "birch")],
-    storage: { ["pm.notif.mailcache." + MOSS_HOUSE]: JSON.stringify({ ts: at("2026-11-10T12:10:00Z"), rows: [{ id: "L1", from: "ash", to: "moss", date: "2026-11-10" }] }) },
+    now: NOON + 40 * MIN, letters: [letter("L1", "ash"), letter("L2", "birch")],
+    storage: { [CACHE]: JSON.stringify({ ts: NOON + 35 * MIN, rows: [{ id: "L1", from: "ash", to: "moss", date: "2026-11-10" }] }) },
   });
   await c.start(bellSource());
-  assert.equal(c.lettersFetches().length, 0, "a cache filled after the crossing and within thirty minutes is used");
+  assert.equal(c.lettersFetches().length, 0, "a cache filled after the crossing and within thirty minutes answers a plain load");
   assert.equal(c.unread(), 1);
 });
 
-test("the recheck keeps the seen set, the household's namespaces and the grouping: seen mail stays read, new mail is unread, another household's cache is untouched", async () => {
+test("the follow-ups keep the seen set, the household's namespaces and the grouping: seen mail stays read, new mail is unread, another household's cache is untouched", async () => {
   const other = "pm.notif.mailcache.hh:other-house";
   const w = world({
     now: at("2026-11-10T11:50:00Z"), letters: [letter("L1", "ash")],
@@ -180,22 +230,22 @@ test("the recheck keeps the seen set, the household's namespaces and the groupin
   await w.start(bellSource());
   assert.equal(w.unread(), 0, "L1 was seen: the badge is clear");
   w.state.letters = [letter("L1", "ash"), letter("L2", "birch"), letter("L2b", "birch")];
-  await w.advanceTo(at("2026-11-10T12:00:50Z"));
+  await w.advanceTo(NOON + 5 * MIN + 1000);
   assert.equal(w.unread(), 1, "two new letters from one neighbour are one unread row (grouped), and the seen letter stays read");
-  assert.equal(JSON.parse(w.store.get("pm.notif.seen." + MOSS_HOUSE)).ids.join(), "L1", "the seen set is not rewritten by a recheck");
+  assert.equal(JSON.parse(w.store.get("pm.notif.seen." + MOSS_HOUSE)).ids.join(), "L1", "the seen set is not rewritten by a follow-up");
   assert.equal(JSON.parse(w.store.get(other)).ts, 1, "another household's cache key is not touched");
 });
 
-test("a FAILED recheck keeps what is on screen (a throw, and a non-OK answer), and the next crossing is still scheduled", async () => {
+test("a FAILED follow-up keeps what is on screen (a throw, and a non-OK answer, even with an OLDER cache present), and the schedule carries on", async () => {
   for (const mode of ["throw", "notok"]) {
     const w = world({ now: at("2026-11-10T11:50:00Z"), letters: [letter("L1", "ash"), letter("L2", "birch")] });
     await w.start(bellSource());
     assert.equal(w.unread(), 2);
-    w.store.delete("pm.notif.mailcache." + MOSS_HOUSE);               // no cache to fall back on: only the rows on screen remain
-    w.state.failLetters = true; w.state.failMode = mode === "throw" ? "throw" : "notok";
-    await w.advanceTo(at("2026-11-10T12:00:50Z"));
-    assert.equal(w.unread(), 2, `${mode}: the bell is not blanked by a failed look`);
-    assert.equal(w.timers.length, 1, `${mode}: the next crossing is still scheduled`);
+    w.store.set(CACHE, JSON.stringify({ ts: at("2026-11-10T11:00:00Z"), rows: [{ id: "L1", from: "ash", to: "moss", date: "2026-11-10" }] }));   // an older, smaller cache
+    w.state.failLetters = true; w.state.failMode = mode;
+    await w.advanceTo(NOON + 5 * MIN + 1000);
+    assert.equal(w.unread(), 2, `${mode}: the bell shows what it had, not the older cache and not nothing`);
+    assert.equal(w.timers.length, 1, `${mode}: the next look is scheduled`);
   }
 });
 
@@ -204,32 +254,37 @@ test("a signed-out reader (no /me) gets no bell and no timer", async () => {
   const src = bellSource();
   w.sandbox.fetch = async () => ({ ok: false, json: async () => null });
   await w.start(src);
-  assert.equal(w.timers.length, 0, "no identity, no recheck");
+  assert.equal(w.timers.length, 0, "no identity, no follow-up");
   assert.equal(w.unread(), 0);
 });
 
-// ── THE FLIP: the scenario goes red on the layout with each piece of the fix removed ──────────────────────────────────
+// ── THE FLIPS: each oracle goes red on the layout with a piece of the fix removed ─────────────────────────────────────
 
-const MUTANTS = [
-  ["no-recheck", "      scheduleCrossingRecheck();\n", "", "the crossing recheck is deleted"],
-  ["cache-ignores-crossing", " && cached.ts >= lastCrossingAt(Date.now())", "", "a young pre-crossing cache is trusted"],
-  ["no-revalidate", "...(opts.revalidate ? { cache: \"no-cache\" } : {})", "", "the recheck lets the browser's HTTP cache answer"],
+const LAYOUT = () => readFileSync(new URL("../src/layouts/PostmarkLayout.astro", import.meta.url), "utf8");
+const FLIPS = [
+  ["no-follow-ups", "      scheduleFollowUp();\n", "", "no follow-up is ever scheduled", lateBake],
+  ["cache-ignores-crossing", " && cached.ts >= lastCrossingAt(Date.now())", "", "a young pre-crossing cache is trusted at load", loadedInWindow],
+  ["force-uses-young-cache", "if (!opts.force && cachedRows && cached.ts", "if (cachedRows && cached.ts", "a forced look lets a young local cache answer (another tab's old-bake read)", lateBake],
+  ["no-http-revalidate", "...(opts.force ? { cache: \"no-cache\" } : {})", "", "a forced look lets the browser's HTTP cache answer", lateBake],
+  ["unchanged-bake-stamped-fresh", "if (!(opts.force && sameRows(rows, opts.previous))) writeJSON(", "if (true) writeJSON(", "an unchanged older bake is stamped as a fresh cache", lateBake],
+  ["never-stops", "if (delivered) settledFor = lastCrossingAt(Date.now());", "", "the follow-ups never stop on delivery", lateBake],
+  ["no-bound", "if (n <= c + FOLLOW_UNTIL_MS) return n;", "return n;", "the follow-ups have no bound", noDelivery],
 ];
-for (const [label, from, to, why] of MUTANTS) {
-  test(`FLIP ${label}: the scenario is red on a layout where ${why}`, async () => {
-    const text = readFileSync(new URL("../src/layouts/PostmarkLayout.astro", import.meta.url), "utf8");
+for (const [label, from, to, why, oracle] of FLIPS) {
+  test(`FLIP ${label}: red on a layout where ${why}`, async () => {
+    const text = LAYOUT();
     assert.ok(text.includes(from), `the flip's anchor is still in the layout: ${label}`);
-    await assert.rejects(scenario(bellSource(text.split(from).join(to))), (e) => e?.name === "AssertionError", `${label} must be caught`);
+    await assert.rejects(oracle(bellSource(text.split(from).join(to))), (e) => e?.name === "AssertionError", `${label} must be caught`);
   });
 }
-test("FLIP no-failure-fallback: the failed-recheck test is red on a layout whose recheck drops the rows on screen when the look fails", async () => {
-  const text = readFileSync(new URL("../src/layouts/PostmarkLayout.astro", import.meta.url), "utf8");
-  const from = "{ revalidate: true, fallback: rows }";
+test("FLIP no-failure-fallback: a failed follow-up regresses the bell on a layout without the fallback", async () => {
+  const text = LAYOUT();
+  const from = "fallback: was }";
   assert.ok(text.includes(from));
   const w = world({ now: at("2026-11-10T11:50:00Z"), letters: [letter("L1", "ash"), letter("L2", "birch")] });
-  await w.start(bellSource(text.split(from).join("{ revalidate: true }")));
-  w.store.delete("pm.notif.mailcache." + MOSS_HOUSE);
+  await w.start(bellSource(text.split(from).join("}")));
+  w.store.set(CACHE, JSON.stringify({ ts: at("2026-11-10T11:00:00Z"), rows: [{ id: "L1", from: "ash", to: "moss", date: "2026-11-10" }] }));
   w.state.failLetters = true;
-  await w.advanceTo(at("2026-11-10T12:00:50Z"));
-  assert.notEqual(w.unread(), 2, "without the fallback a failed look blanks the bell: the real test above would be red");
+  await w.advanceTo(NOON + 5 * MIN + 1000);
+  assert.notEqual(w.unread(), 2, "without the fallback a failed look regresses to the older cache: the real test above would be red");
 });

@@ -628,12 +628,18 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       const seenBtn = root.querySelector("[data-notif-seen]");
 
       const MAIL_TTL = 30 * 60 * 1000; // ~one crossing's worth; the town's clock is the ferry, not the millisecond
-      // THE FERRY'S CROSSINGS (POS-991, postmark#4436; Wright 2026-11-09/10: "the bell rechecks right after each crossing while a
-      // page is open", and the household cache is stale "from the moment a crossing passes"): mail lands at 00:00 and 12:00 UTC.
+      // THE FERRY'S CROSSINGS AND THE BAKE (POS-991, postmark#4436). Mail is delivered at 00:00 and 12:00 UTC, but this bell
+      // reads the site's BAKED letters.json, and a bake that carries a crossing's mail is published later, on the site's refresh
+      // (the :10/:40 timer plus a build of minutes). Wright, 2026-11-10: "the published bake governs": after a crossing, while the
+      // page is open, the bell looks again on a bounded schedule until it sees mail from that crossing, then stops, and it
+      // "never treats an older bake or the young local cache as fresh". The interval and bound are his example's, chosen here:
+      // every five minutes, until an hour after the crossing.
       const CROSSING_MS = 12 * 60 * 60 * 1000;
-      const RECHECK_DELAY_MS = 45 * 1000;      // just after the crossing, so a delivery shows "within a minute or so"
+      const FOLLOW_EVERY_MS = 5 * 60 * 1000;
+      const FOLLOW_UNTIL_MS = 60 * 60 * 1000;
       const lastCrossingAt = (t) => t - (t % CROSSING_MS);
       const nextCrossingAt = (t) => lastCrossingAt(t) + CROSSING_MS;
+      let settledFor = null;                   // the crossing whose mail this page has seen: its follow-ups stop
       const getTok = () => { try { return JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch { return null; } };
       const readJSON = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; } };
       const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -670,21 +676,25 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       // full letter file on every navigation within a session.
       //
       // A CACHE FILLED BEFORE THE LAST CROSSING IS STALE (POS-991): mail lands at a crossing, so rows read just before one cannot
-      // answer a read just after it, however young they are. `opts.revalidate` (the crossing recheck) also asks the browser's own
-      // HTTP cache to revalidate the file; `opts.fallback` is what a failed recheck keeps (the rows already on screen), so a
-      // failure never blanks the bell.
+      // answer a read just after it, however young they are. A FORCED look (`opts.force`, the follow-ups below) skips the local
+      // cache altogether and asks the browser's own HTTP cache to revalidate the file, so neither a young post-crossing cache
+      // (another tab's look at the old bake) nor an old copy of the file can answer it. `opts.previous` is the rows on screen: a
+      // forced look that finds exactly those has found the SAME bake, and an unchanged older bake is not stamped fresh (the cache
+      // is left as it was). `opts.fallback` is what a failed look keeps (the rows already on screen), so a failure never blanks
+      // the bell.
+      const sameRows = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((r, i) => r.id === b[i].id);
       async function receivedMail(hh, handles, opts = {}) {
         const set = new Set(handles);
         const cached = readJSON(cacheKey(hh), null);
         const cachedRows = cached && Array.isArray(cached.rows) ? cached.rows : null;
-        if (cachedRows && cached.ts && Date.now() - cached.ts < MAIL_TTL && cached.ts >= lastCrossingAt(Date.now())) return cachedRows;
+        if (!opts.force && cachedRows && cached.ts && Date.now() - cached.ts < MAIL_TTL && cached.ts >= lastCrossingAt(Date.now())) return cachedRows;
         let letters = [];
         try {
-          const res = await fetch("/data/letters.json", { headers: { accept: "application/json" }, ...(opts.revalidate ? { cache: "no-cache" } : {}) });
+          const res = await fetch("/data/letters.json", { headers: { accept: "application/json" }, ...(opts.force ? { cache: "no-cache" } : {}) });
           if (res.ok) letters = await res.json();
-          else if (cachedRows) return cachedRows;
           else if (opts.fallback) return opts.fallback;
-        } catch { return cachedRows || opts.fallback || []; }
+          else if (cachedRows) return cachedRows;
+        } catch { return opts.fallback || cachedRows || []; }
         const rows = [];
         for (const l of letters) {
           if (l.box !== "inbox") continue;                 // delivered copy only
@@ -693,7 +703,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
           if (!to) continue;                                // not addressed to you
           rows.push({ id: l.id, from: l.from, to, date: l.date || "" });
         }
-        writeJSON(cacheKey(hh), { ts: Date.now(), rows });
+        if (!(opts.force && sameRows(rows, opts.previous))) writeJSON(cacheKey(hh), { ts: Date.now(), rows });
         return rows;
       }
 
@@ -853,22 +863,40 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
 
       render(); // paint the badge (panel stays closed)
 
-      // ---- THE CROSSING RECHECK (POS-991, postmark#4436) ----
+      // ---- THE FOLLOW-UPS AFTER A CROSSING (POS-991, postmark#4436) ----
       // The page used to look once, at load, and trust a 30-minute cache: mail delivered at a crossing showed only on a later
-      // navigation, so a page left open (the usual case) rang an hour late. Now, while this page stays open, the bell looks
-      // again just after each crossing (00:00 and 12:00 UTC), through the SAME receivedMail -> recomputeMail -> render path
-      // (household namespaces, the seen set, grouping and the badge are untouched), then waits for the next one. A failed
-      // look keeps the rows on screen. One timer, one crossing ahead: not a poll.
-      async function refreshMail() {
-        try { rows = await receivedMail(household, handles, { revalidate: true, fallback: rows }); } catch { return; }
+      // navigation, so a page left open (the usual case) rang late. Now, after each crossing (00:00 and 12:00 UTC), while this
+      // page is open (a page loaded inside the window joins it), the bell looks again every FOLLOW_EVERY_MS until mail it did not
+      // have shows up (the bake carrying the crossing has been published) or FOLLOW_UNTIL_MS after the crossing, whichever comes
+      // first; then it stops until the next crossing. Each look is forced (see receivedMail) and goes through the SAME
+      // receivedMail -> recomputeMail -> render path, so household namespaces, the seen set, grouping and the badge are untouched.
+      // A failed look keeps the rows on screen. One timer at a time; not a general poll.
+      async function followUp() {
+        const was = rows;
+        let next;
+        try { next = await receivedMail(household, handles, { force: true, previous: was, fallback: was }); } catch { return; }
+        const known = new Set(was.map((r) => r.id));
+        const delivered = next.some((r) => !known.has(r.id));
+        rows = next;
         recomputeMail();
         render();
+        if (delivered) settledFor = lastCrossingAt(Date.now());   // mail from this crossing is in: no more looks until the next
       }
-      function scheduleCrossingRecheck() {
+      // the next look: the next grid point inside this crossing's window (unless it is settled or past its bound), else the first
+      // look after the next crossing
+      function nextLookAt(now) {
+        const c = lastCrossingAt(now);
+        if (settledFor !== c) {
+          const n = c + FOLLOW_EVERY_MS * (Math.floor((now - c) / FOLLOW_EVERY_MS) + 1);
+          if (n <= c + FOLLOW_UNTIL_MS) return n;       // the bound: no look after FOLLOW_UNTIL_MS past the crossing
+        }
+        return nextCrossingAt(now) + FOLLOW_EVERY_MS;
+      }
+      function scheduleFollowUp() {
         const now = Date.now();
-        setTimeout(async () => { await refreshMail(); scheduleCrossingRecheck(); }, nextCrossingAt(now) + RECHECK_DELAY_MS - now);
+        setTimeout(async () => { await followUp(); scheduleFollowUp(); }, nextLookAt(now) - now);
       }
-      scheduleCrossingRecheck();
+      scheduleFollowUp();
     })();
     // ── END BELL SCRIPT ──
   </script>
