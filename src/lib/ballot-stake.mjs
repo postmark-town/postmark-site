@@ -17,9 +17,11 @@
 //      the household's headroom left, the resident's balance.
 //
 // Changing anything after a preview takes the confirm away until it is
-// previewed again. A refused confirm wrote nothing, and says the office's own
-// words. A confirm whose answer never came back is AMBIGUOUS: the stake may or
-// may not have landed, so the page never retries it and never offers the
+// previewed again. A confirm REFUSED with a 4xx was judged before anything was
+// written, and says the office's own words. A confirm whose answer never came
+// back, or came back as a 5xx (the office's stake can trip after the stake
+// landed: its error is not evidence that nothing moved), is AMBIGUOUS: the
+// stake may or may not have landed, so the page never retries it and never offers the
 // confirm again until the human has read what stands now ("check what
 // landed": the ballot's own read, your household's headroom on the choice)
 // and previewed afresh. There is no idempotency system here, by ruling.
@@ -66,10 +68,22 @@ const s = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
  * kind: "preview" | "staked" | "zero" | "refused". Every word that is the
  * office's is the office's, shown as text.
  */
-export function answerOf({ ok, status, json }, { as, candidate } = {}) {
+export function answerOf({ ok, status, json }, { as, candidate, preview = false } = {}) {
   const j = json && typeof json === "object" ? json : {};
-  if (!ok || j.error || j.refused === true)
-    return { kind: "refused", title: String(j.defect || `the office refused this (${status ?? "no status"})`), lines: j.hint ? [String(j.hint)] : [] };
+  if (!ok || j.error || j.refused === true) {
+    const code = Number(j.code ?? status);
+    const said = [j.defect ? `The office said: ${j.defect}` : "", j.hint ? String(j.hint) : ""].filter(Boolean);
+    // A PREVIEW writes nothing, whatever went wrong: its failure is only a failure to say.
+    if (preview) return { kind: "refused", title: String(j.defect || `the office could not preview this (${status ?? "no status"})`),
+      lines: [...(j.hint ? [String(j.hint)] : []), "Nothing is staked by a preview."] };
+    // A CONFIRM refused with a 4xx was judged before anything was written (the resident, the choice, the
+    // ballot's state, the stamps): a definite refusal. A 5xx (or no code at all) is not that: the office's
+    // stake can trip after the stake has landed (votes.mjs § stakeViaOffice, "the stake pass tripped"), so
+    // the outcome is UNCONFIRMED and goes to the same check as an unanswered confirm (POS-502 lead review).
+    if (Number.isInteger(code) && code >= 400 && code < 500)
+      return { kind: "refused", title: String(j.defect || `the office refused this (${code})`), lines: [...(j.hint ? [String(j.hint)] : []), "Nothing was staked."] };
+    return { ...UNCONFIRMED, lines: [...said, ...UNCONFIRMED.lines] };
+  }
   const a = j.result && typeof j.result === "object" ? j.result : j;
   const applied = Number(a.applied) || 0;
   const requested = Number(a.requested) || 0;
@@ -96,15 +110,27 @@ export function answerOf({ ok, status, json }, { as, candidate } = {}) {
   return { kind: "staked", title: `${who} staked ${applied} of ${requested} on ${on}`, lines };
 }
 
+const CHECK_LINES = Object.freeze([
+  "Nothing will be sent again by itself.",
+  "Check what landed before you stake again: it reads your household's headroom on this choice as it stands now.",
+]);
+
 /** The words for a confirm whose answer never came back. */
 export const AMBIGUOUS = Object.freeze({
   kind: "ambiguous",
   title: "the office did not answer, so this stake may or may not have landed",
-  lines: [
-    "Nothing will be sent again by itself.",
-    "Check what landed before you stake again: it reads your household's headroom on this choice as it stands now.",
-  ],
+  lines: CHECK_LINES,
 });
+
+/** The words for a confirm the office answered with an error it could not stand behind (a 5xx): the outcome is unconfirmed. */
+export const UNCONFIRMED = Object.freeze({
+  kind: "ambiguous",
+  title: "the office answered with an error, and could not confirm whether this stake landed",
+  lines: CHECK_LINES,
+});
+
+/** After a confirm: whether the confirm is held until the human checks what landed and previews again. */
+export const holdsConfirm = (a) => a?.kind === "unreachable" || a?.kind === "ambiguous";
 
 /**
  * POST one stake (or preview) to the household door, as the site: the token
@@ -125,7 +151,7 @@ export async function postStake({ base = officeBase(), token, body, fetchImpl = 
   }
   let json = null;
   try { json = await res.json(); } catch { return { kind: "unreachable" }; }
-  return answerOf({ ok: res.ok, status: res.status, json }, { as: body?.args?.from, candidate: body?.args?.candidate });
+  return answerOf({ ok: res.ok, status: res.status, json }, { as: body?.args?.from, candidate: body?.args?.candidate, preview: body?.args?.preview === true });
 }
 
 /** Read what stands: the ballot's own read, with your household's headroom on each choice (GET /votes/{topic}). */
@@ -257,7 +283,8 @@ export function mountBallotStake(root, { topic, choices, doc = globalThis.docume
     const a = await postStake({ base: office(), token, body, fetchImpl });
     sending = false; confirmBtn.disabled = false; previewBtn.disabled = false;
     forget();
-    if (a.kind === "unreachable") { blocked = true; checkBtn.hidden = false; return say(AMBIGUOUS); }
+    // unanswered, or answered with an error the office could not stand behind: held until checked and previewed again
+    if (holdsConfirm(a)) { blocked = true; checkBtn.hidden = false; return say(a.kind === "unreachable" ? AMBIGUOUS : a); }
     say(a);
     // the host may re-read its tally on this; the mount itself reads nothing more
     const Ev = doc.defaultView?.CustomEvent ?? globalThis.CustomEvent;
