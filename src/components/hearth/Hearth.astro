@@ -66,7 +66,7 @@ const forClient = entries.map((e) => ({ id: e.id, title: e.title, author: e.auth
 const json = (v: unknown) => JSON.stringify(v).split("<").join("\\u003c").split("\u2028").join("\\u2028").split("\u2029").join("\\u2029");
 const slotProps = { house, faces, plate, slug, bulletin };
 ---
-<section class="hearth" data-hearth data-hearth-slug={slug} data-hearth-saved={house.hearth ?? ""} aria-label={`${plate}, the Hearth`}>
+<section class="hearth" data-hearth data-hearth-slug={slug} data-hearth-baked={house.hearth ?? ""} aria-label={`${plate}, the Hearth`}>
   <script type="application/json" data-hearth-faces set:html={json({ handles: faces.map((f) => f.handle), faces: facesByHandle })} />
   <script type="application/json" data-hearth-entries set:html={json(forClient)} />
 

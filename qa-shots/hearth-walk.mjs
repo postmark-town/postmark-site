@@ -97,7 +97,7 @@ function answer(url, headers, method = "GET", postData = null) {
   return { status: 404, body: { error: "fixture: no such door " + p } };
 }
 
-// the saved choice a BUILD would have baked into the page (data-hearth-saved), for the baked-start scenario: the document is rewritten to carry it
+// the saved choice a BUILD would have baked into the page (data-hearth-baked), for the baked-start scenario: the document is rewritten to carry it
 let injectBaked = null;
 let householdsDelay = 0;   // ms the office takes to answer GET /households (the saved-choice read)
 let injectEntry = null;   // a prepared entry added to the page's registered list, for the hostile-template scenario
@@ -134,7 +134,7 @@ async function newPage(browser, { signedIn = false, pendingMe = 0, viewport = { 
     if (local && (injectEntry || injectBaked) && req.resourceType() === "document" && /^\/households\/[^/]+\/$/.test(url.pathname)) {
       const res = await route.fetch();
       let body = await res.text();
-      if (injectBaked) body = body.replace(/data-hearth-saved(?=[\s>])/, `data-hearth-saved="${injectBaked}"`);   // Astro prints the empty value as the bare attribute
+      if (injectBaked) body = body.replace(/data-hearth-baked(?=[\s>])/, `data-hearth-baked="${injectBaked}"`);   // Astro prints the empty value as the bare attribute
       if (!injectEntry) return route.fulfill({ response: res, body });
       body = body.replace(/(<script type="application\/json" data-hearth-entries[^>]*>)([\s\S]*?)(<\/script>)/, (m, a, json, z) => {
         const list = JSON.parse(json.replace(/\\u003c/g, "<"));

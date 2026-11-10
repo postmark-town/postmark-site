@@ -7,6 +7,9 @@
 // probe that can fail, and the resolver's data imports use build-time aliases
 // that `node --test` cannot resolve.
 
+// the one shape an entry id may take (slots.mjs, pure): a saved Hearth that does not have it is not baked into a page
+import { ENTRY_ID } from "./hearth/slots.mjs";
+
 // "the-rookery" → "The Rookery"; "mads-and-dylan" → "Mads and Dylan";
 // "cadaeic.space" → "cadaeic.space" (a slug that carries a dot is already a
 // name someone chose, so it travels untouched).
@@ -108,7 +111,7 @@ export function buildHouses(residents, registry) {
       // no `human` (POS-394): the fold is public, and the private name never enters it
       since: dec.since ?? null,
       // POS-962: the house's saved Hearth, as the registry prints it (the office's households.hearth, public; null until one is chosen). Baked so the page opens on it.
-      hearth: typeof dec.hearth === "string" && dec.hearth ? dec.hearth : null,
+      hearth: typeof dec.hearth === "string" && ENTRY_ID.test(dec.hearth) ? dec.hearth : null,
       // WLD-83: the household human's likeness answer, as the registry prints it
       // (answer and when only; null until answered, which reads as no)
       likeness: dec.likeness?.answer ? { answer: dec.likeness.answer, at: dec.likeness.at ?? null } : null,

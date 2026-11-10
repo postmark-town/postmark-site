@@ -357,9 +357,9 @@ test("the saved choice is baked at build: the registry's `hearth` is on the hous
   assert.equal(whichDesign(DESIGNS, { saved: bySlug.get("plain").hearth }).id, "default");
   const page = read("src/components/hearth/Hearth.astro"), band = read("src/components/household-dashboard/HouseBand.astro"), stage = read("src/lib/hearth/stage.mjs");
   assert.match(page, /const entry = whichDesign\(entries, \{ saved: house\.hearth \?\? null \}\);/);
-  assert.match(page, /data-hearth-saved=\{house\.hearth \?\? ""\}/);
+  assert.match(page, /data-hearth-baked=\{house\.hearth \?\? ""\}/, "the build's own copy has its own attribute: data-hearth-saved is the picker's note, and the picker root's saved id");
   assert.match(band, /whichDesign\(entries, \{ saved: house\.hearth \?\? null \}\)\?\.id/);
-  assert.match(stage, /const baked = root\.dataset\.hearthSaved \|\| null;/);
+  assert.match(stage, /const baked = root\.dataset\.hearthBaked \|\| null;/);
   assert.match(stage, /const first = whichDesign\(entries, \{ entry: asked, saved: baked \}\);/, "the first draw starts from the baked choice");
   assert.match(stage, /const saved = readOk \? read : baked;/, "a failed read keeps the baked choice (else the default)");
 });
@@ -367,7 +367,22 @@ test("the saved choice is baked at build: the registry's `hearth` is on the hous
 test("built: every household page carries the baked-saved hook the stage reads (empty until the office's registry carries a choice)", { skip: !built }, () => {
   for (const slug of slugsBuilt()) {
     const html = dist("households", slug, "index.html");
-    assert.match(html, /<section class="hearth" data-hearth data-hearth-slug="[^"]*" data-hearth-saved(="[^"]*")?[ >]/, `${slug}: the hook is on the Hearth root (Astro prints an empty value as the bare attribute)`);
+    assert.match(html, /<section class="hearth" data-hearth data-hearth-slug="[^"]*" data-hearth-baked(="[^"]*")?[ >]/, `${slug}: the hook is on the Hearth root (Astro prints an empty value as the bare attribute)`);
     assert.match(html, /data-hband-hearth hidden/, `${slug}: the band's Hearth section ships hidden`);
   }
+});
+
+// review of bfddcd08f: the fold holds the registry's `hearth` to the same shape the browser read holds it to (ENTRY_ID), so one house's bad value is not baked
+// into a page (and cannot fail the whole build at the policy hook, which fails closed on an inline handler).
+import { ENTRY_ID } from "../src/lib/hearth/slots.mjs";
+
+test("the fold bakes a saved Hearth only if it is an entry id: a hostile or malformed value is null, a good one stays", () => {
+  const hostile = ['ledger" onerror="alert(1)', "x onerror=alert(1)", "<img src=x onerror=alert(1)>", "javascript:alert(1)", "Ledger", "led ger", "-ledger", "a".repeat(41), "../etc", "ledger\n", ""];
+  const good = ["ledger", "default", "my-entry-2", "a", "a".repeat(40)];
+  const reg = { households: Object.fromEntries([...hostile, ...good].map((h, i) => [`house-${i}`, { residents: [`r${i}`], hearth: h }])) };
+  const { bySlug } = buildHouses([...hostile, ...good].map((_, i) => ({ handle: `r${i}` })), reg);
+  hostile.forEach((h, i) => assert.equal(bySlug.get(`house-${i}`).hearth, null, `not baked: ${JSON.stringify(h)}`));
+  good.forEach((h, i) => assert.equal(bySlug.get(`house-${hostile.length + i}`).hearth, h, `baked: ${h}`));
+  for (const h of good) assert.match(h, ENTRY_ID, "and every baked value is an id the browser read would accept too");
+  assert.match(read("src/lib/houses.mjs"), /typeof dec\.hearth === "string" && ENTRY_ID\.test\(dec\.hearth\)/, "PIN: the one test is ENTRY_ID, shared with choice.mjs's read");
 });

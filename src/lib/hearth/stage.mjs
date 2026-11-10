@@ -69,7 +69,7 @@ export function mountHearth(root) {
   let ballots = null;   // the band's open ballots and their stake form (band-ballots.mjs): mounted once, for the house's own sign-in only
   // THE SAVED CHOICE (POS-962). `baked` is the build's own copy (Hearth.astro bakes house.hearth from households.json, the registry readSavedHearth reads): the first
   // draw starts from it, so a house with a saved choice does not flash the default. The browser read corrects a stale one. `mounted` is the signed-in human's picker.
-  const baked = root.dataset.hearthSaved || null;
+  const baked = root.dataset.hearthBaked || null;
   let knownSaved = baked;
   let mounted = null, readOk = false, savedRead, savedDone = false;
 
