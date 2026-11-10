@@ -55,7 +55,7 @@ test("whichDesign: the default unless a registered entry is asked for; an unknow
 test("PIN the seam: the server and the browser both ask whichDesign, and nothing beside it decides the design", () => {
   const page = read("src/components/hearth/Hearth.astro");
   assert.match(page, /import \{ whichDesign \} from "@\/lib\/hearth\/which-design\.mjs";/);
-  assert.match(page, /const entry = whichDesign\(entries\);/);
+  assert.match(page, /const entry = whichDesign\(entries, \{ saved: house\.hearth \?\? null \}\);/, "the server asks it, with the house's baked choice");
   assert.ok(!/defaultEntry/.test(page), "the page no longer reads the registry's default itself");
   const stage = read("src/lib/hearth/stage.mjs");
   // POS-962 folded in (until 2026-11-09 this counted two calls): compose(), the first draw and the draw after the saved choice is read each ask the one function
@@ -63,7 +63,7 @@ test("PIN the seam: the server and the browser both ask whichDesign, and nothing
   assert.match(stage, /whichDesign\(entries, \{ entry: asked, saved \}\)/, "the saved choice goes in as an input to it");
   const decider = (src) => /entries\.find\(\(e\) => e\.id ===|entries\.some\(\(e\) => e\.id ===|DEFAULT_ENTRY\)/.test(src);
   for (const f of ["src/lib/hearth/stage.mjs", "src/components/hearth/Hearth.astro", "src/components/household-dashboard/HouseBand.astro", "src/lib/hearth/band-ballots.mjs"]) assert.ok(!decider(read(f)), `${f} decides no design of its own`);
-  assert.match(read("src/components/household-dashboard/HouseBand.astro"), /const drawn = whichDesign\(entries\)\?\.id \?\? null;/, "the band's picker starts on what the server draws, asked of the one function");
+  assert.match(read("src/components/household-dashboard/HouseBand.astro"), /const drawn = whichDesign\(entries, \{ saved: house\.hearth \?\? null \}\)\?\.id \?\? null;/, "the band's picker starts on what the server draws, asked of the one function");
   assert.ok(!/\bpickEntry\(/.test(stage), "the stage keeps no choice of its own");
   // Truey's review of ba023e9d9: the first draw must not hand the default over what whichDesign answers (a saved choice later)
   assert.ok(!/asked \|\| DEFAULT/.test(stage), "nothing passes the default explicitly: whichDesign answers for 'nothing asked'");
@@ -272,7 +272,6 @@ test("a saved choice is what the page draws; ?entry= previews over it WITHOUT sa
   assert.equal(whichDesign(DESIGNS, { saved: null }).id, "default", "a house that chose nothing draws the default");
   // the preview, through the real picker with a write spy: previewing sends nothing; only ask() then confirm() writes, once
   const writes = [];
-  const picker = createPicker({ entries: DESIGNS, slug: "dreme-mynd", saved: "ledger", signedIn: true, save: async (a) => { writes.push(a); return { ok: true, status: 200, hearth: a.id }; } });
   const drawn = [];
   const p = createPicker({ entries: DESIGNS, slug: "dreme-mynd", saved: "ledger", signedIn: true, onDraw: (id) => drawn.push(id), save: async (a) => { writes.push(a); return { ok: true, status: 200, hearth: a.id }; } });
   p.preview("orchard");
@@ -284,7 +283,8 @@ test("a saved choice is what the page draws; ?entry= previews over it WITHOUT sa
   assert.deepEqual(writes, [], "asking is only a question");
   await p.confirm();
   assert.deepEqual(writes, [{ slug: "dreme-mynd", id: "orchard" }], "the one write, after the second yes");
-  assert.equal(picker.view().savedId, "ledger");
+  assert.equal(p.view().savedId, "orchard", "and only now is the kept choice the previewed one");
+  assert.deepEqual(drawn, ["orchard", "orchard"], "drawn on the preview, and again on the successful save");
 });
 
 test("a failed choice read falls back to the default AND says so; a choice this build does not know says so too", async () => {
@@ -327,5 +327,47 @@ test("built: the picker is in the band's private body only: no household page ca
     assert.ok(/data-hearth-owner hidden/.test(html), `${slug}: its save controls ship hidden`);
     assert.ok(!/hearth-tools/.test(html), `${slug}: the header carries no picker`);
     assert.ok(!/data-hearth-picker/.test(html.slice(html.indexOf(ENTRY_OPEN), html.indexOf(ENTRY_CLOSE))), `${slug}: none in the entry's region`);
+  }
+});
+
+// ── review of 80af398fb: the picker mounts for the house's own human only; no picker on a failed read; the saved choice baked at build ──
+
+import { buildHouses } from "../src/lib/houses.mjs";
+
+test("PIN the stage: the picker mounts behind the owner, once, after the choice read answered, never on a failed read: the way the ballots mount", () => {
+  const stage = read("src/lib/hearth/stage.mjs");
+  const fn = stage.slice(stage.indexOf("function mountPicker()"), stage.indexOf("const onDraw"));
+  assert.match(fn, /if \(mounted \|\| !pickerRoot \|\| !savedDone \|\| !readOk \|\| mine\(\)\.length === 0\) return;/, "not for a non-owner, not before the read, not on a failed read, once");
+  assert.equal((stage.match(/mountHearthPicker\(/g) ?? []).length, 1, "one call site, inside mountPicker");
+  assert.match(stage, /mountPicker\(\);\s*paintHouse\(stage/, "draw() mounts it for an owner (and so again on pm:lens, which calls load() then draw())");
+  assert.match(stage, /mountPicker\(\);\s*if \(picker && drawn\)/, "and the saved read mounts it when it lands");
+  assert.ok(!/signedIn: \(\) => true/.test(stage), "its sign-in check is the owner's, never a constant");
+  assert.match(read("src/components/household-dashboard/HouseBand.astro"), /data-hband-hearth hidden>/, "the band's Hearth section ships hidden and is shown only when the picker mounts");
+});
+
+test("the saved choice is baked at build: the registry's `hearth` is on the house, the server and the band draw it, and the stage starts from it", () => {
+  const reg = { households: { "dreme-mynd": { residents: ["wick"], hearth: "ledger" }, plain: { residents: ["fen"] }, odd: { residents: ["oak"], hearth: 7 }, blank: { residents: ["elm"], hearth: "" } } };
+  const res = ["wick", "fen", "oak", "elm"].map((handle) => ({ handle }));
+  const { bySlug } = buildHouses(res, reg);
+  assert.equal(bySlug.get("dreme-mynd").hearth, "ledger");
+  assert.equal(bySlug.get("plain").hearth, null, "no saved choice in the registry: null");
+  assert.equal(bySlug.get("odd").hearth, null, "a value that is not an id is not a choice");
+  assert.equal(bySlug.get("blank").hearth, null);
+  assert.equal(whichDesign(DESIGNS, { saved: bySlug.get("dreme-mynd").hearth }).id, "ledger", "the server's answer for that house");
+  assert.equal(whichDesign(DESIGNS, { saved: bySlug.get("plain").hearth }).id, "default");
+  const page = read("src/components/hearth/Hearth.astro"), band = read("src/components/household-dashboard/HouseBand.astro"), stage = read("src/lib/hearth/stage.mjs");
+  assert.match(page, /const entry = whichDesign\(entries, \{ saved: house\.hearth \?\? null \}\);/);
+  assert.match(page, /data-hearth-saved=\{house\.hearth \?\? ""\}/);
+  assert.match(band, /whichDesign\(entries, \{ saved: house\.hearth \?\? null \}\)\?\.id/);
+  assert.match(stage, /const baked = root\.dataset\.hearthSaved \|\| null;/);
+  assert.match(stage, /const first = whichDesign\(entries, \{ entry: asked, saved: baked \}\);/, "the first draw starts from the baked choice");
+  assert.match(stage, /const saved = readOk \? read : baked;/, "a failed read keeps the baked choice (else the default)");
+});
+
+test("built: every household page carries the baked-saved hook the stage reads (empty until the office's registry carries a choice)", { skip: !built }, () => {
+  for (const slug of slugsBuilt()) {
+    const html = dist("households", slug, "index.html");
+    assert.match(html, /<section class="hearth" data-hearth data-hearth-slug="[^"]*" data-hearth-saved(="[^"]*")?[ >]/, `${slug}: the hook is on the Hearth root (Astro prints an empty value as the bare attribute)`);
+    assert.match(html, /data-hband-hearth hidden/, `${slug}: the band's Hearth section ships hidden`);
   }
 });

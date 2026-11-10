@@ -39,7 +39,7 @@ const seat = (h: string) => `/households/${slug}/?resident=${encodeURIComponent(
 const likeness = likenessWords(house, faces.length);
 // the picker lists the registered designs and starts on the one the server draws (the default: the saved choice is read in the browser, stage.mjs)
 const pickable = entries.map((e) => ({ id: e.id, title: e.title, author: e.author }));
-const drawn = whichDesign(entries)?.id ?? null;
+const drawn = whichDesign(entries, { saved: house.hearth ?? null })?.id ?? null;
 ---
 <section class="hband hd" data-hband data-hd data-hd-view="public" data-hd-slug={slug} aria-label={`${plate || "this household"}: for the house's own sign-in`}>
   {/* The question is the sign-in button's own text, so it goes with the button: a visitor without scripts, or a
@@ -55,7 +55,7 @@ const drawn = whichDesign(entries)?.id ?? null;
     {/* ═════════ THE HOUSE'S HEARTH: the picker, for the signed-in human only (POS-962, in the band by POS-984) ═════════
          Preview another design (nothing is saved), or save one for everyone, behind a second yes; the office decides who may.
          Visitors see the house's kept choice drawn, with no picker. */}
-    <section class="hband-hearth" aria-labelledby="hband-hearth-h" data-hband-hearth>
+    <section class="hband-hearth" aria-labelledby="hband-hearth-h" data-hband-hearth hidden>
       <h2 id="hband-hearth-h">The house's Hearth</h2>
       <HearthPicker entries={pickable} selected={drawn} />
     </section>

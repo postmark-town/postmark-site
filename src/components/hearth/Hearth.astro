@@ -47,7 +47,9 @@ const { house, members, plate } = Astro.props;
 const slug = house.path ?? house.slug ?? "";
 // the ONE question the page asks about its design (POS-984): the server draws the design the page opens on, and the
 // browser asks the same function for a preview (?entry=)
-const entry = whichDesign(entries);
+// BAKED (review of 80af398fb): the build's households.json is the registry GET /households answers, so a house's saved choice (`hearth`, office migration 093)
+// is here once the office carries it, and the server draws it: no flash of the default. The browser read (stage.mjs) corrects a stale one.
+const entry = whichDesign(entries, { saved: house.hearth ?? null });
 const faces = members.map((r) => residentFace(r, media, homePictureOf(r.handle)));
 const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   name: f.name, accent: f.accent, avatar: f.avatar, monogram: f.monogram, windowHung: f.windowHung,
@@ -64,7 +66,7 @@ const forClient = entries.map((e) => ({ id: e.id, title: e.title, author: e.auth
 const json = (v: unknown) => JSON.stringify(v).split("<").join("\\u003c").split("\u2028").join("\\u2028").split("\u2029").join("\\u2029");
 const slotProps = { house, faces, plate, slug, bulletin };
 ---
-<section class="hearth" data-hearth data-hearth-slug={slug} aria-label={`${plate}, the Hearth`}>
+<section class="hearth" data-hearth data-hearth-slug={slug} data-hearth-saved={house.hearth ?? ""} aria-label={`${plate}, the Hearth`}>
   <script type="application/json" data-hearth-faces set:html={json({ handles: faces.map((f) => f.handle), faces: facesByHandle })} />
   <script type="application/json" data-hearth-entries set:html={json(forClient)} />
 

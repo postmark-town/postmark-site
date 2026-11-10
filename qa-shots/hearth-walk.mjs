@@ -97,6 +97,9 @@ function answer(url, headers, method = "GET", postData = null) {
   return { status: 404, body: { error: "fixture: no such door " + p } };
 }
 
+// the saved choice a BUILD would have baked into the page (data-hearth-saved), for the baked-start scenario: the document is rewritten to carry it
+let injectBaked = null;
+let householdsDelay = 0;   // ms the office takes to answer GET /households (the saved-choice read)
 let injectEntry = null;   // a prepared entry added to the page's registered list, for the hostile-template scenario
 
 // `pendingMe`: a first sign-in. The token is there and the tab has not been told its handles; GET /me answers after that many ms.
@@ -123,13 +126,16 @@ async function newPage(browser, { signedIn = false, pendingMe = 0, viewport = { 
     const office = url.hostname === "postmark.town" || (local && url.pathname.startsWith("/api/"));
     if (office) {
       if (pendingMe > 0 && url.pathname.replace(/^\/api(?=\/)/, "") === "/me") await new Promise((r) => setTimeout(r, pendingMe));
+      if (householdsDelay > 0 && url.pathname.replace(/^\/api(?=\/)/, "") === "/households" && req.method() === "GET") await new Promise((r) => setTimeout(r, householdsDelay));
       const a = answer(req.url(), req.headers(), req.method(), req.postData());
       log.push({ path: url.pathname.replace(/^\/api(?=\/)/, "") + url.search, auth: req.headers().authorization ?? null, status: a.status });
       return route.fulfill({ status: a.status, contentType: "application/json", body: JSON.stringify(a.body), headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" } });
     }
-    if (local && injectEntry && req.resourceType() === "document" && /^\/households\/[^/]+\/$/.test(url.pathname)) {
+    if (local && (injectEntry || injectBaked) && req.resourceType() === "document" && /^\/households\/[^/]+\/$/.test(url.pathname)) {
       const res = await route.fetch();
       let body = await res.text();
+      if (injectBaked) body = body.replace(/data-hearth-saved(?=[\s>])/, `data-hearth-saved="${injectBaked}"`);   // Astro prints the empty value as the bare attribute
+      if (!injectEntry) return route.fulfill({ response: res, body });
       body = body.replace(/(<script type="application\/json" data-hearth-entries[^>]*>)([\s\S]*?)(<\/script>)/, (m, a, json, z) => {
         const list = JSON.parse(json.replace(/\\u003c/g, "<"));
         list.push({ id: injectEntry.id, title: injectEntry.title, author: injectEntry.author, line: injectEntry.line, css: injectEntry.css, html: injectEntry.html });
@@ -686,6 +692,22 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       await v.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await settleOn(v, "ledger");
       check("⑭ without the preview in the address the kept design is back: the preview was never saved", (await showing(v)) === "ledger" && savedHearth === "ledger");
+      // FORCED (review of 80af398fb): the controls are hidden for a non-owner, and the stage must not even BIND them. Drive the hidden select and buttons through the DOM
+      // as a script would: a change, then a click on save and on the confirm. Nothing may be drawn, nothing written, and the address stays as it was.
+      const force = async (p) => {
+        const before = await showing(p);
+        const target = before === "ledger" ? "default" : "ledger";
+        await p.evaluate((to) => {
+          const s = document.querySelector("[data-hearth-pick]");
+          if (s) { s.value = to; s.dispatchEvent(new Event("change", { bubbles: true })); }
+          for (const sel of ["[data-hearth-save]", "[data-hearth-confirm-yes]"]) document.querySelector(sel)?.click();
+        }, target);
+        await p.waitForTimeout(700);
+        return { before, after: await showing(p), hasEntry: new URL(p.url()).searchParams.has("entry"), bound: await p.evaluate(() => document.querySelector("[data-hearth-picker]")?.dataset.hearthSaved !== undefined) };
+      };
+      log.length = 0;
+      const fv = await force(v);
+      check("⑭ a visitor's FORCED change and save draw nothing, change no address, send nothing, and the picker was never bound", fv.after === fv.before && !fv.hasEntry && !fv.bound && patches().length === 0, JSON.stringify({ ...fv, patches: patches().length }));
       await v.context().close();
 
       // the signed-in human of ANOTHER house has no controls, on house A's page
@@ -695,6 +717,9 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       await x.waitForSelector("[data-hband-notyours]:not([hidden])", { timeout: 15000 });
       await x.waitForTimeout(500);
       check("⑭ a signed-in reader of another house has no picker either", !(await visible(x, "[data-hearth-picker]")) && !(await visible(x, "[data-hearth-owner]")));
+      log.length = 0;
+      const fx = await force(x);
+      check("⑭ and that reader's FORCED change and save, with their own valid bearer, draw nothing and send NOTHING to any house", fx.after === fx.before && !fx.hasEntry && !fx.bound && log.filter((l) => l.path.includes("/hearth") && l.path.startsWith("/households/")).length === 0, JSON.stringify({ ...fx, sent: log.filter((l) => l.path.startsWith("/households/")) }));
       await x.context().close();
 
       // the owner: the picker in the band, a preview (nothing sent), a second yes, the save
@@ -741,11 +766,52 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       await ready(f);
       await f.waitForFunction(() => /could not be read just now; showing the default/.test(document.querySelector("[data-hearth-note]")?.textContent ?? ""), null, { timeout: 15000 });
       check("⑮ the choice read fails: the default is drawn (not the kept design, not a blank), and the page says the read failed", (await f.locator("[data-hearth]").getAttribute("data-hearth-showing")) === "default" && (await visible(f, "[data-hearth-note]")), await text(f, "[data-hearth-note]"));
-      check("⑮ and offers no picker to anyone on a failed read", !(await visible(f, "[data-hearth-picker]")));
+      check("⑮ and offers no picker to a visitor on a failed read", !(await visible(f, "[data-hearth-picker]")));
       await shot(f, "21-saved-hearth-read-failed-desktop", { fullPage: false });
       await f.context().close();
+      // the same, as the house's OWN human (review: the wording is "no picker on a failed read", for the owner too): the band's Hearth section, select and note stay away
+      const fo = await newPage(browser, { signedIn: true });
+      await fo.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await ready(fo);
+      await fo.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 15000 });
+      await fo.waitForFunction(() => /could not be read just now/.test(document.querySelector("[data-hearth-note]")?.textContent ?? ""), null, { timeout: 15000 });
+      await fo.waitForTimeout(600);
+      check("⑮ as the owner too: the default is drawn, the page says the read failed, and the band shows no Hearth section, no select and no picker note", (await fo.locator("[data-hearth]").getAttribute("data-hearth-showing")) === "default" && !(await visible(fo, "[data-hband-hearth]")) && !(await visible(fo, "[data-hearth-pick]")) && !(await visible(fo, "[data-hearth-preview-line]")) && !(await visible(fo, "[data-hearth-owner]")), await text(fo, "[data-hband-hearth]"));
+      await shot(fo, "22-saved-hearth-read-failed-owner-desktop", { fullPage: false });
+      await fo.context().close();
       fail = new Set();
       savedHearth = null;
+    }
+
+    // ── ⑯ THE SAVED CHOICE BAKED AT BUILD (review of 80af398fb): the first draw starts from the build's copy, so the default does not flash; the browser read corrects it ──
+    {
+      const showingOf = (p) => p.locator("[data-hearth]").getAttribute("data-hearth-showing");
+      // (a) the build carried "ledger" (the document is rewritten to say so); the office takes 3s to answer: the page is on the ledger BEFORE the read lands
+      injectBaked = "ledger"; savedHearth = "ledger"; householdsDelay = 3000;
+      log.length = 0;
+      const b = await newPage(browser);
+      await b.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await b.waitForFunction(() => document.querySelector("[data-hearth]")?.dataset.hearthShowing === "ledger", null, { timeout: 2500 }).catch(() => {});
+      check("⑯ a baked saved choice: the page is on it before the browser read has answered (no flash of the default)", (await showingOf(b)) === "ledger" && !log.some((l) => l.path.startsWith("/households?h=")), `${await showingOf(b)} ${JSON.stringify(log.filter((l) => l.path.startsWith("/households")))}`);
+      await b.waitForFunction(() => document.querySelector("[data-hearth]")?.dataset.hearthShowing === "ledger", null, { timeout: 8000 });
+      await b.waitForTimeout(3500);
+      check("⑯ and the read, when it lands, agrees: still the ledger, nothing to say", (await showingOf(b)) === "ledger" && !(await visible(b, "[data-hearth-note]")) && log.some((l) => l.path.startsWith("/households?h=")));
+      await b.context().close();
+      // (b) a STALE bake: the build said "ledger", the office now says the house chose nothing: the read corrects it
+      householdsDelay = 0; savedHearth = null;
+      const s = await newPage(browser);
+      await s.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await s.waitForFunction(() => document.querySelector("[data-hearth]")?.dataset.hearthShowing === "default", null, { timeout: 8000 }).catch(() => {});
+      check("⑯ a stale baked choice is corrected by the browser read (the house has since gone back to the default)", (await showingOf(s)) === "default", await showingOf(s));
+      await s.context().close();
+      // (c) a FAILED read with a baked choice keeps what the build carried, and says so
+      savedHearth = "ledger"; fail = new Set(["/households"]);
+      const k = await newPage(browser);
+      await k.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await k.waitForFunction(() => /could not be read just now/.test(document.querySelector("[data-hearth-note]")?.textContent ?? ""), null, { timeout: 15000 });
+      check("⑯ a failed read keeps the baked choice (the ledger) and says it is the one the page was built with", (await showingOf(k)) === "ledger" && /built with/.test((await text(k, "[data-hearth-note]")) ?? ""), await text(k, "[data-hearth-note]"));
+      await k.context().close();
+      injectBaked = null; fail = new Set(); savedHearth = null; householdsDelay = 0;
     }
 
     // ── ⑦ no request left the machine ───────────────────────────────────────────

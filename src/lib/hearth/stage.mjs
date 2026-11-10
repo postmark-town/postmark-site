@@ -67,6 +67,11 @@ export function mountHearth(root) {
   const ctx = { handles, faces, slug, seatHref, storage, filter: { kind: "all", who: "all" }, expanded: false };
   let reads = null, extras = null, readFor = "", stopCount = () => {};
   let ballots = null;   // the band's open ballots and their stake form (band-ballots.mjs): mounted once, for the house's own sign-in only
+  // THE SAVED CHOICE (POS-962). `baked` is the build's own copy (Hearth.astro bakes house.hearth from households.json, the registry readSavedHearth reads): the first
+  // draw starts from it, so a house with a saved choice does not flash the default. The browser read corrects a stale one. `mounted` is the signed-in human's picker.
+  const baked = root.dataset.hearthSaved || null;
+  let knownSaved = baked;
+  let mounted = null, readOk = false, savedRead, savedDone = false;
 
   function draw() {
     if (!reads) return;
@@ -84,6 +89,7 @@ export function mountHearth(root) {
       const section = band.querySelector("[data-hband-ballots]");
       if (section) ballots = mountBandBallots(section);
     }
+    mountPicker();
     paintHouse(stage, reads, ctx);
     paintExtras(stage, reads, extras, ctx);
     stopCount();
@@ -108,7 +114,7 @@ export function mountHearth(root) {
   function say(text) { if (note) { note.textContent = text ?? ""; note.hidden = !text; } }
 
   function compose(id, { asked = null } = {}) {
-    const entry = whichDesign(entries, { entry: id });
+    const entry = whichDesign(entries, { entry: id, saved: knownSaved });
     if (!entry) { say("No Hearth entry is registered."); return; }
     if (styleEl) styleEl.textContent = entry.css;
     const tpl = document.createElement("template");
@@ -147,8 +153,14 @@ export function mountHearth(root) {
   // THE PICKER (POS-962): a preview draws another entry and keeps only the address (never a save); the save is picker.mjs's, behind a second yes.
   const pickerRoot = root.querySelector("[data-hearth-picker]");
   const api = officeOrigin();
-  let mounted = null;
-  let readOk = false;
+  // The picker is the house's signed-in human's, and MOUNTS only for them, the way the ballots do (draw(), behind the owner, and again on pm:lens through load()):
+  // for anyone else it is never bound, so a forced change or click does nothing. It also waits for the choice read to have answered: on a failed read there is no picker.
+  function mountPicker() {
+    if (mounted || !pickerRoot || !savedDone || !readOk || mine().length === 0) return;
+    const section = pickerRoot.closest("[data-hband-hearth]");
+    if (section) section.hidden = false;
+    mounted = mountHearthPicker(pickerRoot, { entries, slug, saved: savedRead ?? null, token, api, signedIn: () => readOk && mine().length > 0, onDraw });
+  }
   const onDraw = (id) => {
     try {
       const url = new URL(location.href);
@@ -169,7 +181,7 @@ export function mountHearth(root) {
   let asked = null;
   try { asked = new URL(location.href).searchParams.get("entry"); } catch { asked = null; }
   // the page was drawn on the server with the entry it opens on (the default); asked for that same one, there is nothing to redraw
-  const first = whichDesign(entries, { entry: asked });
+  const first = whichDesign(entries, { entry: asked, saved: baked });
   if (first && stage.dataset.hearthEntry === first.id) {
     mountBehaviors(stage);
     root.dataset.hearthShowing = first.id;
@@ -179,13 +191,17 @@ export function mountHearth(root) {
 
   // THE SAVED CHOICE: the office keeps it and reads it signed out, so a reload (and every other visitor) draws what the house chose.
   // whichDesign answers which entry to draw; a preview in the address still wins on this visit, and is not saved.
-  readSavedHearth({ handles, slug, api }).then((saved) => {
-    readOk = saved !== undefined;
+  readSavedHearth({ handles, slug, api }).then((read) => {
+    readOk = read !== undefined;
+    savedRead = read; savedDone = true;
+    // a FAILED read keeps what the build carried (else the default, which whichDesign answers for nothing), and says so
+    const saved = readOk ? read : baked;
+    knownSaved = saved;
     const drawn = whichDesign(entries, { entry: asked, saved });
     if (drawn && drawn.id !== root.dataset.hearthShowing) compose(drawn.id);
-    const note = designNote(entries, { entry: asked, saved });
-    if (note) say(note);
-    if (pickerRoot) mounted = mountHearthPicker(pickerRoot, { entries, slug, saved: saved ?? null, token, api, signedIn: () => readOk && mine().length > 0, onDraw });
+    const note = designNote(entries, { entry: asked, saved: read });
+    if (note) say(!readOk && baked && drawn?.id === baked ? "The house's saved Hearth could not be read just now; showing the one this page was built with." : note);
+    mountPicker();
     if (picker && drawn) picker.value = drawn.id;
   });
 }
