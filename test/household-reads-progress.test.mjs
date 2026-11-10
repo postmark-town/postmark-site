@@ -352,6 +352,7 @@ test("§ 4 the mail box: hidden until a doorstep has answered; part-read it says
 test("§ 5 (text pin) the stage asks for progress on the first read and draws the snapshot it is handed, and sets what is still out before it paints", () => {
   const stage = readFileSync(resolve(ROOT, "src/lib/hearth/stage.mjs"), "utf8");
   assert.match(stage, /onProgress: progressive \? \(snapshot\) => \{ if \(seq === loadSeq\) \{ reads = snapshot; draw\(\); \} \} : null/);
+  assert.match(stage, /const progressive = !reads \|\| still\.residents\.length > 0 \|\| still\.house\.length > 0;/, "the first read (and one that replaces a part-read page) is progressive");
   assert.match(stage, /ctx\.reading = readingOf\(reads\);/);
   assert.ok(stage.indexOf("ctx.reading = readingOf(reads);") < stage.indexOf("paintHouse(stage, reads, ctx)"), "the reading state is set before the stage paints");
   assert.ok(!/await Promise\.all\(\[\s*readHouse/.test(stage), "the stage no longer awaits the house's reads together with the posts");
