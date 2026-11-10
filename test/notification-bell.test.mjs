@@ -110,6 +110,19 @@ function world({ now, letters, storage = {}, household = "hh:moss-house", handle
       clock.now = t;
       await flush();
     },
+    // A SLEEP, not a replay: the machine slept, so NO callback ran while the clock moved; it wakes at `t` and every overdue timer
+    // runs NOW, with the clock at `t` (advanceTo above replays callbacks at their old due times, which is not this case).
+    wake: async (t) => {
+      clock.now = t;
+      for (;;) {
+        const due = timers.filter((x) => x.at <= t).sort((a, b) => a.at - b.at || a.id - b.id)[0];
+        if (!due) break;
+        timers.splice(timers.indexOf(due), 1);
+        due.fn();
+        await flush();
+      }
+      await flush();
+    },
     unread: () => (nodes.badge.hidden ? 0 : Number(nodes.badge.textContent)),
     rows: () => nodes.body.children.map((c) => c.innerHTML),
     lettersFetches: () => fetches.filter((f) => f.url === "/data/letters.json"),
@@ -186,6 +199,32 @@ async function noDelivery(source) {
   assert.equal(w.timers[0].at, MIDNIGHT + 5 * MIN, "at the next crossing plus five minutes");
   return true;
 }
+
+// ── the oracle: A SLEEP ACROSS A CROSSING. The tab's noon timer is overdue when the machine wakes at 00:02 ─────────────────────
+
+async function sleepAcrossNoon(source) {
+  const w = world({ now: at("2026-11-10T11:50:00Z"), letters: [letter("L1", "ash")] });
+  await w.start(source);
+  assert.equal(w.unread(), 1, "page open at 11:50 with one unread correspondent");
+  assert.equal(w.timers.length, 1, "the noon follow-up is scheduled");
+  // the machine sleeps across noon: no callback runs. Only NOON's bake is published (it carries noon's mail) when it wakes at 00:02.
+  w.state.letters = [letter("L1", "ash"), letter("L2", "birch", "moss", "2026-11-10T12:00:00Z")];
+  await w.wake(MIDNIGHT + 2 * MIN);
+  assert.equal(w.lettersFetches().length, 2, "the overdue noon look ran at wake");
+  assert.equal(w.lettersFetches()[1].at, MIDNIGHT + 2 * MIN, "with the clock at 00:02, not at its old due time");
+  assert.equal(w.unread(), 2, "it found noon's mail");
+  assert.equal(w.timers.length, 1, "and MIDNIGHT's window is still scheduled");
+  assert.equal(w.timers[0].at, MIDNIGHT + 5 * MIN, "its first look at 00:05: noon's delivery did not settle midnight");
+  // midnight's bake is published later; midnight's follow-ups then find it without navigation
+  w.state.letters = [...w.state.letters, letter("L3", "cedar", "moss", "2026-11-11T00:00:00Z")];
+  await w.advanceTo(MIDNIGHT + 6 * MIN);
+  assert.equal(w.unread(), 3, "midnight's mail shows without navigation (the 00:05 look)");
+  return true;
+}
+
+test("A SLEEP ACROSS A CROSSING on the layout's own script: an overdue noon look that wakes at 00:02 settles NOON, not midnight, so midnight's late bake still shows without navigation", async () => {
+  assert.equal(await sleepAcrossNoon(bellSource()), true);
+});
 
 test("LATE PUBLICATION on the layout's own script: the bake carrying a crossing's mail is published after it; follow-ups find it, a young cache from another tab does not hide it, and they stop", async () => {
   assert.equal(await lateBake(bellSource()), true);
@@ -267,7 +306,8 @@ const FLIPS = [
   ["force-uses-young-cache", "if (!opts.force && cachedRows && cached.ts", "if (cachedRows && cached.ts", "a forced look lets a young local cache answer (another tab's old-bake read)", lateBake],
   ["no-http-revalidate", "...(opts.force ? { cache: \"no-cache\" } : {})", "", "a forced look lets the browser's HTTP cache answer", lateBake],
   ["unchanged-bake-stamped-fresh", "if (!(opts.force && sameRows(rows, opts.previous))) writeJSON(", "if (true) writeJSON(", "an unchanged older bake is stamped as a fresh cache", lateBake],
-  ["never-stops", "if (delivered) settledFor = lastCrossingAt(Date.now());", "", "the follow-ups never stop on delivery", lateBake],
+  ["never-stops", "if (delivered) settledFor = forCrossing;", "", "the follow-ups never stop on delivery", lateBake],
+  ["settles-the-current-crossing", "if (delivered) settledFor = forCrossing;", "if (delivered) settledFor = lastCrossingAt(Date.now());", "a delivery settles the crossing current when the callback runs (e22f85ae), so an overdue look settles the next window", sleepAcrossNoon],
   ["no-bound", "if (n <= c + FOLLOW_UNTIL_MS) return n;", "return n;", "the follow-ups have no bound", noDelivery],
 ];
 for (const [label, from, to, why, oracle] of FLIPS) {

@@ -871,7 +871,10 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       // first; then it stops until the next crossing. Each look is forced (see receivedMail) and goes through the SAME
       // receivedMail -> recomputeMail -> render path, so household namespaces, the seen set, grouping and the badge are untouched.
       // A failed look keeps the rows on screen. One timer at a time; not a general poll.
-      async function followUp() {
+      // `forCrossing` is the crossing this look was SCHEDULED for. It, and not the crossing current when the callback finally
+      // runs, is what a seen delivery settles: a timer that is overdue (a tab asleep across a crossing) would otherwise find the
+      // OLD crossing's mail at the new crossing's time, settle the new crossing, and skip its follow-ups.
+      async function followUp(forCrossing) {
         const was = rows;
         let next;
         try { next = await receivedMail(household, handles, { force: true, previous: was, fallback: was }); } catch { return; }
@@ -880,7 +883,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
         rows = next;
         recomputeMail();
         render();
-        if (delivered) settledFor = lastCrossingAt(Date.now());   // mail from this crossing is in: no more looks until the next
+        if (delivered) settledFor = forCrossing;   // mail from that crossing is in: no more looks in its window
       }
       // the next look: the next grid point inside this crossing's window (unless it is settled or past its bound), else the first
       // look after the next crossing
@@ -894,7 +897,9 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       }
       function scheduleFollowUp() {
         const now = Date.now();
-        setTimeout(async () => { await followUp(); scheduleFollowUp(); }, nextLookAt(now) - now);
+        const due = nextLookAt(now);
+        const forCrossing = lastCrossingAt(due);   // captured now: the crossing this look belongs to, however late it runs
+        setTimeout(async () => { await followUp(forCrossing); scheduleFollowUp(); }, due - now);
       }
       scheduleFollowUp();
     })();
