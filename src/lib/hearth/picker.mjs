@@ -22,7 +22,8 @@ import { saveHearth } from "./choice.mjs";
 
 const titleOf = (entries, id) => entries.find((e) => e.id === id)?.title ?? id;
 
-export function createPicker({ entries = [], slug, saved = null, save, onDraw = () => {}, signedIn = false, shown: drawn = null } = {}) {
+// `slug` is the house's registry KEY (what the office is told: the save goes to it); `path` is the page's address, which the question names (a key over 96 bytes is a hash there).
+export function createPicker({ entries = [], slug, path = slug, saved = null, save, onDraw = () => {}, signedIn = false, shown: drawn = null } = {}) {
   const isIn = () => (typeof signedIn === "function" ? Boolean(signedIn()) : Boolean(signedIn));   // the sign-in can change under a mounted picker
   let savedId = saved && saved !== DEFAULT_ENTRY && entries.some((e) => e.id === saved) ? saved : null;   // what is actually saved
   // what is drawn: the design the page is already showing when the picker mounts (a `?entry=` preview is on screen before the picker binds), else the kept one
@@ -42,8 +43,8 @@ export function createPicker({ entries = [], slug, saved = null, save, onDraw = 
       canClear: isIn() && savedId !== null && !busy,
       controls: isIn(),
       question: asking ? (asking.id === null
-        ? `Go back to the default Hearth for everyone who visits /households/${slug}/? You can choose again any time.`
-        : `Make ${titleOf(entries, asking.id)} the Hearth everyone sees at /households/${slug}/? You can change it any time.`) : "",
+        ? `Go back to the default Hearth for everyone who visits /households/${path}/? You can choose again any time.`
+        : `Make ${titleOf(entries, asking.id)} the Hearth everyone sees at /households/${path}/? You can change it any time.`) : "",
     };
   };
 
@@ -91,9 +92,9 @@ export function createPicker({ entries = [], slug, saved = null, save, onDraw = 
 }
 
 /** Bind a `[data-hearth-picker]` element (HearthPicker.astro) to a picker. Returns the picker and a `refresh()`. */
-export function mountHearthPicker(root, { entries, slug, saved, token, api, signedIn, onDraw, shown, fetchImpl } = {}) {
+export function mountHearthPicker(root, { entries, slug, path, saved, token, api, signedIn, onDraw, shown, fetchImpl } = {}) {
   const picker = createPicker({
-    entries, slug, saved, signedIn, onDraw, shown,
+    entries, slug, path, saved, signedIn, onDraw, shown,
     save: ({ slug: s, id }) => saveHearth({ slug: s, id, token: typeof token === "function" ? token() : token, api, fetchImpl }),
   });
   const q = (sel) => root.querySelector(sel);

@@ -48,6 +48,8 @@ export function mountHearth(root) {
   const handles = data.handles ?? [];
   const faces = data.faces ?? {};
   const slug = root.dataset.hearthSlug || handles.join("+");
+  // the registry KEY, which the office knows the house by: the saved choice is read under it and PATCHed to it. `slug` above is the page's path, which for a key over 96 bytes is a hash.
+  const key = root.dataset.hearthKey || slug;
   // a resident's card, name and mentions go to that resident's own page: the household page draws each resident once and carries no pages of theirs
   const seatHref = (h) => `/residents/${encodeURIComponent(h)}/`;
   const styleEl = root.querySelector("[data-hearth-css]");
@@ -177,7 +179,7 @@ export function mountHearth(root) {
   function mountPicker() {
     if (mounted || !pickerRoot || !savedDone) return;
     mounted = mountHearthPicker(pickerRoot, {
-      entries, slug, saved: readOk ? (savedRead ?? null) : baked, token, api,
+      entries, slug: key, path: slug, saved: readOk ? (savedRead ?? null) : baked, token, api,
       shown: root.dataset.hearthShowing,
       signedIn: () => readOk && mine().length > 0, onDraw,
     });
@@ -208,7 +210,7 @@ export function mountHearth(root) {
 
   // THE SAVED CHOICE: the office keeps it and reads it signed out, so a reload (and every other visitor) draws what the house chose.
   // whichDesign answers which entry to draw; a preview in the address still wins on this visit, and is not saved.
-  readSavedHearth({ handles, slug, api }).then((read) => {
+  readSavedHearth({ handles, slug: key, api }).then((read) => {
     readOk = read !== undefined;
     savedRead = read; savedDone = true;
     // a FAILED read keeps what the build carried (else the default, which whichDesign answers for nothing), and says so

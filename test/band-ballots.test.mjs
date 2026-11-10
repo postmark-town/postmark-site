@@ -162,34 +162,6 @@ test("a confirmed stake, through the real form: the form raises pm:ballot-staked
 
 // ── the wiring (source pins, labelled as such; the browser walk reads the behaviour) ──
 
-// Until 2026-11-10 these two held the band's wiring: the stage mounted the ballots for the house's own sign-in, and the built page shipped the section.
-// The band is gone (Darko, 17:14–17:28 EST: the theme is the page; the stake form is off the household page and on /votes/), so they are inverted:
-// nothing a household page loads carries the ballots, and /votes/ is where the form is mounted.
-test("PIN the household page carries no ballots: the stage imports neither module, and /votes/ is where the stake form is mounted", () => {
-  const stage = read("src/lib/hearth/stage.mjs");
-  assert.ok(!/band-ballots|ballot-stake|mountBandBallots|pm:ballot-staked/.test(stage), "the household page's script has no ballots and no stake form");
-  for (const f of ["src/components/hearth/Hearth.astro", "town/components/HouseholdPage.astro", "town/components/Household.astro", "town/pages/households/[slug].astro"]) {
-    assert.ok(!/band-ballots|ballot-stake|data-hb-|hband/.test(read(f)), `${f} names no ballots and no band`);
-  }
-  const votes = read("town/pages/votes/index.astro");
-  assert.match(votes, /import \{ mountBallotStake \} from "@\/lib\/ballot-stake\.mjs";/, "the form is /votes/'s");
-  assert.match(votes, /mountBallotStake\(slot, \{ topic: t\.topic, choices: t\.candidates \}\)/, "mounted under each STAKING ballot");
-  assert.match(votes, /if \(t\.status !== "staking"\) return;/);
-});
-
-test("PIN the words stay text: the band's ballots build no markup from office words, and the form's one module does not either", () => {
-  for (const f of ["src/lib/hearth/band-ballots.mjs", "src/lib/ballot-stake.mjs"]) {
-    const src = read(f).replace(/\/\/[^\n]*/g, "");
-    assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function|setAttribute\(["']on|\.action\s*=|["']action["']/.test(src), `${f} builds elements and sets text only, with no inline handler and no form action`);
-  }
-});
-
-test("built: no household page carries a ballots section or a stake form, and /votes/ still ships the slot the form mounts into", { skip: !built }, () => {
-  const slugs = fs.readdirSync(path.join(DIST, "households")).filter((s) => fs.existsSync(path.join(DIST, "households", s, "index.html")));
-  assert.ok(slugs.length > 10, `household pages read: ${slugs.length}`);
-  for (const slug of slugs) {
-    const html = fs.readFileSync(path.join(DIST, "households", slug, "index.html"), "utf8");
-    assert.ok(!/data-hband|hband-|data-hb-ballot|data-hb-stake|class="bs[ "]|bs-form|bs-confirm/.test(html), `${slug}: no band, no ballots section and no stake form (a resident’s own prose may say stake-vote, so the form’s markers are what is looked for)`);
-  }
-  assert.ok(fs.readFileSync(path.join(DIST, "votes", "index.html"), "utf8").includes("data-votes"), "/votes/ is built, with the box the tally and the form are drawn into");
-});
+// The page-wiring pins this file held (the household page carries no ballots; the stage imports neither module; /votes/ mounts the form; the built pages carry no
+// ballots section) moved to test/household-one-page.test.mjs, and the form module's words-stay-text pin to test/ballot-stake.test.mjs, so this file, band-ballots.mjs and
+// HouseBand.astro can be `git rm`'d with nothing lost. What is left tests the retired module alone.

@@ -45,6 +45,9 @@ interface Props {
   plate: string;
 }
 const { house, members, plate } = Astro.props;
+// TWO NAMES, NEVER ONE FOR BOTH: `slug` is the page's path (a registry key over 96 bytes is a hash there: houses.mjs § housePath), and `key` is the registry key
+// the office knows the house by. The address, the look-since storage and the words about the page use the path; the saved choice's read and its PATCH use the
+// KEY (data-hearth-key), or a long-keyed house reads nothing and saves to a path the office has no household at.
 const slug = house.path ?? house.slug ?? "";
 // the ONE question the page asks about its design (POS-984): the server draws the design the page opens on, and the
 // browser asks the same function for a preview
@@ -70,7 +73,7 @@ const forClient = entries.map((e) => ({ id: e.id, title: e.title, author: e.auth
 const json = (v: unknown) => JSON.stringify(v).split("<").join("\\u003c").split("\u2028").join("\\u2028").split("\u2029").join("\\u2029");
 const slotProps = { house, faces, plate, slug, bulletin };
 ---
-<section class="hearth" data-hearth data-hearth-slug={slug} data-hearth-baked={house.hearth ?? ""} aria-label={`${plate}, the Hearth`}>
+<section class="hearth" data-hearth data-hearth-slug={slug} data-hearth-baked={house.hearth ?? ""} data-hearth-key={house.slug ?? ""} aria-label={`${plate}, the Hearth`}>
   <script type="application/json" data-hearth-faces set:html={json({ handles: faces.map((f) => f.handle), faces: facesByHandle })} />
   <script type="application/json" data-hearth-entries set:html={json(forClient)} />
 

@@ -139,6 +139,12 @@ test("the page: a staking ballot carries the stake form; a closed one does not; 
   assert.match(BALLOT_STAKE_CSS, /\.bs \.bs-out\.ambiguous/);
 });
 
+// (moved here from test/band-ballots.test.mjs, which goes with the retired band-ballots.mjs; this module's half of it)
+test("PIN the words stay text: the form's one module builds elements and sets text only, with no inline handler and no form action", () => {
+  const src = MODULE.replace(/\/\/[^\n]*/g, "");
+  assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function|setAttribute\(["']on|\.action\s*=|["']action["']/.test(src), "ballot-stake.mjs builds elements and sets text only, with no inline handler and no form action");
+});
+
 // ── the mount, on a hand-rolled document (the site carries no DOM library; test/fund-household.test.mjs is the precedent) ──
 // Only what the mount touches: elements with attributes, text, children, hidden/disabled, a select's value
 // (its first option's until set), listeners, and the document's head, query and events.

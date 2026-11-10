@@ -175,6 +175,32 @@ test("the design's own Needs you and boat line are on: the host stands down no s
   assert.match(read("src/components/hearth/HearthSlot.astro"), /<p class="hd-boat" data-private data-hd-boat hidden><\/p>/, "the boat line is in the happened slot, private, shipped hidden");
 });
 
+// ── no ballot on the household page (moved here from test/band-ballots.test.mjs, which goes with the retired band-ballots.mjs and HouseBand.astro) ──
+// Until 2026-11-10 the band hosted POS-502's stake form for the signed-in human. The band is gone (Darko, 17:14–17:28 EST: the theme is the page; the stake form is
+// off the household page and on /votes/), so these hold the inversion: nothing a household page loads carries the ballots, and /votes/ is where the form is mounted.
+
+test("PIN the household page carries no ballots: the stage imports neither module, and /votes/ is where the stake form is mounted", () => {
+  const stage = read("src/lib/hearth/stage.mjs");
+  assert.ok(!/band-ballots|ballot-stake|mountBandBallots|pm:ballot-staked/.test(stage), "the household page's script has no ballots and no stake form");
+  for (const f of ["src/components/hearth/Hearth.astro", "town/components/HouseholdPage.astro", "town/components/Household.astro", "town/pages/households/[slug].astro"]) {
+    assert.ok(!/band-ballots|ballot-stake|data-hb-|hband/.test(read(f)), `${f} names no ballots and no band`);
+  }
+  const votes = read("town/pages/votes/index.astro");
+  assert.match(votes, /import \{ mountBallotStake \} from "@\/lib\/ballot-stake\.mjs";/, "the form is /votes/'s");
+  assert.match(votes, /mountBallotStake\(slot, \{ topic: t\.topic, choices: t\.candidates \}\)/, "mounted under each STAKING ballot");
+  assert.match(votes, /if \(t\.status !== "staking"\) return;/);
+});
+
+test("built: no household page carries a ballots section or a stake form, and /votes/ still ships the slot the form mounts into", { skip: !built }, () => {
+  const slugs = slugsBuilt();
+  assert.ok(slugs.length > 10, `household pages read: ${slugs.length}`);
+  for (const slug of slugs) {
+    const html = dist("households", slug, "index.html");
+    assert.ok(!/data-hband|hband-|data-hb-ballot|data-hb-stake|class="bs[ "]|bs-form|bs-confirm/.test(html), `${slug}: no band, no ballots section and no stake form (a resident’s own prose may say stake-vote, so the form’s markers are what is looked for)`);
+  }
+  assert.ok(dist("votes", "index.html").includes("data-votes"), "/votes/ is built, with the box the tally and the form are drawn into");
+});
+
 // ── legible: every ink of the strip is a token paired with its surface, and the pairs are computed ─────────
 // The site has ONE colour scheme: `color-scheme: dark` (src/styles/global.css), the page's night behind the strip, no light scheme and no toggle. The walk (qa-shots/hearth-walk.mjs ⑱)
 // reads the rendered contrast of every visible text in the default design and the strip, signed in and out, with the browser asked for both schemes.
