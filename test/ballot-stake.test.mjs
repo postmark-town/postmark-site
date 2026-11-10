@@ -17,6 +17,7 @@ import {
   stakeBody, stampsOf, residentsOf, choiceNames, answerOf, postStake, readStanding, freshToken, AMBIGUOUS, UNCONFIRMED, BALLOT_STAKE_CSS,
   holdsConfirm, mountBallotStake,
 } from "../src/lib/ballot-stake.mjs";
+import { topicHtml, votesHtml } from "../src/lib/votes-render.mjs";
 
 const PAGE = readFileSync(new URL("../town/pages/votes/index.astro", import.meta.url), "utf8");
 const MODULE = readFileSync(new URL("../src/lib/ballot-stake.mjs", import.meta.url), "utf8");
@@ -127,8 +128,13 @@ test("the token: only a fresh one is used; signed out, nothing is sent", () => {
 
 test("the page: a staking ballot carries the stake form; a closed one does not; the form is the one module, and builds no markup from office words", () => {
   assert.match(PAGE, /import \{ mountBallotStake \} from "@\/lib\/ballot-stake\.mjs"/);
-  assert.match(PAGE, /\(open \? '<div class="v-stake" data-stake-slot="' \+ esc\(t\.topic\) \+ '"><\/div>' : ""\)/);
-  assert.match(PAGE, /if \(t\.status !== "staking"\) return;[\s\S]*mountBallotStake\(slot, \{ topic: t\.topic, choices: t\.candidates \}\)/);
+  // the slot is drawn by the tally's one renderer (POS-983's votes-render.mjs § topicHtml); the page mounts the form after it draws
+  const cands = [{ candidate: "vela", staked: 3 }];
+  assert.match(topicHtml({ topic: "hearth", status: "staking", candidates: cands }), /<div class="v-stake" data-stake-slot="hearth"><\/div><\/article>$/);
+  assert.doesNotMatch(topicHtml({ topic: "hearth", status: "closed", candidates: cands }), /data-stake-slot/);
+  assert.match(topicHtml({ topic: `a"b`, status: "staking", candidates: [] }), /data-stake-slot="a&quot;b"/, "the slot's topic is escaped for its attribute");
+  assert.equal(votesHtml({ topics: [{ topic: "a", status: "staking", candidates: [] }, { topic: "b", status: "staking", candidates: [] }] }).match(/data-stake-slot/g).length, 2);
+  assert.match(PAGE, /box\.innerHTML = votesHtml\(data\);[\s\S]*if \(t\.status !== "staking"\) return;[\s\S]*mountBallotStake\(slot, \{ topic: t\.topic, choices: t\.candidates \}\)/);
   assert.doesNotMatch(MODULE, /innerHTML/, "every word goes in as text");
   assert.match(BALLOT_STAKE_CSS, /\.bs \.bs-out\.ambiguous/);
 });
