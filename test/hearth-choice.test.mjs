@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { designNote, readSavedHearth, saveHearth, savedHearthFrom } from "../src/lib/hearth/choice.mjs";
+import { designNote, readSavedHearth, saveHearth, savedHearthFrom, UNCONFIRMED_SAVE } from "../src/lib/hearth/choice.mjs";
 import { whichDesign } from "../src/lib/hearth/which-design.mjs";
 import { createPicker } from "../src/lib/hearth/picker.mjs";
 
@@ -88,6 +88,40 @@ test("§ 2 the save is a PATCH with the human's bearer; the default goes as null
   const anon = await saveHearth({ slug: "ember-lane", id: "ledger", token: null, api: "/api", fetchImpl: office(200, {}) });
   assert.deepEqual([anon.ok, anon.status], [false, 401]); assert.equal(seen.length, 3, "no token, no request: only the three earlier calls were sent");
   assert.equal((await saveHearth({ slug: "x", id: "ledger", token: "t", api: "/api", fetchImpl: async () => { throw new Error("offline"); } })).status, 0);
+});
+
+test("§ 2 a save whose outcome is not known says so: no answer, or a success that cannot be read, is UNCONFIRMED, never 'nothing was saved' and never a saved default (POS-962 lead FIX)", async () => {
+  const ok200 = (json) => async () => ({ ok: true, status: 200, json });
+  const save = (fetchImpl) => saveHearth({ slug: "ember-lane", id: "ledger", token: "tok", api: "/api", fetchImpl });
+  // no answer: the request may still have landed
+  const offline = await save(async () => { throw new TypeError("network"); });
+  assert.deepEqual([offline.ok, offline.unconfirmed, offline.status, offline.message], [false, true, 0, UNCONFIRMED_SAVE.noAnswer]);
+  // a success whose body cannot be read, has no `hearth`, or names no entry: not a confirmation of anything
+  for (const [label, json] of [
+    ["unparseable", async () => { throw new SyntaxError("cut off"); }],
+    ["no body", async () => null],
+    ["no hearth field", async () => ({ household: "ember-lane" })],
+    ["hearth is not an id", async () => ({ hearth: 7 })],
+  ]) {
+    const r = await save(ok200(json));
+    assert.deepEqual([r.ok, r.unconfirmed, r.status, r.message], [false, true, 200, UNCONFIRMED_SAVE.unreadable], label);
+    assert.equal(r.hearth, undefined, `${label}: no default is synthesized`);
+  }
+  for (const words of Object.values(UNCONFIRMED_SAVE)) {
+    assert.doesNotMatch(words, /nothing was saved|not saved/i);
+    assert.match(words, /could not be confirmed\. Reload the page to see the Hearth this house has saved\./);
+  }
+  // an explicit null IS the confirmed default
+  assert.deepEqual(await save(ok200(async () => ({ hearth: null }))), { ok: true, status: 200, hearth: null });
+});
+
+test("§ 3 an unconfirmed save is said as one by the picker: the office's state is not claimed either way, and the shown choice is not moved", async () => {
+  const { picker, log } = harness({ result: { ok: false, unconfirmed: true, status: 0, message: UNCONFIRMED_SAVE.noAnswer }, opts: { saved: "ledger" } });
+  picker.preview("orchard"); picker.ask();
+  const after = await picker.confirm();
+  assert.equal(log.saves.length, 1, "one save was sent, and nothing resent it");
+  assert.equal(after.said, UNCONFIRMED_SAVE.noAnswer, "its own words, never 'Not saved'");
+  assert.equal(after.savedId, "ledger", "the picker claims no new saved choice");
 });
 
 // ── § 3 the picker ──────────────────────────────────────────────────────────

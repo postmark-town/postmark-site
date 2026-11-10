@@ -156,7 +156,7 @@ export function mountHearth(root) {
   load();
 
   // THE SAVED CHOICE: the office keeps it and reads it signed out, so a reload (and every other visitor) draws what the house chose.
-  // resolveHearth answers which entry to draw; a preview in the address still wins on this visit, and is not saved.
+  // whichDesign answers which entry to draw; a preview in the address still wins on this visit, and is not saved.
   readSavedHearth({ handles, slug, api }).then((saved) => {
     readOk = saved !== undefined;
     const drawn = whichDesign(entries, { entry: asked, saved });

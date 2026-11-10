@@ -14,7 +14,7 @@
 //   const picker = createPicker({ entries, slug, saved, save, onDraw });       // saved: id | null | undefined (choice.mjs § readSavedHearth)
 //   picker.preview(id)            -> draw `id` (not saved)           picker.ask() -> the confirm question      picker.confirm() -> the save
 //   picker.clear()                -> ask to go back to the default   picker.view() -> { ...labels and flags to render }
-//   `onDraw(id)` is called whenever the drawn entry changes (a preview, a successful save, a clear): redraw the house with resolveHearth.
+//   `onDraw(id)` is called whenever the drawn entry changes (a preview, a successful save, a clear): redraw the house with whichDesign.
 
 import { DEFAULT_ENTRY } from "./slots.mjs";
 import { saveHearth } from "./choice.mjs";
@@ -80,7 +80,8 @@ export function createPicker({ entries = [], slug, saved = null, save, onDraw = 
         said = savedId ? `Saved. ${titleOf(entries, savedId)} is now this house’s Hearth.` : "Saved. This house now uses the default Hearth.";
         onDraw(shown);
       } else {
-        said = r.status === 403 ? `Not saved: ${r.message}` : `Not saved. ${r.message}`;
+        // an unconfirmed save may have landed: its words say so, never "Not saved" (POS-962 lead FIX)
+        said = r.unconfirmed ? r.message : r.status === 403 ? `Not saved: ${r.message}` : `Not saved. ${r.message}`;
       }
       return view();
     },
