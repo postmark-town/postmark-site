@@ -57,6 +57,8 @@ let fail = new Set();      // path prefixes the fixture office answers 500 to, f
 // the walk's open ballot: what each choice holds, and whether the office lists a staking ballot at all
 let tally = { "the-ledger": 11, "starter-kit": 3 };
 let ballotOpen = true;
+// the house A's SAVED Hearth (POS-962): what the office keeps, read signed out, written by the owner's confirmed save
+let savedHearth = null;
 function answer(url, headers, method = "GET", postData = null) {
   const u = new URL(url);
   const p = u.pathname.replace(/^\/api(?=\/)/, "");
@@ -76,6 +78,12 @@ function answer(url, headers, method = "GET", postData = null) {
   if (p === "/calendar") return { status: 200, body: fx.calendar(A[0]) };
   if (p === "/posts") return { status: 200, body: fx.posts(u.searchParams.get("class"), A) };
   // GET /me, as the office answers it: the handles, and the household block per handle (postmark-office src/households.mjs householdLookupOf)
+  if (p === "/households" && method === "GET") return { status: 200, body: { registry: { households: { [A_SLUG]: { hearth: savedHearth } } } } };
+  if (p === `/households/${A_SLUG}/hearth` && method === "PATCH") {
+    if (auth !== `Bearer ${OWNER_TOKEN}`) return { status: 403, body: { error: "bounce", code: 403, defect: "not this household's human" } };
+    savedHearth = JSON.parse(postData ?? "{}").hearth ?? null;
+    return { status: 200, body: { hearth: savedHearth } };
+  }
   if (p === "/votes") return { status: 200, body: fx.votes(tally, { open: ballotOpen }) };
   if (p.startsWith("/votes/")) return { status: 200, body: fx.votesStanding(tally, 20 - (tally["the-ledger"] ?? 0) % 20) };
   if (p === "/household" && method === "POST") {
@@ -259,11 +267,12 @@ const run = async () => {
       await page.context().close();
     }
 
-    // ── ② preview any entry: ledger on house A, by the picker and by the URL ───
+    // ── ② preview any entry: ledger on house A, by the picker (the signed-in human's, in the band) and by the URL ───
     {
-      const page = await newPage(browser);
+      const page = await newPage(browser, { signedIn: true });
       await page.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await ready(page);
+      await page.waitForSelector("[data-hband] [data-hearth-owner]:not([hidden])", { timeout: 15000 });   // POS-984/POS-962: the picker is the owner's, in the band
       await page.selectOption("[data-hearth-pick]", "ledger");
       await page.waitForFunction(() => document.querySelector("[data-hearth-stage]")?.dataset.hearthEntry === "ledger");
       check("② the picker previews the second entry without a reload", (await page.locator("[data-hearth-stage]").getAttribute("data-hearth-entry")) === "ledger");
@@ -381,7 +390,8 @@ const run = async () => {
       const state = await page.evaluate(() => {
         const stage = document.querySelector("[data-hearth-stage]");
         const attrs = [...stage.querySelectorAll("*")].flatMap((e) => [...e.attributes].map((a) => a.name));
-        const bar = document.querySelector(".hearth-bar");
+        // POS-984/POS-962: the header bar holds no picker any more; the site's chrome to protect is the owner's picker in the band, and the nav
+const bar = document.querySelector("[data-hband] [data-hearth-pick]");
         // the owner's band sits above the bar now, so the bar can start below the fold: elementFromPoint answers null off-screen
         bar.scrollIntoView({ block: "center", behavior: "instant" });   // the site's CSS smooth-scrolls otherwise, and the rect below would be read mid-flight
         const r = bar.getBoundingClientRect();
@@ -391,7 +401,7 @@ const run = async () => {
           banned: stage.querySelectorAll("script, iframe, object, embed, form, input, style, link, svg").length,
           handlers: attrs.filter((n) => /^on/.test(n)), styleAttr: attrs.includes("style") && [...stage.querySelectorAll("[style]")].filter((e) => !e.closest("[data-hd-card], .hx-bar, .hd-who, .hd-line")).length,
           links: [...stage.querySelectorAll("a")].map((a) => a.getAttribute("href") ?? "").filter((h) => /^javascript:/i.test(h)).length,
-          barShown: getComputedStyle(bar).display !== "none" && r.height > 20, barOnTop: bar.contains(top), barBox: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], topIs: top ? top.tagName + "." + top.className : null,
+          barShown: getComputedStyle(bar).display !== "none" && r.height > 10, barOnTop: bar.contains(top), barBox: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], topIs: top ? top.tagName + "." + top.className : null,
           pickerShown: !!document.querySelector("[data-hearth-pick]")?.offsetParent,
           navShown: getComputedStyle(document.querySelector("nav") ?? document.body).display !== "none",
           stageBox: (() => { const b = stage.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)]; })(),
@@ -649,6 +659,93 @@ const run = async () => {
       check("⑬ with no staking ballot the band shows no ballot section and no form", !(await visible(none, "[data-hband-ballots]")) && (await none.locator(".bs-form").count()) === 0);
       await none.context().close();
       ballotOpen = true;
+    }
+
+    // ── ⑭ A SAVED HEARTH (POS-962 folded into the one page): visitors see the kept design and no picker; ?entry= previews over it without saving;
+    //     the signed-in human's picker, in the band, saves behind a second yes ──
+    {
+      const patches = () => log.filter((l) => l.path === `/households/${A_SLUG}/hearth`);
+      const showing = (p) => p.locator("[data-hearth]").getAttribute("data-hearth-showing");
+      const settleOn = (p, id) => p.waitForFunction((want) => document.querySelector("[data-hearth]")?.dataset.hearthShowing === want, id, { timeout: 15000 });
+      savedHearth = "ledger";
+      log.length = 0;
+      const v = await newPage(browser);
+      await v.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await ready(v);
+      await settleOn(v, "ledger");
+      check("⑭ a visitor sees the house's kept design (the ledger), drawn after the public read", (await showing(v)) === "ledger" && (await v.locator("[data-hearth-stage]").getAttribute("data-hearth-entry")) === "ledger");
+      check("⑭ and no picker: no select, no save controls, nothing to change it with", !(await visible(v, "[data-hearth-picker]")) && !(await visible(v, "[data-hearth-pick]")) && !(await visible(v, "[data-hearth-save]")) && !(await visible(v, "[data-hearth-owner]")));
+      check("⑭ the choice was read signed out: no bearer on the households read", log.filter((l) => l.path.startsWith("/households") && l.auth).length === 0 && log.some((l) => l.path.startsWith("/households?h=")), JSON.stringify(log.filter((l) => l.path.startsWith("/households"))));
+      await shot(v, "19-saved-hearth-visitor-desktop", { fullPage: false });
+      await cleanUnderPolicy(v, "⑭ (a visitor, a saved Hearth)");
+      await v.goto(`${BASE}/households/${A_SLUG}/?entry=default`, { waitUntil: "load" });
+      await ready(v);
+      await v.waitForTimeout(1200);
+      check("⑭ ?entry=default previews over the saved choice, on this visit", (await showing(v)) === "default", await showing(v));
+      check("⑭ and writes nothing: no PATCH went out", patches().length === 0);
+      await v.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await settleOn(v, "ledger");
+      check("⑭ without the preview in the address the kept design is back: the preview was never saved", (await showing(v)) === "ledger" && savedHearth === "ledger");
+      await v.context().close();
+
+      // the signed-in human of ANOTHER house has no controls, on house A's page
+      const x = await newPage(browser, { signedIn: true });
+      await x.goto(`${BASE}/households/${B_SLUG}/`, { waitUntil: "load" });
+      await ready(x);
+      await x.waitForSelector("[data-hband-notyours]:not([hidden])", { timeout: 15000 });
+      await x.waitForTimeout(500);
+      check("⑭ a signed-in reader of another house has no picker either", !(await visible(x, "[data-hearth-picker]")) && !(await visible(x, "[data-hearth-owner]")));
+      await x.context().close();
+
+      // the owner: the picker in the band, a preview (nothing sent), a second yes, the save
+      log.length = 0;
+      const o = await newPage(browser, { signedIn: true });
+      await o.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await ready(o);
+      await o.waitForSelector("[data-hband] [data-hearth-owner]:not([hidden])", { timeout: 20000 });
+      await settleOn(o, "ledger");
+      check("⑭ the owner's picker is in the band, above the design, and says what is kept", /This house’s Hearth: The ledger\./.test((await text(o, "[data-hband] [data-hearth-saved]")) ?? "") && await o.evaluate(() => !!(document.querySelector("[data-hband] [data-hearth-picker]").compareDocumentPosition(document.querySelector("[data-hearth-stage]")) & Node.DOCUMENT_POSITION_FOLLOWING)));
+      await o.selectOption("[data-hearth-pick]", "default");
+      await o.waitForFunction(() => document.querySelector("[data-hearth]")?.dataset.hearthShowing === "default");
+      check("⑭ the picker previews the default over the kept choice, in the address, and says it is not saved", new URL(o.url()).searchParams.get("entry") === "default" && /Previewing .*not saved/.test((await text(o, "[data-hband] [data-hearth-preview-line]")) ?? "") && patches().length === 0);
+      await o.click("[data-hearth-save]");
+      check("⑭ 'Make this our Hearth' only raises a question; nothing is sent", (await visible(o, "[data-hearth-confirm]")) && /back to the default Hearth for everyone/.test((await text(o, "[data-hearth-question]")) ?? "") && patches().length === 0, await text(o, "[data-hearth-question]"));
+      await o.click("[data-hearth-confirm-no]");
+      check("⑭ 'Not now' drops the question; still nothing sent", !(await visible(o, "[data-hearth-confirm]")) && patches().length === 0);
+      await o.click("[data-hearth-save]");
+      await o.click("[data-hearth-confirm-yes]");
+      await o.waitForFunction(() => /Saved\./.test(document.querySelector("[data-hearth-said]")?.textContent ?? ""), null, { timeout: 10000 });
+      check("⑭ the second yes sends ONE save, with the owner's bearer, back to the default (null)", patches().length === 1 && patches()[0].auth === `Bearer ${OWNER_TOKEN}` && savedHearth === null, JSON.stringify(patches()));
+      check("⑭ and says it is saved; the address is clean (the saved choice is the default now)", /This house now uses the default Hearth/.test((await text(o, "[data-hearth-said]")) ?? "") && !new URL(o.url()).searchParams.has("entry"), o.url());
+      await shot(o, "20-saved-hearth-owner-picker-desktop", { fullPage: false });
+      await o.selectOption("[data-hearth-pick]", "ledger");
+      await o.click("[data-hearth-save]");
+      await o.click("[data-hearth-confirm-yes]");
+      await o.waitForFunction(() => /Saved\. The ledger is now/.test(document.querySelector("[data-hearth-said]")?.textContent ?? ""), null, { timeout: 10000 });
+      check("⑭ saving the ledger sends a second save, and the office now keeps it", patches().length === 2 && savedHearth === "ledger", JSON.stringify(patches().map((p) => p.status)));
+      await cleanUnderPolicy(o, "⑭ (the owner's picker, two saves)");
+      await o.context().close();
+      const again = await newPage(browser);
+      await again.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await settleOn(again, "ledger");
+      check("⑭ a visitor arriving after sees the newly kept design", (await showing(again)) === "ledger");
+      await again.context().close();
+    }
+
+    // ── ⑮ A FAILED CHOICE READ: the default is drawn, and the page says so ──
+    {
+      savedHearth = "ledger";
+      fail = new Set(["/households"]);
+      const f = await newPage(browser);
+      await f.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await ready(f);
+      await f.waitForFunction(() => /could not be read just now; showing the default/.test(document.querySelector("[data-hearth-note]")?.textContent ?? ""), null, { timeout: 15000 });
+      check("⑮ the choice read fails: the default is drawn (not the kept design, not a blank), and the page says the read failed", (await f.locator("[data-hearth]").getAttribute("data-hearth-showing")) === "default" && (await visible(f, "[data-hearth-note]")), await text(f, "[data-hearth-note]"));
+      check("⑮ and offers no picker to anyone on a failed read", !(await visible(f, "[data-hearth-picker]")));
+      await shot(f, "21-saved-hearth-read-failed-desktop", { fullPage: false });
+      await f.context().close();
+      fail = new Set();
+      savedHearth = null;
     }
 
     // ── ⑦ no request left the machine ───────────────────────────────────────────

@@ -23,6 +23,9 @@ import { residentFace } from "@/lib/household-dashboard/faces.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { likenessLink, likenessWords } from "@/lib/appearance.mjs";
 import media from "@/data/postmark/media.json";
+import HearthPicker from "@/components/hearth/HearthPicker.astro";
+import { entries } from "@/lib/hearth/registry.mjs";
+import { whichDesign } from "@/lib/hearth/which-design.mjs";
 
 interface Props {
   house: any;
@@ -34,6 +37,9 @@ const faces = members.map((r) => residentFace(r, media, homePictureOf(r.handle))
 const slug = house.path ?? house.slug ?? "";
 const seat = (h: string) => `/households/${slug}/?resident=${encodeURIComponent(h)}`;
 const likeness = likenessWords(house, faces.length);
+// the picker lists the registered designs and starts on the one the server draws (the default: the saved choice is read in the browser, stage.mjs)
+const pickable = entries.map((e) => ({ id: e.id, title: e.title, author: e.author }));
+const drawn = whichDesign(entries)?.id ?? null;
 ---
 <section class="hband hd" data-hband data-hd data-hd-view="public" data-hd-slug={slug} aria-label={`${plate || "this household"}: for the house's own sign-in`}>
   {/* The question is the sign-in button's own text, so it goes with the button: a visitor without scripts, or a
@@ -46,6 +52,14 @@ const likeness = likenessWords(house, faces.length);
   </div>
 
   <div class="hband-own" data-private>
+    {/* ═════════ THE HOUSE'S HEARTH: the picker, for the signed-in human only (POS-962, in the band by POS-984) ═════════
+         Preview another design (nothing is saved), or save one for everyone, behind a second yes; the office decides who may.
+         Visitors see the house's kept choice drawn, with no picker. */}
+    <section class="hband-hearth" aria-labelledby="hband-hearth-h" data-hband-hearth>
+      <h2 id="hband-hearth-h">The house's Hearth</h2>
+      <HearthPicker entries={pickable} selected={drawn} />
+    </section>
+
     <div class="hband-top">
       {/* ═════════ NEEDS YOU (the house's own sign-in only) ═════════ */}
       <aside class="hd-needs" data-hd-needs-box hidden aria-labelledby="hband-needs-h">
@@ -103,6 +117,9 @@ const likeness = likenessWords(house, faces.length);
   .hd-meta { font-family: var(--pm-mono); font-size: 0.68rem; color: var(--hd-moon); margin: 0; }
 
   .hband-own { background: var(--hd-glass); border: 1px solid var(--hd-hair); border-radius: 14px; padding: 1em 1.1em 0.4em; }
+  .hband-hearth { margin: 0 0 1.1em; padding-bottom: 0.9em; border-bottom: 1px dashed var(--hd-hair); }
+  .hband-hearth h2 { margin: 0 0 0.5em; font-size: 1.15rem; color: var(--hd-warm); }
+  .hband-hearth :global(.hearth-picker), .hband-hearth :global(.hearth-note) { color: var(--hd-moon); }
   .hband-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.2em; align-items: start; }
   .hband-top:not(:has(.hd-needs:not([hidden]))) { grid-template-columns: minmax(0, 1fr); }
 

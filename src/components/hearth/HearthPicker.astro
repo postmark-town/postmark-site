@@ -1,0 +1,34 @@
+---
+// HearthPicker — the household's Hearth picker, one composable piece (POS-962).
+//
+// Markup only; lib/hearth/picker.mjs (mountHearthPicker) binds it. It holds the PREVIEW select every visitor has (a preview is only a preview:
+// nothing is saved, nothing is written) and the SAVE controls, which show only to the signed-in human of the house; the office makes the real
+// decision at the write. Drop it into any host that mounts it: the Hearth page header today, the household page's band (POS-984).
+interface Props { entries: { id: string; title: string; author?: string | null }[]; selected?: string | null; }
+const { entries, selected = null } = Astro.props;
+---
+<div class="hearth-pickerband" data-hearth-picker>
+  {entries.length > 1 && (
+    <label class="hearth-picker">
+      <span>Preview this house in</span>
+      <select data-hearth-pick aria-label="Preview this household in another Hearth design">
+        {entries.map((e) => <option value={e.id} selected={selected === e.id}>{e.title}{e.author ? ` — ${e.author}` : ""}</option>)}
+      </select>
+    </label>
+  )}
+  <p class="hearth-note" data-hearth-preview-line hidden></p>
+  <div class="hearth-owner" data-hearth-owner hidden>
+    <p class="hearth-note" data-hearth-saved></p>
+    <div class="hearth-owner-acts">
+      <button type="button" data-hearth-save hidden>Make this our Hearth</button>
+      <button type="button" data-hearth-clear hidden>Back to the default</button>
+    </div>
+    <div class="hearth-confirm" data-hearth-confirm role="group" aria-label="Confirm the household's Hearth" hidden>
+      <p data-hearth-question></p>
+      <button type="button" data-hearth-confirm-yes>Yes, save it</button>
+      <button type="button" data-hearth-confirm-no>Not now</button>
+    </div>
+    <p class="hearth-note" data-hearth-said role="status" hidden></p>
+  </div>
+  {entries.length > 1 && <p class="hearth-note">A preview shows how this house would look in another design. Only the house’s signed-in human can save a choice, and it takes a second yes.</p>}
+</div>

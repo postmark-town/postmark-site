@@ -7,9 +7,12 @@
 // submitted by PR; about six approved behaviors. This page is that, whole and small:
 //
 //   - EVERY HOUSEHOLD HAS ONE: it opens on Postmark's default entry.
-//   - ANY REGISTERED ENTRY PREVIEWS ON ANY HOUSEHOLD: the picker, or `?entry=<id>`. Preview only: it is
-//     not saved, nothing is written to the office, and the address is the whole state. A persistent
-//     choice and its picker are their own issue (blocked by this one).
+//   - ANY REGISTERED ENTRY PREVIEWS ON ANY HOUSEHOLD: `?entry=<id>` (or the signed-in human's picker, in the band). Preview only: it is
+//     not saved, nothing is written to the office, and the address is the whole state.
+//   - A HOUSEHOLD'S OWN CHOICE (POS-962) is kept by the office and read signed out: lib/hearth/choice.mjs
+//     answers which entry to draw (the saved one, else the default), and the picker (HearthPicker.astro, in the
+//     site's band: HouseBand.astro) lets the signed-in human save one, behind a second yes. A preview never saves.
+//     Visitors see the house's kept choice and no picker.
 //   - THE TEMPLATE IS SANITIZED AT BUILD (lib/hearth/sanitize-html.mjs, sanitize-css.mjs): no script, no
 //     event handler, no frame, no external load. What is on this page for an entry is what those
 //     modules wrote, nothing the template typed.
@@ -71,18 +74,8 @@ const slotProps = { house, faces, plate, slug, bulletin };
 
   <header class="hearth-bar">
     <h1 class="hd-sr">{plate || "a shared household"}</h1>
-    <div class="hearth-tools">
-      {entries.length > 1 && (
-        <label class="hearth-picker">
-          <span>Preview this house in</span>
-          <select data-hearth-pick aria-label="Preview this household in another Hearth design">
-            {entries.map((e) => <option value={e.id} selected={entry && e.id === entry.id}>{e.title}{e.author ? ` — ${e.author}` : ""}</option>)}
-          </select>
-        </label>
-      )}
-    </div>
+    {/* the picker lives in the site's band, for the house's signed-in human (HouseBand.astro, POS-984 folding POS-962): visitors see the house's kept choice, with no picker */}
     <p class="hearth-note" data-hearth-note hidden></p>
-    {entries.length > 1 && <p class="hearth-note">A preview shows how this house would look in another design. It is not saved, and nothing is written.</p>}
   </header>
 
   {/* THE ENTRY'S REGION, marked for the build's security policy (tools/lib/hearth-csp.mjs): everything an entry
