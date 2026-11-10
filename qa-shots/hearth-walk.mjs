@@ -100,6 +100,9 @@ function answer(url, headers, method = "GET", postData = null) {
 // the saved choice a BUILD would have baked into the page (data-hearth-baked), for the baked-start scenario: the document is rewritten to carry it
 let injectBaked = null;
 let householdsDelay = 0;   // ms the office takes to answer GET /households (the saved-choice read)
+// POS-984: office paths held shut until the walk lets them go (a slow doorstep, with no clock in it), and every office path as it ARRIVED (before any hold)
+const holds = new Map();
+const requested = [];
 let injectEntry = null;   // a prepared entry added to the page's registered list, for the hostile-template scenario
 
 // `pendingMe`: a first sign-in. The token is there and the tab has not been told its handles; GET /me answers after that many ms.
@@ -125,7 +128,10 @@ async function newPage(browser, { signedIn = false, pendingMe = 0, viewport = { 
     const local = url.hostname === "127.0.0.1" || url.hostname === "localhost";
     const office = url.hostname === "postmark.town" || (local && url.pathname.startsWith("/api/"));
     if (office) {
-      if (pendingMe > 0 && url.pathname.replace(/^\/api(?=\/)/, "") === "/me") await new Promise((r) => setTimeout(r, pendingMe));
+      const asked = url.pathname.replace(/^\/api(?=\/)/, "");
+      requested.push(asked + url.search);
+      if (holds.has(asked)) await holds.get(asked).promise;
+      if (pendingMe > 0&& url.pathname.replace(/^\/api(?=\/)/, "") === "/me") await new Promise((r) => setTimeout(r, pendingMe));
       if (householdsDelay > 0 && url.pathname.replace(/^\/api(?=\/)/, "") === "/households" && req.method() === "GET") await new Promise((r) => setTimeout(r, householdsDelay));
       const a = answer(req.url(), req.headers(), req.method(), req.postData());
       log.push({ path: url.pathname.replace(/^\/api(?=\/)/, "") + url.search, auth: req.headers().authorization ?? null, status: a.status });
@@ -812,6 +818,79 @@ const bar = document.querySelector("[data-hband] [data-hearth-pick]");
       check("⑯ a failed read keeps the baked choice (the ledger) and says it is the one the page was built with", (await showingOf(k)) === "ledger" && /built with/.test((await text(k, "[data-hearth-note]")) ?? ""), await text(k, "[data-hearth-note]"));
       await k.context().close();
       injectBaked = null; fail = new Set(); savedHearth = null; householdsDelay = 0;
+    }
+
+    // ── ⑰ THE PAGE PAINTS AS EACH RESIDENT'S READS ARRIVE (POS-984, Wright and Jetto, 2026-11-10 09:3x EST) ──
+    // On Darko's dev walk /households/starforge/ sat on "reading the house's record…" for 20 to 42 s: the page awaited every resident's doorstep,
+    // outbox and quests together before it painted anything. Here one resident's doorstep is held shut (a gate the walk opens: no clock in it) and
+    // another's fails. The rest of the house, and the town's own reads, must be on the page meanwhile, the page must say plainly that one resident is
+    // still being read, and nothing may say "nothing" for what is only still coming. The failed one is read as not read and holds nothing back.
+    {
+      const slowH = "builder", downH = "cassian", others = ["elide", "wren"];
+      check("⑰ (the walk's own premise) house A is builder, cassian, elide and wren", JSON.stringify(A) === JSON.stringify([slowH, downH, ...others]), JSON.stringify(A));
+      const gate = () => { let go; const promise = new Promise((r) => { go = r; }); return { promise, go }; };
+      const letters = (page, h) => page.locator(`[data-hd-feed] .hd-line.is-letter[data-who="${h}"]`).count();
+      const last = (page, h) => text(page, `[data-hd-card="${h}"] [data-hd-last]`);
+      const reading = (page) => page.evaluate(() => { const e = document.querySelector("[data-hd-reading]"); return e ? { text: e.textContent, shown: !e.hidden && getComputedStyle(e).display !== "none" } : null; });
+      const labels = (page) => page.evaluate(() => [...document.querySelectorAll("[data-hx-chart] [aria-label]")].map((e) => e.getAttribute("aria-label")));
+      const noLongerReading = (page) => page.waitForFunction(() => document.querySelector("[data-hd-reading]")?.hidden === true, null, { timeout: 15000 });
+
+      // (a) a visitor
+      const g = gate();
+      holds.set(`/doorstep/${slowH}`, g);
+      fail = new Set([`/doorstep/${downH}`]);
+      requested.length = 0;
+      const v = await newPage(browser);
+      await v.goto(`${BASE}/households/${A_SLUG}/?entry=ledger`, { waitUntil: "load" });   // the ledger design draws the stamps chart and the residents map, which the default does not
+      await v.waitForFunction((h) => document.querySelector("[data-hd-reading]")?.textContent === "still reading 1 resident…" && document.querySelectorAll('[data-hd-feed] .hd-line.is-letter').length > 0 && !!document.querySelector(`[data-hd-card="${h}"] [data-hd-last]`)?.textContent.trim(), others[0], { timeout: 15000 });
+      const mid = await reading(v);
+      check("⑰ while builder's doorstep is shut, the band says plainly that one resident is still being read (the failed one is not counted)", mid?.shown === true && mid.text === "still reading 1 resident…", JSON.stringify(mid));
+      check("⑰ the others are on the page: their letters are in the feed", (await letters(v, others[0])) > 0 && (await letters(v, others[1])) > 0, `${await letters(v, others[0])} ${await letters(v, others[1])}`);
+      check("⑰ the resident still out has painted nothing of theirs, and their card says it is reading", (await letters(v, slowH)) === 0 && (await last(v, slowH))?.trim() === "still reading…", `${await letters(v, slowH)} ${await last(v, slowH)}`);
+      check("⑰ the cards of those already read do not say they are reading", !/still reading/.test((await last(v, others[0])) ?? "") && !/still reading/.test((await last(v, others[1])) ?? "") && !/still reading/.test((await last(v, downH)) ?? ""), `${await last(v, others[0])} | ${await last(v, downH)}`);
+      check("⑰ the feed does not say there is nothing on the record while one is still out", !/Nothing on the house/.test((await text(v, "[data-hd-feed]")) ?? ""), await text(v, "[data-hd-feed]").then((t) => String(t).slice(0, 80)));
+      check("⑰ the town's own reads painted without waiting for builder: the residents map is drawn", (await v.locator("[data-hx-map] .hx-place").count()) > 0, await text(v, "[data-hx-map]"));
+      const bars = await labels(v);
+      check("⑰ the stamps chart: one bar says still reading, the failed one says not read, the others show their stamps", bars.filter((b) => /: still reading$/.test(b)).length === 1 && bars.filter((b) => /: not read$/.test(b)).length === 1 && bars.filter((b) => /: \d+ stamps$/.test(b)).length === 2, JSON.stringify(bars));
+      check("⑰ builder's doorstep was asked for at the start (the page did not wait to ask), and is still shut", requested.includes(`/doorstep/${slowH}`));
+      await cleanUnderPolicy(v, "⑰ (part-read, visitor)");
+      await shot(v, "17-reading-visitor-desktop", { fullPage: true });
+      g.go();
+      await noLongerReading(v);
+      await v.waitForFunction((h) => document.querySelectorAll(`[data-hd-feed] .hd-line.is-letter[data-who="${h}"]`).length > 0, slowH, { timeout: 15000 });
+      check("⑰ once builder's doorstep lands, their lines join the feed, the card stops saying it is reading, and the line goes", (await letters(v, slowH)) > 0 && !/still reading/.test((await last(v, slowH)) ?? "") && (await reading(v))?.shown === false, `${await letters(v, slowH)} ${await last(v, slowH)}`);
+      const after = await labels(v);
+      check("⑰ and the chart has nothing still reading; the failed one is still 'not read'", after.filter((b) => /still reading/.test(b)).length === 0 && after.filter((b) => /: not read$/.test(b)).length === 1, JSON.stringify(after));
+      // the total work is unchanged: every endpoint the page needs was asked for exactly once, and nothing else was added
+      // (/quests/<h> is asked twice on this page, as it was before this change: once by readHouse and once by the quest board's own read in town/components/Household.astro)
+      const once = [...A.flatMap((h) => [`/doorstep/${h}`, `/mail/${h}?box=outbox`]), "/world/walkers", "/world/conversations", "/calendar"];
+      const questReads = (h) => requested.filter((r) => r === `/quests/${h}`).length;
+      const ofHouse = requested.filter((r) => /^\/(doorstep|mail|world|calendar)/.test(r));
+      check("⑰ the house's reads are the same calls: each doorstep, outbox, walkers, conversations and calendar read once and nothing added; /quests as it was (readHouse's and the board's)", once.every((p) => requested.filter((r) => r === p).length === 1) && ofHouse.length === once.length && A.every((h) => questReads(h) === 2), JSON.stringify(requested.filter((r) => /^\/(doorstep|mail|quests|world|calendar)/.test(r))));
+      await cleanUnderPolicy(v, "⑰ (read whole, visitor)");
+      await v.context().close();
+
+      // (b) the house's own human: Needs you never calls the house calm while a resident is still out
+      const g2 = gate();
+      holds.set(`/doorstep/${slowH}`, g2);
+      const o = await newPage(browser, { signedIn: true });
+      await o.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
+      await o.waitForSelector("[data-hband] [data-hd-needs-box]:not([hidden])", { timeout: 15000 });
+      await o.waitForFunction(() => /Still reading|awaiting|never arrived/.test(document.querySelector("[data-hband] [data-hd-needs]")?.textContent ?? "") && document.querySelector("[data-hd-reading]")?.textContent === "still reading 1 resident…", null, { timeout: 15000 });
+      const needsMid = (await text(o, "[data-hband] [data-hd-needs]")) ?? "";
+      check("⑰ owner, builder still out: Needs you does not say 'Nothing needs you right now'", !/Nothing needs you right now/.test(needsMid), needsMid.slice(0, 160));
+      check("⑰ owner, builder still out: the mail slot paints what is read and says the counts may be short because one is still being read", /Still reading 1 resident, so these counts may be short\./.test((await text(o, "[data-hx-mail-list]")) ?? ""), await text(o, "[data-hx-mail-list]"));
+      await cleanUnderPolicy(o, "⑰ (part-read, owner)");
+      await shot(o, "17-reading-owner-desktop", { fullPage: true });
+      g2.go();
+      await noLongerReading(o);
+      await o.waitForFunction(() => /awaiting the house’s word/.test(document.querySelector("[data-hband] [data-hd-needs]")?.textContent ?? ""), null, { timeout: 15000 });
+      const needsDone = (await text(o, "[data-hband] [data-hd-needs]")) ?? "";
+      check("⑰ owner, once builder lands: Needs you holds builder's stances and cassian's bounce, with no filler", /awaiting the house’s word/.test(needsDone) && !/Still reading/.test(needsDone) && !/Still reading/.test((await text(o, "[data-hx-mail-list]")) ?? ""), needsDone.slice(0, 160));
+      await cleanUnderPolicy(o, "⑰ (read whole, owner)");
+      await o.context().close();
+      holds.clear();
+      fail = new Set();
     }
 
     // ── ⑦ no request left the machine ───────────────────────────────────────────

@@ -45,6 +45,8 @@ const drawn = whichDesign(entries, { saved: house.hearth ?? null })?.id ?? null;
   {/* The question is the sign-in button's own text, so it goes with the button: a visitor without scripts, or a
       signed-in reader, never reads a bare "Is this your house?". Signing in is the layout's GitHub sign-in, which needs
       scripts; the noscript line says so. A signed-in reader of ANOTHER house is told plainly (stage.mjs shows it). */}
+  {/* The page paints as each resident's reads arrive (stage.mjs, POS-984): while some are still out this one plain line says how many, for everyone, and is hidden once all have answered. */}
+  <p class="hband-reading" data-hd-reading role="status" hidden></p>
   <div class="hband-visit" data-public>
     <button type="button" class="hd-link-btn" data-hd-signin hidden>Is this your house? Sign in with GitHub →</button>
     <p class="hband-notyours" data-hband-notyours hidden>This isn’t your house: you are signed in as another household. Everything here is the town’s public record of it.</p>
@@ -110,6 +112,7 @@ const drawn = whichDesign(entries, { saved: house.hearth ?? null })?.id ?? null;
   .hband :global([hidden]) { display: none !important; }
   .hband[data-hd-view="public"] :global([data-private]) { display: none !important; }
   .hband[data-hd-view="owner"] :global([data-public]) { display: none !important; }
+  .hband-reading { margin: 0 0 0.5em; font-family: var(--pm-mono); font-size: 0.72rem; color: var(--hd-moon); }
   .hband-visit { margin: 0; font-size: 0.92rem; }
   .hband-visit p { margin: 0; }
   .hd-link-btn { all: unset; cursor: pointer; color: var(--pm-gold); }

@@ -159,7 +159,8 @@ test("private slots ship hidden and marked private, in the static page and in ev
 
 test("the stage reads with the reader's bearer only on residents the sign-in holds, and nowhere else", () => {
   const stage = read("src/lib/hearth/stage.mjs");
-  assert.match(stage, /readHouse\(handles, \{ token: own\.length \? token\(\) : null, mine: own \}\)/);
+  // until 2026-11-10 this asserted the call ended at `mine: own }` (the stage awaited the whole read); it carries `onProgress` now (POS-984, test/household-reads-progress.test.mjs)
+  assert.match(stage, /readHouse\(handles, \{\s*token: own\.length \? token\(\) : null, mine: own,\s*onProgress: /);
   assert.match(stage, /const mine = \(\) => \(token\(\) \? held\(\)\.filter\(\(h\) => handles\.includes\(h\)\) : \[\]\)/);
   const reads = read("src/lib/household-dashboard/reads.mjs");
   assert.match(reads, /getJSON\(`\$\{api\}\/doorstep\/\$\{e\(h\)\}`, token && own\.has\(h\) \? token : null\)/);

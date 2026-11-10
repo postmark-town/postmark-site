@@ -11,7 +11,8 @@
 //            picker and `?entry=<id>` call it: ANY registered entry on ANY household. A preview is
 //            only that: nothing is saved, no office write is made, the URL is the whole state.
 //   READ     the reads the household page already makes (reads.mjs), with the reader's bearer only
-//            on the doorsteps of residents the reader's own sign-in holds, never anyone else's.
+//            on the doorsteps of residents the reader's own sign-in holds, never anyone else's. The first
+//            read paints as each resident's reads arrive (POS-984), not once, at the slowest.
 //   PAINT    the dashboard's own paintHouse for the parts it already draws (feed, Needs you, the
 //            numbers, the cards, the clocks), then hearth/paint.mjs for the rest.
 //   BEHAVE   behaviors.mjs on the template's own markup.
@@ -22,6 +23,7 @@
 import { KEYS, tokenIsFresh } from "../auth.mjs";
 import { readHouse, readHearthExtras, officeOrigin } from "../household-dashboard/reads.mjs";
 import { paintHouse, writeLook } from "../household-dashboard/paint.mjs";
+import { readingOf } from "../household-dashboard/fold.mjs";
 import { paintExtras, startCountdown } from "./paint.mjs";
 import { mountBehaviors } from "./behaviors.mjs";
 import { whichDesign } from "./which-design.mjs";
@@ -65,7 +67,7 @@ export function mountHearth(root) {
 
   const phone = window.matchMedia("(max-width: 760px)");
   const ctx = { handles, faces, slug, seatHref, storage, filter: { kind: "all", who: "all" }, expanded: false };
-  let reads = null, extras = null, readFor = "", stopCount = () => {};
+  let reads = null, extras = null, extrasAsked = false, readFor = "", stopCount = () => {};
   let ballots = null;   // the band's open ballots and their stake form (band-ballots.mjs): mounted once, for the house's own sign-in only
   // THE SAVED CHOICE (POS-962). `baked` is the build's own copy (Hearth.astro bakes house.hearth from households.json, the registry readSavedHearth reads): the first
   // draw starts from it, so a house with a saved choice does not flash the default. The browser read corrects a stale one. `mounted` is the signed-in human's picker.
@@ -79,6 +81,7 @@ export function mountHearth(root) {
     ctx.phone = phone.matches;
     ctx.mine = mine();
     ctx.owner = ctx.mine.length > 0;
+    ctx.reading = readingOf(reads);       // what is still out: every painter says "still reading" for it, never "nothing" or "did not answer"
     for (const b of root.querySelectorAll("[data-hd-signin]")) b.hidden = !document.querySelector("[data-auth-signin]") || !!token();
     // signed in, but not as anyone of this house: say so, rather than an unanswered question (the band's own line)
     // (not before /me has answered: a first sign-in's owner would see it flash, lib/hearth/not-yours.mjs)
@@ -99,15 +102,27 @@ export function mountHearth(root) {
     if (holoNote) holoNote.hidden = !wrap || wrap.hidden;
   }
 
+  // THE FIRST READ PAINTS AS IT ARRIVES (POS-984). The reads are one per resident, and on a busy box the slowest decides when a page that waits for all of them
+  // shows anything, so the stage paints each time a resident's reads settle or a house-wide read lands (readHouse's onProgress). A resident whose read failed
+  // is drawn as not read and never holds the others back. A read of a page that is already whole (a stake, a sign-in) is swapped in once, when it finishes, so
+  // nothing that was on the page empties meanwhile; one that replaces a part-read page starts over, as the page has nothing complete to keep.
+  let loadSeq = 0;
   async function load() {
     const own = mine();
     const key = own.join(",");
     if (reads && key === readFor) { draw(); return; }
     readFor = key;
-    [reads, extras] = await Promise.all([
-      readHouse(handles, { token: own.length ? token() : null, mine: own }),
-      extras ? Promise.resolve(extras) : readHearthExtras(),
-    ]);
+    const seq = ++loadSeq;
+    const still = readingOf(reads);
+    const progressive = !reads || still.residents.length > 0 || still.house.length > 0;
+    // the posts are read once, beside the house's reads, and painted when they land; the part keeps its placeholder until then
+    if (!extras && !extrasAsked) { extrasAsked = true; readHearthExtras().then((x) => { extras = x; draw(); }); }
+    const done = await readHouse(handles, {
+      token: own.length ? token() : null, mine: own,
+      onProgress: progressive ? (snapshot) => { if (seq === loadSeq) { reads = snapshot; draw(); } } : null,
+    });
+    if (seq !== loadSeq || progressive) return;   // a newer read has taken over (this one's answer is stale), or the last progress was this answer and is drawn
+    reads = done;
     draw();
   }
 
