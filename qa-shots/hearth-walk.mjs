@@ -38,7 +38,7 @@ const { chromium } = createRequire(import.meta.url)(PW);
 const BASE = process.env.BASE ?? "http://127.0.0.1:4399";
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 // POS-984 (rebuilt 2026-11-10): the walk covers the ONE household page (/households/<slug>/), owner and visitor: the Hearth under the shell with one thin strip
-// (the dropdown, the owner's two links, the reading line) and no band; the screenshots land beside it by default
+// (the household's sub-rail with its reading mark and the owner's +, and in its corner the dropdown and the owner's settings, POS-999) and no band; the screenshots land beside it by default
 const OUT = process.env.OUT ?? path.join(os.tmpdir(), "pos984-walk");   // never inside a pool tree
 fs.mkdirSync(OUT, { recursive: true });
 const households = JSON.parse(fs.readFileSync(path.join(ROOT, "src/data/postmark/households.json"), "utf8")).households;
@@ -182,7 +182,8 @@ const run = async () => {
     {
       const pointAt = (page) => page.evaluate(() => {
         const out = {};
-        for (const [name, sel] of [["the breadcrumb", "[data-hearth-bar] .hearth-crumbs a"], ["the Hearth dropdown", "[data-hearth-bar] [data-hearth-pick]"], ["+ add a resident", "[data-hearth-bar] [data-house-add]"], ["the likeness answer", "[data-hearth-bar] .hearth-likeness a"]]) {
+        // POS-999: the + is a round pill on the sub-rail, and the likeness answer is in the settings panel, so the settings button is what stands in the strip
+        for (const [name, sel] of [["the breadcrumb", "[data-hearth-bar] .hearth-crumbs a"], ["the Hearth dropdown", "[data-hearth-bar] [data-hearth-pick]"], ["the +", "[data-hearth-bar] [data-house-add]"], ["the settings", "[data-hearth-bar] .hearth-gear"]]) {
           const e = document.querySelector(sel);
           if (!e) { out[name] = "absent"; continue; }
           e.scrollIntoView({ block: "center", behavior: "instant" });
@@ -212,20 +213,20 @@ const run = async () => {
         const page = await newPage(browser, { signedIn: true });
         await page.goto(`${BASE}/households/${A_SLUG}/?entry=${id}`, { waitUntil: "load" });
         await ready(page);
-        await page.waitForSelector("[data-hearth-bar] [data-hearth-own]:not([hidden])", { timeout: 15000 });   // the owner's two links are shown: the strip is whole
-        await page.waitForFunction(() => document.querySelector("[data-hd-reading]")?.hidden === true, null, { timeout: 15000 });   // and the reading line has gone, so the strip photographs the same twice
+        await page.waitForSelector("[data-hearth-bar] [data-hearth-own]:not([hidden])", { timeout: 15000 });   // the owner's settings are shown: the strip is whole
+        await page.waitForFunction(() => document.querySelector("[data-hd-reading-mark]")?.hidden === true, null, { timeout: 15000 });   // and the reading mark has gone, so the strip photographs the same twice
         check(`⑫ ${what}: the design drawn is the hostile one`, (await page.locator("[data-hearth-stage]").getAttribute("data-hearth-entry")) === id);
         const moved = await page.evaluate(() => { const s = document.querySelector("[data-hearth-stage]").getBoundingClientRect().top; const f = (document.querySelector(".hearth-frame") ?? document.querySelector("[data-hearth-stage]")).getBoundingClientRect().top; return Math.round(f - s); });
         const ink = await page.evaluate(() => { const c = getComputedStyle(document.querySelector("[data-hearth-stage]")); return { outline: c.outlineWidth + " " + c.outlineStyle, shadow: c.boxShadow }; });
         if (/outline|shadow/.test(id)) check(`⑫ ${what}: the rule took effect on the design's own box (${JSON.stringify(ink)})`, /900px/.test(id === "rooted-outline" ? ink.outline : ink.shadow), JSON.stringify(ink));
         else if (id !== "rooted-none") check(`⑫ ${what}: the rule took effect: the design's own box sits ${moved}px above where it was put`, moved > 300, moved);
         const at = await pointAt(page);
-        check(`⑫ ${what}: the strip's controls are still the top thing at their own points (the breadcrumb, the dropdown, + add a resident, the likeness answer)`, asBand(at), JSON.stringify(at));
+        check(`⑫ ${what}: the strip's controls are still the top thing at their own points (the breadcrumb, the dropdown, the +, the settings)`, asBand(at), JSON.stringify(at));
         // the pixels of the strip itself: the control's, twice (the probe is stable), then every hostile design's must equal it. The strip is photographed at the top of the page,
         // so a design that makes the page longer or shorter cannot move it by a sub-pixel (pointAt scrolled it to the middle of the screen, where the design's height decides its offset)
         await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
         await page.mouse.move(0, 0);
-        // The parts photographed are the strip's own words that do not name the design on show: the breadcrumb, and the owner's two links. (The dropdown's width and the
+        // The parts photographed are the strip's own parts that do not name the design on show: the breadcrumb, and the owner's settings button. (The dropdown's width and the
         // "Previewing <id>" line legitimately differ per design: they say which design is drawn. The dropdown is held by pointAt above, at its own point.)
         const shoot = async () => ({
           crumbs: await page.locator("[data-hearth-bar] .hearth-crumbs").screenshot({ animations: "disabled", caret: "initial" }),
@@ -516,7 +517,8 @@ const run = async () => {
       check("⑪ and the strip: the breadcrumb and the Hearth dropdown, enabled, for a visitor too", (await visible(v, "[data-hearth-bar] .hearth-crumbs")) && (await visible(v, "[data-hearth-bar] [data-hearth-pick]")) && (await v.locator("[data-hearth-pick]").isEnabled()));
       check("⑪ and none of an owner's: no band, no Needs you, no boat line, no quests, no managing the house, no + add a resident, no likeness answer, no save", !(await v.locator("[data-hband]").count()) && !(await visible(v, "[data-hd-needs-box]")) && !(await visible(v, "[data-hd-boat]")) && !(await visible(v, "[data-quests]")) && !(await visible(v, "[data-house-add]")) && !(await visible(v, ".hearth-likeness")) && !(await visible(v, "[data-hearth-owner]")) && !(await visible(v, "[data-hearth-save]")));
       check("⑪ exactly one sign-in line on the page", (await v.locator("[data-hd-signin]:visible").count()) === 1);
-      check("⑪ no pill rail above the Hearth: no Household chip, no chip per resident, no tablist", (await v.locator("[data-house-tabs], [data-house-tab], .pm-chiprow, [role=tablist].house-tabs").count()) === 0);
+      // until 2026-11-11: "no pill rail above the Hearth". POS-999 put the household's sub-rail in the strip: the household's chip lit, a chip per resident, and still no old tab rail
+      check("⑪ the household's sub-rail above the Hearth: its own chip lit, a chip per resident, and no old tab rail or nav row", (await v.locator("[data-hearth-bar] [data-house-rail] a[data-house-link][aria-current=page]").count()) === 1 && (await v.locator("[data-hearth-bar] [data-house-rail] [data-rail-chip]").count()) === A.length && (await v.locator("[data-house-tabs], [data-house-tab], .pm-chiprow, [role=tablist].house-tabs").count()) === 0);
       await shot(v, "10-one-page-visitor-desktop", { fullPage: true });
       await cleanUnderPolicy(v, "⑪ (visitor)");
       await v.context().close();
@@ -528,16 +530,23 @@ const run = async () => {
       await ready(o);
       await o.waitForSelector("[data-hearth-slot=needs-you]:not([hidden])", { timeout: 15000 });
       await o.waitForSelector("[data-hearth-bar] [data-hearth-own]:not([hidden])", { timeout: 15000 });
-      check("⑪ the owner's strip: + add a resident and the likeness answer, beside the dropdown", (await visible(o, "[data-hearth-bar] [data-house-add]")) && /likeness question/.test((await text(o, "[data-hearth-bar] .hearth-likeness")) ?? "") && (await visible(o, "[data-hearth-bar] [data-hearth-pick]")), await text(o, "[data-hearth-bar] [data-hearth-own]"));
+      // POS-999: the + is the sub-rail's round pill and the likeness answer is in the settings panel, in the corner beside the dropdown
+      check("⑪ the owner's strip: the +, and the settings beside the dropdown, the likeness answer in its panel (closed until asked)", (await visible(o, "[data-hearth-bar] [data-house-add]")) && (await visible(o, "[data-hearth-bar] .hearth-gear")) && !(await visible(o, "[data-hearth-bar] .hearth-likeness")) && /likeness question/.test((await text(o, "[data-hearth-bar] .hearth-likeness")) ?? "") && (await visible(o, "[data-hearth-bar] [data-hearth-pick]")), await text(o, "[data-hearth-bar] [data-hearth-own]"));
+      await o.locator("[data-hearth-bar] .hearth-gear").click();
+      check("⑪ the settings open on a click, and the likeness answer is there", await visible(o, "[data-hearth-bar] .hearth-likeness a"));
+      await o.keyboard.press("Escape");
+      check("⑪ and Escape closes them", !(await visible(o, "[data-hearth-bar] .hearth-likeness")));
       check("⑪ the likeness answer links to the office's own page for THIS house", ((await o.locator("[data-hearth-bar] .hearth-likeness a").getAttribute("href")) ?? "").includes(`/oauth/likeness?household=${A_SLUG}`), await o.locator("[data-hearth-bar] .hearth-likeness a").getAttribute("href"));
       check("⑪ the design draws Needs you and the waiting-mail line for its owner, and Edit profile on each resident's card", (await visible(o, "[data-hearth-slot=needs-you]")) && (await visible(o, "[data-hd-boat]")) && (await o.locator("[data-hearth-slot=residents] [data-hd-edit]:visible").count()) === A.length);
       check("⑪ the visitor's sign-in line is gone for the owner", (await o.locator("[data-hd-signin]:visible").count()) === 0);
       check("⑪ no band, no quests, no ballots, no managing the house on the owner's page either", !(await o.locator("[data-hband], [data-quests], [data-hband-ballots], .bs-form, [data-hb-ballot]").count()) && !(await o.content()).includes("Managing the house"));
       check("⑪ the strip is above the design", await o.evaluate(() => document.querySelector("[data-hearth-bar]").getBoundingClientRect().bottom <= document.querySelector("[data-hearth-stage]").getBoundingClientRect().top + 1));
-      check("⑪ the header's household link goes to YOUR household, not a resident's window", await (async () => {
-        await o.waitForFunction(() => document.querySelector("[data-auth-handles] a")?.textContent === "your household", null, { timeout: 15000 }).catch(() => {});
-        const links = await o.locator("[data-auth-handles] a").evaluateAll((as) => as.map((a) => [a.textContent, a.getAttribute("href")]));
-        return JSON.stringify(links) === JSON.stringify([["your household", `/households/${A_SLUG}/`]]) ? true : JSON.stringify(links);
+      // until 2026-11-11 the corner was the words "your household" as one link; POS-999 made it a round household icon and the residents' faces
+      check("⑪ the header's corner: the household icon goes to YOUR household, and a face per resident to its own page", await (async () => {
+        await o.waitForFunction((n) => document.querySelectorAll("[data-auth-handles] .pm-corner-face").length === n, A.length, { timeout: 15000 }).catch(() => {});
+        const links = await o.locator("[data-auth-handles] a").evaluateAll((as) => as.map((a) => [a.className, a.getAttribute("href")]));
+        const want = [["pm-corner-house", `/households/${A_SLUG}/`], ...A.map((h) => ["pm-corner-face", `/residents/${h}/`])];
+        return JSON.stringify(links) === JSON.stringify(want) ? true : JSON.stringify(links);
       })());
       await shot(o, "11-one-page-owner-desktop", { fullPage: true });
       await cleanUnderPolicy(o, "⑪ (owner)");
@@ -810,9 +819,10 @@ const run = async () => {
       const gate = () => { let go; const promise = new Promise((r) => { go = r; }); return { promise, go }; };
       const letters = (page, h) => page.locator(`[data-hd-feed] .hd-line.is-letter[data-who="${h}"]`).count();
       const last = (page, h) => text(page, `[data-hd-card="${h}"] [data-hd-last]`);
-      const reading = (page) => page.evaluate(() => { const e = document.querySelector("[data-hd-reading]"); return e ? { text: e.textContent, shown: !e.hidden && getComputedStyle(e).display !== "none" } : null; });
+      // POS-999: the strip's reading line is the sub-rail's mark, its words its title
+      const reading = (page) => page.evaluate(() => { const e = document.querySelector("[data-hd-reading-mark]"); return e ? { text: e.title, shown: !e.hidden && getComputedStyle(e).display !== "none" } : null; });
       const labels = (page) => page.evaluate(() => [...document.querySelectorAll("[data-hx-chart] [aria-label]")].map((e) => e.getAttribute("aria-label")));
-      const noLongerReading = (page) => page.waitForFunction(() => document.querySelector("[data-hd-reading]")?.hidden === true, null, { timeout: 15000 });
+      const noLongerReading = (page) => page.waitForFunction(() => document.querySelector("[data-hd-reading-mark]")?.hidden === true, null, { timeout: 15000 });
 
       // (a) a visitor
       const g = gate();
@@ -821,7 +831,7 @@ const run = async () => {
       requested.length = 0;
       const v = await newPage(browser);
       await v.goto(`${BASE}/households/${A_SLUG}/?entry=ledger`, { waitUntil: "load" });   // the ledger design draws the stamps chart and the residents map, which the default does not
-      await v.waitForFunction((h) => document.querySelector("[data-hd-reading]")?.textContent === "still reading 1 resident…" && document.querySelectorAll('[data-hd-feed] .hd-line.is-letter').length > 0 && !!document.querySelector(`[data-hd-card="${h}"] [data-hd-last]`)?.textContent.trim(), others[0], { timeout: 15000 });
+      await v.waitForFunction((h) => document.querySelector("[data-hd-reading-mark]")?.title === "still reading 1 resident…" && document.querySelectorAll('[data-hd-feed] .hd-line.is-letter').length > 0 && !!document.querySelector(`[data-hd-card="${h}"] [data-hd-last]`)?.textContent.trim(), others[0], { timeout: 15000 });
       const mid = await reading(v);
       check("⑰ while builder's doorstep is shut, the strip says plainly that one resident is still being read (the failed one is not counted)", mid?.shown === true && mid.text === "still reading 1 resident…", JSON.stringify(mid));
       check("⑰ the others are on the page: their letters are in the feed", (await letters(v, others[0])) > 0 && (await letters(v, others[1])) > 0, `${await letters(v, others[0])} ${await letters(v, others[1])}`);
@@ -856,7 +866,7 @@ const run = async () => {
       const o = await newPage(browser, { signedIn: true });
       await o.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await o.waitForSelector("[data-hearth-slot=needs-you]:not([hidden])", { timeout: 15000 });
-      await o.waitForFunction(() => /Still reading|awaiting|never arrived/.test(document.querySelector("[data-hearth-slot=needs-you] [data-hd-needs]")?.textContent ?? "") && document.querySelector("[data-hd-reading]")?.textContent === "still reading 1 resident…", null, { timeout: 15000 });
+      await o.waitForFunction(() => /Still reading|awaiting|never arrived/.test(document.querySelector("[data-hearth-slot=needs-you] [data-hd-needs]")?.textContent ?? "") && document.querySelector("[data-hd-reading-mark]")?.title === "still reading 1 resident…", null, { timeout: 15000 });
       const needsMid = (await text(o, "[data-hearth-slot=needs-you] [data-hd-needs]")) ?? "";
       check("⑰ owner, builder still out: Needs you does not say 'Nothing needs you right now'", !/Nothing needs you right now/.test(needsMid), needsMid.slice(0, 160));
       check("⑰ owner, builder still out: the mail slot paints what is read and says the counts may be short because one is still being read", /Still reading 1 resident, so these counts may be short\./.test((await text(o, "[data-hx-mail-list]")) ?? ""), await text(o, "[data-hx-mail-list]"));
@@ -967,7 +977,7 @@ const run = async () => {
               if (query) await p.getByRole("button", { name: "Needs you and mail" }).click();
               await p.waitForSelector("[data-hearth-slot=needs-you]:not([hidden])", { timeout: 15000 });
             }
-            await p.waitForFunction(() => document.querySelector("[data-hd-reading]")?.hidden === true, null, { timeout: 15000 });
+            await p.waitForFunction(() => document.querySelector("[data-hd-reading-mark]")?.hidden === true, null, { timeout: 15000 });
             await p.waitForTimeout(500);
             const r = await measure(p);
             check(`⑱ legible: ${design}, ${signedIn ? "the owner's page (Needs you, the mail, the strip's links)" : "a visitor's"}, browser asked for ${colorScheme}: every one of ${r.checked} visible texts reads at AA (4.5:1; 3:1 for large text), worst ${r.worst?.ratio}:1 (${r.worst?.tag} “${r.worst?.text}”)`, r.checked > 20 && r.fails.length === 0, JSON.stringify(r.fails.slice(0, 6)));

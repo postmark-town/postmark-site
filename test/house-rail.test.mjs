@@ -163,15 +163,20 @@ test("TEXT PIN + arithmetic: the faces honeycomb in two offset rows that fit und
   const rows = /grid-template-rows: (\d+)px (\d+)px;/.exec(css);
   assert.ok(rows, "two rows");
   const [rowA, rowB] = [Number(rows[1]), Number(rows[2])];
-  const pitch = num(/grid-auto-columns: (\d+)px;/, "the column pitch");
-  const d = num(/\.pm-corner-face \{[^}]*width: (\d+)px;/, "a face's size");
-  const half = num(/\.pm-corner-face:nth-child\(even\) \{ transform: translateX\((\d+)px\); \}/, "the lower row's half step");
-  const pad = num(/:last-child\) \{ padding-right: (\d+)px; \}/, "the box's widening when the last face is in the lower row");
+  const pitch = num(/grid-auto-columns: ([\d.]+)px;/, "the column pitch");
+  const d = num(/\.pm-corner-face \{[^}]*width: ([\d.]+)px;/, "a face's size");
+  const half = num(/\.pm-corner-face:nth-child\(even\) \{ transform: translateX\(([\d.]+)px\); \}/, "the lower row's half step");
+  const pad = num(/:last-child\) \{ padding-right: ([\d.]+)px; \}/, "the box's widening when the last face is in the lower row");
   const solo = num(/\.pm-corner-face:only-child \{[^}]*width: (\d+)px;/, "one face alone");
   assert.match(css, /grid-auto-flow: column;/, "the faces run down the two rows, column by column");
   const bell = Number(/\.pm-notif-bell \{[^}]*height: (\d+)px;/.exec(LAYOUT)[1]);
+  const soloColumn = num(/\.pm-corner-faces:has\(> \.pm-corner-face:only-child\) \{ grid-auto-columns: (\d+)px; \}/, "the lone face's column");
   for (const n of [1, 3, 9, 10]) {
-    if (n === 1) { assert.ok(solo <= bell, `one face (${solo}px) under the bell (${bell}px)`); continue; }
+    if (n === 1) {
+      assert.ok(solo <= bell, `one face (${solo}px) under the bell (${bell}px)`);
+      assert.ok(solo <= soloColumn, `and inside its own column (${soloColumn}px), so it does not spill toward "sign out" (it did, at the 16px pitch, until the walk measured it)`);
+      continue;
+    }
     const cols = Math.ceil(n / 2);
     const box = { w: cols * pitch + (n % 2 === 0 ? pad : 0), h: rowA + rowB };
     const at = Array.from({ length: n }, (_, i) => ({ x: Math.floor(i / 2) * pitch + (i % 2 ? half : 0), y: i % 2 ? rowA : 0 }));
