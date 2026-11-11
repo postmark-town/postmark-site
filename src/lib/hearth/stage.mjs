@@ -17,16 +17,17 @@
 //            numbers, the cards, the clocks), then hearth/paint.mjs for the rest.
 //   BEHAVE   behaviors.mjs on the template's own markup.
 //
-// THE STRIP (`[data-hearth-bar]`, Hearth.astro) is the site's, above the stage and outside every design. It holds the Hearth dropdown, the
-// house's-own-human links (add a resident, the likeness answer) and the one line that says the page is part-read. This file wires it: the
-// dropdown binds for every reader, the save controls and the links show for the house's own sign-in only.
+// THE STRIP (`[data-hearth-bar]`, Hearth.astro) is the site's, above the stage and outside every design. It holds the household's sub-rail
+// (HouseRail.astro) with its "+" (add a resident) and its mark for reads still in flight, and in the rail's corner the Hearth dropdown and the
+// settings (the likeness answer). This file wires it: the dropdown binds for every reader; the "+", the settings and the save controls show for
+// the house's own sign-in only.
 //
 // The stage root carries `data-hd` and the house's slug so paintHouse works on it unchanged; its
 // `data-hd-view` is `public` until the reader's sign-in holds a resident of this house.
 
 import { KEYS, tokenIsFresh } from "../auth.mjs";
 import { readHouse, readHearthExtras, officeOrigin } from "../household-dashboard/reads.mjs";
-import { paintHouse, paintReading, writeLook } from "../household-dashboard/paint.mjs";
+import { paintHouse, paintReadingMark, writeLook } from "../household-dashboard/paint.mjs";
 import { readingOf } from "../household-dashboard/fold.mjs";
 import { paintExtras, startCountdown } from "./paint.mjs";
 import { mountBehaviors } from "./behaviors.mjs";
@@ -80,11 +81,19 @@ export function mountHearth(root) {
   let knownSaved = baked;
   let mounted = null, readOk = false, savedRead, savedDone = false;
 
-  // THE STRIP'S OWN PARTS, for the house's own human only: "+ add a resident" and the likeness answer ship hidden. They do not wait for the
-  // reads (which can be slow): the reader's sign-in is known as soon as the layout's /me has answered. The office is still the enforcer of every act.
+  // THE STRIP'S OWN PARTS, for the house's own human only: the sub-rail's "+" (add a resident) and the settings (the likeness answer) ship hidden.
+  // They do not wait for the reads (which can be slow): the reader's sign-in is known as soon as the layout's /me has answered. The office is still
+  // the enforcer of every act.
   function paintStrip() {
     const owner = mine().length > 0;
-    for (const e of bar?.querySelectorAll("[data-hearth-own]") ?? []) e.hidden = !owner;
+    for (const e of bar?.querySelectorAll("[data-hearth-own], [data-house-add]") ?? []) e.hidden = !owner;
+    if (!owner && settings) settings.open = false;
+  }
+  // the settings panel is a <details>: it opens and closes by itself; a click elsewhere or Escape closes it too
+  const settings = bar?.querySelector("[data-hearth-settings]") ?? null;
+  if (settings) {
+    document.addEventListener("click", (e) => { if (settings.open && !settings.contains(e.target)) settings.open = false; });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && settings.open) { settings.open = false; settings.querySelector("summary")?.focus(); } });
   }
 
   function draw() {
@@ -99,7 +108,7 @@ export function mountHearth(root) {
     // signed in, but not as anyone of this house: say so, rather than an unanswered question (the house slot's own line)
     // (not before /me has answered: a first sign-in's owner would see it flash, lib/hearth/not-yours.mjs)
     for (const n of root.querySelectorAll("[data-hx-notyours]")) n.hidden = !notYours({ signedIn: !!token(), answered: meAnswered(sessionStorage), owner: ctx.owner });
-    if (bar) paintReading(bar, ctx.reading);
+    if (bar) paintReadingMark(bar, ctx.reading);
     mountPicker();
     paintHouse(stage, reads, ctx);
     paintExtras(stage, reads, extras, ctx);

@@ -14,8 +14,8 @@
 // Households seat (`alsoKeys: ["household", "residents"]` in src/lib/nav.mjs), so the rail lights THE HOUSEHOLDS above a house rather than The
 // Town. See `alsoKeys` in src/lib/nav.mjs for the reasoning and `test/nav.test.mjs` for the guard.
 //
-// The page draws no chip row of its own any more (there is no rail of residents). It keeps `ownChips` all the same, so the shell adds no row of
-// chips above the design either: the room is the design's (test/nav.test.mjs holds the flag; whether this page wants the Households chips is Darko's).
+// The page draws its own chip row, the household's sub-rail (HouseRail.astro, POS-999), so it takes `ownChips` and the shell adds no row of chips
+// above it (test/nav.test.mjs holds the flag).
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import HouseholdPage from "../../components/HouseholdPage.astro";
 import { declaredHouses, membersOf, nameplate } from "@/lib/household.mjs";

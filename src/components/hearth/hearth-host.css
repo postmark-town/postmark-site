@@ -191,7 +191,8 @@
 .hearth-frame { contain: paint; display: flow-root; }
 
 /* ── the site's own strip above the stage: never part of a template (POS-984) ──
- * One thin row: where you are, the Hearth dropdown, and (for the house's own human) two links. Every ink here is a token, and each is paired with
+ * Where you are, then the household's sub-rail (HouseRail.astro, POS-999) with the Hearth dropdown and (for the house's own human) the settings in its
+ * far corner. The sub-rail's chips wear postmark.css's own `.pm-chip`. Every ink here is a token, and each is paired with
  * the surface it sits on: the strip's ink is read on the page's night (the site has one colour scheme, the dark `color-scheme: dark` of global.css,
  * and no light one), the field's ink on the field. No ink is borrowed from another surface; the contrast of every pair is held by the walk (qa-shots/hearth-walk.mjs ⑱). */
 .hearth {
@@ -208,11 +209,16 @@
 .hearth-crumbs { margin: 0; text-transform: uppercase; letter-spacing: 0.14em; color: var(--hx-chrome-link); }
 .hearth-crumbs a { color: var(--hx-chrome-link); text-decoration: none; }
 .hearth-crumbs a:hover, .hearth-crumbs a:focus-visible { text-decoration: underline; }
-.hearth-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.3em 1.2em; }
-.hearth-reading { margin: 0; color: var(--hx-chrome-ink); }
-.hearth-own { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2em 1.2em; margin: 0; }
-.hearth-own a { color: var(--hx-chrome-link); text-underline-offset: 2px; }
-.hearth-own .house-add { text-decoration: none; border-bottom: 1px dotted currentColor; }
+/* the sub-rail is the strip's second line, the whole width; inside the strip it draws no rule of its own (the strip's is the one) */
+.hearth .hearth-bar > .pm-subrail { flex: 1 1 100%; margin: 0; padding: 0; border: 0; }
+.hearth .hearth-bar .pm-subrail-corner { font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.04em; }
+/* the settings, the house's own human's: a small round button, and a panel under it, at the corner's right edge */
+.hearth-settings { position: relative; }
+.hearth-gear { list-style: none; display: inline-grid; place-items: center; width: 28px; height: 28px; box-sizing: border-box; border-radius: 999px; cursor: pointer; color: var(--hx-chrome-link); border: 1px solid var(--hx-chrome-line); }
+.hearth-gear::-webkit-details-marker { display: none; }
+.hearth-gear:hover, .hearth-gear:focus-visible, .hearth-settings[open] > .hearth-gear { color: var(--hx-chrome-field-ink); background: var(--hx-chrome-field); }
+.hearth-settings-panel { position: absolute; z-index: 20; top: calc(100% + 6px); right: 0; width: max-content; max-width: min(22rem, calc(100vw - 2rem)); box-sizing: border-box; padding: 0.6em 0.8em; border-radius: 8px; border: 1px solid var(--hx-chrome-line); background: var(--hx-chrome-field); color: var(--hx-chrome-field-ink); }
+.hearth-settings-panel a { color: var(--hx-chrome-link); text-underline-offset: 2px; }
 .hearth-picker { display: inline-flex; align-items: center; gap: 0.5em; }
 .hearth-picker select { font: inherit; background: var(--hx-chrome-field); color: var(--hx-chrome-field-ink); border: 1px solid var(--hx-chrome-line); border-radius: 6px; padding: 2px 8px; max-width: 100%; }
 .hearth-picker select:disabled { opacity: 0.6; }
@@ -233,4 +239,4 @@
 .hearth-confirm p { margin: 0; font-size: 0.8rem; }
 .hearth-pickerband button { font: inherit; padding: 0.2em 0.8em; border-radius: 999px; cursor: pointer; border: 1px solid var(--hx-chrome-line); background: var(--hx-chrome-field); color: var(--hx-chrome-field-ink); }
 .hearth-pickerband button:disabled { opacity: 0.5; cursor: default; }
-@media (max-width: 520px) { .hearth-bar { font-size: 0.68rem; } .hearth-tools, .hearth-pickerband, .hearth-owner { justify-content: flex-start; } }
+@media (max-width: 520px) { .hearth-bar { font-size: 0.68rem; } .hearth-pickerband, .hearth-owner { justify-content: flex-start; } }

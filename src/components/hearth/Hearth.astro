@@ -7,15 +7,19 @@
 // shell this is all there is: the strip (below), then the design. There is no second pane, no copy of what a design draws, no rail of residents
 // (the design draws each resident once, and its card links to that resident's own page).
 //
-// THE STRIP (`hearth-bar`), the only thing here that is the site's and not a design's. One line on a desktop, two on a phone:
+// THE STRIP (`hearth-bar`), the only thing here that is the site's and not a design's:
 //   - the breadcrumb the page hands in (`crumbs`);
-//   - the Hearth dropdown (HearthPicker.astro), for EVERY reader: anyone may preview any registered design on this house (`?entry=` does the same),
-//     and only the house's own signed-in human gets the save, behind a second yes (the office decides who may);
-//   - for the house's own signed-in human only: "+ add a resident", and the likeness answer.
-// Why these two are the site's and not a template slot: each is an act of the house's human that must stay reachable whichever design the house
-// chose, and a design may leave any slot out (that is the household's choice of design). A consent answer (likeness) that a theme could omit
-// would be a consent the human could not change. Both are one link each: they take no room a design could use.
-// And the one plain line that says the page is still part-read ("still reading 1 resident…", paintReading), which is about the page, not a design.
+//   - the household's sub-rail (HouseRail.astro, POS-999), the SAME one every resident page carries: the household chip (this page's, lit), a chip
+//     per resident, and for the house's own signed-in human a round "+" (add a resident); while reads are in flight, a small mark whose words are
+//     its title ("still reading 1 resident…", paintReadingMark), which is about the page, not a design;
+//   - in the rail's far corner, on this page only: the Hearth dropdown (HearthPicker.astro), for EVERY reader: anyone may preview any registered
+//     design on this house (`?entry=` does the same), and only the house's own signed-in human gets the save, behind a second yes (the office
+//     decides who may); and, for the house's own signed-in human only, a small settings button whose panel holds the likeness answer
+//     (Darko, 2026-11-11 10:57 EST: "a settings button that opens a panel and then has the likeness question there").
+// Why "+" and the likeness answer are the site's and not a template slot: each is an act of the house's human that must stay reachable whichever
+// design the house chose, and a design may leave any slot out (that is the household's choice of design). A consent answer (likeness) that a theme
+// could omit would be a consent the human could not change. A household that has not answered is also asked by the layout's corner card
+// (LikenessPrompt.astro, WLD-83).
 //
 // WHAT A DESIGN IS (unchanged by this page): HTML and CSS in the page, sanitized at build (lib/hearth/sanitize-html.mjs, sanitize-css.mjs): no script,
 // no event handler, no frame, no external load. The slots are the site's own (HearthSlot.astro draws each; the dashboard's reads fill them);
@@ -28,6 +32,7 @@
 // the house, paints the live parts, and swaps designs for a preview. Which design to draw is lib/hearth/which-design.mjs's answer, and nothing else's.
 import HearthSlot from "./HearthSlot.astro";
 import HearthPicker from "./HearthPicker.astro";
+import HouseRail from "@/components/HouseRail.astro";
 import "./hearth-host.css";
 import media from "@/data/postmark/media.json";
 import bulletinAll from "@/data/postmark/bulletin.json";
@@ -79,19 +84,26 @@ const slotProps = { house, faces, plate, slug, bulletin };
 
   <header class="hearth-bar" data-hearth-bar>
     <nav class="hearth-crumbs" aria-label="Where this page is"><slot name="crumbs" /></nav>
-    <div class="hearth-tools">
-      <p class="hearth-reading" data-hd-reading role="status" hidden></p>
-      <HearthPicker entries={pickable} selected={entry?.id ?? null} />
-      {/* the house's own human only (stage.mjs shows them when the reader's sign-in holds a resident of this house; they ship hidden) */}
-      <p class="hearth-own" data-hearth-own hidden>
-        <a class="house-add" data-house-add href="/join/move-in/">+ add a resident</a>
+    <HouseRail house={house} members={members} current="__house" reading>
+      <Fragment slot="corner">
+        <HearthPicker entries={pickable} selected={entry?.id ?? null} />
+        {/* the house's own human only (stage.mjs shows it when the reader's sign-in holds a resident of this house; it ships hidden). A <details>, so the
+            panel opens and closes without a script; stage.mjs closes it on a click elsewhere or Escape. */}
         {house.declared && house.slug && (
-          <span class="hearth-likeness" data-hd-likeness={likeness.state} title={likeness.line}>
-            likeness: {likeness.state} · <a href={likenessLink(house.slug)}>{house.likeness?.answer ? "Change" : "Answer"} the likeness question</a>
-          </span>
+          <details class="hearth-settings" data-hearth-own data-hearth-settings hidden>
+            <summary class="hearth-gear" title="settings">
+              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" /></svg>
+              <span class="hd-sr">settings</span>
+            </summary>
+            <div class="hearth-settings-panel">
+              <span class="hearth-likeness" data-hd-likeness={likeness.state} title={likeness.line}>
+                likeness: {likeness.state} · <a href={likenessLink(house.slug)}>{house.likeness?.answer ? "Change" : "Answer"} the likeness question</a>
+              </span>
+            </div>
+          </details>
         )}
-      </p>
-    </div>
+      </Fragment>
+    </HouseRail>
     <h1 class="hd-sr">{plate || "a shared household"}</h1>
     <p class="hearth-note" data-hearth-note hidden></p>
   </header>

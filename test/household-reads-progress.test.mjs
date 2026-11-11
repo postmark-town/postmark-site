@@ -356,9 +356,11 @@ test("§ 5 (text pin) the stage asks for progress on the first read and draws th
   assert.match(stage, /ctx\.reading = readingOf\(reads\);/);
   assert.ok(stage.indexOf("ctx.reading = readingOf(reads);") < stage.indexOf("paintHouse(stage, reads, ctx)"), "the reading state is set before the stage paints");
   assert.ok(!/await Promise\.all\(\[\s*readHouse/.test(stage), "the stage no longer awaits the house's reads together with the posts");
-  // until 2026-11-10 the band carried this line; the household page's strip does now, still outside every design, and the stage paints it into the strip
-  const strip = readFileSync(resolve(ROOT, "src/components/hearth/Hearth.astro"), "utf8");
-  assert.match(strip, /<p class="hearth-reading" data-hd-reading role="status" hidden><\/p>/, "the strip carries the one reading line, outside every design");
-  assert.ok(strip.indexOf('data-hd-reading') < strip.indexOf("<!--hearth-entry-->"), "above, and outside, the entry's region");
-  assert.match(stage, /if \(bar\) paintReading\(bar, ctx\.reading\);/, "the stage paints it, from the same reading state");
+  // until 2026-11-10 the band carried this line; until 2026-11-11 the strip carried it as words. POS-999 (Darko, 2026-11-11) made it a small mark in the
+  // household's sub-rail, its words its title, still outside every design; the stage paints it from the same reading state (test/house-rail.test.mjs runs the painter)
+  const page = readFileSync(resolve(ROOT, "src/components/hearth/Hearth.astro"), "utf8");
+  assert.match(page, /<HouseRail house=\{house\} members=\{members\} current="__house" reading>/, "the strip's sub-rail carries the reading mark");
+  assert.ok(page.indexOf("<HouseRail ") < page.indexOf("<!--hearth-entry-->"), "above, and outside, the entry's region");
+  assert.match(readFileSync(resolve(ROOT, "src/components/HouseRail.astro"), "utf8"), /\{reading && <span class="pm-subrail-reading" data-hd-reading-mark role="status" hidden>/, "the mark ships hidden");
+  assert.match(stage, /if \(bar\) paintReadingMark\(bar, ctx\.reading\);/, "the stage paints it, from the same reading state");
 });

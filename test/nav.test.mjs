@@ -574,8 +574,10 @@ test("A SHARED HOUSE'S PAGE TAKES NO ROW FROM THE NAV — its own member rail is
   // The Households has no row now, but the predicate stays: the day a second
   // read joins the family, a shared house must not show the nav's row stacked
   // over its own.
+  // Until 2026-11-11 a resident page passed ownChips only for a shared house (`isShared`). POS-999 put the household's sub-rail on EVERY resident page, a
+  // house of one's included, so every resident page draws its own row.
   const resident = join(PAGES, "residents", "[handle].astro");
-  assert.match(layoutTagOf(resident), /\bownChips=\{isShared\(house, members\)\}/, "residents/[handle].astro does not pass ownChips");
+  assert.match(layoutTagOf(resident), /\bownChips=\{true\}/, "residents/[handle].astro does not pass ownChips");
   // Every house's own page draws its rail, a house of one included (Keemin,
   // 2026-09-27: solos have a household page too), so it always takes no row.
   const house = join(PAGES, "households", "[slug].astro");

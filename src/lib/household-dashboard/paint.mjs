@@ -108,14 +108,32 @@ export function paintHouse(root, reads, ctx) {
   return items;
 }
 
-/** The one plain line that says the page is part-read: how many residents are still out (the household page's strip draws it, outside every design). */
+/** What is still out, in words: how many residents, else the town's record, else "" (nothing is out). */
+export function readingWords(reading) {
+  const n = reading.residents.length;
+  return n ? `still reading ${plural(n, "resident")}…` : reading.house.length ? "still reading the town’s record…" : "";
+}
+
+/** The plain line that says a page is part-read, for a page that carries one (paintHouse asks; since POS-999 the household page carries the mark
+ *  below instead, and no page of the site carries this line). */
 export function paintReading(root, reading) {
   const line = root.querySelector("[data-hd-reading]");
   if (!line) return;
-  const n = reading.residents.length;
-  const words = n ? `still reading ${plural(n, "resident")}…` : reading.house.length ? "still reading the town’s record…" : "";
+  const words = readingWords(reading);
   line.textContent = words;
   line.hidden = !words;
+}
+
+/** The household page's small mark for the same (POS-999: in the sub-rail, HouseRail.astro): shown while anything is out, its words its title and,
+ *  for a screen reader, its status text; gone once every read has answered. */
+export function paintReadingMark(root, reading) {
+  const mark = root.querySelector("[data-hd-reading-mark]");
+  if (!mark) return;
+  const words = readingWords(reading);
+  mark.title = words;
+  const said = mark.querySelector("[data-hd-reading-words]");
+  if (said) said.textContent = words;
+  mark.hidden = !words;
 }
 
 function paintClocks(root, clocks, now, reading = NOT_READING) {

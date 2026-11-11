@@ -82,6 +82,8 @@ export const SOURCES = Object.freeze([
   "src/components/LikenessPrompt.astro", "src/components/WriteGateNote.astro",
   "src/components/HalloweenMotif.astro", "src/components/HalloweenSkin.astro", "src/components/PageFreshness.astro",
   "src/components/ResidentCard.astro",
+  // POS-999: the household's sub-rail, drawn in the household page's strip and on every resident page (it prints the house's plate)
+  "src/components/HouseRail.astro",
   "src/components/household-dashboard/HouseDashboard.astro", "src/components/household-dashboard/ResidentCard.astro",
   // POS-984: a declared house's household page is the Hearth (HouseholdPage.astro) and nothing else of the site's but its strip; the quests board is still HouseDashboard's, for an undeclared shared house
   "town/components/HouseholdPage.astro", "src/components/hearth/Hearth.astro", "src/components/hearth/HearthSlot.astro",
@@ -141,7 +143,9 @@ const OLD = Object.freeze({
   fold: "      human: dec.human ?? null,\n",
 });
 const EDIT = Object.freeze({
-  chrome: { path: "town/components/Household.astro", from: "      <p class=\"house-meta\">\n", to: "      <p class=\"house-meta\">\n" + OLD.chrome },
+  // POS-999: the house's chrome is the household's sub-rail (HouseRail.astro), whose household chip prints the plate on the household page and on every
+  // resident page; until 2026-11-11 it was Household.astro's nameplate (`<p class="house-meta">`, line 299 when the mutant was named), on resident pages only
+  chrome: { path: "src/components/HouseRail.astro", from: "  <div class=\"pm-subrail-chips\">\n", to: "  <div class=\"pm-subrail-chips\">\n" + OLD.chrome },
   // POS-984: the household page's hd-sub is the Hearth's house slot now (HouseDashboard keeps its own only for an undeclared shared house's resident pages, which this proof's declared house does not reach)
   hdsub: { path: "src/components/hearth/HearthSlot.astro", from: "    <p class=\"hd-sub\">\n", to: "    <p class=\"hd-sub\">\n" + OLD.hdsub },
   desc: { path: "town/pages/households/[slug].astro",
@@ -155,14 +159,15 @@ const EDIT = Object.freeze({
 // line restored alongside. Until POS-984 the house was shared (two members), so Household
 // mounted HouseDashboard on every route and the hd-sub emitter reached the resident wrapper
 // and resident pages too; a declared house's resident pages carry no seat now, and the
-// household's own page is HouseholdPage.astro (no Household.astro), so the chrome emitter
-// (Household.astro's plate) reaches only the resident surfaces, and the hd-sub emitter only
-// the household page. A fold+ mutant also re-inserts its template clause, so the prop-path
-// fragments (handed a house with a human) redden with it (CI 38358098533).
+// household's own page is HouseholdPage.astro (no Household.astro), so the hd-sub emitter reaches only
+// the household page. The chrome emitter is the household's sub-rail (POS-999), which both pages carry,
+// so it reaches all four household and resident surfaces. A fold+ mutant also re-inserts its template
+// clause, so the prop-path fragments (handed a house with a human) redden with it (CI 38358098533).
 export const MUTANTS = Object.freeze({
-  // until POS-984 the chrome emitter was also on the household route, so it reddened householdSeat; that fragment is HouseholdPage.astro now, which has no plate chrome
-  "household-299": { emitter: "Household.astro:299 (chrome), prop path", edits: [EDIT.chrome],
-    mustRed: { residentWrapper: [C.NEVER] } },
+  // the names keep the line the chrome emitter had when they were named (Household.astro:299, the nameplate); since POS-999 it is HouseRail.astro's household chip.
+  // Until 2026-11-11 it reddened residentWrapper only (POS-984 had taken it off the household route); the sub-rail is on the household page's strip too, so householdSeat reddens again
+  "household-299": { emitter: "HouseRail.astro (the household chip's plate; was Household.astro:299), prop path", edits: [EDIT.chrome],
+    mustRed: { residentWrapper: [C.NEVER], householdSeat: [C.NEVER] } },
   // until POS-984 the hd-sub emitter was HouseDashboard.astro:68, mounted on every route, so it also reddened residentWrapper;
   // the household's own page draws the Hearth's house slot, and a resident's page of a declared house carries no seat
   "dashboard-68": { emitter: "HearthSlot.astro (the house slot's hd-sub), prop path", edits: [EDIT.hdsub],
@@ -171,8 +176,8 @@ export const MUTANTS = Object.freeze({
     mustRed: { householdPage: [C.NEVER, C.DESC] } },
   "fold+68": { emitter: "houses.mjs fold + HearthSlot.astro (the house slot's hd-sub), built page", edits: [EDIT.fold, EDIT.hdsub],
     mustRed: { householdPage: [C.NEVER, C.HDHUMAN], householdSeat: [C.NEVER, C.HDHUMAN] } },
-  "fold+299": { emitter: "houses.mjs fold + Household.astro:299 (chrome), built pages", edits: [EDIT.fold, EDIT.chrome],
-    mustRed: { residentPage: [C.NEVER], residentWrapper: [C.NEVER] } },
+  "fold+299": { emitter: "houses.mjs fold + HouseRail.astro (the household chip's plate; was Household.astro:299), built pages", edits: [EDIT.fold, EDIT.chrome],
+    mustRed: { residentPage: [C.NEVER], residentWrapper: [C.NEVER], householdPage: [C.NEVER], householdSeat: [C.NEVER] } },
 });
 
 // ── invented fixtures (no real record, row, name or value) ──────────────────

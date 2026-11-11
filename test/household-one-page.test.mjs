@@ -11,8 +11,8 @@
 // WHAT THIS HOLDS, and what reads what:
 //   - the SEAM: the page asks ONE function which design to draw (which-design.mjs); the function is run, and the built page
 //     is checked against its answer;
-//   - the ONE PAGE: no band, no rail of residents, no quests, no ballots; the strip (the Hearth dropdown for everyone, the owner's two
-//     links, the reading line) above the design; the old /hearth/ address forwarding with the preview's query riding across (the
+//   - the ONE PAGE: no band, no old tab rail, no quests, no ballots; the strip (the breadcrumb, the household's sub-rail with the Hearth dropdown for
+//     everyone and the owner's + and settings, POS-999, held in full by test/house-rail.test.mjs) above the design; the old /hearth/ address forwarding with the preview's query riding across (the
 //     forwarder's own script is RUN); `?resident=` redirecting to the resident's own page (that script is RUN too); the ways in (the
 //     layout's household link, a resident page's rail);
 //   - the strip is OUT OF A DESIGN'S REACH: through the real sanitizer, a hostile stylesheet cannot name it;
@@ -90,18 +90,24 @@ test("built: every household page is drawn in the design whichDesign names (the 
 
 const outsideTemplates = (html) => html.replace(/<template\b[\s\S]*?<\/template>/g, "");
 
-test("built: no household page carries a band, a rail of residents, the day's quests, a ballot or a managing-the-house list: the design is the page", { skip: !built }, () => {
+// Until 2026-11-11 this held that a household page carried no rail of residents. Darko's dev walk that day (POS-999, 10:48 EST: "We need to unify the
+// subrail of the household and each resident page") put the household's sub-rail in the strip; test/house-rail.test.mjs holds it. The old tab rail stays gone.
+test("built: no household page carries a band, the old tab rail, a nav chip row, the day's quests, a ballot or a managing-the-house list: the design is the page, under the strip", { skip: !built }, () => {
   for (const slug of slugsBuilt()) {
     const html = dist("households", slug, "index.html");
     for (const gone of ["data-hband", "hband", "data-house-tabs", "data-house-tab=", "pm-chiprow", "data-quests", "data-hb-edit", "data-hband-manage", "Managing the house", "Open ballots", "data-hd-quests", "data-profile-bubble"]) {
       assert.ok(!html.includes(gone), `${slug}: the page does not carry ${gone}`);
     }
+    assert.equal((html.match(/data-house-rail\b/g) ?? []).length, 1, `${slug}: its one row of chips is the household's sub-rail`);
     // the sentence "the design draws the house" has a witness: the stage is the page's only body, and every resident is drawn by it, once
     assert.equal((outsideTemplates(html).match(/data-hearth-stage /g) ?? []).length, 1, `${slug}: one stage`);
   }
 });
 
-test("built: the strip sits above the design and outside the entry's region: the breadcrumb, the dropdown, the reading line, and the owner's two links, shipped hidden", { skip: !built }, () => {
+// Until 2026-11-11 the strip carried a reading line and, for the owner, two underlined links ("+ add a resident" and the likeness answer). POS-999 (Darko,
+// 10:48 and 10:57 EST) made the reading line a mark in the sub-rail, the + a round pill after the residents' chips, and the likeness answer a settings panel
+// in the corner; test/house-rail.test.mjs holds each.
+test("built: the strip sits above the design and outside the entry's region: the breadcrumb, the sub-rail with its reading mark and its +, and in its corner the dropdown and the settings, the owner's parts shipped hidden", { skip: !built }, () => {
   for (const slug of slugsBuilt()) {
     const html = dist("households", slug, "index.html");
     const bar = html.indexOf("data-hearth-bar");
@@ -110,13 +116,13 @@ test("built: the strip sits above the design and outside the entry's region: the
     assert.ok(withoutEntryRegion(html).includes("data-hearth-bar"), `${slug}: the strip is the host's, not the entry's`);
     const strip = html.slice(bar, html.indexOf(ENTRY_OPEN));
     assert.match(strip, /<a href="\/households\/"[^>]*>Residents<\/a>/, `${slug}: the breadcrumb`);
+    assert.ok(strip.indexOf("hearth-crumbs") < strip.indexOf("data-house-rail"), `${slug}: the breadcrumb, then the sub-rail`);
     assert.equal((html.match(/data-hearth-picker/g) ?? []).length, 1, `${slug}: one dropdown`);
     assert.match(strip, /<select data-hearth-pick disabled /, `${slug}: the dropdown ships disabled and is enabled when it is bound`);
-    assert.match(strip, /<p class="hearth-reading" data-hd-reading role="status" hidden><\/p>/, `${slug}: the one reading line`);
-    assert.ok(/data-hearth-own hidden/.test(strip) && /data-hearth-owner hidden/.test(strip), `${slug}: the owner's links and save controls ship hidden`);
-    const own = strip.slice(strip.indexOf("data-hearth-own"));
-    assert.match(own, /<a class="house-add" data-house-add href="\/join\/move-in\/"[^>]*>\+ add a resident<\/a>/, `${slug}: + add a resident`);
-    assert.match(own, /(Answer|Change) the likeness question/, `${slug}: the likeness answer (a declared house)`);
+    assert.match(strip, /<span class="pm-subrail-reading" data-hd-reading-mark role="status" hidden[ >]/, `${slug}: the one reading mark`);
+    assert.ok(/data-hearth-own data-hearth-settings hidden/.test(strip) && /data-hearth-owner hidden/.test(strip), `${slug}: the settings and the save controls ship hidden`);
+    assert.match(strip, /<a class="pm-subrail-add" data-house-add href="\/join\/move-in\/"[^>]*\bhidden\b/, `${slug}: the round +, shipped hidden`);
+    assert.match(strip.slice(strip.indexOf("data-hearth-settings")), /(Answer|Change) the likeness question/, `${slug}: the likeness answer, in the settings (a declared house)`);
     assert.ok(!/data-hearth-save[^>]*>[^<]*<\/button>/.test(strip.replace(/data-hearth-save hidden>/g, "")), `${slug}: the save button ships hidden`);
   }
 });
@@ -323,14 +329,18 @@ test("householdHome: signed in, 'your household' is the declared house's page; a
   assert.equal(householdHome({ households: { a: { slug: "plain" }, b: { slug: "other" } } }, ["b", "a"]), "/households/other/", "the first held handle's house");
 });
 
-test("PIN the header: the layout asks householdHome from /me, keeps what it found, and its first paint reads the same key", () => {
+// Until 2026-11-11 the header drew "your household" as a link, from two painters (the first paint's and the island's). POS-999 made the corner a round
+// household icon and the residents' faces, drawn by ONE painter both call; test/house-rail.test.mjs runs it.
+test("PIN the header: the layout asks householdHome from /me, keeps what it found, and the one painter (the first paint's) reads the same key", () => {
   const layout = read("src/layouts/PostmarkLayout.astro");
   assert.match(layout, /import \{ householdHome \} from "@\/lib\/house-home\.mjs";/);
   assert.match(layout, /const home = householdHome\(me, handles\);/);
   assert.match(layout, /sessionStorage\.setItem\("pm\.oauth\.household", home\)/);
   assert.match(layout, /localStorage\.setItem\("pm\.oauth\.household\.cache", home\)/);
-  assert.match(layout, /sessionStorage\.getItem\("pm\.oauth\.household"\) \|\| localStorage\.getItem\("pm\.oauth\.household\.cache"\)/, "the synchronous first paint and the island read one key");
-  assert.equal((layout.match(/a\.textContent = "your household"|h0\.textContent = "your household"/g) ?? []).length, 2, "both painters draw the one link home");
+  assert.match(layout, /var home = text\(true, "pm\.oauth\.household"\) \|\| text\(false, "pm\.oauth\.household\.cache"\);/, "the painter reads that key, the session's first");
+  assert.equal((layout.match(/window\.pmHouseCorner = function/g) ?? []).length, 1, "one painter");
+  assert.equal((layout.match(/window\.pmHouseCorner\(|window\.pmHouseCorner\?\.\(/g) ?? []).length, 2, "the first paint and the island both call it");
+  assert.ok(!/textContent = "your household"/.test(layout), "and nothing draws the old words as a link");
   assert.match(layout, /sessionStorage\.removeItem\("pm\.oauth\.household"\)/, "a sign-out forgets it");
 });
 
