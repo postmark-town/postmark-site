@@ -59,11 +59,12 @@
 }
 
 /* ── the town header (Postmark's OWN chrome — one rail, not two) ──
-   The gap between its parts and the nav links' side padding were trimmed (1.4em → 1em, 0.75em → 0.55em) to make room for the signed-in
-   household's corner at twice its first size (POS-999, Darko 2026-11-11 12:50 EST: "allot like maybe around twice the amount of horizontal
-   space in the top rail"), so ten residents' faces still leave the nav on one row at a desktop width (PostmarkLayout.astro § THE HOUSE'S CORNER). */
+   The Postmark mark, the nav's run of links, and at the right the END: Join and the reader's own corner (the bell, the household, sign
+   in or out), PostmarkLayout.astro § THE TOP RAIL'S TWO ROWS. When they do not fit on one row, the end stays on the first row at the
+   right and the nav's links take the second row together (POS-999, Darko 2026-11-11 12:52 EST: "two rows in the top rail is actually
+   totally fine"). */
 .pm .pm-townhead {
-  display: flex; align-items: center; gap: 1em;
+  display: flex; align-items: center; gap: 1.4em;
   max-width: 1160px; margin: 0 auto;
   padding: 1.1em 1.2em 1.5em;
 }
@@ -99,13 +100,13 @@
   flex-wrap: wrap; /* never clip a section off the end — wrap instead */
   justify-content: flex-end;
 }
-.pm .pm-townnav-links a {
+.pm .pm-townnav-links a, .pm a.pm-nav-join {
   font-family: var(--pm-mono);
   font-size: 0.74rem; letter-spacing: 0.08em;
   color: rgba(232, 196, 139, 0.75);
   text-decoration: none;
   white-space: nowrap;
-  padding: 0.5em 0.55em;
+  padding: 0.5em 0.75em;
   border-radius: 999px;
   transition: color 0.12s ease, background 0.12s ease;
 }
@@ -113,28 +114,46 @@
 /* the Join door wears a lantern — always-lit outline + soft wax-gold glow so
    a newcomer's eye finds it without hunting (Keemin, 2026-07-31). Calm
    pizzazz: no motion beyond hover; when Join IS the current page, the filled
-   aria-current pill below wins the cascade on purpose. */
-.pm .pm-townnav-links a.pm-nav-join {
+   aria-current pill below wins the cascade on purpose. It stands at the
+   rail's end, with the reader's own corner, not in the nav's run of links
+   (POS-999, Darko 2026-11-11 12:52 EST: "join is a special button that we
+   want to keep at the top and like near the sign in or like auth stuff"). */
+.pm a.pm-nav-join {
+  flex: none;
   color: var(--pm-gold-bright);
   border: 1px solid rgba(232, 196, 139, 0.55);
   background: rgba(232, 196, 139, 0.10);
   box-shadow: 0 0 12px rgba(232, 196, 139, 0.18), inset 0 0 8px rgba(232, 196, 139, 0.06);
   font-weight: 700;
 }
-.pm .pm-townnav-links a.pm-nav-join::before { content: "✦ "; }
-.pm .pm-townnav-links a.pm-nav-join:hover {
+.pm a.pm-nav-join::before { content: "✦ "; }
+.pm a.pm-nav-join:hover {
   color: #241505;
   background: linear-gradient(180deg, var(--pm-gold-bright), var(--pm-gold));
   box-shadow: 0 0 16px rgba(232, 196, 139, 0.35);
 }
-.pm .pm-townnav-links a[aria-current="page"] {
+.pm .pm-townnav-links a[aria-current="page"], .pm a.pm-nav-join[aria-current="page"] {
   color: #241505;
   background: linear-gradient(180deg, var(--pm-gold-bright), var(--pm-gold));
   font-weight: 700;
 }
+/* the rail's END: Join, then the reader's own corner (PostmarkLayout.astro) */
+.pm .pm-townhead-end { display: inline-flex; align-items: center; gap: 0.6em; margin-left: auto; flex: none; }
+/* TWO ROWS, ON A DESKTOP (the layout's first-paint script measures and sets data-rows; without a script the old wrapping stands):
+   one row when everything fits; else the end stays on the first row at the right, and the nav's links move to the second row together,
+   at the right, never one link orphaned below the rest. */
+@media (min-width: 861px) {
+  .pm .pm-townhead[data-rows="1"] .pm-townnav-links { flex-wrap: nowrap; }
+  .pm .pm-townhead[data-rows="2"] { flex-wrap: wrap; row-gap: 0.3em; }
+  .pm .pm-townhead[data-rows="2"] .pm-townhead-end { order: 1; }
+  .pm .pm-townhead[data-rows="2"] .pm-townnav-links { order: 2; flex-basis: 100%; margin-left: 0; flex-wrap: nowrap; }
+}
 @media (max-width: 860px) {
   .pm .pm-townhead { flex-wrap: wrap; gap: 0.7em; padding-bottom: 1.1em; }
-  .pm .pm-townnav-links { margin-left: 0; flex-basis: 100%; }
+  .pm .pm-townnav-links { margin-left: 0; flex-basis: 100%; order: 2; }
+  /* on a phone the end (Join and the corner) comes before the nav's links, at the right; a wide corner (many faces) takes Join onto a
+     line of its own above it rather than running off the screen */
+  .pm .pm-townhead-end { order: 1; flex: 0 1 auto; max-width: 100%; flex-wrap: wrap; justify-content: flex-end; row-gap: 0.5em; }
 }
 
 /* prose links on the night sky read town-gold, not the atelier's amber */

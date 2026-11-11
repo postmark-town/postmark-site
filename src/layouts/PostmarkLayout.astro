@@ -166,14 +166,21 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
             as a link to their own window. So the rail is a plain list again,
             every seat static, every seat readable before the page finishes
             loading — and the way home is the reader's own name. */}
-        {RAIL.map((n) => (
+        {RAIL.filter((n) => !n.lantern).map((n) => (
           <a
             href={railHref(n)}
-            class={n.lantern ? "pm-nav-join" : undefined}
             aria-current={here?.key === n.key ? "page" : undefined}
           >{n.label}{n.beta && <span class="pm-nav-beta">beta</span>}</a>
         ))}
       </nav>
+      {/* THE RAIL'S END (POS-999; Darko, 2026-11-11 12:52 EST: "join is a special button that we want to keep at the top and like near the
+          sign in or like auth stuff, because that is kind of where it categorically belongs"). Join, the rail's lantern seat (still RAIL's,
+          the one source), stands here, before the reader's own corner: the bell, the household and its faces, sign out; or sign in. It sits
+          outside the auth block, which ships hidden until a script paints it, so Join is there with no script at all. */}
+      <div class="pm-townhead-end" data-townhead-end>
+      {RAIL.filter((n) => n.lantern).map((n) => (
+        <a href={railHref(n)} class="pm-nav-join" aria-current={here?.key === n.key ? "page" : undefined}>{n.label}</a>
+      ))}
       <div class="pm-auth" data-auth hidden>
         <!-- the notification bell: signed-in humans only. The island below
              reveals it and paints the badge; hidden for signed-out readers
@@ -201,6 +208,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
           <span class="pm-corner" data-auth-handles>✦ signed in</span>
           <button type="button" class="pm-auth-out" data-auth-signout>sign out</button>
         </span>
+      </div>
       </div>
     </header>
     {/* The two clocks (part 7) stood here for an afternoon; Keemin removed them
@@ -283,20 +291,47 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
           });
           wrap.append(faces);
         };
+        // the auth area's first paint (its own function: its early returns end the paint, not the row check below)
+        (function () {
+          try {
+            var root = document.querySelector("[data-auth]");
+            if (!root) return;
+            root.hidden = false;
+            var tok = null;
+            try { tok = JSON.parse(localStorage.getItem("pm.oauth.token") || "null"); } catch (e) {}
+            var fresh = tok && tok.access_token && (!tok.obtained || !tok.expires_in || Date.now() < tok.obtained + tok.expires_in * 1000);
+            var btn = root.querySelector("[data-auth-signin]");
+            var who = root.querySelector("[data-auth-who]");
+            if (!fresh) { btn.hidden = false; who.hidden = true; return; }
+            btn.hidden = true; who.hidden = false;
+            window.pmHouseCorner(root.querySelector("[data-auth-handles]"));
+            var hs = read(true, "pm.oauth.handles", null) || read(false, "pm.oauth.handles.cache", []);
+            document.documentElement.setAttribute("data-lens", hs[0] || "signed-in");
+          } catch (e) {}
+        })();
+        // THE TOP RAIL'S TWO ROWS (POS-999; Darko, 2026-11-11 12:52 EST: "two rows in the top rail is actually totally fine … The one rail or the
+        // single row is actually pretty unique to households who like barely have any residents"). On a desktop: one row when everything fits;
+        // else the end (Join and the corner) stays on the first row at the right and the nav's links take the second row together
+        // (postmark.css § the town header). Measured here, before the first paint, and again whenever the rail's end or the sentinel's glyph
+        // changes size (the faces arriving), the window does, or a font lands. On a phone the stylesheet's own stacking stands. Without a
+        // script none of this runs, and the old wrapping is what shows.
+        window.pmRailRows = function () {
+          var head = document.querySelector(".pm-townhead");
+          if (!head) return;
+          if (window.matchMedia && window.matchMedia("(max-width: 860px)").matches) { head.removeAttribute("data-rows"); return; }
+          head.setAttribute("data-rows", "1");
+          head.setAttribute("data-rows", head.scrollWidth > head.clientWidth + 1 ? "2" : "1");
+        };
         try {
-          var root = document.querySelector("[data-auth]");
-          if (!root) return;
-          root.hidden = false;
-          var tok = null;
-          try { tok = JSON.parse(localStorage.getItem("pm.oauth.token") || "null"); } catch (e) {}
-          var fresh = tok && tok.access_token && (!tok.obtained || !tok.expires_in || Date.now() < tok.obtained + tok.expires_in * 1000);
-          var btn = root.querySelector("[data-auth-signin]");
-          var who = root.querySelector("[data-auth-who]");
-          if (!fresh) { btn.hidden = false; who.hidden = true; return; }
-          btn.hidden = true; who.hidden = false;
-          window.pmHouseCorner(root.querySelector("[data-auth-handles]"));
-          var hs = read(true, "pm.oauth.handles", null) || read(false, "pm.oauth.handles.cache", []);
-          document.documentElement.setAttribute("data-lens", hs[0] || "signed-in");
+          window.pmRailRows();
+          var busy = false;
+          var again = function () { if (busy) return; busy = true; try { window.pmRailRows(); } finally { busy = false; } };
+          if (window.ResizeObserver) {
+            var ro = new ResizeObserver(again);
+            ["[data-townhead-end]", "[data-pm-alert]"].forEach(function (s) { var e = document.querySelector(s); if (e) ro.observe(e); });
+          }
+          window.addEventListener("resize", again);
+          if (document.fonts && document.fonts.ready) document.fonts.ready.then(again);
         } catch (e) {}
       })();
     </script>
@@ -1051,7 +1086,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
   /* the sign-in pill (pages-era styles, resurrected).
      [hidden] must beat the display classes — the sign-out ghost bug. */
   .pm-auth[hidden], .pm-auth-who[hidden], .pm-auth-btn[hidden] { display: none; }
-  .pm-auth { display: inline-flex; align-items: center; gap: 0.4em; margin-left: auto; }
+  .pm-auth { display: inline-flex; align-items: center; gap: 0.6em; margin-left: auto; }
   .pm-auth-btn {
     font: 700 0.68rem/1 ui-monospace, Consolas, monospace; letter-spacing: 0.08em;
     color: #241505; background: linear-gradient(180deg, #f6dcae, #e8c48b);
@@ -1059,7 +1094,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
   }
   .pm-auth-btn:hover { filter: brightness(1.06); }
   .pm-auth-who {
-    display: inline-flex; align-items: center; gap: 0.4em;
+    display: inline-flex; align-items: center; gap: 0.5em;
     font-family: ui-monospace, Consolas, monospace; font-size: 0.66rem;
     color: rgba(232, 196, 139, 0.85);
   }
@@ -1073,13 +1108,12 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
 
   /* ── THE HOUSE'S CORNER (POS-999): the household's round icon, then its residents' faces as one honeycomb ──
      The faces run down two rows, column by column (1 over 2, 3 over 4 …), and the lower row sits half a step to the right and nests up into
-     the upper one: two offset rows of 22px circles, 2px apart, 43px tall; the header's row grows with it (81px → 90px) and keeps every part
-     centred. One face alone is one 28px circle, the household icon's size.
+     the upper one: two offset rows of 28px circles, 2px apart, 54px tall; the header's row grows with it and keeps every part centred. One
+     face alone is one 28px circle, the household icon's size.
      THE SIZE (Darko, 2026-11-11 12:50 EST, on dev: "the upper right corner is way too small … allot like maybe around twice the amount of
-     horizontal space in the top rail for the household icon as well as the residents, and make their circles around twice as large"). It is
-     the largest that keeps the nav on one row at 1280 and 1568 px with ten faces (measured: with the nav's own spacing trimmed, postmark.css
-     § the town header, and this corner's gaps at 0.4em, the corner may be 174px; ten 22px faces make it 166px). Twice the first size (28px
-     faces, 199px at ten) pushes "Join" onto a second row at nine and ten faces. The first size was 14px faces, 112px at ten. */
+     horizontal space in the top rail for the household icon as well as the residents, and make their circles around twice as large"): twice
+     the first size (14px faces). Ten faces make a 199px corner; when the rail cannot hold it on one row, the rail takes two (12:52: "two
+     rows in the top rail is actually totally fine"), below § THE TOP RAIL'S TWO ROWS in the first-paint script. */
   .pm-corner { display: inline-flex; align-items: center; gap: 6px; }
   /* the corner never squeezes: the nav beside it is the part that wraps ("never clip a section off the end — wrap instead"), and a pill never breaks its word */
   .pm-auth { flex-shrink: 0; }
@@ -1093,18 +1127,18 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
   .pm-auth-who .pm-corner-house:hover, .pm-corner-house:focus-visible { text-decoration: none; border-color: var(--pm-gold-bright, #f6dcae); background: rgba(232, 196, 139, 0.14); }
   .pm-corner-faces {
     display: inline-grid; flex: none;
-    grid-auto-flow: column; grid-template-rows: 21px 22px; grid-auto-columns: 24px;
+    grid-auto-flow: column; grid-template-rows: 26px 28px; grid-auto-columns: 30px;
   }
   /* the lower row's half step: the faces are shifted, so the box is widened by it when the last face is in the lower row */
-  .pm-corner-faces:has(> .pm-corner-face:nth-child(even):last-child) { padding-right: 12px; }
+  .pm-corner-faces:has(> .pm-corner-face:nth-child(even):last-child) { padding-right: 15px; }
   .pm-corner-face {
     position: relative; display: grid; place-items: center; box-sizing: border-box;
-    width: 22px; height: 22px; border-radius: 999px; overflow: hidden;
+    width: 28px; height: 28px; border-radius: 999px; overflow: hidden;
     color: var(--pm-gold-bright, #f6dcae); background: #16223d; text-decoration: none;
-    font: 700 0.72rem/1 var(--pm-mono); text-transform: uppercase;
+    font: 700 0.85rem/1 var(--pm-mono); text-transform: uppercase;
     box-shadow: 0 0 0 1px rgba(232, 196, 139, 0.55);
   }
-  .pm-corner-face:nth-child(even) { transform: translateX(12px); }
+  .pm-corner-face:nth-child(even) { transform: translateX(15px); }
   .pm-corner-face:only-child { grid-row: 1 / span 2; align-self: center; width: 28px; height: 28px; font-size: 0.85rem; }
   .pm-corner-faces:has(> .pm-corner-face:only-child) { grid-auto-columns: 28px; }
   .pm-corner-face img { width: 100%; height: 100%; object-fit: cover; display: block; }

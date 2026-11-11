@@ -157,12 +157,11 @@ test("the painter draws what the plan says: the round icon (named), then one fac
 
 // ── the honeycomb (a text pin with arithmetic: the numbers are the stylesheet's own) ───────────────────
 
-// Until 2026-11-11 12:50 EST this held the faces (then 14px) under the bell's 30px height. Darko, on dev: "make their circles around twice as large"
-// and "allot like maybe around twice the amount of horizontal space": the faces are 22px and the cluster is taller than the bell, so the header's row
-// grows with it; what binds now is the WIDTH at ten faces. CORNER_BUDGET is the widest corner (px) that kept the nav on one row at 1280 and 1568 px,
-// measured in a browser on 2026-11-11 with the trimmed nav spacing (Consolas, the Windows monospace; SF Mono's wider face leaves less, the lane's report says how much).
-const CORNER_BUDGET = 174;
-test("TEXT PIN + arithmetic: the faces honeycomb in two offset rows at 1, 3, 9 and 10 faces, no two faces touch, none leaves its box, and ten fit the header's measured width", () => {
+// Until 2026-11-11 12:50 EST this held the faces (then 14px) under the bell's 30px height; then, briefly, ten 22px faces inside the 174px the header
+// left with the nav on one row. Darko, on dev, 12:50: "make their circles around twice as large"; 12:52: "two rows in the top rail is actually totally
+// fine". So the faces are twice the first 14px, the cluster is taller than the bell (the header's row grows with it), and no width bound holds the
+// corner: when the rail cannot hold it on one row it takes two (the layout's § THE TOP RAIL'S TWO ROWS, which the lane's walk measures in a browser).
+test("TEXT PIN + arithmetic: the faces honeycomb in two offset rows at 1, 3, 9 and 10 faces, twice the first size, no two faces touch, and none leaves its box", () => {
   const css = LAYOUT.slice(LAYOUT.indexOf("THE HOUSE'S CORNER (POS-999)"));
   const num = (re, what) => { const m = re.exec(css); assert.ok(m, `the stylesheet says ${what}`); return Number(m[1]); };
   const rows = /grid-template-rows: (\d+)px (\d+)px;/.exec(css);
@@ -176,7 +175,6 @@ test("TEXT PIN + arithmetic: the faces honeycomb in two offset rows at 1, 3, 9 a
   assert.match(css, /grid-auto-flow: column;/, "the faces run down the two rows, column by column");
   const soloColumn = num(/\.pm-corner-faces:has\(> \.pm-corner-face:only-child\) \{ grid-auto-columns: (\d+)px; \}/, "the lone face's column");
   const icon = num(/\.pm-corner-house \{[^}]*width: (\d+)px;/, "the household icon's size");
-  const gap = num(/\.pm-corner \{[^}]*gap: (\d+)px;/, "the gap between the icon and the faces");
   for (const n of [1, 3, 9, 10]) {
     if (n === 1) {
       assert.ok(solo <= rowA + rowB, `one face (${solo}px) within the two rows' height (${rowA + rowB}px)`);
@@ -192,9 +190,8 @@ test("TEXT PIN + arithmetic: the faces honeycomb in two offset rows at 1, 3, 9 a
       const dist = Math.hypot(at[i].x - at[j].x, at[i].y - at[j].y);
       assert.ok(dist >= d, `${n} faces: faces ${i + 1} and ${j + 1} are ${dist.toFixed(1)}px apart, centre to centre (they would overlap under ${d})`);
     }
-    // the corner is the icon, the gap and the faces; ten must leave a margin inside the measured budget (font and sub-pixel differences eat a few px)
-    if (n === 10) assert.ok(icon + gap + box.w <= CORNER_BUDGET - 6, `ten faces make a ${icon + gap + box.w}px corner, inside the ${CORNER_BUDGET}px the header leaves with a margin`);
-    if (n === 10) assert.ok(d >= 22, `and the faces stay at least 22px (the first size was 14px, which Darko found "way too small"): ${d}px`);
+    if (n === 10) assert.equal(d, 2 * 14, `the faces are twice the first size (14px, which Darko found "way too small"): ${d}px`);
+    if (n === 10) assert.equal(icon, 28, "and the household icon is the faces' size");
     // honeycombed: the lower row sits between the upper row's faces, not under them
     if (n >= 3) assert.ok(Math.abs(Math.hypot(half, rowA) - pitch) <= 1, "a lower face is as far from its two upper neighbours as they are from each other");
   }
@@ -327,6 +324,25 @@ test("TEXT PIN: the + and the settings are the house's own human's: the househol
   const house = read("town/components/Household.astro");
   assert.match(house, /const owner = handles\.some\(\(h\) => here\.has\(h\)\);\s*for \(const link of links\) link\.hidden = !owner;/, "resident page: the + follows /me's handles against this house's");
   assert.equal((read("src/components/HouseRail.astro").match(/data-house-add/g) ?? []).length, 1, "one + in the component");
+});
+
+// ── the top rail's end and its two rows (POS-999; Darko, 2026-11-11 12:52 EST) ──
+// "join is a special button that we want to keep at the top and like near the sign in or like auth stuff"; "two rows in the top rail is actually
+// totally fine". TEXT PINS: the walk in the lane's report measures the rows in a browser at 1, 3, 9 and 10 faces, signed in and out.
+test("TEXT PIN: Join is rendered from the rail's own lantern seat at the rail's end, outside the nav's links and outside the hidden auth block; the first paint measures the rows", () => {
+  assert.match(LAYOUT, /\{RAIL\.filter\(\(n\) => !n\.lantern\)\.map\(/, "the nav's links are every seat but the lantern");
+  const end = LAYOUT.indexOf('<div class="pm-townhead-end" data-townhead-end>');
+  assert.ok(end > LAYOUT.indexOf('<nav class="pm-townnav-links"'), "the end follows the nav");
+  const join = LAYOUT.indexOf('{RAIL.filter((n) => n.lantern).map((n) => (', end);
+  assert.ok(join > end && join < LAYOUT.indexOf('<div class="pm-auth" data-auth hidden>'), "Join is in the end, before the auth block (which ships hidden), so it shows with no script");
+  assert.match(LAYOUT.slice(join, join + 300), /class="pm-nav-join" aria-current=\{here\?\.key === n\.key \? "page" : undefined\}/, "it keeps its lantern class and lights when it is the page");
+  const script = firstPaintScript();
+  assert.match(script, /window\.pmRailRows = function \(\)/, "the first paint defines the row check");
+  assert.match(script, /head\.setAttribute\("data-rows", head\.scrollWidth > head\.clientWidth \+ 1 \? "2" : "1"\);/, "two rows exactly when one would overflow");
+  assert.ok(script.indexOf("window.pmRailRows();") > script.indexOf("window.pmRailRows = function"), "and runs it before the first paint");
+  const css = read("src/styles/postmark.css");
+  assert.match(css, /\.pm \.pm-townhead\[data-rows="2"\] \.pm-townhead-end \{ order: 1; \}/, "two rows: the end stays on the first row");
+  assert.match(css, /\.pm \.pm-townhead\[data-rows="2"\] \.pm-townnav-links \{ order: 2; flex-basis: 100%; margin-left: 0; flex-wrap: nowrap; \}/, "and the nav's links take the second row together, unbroken");
 });
 
 test("TEXT PIN: on a resident page a resident's chip is a link; a plain click switches the tab in place (the address moves to its page), any other click is the browser's", () => {

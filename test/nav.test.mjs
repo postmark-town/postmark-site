@@ -490,15 +490,23 @@ test("THE NAV FLAGS default off, and a flagged chip cannot render while its flag
 const DIST = join(ROOT, "dist-town");
 const builtPage = (href) => join(DIST, ...href.split("/").filter(Boolean), "index.html");
 
-test("the built rail is the seven seats, on every page that wears the layout", { skip: !existsSync(builtPage("/")) }, () => {
+// Until 2026-11-11 the seven seats were all in the nav's run of links. POS-999 (Darko, 12:52 EST: "join is a special button that we want to keep at
+// the top and like near the sign in or like auth stuff") moved the lantern seat, Join, to the rail's end beside the reader's own corner. RAIL is
+// still the seven seats (the one source); the built rail draws six in the nav and Join, once, at the end.
+test("the built rail is the seven seats, on every page that wears the layout: six in the nav, and Join at the rail's end", { skip: !existsSync(builtPage("/")) }, () => {
   const seats = (href) => {
     const s = readFileSync(builtPage(href), "utf8");
     const i = s.indexOf('class="pm-townnav-links"');
     const nav = s.slice(i, s.indexOf("</nav>", i));
-    return [...nav.matchAll(/<a\b[^>]*>([^<]*)/g)].map((m) => m[1].trim());
+    const e = s.indexOf('class="pm-townhead-end"');
+    const end = s.slice(e, s.indexOf('class="pm-auth"', e));
+    return { nav: [...nav.matchAll(/<a\b[^>]*>([^<]*)/g)].map((m) => m[1].trim()), end: [...end.matchAll(/<a\b[^>]*class="pm-nav-join"[^>]*>([^<]*)/g)].map((m) => m[1].trim()), joins: (s.match(/class="pm-nav-join"/g) ?? []).length };
   };
   for (const href of ["/", "/town/", "/bulletin/", "/meeps/", "/households/", "/mail/", "/daily/", "/docs/", "/projects/", "/docs/stamps/"]) {
-    assert.deepEqual(seats(href), SEATS, `${href}'s built rail`);
+    const r = seats(href);
+    assert.deepEqual([...r.nav, ...r.end], SEATS, `${href}'s built rail`);
+    assert.deepEqual(r.end, ["Join"], `${href}: Join is at the rail's end`);
+    assert.equal(r.joins, 1, `${href}: one Join`);
   }
 });
 
