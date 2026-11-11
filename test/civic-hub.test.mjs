@@ -1342,24 +1342,23 @@ test("an elastic pot gets a bar against its floor, and the bar says the roll kee
   assert.equal(/\$5\b/.test(sBody), false, "the floor is read, never typed");
 });
 
-test("the estimate renders only where a close could run, and never as a promise", () => {
-  // THE RULING THIS ASSERTS — the founder, 2026-08-23: an estimated return may
-  // show "as of this moment", honestly: at today's roll and stakes, moving as
-  // both move, {HOLO_LINE} — never a promise. RE-HOMED 2026-08-26 by the card
-  // law: what a dollar mints is the FUND PAGE's detail, not the market's, so
-  // the assertions moved with the sentence.
+test("the money moment shows no per-dollar estimate (POS-1001)", () => {
+  // INVERTED 2026-11-11 (POS-1001). Until then this asserted the founder's
+  // 2026-08-23 word that an estimated return MAY show "as of this moment",
+  // honestly: "≈ N✦ per $1 if the close ran this moment … it moves as both
+  // move. Never a promise.", gated on funding.mjs § mintPerDollar. A figure of
+  // stamps per dollar prices stamps in money, and NOMOS II.4.5 reads: "The town
+  // rewards money by what it enables, never by a price list." So the fund page
+  // renders no estimate at all, typed or computed.
   const fund = read("../town/pages/fund/[pot].astro");
   const fbody = flat(fund.slice(fund.indexOf("---", 3) + 3));
+  assert.ok(fbody.includes("the fine print"), "the slice is the template");
 
-  assert.ok(fund.includes("{estimate != null && ("),
-    "the estimate is gated on the helper, which returns null where no close can run");
-  assert.ok(fbody.includes("if the close ran this moment"), "it says when it would apply");
-  assert.ok(fbody.includes("it moves as both move"), "and that it is not fixed");
-  assert.ok(fund.includes("{HOLO_LINE}"), "and the page carries the ruling's line");
-  // the number comes from the reader, not from the page
-  assert.ok(/const estimate = mintPerDollar\(pot\)/.test(fund),
-    "the math lives in funding.mjs and the page only calls it");
-  assert.equal(/per \$1[^<]*0\.\d/.test(fbody), false, "no estimate is typed into the markup");
+  assert.equal(fund.includes("mintPerDollar("), false, "the page no longer calls the per-dollar helper");
+  assert.equal(fund.includes("{estimate"), false, "and renders no estimate");
+  assert.equal(fbody.includes("per $1"), false, "no stamps-per-dollar figure on the page");
+  assert.equal(fbody.includes("if the close ran this moment"), false, "and no estimate's sentence");
+  assert.ok(fund.includes("{HOLO_LINE}"), "the page still carries the ruling's line");
 });
 
 test("the pots block says when its data was made", () => {

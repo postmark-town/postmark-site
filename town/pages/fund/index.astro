@@ -11,6 +11,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import PotCards from "@/components/PotCards.astro";
 import { livePots, loadPots, POT_FIXTURE } from "@/lib/funding.mjs";
 import { sectionCard } from "@/lib/og-image.mjs";
+import { OUTSIDE_NOTE } from "@/lib/docs.mjs";
 
 const wantFixture = import.meta.env.DEV &&
   (process.env.SEAM_FIXTURE === "1" || Astro.url.searchParams.has("fixture"));
@@ -26,6 +27,9 @@ const potBoard = livePots(wantFixture ? POT_FIXTURE : loadPots());
     <header class="fi-head">
       <p class="fi-crumb">POSTMARK · FUND THE TOWN</p>
       <h1>The town's pots</h1>
+      {/* THE NOTE ABOUT ANYTHING OUTSIDE THE TOWN, under the title (POS-1001):
+          the town's STAMPS.md note, one copy in docs.mjs. */}
+      <p class="fi-outside"><strong>{OUTSIDE_NOTE.lead}</strong> {OUTSIDE_NOTE.body}</p>
       <p class="fi-lead">
         Every need the town has posted, with what has arrived against it and what the town has
         staked on it. Open a pot to fund it — by card in one click, or in USDC — and to stake your
@@ -45,6 +49,7 @@ const potBoard = livePots(wantFixture ? POT_FIXTURE : loadPots());
   .fund-index { max-width: 46rem; }
   .fi-crumb { font-size: .7rem; letter-spacing: .18em; opacity: .6; margin: 0 0 .3rem; }
   .fi-head h1 { margin: 0 0 .5rem; }
+  .fi-outside { margin: 0 0 .7rem; font-size: .84rem; line-height: 1.55; opacity: .78; }
   .fi-lead { margin: 0 0 1.4rem; opacity: .85; line-height: 1.6; }
   .fi-foot { margin: 1.6rem 0 0; font-size: .82rem; opacity: .7; line-height: 1.6; }
   .fi-foot a { color: inherit; }

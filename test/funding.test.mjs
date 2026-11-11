@@ -45,6 +45,7 @@ import {
   giverLabel,
 } from "../src/lib/funding.mjs";
 import { buildHouses } from "../src/lib/houses.mjs";
+import { OUTSIDE_NOTE } from "../src/lib/docs.mjs";
 
 // ── nothing published yet ────────────────────────────────────────────────────
 
@@ -912,13 +913,14 @@ test("no built page teaches the expansion twice in flowing prose", { skip: !buil
 // that is the point: one sweep per ruling leaves the other ruling's pages
 // standing.
 //
-// NOT ON THIS LIST, DELIBERATELY: "join the judgment". The town's own
-// JOINING.md still carries "Money can join the ownership; it can never join the
-// judgment", and /stamps/ quotes it inside a blockquote WITH ITS CITATION. The
-// quote is faithful to its source, so a probe that reddened on it would be
-// asking this repo to fork a quote rather than asking the town to amend the
-// line. The phrase joins this list the day JOINING.md is amended, and this
-// paragraph is the standing note of that gap.
+// NOT ON THIS LIST, DELIBERATELY: "join the judgment". It was left off while
+// /stamps/ quoted the town's JOINING.md ("Money can join the ownership; it can
+// never join the judgment") inside a blockquote with its citation, since a
+// probe that reddened on it would have asked this repo to fork a quote. JOINING
+// lost the line on 2026-10-06, and POS-1001 (2026-11-11) took the quote off
+// /docs/stamps/ with the seam's pull quote; POS-1001's own sweep, below, reads
+// the phrase on the pages it changed. Whether it joins this every-page list is
+// a wider question than POS-1001's.
 const REPEALED = [
   "soulbound",                  // the word itself, on any surface
   "never spent as postage",     // HOLO_NAME_LINE's old closing clause
@@ -981,6 +983,99 @@ test("and the VOICE half is on the pages too, not merely absent", { skip: !(buil
   }
   const stamps = readFileSync(join(DIST, "docs", "stamps", "index.html"), "utf8");
   assert.match(stamps, /cap on money/, "the Rules name what bounds money, now that no verb does");
+});
+
+// ── POS-1001 · the claims NOMOS doesn't make, and its note ───────────────────
+//
+// NOMOS II.4: "Stamps are not money. They can't be bought"; II.4.5: "never by a
+// price list"; II.6.1: NOMOS "grants no claim" on owning Postmark or on money
+// outside the town. POS-1001 changed the site's sentences that said otherwise,
+// one line each, and put the town STAMPS.md's note under the title of the
+// stamps, numbers and fund pages. These read the BUILT pages: the note renders
+// from one constant (src/lib/docs.mjs § OUTSIDE_NOTE), and only the render
+// shows it landed where a reader looks.
+//
+// The note's words are written out here rather than imported, because a
+// constant that agrees with itself proves nothing. Their source is the note at
+// the top of the town's STAMPS.md, word for word.
+const OUTSIDE_NOTE_WORDS = "About anything outside the town. Anything this page says about the world outside Postmark (ownership, equity, a share of Postmark, revenue, dividends or money) is speculative: a thought experiment at this stage, not a promise. Nothing here is a legally binding contract, offer or commitment. NOMOS, the town's law, governs only the town's own world (NOMOS II.6).";
+
+/** A built page's words as a reader sees them: scripts, styles and tags out, entities decoded, whitespace collapsed. */
+const pageText = (html) => String(html)
+  .replace(/<script\b[\s\S]*?<\/script>/g, " ").replace(/<style\b[\s\S]*?<\/style>/g, " ")
+  .replace(/<[^>]+>/g, " ")
+  .replace(/&#0*39;|&#x0*27;|&apos;/gi, "'").replace(/&quot;/g, '"')
+  .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+  .replace(/\s+/g, " ");
+/** Every built /fund/<pot>/ page (the /fund/ index itself is not a pot). */
+const builtPotPages = () => (existsSync(join(DIST, "fund"))
+  ? readdirSync(join(DIST, "fund")).map((d) => join(DIST, "fund", d, "index.html")).filter(existsSync)
+  : []);
+
+test("POS-1001: the note's one copy is the town's STAMPS.md note, word for word", () => {
+  assert.equal(`${OUTSIDE_NOTE.lead} ${OUTSIDE_NOTE.body}`, OUTSIDE_NOTE_WORDS);
+});
+
+test("POS-1001: the note is the first paragraph under the title of /docs/stamps/, /docs/numbers/, /fund/ and every /fund/<pot>/",
+  { skip: !(builtPage("docs", "stamps") && builtPage("docs", "numbers") && builtPage("fund")) }, () => {
+  const pots = builtPotPages();
+  assert.ok(pots.length > 0, "this reads nothing: no built pot page");
+  for (const p of [page("docs", "stamps"), page("docs", "numbers"), page("fund"), ...pots]) {
+    const html = readFileSync(p, "utf8");
+    const rel = p.slice(DIST.length);
+    assert.equal(pageText(html).split(OUTSIDE_NOTE_WORDS).length - 1, 1, `${rel} carries the note exactly once`);
+    const title = html.indexOf("</h1>");
+    assert.ok(title > 0, `${rel} has no title`);
+    const first = html.indexOf("<p", title);
+    assert.ok(pageText(html.slice(first, html.indexOf("</p>", first))).trim().startsWith("About anything outside the town."),
+      `${rel}: the first paragraph under the title is not the note`);
+  }
+});
+
+// The stale-phrase count, base against head (REDS-AND-CONTROLS § Greps as
+// instruments): each retired sentence by the page that carried it, with what
+// replaced it beside it, so a page that renders nothing can't pass. The stamps
+// page's "What your share means" section and its quotes are NOT here: they wait
+// on Darko's call (POS-1001/a), and so does /docs/numbers/'s backing gauge.
+// "✦ per $1", not "per $1": a resident's handle ending in "-semper" beside a
+// "$10" on the roll reads as "per $1" to a bare includes().
+const POS1001_POT_GONE = ["plus ownership and memory", "converts to real value", "a bounded say", "manufacture ownership", "✦ per $1"];
+const POS1001_POT_NOW = [
+  "A gift pays a bill and is written down in your name. If the town staked on this pot, the close thanks you in stamps that work like any stamp, including vote; money's share of your household is capped, and stamps never turn into money.",
+  "Stamps minted to a giver work like any stamp, and a household's holo may never pass ρ × everything it has minted (never more than half, NOMOS II.4.5.1).",
+];
+const POS1001_PAGES = [
+  { at: ["docs", "stamps"],
+    gone: ["Your lifetime count is your share of Postmark", "this is your share of the town", "the one that is your share",
+      "This is your share.", "Money can join the ownership", "manufacture ownership", "Money can never leave as currency",
+      "Value exits as", "Value leaves as goods", "durable income stream", "monetary policy by vote", "petition a dial ballot",
+      "Money moves on crossings", "free forever at zero stamps", "at zero stamps, permanently",
+      "Dollars the town holds per ✧", "so there is nothing to back"],
+    now: ["Your lifetime count is your record here.", "It only rises, and it is public.",
+      "A gift pays a bill; how much of a household's stamps can come from gifts is capped.",
+      "Money cannot mint stamps for something nobody wanted", "Stamps never turn into money.", "No. Stamps never turn into money.",
+      "Mail, ballots, the map and residency are free at zero stamps today. Nothing decays and nothing expires.",
+      "Founder-set today, in the open. From 1 January the dials are market law, changed by bill (NOMOS III.2.3).",
+      "Stamps move on crossings, like everything else here."] },
+  { at: ["docs", "numbers"], gone: ["the town's own tender", "the only way a ballot can move it"], now: ["are the town's own unit"] },
+  { at: ["docs"], gone: ["The town's currency"], now: ["What a stamp is, how one is earned, and where a staked stamp goes."] },
+  { at: [], gone: ["founded by Keemin"], now: ["founded by Darko"] },
+];
+
+test("POS-1001: the retired sentences are gone from the pages that carried them, and what replaced them is there",
+  { skip: !(builtSite && builtPage("docs") && builtPage("docs", "stamps") && builtPage("docs", "numbers") && builtFamily("fund")) }, () => {
+  const pots = builtPotPages();
+  assert.ok(pots.length > 0, "this reads nothing: no built pot page");
+  const rows = [
+    ...POS1001_PAGES.map((r) => ({ p: page(...r.at), gone: r.gone, now: r.now })),
+    ...pots.map((p) => ({ p, gone: POS1001_POT_GONE, now: POS1001_POT_NOW })),
+  ];
+  for (const { p, gone, now } of rows) {
+    const rel = p.slice(DIST.length) || "/";
+    const text = pageText(readFileSync(p, "utf8"));
+    for (const g of gone) assert.equal(text.includes(g), false, `${rel}: "${g}" is still on the page`);
+    for (const n of now) assert.ok(text.includes(n), `${rel}: "${n}" is not on the page`);
+  }
 });
 
 test("the glossary's holo entry says what the name is short for", { skip: !builtPage("docs", "stamps") }, () => {
