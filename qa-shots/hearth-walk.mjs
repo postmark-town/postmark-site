@@ -226,19 +226,21 @@ const run = async () => {
         // so a design that makes the page longer or shorter cannot move it by a sub-pixel (pointAt scrolled it to the middle of the screen, where the design's height decides its offset)
         await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
         await page.mouse.move(0, 0);
-        // The parts photographed are the strip's own parts that do not name the design on show: the breadcrumb, and the owner's settings button. (The dropdown's width and the
-        // "Previewing <id>" line legitimately differ per design: they say which design is drawn. The dropdown is held by pointAt above, at its own point.)
+        // The parts photographed are the strip's own parts that do not name the design on show, and whose place does not move with it: the breadcrumb, and the owner's
+        // round + on the sub-rail (POS-999). (The dropdown's width and the "Previewing <id>" line legitimately differ per design: they say which design is drawn. The dropdown
+        // and the settings button share that row, so the settings button's place moves by a sub-pixel with them, and a picture of it differs at its edge by 1 level in 255
+        // with no design's ink in it (measured 2026-11-11 under the magenta outline); both are held by pointAt above, at their own points.)
         const shoot = async () => ({
           crumbs: await page.locator("[data-hearth-bar] .hearth-crumbs").screenshot({ animations: "disabled", caret: "initial" }),
-          own: await page.locator("[data-hearth-bar] [data-hearth-own]").screenshot({ animations: "disabled", caret: "initial" }),
+          own: await page.locator("[data-hearth-bar] [data-house-add]").screenshot({ animations: "disabled", caret: "initial" }),
         });
         const pixels = await shoot();
         fs.writeFileSync(path.join(OUT, `16-strip-${id}-own.png`), pixels.own);
         if (id === "rooted-none") {
           controlPixels = pixels;
           const again = await shoot();
-          check("⑫ the pixel probe is stable: the control's breadcrumb and owner links photographed twice are the same pictures", pixels.crumbs.equals(again.crumbs) && pixels.own.equals(again.own), `${pixels.crumbs.length} + ${pixels.own.length} bytes`);
-        } else check(`⑫ ${what}: the strip's breadcrumb and owner links are pixel for pixel the control's (no ink of the design's reached them)`, !!controlPixels && pixels.crumbs.equals(controlPixels.crumbs) && pixels.own.equals(controlPixels.own), `${pixels.crumbs.length}+${pixels.own.length} bytes vs ${controlPixels?.crumbs.length}+${controlPixels?.own.length}`);
+          check("⑫ the pixel probe is stable: the control's breadcrumb and the owner's + photographed twice are the same pictures", pixels.crumbs.equals(again.crumbs) && pixels.own.equals(again.own), `${pixels.crumbs.length} + ${pixels.own.length} bytes`);
+        } else check(`⑫ ${what}: the strip's breadcrumb and the owner's + are pixel for pixel the control's (no ink of the design's reached them)`, !!controlPixels && pixels.crumbs.equals(controlPixels.crumbs) && pixels.own.equals(controlPixels.own), `${pixels.crumbs.length}+${pixels.own.length} bytes vs ${controlPixels?.crumbs.length}+${controlPixels?.own.length}`);
         await shot(page, `16-rooted-${id}-desktop`, { fullPage: false });
         await page.context().close();
         injectEntry = null;
