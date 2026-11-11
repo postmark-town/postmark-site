@@ -1039,8 +1039,10 @@ test("POS-1001: the note is the first paragraph under the title of /docs/stamps/
 // on Darko's call (POS-1001/a), and so does /docs/numbers/'s backing gauge.
 // "✦ per $1", not "per $1": a resident's handle ending in "-semper" beside a
 // "$10" on the roll reads as "per $1" to a bare includes().
-const POS1001_POT_GONE = ["plus ownership and memory", "converts to real value", "a bounded say", "manufacture ownership", "✦ per $1"];
+const POS1001_POT_GONE = ["plus ownership and memory", "converts to real value", "a bounded say", "manufacture ownership", "✦ per $1",
+  "The stamps it mints"];
 const POS1001_POT_NOW = [
+  "Any stamps the close mints for it stake, vote and pay",
   "A gift pays a bill and is written down in your name. If the town staked on this pot, the close thanks you in stamps that work like any stamp, including vote; money's share of your household is capped, and stamps never turn into money.",
   "Stamps minted to a giver work like any stamp, and a household's holo may never pass ρ × everything it has minted (never more than half, NOMOS II.4.5.1).",
 ];
@@ -1050,14 +1052,15 @@ const POS1001_PAGES = [
       "This is your share.", "Money can join the ownership", "manufacture ownership", "Money can never leave as currency",
       "Value exits as", "Value leaves as goods", "durable income stream", "monetary policy by vote", "petition a dial ballot",
       "Money moves on crossings", "free forever at zero stamps", "at zero stamps, permanently",
-      "Dollars the town holds per ✧", "so there is nothing to back"],
+      "Dollars the town holds per ✧", "so there is nothing to back", "a ballot that moves a dial"],
     now: ["Your lifetime count is your record here.", "It only rises, and it is public.",
       "A gift pays a bill; how much of a household's stamps can come from gifts is capped.",
       "Money cannot mint stamps for something nobody wanted", "Stamps never turn into money.", "No. Stamps never turn into money.",
       "Mail, ballots, the map and residency are free at zero stamps today. Nothing decays and nothing expires.",
       "Founder-set today, in the open. From 1 January the dials are market law, changed by bill (NOMOS III.2.3).",
-      "Stamps move on crossings, like everything else here."] },
-  { at: ["docs", "numbers"], gone: ["the town's own tender", "the only way a ballot can move it"], now: ["are the town's own unit"] },
+      "Stamps move on crossings, like everything else here.", "so a bill that moves a dial needs no edit"] },
+  { at: ["docs", "numbers"], gone: ["the town's own tender", "the only way a ballot can move it", "The town's ballot is what moves it"], now: ["are the town's own unit"] },
+  { at: ["fund"], gone: ["the stamps it mints you vote"], now: ["any stamps it mints you vote like any other"] },
   { at: ["docs"], gone: ["The town's currency"], now: ["What a stamp is, how one is earned, and where a staked stamp goes."] },
   { at: [], gone: ["founded by Keemin"], now: ["founded by Darko"] },
 ];
@@ -1076,6 +1079,12 @@ test("POS-1001: the retired sentences are gone from the pages that carried them,
     for (const g of gone) assert.equal(text.includes(g), false, `${rel}: "${g}" is still on the page`);
     for (const n of now) assert.ok(text.includes(n), `${rel}: "${n}" is not on the page`);
   }
+  // A TEXT PIN, labelled so: /docs/numbers/'s ρ sentence renders one branch at a
+  // time, and while ρ sits at its ceiling the other one is never built. So the
+  // unbuilt branch is read from the source.
+  const numbersSrc = readFileSync(new URL("../town/pages/docs/numbers/index.astro", import.meta.url), "utf8");
+  assert.ok(numbersSrc.includes('"A bill is what moves it."'), "the ρ sentence's other branch says a bill moves it");
+  assert.equal(numbersSrc.includes("ballot is what moves it"), false, "and no longer says a ballot does");
 });
 
 test("the glossary's holo entry says what the name is short for", { skip: !builtPage("docs", "stamps") }, () => {

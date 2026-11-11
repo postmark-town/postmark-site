@@ -180,8 +180,14 @@ test("the consent line sits ABOVE the address, and the full terms below it", () 
     "the full what-this-buys sentence lives in the fine print, verbatim");
   const consent = PAGE.slice(law, PAGE.indexOf("</p>", law));
   assert.ok(consent.includes("Recorded in your household's name on the town's public ledger"), "the line says whose name it is written in");
-  assert.ok(consent.includes("stake, vote and pay"),
-    "the consent line says what the stamps a gift mints actually do");
+  // (POS-1001, 2026-11-11: until then the line read "The stamps it mints
+  // <em>stake, vote and pay</em>." and this asserted only "stake, vote and
+  // pay". A gift mints stamps only if the town staked on the pot, so the line
+  // now says "any stamps the close mints", and this asserts the whole sentence.)
+  assert.ok(consent.includes("Any stamps the close mints for it <em>stake, vote and pay</em>."),
+    "the consent line says what any stamps the close mints actually do");
+  assert.equal(consent.includes("The stamps it mints"), false,
+    "and no longer says every gift mints stamps");
   // AMENDED 2026-10-02 (Wright's visual review of #213): the lead drops "money's
   // share of a household is capped, and it promises no return"; the fine print,
   // one link away, carries both, and that is asserted instead.
