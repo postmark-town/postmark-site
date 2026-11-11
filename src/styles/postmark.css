@@ -58,9 +58,12 @@
   .pm .pm-holo-ink { animation: none; }
 }
 
-/* ── the town header (Postmark's OWN chrome — one rail, not two) ── */
+/* ── the town header (Postmark's OWN chrome — one rail, not two) ──
+   The gap between its parts and the nav links' side padding were trimmed (1.4em → 1em, 0.75em → 0.55em) to make room for the signed-in
+   household's corner at twice its first size (POS-999, Darko 2026-11-11 12:50 EST: "allot like maybe around twice the amount of horizontal
+   space in the top rail"), so ten residents' faces still leave the nav on one row at a desktop width (PostmarkLayout.astro § THE HOUSE'S CORNER). */
 .pm .pm-townhead {
-  display: flex; align-items: center; gap: 1.4em;
+  display: flex; align-items: center; gap: 1em;
   max-width: 1160px; margin: 0 auto;
   padding: 1.1em 1.2em 1.5em;
 }
@@ -102,7 +105,7 @@
   color: rgba(232, 196, 139, 0.75);
   text-decoration: none;
   white-space: nowrap;
-  padding: 0.5em 0.75em;
+  padding: 0.5em 0.55em;
   border-radius: 999px;
   transition: color 0.12s ease, background 0.12s ease;
 }

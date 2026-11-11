@@ -1051,7 +1051,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
   /* the sign-in pill (pages-era styles, resurrected).
      [hidden] must beat the display classes — the sign-out ghost bug. */
   .pm-auth[hidden], .pm-auth-who[hidden], .pm-auth-btn[hidden] { display: none; }
-  .pm-auth { display: inline-flex; align-items: center; gap: 0.6em; margin-left: auto; }
+  .pm-auth { display: inline-flex; align-items: center; gap: 0.4em; margin-left: auto; }
   .pm-auth-btn {
     font: 700 0.68rem/1 ui-monospace, Consolas, monospace; letter-spacing: 0.08em;
     color: #241505; background: linear-gradient(180deg, #f6dcae, #e8c48b);
@@ -1059,7 +1059,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
   }
   .pm-auth-btn:hover { filter: brightness(1.06); }
   .pm-auth-who {
-    display: inline-flex; align-items: center; gap: 0.5em;
+    display: inline-flex; align-items: center; gap: 0.4em;
     font-family: ui-monospace, Consolas, monospace; font-size: 0.66rem;
     color: rgba(232, 196, 139, 0.85);
   }
@@ -1071,38 +1071,42 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
   }
   .pm-auth-out:hover { color: var(--pm-gold-bright); border-color: rgba(232, 196, 139, 0.7); }
 
-  /* ── THE HOUSE'S CORNER (POS-999): the household's round icon, then its residents' faces as one small honeycomb ──
+  /* ── THE HOUSE'S CORNER (POS-999): the household's round icon, then its residents' faces as one honeycomb ──
      The faces run down two rows, column by column (1 over 2, 3 over 4 …), and the lower row sits half a step to the right and nests up into
-     the upper one: two offset rows of 14px circles, 27px tall, under the bell's 30px, whatever the count. One face alone is one bigger
-     circle, centred. Sized so that ten faces (82px) keep the header's nav on one row at a desktop width (measured at 1280 and 1568 px:
-     15px faces, at 121px for the corner, pushed "Join" onto a second row). */
-  .pm-corner { display: inline-flex; align-items: center; gap: 5px; }
+     the upper one: two offset rows of 22px circles, 2px apart, 43px tall; the header's row grows with it (81px → 90px) and keeps every part
+     centred. One face alone is one 28px circle, the household icon's size.
+     THE SIZE (Darko, 2026-11-11 12:50 EST, on dev: "the upper right corner is way too small … allot like maybe around twice the amount of
+     horizontal space in the top rail for the household icon as well as the residents, and make their circles around twice as large"). It is
+     the largest that keeps the nav on one row at 1280 and 1568 px with ten faces (measured: with the nav's own spacing trimmed, postmark.css
+     § the town header, and this corner's gaps at 0.4em, the corner may be 174px; ten 22px faces make it 166px). Twice the first size (28px
+     faces, 199px at ten) pushes "Join" onto a second row at nine and ten faces. The first size was 14px faces, 112px at ten. */
+  .pm-corner { display: inline-flex; align-items: center; gap: 6px; }
   /* the corner never squeezes: the nav beside it is the part that wraps ("never clip a section off the end — wrap instead"), and a pill never breaks its word */
   .pm-auth { flex-shrink: 0; }
   .pm-auth-out { white-space: nowrap; }
   .pm-corner-house {
     display: inline-grid; place-items: center; flex: none; box-sizing: border-box;
-    width: 24px; height: 24px; border-radius: 999px;
-    color: var(--pm-gold-bright, #f6dcae); text-decoration: none; font-size: 0.85rem; line-height: 1;
+    width: 28px; height: 28px; border-radius: 999px;
+    color: var(--pm-gold-bright, #f6dcae); text-decoration: none; font-size: 1rem; line-height: 1;
     border: 1px solid rgba(232, 196, 139, 0.5); background: rgba(13, 20, 38, 0.6);
   }
   .pm-auth-who .pm-corner-house:hover, .pm-corner-house:focus-visible { text-decoration: none; border-color: var(--pm-gold-bright, #f6dcae); background: rgba(232, 196, 139, 0.14); }
   .pm-corner-faces {
     display: inline-grid; flex: none;
-    grid-auto-flow: column; grid-template-rows: 13px 14px; grid-auto-columns: 15px;
+    grid-auto-flow: column; grid-template-rows: 21px 22px; grid-auto-columns: 24px;
   }
   /* the lower row's half step: the faces are shifted, so the box is widened by it when the last face is in the lower row */
-  .pm-corner-faces:has(> .pm-corner-face:nth-child(even):last-child) { padding-right: 7.5px; }
+  .pm-corner-faces:has(> .pm-corner-face:nth-child(even):last-child) { padding-right: 12px; }
   .pm-corner-face {
     position: relative; display: grid; place-items: center; box-sizing: border-box;
-    width: 14px; height: 14px; border-radius: 999px; overflow: hidden;
+    width: 22px; height: 22px; border-radius: 999px; overflow: hidden;
     color: var(--pm-gold-bright, #f6dcae); background: #16223d; text-decoration: none;
-    font: 700 0.5rem/1 var(--pm-mono); text-transform: uppercase;
+    font: 700 0.72rem/1 var(--pm-mono); text-transform: uppercase;
     box-shadow: 0 0 0 1px rgba(232, 196, 139, 0.55);
   }
-  .pm-corner-face:nth-child(even) { transform: translateX(7.5px); }
-  .pm-corner-face:only-child { grid-row: 1 / span 2; align-self: center; width: 24px; height: 24px; font-size: 0.68rem; }
-  .pm-corner-faces:has(> .pm-corner-face:only-child) { grid-auto-columns: 24px; }
+  .pm-corner-face:nth-child(even) { transform: translateX(12px); }
+  .pm-corner-face:only-child { grid-row: 1 / span 2; align-self: center; width: 28px; height: 28px; font-size: 0.85rem; }
+  .pm-corner-faces:has(> .pm-corner-face:only-child) { grid-auto-columns: 28px; }
   .pm-corner-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .pm-auth-who .pm-corner-face:hover, .pm-corner-face:focus-visible { z-index: 1; text-decoration: none; box-shadow: 0 0 0 1.5px var(--pm-gold-bright, #f6dcae); }
 </style>

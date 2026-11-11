@@ -157,7 +157,12 @@ test("the painter draws what the plan says: the round icon (named), then one fac
 
 // ── the honeycomb (a text pin with arithmetic: the numbers are the stylesheet's own) ───────────────────
 
-test("TEXT PIN + arithmetic: the faces honeycomb in two offset rows that fit under the bell at 1, 3, 9 and 10 faces, no two faces touch, and none leaves its box", () => {
+// Until 2026-11-11 12:50 EST this held the faces (then 14px) under the bell's 30px height. Darko, on dev: "make their circles around twice as large"
+// and "allot like maybe around twice the amount of horizontal space": the faces are 22px and the cluster is taller than the bell, so the header's row
+// grows with it; what binds now is the WIDTH at ten faces. CORNER_BUDGET is the widest corner (px) that kept the nav on one row at 1280 and 1568 px,
+// measured in a browser on 2026-11-11 with the trimmed nav spacing (Consolas, the Windows monospace; SF Mono's wider face leaves less, the lane's report says how much).
+const CORNER_BUDGET = 174;
+test("TEXT PIN + arithmetic: the faces honeycomb in two offset rows at 1, 3, 9 and 10 faces, no two faces touch, none leaves its box, and ten fit the header's measured width", () => {
   const css = LAYOUT.slice(LAYOUT.indexOf("THE HOUSE'S CORNER (POS-999)"));
   const num = (re, what) => { const m = re.exec(css); assert.ok(m, `the stylesheet says ${what}`); return Number(m[1]); };
   const rows = /grid-template-rows: (\d+)px (\d+)px;/.exec(css);
@@ -169,24 +174,27 @@ test("TEXT PIN + arithmetic: the faces honeycomb in two offset rows that fit und
   const pad = num(/:last-child\) \{ padding-right: ([\d.]+)px; \}/, "the box's widening when the last face is in the lower row");
   const solo = num(/\.pm-corner-face:only-child \{[^}]*width: (\d+)px;/, "one face alone");
   assert.match(css, /grid-auto-flow: column;/, "the faces run down the two rows, column by column");
-  const bell = Number(/\.pm-notif-bell \{[^}]*height: (\d+)px;/.exec(LAYOUT)[1]);
   const soloColumn = num(/\.pm-corner-faces:has\(> \.pm-corner-face:only-child\) \{ grid-auto-columns: (\d+)px; \}/, "the lone face's column");
+  const icon = num(/\.pm-corner-house \{[^}]*width: (\d+)px;/, "the household icon's size");
+  const gap = num(/\.pm-corner \{[^}]*gap: (\d+)px;/, "the gap between the icon and the faces");
   for (const n of [1, 3, 9, 10]) {
     if (n === 1) {
-      assert.ok(solo <= bell, `one face (${solo}px) under the bell (${bell}px)`);
+      assert.ok(solo <= rowA + rowB, `one face (${solo}px) within the two rows' height (${rowA + rowB}px)`);
       assert.ok(solo <= soloColumn, `and inside its own column (${soloColumn}px), so it does not spill toward "sign out" (it did, at the 16px pitch, until the walk measured it)`);
       continue;
     }
     const cols = Math.ceil(n / 2);
     const box = { w: cols * pitch + (n % 2 === 0 ? pad : 0), h: rowA + rowB };
     const at = Array.from({ length: n }, (_, i) => ({ x: Math.floor(i / 2) * pitch + (i % 2 ? half : 0), y: i % 2 ? rowA : 0 }));
-    assert.ok(box.h <= bell, `${n} faces: ${box.h}px tall, under the bell's ${bell}px`);
+    assert.ok(box.h < 2 * d, `${n} faces: ${box.h}px tall, the lower row nesting into the upper (two stacked rows would be ${2 * d}px)`);
     for (const p of at) assert.ok(p.x + d <= box.w && p.y + d <= box.h, `${n} faces: a face at ${p.x},${p.y} stays inside its ${box.w}×${box.h} box`);
     for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
       const dist = Math.hypot(at[i].x - at[j].x, at[i].y - at[j].y);
       assert.ok(dist >= d, `${n} faces: faces ${i + 1} and ${j + 1} are ${dist.toFixed(1)}px apart, centre to centre (they would overlap under ${d})`);
     }
-    if (n === 10) assert.ok(box.w <= 90, `ten faces are ${box.w}px wide`);
+    // the corner is the icon, the gap and the faces; ten must leave a margin inside the measured budget (font and sub-pixel differences eat a few px)
+    if (n === 10) assert.ok(icon + gap + box.w <= CORNER_BUDGET - 6, `ten faces make a ${icon + gap + box.w}px corner, inside the ${CORNER_BUDGET}px the header leaves with a margin`);
+    if (n === 10) assert.ok(d >= 22, `and the faces stay at least 22px (the first size was 14px, which Darko found "way too small"): ${d}px`);
     // honeycombed: the lower row sits between the upper row's faces, not under them
     if (n >= 3) assert.ok(Math.abs(Math.hypot(half, rowA) - pitch) <= 1, "a lower face is as far from its two upper neighbours as they are from each other");
   }
