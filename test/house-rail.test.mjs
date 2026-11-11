@@ -338,7 +338,10 @@ test("TEXT PIN: Join is rendered from the rail's own lantern seat at the rail's 
   assert.match(LAYOUT.slice(join, join + 300), /class="pm-nav-join" aria-current=\{here\?\.key === n\.key \? "page" : undefined\}/, "it keeps its lantern class and lights when it is the page");
   const script = firstPaintScript();
   assert.match(script, /window\.pmRailRows = function \(\)/, "the first paint defines the row check");
-  assert.match(script, /head\.setAttribute\("data-rows", head\.scrollWidth > head\.clientWidth \+ 1 \? "2" : "1"\);/, "two rows exactly when one would overflow");
+  // until the 1c sweep (2026-11-11) this read scrollWidth alone, which does not count overflow into the header's own padding: four faces ran 3px past the edge, called one row
+  assert.match(script, /var over = head\.scrollWidth > head\.clientWidth \+ 1 \|\| \(end && end\.getBoundingClientRect\(\)\.right > edge \+ 0\.5\);/, "two rows when one would overflow, the end passing the content edge included");
+  assert.match(script, /var edge = head\.getBoundingClientRect\(\)\.right - parseFloat\(getComputedStyle\(head\)\.paddingRight\);/, "the edge is the content edge, inside the padding");
+  assert.match(script, /head\.setAttribute\("data-rows", over \? "2" : "1"\);/);
   assert.ok(script.indexOf("window.pmRailRows();") > script.indexOf("window.pmRailRows = function"), "and runs it before the first paint");
   const css = read("src/styles/postmark.css");
   assert.match(css, /\.pm \.pm-townhead\[data-rows="2"\] \.pm-townhead-end \{ order: 1; \}/, "two rows: the end stays on the first row");

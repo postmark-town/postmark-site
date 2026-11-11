@@ -320,7 +320,12 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
           if (!head) return;
           if (window.matchMedia && window.matchMedia("(max-width: 860px)").matches) { head.removeAttribute("data-rows"); return; }
           head.setAttribute("data-rows", "1");
-          head.setAttribute("data-rows", head.scrollWidth > head.clientWidth + 1 ? "2" : "1");
+          // overflow is the end passing the header's content edge: a box's scrollWidth does not count overflow that only runs into its own
+          // padding, so up to the padding's width would go unseen (measured: four faces ran 3px past the edge with scrollWidth unchanged)
+          var end = head.querySelector("[data-townhead-end]");
+          var edge = head.getBoundingClientRect().right - parseFloat(getComputedStyle(head).paddingRight);
+          var over = head.scrollWidth > head.clientWidth + 1 || (end && end.getBoundingClientRect().right > edge + 0.5);
+          head.setAttribute("data-rows", over ? "2" : "1");
         };
         try {
           window.pmRailRows();

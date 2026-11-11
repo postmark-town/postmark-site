@@ -62,9 +62,12 @@
    The Postmark mark, the nav's run of links, and at the right the END: Join and the reader's own corner (the bell, the household, sign
    in or out), PostmarkLayout.astro § THE TOP RAIL'S TWO ROWS. When they do not fit on one row, the end stays on the first row at the
    right and the nav's links take the second row together (POS-999, Darko 2026-11-11 12:52 EST: "two rows in the top rail is actually
-   totally fine"). */
+   totally fine. The one rail or the single row is actually pretty unique to households who like barely have any residents").
+   The gap here (1.4em → 1em) and the nav links' side padding (0.75em → 0.55em) are trimmed so a small house keeps one row: measured at
+   1280 and 1568 px, one row holds up to seven faces in Windows' monospace (three without the trims) and up to three in a Mac's (SF Mono's
+   width; none without them). */
 .pm .pm-townhead {
-  display: flex; align-items: center; gap: 1.4em;
+  display: flex; align-items: center; gap: 1em;
   max-width: 1160px; margin: 0 auto;
   padding: 1.1em 1.2em 1.5em;
 }
@@ -106,7 +109,7 @@
   color: rgba(232, 196, 139, 0.75);
   text-decoration: none;
   white-space: nowrap;
-  padding: 0.5em 0.75em;
+  padding: 0.5em 0.55em;
   border-radius: 999px;
   transition: color 0.12s ease, background 0.12s ease;
 }
@@ -119,7 +122,7 @@
    (POS-999, Darko 2026-11-11 12:52 EST: "join is a special button that we
    want to keep at the top and like near the sign in or like auth stuff"). */
 .pm a.pm-nav-join {
-  flex: none;
+  flex: none; padding: 0.5em 0.75em;
   color: var(--pm-gold-bright);
   border: 1px solid rgba(232, 196, 139, 0.55);
   background: rgba(232, 196, 139, 0.10);
@@ -154,6 +157,9 @@
   /* on a phone the end (Join and the corner) comes before the nav's links, at the right; a wide corner (many faces) takes Join onto a
      line of its own above it rather than running off the screen */
   .pm .pm-townhead-end { order: 1; flex: 0 1 auto; max-width: 100%; flex-wrap: wrap; justify-content: flex-end; row-gap: 0.5em; }
+  /* the end's parts (Join, the bell, the household and its faces, sign out) are one group here, which breaks between them, at the right,
+     when the phone is too narrow for a wide corner (many faces, a wide monospace); a hidden auth block stays hidden */
+  .pm .pm-townhead-end .pm-auth:not([hidden]), .pm .pm-townhead-end .pm-auth-who:not([hidden]) { display: contents; }
 }
 
 /* prose links on the night sky read town-gold, not the atelier's amber */
