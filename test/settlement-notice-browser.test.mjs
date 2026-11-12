@@ -278,7 +278,7 @@ test("the front page: NO line of its own; a forced fresh settlement DOWN lights 
     assert.equal(rest.color, "rgb(224, 132, 107)", "it is the existing red mark, its look unchanged (#e0846b)");
     assert.equal(rest.open, false, "closed until a reader hovers, focuses or taps it");
     await p.evalJs(`document.querySelector("[data-pm-alert-glyph]").click(); true`);
-    await p.until(`(${GLYPH})?.open === true`, "its popover to open on a tap");
+    await p.until(`(${GLYPH})?.open === true`, "its popover to open on a click (element.click(), which does not focus; a real tap's focusin opens it and its click shuts it, as on the train base before this PR)");
     const g = await p.evalJs(GLYPH);
     assert.equal(g.rows.length, 1, `one row, the settlement's (${JSON.stringify(g.rows)})`);
     assert.ok(g.rows[0].endsWith("the settlement — " + GLYPH_WORDS), `the row says the plain words (${g.rows[0]})`);
@@ -329,7 +329,7 @@ test("the front page at PHONE width (390 px): the red mark's open popover with t
   try {
     await p.until(`(${GLYPH})?.shown === true`, "the red mark at 390 px");
     await p.evalJs(`document.querySelector("[data-pm-alert-glyph]").click(); true`);
-    await p.until(`(${GLYPH})?.open === true`, "its popover to open on a tap");
+    await p.until(`(${GLYPH})?.open === true`, "its popover to open on a click (element.click(), which does not focus)");
     const g = await p.evalJs(GLYPH);
     assert.ok(g.rows.some((r) => r.endsWith(GLYPH_WORDS)), "the same words on a phone");
     assert.ok(g.pop.left >= 0 && g.pop.right <= 390, `the popover is inside the 390 px view (left ${g.pop.left}, right ${g.pop.right})`);
