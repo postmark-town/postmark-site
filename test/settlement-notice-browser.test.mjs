@@ -213,7 +213,7 @@ for (const [name, path] of PAGES) {
       // no overlap with any control: the layout's links/buttons (front) or the World's own top controls cluster (World)
       const hit = await p.evalJs(`(() => { const n = document.querySelector("[data-settlement-notice]").getBoundingClientRect();
         const sel = "a[href], button, input, select, summary, [role=button], #pm-world-auth";
-        const over = [...document.querySelectorAll(sel)].filter((e) => { if (e.closest("[data-settlement-notice]")) return false; const r = e.getBoundingClientRect(); const cs = getComputedStyle(e);
+        const over = [...document.querySelectorAll(sel)].filter((e) => { if (e.closest("[data-settlement-notice]") || e.closest("svg")) return false;   // the map's own marks are the VIEW the floating notice lies over, and it takes no clicks const r = e.getBoundingClientRect(); const cs = getComputedStyle(e);
           if (r.width === 0 || r.height === 0 || cs.visibility === "hidden" || cs.display === "none" || e.hidden) return false;
           return r.left < n.right && r.right > n.left && r.top < n.bottom && r.bottom > n.top; });
         return over.map((e) => { const r = e.getBoundingClientRect(); return (e.id || e.className || e.tagName).toString().slice(0, 40) + " [" + [r.left, r.top, r.right, r.bottom].map(Math.round).join(",") + "] vs notice [" + [n.left, n.top, n.right, n.bottom].map(Math.round).join(",") + "]"; }); })()`);

@@ -8,7 +8,7 @@
 // below the live ticker and above the hero, a "temporary exclamation point", not a banner.
 //
 // THE PRODUCTION PATH, not a copy: this file takes the component's own client script out of
-// src/components/SettlementNotice.astro, hands it the REAL reader and judgment (src/lib/sentinel-board.mjs) bound to a fake
+// src/components/SettlementNotice.astro, hands it the REAL reader and judgment (src/lib/sentinel-alert.mjs) bound to a fake
 // browser (clock, fetch, visibility, one minute timer), and drives forced board payloads through it. The rendered check in a
 // real browser, at desktop and phone width, is test/settlement-notice-browser.test.mjs.
 
@@ -20,7 +20,7 @@ import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import vm from "node:vm";
 
-import * as board from "../src/lib/sentinel-board.mjs";
+import * as board from "../src/lib/sentinel-alert.mjs";
 
 const here = (p) => new URL(`../${p}`, import.meta.url);
 const read = (p) => readFileSync(here(p), "utf8");
@@ -65,7 +65,7 @@ function page({ source = COMPONENT, moduleOverride = board, origins = [""], vari
   return {
     els, fetches, state, clock,
     start: async () => {
-      const src = scriptOf(source).replace(/import\("@\/lib\/sentinel-board\.mjs"\)/, "Promise.resolve(__board)");
+      const src = scriptOf(source).replace(/import\("@\/lib\/sentinel-alert\.mjs"\)/, "Promise.resolve(__board)");
       new vm.Script(`(function(){${src}\n})()`).runInNewContext(sandbox);
       await flush();
     },
@@ -157,16 +157,18 @@ function srcFiles(dir, out = []) {
 
 test("THE WORDS live in ONE home and are exactly the approved ones; the component renders that constant", () => {
   assert.equal(board.SETTLEMENT_NOTICE_TEXT, WORDS);
-  assert.match(COMPONENT, /import \{ SETTLEMENT_NOTICE_TEXT \} from "@\/lib\/sentinel-board\.mjs";/);
+  assert.match(COMPONENT, /import \{ SETTLEMENT_NOTICE_TEXT \} from "@\/lib\/sentinel-alert\.mjs";/);
   assert.match(COMPONENT, /<span class="sn-text">\{SETTLEMENT_NOTICE_TEXT\}<\/span>/, "rendered from the one constant at build time");
   const homes = [...srcFiles("src"), ...srcFiles("town")].filter((p) => read(p).includes("It will show here as soon as it's published"));
-  assert.deepEqual(homes.filter((p) => !p.startsWith("src/lib/sentinel-board.mjs")), [], "no second copy of the sentence in the site's source");
+  assert.deepEqual(homes.filter((p) => !p.startsWith("src/lib/sentinel-alert.mjs")), [], "no second copy of the sentence in the site's source");
 });
 
 test("NO 'unconfirmed' STATE exists anywhere: restoring the earlier design is not possible without failing this", () => {
-  for (const p of ["src/lib/sentinel-board.mjs", "src/components/SettlementNotice.astro"]) {
+  for (const p of ["src/lib/sentinel-alert.mjs", "src/components/SettlementNotice.astro"]) {
     const text = read(p).replace(/^\s*\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/<!--[\s\S]*?-->/g, "");
-    assert.ok(!/can[’']?t confirm|unconfirmed|cannot confirm|is delayed/i.test(text), `${p}: no unconfirmed or 'delayed' wording`);
+    // sentinel-alert.mjs also holds the header glyph's older code; only the notice's own section is held to this
+    const own = p.endsWith("sentinel-alert.mjs") ? text.slice(text.indexOf("export const SETTLEMENT_NOTICE_TEXT")) : text;
+    assert.ok(!/can[’']?t confirm|unconfirmed|cannot confirm|is delayed/i.test(own), `${p}: no unconfirmed or 'delayed' wording`);
   }
   assert.deepEqual(board.settlementNoticeFromBoard(JSON.parse(fixture("STALE")), { nowMs: NOW }), { show: false });
   assert.deepEqual(board.settlementNoticeFromBoard(JSON.parse(fixture("UNKNOWN")), { nowMs: NOW }), { show: false });
@@ -175,14 +177,13 @@ test("NO 'unconfirmed' STATE exists anywhere: restoring the earlier design is no
 test("FLIP: a judgment that shows on STALE/UNKNOWN or on an old board ('unconfirmed' restored) FAILS the acceptance above", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pos1004-flip-"));
   try {
-    for (const f of ["sentinel-board.mjs", "sentinel-alert.mjs"]) writeFileSync(join(dir, f), read(`src/lib/${f}`));
     // the 'unconfirmed' design: STALE and UNKNOWN (and an old board) say something too
-    const text = read("src/lib/sentinel-board.mjs")
+    const text = read("src/lib/sentinel-alert.mjs")
       .replace('return probe && probe.verdict === "DOWN" ? { show: true } : hide;', 'return probe && (probe.verdict === "DOWN" || probe.verdict === "STALE" || probe.verdict === "UNKNOWN") ? { show: true } : hide;')
       .replace("if (age < 0 || age > BOARD_MAX_AGE_MS) return hide;", "");
-    assert.notEqual(text, read("src/lib/sentinel-board.mjs"), "the flip's anchors are still in the module");
-    writeFileSync(join(dir, "sentinel-board.mjs"), text);
-    const mutant = await import(pathToFileURL(join(dir, "sentinel-board.mjs")).href);
+    assert.notEqual(text, read("src/lib/sentinel-alert.mjs"), "the flip's anchors are still in the module");
+    writeFileSync(join(dir, "sentinel-alert.mjs"), text);
+    const mutant = await import(pathToFileURL(join(dir, "sentinel-alert.mjs")).href);
     const accept = async (mod) => {
       for (const body of [fixture("STALE"), fixture("UNKNOWN"), fixture("DOWN", { ageMin: 600 })]) {
         const w = page({ moduleOverride: mod });

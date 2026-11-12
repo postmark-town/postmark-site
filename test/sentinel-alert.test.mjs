@@ -133,9 +133,9 @@ test("the layout's glyph is HIDDEN in the markup and revealed only by the script
 test("the layout reads the sentinel's own published board, and fails to console.debug and nothing louder", () => {
   const src = readFileSync(LAYOUT, "utf8");
   assert.match(src, /data-pm-alert-origin=\{P\}/, "the origin crosses into the browser as an ATTRIBUTE");
-  // POS-1004: the ONE fetch of the board lives in the shared reader (src/lib/sentinel-board.mjs), which the glyph and the
-  // late-settlement notice both subscribe to; the layout hands it the origin and keeps the alert judgment.
-  const reader = readFileSync(new URL("../src/lib/sentinel-board.mjs", import.meta.url), "utf8");
+  // POS-1004: the ONE fetch of the board lives in the shared reader (src/lib/sentinel-alert.mjs § readBoardEvery), which the glyph
+  // and the late-settlement notice both subscribe to; the layout hands it the origin and keeps the alert judgment.
+  const reader = readFileSync(new URL("../src/lib/sentinel-alert.mjs", import.meta.url), "utf8");
   assert.match(reader, /\(origin \|\| ""\) \+ BOARD_PATH/, "the town's board, at the town's origin \u2014 which keeps the harbor's mirrored vhost reading the TOWN's board");
   assert.match(reader, /export const BOARD_PATH = "\/ops\/sentinel\.json"/);
   assert.match(src, /readBoardEvery\(origin, paint\)/, "the glyph reads the board through the shared reader, not a second fetch");

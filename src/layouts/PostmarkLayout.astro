@@ -540,7 +540,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
     // over a missing ops file is a worse outage than the one it reports. Every
     // failure path lands on console.debug and nothing else.
     //
-    // THE BOARD IS READ ONCE PER PAGE (POS-1004): `@/lib/sentinel-board.mjs` owns the one fetch of /ops/sentinel.json
+    // THE BOARD IS READ ONCE PER PAGE (POS-1004): `@/lib/sentinel-alert.mjs` (§ readBoardEvery) owns the one fetch of /ops/sentinel.json
     // (`origin + "/ops/sentinel.json"`, `cache: "no-store"`) and shares it with the late-settlement notice: on load, once a minute
     // while the page is visible, and on return. This script is a listener: it applies the same alert judgment to each board the
     // reader hands it, and hides the glyph again if a later board is all green.
@@ -548,8 +548,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       const wrap = document.querySelector("[data-pm-alert]");
       if (!wrap) return;
       try {
-        const { alertFromBoard } = await import("@/lib/sentinel-alert.mjs");
-        const { readBoardEvery } = await import("@/lib/sentinel-board.mjs");
+        const { alertFromBoard, readBoardEvery } = await import("@/lib/sentinel-alert.mjs");
         const origin = wrap.dataset.pmAlertOrigin || "";
         const glyph = wrap.querySelector("[data-pm-alert-glyph]");
         const pop = wrap.querySelector("[data-pm-alert-pop]");

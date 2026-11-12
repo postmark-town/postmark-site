@@ -16,7 +16,7 @@ import { readFileSync } from "node:fs";
 
 import {
   BOARD_MAX_AGE_MS, BOARD_PATH, POLL_MS, SETTLEMENT_NOTICE_TEXT, SETTLEMENT_PROBE_KEY, readBoardEvery, settlementNoticeFromBoard,
-} from "../src/lib/sentinel-board.mjs";
+} from "../src/lib/sentinel-alert.mjs";
 
 const NOW = Date.parse("2026-11-12T07:30:00.000Z");
 const MIN = 60 * 1000;
@@ -218,6 +218,6 @@ test("a listener that throws does not stop the others, and the last unsubscribe 
 });
 
 test("the reader's source speaks only at console.debug", () => {
-  const src = readFileSync(new URL("../src/lib/sentinel-board.mjs", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, "");
+  const src = readFileSync(new URL("../src/lib/sentinel-alert.mjs", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, "");
   for (const loud of ["console.warn", "console.error", "console.log", "alert("]) assert.ok(!src.includes(loud), loud);
 });
