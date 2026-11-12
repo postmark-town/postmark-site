@@ -485,7 +485,7 @@ const html = rawHtml.replace(/<head>/i,
 <script>
   // THE IN-TOWN-BY-MAIL BUTTON (POS-1006). The viewer keeps filling its one `.wv-bymail` list; this only reads it (lib/world-bymail-panel.mjs), shows a button beside
   // Time travel while it holds a name, opens that same section as a panel, and closes it on a press outside (or Escape).
-  import { bymailCount, bymailLabel, panelBox, isOutside } from "@/lib/world-bymail-panel.mjs";
+  import { bymailCount, bymailLabel, panelBox, isOutside, nameSpan } from "@/lib/world-bymail-panel.mjs";
 
   let button: HTMLButtonElement | null = null;
   let section: HTMLElement | null = null;
@@ -522,7 +522,11 @@ const html = rawHtml.replace(/<head>/i,
     button.textContent = bymailLabel(n);
     // the card's heading carries the count (the viewer's h2 is not rewritten, only marked), and a cut label keeps its full text as the link's title
     section?.querySelector(".wv-bymail-head")?.setAttribute("data-pm-count", String(n));
-    section?.querySelectorAll<HTMLAnchorElement>(".wv-bymail-link").forEach((a) => { if (!a.title) a.title = a.textContent ?? ""; });
+    section?.querySelectorAll<HTMLAnchorElement>(".wv-bymail-link").forEach((a) => {
+      if (!a.title) a.title = a.textContent ?? "";
+      const li = a.closest("li");
+      if (li) { const k = nameSpan(a.textContent ?? ""); if (k > 1) li.setAttribute("data-pm-span", String(k)); else li.removeAttribute("data-pm-span"); }
+    });
     if (n === 0) close();   // the viewer emptied its list (or hid it): nothing to open
     else place();
   }
@@ -596,14 +600,18 @@ const html = rawHtml.replace(/<head>/i,
   body .wv-bymail.pm-bymail-open:not([hidden]) {
     display: block; position: fixed; z-index: 8100; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
     padding: 0.9em 1em 1em; border: 1px solid rgba(232, 196, 139, 0.4); border-radius: 14px;
-    background: rgba(13, 20, 38, 0.96); box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5); color: #b9ad93;
+    background: var(--panel, #1c2129); box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5); color: #b9ad93;   /* the page's own panel colour, FULLY opaque: nothing behind the card reads through it */
     scrollbar-width: thin; scrollbar-color: rgba(232, 196, 139, 0.35) transparent;
   }
   body .wv-bymail.pm-bymail-open .wv-bymail-head {
     margin: 0 0 0.7em; font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; color: rgba(232, 196, 139, 0.7);
   }
   body .wv-bymail.pm-bymail-open .wv-bymail-head[data-pm-count]::after { content: " · " attr(data-pm-count); }
-  body .wv-bymail.pm-bymail-open .wv-bymail-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px 0; font-size: 0.82rem; line-height: 1.4; }
+  /* Names in FITTING COLUMNS: three across at the card's width, an ordinary short handle one column; a longer name takes two or three columns (world.astro's module sets
+     data-pm-span from its length) and ends in an ellipsis only when even all three are not enough. */
+  body .wv-bymail.pm-bymail-open .wv-bymail-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px 10px;   /* the viewer's own order is kept (no dense reflow) */ font-size: 0.82rem; line-height: 1.4; }
+  body .wv-bymail.pm-bymail-open .wv-bymail-list li[data-pm-span="2"] { grid-column: span 2; }
+  body .wv-bymail.pm-bymail-open .wv-bymail-list li[data-pm-span="3"] { grid-column: 1 / -1; }
   body .wv-bymail.pm-bymail-open .wv-bymail-list li { min-width: 0; }
   body .wv-bymail.pm-bymail-open .wv-bymail-link,
   body .wv-bymail.pm-bymail-open .wv-bymail-list li:not(:has(a)) {

@@ -21,12 +21,12 @@ export const bymailLabel = (n) => `In town by mail · ${n}`;
 
 /**
  * Where the open panel sits, from the button's box and the window's: ABOVE the button when the controls hang from the bottom (desktop), BELOW it when
- * they hang from the top (a phone). Fixed coordinates, clamped so the panel is wholly inside the window with a 10px margin and never wider than 19rem
- * (304px) or the window less its margins. `maxHeight` is what is left on its side of the button, at most 24rem, so a long list scrolls inside the card.
+ * they hang from the top (a phone). Fixed coordinates, clamped so the panel is wholly inside the window with a 10px margin and never wider than 22rem
+ * (352px) or the window less its margins. `maxHeight` is what is left on its side of the button, at most 30rem, so a long list scrolls inside the card.
  */
 export function panelBox(btn, { width, height, fromTop = false }) {
-  const M = 10, GAP = 8, CAP = 384;   // a card, not a column: at most 24rem tall, however tall the window
-  const w = Math.max(160, Math.min(304, width - 2 * M));
+  const M = 10, GAP = 8, CAP = 480;   // a card, not a column: at most 30rem tall, however tall the window
+  const w = Math.max(160, Math.min(352, width - 2 * M));
   const left = Math.min(Math.max(M, btn.left), Math.max(M, width - M - w));
   if (fromTop) {
     const top = Math.min(btn.bottom + GAP, height - M - 80);
@@ -40,4 +40,13 @@ export function panelBox(btn, { width, height, fromTop = false }) {
 export function isOutside(target, panel, button) {
   const inside = (box) => Boolean(box && target && (box === target || box.contains?.(target)));
   return !(inside(panel) || inside(button));
+}
+
+/**
+ * How many of the card's three columns a name takes, from its length: an ordinary short handle (the real list's median is 6 characters and 95 in 100 are at
+ * most 20) is ONE column; a longer one takes TWO (up to 26); a longer one takes all THREE, and ends in an ellipsis only when even that is not enough.
+ */
+export function nameSpan(text) {
+  const n = String(text ?? "").length;
+  return n <= 12 ? 1 : n <= 26 ? 2 : 3;
 }
