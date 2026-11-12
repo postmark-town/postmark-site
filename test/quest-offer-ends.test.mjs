@@ -72,5 +72,5 @@ test("TEXT PIN (the weakest instrument): the /town/ page hands questBoardFrom th
   const page = readFileSync(join(HERE, "..", "town", "pages", "town", "index.astro"), "utf8");
   const calls = page.split("\n").filter((l) => l.includes("questBoardFrom(") && !l.trim().startsWith("//") && !l.includes("import"));
   assert.equal(calls.length, 1, "one call to questBoardFrom in the page");
-  assert.match(calls[0], /questBoardFrom\(questPosts, \{ today: townDay\(\) \}\)/);
+  assert.match(calls[0], /questBoardFrom\(questPosts, \{ today: townDay\(\), registry: questRegistry \}\)/, "the town's day, and (POS-954) the registry the monthly quests are defined by");
 });
