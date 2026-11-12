@@ -149,7 +149,11 @@ test("4 · nothing on the fund page asks the payer to type a handle; the stale c
   assert.match(outside, /as a gift from outside the town; it mints no stamps\./);
   const ledgerLine = PAGE.match(/<p class="f-ledger-line">([^]*?)<\/p>/)?.[1] ?? "";
   const shownSignedOut = ledgerLine.replace(/<span data-ledger-when="household" hidden>[^]*?<\/span>/, "");
-  assert.ok(ledgerLine && !/stamps it mints/.test(shownSignedOut), "the signed-out lead never says \"stamps it mints\"");
+  // (POS-1001, 2026-11-11: the household line now reads "Any stamps the close
+  // mints for it"; until then it read "The stamps it mints", and this probe
+  // looked only for "stamps it mints", which the new line no longer contains.)
+  assert.ok(ledgerLine && /stamps the close mints/.test(ledgerLine), "the household line is in the ledger line to be hidden");
+  assert.ok(!/stamps it mints|stamps the close mints|stake, vote and pay/.test(shownSignedOut), "the signed-out lead never promises stamps");
   // the PayPal and USDC buttons open their panels; no separate disclosure row repeats them
   assert.ok(!/<summary>[^]*?PayPal<\/span>/.test(PAGE) && !/<summary><span class="f-usdc-sum">USDC/.test(PAGE), "no summary row repeats a rail button");
   assert.match(PAGE, /aria-controls="usdc" aria-expanded="false" data-open="usdc">USDC</);
