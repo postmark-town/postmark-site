@@ -225,10 +225,10 @@ test("the holo cap is the law's formula, not a stored number", () => {
   assert.notEqual(halved.holoCap, e.holoCap, "a stored cap would not have moved");
 });
 
-test("the backing gauge is dollars per ✧, and says nothing when nothing is minted", () => {
-  assert.equal(readEconomy(ECONOMY_FIXTURE).backing, 175 / 19);
-  assert.equal(readEconomy({ ...ECONOMY_FIXTURE, holo_issued: 0 }).backing, null);
-});
+// The backing gauge's test ("the backing gauge is dollars per ✧, and says
+// nothing when nothing is minted") is rewritten in the POS-1001 block below:
+// POS-1001/f took the gauge off /docs/numbers/, so it asserts where the gauge's
+// holo sentence went.
 
 // ── the fixtures tell ONE story ──────────────────────────────────────────────
 
@@ -1042,8 +1042,8 @@ test("POS-1001: the note is the first paragraph under the title of /docs/stamps/
 // replaced it beside it, so a page that renders nothing can't pass. The stamps
 // page's "What your share means" section and its quotes are here since Darko's
 // call (POS-1001/a, 2026-11-11 20:06 EST: "Remove it from the site"), with no
-// replacement. /docs/numbers/'s backing gauge is not here: it waits on Darko's
-// call (POS-1001/f).
+// replacement, and so is /docs/numbers/'s backing gauge (POS-1001/f, 20:08 EST;
+// its holo sentence's new home has its own test below).
 // "✦ per $1", not "per $1": a resident's handle ending in "-semper" beside a
 // "$10" on the roll reads as "per $1" to a bare includes().
 const POS1001_POT_GONE = ["plus ownership and memory", "converts to real value", "a bounded say", "manufacture ownership", "✦ per $1",
@@ -1070,7 +1070,8 @@ const POS1001_PAGES = [
       "Mail, ballots, the map and residency are free at zero stamps today. Nothing decays and nothing expires.",
       "Founder-set today, in the open. From 1 January the dials are market law, changed by bill (NOMOS III.2.3).",
       "Stamps move on crossings, like everything else here.", "so a bill that moves a dial needs no edit"] },
-  { at: ["docs", "numbers"], gone: ["the town's own tender", "the only way a ballot can move it", "The town's ballot is what moves it"], now: ["are the town's own unit"] },
+  { at: ["docs", "numbers"], gone: ["the town's own tender", "the only way a ballot can move it", "The town's ballot is what moves it",
+      "the backing gauge", "Treasury ÷ holo ever minted"], now: ["are the town's own unit"] },
   { at: ["fund"], gone: ["the stamps it mints you vote"], now: ["any stamps it mints you vote like any other"] },
   { at: ["docs"], gone: ["The town's currency"], now: ["What a stamp is, how one is earned, and where a staked stamp goes."] },
   { at: [], gone: ["founded by Keemin"], now: ["founded by Darko"] },
@@ -1096,6 +1097,27 @@ test("POS-1001: the retired sentences are gone from the pages that carried them,
   const numbersSrc = readFileSync(new URL("../town/pages/docs/numbers/index.astro", import.meta.url), "utf8");
   assert.ok(numbersSrc.includes('"A bill is what moves it."'), "the ρ sentence's other branch says a bill moves it");
   assert.equal(numbersSrc.includes("ballot is what moves it"), false, "and no longer says a ballot does");
+});
+
+// POS-1001/f, Darko 2026-11-11 20:08 EST, verbatim: "Move the holo sentence
+// into the "holo issued" dial's note, then remove the gauge" ("the page keeps
+// your sentence and loses the word 'backing'"). Until 2026-11-11 this test sat
+// with the dial arithmetic as "the backing gauge is dollars per ✧, and says
+// nothing when nothing is minted" and asserted readEconomy's `backing` (175 / 19
+// on the fixture, null at zero holo), the number the gauge printed. It now
+// asserts the sentence's new home, on the built page.
+test("POS-1001/f: /docs/numbers/ says the holo sentence in the 'holo issued' dial's note, and has no backing gauge",
+  { skip: !builtPage("docs", "numbers") }, () => {
+  const html = readFileSync(page("docs", "numbers"), "utf8");
+  const dials = [...html.matchAll(/<article class="n-dial[^"]*"[^>]*>([\s\S]*?)<\/article>/g)].map((m) => m[1]);
+  assert.ok(dials.length > 0, "this reads nothing: no dial on the built page");
+  const holo = dials.filter((d) => pageText(d).includes("holo issued"));
+  assert.equal(holo.length, 1, "the page has one 'holo issued' dial");
+  const note = /<p class="n-note[^"]*"[^>]*>([\s\S]*?)<\/p>/.exec(holo[0]);
+  assert.ok(note, "the 'holo issued' dial has a note");
+  assert.ok(pageText(note[1]).includes(`Holo is ${HOLO_NAME_LINE}`), "the 'holo issued' dial's note carries the holo sentence");
+  assert.equal(holoTimes(outsideGlossary(html)), 1, "and the page says it exactly once");
+  assert.equal(/backing/i.test(html), false, "the page no longer says 'backing': not the gauge's label, not the page's description");
 });
 
 test("the glossary's holo entry says what the name is short for", { skip: !builtPage("docs", "stamps") }, () => {

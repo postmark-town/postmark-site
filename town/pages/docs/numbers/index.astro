@@ -29,7 +29,7 @@
 // coherent example numbers; both are gated on import.meta.env.DEV, so neither
 // can be reached on postmark.town.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import { loadEconomy, readEconomy, ECONOMY_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, usd, pct, num } from "@/lib/funding.mjs";
+import { loadEconomy, readEconomy, ECONOMY_FIXTURE, HOLO_LINE, HOLO_NAME_LINE, pct, num } from "@/lib/funding.mjs";
 import { OUTSIDE_NOTE } from "@/lib/docs.mjs";
 
 const wantFixture = import.meta.env.DEV &&
@@ -44,7 +44,7 @@ const wagePer100 = econ ? Math.floor(econ.sigma * 100) : 0;
 <PostmarkLayout
   door={{ mcp: 'town { read: "stamps" }', get: "/api/stamps" }}
   title="The Town's Numbers — Postmark"
-  description="The economy's dials: the deliverer's fraction, the funding-mint cap, the backing gauge, and holo issued against its cap — read from the ledger's own record."
+  description="The economy's dials: the deliverer's fraction, the funding-mint cap, and holo issued against its cap — read from the ledger's own record."
   active="numbers"
 >
   <main class="pm-wrap numbers">
@@ -124,29 +124,17 @@ const wagePer100 = econ ? Math.floor(econ.sigma * 100) : 0;
           </article>
 
           <article class="n-dial">
-            <p class="n-kind">the backing gauge</p>
-            <p class="n-big">
-              {econ.backing == null ? "—" : usd(econ.backing.toFixed(2))}
-              <span class="n-unit">per ✧</span>
-            </p>
-            <p class="n-note">
-              Treasury ÷ holo ever minted: <strong>{usd(econ.treasuryUsd)}</strong> standing
-              behind <strong>{num(econ.holoIssued)}✧</strong>. Holo is {HOLO_NAME_LINE} It is never burned, so what
-              has been issued is what has ever been minted. This is a fact about what the
-              town holds — <em>not</em> a redemption promise, and nothing here can be
-              exchanged for it.
-            </p>
-          </article>
-
-          <article class="n-dial">
             <p class="n-kind">holo issued · against the cap</p>
             <p class="n-big">{num(econ.holoIssued)}<span class="n-unit">✧ of {num(econ.holoCap)}</span></p>
             <div class="n-bar" role="img"
                  aria-label={`${num(econ.holoIssued)} holo issued against a town-wide cap of ${num(econ.holoCap)}`}>
               <i class="pm-holo-ink" style={`width:${Math.max(1.5, pct(econ.capUsed ?? 0))}%`}></i>
             </div>
+            {/* THE HOLO SENTENCE, the page's one copy of the expansion. It moved
+                here from the backing gauge when the gauge left the page
+                (POS-1001/f, 2026-11-11). */}
             <p class="n-note">
-              All holo ever minted, against ρ × the {num(econ.capBase)}✦ the town has
+              Holo is {HOLO_NAME_LINE} All holo ever minted, against ρ × the {num(econ.capBase)}✦ the town has
               minted from every source. Since the founder's 2026-09-17 ruling a pot's close
               mints its givers' reward as holo, one row per receipt it settles. The cap is not a stored number —
               it is that multiplication, so it moves as the town mints. ✧ holo is fresh mint
