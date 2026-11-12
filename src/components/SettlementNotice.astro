@@ -59,15 +59,22 @@ const { variant = "flow", origin = "" } = Astro.props;
   .sn-text { text-wrap: balance; text-align: center; }
   /* the front page: in flow, a quiet line between the ticker and the hero */
   .sn-flow { padding: 8px 14px; background: rgba(20, 23, 29, 0.55); border-bottom: 1px solid rgba(232, 196, 139, 0.16); }
-  /* the World: floats over the viewer, centred, UNDER the top controls (the auth cluster sits at top:10px, z-index 9000) */
+  /* the World: floats over the viewer, UNDER its top controls, never across them. The viewer draws three layouts (its own breakpoints):
+       · 721–1160 px   the Telling stacks above the painting and the page scrolls: seat it below the Telling's filter-chip row (chips end ~107 px);
+       · 1161 px up    the app frame: the painting is the right column and its search and icon row end ~90 px: seat it under that row, right-aligned,
+                       no wider than the painting's column (the Telling is 740 px wide);
+       · 720 px down   the painting alone: the top ~170 px is the search, the icon row and the Time travel / by-mail row, and their cards open below
+                       at ~174 px, so the notice goes to the foot of the painting, above the elevation pill. */
   .sn-over {
-    position: fixed; top: 54px; left: 12px; right: 12px; margin-inline: auto; width: fit-content; z-index: 8500;
+    box-sizing: border-box; position: fixed; top: 118px; left: 12px; right: 12px; margin-inline: auto; width: fit-content; z-index: 8500;
     max-width: min(27rem, calc(100vw - 24px)); padding: 6px 14px;
     background: rgba(20, 23, 29, 0.86); border: 1px solid rgba(232, 196, 139, 0.4); border-radius: 999px;
     backdrop-filter: blur(4px); pointer-events: none;
   }
+  @media (min-width: 1161px) {
+    .sn-over { top: 100px; left: auto; right: 12px; margin-inline: 0; max-width: min(27rem, calc(100vw - 764px)); }
+  }
   @media (max-width: 720px) {
-    /* a phone: the auth fold and the tour opener fill the top rows (down to ~125 px); seat the notice under them, and let it wrap into a soft rounded block */
-    .sn-over { top: 134px; border-radius: 14px; font-size: 0.7rem; }
+    .sn-over { top: auto; bottom: 56px; border-radius: 14px; font-size: 0.7rem; }
   }
 </style>

@@ -50,11 +50,20 @@ function findChrome() {
 }
 
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".woff2": "font/woff2", ".txt": "text/plain" };
+// OPTIONAL: SETTLEMENT_NOTICE_WORLD_DIR names a read-only checkout's tree that holds `spectator/` (and `tools/`), e.g. an export of
+// postmark-world's settlement/S165. Its files are served over /world-engine/spectator/** and /world-engine/tools/**, so the World page
+// renders the viewer that carries POS-1006's "In town by mail" button, which the package pin alone does not (POS-1004 round 2).
+// Unset (CI), the built page's own viewer is what is rendered. Nothing is written there and nothing in it is copied into the repo.
+const WORLD_DIR = process.env.SETTLEMENT_NOTICE_WORLD_DIR || null;
 function serveDist() {
   const server = http.createServer((req, res) => {
     let p = decodeURIComponent((req.url || "/").split("?")[0]);
     let file = normalize(join(DIST, p));
     if (!file.startsWith(DIST + sep) && file !== DIST) { res.writeHead(403); return res.end(); }
+    if (WORLD_DIR && /^\/world-engine\/(spectator|tools)\//.test(p)) {
+      const over = normalize(join(WORLD_DIR, p.replace("/world-engine/", "")));
+      if (over.startsWith(normalize(WORLD_DIR) + sep) && existsSync(over) && statSync(over).isFile()) { res.writeHead(200, { "content-type": MIME[extname(over)] || "application/octet-stream" }); return res.end(readFileSync(over)); }
+    }
     try { if (statSync(file).isDirectory()) file = join(file, "index.html"); } catch { /* maybe a file */ }
     if (!existsSync(file)) { res.writeHead(404, { "content-type": "text/plain" }); return res.end("not found"); }
     res.writeHead(200, { "content-type": MIME[extname(file)] || "application/octet-stream" });
@@ -104,17 +113,25 @@ async function launch(chrome) {
   };
 }
 
-async function openPage(b, base, path, { width, board }) {
+async function openPage(b, base, path, { width, height = 900, board, walkers = null }) {
   const { targetId } = await b.send("Target.createTarget", { url: "about:blank" });
   const { sessionId } = await b.send("Target.attachToTarget", { targetId, flatten: true });
   const S = (m, p) => b.send(m, p, sessionId);
   await S("Page.enable");
-  await S("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 });
+  await S("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 600 });
   // THE FORCED BOARD: this test answers /ops/sentinel.json. `board.body()` is read at request time, so a step can change it.
-  await S("Fetch.enable", { patterns: [{ urlPattern: "*/ops/sentinel.json*", requestStage: "Request" }] });
+  // `walkers` (invented handles, no position) is answered for the viewer's by-mail list, so the button has names to show.
+  await S("Fetch.enable", { patterns: [{ urlPattern: "*/ops/sentinel.json*", requestStage: "Request" }, ...(walkers ? [{ urlPattern: "*/api/*", requestStage: "Request" }] : [])] });
   const listener = (m) => {
     if (m.sessionId !== sessionId || m.method !== "Fetch.requestPaused") return;
     const { requestId } = m.params;
+    const asked = m.params.request?.url ?? "";
+    if (/\/api\//.test(asked)) {     // the viewer's office reads: the walkers get the invented list, anything else a JSON "none", as an office would say it
+      const walkersRead = /\/api\/world\/walkers/.test(asked);
+      const answer = walkersRead ? { at: Date.now(), walkers: walkers.map((handle) => ({ handle, placeholder: true })), standing: [] } : { error: "none" };
+      S("Fetch.fulfillRequest", { requestId, responseCode: walkersRead ? 200 : 404, responseHeaders: [{ name: "content-type", value: "application/json" }, { name: "access-control-allow-origin", value: "*" }], body: Buffer.from(JSON.stringify(answer)).toString("base64") }).catch(() => {});
+      return;
+    }
     const body = board.body();
     if (body === null) S("Fetch.fulfillRequest", { requestId, responseCode: 404, responseHeaders: [{ name: "content-type", value: "text/plain" }], body: Buffer.from("no board").toString("base64") }).catch(() => {});
     else S("Fetch.fulfillRequest", { requestId, responseCode: 200, responseHeaders: [{ name: "content-type", value: "application/json" }, { name: "cache-control", value: "no-cache" }], body: Buffer.from(body).toString("base64") }).catch(() => {});
@@ -251,7 +268,7 @@ test("the front page: the notice sits BELOW the live ticker and ABOVE the hero",
   } finally { await p.close(); }
 });
 
-test("the World page: the floating notice is centred, under the top row, and in front of nothing it could hide (it takes no clicks)", { skip: SKIP, timeout: 120_000 }, async () => {
+test("the World page: the floating notice is fixed, takes no clicks, and sits under the painting's top controls (right-aligned over the painting in the app frame)", { skip: SKIP, timeout: 120_000 }, async () => {
   await boot();
   state.bodyFn = fresh("DOWN");
   const p = await openPage(browser, base, "/world/", { width: 1280, board });
@@ -260,7 +277,61 @@ test("the World page: the floating notice is centred, under the top row, and in 
     const g = await p.evalJs(`(() => { const e = document.querySelector("[data-settlement-notice]"), r = e.getBoundingClientRect(), cs = getComputedStyle(e); return { top: r.top, left: r.left, right: r.right, pointer: cs.pointerEvents, position: cs.position }; })()`);
     assert.equal(g.position, "fixed");
     assert.equal(g.pointer, "none", "it never takes a click meant for the view");
-    assert.ok(g.top >= 40, `below the top controls row (top ${g.top})`);
-    assert.ok(Math.abs((g.left + g.right) / 2 - 640) < 4, "centred");
+    assert.ok(g.top >= 95, `below the painting's search and icon row, which end near 90 px (top ${g.top})`);
+    assert.ok(Math.abs(g.right - (1280 - 12)) < 2, `right-aligned over the painting (right ${g.right})`);
   } finally { await p.close(); }
 });
+
+// CLEARANCE, measured and not assumed (click-through is not clearance): the notice's box against the boxes of the controls the viewer
+// ACTUALLY draws: the Telling's filter chips, the Time travel opener and body, the by-mail button and its open card, and (app frame)
+// the whole Telling column. Every layout the viewer has is walked: the app frame, the stacked page, and the phone painting.
+// The by-mail controls come from the viewer that carries POS-1006: set SETTLEMENT_NOTICE_WORLD_DIR (see above). Without it (CI, on the
+// package pin) the chips, Time travel and the Telling are still checked, and the by-mail ones are asserted absent so a silent
+// downgrade of this test is named rather than passed.
+const INVENTED = ["ash", "birch", "wren", "cedar", "fern", "moss", "pike", "quill", "rook", "sage", "tern", "vale"];
+const CLEARANCE = `(() => {
+  const n = document.querySelector("[data-settlement-notice]").getBoundingClientRect();
+  const box = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom) }; };
+  const live = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none" && !el.hidden; };
+  const sets = { chips: ".wv-fchip", timeTravelButton: ".pm-tt-open", timeTravelBody: ".pm-tt-body", byMailButton: ".pm-bymail-btn", byMailCard: ".wv-bymail", tellingColumn: ".wv-telling" };
+  const out = { notice: box(document.querySelector("[data-settlement-notice]")), present: {}, hits: [], vw: innerWidth };
+  for (const [k, sel] of Object.entries(sets)) {
+    const els = [...document.querySelectorAll(sel)].filter(live);
+    out.present[k] = els.length;
+    if (k === "tellingColumn" && innerWidth < 1161) continue;           /* below the app frame the Telling is a page above the painting, not a column beside it */
+    for (const e of els) { const r = box(e); if (r.l < n.right && r.r > n.left && r.t < n.bottom && r.b > n.top) out.hits.push(k + " " + JSON.stringify(r)); }
+  }
+  return out;
+})()`;
+
+for (const [width, height] of [[1280, 800], [1920, 1080], [1180, 800], [1024, 800], [721, 800], [390, 844], [360, 640]]) {
+  test(`the World page at ${width}x${height}: the notice is clear of the Telling's chips, Time travel and the by-mail row and its open card`, { skip: SKIP, timeout: 120_000 }, async () => {
+    await boot();
+    state.bodyFn = fresh("DOWN");
+    const p = await openPage(browser, base, "/world/", { width, height, board, walkers: INVENTED });
+    try {
+      await p.until(`(${NOTICE})?.shown === true`, "the notice");
+      await p.until(`document.querySelector(".pm-tt-open") !== null`, "the viewer's Time travel opener");
+      await new Promise((ok) => setTimeout(ok, 2800));                 // the viewer's first-visit tour opens on its own; Escape is how a visitor puts it away
+      await p.evalJs(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); true`);
+      if (WORLD_DIR) await p.until(`(() => { const b = document.querySelector(".pm-bymail-btn"); return !!b && !b.hidden; })()`, "the by-mail button (the S165 viewer, with invented residents)");
+      await new Promise((ok) => setTimeout(ok, 500));
+      const closed = await p.evalJs(CLEARANCE);
+      assert.ok(closed.present.timeTravelButton > 0, "Time travel is drawn, so it is checked");
+      if (width > 720) assert.ok(closed.present.chips > 0, "the Telling's filter chips are drawn, so they are checked");
+      if (WORLD_DIR) assert.ok(closed.present.byMailButton > 0, "the by-mail button is drawn, so it is checked");
+      else assert.equal(closed.present.byMailButton, 0, "no by-mail button on the pinned viewer: this run did not check it (set SETTLEMENT_NOTICE_WORLD_DIR)");
+      assert.deepEqual(closed.hits, [], `the notice ${JSON.stringify(closed.notice)} covers no control`);
+      if (width >= 1161) assert.ok(closed.notice.l >= (await p.evalJs(`document.querySelector(".wv-telling").getBoundingClientRect().right`)), "right of the Telling column");
+      if (WORLD_DIR) {
+        await p.evalJs(`document.querySelector(".pm-bymail-btn").click(); true`);
+        await p.until(`(() => { const c = document.querySelector(".wv-bymail"); return !!c && c.getClientRects().length > 0; })()`, "the by-mail card to open");
+        const open = await p.evalJs(CLEARANCE);
+        assert.ok(open.present.byMailCard > 0, "the open by-mail card is drawn, so it is checked");
+        assert.deepEqual(open.hits, [], `with the by-mail card open, the notice ${JSON.stringify(open.notice)} covers nothing`);
+      }
+      const view = await p.evalJs(`(() => { const r = document.querySelector("[data-settlement-notice]").getBoundingClientRect(); return { l: r.left, r: r.right, b: r.bottom, w: innerWidth, h: innerHeight }; })()`);
+      assert.ok(view.l >= 0 && view.r <= view.w && view.b <= view.h, `the notice is wholly inside the view ${JSON.stringify(view)}`);
+    } finally { await p.close(); }
+  });
+}

@@ -198,7 +198,9 @@ export function readBoardEvery(origin, listener, { pollMs = POLL_MS, env = globa
       return reader.inflight;
     };
     reader.read = read;
-    reader.timer = env.setInterval(() => { if (visible()) read(); }, pollMs);
+    // Each beat re-judges the board already in hand, whether or not a fetch is pending: a warning's age never waits on the network.
+    const announce = () => { for (const l of [...reader.listeners]) { try { l(reader.last); } catch (error) { console.debug("pm-board: a listener threw (" + (error && error.message) + ")"); } } };
+    reader.timer = env.setInterval(() => { if (!visible()) return; if (reader.inflight && reader.last !== undefined) announce(); read(); }, pollMs);
     const onReturn = () => { if (visible()) read(); };
     env.document?.addEventListener?.("visibilitychange", onReturn);
     env.addEventListener?.("pageshow", onReturn);

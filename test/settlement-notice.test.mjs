@@ -47,9 +47,9 @@ function page({ source = COMPONENT, moduleOverride = board, origins = [""], vari
   const intervals = [];
   const docL = {}, winL = {};
   const fetches = [];
-  const state = { body: null, ok: true };
+  const state = { body: null, ok: true, hang: false };
   const env = {
-    fetch: async (url, opts) => { fetches.push({ url, opts }); return { ok: state.ok, status: state.ok ? 200 : 404, text: async () => state.body ?? "" }; },
+    fetch: async (url, opts) => { fetches.push({ url, opts }); if (state.hang) return new Promise(() => {}); return { ok: state.ok, status: state.ok ? 200 : 404, text: async () => state.body ?? "" }; },
     setInterval: (fn, ms) => { intervals.push({ fn, ms, at: clock.now + ms }); return intervals.length; },
     clearInterval: (id) => { intervals[id - 1] = null; },
     document: { visibilityState: "visible", addEventListener: (t, f) => { (docL[t] ??= []).push(f); }, removeEventListener() {} },
@@ -126,6 +126,40 @@ test("a board that goes old on an open page clears it: a stale reading is never 
   assert.deepEqual(w.shown(), [true], "18 minutes old at load: still readable");
   await w.minute(); await w.minute(); await w.minute();                // the same published board, three minutes older: 21 minutes
   assert.deepEqual(w.shown(), [false], "the same board, past twenty minutes: nothing, not a latched warning");
+});
+
+test("a DOWN shown at 18 minutes expires at 20 although the next fetch NEVER finishes: freshness does not wait on the network", async () => {
+  const w = page();
+  w.state.body = fixture("DOWN", { ageMin: 18 });
+  await w.start();
+  assert.deepEqual(w.shown(), [true]);
+  w.state.hang = true;                                                   // from here every read is deferred forever
+  await w.minute();                                                      // 19: the fetch is now pending
+  assert.deepEqual(w.shown(), [true], "still readable at 19 minutes");
+  await w.minute(); await w.minute();                                    // 21 minutes, the same fetch still pending
+  assert.equal(w.fetches.length, 2, "one read is pending, not re-issued on every beat");
+  assert.deepEqual(w.shown(), [false], "past twenty minutes it is gone with the fetch still unresolved");
+});
+
+test("FLIP: a reader that repaints only when a fetch finishes FAILS the deferred-fetch expiry above", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pos1004-flip-"));
+  try {
+    const src = read("src/lib/sentinel-alert.mjs");
+    const text = src.replace("if (reader.inflight && reader.last !== undefined) announce(); ", "");
+    assert.notEqual(text, src, "the flip's anchor is still in the module");
+    writeFileSync(join(dir, "sentinel-alert.mjs"), text);
+    const mutant = await import(pathToFileURL(join(dir, "sentinel-alert.mjs")).href);
+    const run = async (mod) => {
+      const w = page({ moduleOverride: mod });
+      w.state.body = fixture("DOWN", { ageMin: 18 });
+      await w.start();
+      w.state.hang = true;
+      await w.minute(); await w.minute(); await w.minute();
+      assert.deepEqual(w.shown(), [false]);
+    };
+    await run(board);
+    await assert.rejects(run(mutant), (e) => e?.name === "AssertionError", "the network-gated repaint keeps a stale warning up");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("both notices on one page (the front page's flow seat and the World's overlay are separate pages, but a page may hold more than one) share ONE read", async () => {
