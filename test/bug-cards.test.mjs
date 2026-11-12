@@ -138,6 +138,21 @@ test("paintCards: each bug is one <details>; its summary is the jar's slot, the 
   assert.doesNotMatch(SRC.slice(SRC.indexOf("export function paintCards")), /innerHTML|insertAdjacentHTML|outerHTML/);
 });
 
+// POS-1007: "on every jar card, the reporter comes first: 'reported by <reporter>', then 'named by <fixer>' ... the
+// resident who caught it leads." (Until 2026-11-12 the closed card printed "named by" above the title, before "reported by".)
+test("paintCards: a named card says who reported it before who named it, closed and opened", () => {
+  const doc = stubDoc();
+  paintCards(doc.root, cardsOf(READ), doc);
+  const w = find(doc.root, (e) => e.tagName === "DETAILS" && e.dataset.post === "wildcat/preview-disagrees")[0];
+  const head = find(w.children[0], cls("bc-head"))[0];
+  assert.deepEqual(head.children.map((e) => e.className), ["bc-name", "bc-title", "bc-by", "bc-nb"], "the closed card is not name, title, reported by, named by");
+  assert.equal(textOf(find(head, cls("bc-by"))[0]), "reported by wildcat");
+  assert.equal(textOf(find(head, cls("bc-nb"))[0]), "named by lupi");
+  // opened, the page's CSS hides the summary's "named by", and the body says "named by …, who fixed it" after the summary's "reported by"
+  const all = textOf(w);
+  assert.ok(all.indexOf("reported by wildcat") !== -1 && all.indexOf("reported by wildcat") < all.indexOf("named by lupi, who fixed it"), "the opened card names the fixer before the reporter");
+});
+
 test("paintCards: the expanded card lists every stage's credit, day, stamps and link; unreached stages say not yet", () => {
   const doc = stubDoc();
   paintCards(doc.root, cardsOf(READ), doc);

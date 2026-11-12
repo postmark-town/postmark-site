@@ -45,6 +45,7 @@ import {
   giverLabel,
 } from "../src/lib/funding.mjs";
 import { buildHouses } from "../src/lib/houses.mjs";
+import { OUTSIDE_NOTE } from "../src/lib/docs.mjs";
 
 // ── nothing published yet ────────────────────────────────────────────────────
 
@@ -207,10 +208,12 @@ test("the holo cap is the law's formula, not a stored number", () => {
   // `overCap`. That cannot work now: holo is inside its own base, so nudging
   // holo up raises the cap with it. The town-wide condition solves to
   // holo > ρ/(1−ρ) × primary, and at the launch dial ρ = 0.5 that is exactly
-  // holo > primary — i.e. "money's share of the town may not pass ρ", which is
-  // the constitutional sentence stated exactly ("money can come to own up to
-  // half of Postmark; it can never own more"). The OLD base capped money's share
-  // at ρ/(1+ρ) = 0.333, stricter than the constitution ever claimed. So the
+  // holo > primary — i.e. "money's share of the town may not pass ρ". That
+  // town-wide limit follows from the household cap rather than being it: NOMOS
+  // II.4.5.1 caps each household's share ("Money's share of any household's
+  // stamps is capped, and never above half"), and if no household's share passes
+  // ρ, the town's, summed over households, can't either. The OLD base capped
+  // money's share at ρ/(1+ρ) = 0.333, stricter than that ceiling. So the
   // compounding base reads the ceiling MORE truly, not less.
   assert.equal(readEconomy({ ...ECONOMY_FIXTURE, holo_issued: e.holoCap + 1 }).overCap, false,
     "one past the cap no longer trips it — the cap moved up with the input, and a probe that cannot fire is worth saying out loud");
@@ -224,10 +227,10 @@ test("the holo cap is the law's formula, not a stored number", () => {
   assert.notEqual(halved.holoCap, e.holoCap, "a stored cap would not have moved");
 });
 
-test("the backing gauge is dollars per ✧, and says nothing when nothing is minted", () => {
-  assert.equal(readEconomy(ECONOMY_FIXTURE).backing, 175 / 19);
-  assert.equal(readEconomy({ ...ECONOMY_FIXTURE, holo_issued: 0 }).backing, null);
-});
+// The backing gauge's test ("the backing gauge is dollars per ✧, and says
+// nothing when nothing is minted") is rewritten in the POS-1001 block below:
+// POS-1001/f took the gauge off /docs/numbers/, so it asserts where the gauge's
+// holo sentence went.
 
 // ── the fixtures tell ONE story ──────────────────────────────────────────────
 
@@ -308,10 +311,8 @@ test("the mintbar fixture agrees with the deeds it came from", () => {
 // ── holo is a balance (soulbound repealed, 2026-09-17) ──────────────────────
 
 test("holo is a SUBSET of what a household minted, and the tense arithmetic still closes", () => {
-  // THE LAW THIS USED TO ASSERT — capture doc § 9, quoted:
-  //   "Soulbound equity denomination: no stake, no vote, no transfer. Counted
-  //    in ownership and the backing gauge; rendered on the household's page.
-  //    Holographic — you can see it; there's nothing inside to spend."
+  // THE LAW THIS USED TO ASSERT — capture doc § 9: holo could not be staked,
+  // voted, transferred or spent.
   //
   // REPEALED. THE FOUNDER, 2026-09-17, verbatim: "non-spendable is repealed; the
   // stamps are like any other, but are holo to signify the special source." Holo
@@ -912,13 +913,15 @@ test("no built page teaches the expansion twice in flowing prose", { skip: !buil
 // that is the point: one sweep per ruling leaves the other ruling's pages
 // standing.
 //
-// NOT ON THIS LIST, DELIBERATELY: "join the judgment". The town's own
-// JOINING.md still carries "Money can join the ownership; it can never join the
-// judgment", and /stamps/ quotes it inside a blockquote WITH ITS CITATION. The
-// quote is faithful to its source, so a probe that reddened on it would be
-// asking this repo to fork a quote rather than asking the town to amend the
-// line. The phrase joins this list the day JOINING.md is amended, and this
-// paragraph is the standing note of that gap.
+// NOT ON THIS LIST, DELIBERATELY: "join the judgment". It was left off while
+// /stamps/ quoted a line of the town's JOINING.md that used those words, inside
+// a blockquote with its citation, since a probe that reddened on it would have
+// asked this repo to fork a quote. JOINING
+// lost the line on 2026-10-06, and POS-1001 (2026-11-11) took the quote off
+// /docs/stamps/ with the seam's pull quote. POS-1001's own sweep, below, reads
+// that quoted line's opening words off /docs/stamps/ (its row's `gone` list),
+// not "join the judgment", and reads no other page for it. Whether the phrase
+// joins this every-page list is a wider question than POS-1001's.
 const REPEALED = [
   "soulbound",                  // the word itself, on any surface
   "never spent as postage",     // HOLO_NAME_LINE's old closing clause
@@ -980,7 +983,164 @@ test("and the VOICE half is on the pages too, not merely absent", { skip: !(buil
     assert.match(html, /is capped/, `/${rel} states the vote and must state the bound in the same breath`);
   }
   const stamps = readFileSync(join(DIST, "docs", "stamps", "index.html"), "utf8");
-  assert.match(stamps, /cap on money/, "the Rules name what bounds money, now that no verb does");
+  // Until 2026-11-11 this matched /cap on money/, which the built page carried
+  // only on one line of the "What your share means" section's ECONOMY.md § 5
+  // quote. POS-1001/a removed that section from the site; the seam section's
+  // own sentence ("ρ, the cap on money’s share of a household") says the same
+  // words across a line break, so the match now allows the break.
+  assert.match(stamps, /cap\s+on\s+money/, "the Rules name what bounds money, now that no verb does");
+});
+
+// ── POS-1001 · the claims NOMOS doesn't make, and its note ───────────────────
+//
+// NOMOS's definition of Stamp: "Stamps are not money. They can't be bought";
+// II.4.5: "never by a price list"; II.6.1: NOMOS "grants no claim" on owning Postmark or on money
+// outside the town. POS-1001 changed the site's sentences that said otherwise,
+// one line each, and put the town STAMPS.md's note under the title of the
+// stamps, numbers and fund pages. These read the BUILT pages: the note renders
+// from one constant (src/lib/docs.mjs § OUTSIDE_NOTE), and only the render
+// shows it landed where a reader looks.
+//
+// The note's words are written out here rather than imported, because a
+// constant that agrees with itself proves nothing. Their source is the note at
+// the top of the town's STAMPS.md, word for word.
+const OUTSIDE_NOTE_WORDS = "About anything outside the town. Anything this page says about the world outside Postmark (ownership, equity, a share of Postmark, revenue, dividends or money) is speculative: a thought experiment at this stage, not a promise. Nothing here is a legally binding contract, offer or commitment. NOMOS, the town's law, governs only the town's own world (NOMOS II.6).";
+
+/** A built page's words as a reader sees them: scripts, styles and tags out, entities decoded, whitespace collapsed. */
+const pageText = (html) => String(html)
+  .replace(/<script\b[\s\S]*?<\/script>/g, " ").replace(/<style\b[\s\S]*?<\/style>/g, " ")
+  .replace(/<[^>]+>/g, " ")
+  .replace(/&#0*39;|&#x0*27;|&apos;/gi, "'").replace(/&quot;/g, '"')
+  .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+  .replace(/\s+/g, " ");
+/** The <p> element of a built page that holds `anchor`. The anchor must be on the page exactly once, so a scoped check can't pass by reading nothing. */
+const paragraphHolding = (html, anchor, rel) => {
+  assert.equal(html.split(anchor).length - 1, 1, `${rel}: "${anchor}" should be on the page exactly once`);
+  const at = html.indexOf(anchor);
+  const open = [...html.slice(0, at).matchAll(/<p[\s>]/g)].pop();
+  assert.ok(open, `${rel}: no <p> holds "${anchor}"`);
+  const close = html.indexOf("</p>", at);
+  assert.ok(close > at, `${rel}: the <p> holding "${anchor}" never closes`);
+  return html.slice(open.index, close + 4);
+};
+/** Every built /fund/<pot>/ page (the /fund/ index itself is not a pot). */
+const builtPotPages = () => (existsSync(join(DIST, "fund"))
+  ? readdirSync(join(DIST, "fund")).map((d) => join(DIST, "fund", d, "index.html")).filter(existsSync)
+  : []);
+
+test("POS-1001: the note's one copy is the town's STAMPS.md note, word for word", () => {
+  assert.equal(`${OUTSIDE_NOTE.lead} ${OUTSIDE_NOTE.body}`, OUTSIDE_NOTE_WORDS);
+});
+
+test("POS-1001: the note is the first paragraph under the title of /docs/stamps/, /docs/numbers/, /fund/ and every /fund/<pot>/",
+  { skip: !(builtPage("docs", "stamps") && builtPage("docs", "numbers") && builtPage("fund")) }, () => {
+  const pots = builtPotPages();
+  assert.ok(pots.length > 0, "this reads nothing: no built pot page");
+  for (const p of [page("docs", "stamps"), page("docs", "numbers"), page("fund"), ...pots]) {
+    const html = readFileSync(p, "utf8");
+    const rel = p.slice(DIST.length);
+    assert.equal(pageText(html).split(OUTSIDE_NOTE_WORDS).length - 1, 1, `${rel} carries the note exactly once`);
+    const title = html.indexOf("</h1>");
+    assert.ok(title > 0, `${rel} has no title`);
+    const first = html.indexOf("<p", title);
+    assert.ok(pageText(html.slice(first, html.indexOf("</p>", first))).trim().startsWith("About anything outside the town."),
+      `${rel}: the first paragraph under the title is not the note`);
+  }
+});
+
+// The stale-phrase count, base against head (REDS-AND-CONTROLS § Greps as
+// instruments): each retired sentence by the page that carried it, with what
+// replaced it beside it, so a page that renders nothing can't pass. The stamps
+// page's "What your share means" section and its quotes are here since Darko's
+// call (POS-1001/a, 2026-11-11 20:06 EST: "Remove it from the site"), with no
+// replacement, and so is /docs/numbers/'s backing gauge (POS-1001/f, 20:08 EST;
+// its holo sentence's new home has its own test below).
+// "✦ per $1", not "per $1": a resident's handle ending in "-semper" beside a
+// "$10" on the roll reads as "per $1" to a bare includes().
+const POS1001_POT_GONE = ["plus ownership and memory", "converts to real value", "a bounded say", "manufacture ownership", "✦ per $1",
+  "The stamps it mints"];
+const POS1001_POT_NOW = [
+  "Any stamps the close mints for it stake, vote and pay",
+  "A gift pays a bill and is written down in your name. If the town staked on this pot, the close thanks you in stamps that work like any stamp, including vote; money's share of your household is capped, and stamps never turn into money.",
+  "Stamps minted to a giver work like any stamp, and a household's holo may never pass ρ × everything it has minted (never more than half, NOMOS II.4.5.1).",
+];
+const POS1001_PAGES = [
+  { at: ["docs", "stamps"],
+    gone: ["Your lifetime count is your share of Postmark", "this is your share of the town", "the one that is your share",
+      "This is your share.", "Money can join the ownership", "manufacture ownership", "Money can never leave as currency",
+      "Value exits as", "Value leaves as goods", "durable income stream", "monetary policy by vote", "petition a dial ballot",
+      "Money moves on crossings", "free forever at zero stamps", "at zero stamps, permanently",
+      "Dollars the town holds per ✧", "so there is nothing to back", "a ballot that moves a dial",
+      // POS-1001/a: the "What your share means" section, its heading, cards, paragraph and quotes
+      "What your share means", "We keep saying share and ownership", "pre-agreed table for sharing",
+      "a record, not a promise", "Old money cannot rule from the grave", "Law of the two claims",
+      "Plutocracy is excluded once", "the ratification mechanism is accession", "still accumulating their share",
+      // the FAQ's earlier answer to "Who decides the dials?", which cited NOMOS III.2.3 for dials it doesn't name
+      "the dials are market law, changed by bill", "(NOMOS III.2.3)"],
+    now: ["Your lifetime count is your record here.", "It only rises, and it is public.",
+      "A gift pays a bill; how much of a household's stamps can come from gifts is capped.",
+      "Money cannot mint stamps for something nobody wanted", "Stamps never turn into money.", "No. Stamps never turn into money.",
+      "Mail, ballots, the map and residency are free at zero stamps today. Nothing decays and nothing expires.",
+      // The FAQ's "Who decides the dials?": until 2026-11-11 this pinned an answer
+      // citing NOMOS III.2.3, whose dials don't include this page's. It now
+      // quotes NOMOS III.3 word for word.
+      "Founder-set today, in the open. From 1 January, NOMOS says (III.3): \"Until a bill changes them, the town's existing law homes stand as market law where they don't contradict the spine, and the founding household rules on them in the open, as before.\"",
+      "Stamps move on crossings, like everything else here.", "so a bill that moves a dial needs no edit"] },
+  { at: ["docs", "numbers"], gone: ["the town's own tender", "the only way a ballot can move it", "The town's ballot is what moves it",
+      "the backing gauge", "Treasury ÷ holo ever minted"], now: ["are the town's own unit"] },
+  { at: ["fund"], gone: ["the stamps it mints you vote"], now: ["any stamps it mints you vote like any other"] },
+  { at: ["docs"], gone: ["The town's currency"], now: ["What a stamp is, how one is earned, and where a staked stamp goes."] },
+  // The home page's footer line says Darko; the retired spelling is held as a
+  // pattern, not printed. Both checks read only the paragraph that carries "A
+  // Starforge project", so a "founded by <handle>" elsewhere on the home page
+  // one day can't turn this red.
+  { at: [], scope: "A Starforge project", gone: [/founded by (?!Darko\b)\S/], now: ["founded by Darko"] },
+  // POS-1001/d: the Marketplace building's who-line, under its coming-soon chip
+  { at: ["town"], gone: ["residents asking stamps for goods"], now: ["residents offering things to one another"] },
+];
+
+test("POS-1001: the retired sentences are gone from the pages that carried them, and what replaced them is there",
+  { skip: !(builtSite && builtPage("docs") && builtPage("docs", "stamps") && builtPage("docs", "numbers") && builtFamily("fund")) }, () => {
+  const pots = builtPotPages();
+  assert.ok(pots.length > 0, "this reads nothing: no built pot page");
+  const rows = [
+    ...POS1001_PAGES.map((r) => ({ p: page(...r.at), gone: r.gone, now: r.now, scope: r.scope })),
+    ...pots.map((p) => ({ p, gone: POS1001_POT_GONE, now: POS1001_POT_NOW })),
+  ];
+  for (const { p, gone, now, scope } of rows) {
+    const rel = p.slice(DIST.length) || "/";
+    const html = readFileSync(p, "utf8");
+    const text = pageText(scope ? paragraphHolding(html, scope, rel) : html);
+    for (const g of gone) assert.equal(g instanceof RegExp ? g.test(text) : text.includes(g), false, `${rel}: "${g}" is still on the page`);
+    for (const n of now) assert.ok(text.includes(n), `${rel}: "${n}" is not on the page`);
+  }
+  // A TEXT PIN, labelled so: /docs/numbers/'s ρ sentence renders one branch at a
+  // time, and while ρ sits at its ceiling the other one is never built. So the
+  // unbuilt branch is read from the source.
+  const numbersSrc = readFileSync(new URL("../town/pages/docs/numbers/index.astro", import.meta.url), "utf8");
+  assert.ok(numbersSrc.includes('"A bill is what moves it."'), "the ρ sentence's other branch says a bill moves it");
+  assert.equal(numbersSrc.includes("ballot is what moves it"), false, "and no longer says a ballot does");
+});
+
+// POS-1001/f, Darko 2026-11-11 20:08 EST, verbatim: "Move the holo sentence
+// into the "holo issued" dial's note, then remove the gauge" ("the page keeps
+// your sentence and loses the word 'backing'"). Until 2026-11-11 this test sat
+// with the dial arithmetic as "the backing gauge is dollars per ✧, and says
+// nothing when nothing is minted" and asserted readEconomy's `backing` (175 / 19
+// on the fixture, null at zero holo), the number the gauge printed. It now
+// asserts the sentence's new home, on the built page.
+test("POS-1001/f: /docs/numbers/ says the holo sentence in the 'holo issued' dial's note, and has no backing gauge",
+  { skip: !builtPage("docs", "numbers") }, () => {
+  const html = readFileSync(page("docs", "numbers"), "utf8");
+  const dials = [...html.matchAll(/<article class="n-dial[^"]*"[^>]*>([\s\S]*?)<\/article>/g)].map((m) => m[1]);
+  assert.ok(dials.length > 0, "this reads nothing: no dial on the built page");
+  const holo = dials.filter((d) => pageText(d).includes("holo issued"));
+  assert.equal(holo.length, 1, "the page has one 'holo issued' dial");
+  const note = /<p class="n-note[^"]*"[^>]*>([\s\S]*?)<\/p>/.exec(holo[0]);
+  assert.ok(note, "the 'holo issued' dial has a note");
+  assert.ok(pageText(note[1]).includes(`Holo is ${HOLO_NAME_LINE}`), "the 'holo issued' dial's note carries the holo sentence");
+  assert.equal(holoTimes(outsideGlossary(html)), 1, "and the page says it exactly once");
+  assert.equal(/backing/i.test(html), false, "the page no longer says 'backing': not the gauge's label, not the page's description");
 });
 
 test("the glossary's holo entry says what the name is short for", { skip: !builtPage("docs", "stamps") }, () => {
