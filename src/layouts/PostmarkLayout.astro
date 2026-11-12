@@ -539,22 +539,34 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
     // FAILING SILENT IS THE CONTRACT, not a convenience: a header that throws
     // over a missing ops file is a worse outage than the one it reports. Every
     // failure path lands on console.debug and nothing else.
+    //
+    // THE BOARD IS READ ONCE PER PAGE (POS-1004): `@/lib/sentinel-board.mjs` owns the one fetch of /ops/sentinel.json
+    // (`origin + "/ops/sentinel.json"`, `cache: "no-store"`) and shares it with the late-settlement notice: on load, once a minute
+    // while the page is visible, and on return. This script is a listener: it applies the same alert judgment to each board the
+    // reader hands it, and hides the glyph again if a later board is all green.
     (async function () {
       const wrap = document.querySelector("[data-pm-alert]");
       if (!wrap) return;
       try {
-        const { parseBoard, alertFromBoard } = await import("@/lib/sentinel-alert.mjs");
+        const { alertFromBoard } = await import("@/lib/sentinel-alert.mjs");
+        const { readBoardEvery } = await import("@/lib/sentinel-board.mjs");
         const origin = wrap.dataset.pmAlertOrigin || "";
-        const res = await fetch(origin + "/ops/sentinel.json", { cache: "no-store" });
-        if (!res || !res.ok) { console.debug("pm-alert: no sentinel board (" + (res && res.status) + ")"); return; }
-        const view = alertFromBoard(parseBoard(await res.text()));
-        if (!view.show) return;
-
         const glyph = wrap.querySelector("[data-pm-alert-glyph]");
         const pop = wrap.querySelector("[data-pm-alert-pop]");
         const headEl = wrap.querySelector("[data-pm-alert-headline]");
         const bodyEl = wrap.querySelector("[data-pm-alert-body]");
         const footEl = wrap.querySelector("[data-pm-alert-foot]");
+        let wired = false;
+        let open = false;
+        const set = (next) => {
+          open = next;
+          pop.hidden = !open;
+          wrap.classList.toggle("open", open);
+          glyph.setAttribute("aria-expanded", open ? "true" : "false");
+        };
+        const paint = (board) => {
+        const view = alertFromBoard(board);
+        if (!view.show) { wrap.hidden = true; if (open) set(false); return; }
 
         // textContent throughout: every string here was written by a probe's
         // reason or by a refresh report's detail, and neither is markup.
@@ -580,13 +592,8 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
         }
         footEl.textContent = view.rebake;
 
-        let open = false;
-        const set = (next) => {
-          open = next;
-          pop.hidden = !open;
-          wrap.classList.toggle("open", open);
-          glyph.setAttribute("aria-expanded", open ? "true" : "false");
-        };
+        if (!wired) {
+        wired = true;
         // HOVER, FOCUS **AND** TAP. A hover-only affordance is invisible on a
         // phone, which is where the founder saw the short town. The pointer
         // guard is what keeps the two from fighting: a touch fires
@@ -598,8 +605,11 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
         wrap.addEventListener("focusin", () => set(true));
         wrap.addEventListener("focusout", () => { if (!wrap.contains(document.activeElement)) set(false); });
         document.addEventListener("keydown", (e) => { if (e.key === "Escape" && open) { set(false); glyph.blur(); } });
+        }
 
         wrap.hidden = false;
+        };
+        readBoardEvery(origin, paint);
       } catch (error) {
         console.debug("pm-alert: stood down (" + (error && error.message) + ")");
       }

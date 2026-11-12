@@ -133,7 +133,13 @@ test("the layout's glyph is HIDDEN in the markup and revealed only by the script
 test("the layout reads the sentinel's own published board, and fails to console.debug and nothing louder", () => {
   const src = readFileSync(LAYOUT, "utf8");
   assert.match(src, /data-pm-alert-origin=\{P\}/, "the origin crosses into the browser as an ATTRIBUTE");
-  assert.match(src, /origin \+ "\/ops\/sentinel\.json"/, "the town's board, at the town's origin \u2014 which keeps the harbor's mirrored vhost reading the TOWN's board");
+  // POS-1004: the ONE fetch of the board lives in the shared reader (src/lib/sentinel-board.mjs), which the glyph and the
+  // late-settlement notice both subscribe to; the layout hands it the origin and keeps the alert judgment.
+  const reader = readFileSync(new URL("../src/lib/sentinel-board.mjs", import.meta.url), "utf8");
+  assert.match(reader, /\(origin \|\| ""\) \+ BOARD_PATH/, "the town's board, at the town's origin \u2014 which keeps the harbor's mirrored vhost reading the TOWN's board");
+  assert.match(reader, /export const BOARD_PATH = "\/ops\/sentinel\.json"/);
+  assert.match(src, /readBoardEvery\(origin, paint\)/, "the glyph reads the board through the shared reader, not a second fetch");
+  assert.ok(!/fetch\(origin/.test(src), "the layout makes no board fetch of its own");
   // THE BUG THIS LINE EXISTS FOR, found by the rendered check and by nothing
   // else: the first cut wrote `fetch(`${P}/ops/sentinel.json`)` INSIDE the
   // client script. `P` is Astro frontmatter and does not cross into a browser
@@ -142,7 +148,7 @@ test("the layout reads the sentinel's own published board, and fails to console.
   // there. A server variable interpolated into a client script is the class.
   const clientScript = src.slice(src.indexOf("THE SENTINEL'S GLYPH"), src.indexOf("The notification bell"));
   assert.ok(!/\$\{P\}/.test(clientScript), "no frontmatter variable may be interpolated into the client script");
-  assert.match(src, /cache: "no-store"/, "no-store: the board is published with Cache-Control: no-cache and a stale board is a wrong alarm");
+  assert.match(reader, /cache: "no-store"/, "no-store: the board is published with Cache-Control: no-cache and a stale board is a wrong alarm");
   const script = src.slice(src.indexOf("THE SENTINEL'S GLYPH"), src.indexOf("The notification bell"));
   assert.ok(script.includes("console.debug"), "the failure paths speak at debug");
   for (const loud of ["console.warn", "console.error", "console.log", "alert("]) {
