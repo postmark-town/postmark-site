@@ -67,8 +67,12 @@ function serveDist() {
 
 async function launch(chrome) {
   const profile = mkdtempSync(join(tmpdir(), "pos1004-profile-"));
+  // DETACHED, so the whole browser (its renderer, GPU and zygote helpers too) is one process group that `close` kills as one: a
+  // helper that outlived the main process would keep its inherited stderr pipe open and hold this test process's event loop (and
+  // so the whole `node --test` run) open for ever. The first CI run of this file hung exactly there.
   const child = spawn(chrome, ["--headless=new", "--no-sandbox", "--disable-gpu", "--disable-sync", "--disable-extensions", "--hide-scrollbars",
-    "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+    "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: ["ignore", "ignore", "pipe"], detached: true });
+  child.unref();
   const wsUrl = await new Promise((ok, no) => {
     let buf = "";
     const t = setTimeout(() => no(new Error("no DevTools url within 20 s")), 20_000);
@@ -91,7 +95,12 @@ async function launch(chrome) {
   });
   return {
     send, listeners,
-    close: () => { try { ws.close(); } catch { /* gone */ } try { child.kill("SIGKILL"); } catch { /* gone */ } rmSync(profile, { recursive: true, force: true }); },
+    close: () => {
+      try { ws.close(); } catch { /* gone */ }
+      try { process.kill(-child.pid, "SIGKILL"); } catch { try { child.kill("SIGKILL"); } catch { /* gone */ } }   // the whole group
+      try { child.stderr.destroy(); } catch { /* gone */ }
+      rmSync(profile, { recursive: true, force: true });
+    },
   };
 }
 
@@ -143,12 +152,19 @@ async function boot() {
   else { server = await serveDist(); base = `http://127.0.0.1:${server.address().port}`; }
   browser = await launch(chrome);
 }
-test.after(async () => { browser?.close(); await new Promise((ok) => (server ? server.close(ok) : ok())); });
+// Teardown that cannot hang the run: kill the browser group, drop every connection, and give the server's close a bound.
+test.after(async () => {
+  browser?.close();
+  if (server) {
+    server.closeAllConnections?.();
+    await Promise.race([new Promise((ok) => server.close(ok)), new Promise((ok) => setTimeout(ok, 3000).unref())]);
+  }
+});
 
 const PAGES = [["the front page", "/"], ["the World page", "/world/"]];
 
 for (const [name, path] of PAGES) {
-  test(`${name}: hidden in the built markup, then a forced fresh settlement DOWN shows the exact words, and OK clears it WITHOUT A RELOAD`, { skip: SKIP }, async () => {
+  test(`${name}: hidden in the built markup, then a forced fresh settlement DOWN shows the exact words, and OK clears it WITHOUT A RELOAD`, { skip: SKIP, timeout: 120_000 }, async () => {
     await boot();
     state.bodyFn = fresh("DOWN");
     const p = await openPage(browser, base, path, { width: 1280, board });
@@ -170,7 +186,7 @@ for (const [name, path] of PAGES) {
     } finally { await p.close(); }
   });
 
-  test(`${name}: CONTROLS, nothing shows for OK, STALE, UNKNOWN, INFO, no settlement probe, an old board, another probe's DOWN, a 404 or garbage`, { skip: SKIP }, async () => {
+  test(`${name}: CONTROLS, nothing shows for OK, STALE, UNKNOWN, INFO, no settlement probe, an old board, another probe's DOWN, a 404 or garbage`, { skip: SKIP, timeout: 120_000 }, async () => {
     await boot();
     const controls = [
       ["OK", fresh("OK")], ["STALE", fresh("STALE")], ["UNKNOWN", fresh("UNKNOWN")], ["INFO", fresh("INFO")], ["no settlement probe", fresh(null)],
@@ -194,7 +210,7 @@ for (const [name, path] of PAGES) {
     }
   });
 
-  test(`${name}: at PHONE width (390 px) the notice fits the view, overlaps no control and does not widen the page`, { skip: SKIP }, async () => {
+  test(`${name}: at PHONE width (390 px) the notice fits the view, overlaps no control and does not widen the page`, { skip: SKIP, timeout: 120_000 }, async () => {
     await boot();
     // the baseline: the same page, no notice, at 390 px
     state.bodyFn = fresh("OK");
@@ -223,7 +239,7 @@ for (const [name, path] of PAGES) {
   });
 }
 
-test("the front page: the notice sits BELOW the live ticker and ABOVE the hero", { skip: SKIP }, async () => {
+test("the front page: the notice sits BELOW the live ticker and ABOVE the hero", { skip: SKIP, timeout: 120_000 }, async () => {
   await boot();
   state.bodyFn = fresh("DOWN");
   const p = await openPage(browser, base, "/", { width: 1280, board });
@@ -235,7 +251,7 @@ test("the front page: the notice sits BELOW the live ticker and ABOVE the hero",
   } finally { await p.close(); }
 });
 
-test("the World page: the floating notice is centred, under the top row, and in front of nothing it could hide (it takes no clicks)", { skip: SKIP }, async () => {
+test("the World page: the floating notice is centred, under the top row, and in front of nothing it could hide (it takes no clicks)", { skip: SKIP, timeout: 120_000 }, async () => {
   await boot();
   state.bodyFn = fresh("DOWN");
   const p = await openPage(browser, base, "/world/", { width: 1280, board });
