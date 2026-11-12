@@ -141,11 +141,54 @@ test("a DOWN shown at 18 minutes expires at 20 although the next fetch NEVER fin
   assert.deepEqual(w.shown(), [false], "past twenty minutes it is gone with the fetch still unresolved");
 });
 
+test("a DOWN that is already expired at its first minute beat clears as the NEW read starts (that read never finishes)", async () => {
+  const w = page();
+  w.state.body = fixture("DOWN", { ageMin: 19.5 });
+  await w.start();
+  assert.deepEqual(w.shown(), [true], "19.5 minutes old at load");
+  w.state.hang = true;                                                   // nothing pending yet: the next beat starts the hung read
+  await w.minute();                                                      // 20.5 minutes: expired at this very beat
+  assert.equal(w.fetches.length, 2, "the new read did start");
+  assert.deepEqual(w.shown(), [false], "gone at the beat that starts the read, not a beat later");
+});
+
+test("RETURN to the page with an expired cached DOWN and an unresolved read clears it at once", async () => {
+  const w = page();
+  w.state.body = fixture("DOWN", { ageMin: 18 });
+  await w.start();
+  w.state.hang = true;
+  await w.minute();                                                      // 19 minutes: a read is now pending and never finishes
+  assert.deepEqual(w.shown(), [true]);
+  w.clock.now += 2 * MIN;                                                // the tab slept two minutes: 21, no beat ran
+  await w.ret();
+  assert.deepEqual(w.shown(), [false], "on return the cached board is judged again without waiting for the pending read");
+  assert.equal(w.fetches.length, 2, "and the pending read is joined, not doubled");
+});
+
+test("FLIP: a reader that re-judges only when a read is already pending, or only on a beat, FAILS the two assertions above", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pos1004-flip-"));
+  try {
+    const src = read("src/lib/sentinel-alert.mjs");
+    const beat = "if (!visible()) return; announce(); read();";
+    const ret = "if (!visible()) return; announce(); read();";
+    assert.equal(src.split(beat).length - 1, 2, "both anchors are in the module");
+    const noBeat = src.replace(beat, "if (!visible()) return; if (reader.inflight && reader.last !== undefined) announce(); read();");   // the d29 reader
+    const noReturn = src.replace(`const onReturn = () => { ${ret} };`, "const onReturn = () => { if (visible()) read(); };");
+    assert.notEqual(noBeat, src); assert.notEqual(noReturn, src);
+    const load = async (name, text) => { writeFileSync(join(dir, name), text); return import(pathToFileURL(join(dir, name)).href); };
+    const first = async (mod) => { const w = page({ moduleOverride: mod }); w.state.body = fixture("DOWN", { ageMin: 19.5 }); await w.start(); w.state.hang = true; await w.minute(); assert.deepEqual(w.shown(), [false]); };
+    const back = async (mod) => { const w = page({ moduleOverride: mod }); w.state.body = fixture("DOWN", { ageMin: 18 }); await w.start(); w.state.hang = true; await w.minute(); w.clock.now += 2 * MIN; await w.ret(); assert.deepEqual(w.shown(), [false]); };
+    await first(board); await back(board);
+    await assert.rejects(first(await load("a.mjs", noBeat)), (e) => e?.name === "AssertionError", "the d29 reader keeps a first-expired DOWN up while the new read hangs");
+    await assert.rejects(back(await load("b.mjs", noReturn)), (e) => e?.name === "AssertionError", "a return that only joins the pending read keeps it up");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("FLIP: a reader that repaints only when a fetch finishes FAILS the deferred-fetch expiry above", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pos1004-flip-"));
   try {
     const src = read("src/lib/sentinel-alert.mjs");
-    const text = src.replace("if (reader.inflight && reader.last !== undefined) announce(); ", "");
+    const text = src.replaceAll("announce(); read();", "read();");
     assert.notEqual(text, src, "the flip's anchor is still in the module");
     writeFileSync(join(dir, "sentinel-alert.mjs"), text);
     const mutant = await import(pathToFileURL(join(dir, "sentinel-alert.mjs")).href);

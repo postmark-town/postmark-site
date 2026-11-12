@@ -179,7 +179,7 @@ test("DOWN then OK: the next board clears it, without a reload (the subscriber i
   assert.deepEqual(verdicts, [true]);
   w.state.body = boardText(board("OK"));
   await w.tick(POLL_MS);
-  assert.deepEqual(verdicts, [true, false], "cleared by the next read");
+  assert.deepEqual(verdicts, [true, true, false], "the beat re-judges the cached DOWN (still shown), then the next read clears it");
 });
 
 test("a failed read, a non-OK answer and a body that is not a board all hand the listener null (and speak only at debug)", async () => {
@@ -210,7 +210,7 @@ test("a listener that throws does not stop the others, and the last unsubscribe 
   assert.equal(ok.length, 1, "the other listener still heard");
   off1();
   await w.tick(POLL_MS);
-  assert.equal(ok.length, 2, "still reading while one subscriber remains");
+  assert.equal(ok.length, 3, "still reading while one subscriber remains (the beat's re-judgment of the cached board, then the read)");
   off2();
   const before = w.fetches.length;
   await w.tick(POLL_MS); await w.tick(POLL_MS);

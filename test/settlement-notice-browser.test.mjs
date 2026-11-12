@@ -288,6 +288,110 @@ test("the World page: the floating notice is fixed, takes no clicks, and sits un
 // The by-mail controls come from the viewer that carries POS-1006: set SETTLEMENT_NOTICE_WORLD_DIR (see above). Without it (CI, on the
 // package pin) the chips, Time travel and the Telling are still checked, and the by-mail ones are asserted absent so a silent
 // downgrade of this test is named rather than passed.
+// FOREGROUND, not rectangles: what is painted on top at the centre of each row of the open card. The notice takes no clicks, so it is made to take them for
+// the length of the probe (that is what lets elementFromPoint see it at all) and put back. A row whose topmost element is the notice is masked.
+const FOREGROUND = `(() => {
+  const n = document.querySelector("[data-settlement-notice]"), card = document.querySelector(".wv-bymail");
+  const saved = n.style.pointerEvents; n.style.pointerEvents = "auto";
+  try {
+    const c = card.getBoundingClientRect(), nr = n.getBoundingClientRect();
+    const overlaps = c.left < nr.right && c.right > nr.left && c.top < nr.bottom && c.bottom > nr.top;
+    const masked = []; let sampled = 0;
+    for (const a of [card.querySelector(".wv-bymail-head"), ...card.querySelectorAll(".wv-bymail-link")].filter(Boolean)) {
+      const r = a.getBoundingClientRect(), x = (r.left + r.right) / 2, y = (r.top + r.bottom) / 2;
+      if (x < c.left || x > c.right || y < c.top || y > c.bottom || x < 0 || y < 0 || x > innerWidth || y > innerHeight) continue;   /* scrolled out of the card's own window */
+      sampled += 1;
+      const top = document.elementFromPoint(x, y);
+      if (top && top.closest("[data-settlement-notice]")) masked.push((a.textContent || "").trim().slice(0, 20));
+    }
+    return { overlaps, sampled, masked };
+  } finally { n.style.pointerEvents = saved; }
+})()`;
+const LONG = Array.from({ length: 64 }, (_, i) => `resident-${String(i + 1).padStart(2, "0")}`);
+
+// THE REAL-LENGTH CARD at the short sizes Truey reproduced the masking at: 64 names make the released card as tall as its window.
+for (const [width, height] of [[375, 667], [360, 640], [1024, 600], [844, 390]]) {
+  test(`the World page at ${width}x${height}: a 64-name by-mail card is wholly in front of the notice (and the check bites when the notice is raised above it)`, { skip: SKIP, timeout: 120_000 }, async () => {
+    await boot();
+    state.bodyFn = fresh("DOWN");
+    const p = await openPage(browser, base, "/world/", { width, height, board, walkers: LONG });
+    try {
+      await p.until(`(${NOTICE})?.shown === true`, "the notice");
+      await new Promise((ok) => setTimeout(ok, 2800));
+      if (!WORLD_DIR) {   // CI on the pinned viewer: there is no by-mail card to look through (a skip would fail built-pages), so say so by asserting its absence
+        assert.equal(await p.evalJs(`document.querySelector(".pm-bymail-btn") === null`), true, "no by-mail button on the pinned viewer: this run did not check the long card (set SETTLEMENT_NOTICE_WORLD_DIR)");
+        return;
+      }
+      await p.evalJs(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); true`);
+      await p.until(`(() => { const b = document.querySelector(".pm-bymail-btn"); return !!b && !b.hidden; })()`, "the by-mail button");
+      await p.evalJs(`document.querySelector(".pm-bymail-btn").click(); true`);
+      await p.until(`(() => { const c = document.querySelector(".wv-bymail"); return !!c && c.getClientRects().length > 0; })()`, "the by-mail card to open");
+      assert.equal(await p.evalJs(`document.querySelectorAll(".wv-bymail-link").length`), 64, "the real-length list");
+      const fg = await p.evalJs(FOREGROUND);
+      assert.ok(fg.sampled > 0, "rows of the card were sampled");
+      assert.deepEqual(fg.masked, [], `no row of the card is under the notice (rectangles overlap: ${fg.overlaps})`);
+      assert.equal((await p.evalJs(NOTICE)).shown, false, "the World notice steps aside while the card is open");
+      if (fg.overlaps) {   // the falsifier: the d29 paint order (the notice above the card, not stepping aside) must be caught by this very check
+        await p.evalJs(`(() => { const n = document.querySelector("[data-settlement-notice]"); n.style.zIndex = "8500"; n.style.visibility = "visible"; })(); true`);
+        const old = await p.evalJs(FOREGROUND);
+        assert.ok(old.masked.length > 0, "with the step-aside undone and the notice raised to the old z-index 8500 the same check finds masked rows");
+      }
+    } finally { await p.close(); }
+  });
+}
+
+// R1 (Wright, 06:46Z): the WORLD notice steps aside while the by-mail card, the search-results list or the bell menu is open, and returns on close. The
+// bell's menu is the viewer's phone control, so it is opened at phone width; the by-mail card needs the S165 viewer (SETTLEMENT_NOTICE_WORLD_DIR).
+for (const [width, height, lists] of [[390, 844, ["search", "bell", "bymail"]], [1280, 800, ["search", "bymail"]]]) {
+  test(`the World page at ${width}x${height}: DOWN shows, then each open list (${lists.join(", ")}) hides the notice and closing it brings it back`, { skip: SKIP, timeout: 120_000 }, async () => {
+    await boot();
+    state.bodyFn = fresh("DOWN");
+    const p = await openPage(browser, base, "/world/", { width, height, board, walkers: INVENTED });
+    try {
+      await p.until(`(${NOTICE})?.shown === true`, "the notice");
+      await p.until(`document.querySelector(".pm-tt-open") !== null`, "the viewer");
+      await new Promise((ok) => setTimeout(ok, 2800));
+      await p.evalJs(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); true`);
+      const shown = async () => (await p.evalJs(NOTICE)).shown;
+      assert.equal(await shown(), true, "DOWN: shown before any list is open");
+      const steps = {
+        search: [`(() => { const i = document.querySelector(".wv-search-input"); i.value = "a"; i.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`, `(() => { const r = document.querySelector(".wv-search-results"); return !!r && !r.hidden; })()`,
+          `(() => { const i = document.querySelector(".wv-search-input"); i.value = ""; i.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`],
+        bell: [`(() => { document.querySelector(".wv-bell").click(); return true; })()`, `(() => { const m = document.querySelector(".wv-bell-menu"); return !!m && !m.hidden; })()`, `(() => { document.querySelector(".wv-bell").click(); return true; })()`],
+        bymail: [`(() => { document.querySelector(".pm-bymail-btn").click(); return true; })()`, `(() => { const c = document.querySelector(".wv-bymail"); return !!c && c.classList.contains("pm-bymail-open") && c.getClientRects().length > 0; })()`, `(() => { document.querySelector(".pm-bymail-btn").click(); return true; })()`],
+      };
+      for (const list of lists) {
+        if ((list === "bymail" || list === "bell") && !WORLD_DIR) continue;   // the pinned viewer has neither the by-mail card nor the phone bell menu (CI): the search list is still checked
+        const [open, isOpen, close] = steps[list];
+        await p.evalJs(open);
+        await p.until(isOpen, `the ${list} list to be open`);
+        await p.until(`(${NOTICE})?.shown === false`, `the notice to step aside for the open ${list} list`);
+        const hidden = await p.evalJs(`getComputedStyle(document.querySelector("[data-settlement-notice]")).visibility`);
+        assert.equal(hidden, "hidden", `${list}: hidden while open`);
+        await p.evalJs(close);
+        await p.until(`!(${isOpen})`, `the ${list} list to close`);
+        await p.until(`(${NOTICE})?.shown === true`, `the notice to return when the ${list} list closes`);
+      }
+      // the predicate is unchanged: a list that is open does not make an OK board show anything, and OK still clears a shown one
+      state.bodyFn = fresh("OK");
+      await p.evalJs(`document.dispatchEvent(new Event("visibilitychange")); window.dispatchEvent(new Event("pageshow")); true`);
+      await p.until(`(${NOTICE})?.shown === false`, "OK to clear it");
+    } finally { await p.close(); }
+  });
+}
+
+test("the front page: its notice never steps aside for these lists (only the World's does)", { skip: SKIP, timeout: 120_000 }, async () => {
+  await boot();
+  state.bodyFn = fresh("DOWN");
+  const p = await openPage(browser, base, "/", { width: 1280, board });
+  try {
+    await p.until(`(${NOTICE})?.shown === true`, "the front notice");
+    await p.evalJs(`(() => { for (const cls of ["wv-bymail pm-bymail-open", "wv-search-results", "wv-bell-menu"]) { const e = document.createElement("div"); e.className = cls; e.textContent = "x"; document.body.appendChild(e); } return true; })()`);
+    await new Promise((ok) => setTimeout(ok, 300));
+    assert.equal((await p.evalJs(NOTICE)).shown, true, "with all three present and visible, the front notice still shows");
+  } finally { await p.close(); }
+});
+
 const INVENTED = ["ash", "birch", "wren", "cedar", "fern", "moss", "pike", "quill", "rook", "sage", "tern", "vale"];
 const CLEARANCE = `(() => {
   const n = document.querySelector("[data-settlement-notice]").getBoundingClientRect();
@@ -328,7 +432,11 @@ for (const [width, height] of [[1280, 800], [1920, 1080], [1180, 800], [1024, 80
         await p.until(`(() => { const c = document.querySelector(".wv-bymail"); return !!c && c.getClientRects().length > 0; })()`, "the by-mail card to open");
         const open = await p.evalJs(CLEARANCE);
         assert.ok(open.present.byMailCard > 0, "the open by-mail card is drawn, so it is checked");
-        assert.deepEqual(open.hits, [], `with the by-mail card open, the notice ${JSON.stringify(open.notice)} covers nothing`);
+        // the open card is an interactive panel and paints ABOVE the passive notice, so a rectangle that overlaps it is harmless: what must hold is that
+        // nothing ELSE is covered, and (FOREGROUND, below) that no row of the card is masked.
+        assert.deepEqual(open.hits.filter((h) => !h.startsWith("byMailCard")), [], `with the by-mail card open, the notice ${JSON.stringify(open.notice)} covers no other control`);
+        const fg = await p.evalJs(FOREGROUND);
+        assert.deepEqual(fg.masked, [], "no row of the open card is under the notice");
       }
       const view = await p.evalJs(`(() => { const r = document.querySelector("[data-settlement-notice]").getBoundingClientRect(); return { l: r.left, r: r.right, b: r.bottom, w: innerWidth, h: innerHeight }; })()`);
       assert.ok(view.l >= 0 && view.r <= view.w && view.b <= view.h, `the notice is wholly inside the view ${JSON.stringify(view)}`);

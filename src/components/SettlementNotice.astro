@@ -64,9 +64,13 @@ const { variant = "flow", origin = "" } = Astro.props;
        · 1161 px up    the app frame: the painting is the right column and its search and icon row end ~90 px: seat it under that row, right-aligned,
                        no wider than the painting's column (the Telling is 740 px wide);
        · 720 px down   the painting alone: the top ~170 px is the search, the icon row and the Time travel / by-mail row, and their cards open below
-                       at ~174 px, so the notice goes to the foot of the painting, above the elevation pill. */
+                       at ~174 px, so the notice goes to the foot of the painting, above the elevation pill.
+     PAINT ORDER: it is passive (takes no clicks) and sits at z-index 1, under the site's own panels (the Time travel body 8000, the sign-in cluster 9000).
+     The viewer's by-mail card, search list and bell menu live INSIDE the painting's own stacking context (.wv-sticky is position:sticky), so no z-index
+     can put a notice between the painting and them: the World notice STEPS ASIDE while any of the three is open (the rule below, the same pattern as
+     WLD-47's "chrome steps aside for an open list" in world.astro) and returns the moment it closes. The front page's notice never does. */
   .sn-over {
-    box-sizing: border-box; position: fixed; top: 118px; left: 12px; right: 12px; margin-inline: auto; width: fit-content; z-index: 8500;
+    box-sizing: border-box; position: fixed; top: 118px; left: 12px; right: 12px; margin-inline: auto; width: fit-content; z-index: 1;
     max-width: min(27rem, calc(100vw - 24px)); padding: 6px 14px;
     background: rgba(20, 23, 29, 0.86); border: 1px solid rgba(232, 196, 139, 0.4); border-radius: 999px;
     backdrop-filter: blur(4px); pointer-events: none;
@@ -74,6 +78,8 @@ const { variant = "flow", origin = "" } = Astro.props;
   @media (min-width: 1161px) {
     .sn-over { top: 100px; left: auto; right: 12px; margin-inline: 0; max-width: min(27rem, calc(100vw - 764px)); }
   }
+  /* all widths: an open by-mail card, search-results list or bell menu is in front; the notice is hidden for as long as one is open */
+  :global(body:has(.wv-bymail.pm-bymail-open:not([hidden]), .wv-search-results:not([hidden]), .wv-bell-menu:not([hidden]))) .sn-over { visibility: hidden; }
   @media (max-width: 720px) {
     .sn-over { top: auto; bottom: 56px; border-radius: 14px; font-size: 0.7rem; }
   }
