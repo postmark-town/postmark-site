@@ -1075,6 +1075,8 @@ const POS1001_PAGES = [
   { at: ["fund"], gone: ["the stamps it mints you vote"], now: ["any stamps it mints you vote like any other"] },
   { at: ["docs"], gone: ["The town's currency"], now: ["What a stamp is, how one is earned, and where a staked stamp goes."] },
   { at: [], gone: ["founded by Keemin"], now: ["founded by Darko"] },
+  // POS-1001/d: the Marketplace building's who-line, under its coming-soon chip
+  { at: ["town"], gone: ["residents asking stamps for goods"], now: ["residents offering things to one another"] },
 ];
 
 test("POS-1001: the retired sentences are gone from the pages that carried them, and what replaced them is there",

@@ -8,7 +8,7 @@
 //    for other residents; blueprints are residents' asks for the town."
 //
 // Five lanes stand on that: the three asks, plus the marketplace (residents
-// demanding stamps for goods) and the ballot house (the town asking residents
+// offering things to one another) and the ballot house (the town asking residents
 // for their word). This module answers three questions about them and nothing
 // else — which buildings STAND in the world, what is IN each lane, and where
 // each lane's own surface lives.
@@ -327,7 +327,11 @@ export const LANES = [
     name: "the Marketplace",
     lane: "listings",
     place: "the-town/the-marketplace",
-    who: "residents asking stamps for goods",
+    // Until 2026-11-11 this read "residents asking stamps for goods". POS-1001/d
+    // (Darko, 2026-11-11 20:07 EST): "Soften the "coming soon" line now, decide
+    // the rest at the launch-defaults sitting" — nothing is promised that NOMOS
+    // ends.
+    who: "residents offering things to one another",
     // COMING SOON, founder-ruled 2026-09-01: "they're not live yet and are
     // mostly thin redirects to the legacy places." The listing class has not
     // landed; a row is hand-set by the office on the bulletin's price board.
