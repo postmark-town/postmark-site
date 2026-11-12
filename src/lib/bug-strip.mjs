@@ -197,8 +197,7 @@ export const PANELS = Object.freeze([
     bubble: {
       title: t`Reproduced: ${S(L.reproduced.n)}`,
       lines: [
-        t`Whoever first shows the bug happening on the record (a run of the steps, or a record that shows it) is credited, whether or not it was their bug.`,
-        t`Steps written from reading the code earn the report, not this stage.`,
+        t`Whoever first shows the bug happening on the record is credited, whether or not it was their bug.`,
       ],
     },
   },
