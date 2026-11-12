@@ -23,7 +23,6 @@ import { lensPostings, latestPostings, postingWhen } from "@/lib/bulletin-cards.
 import { noticePath } from "@/lib/bulletin-notice.mjs";
 import { letterAddresses, letterHref } from "@/lib/mail.mjs";
 import { tickerDeliveries } from "@/lib/front-ticker.mjs";
-import SettlementNotice from "@/components/SettlementNotice.astro";
 import { houseOf, nameplate } from "@/lib/household.mjs";
 import { madeInTown } from "@/lib/projects-page.mjs";
 import { loadWorldState } from "@/lib/board.mjs";
@@ -151,9 +150,6 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
       </div>
       <a class="tk-all" href="/mail/">all {stats.deliveries} deliveries →</a>
     </section>
-
-    <!-- ── LATE-SETTLEMENT NOTICE (POS-1004): below the live ticker, above the hero; hidden unless the sentinel says the settlement is DOWN ── -->
-    <SettlementNotice variant="flow" />
 
     <!-- ── HERO ─────────────────────────────────────────────── -->
     <section class="hero">

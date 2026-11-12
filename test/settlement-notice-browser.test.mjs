@@ -3,9 +3,12 @@
 //   node --test test/settlement-notice-browser.test.mjs
 //
 // WHAT THIS PROVES that test/settlement-notice.test.mjs (the component's script against the real reader, in a vm) cannot: that
-// the BUILT front page and World page carry the notice in the right seat, that it renders the exact words, that it appears under
-// a forced fresh `settlement` DOWN board and nowhere else, that it clears WITHOUT A RELOAD when the board goes OK, and that it
-// fits a phone-width view without overlapping a control or widening the page.
+// the BUILT World page carries the notice in the right seat, that it renders the exact words, that it appears under a forced
+// fresh `settlement` DOWN board and nowhere else, that it clears WITHOUT A RELOAD when the board goes OK, and that it fits a
+// phone-width view without overlapping a control or widening the page. And, for the front page (Darko, 2026-11-12 09:06 EST:
+// "1004 should just be lumped into the red exclamation point that already exists on the main site. world page version is fine"):
+// that it has NO line of its own, and that the same forced DOWN lights the header's existing red mark, whose popover says the
+// plain words, and that OK clears the mark without a reload.
 //
 // HOW: it serves the built site (dist-town/, the same one `npm run build` makes; the built-pages CI job builds it first) from a
 // tiny static server, drives headless Chrome over CDP (Node's global WebSocket; a throwaway profile, no sync, no extensions),
@@ -29,6 +32,7 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const DIST = join(ROOT, "dist-town");
 const BASE_URL = process.env.SETTLEMENT_NOTICE_BASE_URL || null;
 const WORDS = "The latest World settlement is running late. It will show here as soon as it's published.";
+const GLYPH_WORDS = "The latest World settlement is running late. It will show as soon as it's published.";   // the header mark's row (no "here": it is never on the World page)
 
 const builtPages = existsSync(join(DIST, "index.html")) && existsSync(join(DIST, "world", "index.html"));
 const SKIP = BASE_URL || builtPages ? false : "no built pages (dist-town/) and no SETTLEMENT_NOTICE_BASE_URL: nothing to render";
@@ -159,6 +163,8 @@ const fresh = (settlement, { ageMin = 2, extra = [] } = {}) => () => JSON.string
 const board = { body: () => state.bodyFn(), get reads() { return state.reads; }, set reads(v) { state.reads = v; } };
 
 const NOTICE = `(() => { const e = document.querySelector("[data-settlement-notice]"); if (!e) return null; const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return { hiddenAttr: e.hidden, shown: !e.hidden && cs.display !== "none" && cs.visibility !== "hidden" && r.width > 0 && r.height > 0, text: e.textContent.trim().replace(/\\s+/g, " "), rect: { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height } }; })()`;
+// THE HEADER'S RED MARK (src/layouts/PostmarkLayout.astro, the sentinel's glyph since 2026-09-17): shown, open, its colour at rest, and its popover's rows.
+const GLYPH = `(() => { const w = document.querySelector("[data-pm-alert]"); if (!w) return null; const g = w.querySelector("[data-pm-alert-glyph]"), pop = w.querySelector("[data-pm-alert-pop]"); const r = g.getBoundingClientRect(), pr = pop.getBoundingClientRect(); return { shown: !w.hidden && getComputedStyle(w).display !== "none" && r.width > 0 && r.height > 0, open: !pop.hidden && pr.width > 0, color: getComputedStyle(g).color, rows: [...w.querySelectorAll(".pm-alert-row")].map((li) => li.textContent.replace(/\\s+/g, " ").trim()), pop: { left: pr.left, right: pr.right, top: pr.top, bottom: pr.bottom } }; })()`;
 
 let chrome = null, server = null, browser = null, base = null;
 async function boot() {
@@ -178,7 +184,9 @@ test.after(async () => {
   }
 });
 
-const PAGES = [["the front page", "/"], ["the World page", "/world/"]];
+// Until 2026-11-12 the front page was a second entry here, with its own notice line. It is now read through the header's red
+// mark (the front-page tests after this loop).
+const PAGES = [["the World page", "/world/"]];
 
 for (const [name, path] of PAGES) {
   test(`${name}: hidden in the built markup, then a forced fresh settlement DOWN shows the exact words, and OK clears it WITHOUT A RELOAD`, { skip: SKIP, timeout: 120_000 }, async () => {
@@ -250,21 +258,83 @@ for (const [name, path] of PAGES) {
           if (r.width === 0 || r.height === 0 || cs.visibility === "hidden" || cs.display === "none" || e.hidden) return false;
           return r.left < n.right && r.right > n.left && r.top < n.bottom && r.bottom > n.top; });
         return over.map((e) => { const r = e.getBoundingClientRect(); return (e.id || e.className || e.tagName).toString().slice(0, 40) + " [" + [r.left, r.top, r.right, r.bottom].map(Math.round).join(",") + "] vs notice [" + [n.left, n.top, n.right, n.bottom].map(Math.round).join(",") + "]"; }); })()`);
-      if (name === "the front page") assert.deepEqual(hit, [], "a flow notice sits between the ticker and the hero and covers no control");
-      else assert.deepEqual(hit.filter((h) => !/^$/.test(h)), [], "the floating notice sits clear of the World's top controls");
+      assert.deepEqual(hit.filter((h) => !/^$/.test(h)), [], "the floating notice sits clear of the World's top controls");
     } finally { await p.close(); }
   });
 }
 
-test("the front page: the notice sits BELOW the live ticker and ABOVE the hero", { skip: SKIP, timeout: 120_000 }, async () => {
+// ── THE FRONT PAGE: no line of its own; a late settlement is the header's red mark (Darko, 2026-11-12 09:06 EST) ─────────────
+// Until 2026-11-12 these asserted a notice line below the live ticker and above the hero, that never stepped aside for the World's lists.
+
+test("the front page: NO line of its own; a forced fresh settlement DOWN lights the header's red mark, its popover says the plain words, and OK clears it WITHOUT A RELOAD", { skip: SKIP, timeout: 120_000 }, async () => {
   await boot();
   state.bodyFn = fresh("DOWN");
   const p = await openPage(browser, base, "/", { width: 1280, board });
   try {
-    await p.until(`(${NOTICE})?.shown === true`, "the notice");
-    const order = await p.evalJs(`(() => { const t = document.querySelector("section.ticker").getBoundingClientRect(), n = document.querySelector("[data-settlement-notice]").getBoundingClientRect(), h = document.querySelector("section.hero").getBoundingClientRect(); return { tickerBottom: t.bottom, noticeTop: n.top, noticeBottom: n.bottom, heroTop: h.top }; })()`);
-    assert.ok(order.noticeTop >= order.tickerBottom - 1, `below the ticker (${order.noticeTop} >= ${order.tickerBottom})`);
-    assert.ok(order.noticeBottom <= order.heroTop + 1, `above the hero (${order.noticeBottom} <= ${order.heroTop})`);
+    await p.until(`(${GLYPH})?.shown === true`, "the header's red mark to light under a forced settlement DOWN");
+    assert.equal(await p.evalJs(`document.querySelectorAll("[data-settlement-notice]").length`), 0,
+      "Darko 2026-11-12 09:06 EST: \"1004 should just be lumped into the red exclamation point that already exists on the main site\": the front page grows no notice line of its own");
+    const rest = await p.evalJs(GLYPH);
+    assert.equal(rest.color, "rgb(224, 132, 107)", "it is the existing red mark, its look unchanged (#e0846b)");
+    assert.equal(rest.open, false, "closed until a reader hovers, focuses or taps it");
+    await p.evalJs(`document.querySelector("[data-pm-alert-glyph]").click(); true`);
+    await p.until(`(${GLYPH})?.open === true`, "its popover to open on a tap");
+    const g = await p.evalJs(GLYPH);
+    assert.equal(g.rows.length, 1, `one row, the settlement's (${JSON.stringify(g.rows)})`);
+    assert.ok(g.rows[0].endsWith("the settlement — " + GLYPH_WORDS), `the row says the plain words (${g.rows[0]})`);
+    assert.ok(!g.rows[0].includes("forced by the test"), "and not the sentinel's own reason");
+    // clear without a reload: mark the document, flip the board to OK, return to the page, and wait
+    await p.evalJs(`window.__noReload = "still here"; true`);
+    const readsBefore = board.reads;
+    state.bodyFn = fresh("OK");
+    await p.evalJs(`document.dispatchEvent(new Event("visibilitychange")); window.dispatchEvent(new Event("pageshow")); true`);
+    await p.until(`(${GLYPH})?.shown === false`, "the red mark to clear after the board reads OK");
+    assert.equal(await p.evalJs(`window.__noReload`), "still here", "the same document: it cleared without a reload");
+    assert.ok(board.reads > readsBefore, "by reading the board again");
+    assert.equal(await p.evalJs(`document.querySelectorAll("[data-settlement-notice]").length`), 0, "and no notice line appeared on the way");
+  } finally { await p.close(); }
+});
+
+test("the front page: CONTROLS, the plain words appear for a fresh settlement DOWN only; OK shows no mark; STALE, an old board and another probe's DOWN keep the mark's own words", { skip: SKIP, timeout: 120_000 }, async () => {
+  await boot();
+  const controls = [
+    ["OK", fresh("OK"), false], ["STALE", fresh("STALE"), true], ["a 25-minute-old DOWN", fresh("DOWN", { ageMin: 25 }), true],
+    ["another probe's DOWN", fresh("OK", { extra: [{ key: "settlement_tag", label: "the settlement tag", verdict: "DOWN", reason: "forced by the test" }] }), true],
+  ];
+  for (const [label, bodyFn, lit] of controls) {
+    state.bodyFn = bodyFn;
+    const reads0 = board.reads;
+    const p = await openPage(browser, base, "/", { width: 1280, board });
+    try {
+      for (const t0 = Date.now(); board.reads === reads0 && Date.now() - t0 < 10_000;) await new Promise((ok) => setTimeout(ok, 100));
+      assert.ok(board.reads > reads0, `${label}: the page asked for the board`);
+      if (lit) await p.until(`(${GLYPH})?.shown === true`, `${label}: the mark (the sentinel's own judgment, unchanged)`);
+      else await new Promise((ok) => setTimeout(ok, 600));
+      const g = await p.evalJs(GLYPH);
+      assert.equal(g.shown, lit, `${label}: the mark ${lit ? "shows" : "does not show"}`);
+      assert.ok(!g.rows.some((r) => r.includes(GLYPH_WORDS)), `${label}: no plain settlement line (${JSON.stringify(g.rows)})`);
+      assert.equal(await p.evalJs(`document.querySelectorAll("[data-settlement-notice]").length`), 0, `${label}: no notice line`);
+    } finally { await p.close(); }
+  }
+});
+
+test("the front page at PHONE width (390 px): the red mark's open popover with the plain words fits the view and does not widen the page", { skip: SKIP, timeout: 120_000 }, async () => {
+  await boot();
+  state.bodyFn = fresh("OK");
+  const base0 = await openPage(browser, base, "/", { width: 390, board });
+  let baseWidth;
+  try { await new Promise((ok) => setTimeout(ok, 1500)); baseWidth = await base0.evalJs(`document.documentElement.scrollWidth`); } finally { await base0.close(); }
+  state.bodyFn = fresh("DOWN");
+  const p = await openPage(browser, base, "/", { width: 390, board });
+  try {
+    await p.until(`(${GLYPH})?.shown === true`, "the red mark at 390 px");
+    await p.evalJs(`document.querySelector("[data-pm-alert-glyph]").click(); true`);
+    await p.until(`(${GLYPH})?.open === true`, "its popover to open on a tap");
+    const g = await p.evalJs(GLYPH);
+    assert.ok(g.rows.some((r) => r.endsWith(GLYPH_WORDS)), "the same words on a phone");
+    assert.ok(g.pop.left >= 0 && g.pop.right <= 390, `the popover is inside the 390 px view (left ${g.pop.left}, right ${g.pop.right})`);
+    assert.ok(await p.evalJs(`document.documentElement.scrollWidth`) <= Math.max(baseWidth, 390), "the mark did not widen the page");
+    assert.equal(await p.evalJs(`document.querySelectorAll("[data-settlement-notice]").length`), 0, "no notice line on a phone either");
   } finally { await p.close(); }
 });
 
@@ -379,18 +449,6 @@ for (const [width, height, lists] of [[390, 844, ["search", "bell", "bymail"]], 
     } finally { await p.close(); }
   });
 }
-
-test("the front page: its notice never steps aside for these lists (only the World's does)", { skip: SKIP, timeout: 120_000 }, async () => {
-  await boot();
-  state.bodyFn = fresh("DOWN");
-  const p = await openPage(browser, base, "/", { width: 1280, board });
-  try {
-    await p.until(`(${NOTICE})?.shown === true`, "the front notice");
-    await p.evalJs(`(() => { for (const cls of ["wv-bymail pm-bymail-open", "wv-search-results", "wv-bell-menu"]) { const e = document.createElement("div"); e.className = cls; e.textContent = "x"; document.body.appendChild(e); } return true; })()`);
-    await new Promise((ok) => setTimeout(ok, 300));
-    assert.equal((await p.evalJs(NOTICE)).shown, true, "with all three present and visible, the front notice still shows");
-  } finally { await p.close(); }
-});
 
 const INVENTED = ["ash", "birch", "wren", "cedar", "fern", "moss", "pike", "quill", "rook", "sage", "tern", "vale"];
 const CLEARANCE = `(() => {

@@ -3,7 +3,10 @@
 //
 // Darko, 2026-11-11 16:32 EST: "some kind of like temporary exclamation point ... on the site, like an alarm for the settlement
 // being delayed." RULED 20:08 EST: "a small notice on the World page and the town's front page, cleared automatically when the
-// settlement lands". Wright's 2026-11-12 02:14Z approval: ONE state only. The words are in ONE home, src/lib/sentinel-alert.mjs
+// settlement lands". Then 2026-11-12 09:06 EST: "1004 should just be lumped into the red exclamation point that already exists on
+// the main site. world page version is fine". So this component is the World page's only: the front page has no line of its own,
+// and a late settlement shows there through the header glyph (src/layouts/PostmarkLayout.astro; its row's words are
+// alertFromBoard's). Wright's 2026-11-12 02:14Z approval: ONE state only. The words are in ONE home, src/lib/sentinel-alert.mjs
 // (SETTLEMENT_NOTICE_TEXT), rendered here at build time; the judgment is `settlementNoticeFromBoard` there too.
 //
 // IT IS HIDDEN BY DEFAULT AND HIDDEN BY ABSENCE. The markup ships `hidden`; the script reveals it only for a readable board no
@@ -14,11 +17,11 @@
 //
 // A temporary exclamation point, not a banner: one small line, a small mark, no colour block, no close button (it clears itself).
 //
-// `variant="flow"` sits in the page's own flow (the front page: below the live ticker, above the hero). `variant="over"` floats
-// over the World viewer (a layout-less passthrough of the viewer shell: below its top controls, above the view).
+// `variant="over"` floats over the World viewer (a layout-less passthrough of the viewer shell: below its top controls, above the
+// view). It is the one seat.
 import { SETTLEMENT_NOTICE_TEXT } from "@/lib/sentinel-alert.mjs";
 
-const { variant = "flow", origin = "" } = Astro.props;
+const { variant = "over", origin = "" } = Astro.props;
 ---
 <p class={`sn sn-${variant}`} data-settlement-notice data-sn-origin={origin} role="status" hidden>
   <span class="sn-mark" aria-hidden="true">!</span><span class="sn-text">{SETTLEMENT_NOTICE_TEXT}</span>
@@ -57,8 +60,6 @@ const { variant = "flow", origin = "" } = Astro.props;
     font-weight: 700; font-size: 0.85em;
   }
   .sn-text { text-wrap: balance; text-align: center; }
-  /* the front page: in flow, a quiet line between the ticker and the hero */
-  .sn-flow { padding: 8px 14px; background: rgba(20, 23, 29, 0.55); border-bottom: 1px solid rgba(232, 196, 139, 0.16); }
   /* the World: floats over the viewer, UNDER its top controls, never across them. The viewer draws three layouts (its own breakpoints):
        · 721–1160 px   the Telling stacks above the painting and the page scrolls: seat it below the Telling's filter-chip row (chips end ~107 px);
        · 1161 px up    the app frame: the painting is the right column and its search and icon row end ~90 px: seat it under that row, right-aligned,
@@ -68,7 +69,7 @@ const { variant = "flow", origin = "" } = Astro.props;
      PAINT ORDER: it is passive (takes no clicks) and sits at z-index 1, under the site's own panels (the Time travel body 8000, the sign-in cluster 9000).
      The viewer's by-mail card, search list and bell menu live INSIDE the painting's own stacking context (.wv-sticky is position:sticky), so no z-index
      can put a notice between the painting and them: the World notice STEPS ASIDE while any of the three is open (the rule below, the same pattern as
-     WLD-47's "chrome steps aside for an open list" in world.astro) and returns the moment it closes. The front page's notice never does. */
+     WLD-47's "chrome steps aside for an open list" in world.astro) and returns the moment it closes. */
   .sn-over {
     box-sizing: border-box; position: fixed; top: 118px; left: 12px; right: 12px; margin-inline: auto; width: fit-content; z-index: 1;
     max-width: min(27rem, calc(100vw - 24px)); padding: 6px 14px;

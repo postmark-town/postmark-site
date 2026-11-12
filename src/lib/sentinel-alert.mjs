@@ -76,6 +76,11 @@ export function alertFromBoard(board, { nowMs = Date.now() } = {}) {
   const probes = Array.isArray(board.probes) ? board.probes : null;
   if (!probes) return none;
 
+  // A LATE SETTLEMENT IS SAID IN PLAIN WORDS (POS-1004; Darko, 2026-11-12 09:06 EST: "1004 should just be lumped into the red
+  // exclamation point that already exists on the main site"). The `settlement` probe's DOWN already raises the glyph, as every DOWN
+  // does; what changes is its row: under the notice's one judgment (settlementNoticeFromBoard, below) the row says
+  // SETTLEMENT_LATE_LINE instead of the sentinel's operator reason. Whether the glyph shows is untouched.
+  const late = settlementNoticeFromBoard(board, { nowMs }).show;
   const rows = [];
   for (const p of probes) {
     if (p == null || typeof p !== "object") continue;
@@ -88,8 +93,10 @@ export function alertFromBoard(board, { nowMs = Date.now() } = {}) {
       reason: typeof p.reason === "string" ? p.reason : "",
       // `detail` is the refresh report's own sentence, carried onto the board by
       // the office's site_refresh probe so this popover can say "48 doors are
-      // missing" rather than only "failed".
-      detail: typeof p.detail === "string" && p.detail !== "" ? p.detail : null,
+      // missing" rather than only "failed". For a late settlement it is the
+      // plain line above.
+      detail: late && p.key === SETTLEMENT_PROBE_KEY ? SETTLEMENT_LATE_LINE
+        : (typeof p.detail === "string" && p.detail !== "" ? p.detail : null),
       age: Number.isFinite(sinceMs) ? humanAge(nowMs - sinceMs) : null,
     });
   }
@@ -113,7 +120,10 @@ export function alertFromBoard(board, { nowMs = Date.now() } = {}) {
 // Darko, 2026-11-11 16:32 EST: residents wait an ambiguous time after the advertised settlement hours (06:00 and 18:00 UTC), and
 // he wants "some kind of like temporary exclamation point ... on the site, like an alarm for the settlement being delayed."
 // RULED, Darko 20:08 EST: "Yes, a small notice on the World page and the town's front page, cleared automatically when the
-// settlement lands". Wright's 2026-11-12 02:14Z build approval, which replaces the earlier two-state proposal:
+// settlement lands". Then, 2026-11-12 09:06 EST, after the pictures: "1004 should just be lumped into the red exclamation point that
+// already exists on the main site. world page version is fine". So the World page keeps its notice, and the front page has no line
+// of its own: there a late settlement is the header glyph's row, in plain words (alertFromBoard, above).
+// Wright's 2026-11-12 02:14Z build approval, which replaces the earlier two-state proposal:
 //
 //   · the `settlement` probe reads DOWN on a board no more than 20 minutes old: show the notice;
 //   · anything else (OK, STALE, UNKNOWN, INFO, a missing or unreadable board or timestamp, no `settlement` probe, an old board):
@@ -130,11 +140,15 @@ export function alertFromBoard(board, { nowMs = Date.now() } = {}) {
 //
 // TWO HALVES, KEPT APART so each can be falsified without a browser:
 //   · pure: `settlementNoticeFromBoard` (the judgment) and `SETTLEMENT_NOTICE_TEXT` (the words, in this one home);
-//   · the reader: `readBoardEvery`, one fetch of /ops/sentinel.json per page, shared by every consumer (the header glyph and the
-//     notice), on load, once a minute while the page is visible, and on return to it.
+//   · the reader: `readBoardEvery`, one fetch of /ops/sentinel.json per page, shared by every consumer on it (the header glyph on
+//     layout pages, the notice on the World page), on load, once a minute while the page is visible, and on return to it.
 
-/** The notice's words, exactly as approved. The ONE home: both pages render this constant. */
+/** The notice's words, exactly as approved. The ONE home: the World page renders this constant. */
 export const SETTLEMENT_NOTICE_TEXT = "The latest World settlement is running late. It will show here as soon as it's published.";
+
+/** The same words for the header glyph's row (alertFromBoard, above), less "here": the glyph is on the front page and every other
+ *  layout page, never on the World page, which is where the settlement shows. */
+export const SETTLEMENT_LATE_LINE = "The latest World settlement is running late. It will show as soon as it's published.";
 
 /** A board older than this says nothing about the settlement: the watchman's own beat is the board's `generated_at`. */
 export const BOARD_MAX_AGE_MS = 20 * 60 * 1000;

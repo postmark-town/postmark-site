@@ -1,11 +1,13 @@
-// settlement-notice.test.mjs — the late-settlement notice on the World page and the town's front page (POS-1004, part 2 of 2).
+// settlement-notice.test.mjs — the late-settlement notice on the World page (POS-1004, part 2 of 2).
 //
 //   node --test test/settlement-notice.test.mjs      (no network, no browser, nothing live: invented boards only)
 //
 // LAW: Darko 20:08 EST, "a small notice on the World page and the town's front page, cleared automatically when the settlement
 // lands"; Wright's 2026-11-12 02:14Z approval: ONE state, the words "The latest World settlement is running late. It will show
-// here as soon as it's published.", seated on the World page below the top controls and above the view and on the front page
-// below the live ticker and above the hero, a "temporary exclamation point", not a banner.
+// here as soon as it's published.", seated on the World page below the top controls and above the view, a "temporary exclamation
+// point", not a banner. Then Darko, 2026-11-12 09:06 EST: "1004 should just be lumped into the red exclamation point that already
+// exists on the main site. world page version is fine": the front page has no line of its own (the SEATS test below); there a late
+// settlement is the header glyph's row (test/sentinel-alert.test.mjs).
 //
 // THE PRODUCTION PATH, not a copy: this file takes the component's own client script out of
 // src/components/SettlementNotice.astro, hands it the REAL reader and judgment (src/lib/sentinel-alert.mjs) bound to a fake
@@ -42,7 +44,7 @@ function scriptOf(source) {
   return m[1];
 }
 
-function page({ source = COMPONENT, moduleOverride = board, origins = [""], variant = "flow" } = {}) {
+function page({ source = COMPONENT, moduleOverride = board, origins = [""], variant = "over" } = {}) {
   const clock = { now: NOW };
   const intervals = [];
   const docL = {}, winL = {};
@@ -205,7 +207,7 @@ test("FLIP: a reader that repaints only when a fetch finishes FAILS the deferred
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("both notices on one page (the front page's flow seat and the World's overlay are separate pages, but a page may hold more than one) share ONE read", async () => {
+test("two notices on one page (the World page holds one, but a page may hold more than one) share ONE read", async () => {
   const w = page({ origins: ["", ""] });
   w.state.body = fixture("DOWN");
   await w.start();
@@ -274,12 +276,13 @@ test("FLIP: a judgment that shows on STALE/UNKNOWN or on an old board ('unconfir
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("SEATS: the front page, below the live ticker and above the hero; the World, after the viewer's top controls and before the view's other islands", () => {
+// Until 2026-11-12 this asserted a second seat on the front page, below the live ticker and above the hero. Darko, 09:06 EST:
+// "1004 should just be lumped into the red exclamation point that already exists on the main site." A source pin, labelled as one;
+// the built front page is read for the same thing in test/settlement-notice-browser.test.mjs.
+test("SEATS: the World only, after the viewer's top controls and before the view's other islands; the FRONT PAGE has no line of its own", () => {
   const index = read("town/pages/index.astro");
-  const tick = index.indexOf('class="ticker"'), notice = index.indexOf('<SettlementNotice variant="flow" />'), hero = index.indexOf('<section class="hero">');
-  assert.ok(tick > 0 && notice > tick && hero > notice, "ticker < notice < hero");
-  assert.match(index, /import SettlementNotice from "@\/components\/SettlementNotice\.astro";/);
-  assert.equal((index.match(/<SettlementNotice/g) ?? []).length, 1, "once");
+  assert.ok(!/SettlementNotice|data-settlement-notice|SETTLEMENT_NOTICE_TEXT/.test(index), "Darko 2026-11-12 09:06 EST: \"1004 should just be lumped into the red exclamation point that already exists on the main site\": no separate notice on the front page");
+  assert.ok(!/sn-flow/.test(COMPONENT), "and the front page's in-flow seat is gone from the component");
   const world = read("town/pages/world.astro");
   assert.match(world, /import SettlementNotice from '@\/components\/SettlementNotice\.astro';/);
   assert.equal((world.match(/<SettlementNotice/g) ?? []).length, 1, "once");

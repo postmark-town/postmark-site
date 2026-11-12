@@ -541,9 +541,11 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
     // failure path lands on console.debug and nothing else.
     //
     // THE BOARD IS READ ONCE PER PAGE (POS-1004): `@/lib/sentinel-alert.mjs` (§ readBoardEvery) owns the one fetch of /ops/sentinel.json
-    // (`origin + "/ops/sentinel.json"`, `cache: "no-store"`) and shares it with the late-settlement notice: on load, once a minute
-    // while the page is visible, and on return. This script is a listener: it applies the same alert judgment to each board the
-    // reader hands it, and hides the glyph again if a later board is all green.
+    // (`origin + "/ops/sentinel.json"`, `cache: "no-store"`), shared by every reader on the page: on load, once a minute while the
+    // page is visible, and on return. This script is a listener: it applies the same alert judgment to each board the reader hands
+    // it, and hides the glyph again if a later board is all green. A LATE SETTLEMENT shows here (Darko, 2026-11-12 09:06 EST: "1004
+    // should just be lumped into the red exclamation point that already exists on the main site"): its row's words come from
+    // alertFromBoard, and it clears with the rest when the settlement lands.
     (async function () {
       const wrap = document.querySelector("[data-pm-alert]");
       if (!wrap) return;

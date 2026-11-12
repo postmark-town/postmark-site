@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { alertFromBoard, parseBoard, REBAKE_LINE, SENTINEL_BAD } from "../src/lib/sentinel-alert.mjs";
+import { alertFromBoard, parseBoard, REBAKE_LINE, SENTINEL_BAD, SETTLEMENT_LATE_LINE } from "../src/lib/sentinel-alert.mjs";
 
 const LAYOUT = new URL("../src/layouts/PostmarkLayout.astro", import.meta.url);
 
@@ -113,6 +113,50 @@ test("`since` is shown when the board carries it and omitted when it does not", 
   const without = alertFromBoard(liveBoard([{ key: "site_home", label: "postmark.town", verdict: "DOWN", reason: "HTTP 503" }]));
   assert.equal(without.rows[0].age, null,
     "TODAY'S BOARD CARRIES NO `since` \u2014 the sentinel keeps a probe's onset in its own state file, not on the published board. The popover must omit the age rather than invent one; most reasons say it in prose (\"ticked 8 min ago\").");
+});
+
+// ---------------------------------------------------------------------------
+// a late settlement, in plain words (POS-1004)
+// ---------------------------------------------------------------------------
+//
+// LAW: Darko, 2026-11-12 09:06 EST: "1004 should just be lumped into the red exclamation point that already exists on the main
+// site." The glyph already rises for the `settlement` probe's DOWN, as for any DOWN; what this holds is its row's words. The
+// reason below is the sentinel's own DOWN wording for a missing tag (postmark-office tools/site-sentinel.mjs), invented values.
+
+const NOW = Date.parse("2026-11-12T19:05:00.000Z");
+const SENTINEL_REASON = "the 18:00Z sweep published and no settlement tag covers it after 1 h 5 min (S166): blocked, ours to unblock (postmark-telemetry SHIPPING.md § 9)";
+const lateBoard = (verdict, { ageMin = 2, extra = [] } = {}) => ({
+  ...liveBoard([...OK_PROBES, { key: "settlement", label: "the settlement", kind: "settlement", verdict, reason: SENTINEL_REASON, detail: { at: "2026-11-12T18:00:00Z", status: "published" } }, ...extra]),
+  generated_at: new Date(NOW - ageMin * 60_000).toISOString(),
+});
+const shown = (view) => view.rows.map((r) => `${r.label} — ${r.detail || r.reason}`);
+
+test("A LATE SETTLEMENT lights the glyph, and its row says the plain words instead of the sentinel's operator reason", () => {
+  const view = alertFromBoard(lateBoard("DOWN"), { nowMs: NOW });
+  assert.equal(view.show, true, "the settlement's DOWN raises the glyph");
+  assert.equal(view.rows.length, 1);
+  assert.equal(view.rows[0].key, "settlement");
+  assert.equal(view.rows[0].detail, SETTLEMENT_LATE_LINE, "the row's text, which the layout prints, is the plain line");
+  assert.equal(SETTLEMENT_LATE_LINE, "The latest World settlement is running late. It will show as soon as it's published.");
+  assert.ok(!shown(view).join(" ").includes("SHIPPING.md"), "and NOT the sentinel's operator reason");
+});
+
+test("LATE-SETTLEMENT CONTROLS: it clears when the settlement lands, and the plain words follow the notice's one judgment", () => {
+  assert.equal(alertFromBoard(lateBoard("OK"), { nowMs: NOW }).show, false, "the settlement landed and nothing else is bad: the glyph is gone");
+  // STALE and an old board still raise the glyph (the sentinel's own judgment, unchanged), but they are not "late": operator words
+  for (const [label, board] of [["STALE", lateBoard("STALE")], ["a 25-minute-old board", lateBoard("DOWN", { ageMin: 25 })]]) {
+    const view = alertFromBoard(board, { nowMs: NOW });
+    assert.equal(view.show, true, `${label}: the glyph still shows`);
+    assert.equal(view.rows[0].detail, null, `${label}: no plain line`);
+    assert.equal(view.rows[0].reason, SENTINEL_REASON, `${label}: the sentinel's own reason`);
+  }
+  // another probe's DOWN beside an OK settlement: that probe's row, never the settlement's words
+  const other = alertFromBoard(lateBoard("OK", { extra: [{ key: "settlement_tag", label: "the settlement tag", verdict: "DOWN", reason: "invented" }] }), { nowMs: NOW });
+  assert.equal(other.show, true);
+  assert.ok(!other.rows.some((r) => r.detail === SETTLEMENT_LATE_LINE), "no plain settlement line for another probe's DOWN, whatever its key says");
+  // and beside another bad probe, a late settlement is one row of several: each keeps its own words
+  const both = alertFromBoard(lateBoard("DOWN", { extra: [{ key: "site_refresh", label: "the box's site refresh", verdict: "DOWN", reason: "r", detail: "48 doors are missing" }] }), { nowMs: NOW });
+  assert.deepEqual(both.rows.map((r) => r.detail), [SETTLEMENT_LATE_LINE, "48 doors are missing"]);
 });
 
 // ---------------------------------------------------------------------------
