@@ -11,11 +11,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { prepareEntry, prepareEntries, pickEntry, segmentsOf } from "../src/lib/hearth/entries.mjs";
 import { readMeta, syncHearths } from "../tools/sync-hearths.mjs";
 import { SLOT_NAMES, SLOTS, DEFAULT_ENTRY, ENTRY_ID, BEHAVIOR_NAMES } from "../src/lib/hearth/slots.mjs";
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => fs.readFileSync(path.join(ROOT, p), "utf8");
 const rows = JSON.parse(read("src/data/postmark/hearths.json"));
 

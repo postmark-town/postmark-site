@@ -8,7 +8,7 @@
 // belongs here. So /stamps/ is a page again, and it is the page it always
 // wanted to be — the questions, and the dials under them.
 //
-// WHAT LIVES HERE: the one-breath definition, the five things, the nine
+// WHAT LIVES HERE: the one-breath definition, the five things, the eight
 // teaching sections, and the economy's dials.
 // WHAT DOES NOT: the Bounty Board and the pots. Those are lanes, they moved to
 // the civic quarter, and a copy of either here would be the split that the
@@ -18,7 +18,7 @@
 // The founder's word: "lead with the questions now that the quest guild
 // absorbed the town's asks." The portal opened with the MARKET because a market
 // square does not open with its constitution nailed to the gate — but the
-// market is not here any more, and what is left is a teaching. So the nine
+// market is not here any more, and what is left is a teaching. So the eight
 // sections come first and the dials sit under them, rather than the reverse.
 // The head above them is the one-breath answer to WHAT IS THIS, which the
 // founder ruled unfolded on 2026-08-26 and which nothing since has moved.
@@ -37,6 +37,7 @@ import { loadEconomy, readEconomy, HOLO_LINE, HOLO_NAME_LINE } from "@/lib/fundi
 import { livePots, loadPots, POT_FIXTURE, usd, pct, num } from "@/lib/funding.mjs";
 import PotCards from "@/components/PotCards.astro";
 import { QUEST_REGISTRY, questKind, PAIR_RULE } from "@/lib/civic.mjs";
+import { OUTSIDE_NOTE } from "@/lib/docs.mjs";
 
 const TOWN = "https://github.com/postmark-town/postmark/blob/main";
 // ECONOMY.md moved to the blueprints documentation shelf 2026-08-30; the
@@ -109,8 +110,10 @@ const thin = close({
 // things that can drift from it independently.
 const { daily, milestone, arriving } = QUEST_REGISTRY;
 
-// The nine teaching sections, and the hash router's list at the same time.
-const RULE_IDS = ["what","earning","staking","seam","minterest","ownership","faq","glossary","check"];
+// The eight teaching sections, and the hash router's list at the same time.
+// "ownership" (What your share means) left the site 2026-11-11 (POS-1001/a):
+// the site says only what NOMOS says.
+const RULE_IDS = ["what","earning","staking","seam","minterest","faq","glossary","check"];
 
 // The lane fragments this route no longer carries, and where each one went.
 // #market was the portal's Market tab, whose two blocks are now the Bounty
@@ -136,6 +139,9 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
     <header class="p-head">
       <p class="p-crumb"><a href="/docs/">DOCS</a> · STAMPS</p>
       <h1>Stamps <span class="p-glyph">✦</span></h1>
+      {/* THE NOTE ABOUT ANYTHING OUTSIDE THE TOWN, under the title (POS-1001):
+          the town's STAMPS.md note, one copy in docs.mjs. */}
+      <p class="p-outside"><strong>{OUTSIDE_NOTE.lead}</strong> {OUTSIDE_NOTE.body}</p>
       {/* WHAT IS THIS, before anything else. A reader who read the old page
           three times and still couldn't say what a stamp was is the finding
           this head answers (discussion #2036, 2026-08-25): plain words,
@@ -156,8 +162,8 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
           <li><b>You earn stamps by corresponding.</b> A letter that lands mints one to you and one to the person you wrote — under caps, so writing more never earns more.</li>
           <li><b>You cannot buy one.</b> No faucet, no purchase, no exchange rate. A gift to a posted need can be minted stamps — but only as many as the town's own stakes on that need size, never as many as the dollars would buy.</li>
           <li><b>Staking is lending, not spending.</b> Stake on a vote, on something in the World or on a pot, and your stamps come home whole. Nothing in this town consumes a stake.</li>
-          <li><b>Your lifetime count is your share of Postmark.</b> Spending and staking never lower it — it only ever grows, and it is public.</li>
-          <li><b>Ignoring all of it costs you nothing.</b> A resident who only writes letters is whole: mail, votes and the World are free at zero stamps, permanently.</li>
+          <li><b>Your lifetime count is your record here.</b> Spending and staking never lower it — it only ever grows, and it is public.</li>
+          <li><b>Ignoring all of it costs you nothing.</b> A resident who only writes letters is whole: mail, votes and the World are free at zero stamps.</li>
         </ol>
       </details>
       <p class="p-give">
@@ -200,8 +206,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <article class="s-tense">
           <p class="s-kind">past · minted</p>
           <p>
-            Everything you've <em>ever</em> earned. It only rises — this is your share of
-            the town, and it is public.
+            Everything you've <em>ever</em> earned. It only rises, and it is public.
           </p>
         </article>
         <article class="s-tense">
@@ -448,7 +453,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <details class="r-fold" id="seam">
           <summary><span class="r-sum">The funding seam</span></summary>
           <div class="r-body">
-      <p class="s-pull">Money can join the ownership; how much of the judgment it can join is capped.</p>
+      <p class="s-pull">A gift pays a bill; how much of a household's stamps can come from gifts is capped.</p>
       <p>
         Postmark costs real dollars to run. This is the one door where outside money comes
         in: it pays a posted bill, the town writes down who paid and how much — permanently,
@@ -620,7 +625,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
       <p>
         The same dollars aimed at a heavily-staked pot are minted richly; aimed at a pot
         nobody staked, they are minted nothing — the bill is paid and the record keeps the
-        name and the dollars either way. Money cannot manufacture ownership out of something nobody wanted, so the
+        name and the dollars either way. Money cannot mint stamps for something nobody wanted, so the
         winning move with a dollar is to read the town and fund what it actually needs.
       </p>
 
@@ -629,22 +634,11 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <li><b>Money is capped by participation.</b> A household's holo may never pass ρ × everything it has minted here, so a close mints it at most the room left; a pot nobody staked mints nothing at all.</li>
         <li><b>Nothing you fully control can mint for you.</b> Self-mail, your own stakes behind your own dollars, the treasury's spending — none of it mints.</li>
         <li><b>Dollars past a pot's posted target are refused</b> — the town does not take more than it asked for.</li>
-        <li><b>Money can never leave as currency.</b> Stamps do not convert out. Value exits as goods and works, never as a cash-out.</li>
+        <li><b>Stamps never turn into money.</b></li>
       </ul>
 
       <details class="s-law">
         <summary>The law, in its own words</summary>
-        <blockquote>
-          Postmark has an ownership record. Residents earn stamps by participating; stamps
-          are the town's memory of what you gave it, and your share of what it becomes. Real
-          money can fund the town's named needs (servers, tools — posted as pots on the quest
-          board), and the givers receive fresh stamps at the close, sized by what the town
-          staked on the pot and capped by law at half of everything a household has earned;
-          a stake lent on a pot comes home whole. Money can join the ownership; it can never
-          join the judgment. Ignoring all of this costs you nothing — a resident who only
-          writes letters is whole.
-          <cite><a href={`${TOWN}/JOINING.md`} target="_blank" rel="noopener">JOINING.md § the ownership record</a></cite>
-        </blockquote>
         <blockquote>
           A keeping pot: back the town box (~$150/mo). Stake stamps on the pot to say it
           matters; witnessed dollars close the month. … every stake comes home whole at the
@@ -667,14 +661,6 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
           no household's holo AFTER the close passes rho × its all-sources mint BEFORE it —
           money's share of a household may never pass rho.
           <cite><a href={`${TOWN}/ECONOMY-DIALS.json`} target="_blank" rel="noopener">ECONOMY-DIALS.json § law_side.keeping</a> (re-shaped 2026-09-17)</cite>
-        </blockquote>
-        <blockquote>
-          <b>Stamps never convert out.</b> Buy-in corrupts the votes (plutocracy); cash-out
-          corrupts the motive (participation becomes wage-mining; the play-to-earn collapses
-          are the standing postmortem). Value exits as <i>goods and works</i> — merchandise,
-          commissions, shipped projects paying real dollars through pots — never as currency
-          conversion.
-          <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 7</a></cite>
         </blockquote>
         <p class="s-law-foot">
           The dial the close actually runs on — the cap — is published at
@@ -715,93 +701,6 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
           is a town-set scalar.
           <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 9.1</a></cite>
         </blockquote>
-        <blockquote>
-          The <b>creator</b> receives it, not the stakers — worldbuilding becomes a durable
-          income stream, while staking a mark stays a decision (voice), returned.
-          <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 9.1</a></cite>
-        </blockquote>
-        <blockquote>
-          <b>q is monetary policy by vote.</b> On a slow cadence (a monthly ballot) the town
-          sets how much the World-as-a-project matters, scaling the whole beauty-engine up or
-          down. It is literally the town voting its own inflation rate, and the pressure
-          valve if the engine is ever seen to be farmed.
-          <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 9.1</a></cite>
-        </blockquote>
-      </details>
-          </div>
-        </details>
-        <details class="r-fold" id="ownership">
-          <summary><span class="r-sum">What your share means</span></summary>
-          <div class="r-body">
-      <p>
-        We keep saying <em>share</em> and <em>ownership</em>. The plain truth of it:
-      </p>
-      <div class="s-three">
-        <article class="s-card">
-          <p class="s-kind">today</p>
-          <p>
-            Your share is the town's public memory of who built it — your fraction of all
-            witnessed contribution. It pays nothing, redeems for nothing, and governs
-            nothing. Its value is that the record is real, and checkable by anyone.
-          </p>
-        </article>
-        <article class="s-card">
-          <p class="s-kind">someday, maybe</p>
-          <p>
-            If Postmark ever carries real-world value, this same ledger is the pre-agreed
-            table for sharing it — settled in public before there was anything to argue
-            over. A conditional claim, not enforceable today. Not an investment.
-          </p>
-        </article>
-        <article class="s-card">
-          <p class="s-kind">what it is not</p>
-          <p>
-            Not stock, not a token, not a promise of profit. The sentence the town holds
-            itself to: <b>a record, not a promise.</b> If anyone ever tells you otherwise,
-            this page is your receipt that the deal was never that.
-          </p>
-        </article>
-      </div>
-
-      <p>
-        <b>Old money cannot rule from the grave.</b> Steering runs entirely on liquid and
-        staked stamps, so the record itself governs nothing. And money cannot outrun
-        participation: what a gift mints is sized by what the town chose to stake and capped
-        so that money's share of that household never passes ρ. Arithmetic, not a promise — and published.
-      </p>
-
-      <details class="s-law">
-        <summary>The law, in its own words</summary>
-        <blockquote>
-          <b>Law of the two claims.</b> <i>Ownership honors contributed attention; control
-          follows living attention.</i> Equity (past tense) is the claim on the venture's
-          external value… It governs <b>nothing</b> inside the town. Steering — quest
-          ratification, marks, ballots, prices — runs entirely on liquid and staked stamps.
-          <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 5</a></cite>
-        </blockquote>
-        <blockquote>
-          Plutocracy is excluded once, by an amount and not by a verb: money buys stamps
-          through the funding seam, those stamps do everything a stamp does — including vote
-          — and what bounds them is ρ, the cap on money’s share of a household.
-          <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 5</a></cite>
-        </blockquote>
-        <blockquote>
-          the founding contribution is a residual, declared claim, never a priced one. …
-          The line is <b>constitutional, not economic</b>: it is never priced, only
-          <i>ratified</i> — and the ratification mechanism is <b>accession</b>. Everyone who
-          contributes under the posted rules after epoch accepts the genesis as part of the
-          law they are joining.
-          <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 6</a></cite>
-        </blockquote>
-        <blockquote>
-          It requires <b>local comprehensibility</b> (each interaction understandable at the
-          point of contact) and <b>safe ignorability</b> (a hard design constraint: ignoring
-          the economy must never be costly). A resident who only writes letters and never
-          learns what a pot is remains fully whole — still minting, still accumulating their
-          share, protected by the caps from being out-farmed. Corollary: no decay mechanics,
-          no use-it-or-lose-it, ever.
-          <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 10</a></cite>
-        </blockquote>
       </details>
           </div>
         </details>
@@ -821,16 +720,15 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
       <details class="s-faq">
         <summary>Can I cash stamps out?</summary>
         <p>
-          No. Cash-out would turn participation into wage-mining. Value leaves as goods and
-          works — commissions, shipped projects — never as currency.
+          No. Stamps never turn into money.
         </p>
       </details>
 
       <details class="s-faq">
         <summary>Do I have to care about any of this?</summary>
         <p>
-          No, and the design would be broken if you did. Mail, ballots, the map, residency —
-          free forever at zero stamps. Nothing decays, nothing expires, nobody is ranked.
+          No, and the design would be broken if you did. Mail, ballots, the map and
+          residency are free at zero stamps today. Nothing decays and nothing expires.
           A resident with no stamps is a resident.
         </p>
       </details>
@@ -849,7 +747,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <summary>Why did my balance drop when I staked?</summary>
         <p>
           The stamps are pledged, not gone — they come back when the thing closes. Your
-          <em> minted</em> number, the one that is your share, never moves.
+          <em> minted</em> number never moves.
         </p>
       </details>
 
@@ -903,8 +801,10 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
       <details class="s-faq">
         <summary>Who decides the dials?</summary>
         <p>
-          Founder-set defaults for the pilot quarter, published in the open. After a
-          quarter of real numbers, any household may petition a dial ballot. Live values:
+          Founder-set today, in the open. From 1 January, NOMOS says (III.3):
+          "Until a bill changes them, the town's existing law homes stand as
+          market law where they don't contradict the spine, and the founding
+          household rules on them in the open, as before." Live values:
           <a href="/docs/numbers/"> The Town's Numbers</a>.
         </p>
       </details>
@@ -928,7 +828,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <div><dt>burn</dt><dd>A stamp destroyed. A verb the ledger's grammar keeps and the town does not use: since 2026-09-14 nothing burns anywhere — every stake comes home whole.</dd></div>
         <div><dt>stake</dt><dd>Stamps escrowed behind something open — a ballot, a mark, a pot, a bounty. One instrument, one fate: home, whole.</dd></div>
         <div><dt>pay</dt><dd>A transfer between residents, all-or-nothing, settled at a crossing. Supply-neutral: nothing mints.</dd></div>
-        <div><dt>minted</dt><dd>Your lifetime total. Only rises. This is your share.</dd></div>
+        <div><dt>minted</dt><dd>Your lifetime total. Only rises.</dd></div>
         <div><dt>liquid</dt><dd>What you can spend or stake right now.</dd></div>
         <div><dt>staked</dt><dd>Stamps locked into something open. Pledged, not gone.</dd></div>
         <div><dt>assets</dt><dd>liquid + staked — everything you hold today.</dd></div>
@@ -951,7 +851,7 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
         <div><dt>σ (sigma)</dt><dd>The deliverer's fraction of a fulfilled bounty's staked mass, minted fresh as a wage at the conversion. No leg in a pot's close since 2026-09-14. Published at <a href="/docs/numbers/">The Town's Numbers</a>.</dd></div>
         <div><dt>ρ (rho)</dt><dd>The dial that caps money's share of a household: its holo may never pass ρ × everything it has minted, from every source, holo included. Published at <a href="/docs/numbers/">The Town's Numbers</a>.</dd></div>
         <div><dt>q</dt><dd>The scalar that would set how much the World-as-a-project pays its makers. Not yet set by the town — see <a href="#minterest">minterest</a>.</dd></div>
-        <div><dt>crossing / settlement</dt><dd>The twice-daily moments the ferry runs and the world's record settles. Money moves on crossings, like everything else here.</dd></div>
+        <div><dt>crossing / settlement</dt><dd>The twice-daily moments the ferry runs and the world's record settles. Stamps move on crossings, like everything else here.</dd></div>
         <div><dt>mark</dt><dd>Anything standing on the World's record — a home, a garden, a tool, a notice. Marks can be staked, and one day will pay their makers.</dd></div>
         <div><dt>the seam</dt><dd>The single door where outside money meets the town. Nothing is burned there; what a gift mints is sized by the town's own stakes.</dd></div>
       </dl>
@@ -1029,17 +929,10 @@ node tools/stamp-mint.mjs --derive      # recompute, from the mail, what the led
               <p class="n-v">{num(econ.holoIssued)}<span class="n-u pm-holo-ink m-holo">✧</span></p>
               <p class="n-s">Ever minted, never burned — against a town-wide cap of {num(econ.holoCap)}✧. Since the founder's 2026-09-17 ruling a pot's close mints its givers' reward as holo, one row per receipt it settles.</p>
             </article>
-            <article class="n-tile">
-              <p class="n-k">backing</p>
-              <p class="n-v">{econ.backing == null ? "—" : usd(Math.round(econ.backing * 100) / 100)}</p>
-              <p class="n-s">{econ.backing == null
-                ? "No holo has been minted, so there is nothing to back — a real state, not a missing number."
-                : "Dollars the town holds per ✧ ever minted. A fact about the treasury, never a redemption promise."}</p>
-            </article>
           </div>
           <p class="m-note">
             Every value above is read from the ledger's own derived record; none is written down
-            here, so a ballot that moves a dial needs no edit. The full gauges hang at
+            here, so a bill that moves a dial needs no edit. The full gauges hang at
             <a href="/docs/numbers/"> the Town's Numbers</a>, and the signed record itself is
             <a href={LEDGER} target="_blank" rel="noopener"> the ledger ↗</a>.
           </p>
@@ -1357,6 +1250,7 @@ node tools/stamp-mint.mjs --derive      # recompute, from the mail, what the led
   .p-crumb a { color: inherit; text-decoration: none; }
   .p-crumb a:hover { text-decoration: underline; }
   .portal h1 { margin: 0 0 .6rem; }
+  .p-outside { margin: 0 0 .9rem; font-size: .84rem; line-height: 1.55; max-width: 44rem; opacity: .78; }
   .p-glyph { color: var(--pm-gold); }
   .p-folk {
     margin: 0; font-size: 1.02rem; line-height: 1.6; font-style: italic;

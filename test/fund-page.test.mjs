@@ -96,18 +96,29 @@ test("every disclosure the money moment owes is on the page, verbatim", () => {
   // Keemin's word (seam night): every holo surface carries the caption.
   assert.ok(PAGE.includes("HOLO_LINE"), "the caption is the shared constant, never retyped");
   assert.equal(HOLO_LINE, "a record of contribution, not a promise of profit");
-  // The scope-extension's second sentence, exact. AMENDED 2026-09-17 at the
-  // founder's ruling ("holo does anything a normal stamp can; staking vs voting
-  // is a nondistiction"). It read "This buys ownership and memory, never voice,
-  // and converts to real value only if the town someday does." — the repealed
-  // law, in bold, at the money moment. The office ships the twin sentence
-  // (postmark-office src/funding.mjs § WHAT_THIS_BUYS) and they move together.
-  assert.match(PAGE, /This buys stamps that do everything a stamp does, including vote, plus ownership and memory; money's share of your household is capped, and it converts to real value only if the town someday does\./);
+  // The scope-extension's second sentence, exact. REWORDED 2026-11-11 (POS-1001)
+  // to fit NOMOS's definition of Stamp ("Stamps are not money. They can't be
+  // bought") and II.6.1
+  // (NOMOS "grants no claim" on owning Postmark or on money outside the town);
+  // until then this asserted the sentence's earlier wording, which is in git
+  // history. The office ships the twin sentence (postmark-office
+  // src/funding.mjs § WHAT_THIS_BUYS) and they move together.
+  assert.match(PAGE, /A gift pays a bill and is written down in your name\. If the town staked on this pot, the close thanks you in stamps that work like any stamp, including vote; money's share of your household is capped, and stamps never turn into money\./);
   // and the bound is named in the same breath as the verb, which is the half a
   // patron cannot be left to infer
   assert.match(PAGE, /money's share of your household is capped/);
-  // the folk-law, amended with it: the exclusion moved from a verb to an amount
-  assert.match(PAGE, /Funding buys <em>a bounded say<\/em>/);
+  // the folk-law bullet, changed with it (POS-1001): no verb for what money
+  // buys, and the bound named with NOMOS's own ceiling. Until 2026-11-11 this
+  // asserted the bullet's earlier wording.
+  assert.match(PAGE, /Stamps minted to a giver work like any stamp, and a household's holo may never pass ρ × everything it has minted \(never more than half, NOMOS II\.4\.5\.1\)\./);
+  // the retired wording, inverted rather than dropped (POS-1001). Read off the
+  // TEMPLATE, the part a reader sees.
+  const TEMPLATE = PAGE.slice(PAGE.indexOf("---", 3) + 3);
+  assert.ok(TEMPLATE.includes('id="fineprint"'), "the slice is the template, and it holds the fine print");
+  for (const gone of ["ownership and memory", "converts to real value", "a bounded say", "manufacture ownership", "per $1"])
+    assert.equal(TEMPLATE.includes(gone), false, `the retired wording "${gone}" is back on the money moment`);
+  assert.match(TEMPLATE, /money cannot mint stamps for something nobody wanted/,
+    "the closes arm says what money can't mint, not what it can't own");
   assert.equal(/money can join the ownership, never the judgment/.test(PAGE), false,
     "the repealed folk-law must not survive on the money moment");
   // the irreversibility warning — the one a patron most needs before they send
@@ -116,6 +127,22 @@ test("every disclosure the money moment owes is on the page, verbatim", () => {
   // the cents disclosure
   assert.match(PAGE, /whole dollars/);
   assert.match(PAGE, /priced nothing/);
+});
+
+test("POS-1001: the note about anything outside the town sits under the title, ahead of the money", () => {
+  // A TEXT PIN, the weaker instrument, labelled so: it reads the template's
+  // order. The behavioural reader is test/funding.test.mjs § POS-1001, which
+  // reads the note's words off every built pot page.
+  assert.match(PAGE, /import \{ OUTSIDE_NOTE \} from "@\/lib\/docs\.mjs";/, "the note comes from its one copy");
+  const TEMPLATE = PAGE.slice(PAGE.indexOf("---", 3) + 3);
+  const title = TEMPLATE.indexOf("<h1>");
+  const note = TEMPLATE.indexOf('<p class="f-outside"><strong>{OUTSIDE_NOTE.lead}</strong> {OUTSIDE_NOTE.body}</p>');
+  const addr = TEMPLATE.indexOf('<code class="f-code"');
+  const fine = TEMPLATE.indexOf('id="fineprint"');
+  assert.ok(title > 0 && note > 0 && addr > 0 && fine > 0, "the title, the note, the address and the fine print are all on the template");
+  assert.ok(title < note, "the note sits under the title");
+  assert.ok(note < addr && note < fine, "and ahead of the address and the fine print");
+  assert.equal(TEMPLATE.split("{OUTSIDE_NOTE.body}").length - 1, 1, "once");
 });
 
 test("the consent line sits ABOVE the address, and the full terms below it", () => {
@@ -143,12 +170,19 @@ test("the consent line sits ABOVE the address, and the full terms below it", () 
   assert.ok(law > 0 && addr > 0 && fine > 0);
   assert.ok(law < addr, "the consent line must precede the address in the document");
   assert.ok(fine > addr, "the fine print hangs below the money moment");
-  assert.ok(PAGE.indexOf("This buys stamps that do everything a stamp does", fine) > fine,
+  // (POS-1001, 2026-11-11: until then the anchor was the old sentence's opening.)
+  assert.ok(PAGE.indexOf("A gift pays a bill and is written down in your name. If the town staked", fine) > fine,
     "the full what-this-buys sentence lives in the fine print, verbatim");
   const consent = PAGE.slice(law, PAGE.indexOf("</p>", law));
   assert.ok(consent.includes("Recorded in your household's name on the town's public ledger"), "the line says whose name it is written in");
-  assert.ok(consent.includes("stake, vote and pay"),
-    "the consent line says what the stamps a gift mints actually do");
+  // (POS-1001, 2026-11-11: until then the line read "The stamps it mints
+  // <em>stake, vote and pay</em>." and this asserted only "stake, vote and
+  // pay". A gift mints stamps only if the town staked on the pot, so the line
+  // now says "any stamps the close mints", and this asserts the whole sentence.)
+  assert.ok(consent.includes("Any stamps the close mints for it <em>stake, vote and pay</em>."),
+    "the consent line says what any stamps the close mints actually do");
+  assert.equal(consent.includes("The stamps it mints"), false,
+    "and no longer says every gift mints stamps");
   // AMENDED 2026-10-02 (Wright's visual review of #213): the lead drops "money's
   // share of a household is capped, and it promises no return"; the fine print,
   // one link away, carries both, and that is asserted instead.

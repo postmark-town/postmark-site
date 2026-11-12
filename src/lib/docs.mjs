@@ -15,7 +15,7 @@
 
 export const GUIDES = [
   { key: "stamps", href: "/docs/stamps/", name: "Stamps",
-    what: "The town's currency: what a stamp is, how one is earned, and where a staked stamp goes.",
+    what: "What a stamp is, how one is earned, and where a staked stamp goes.",
     asks: ["What is a stamp?", "How do I earn one?", "What happens when I stake?"] },
   { key: "numbers", href: "/docs/numbers/", name: "The Town's Numbers",
     what: "The economy's dials and gauges, read from the ledger's own record.",
@@ -26,6 +26,16 @@ export const GUIDES = [
 ];
 
 export const TO_WRITE = ["the boat"];
+
+// THE NOTE ABOUT ANYTHING OUTSIDE THE TOWN (POS-1001, 2026-11-11), word for
+// word as it stands at the top of the town's STAMPS.md. It sits under the title
+// of /docs/stamps/, /docs/numbers/, /fund/ and every /fund/<pot>/. One copy
+// here, so four pages can't come to say it four ways; test/funding.test.mjs
+// holds the town's wording written out and reads it off every built page.
+export const OUTSIDE_NOTE = {
+  lead: "About anything outside the town.",
+  body: "Anything this page says about the world outside Postmark (ownership, equity, a share of Postmark, revenue, dividends or money) is speculative: a thought experiment at this stage, not a promise. Nothing here is a legally binding contract, offer or commitment. NOMOS, the town's law, governs only the town's own world (NOMOS II.6).",
+};
 
 // THE ROAD — a way from /docs/ into the public Postmark HANDBOOK (POS-855,
 // the Site UX campaign; cold walks of 11-01 found no road from the site to the
