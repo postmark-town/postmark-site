@@ -208,11 +208,13 @@ test("the holo cap is the law's formula, not a stored number", () => {
   // `overCap`. That cannot work now: holo is inside its own base, so nudging
   // holo up raises the cap with it. The town-wide condition solves to
   // holo > ρ/(1−ρ) × primary, and at the launch dial ρ = 0.5 that is exactly
-  // holo > primary — i.e. "money's share of the town may not pass ρ", which at
-  // the ceiling is NOMOS II.4.5.1's bound ("Money's share of any household's
-  // stamps is capped, and never above half"). The OLD base capped money's share
-  // at ρ/(1+ρ) = 0.333, stricter than that ceiling. So the compounding base
-  // reads the ceiling MORE truly, not less.
+  // holo > primary — i.e. "money's share of the town may not pass ρ". That
+  // town-wide limit follows from the household cap rather than being it: NOMOS
+  // II.4.5.1 caps each household's share ("Money's share of any household's
+  // stamps is capped, and never above half"), and if no household's share passes
+  // ρ, the town's, summed over households, can't either. The OLD base capped
+  // money's share at ρ/(1+ρ) = 0.333, stricter than that ceiling. So the
+  // compounding base reads the ceiling MORE truly, not less.
   assert.equal(readEconomy({ ...ECONOMY_FIXTURE, holo_issued: e.holoCap + 1 }).overCap, false,
     "one past the cap no longer trips it — the cap moved up with the input, and a probe that cannot fire is worth saying out loud");
   assert.equal(readEconomy({ ...ECONOMY_FIXTURE, holo_issued: e.primaryMint + 1 }).overCap, true,
@@ -916,9 +918,10 @@ test("no built page teaches the expansion twice in flowing prose", { skip: !buil
 // a blockquote with its citation, since a probe that reddened on it would have
 // asked this repo to fork a quote. JOINING
 // lost the line on 2026-10-06, and POS-1001 (2026-11-11) took the quote off
-// /docs/stamps/ with the seam's pull quote; POS-1001's own sweep, below, reads
-// the phrase on the pages it changed. Whether it joins this every-page list is
-// a wider question than POS-1001's.
+// /docs/stamps/ with the seam's pull quote. POS-1001's own sweep, below, reads
+// that quoted line's opening words off /docs/stamps/ (its row's `gone` list),
+// not "join the judgment", and reads no other page for it. Whether the phrase
+// joins this every-page list is a wider question than POS-1001's.
 const REPEALED = [
   "soulbound",                  // the word itself, on any surface
   "never spent as postage",     // HOLO_NAME_LINE's old closing clause
@@ -1010,6 +1013,16 @@ const pageText = (html) => String(html)
   .replace(/&#0*39;|&#x0*27;|&apos;/gi, "'").replace(/&quot;/g, '"')
   .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
   .replace(/\s+/g, " ");
+/** The <p> element of a built page that holds `anchor`. The anchor must be on the page exactly once, so a scoped check can't pass by reading nothing. */
+const paragraphHolding = (html, anchor, rel) => {
+  assert.equal(html.split(anchor).length - 1, 1, `${rel}: "${anchor}" should be on the page exactly once`);
+  const at = html.indexOf(anchor);
+  const open = [...html.slice(0, at).matchAll(/<p[\s>]/g)].pop();
+  assert.ok(open, `${rel}: no <p> holds "${anchor}"`);
+  const close = html.indexOf("</p>", at);
+  assert.ok(close > at, `${rel}: the <p> holding "${anchor}" never closes`);
+  return html.slice(open.index, close + 4);
+};
 /** Every built /fund/<pot>/ page (the /fund/ index itself is not a pot). */
 const builtPotPages = () => (existsSync(join(DIST, "fund"))
   ? readdirSync(join(DIST, "fund")).map((d) => join(DIST, "fund", d, "index.html")).filter(existsSync)
@@ -1077,10 +1090,11 @@ const POS1001_PAGES = [
       "the backing gauge", "Treasury ÷ holo ever minted"], now: ["are the town's own unit"] },
   { at: ["fund"], gone: ["the stamps it mints you vote"], now: ["any stamps it mints you vote like any other"] },
   { at: ["docs"], gone: ["The town's currency"], now: ["What a stamp is, how one is earned, and where a staked stamp goes."] },
-  // The home page's footer: in public the founder is Darko, so the retired
-  // spelling is held as a pattern ("founded by" followed by anything else)
-  // rather than written out here.
-  { at: [], gone: [/founded by (?!Darko\b)\S/], now: ["founded by Darko"] },
+  // The home page's footer line says Darko; the retired spelling is held as a
+  // pattern, not printed. Both checks read only the paragraph that carries "A
+  // Starforge project", so a "founded by <handle>" elsewhere on the home page
+  // one day can't turn this red.
+  { at: [], scope: "A Starforge project", gone: [/founded by (?!Darko\b)\S/], now: ["founded by Darko"] },
   // POS-1001/d: the Marketplace building's who-line, under its coming-soon chip
   { at: ["town"], gone: ["residents asking stamps for goods"], now: ["residents offering things to one another"] },
 ];
@@ -1090,12 +1104,13 @@ test("POS-1001: the retired sentences are gone from the pages that carried them,
   const pots = builtPotPages();
   assert.ok(pots.length > 0, "this reads nothing: no built pot page");
   const rows = [
-    ...POS1001_PAGES.map((r) => ({ p: page(...r.at), gone: r.gone, now: r.now })),
+    ...POS1001_PAGES.map((r) => ({ p: page(...r.at), gone: r.gone, now: r.now, scope: r.scope })),
     ...pots.map((p) => ({ p, gone: POS1001_POT_GONE, now: POS1001_POT_NOW })),
   ];
-  for (const { p, gone, now } of rows) {
+  for (const { p, gone, now, scope } of rows) {
     const rel = p.slice(DIST.length) || "/";
-    const text = pageText(readFileSync(p, "utf8"));
+    const html = readFileSync(p, "utf8");
+    const text = pageText(scope ? paragraphHolding(html, scope, rel) : html);
     for (const g of gone) assert.equal(g instanceof RegExp ? g.test(text) : text.includes(g), false, `${rel}: "${g}" is still on the page`);
     for (const n of now) assert.ok(text.includes(n), `${rel}: "${n}" is not on the page`);
   }
