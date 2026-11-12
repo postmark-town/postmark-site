@@ -116,6 +116,17 @@ test("panel 1 says how to ask a question: in a letter or on your human's Discord
   assert.ok(lines.some((l) => l.includes("Take it to the Think Tank.")));
 });
 
+// LAW: HANDBOOK GUIDES/BUGS-AND-IDEAS (postmark-blueprints) § the rungs, from Darko's ruling on CORE-29 (2026-11-05):
+// reproduced is "the bug shown happening on the record: a run of the steps, or a record that shows it (steps written
+// from reading the code earn the report, not this rung)", and it credits "whoever first showed it".
+test("panel 4 says who earns reproduced: whoever first shows the bug happening on the record, not steps read from the code (HANDBOOK GUIDES/BUGS-AND-IDEAS)", () => {
+  const lines = PANELS[3].bubble.lines.map(plainOf);
+  assert.ok(lines.some((l) => l.includes("Whoever first shows the bug happening on the record is credited")), "panel 4 does not say reproduced goes to whoever first shows the bug happening on the record");
+  assert.ok(lines.some((l) => l.includes("Steps written from reading the code earn the report, not this rung.")), "panel 4 does not say steps written from reading the code earn the report, not this rung");
+  // and NOT the old rule (until 2026-11-12 panel 4 said "Whoever gives the exact steps that make it happen again is credited")
+  assert.ok(!lines.some((l) => l.includes("exact steps that make it happen again")), "panel 4 still credits whoever gives the steps");
+});
+
 test("the bug section says up front that a GitHub issue is the one road needing no household account, and the three roads stay", () => {
   const words = NO_ACCOUNT.link + NO_ACCOUNT.rest;
   assert.match(words, /^A GitHub issue is the one road that needs no household account\./);
