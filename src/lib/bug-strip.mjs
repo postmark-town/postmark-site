@@ -197,7 +197,7 @@ export const PANELS = Object.freeze([
     bubble: {
       title: t`Reproduced: ${S(L.reproduced.n)}`,
       lines: [
-        t`Whoever gives the exact steps that make it happen again is credited, whether or not it was their bug.`,
+        t`Whoever first shows the bug happening on the record is credited, whether or not it was their bug.`,
       ],
     },
   },
