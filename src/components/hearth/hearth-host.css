@@ -245,4 +245,6 @@
 .hearth-acts button:disabled { opacity: 0.5; cursor: default; }
 .hearth-by { color: var(--hx-chrome-ink); white-space: nowrap; }
 .hearth-refused { color: var(--hx-chrome-no); }
-@media (max-width: 520px) { .hearth-bar { font-size: 0.68rem; } .hearth-pickerband { justify-content: flex-start; } }
+/* on a phone the corner's gaps are a little tighter, so the dropdown, its credit and the owner's settings keep one line (measured at 390 px: 4 px over at the
+   wider gaps, with "Postmark's default" and "Designed by postmark"); a longer title or author wraps, as before */
+@media (max-width: 520px) { .hearth-bar { font-size: 0.68rem; } .hearth-pickerband { justify-content: flex-start; column-gap: 0.4em; } .hearth .hearth-bar .pm-subrail-corner { column-gap: 0.6em; } }
