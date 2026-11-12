@@ -61,12 +61,13 @@
 /* ── the town header (Postmark's OWN chrome — one rail, not two) ──
    The Postmark mark, the nav's run of links, and at the right the END: Join and the reader's own corner (the bell, the household, sign
    in or out), PostmarkLayout.astro § THE HOUSE'S CORNER. On a desktop the header is one row and never wraps: when everything does not
-   fit, the nav's box narrows and its links wrap inside it, the first row keeping as many as fit and only the rest going beneath them (a
-   second row; a third or more only when a narrow window holds a big household's corner), while the mark and the end stay where they are.
-   That is how the rail wrapped before the household's faces came (POS-999,
+   fit, the nav's box narrows and its links wrap inside it, the first row keeping as many as fit and only the rest going to a second row
+   beneath them, while the mark and the end stay where they are. That is how the rail wrapped before the household's faces came (POS-999,
    Darko 2026-11-12 08:46 EST: "please look at how the main rail would overflow into a second row when there wasn't enough horizontal
    space before we even incorporated the household and resident icons. I want the main rail to split into a top and bottom row; not put
-   the whole thing in the bottom and put a giant empty space in the middle"). Below 861px the phone's own stacking, further down, stands.
+   the whole thing in the bottom and put a giant empty space in the middle"). Never more than two rows: where the links would need a third
+   beside a big household's corner, or the corner would run into the padding, the rail takes the phone's stacking (§ THE STACKED RAIL,
+   further down), as it always does below 861px.
    The gap here (1.4em → 1em) and the nav links' side padding (0.75em → 0.55em) are trimmed so a small house keeps one row. */
 .pm .pm-townhead {
   display: flex; align-items: center; gap: 1em;
@@ -154,6 +155,12 @@
      when the phone is too narrow for a wide corner (many faces, a wide monospace); a hidden auth block stays hidden */
   .pm .pm-townhead-end .pm-auth:not([hidden]), .pm .pm-townhead-end .pm-auth-who:not([hidden]) { display: contents; }
 }
+/* THE STACKED RAIL ON A DESKTOP: the phone's layout above, rule for rule, where the nav's links would take a third row beside the reader's
+   corner or the corner would run into the padding (the layout's first-paint script measures it and sets data-stacked; § THE TOP RAIL) */
+.pm .pm-townhead[data-stacked] { flex-wrap: wrap; gap: 0.7em; padding-bottom: 1.1em; }
+.pm .pm-townhead[data-stacked] .pm-townnav-links { margin-left: 0; flex-basis: 100%; order: 2; }
+.pm .pm-townhead[data-stacked] .pm-townhead-end { order: 1; flex: 0 1 auto; max-width: 100%; flex-wrap: wrap; justify-content: flex-end; row-gap: 0.5em; }
+.pm .pm-townhead[data-stacked] .pm-townhead-end .pm-auth:not([hidden]), .pm .pm-townhead[data-stacked] .pm-townhead-end .pm-auth-who:not([hidden]) { display: contents; }
 
 /* prose links on the night sky read town-gold, not the atelier's amber */
 .pm .how a, .pm .sect-note a, .pm .most-blurb a, .pm .illum-note a {

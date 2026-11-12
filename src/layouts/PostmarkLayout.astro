@@ -309,8 +309,39 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
             document.documentElement.setAttribute("data-lens", hs[0] || "signed-in");
           } catch (e) {}
         })();
-        // The top rail's rows are the stylesheet's alone (postmark.css § the town header): when the rail cannot hold everything on one row,
-        // the nav's links wrap inside the nav, as they did before the faces. No script measures them.
+        // THE TOP RAIL: AT MOST TWO ROWS (POS-999; Darko, 2026-11-12 08:46 EST: "I want the main rail to split into a top and bottom row"). On a
+        // desktop the stylesheet wraps the nav's links inside the nav, the first row keeping as many as fit (postmark.css § the town header).
+        // Where that would take a third row beside the reader's corner (a narrow window and a big household), or the corner would run into the
+        // rail's padding, the rail takes the phone's layout instead (data-stacked): the mark and the corner on the first row, the links on the
+        // second. Measured here before the first paint, and again when the corner or the sentinel's glyph changes size (the faces arriving), the
+        // window does, or a font lands. A phone has its own layout already; without a script the stylesheet's wrapping stands.
+        // pm-rail-stack:decide
+        function pmRailStacked(tops, endRight, edge, overflow) {
+          var rows = 0, last = -Infinity;
+          tops.slice().sort(function (a, b) { return a - b; }).forEach(function (t) { if (t - last > 4) { rows += 1; last = t; } });
+          return rows > 2 || endRight > edge + 0.5 || !!overflow;
+        }
+        // /pm-rail-stack:decide
+        window.pmRailStack = function () {
+          var head = document.querySelector(".pm-townhead");
+          if (!head) return;
+          head.removeAttribute("data-stacked");
+          if (window.matchMedia && window.matchMedia("(max-width: 860px)").matches) return;
+          var end = head.querySelector("[data-townhead-end]");
+          var tops = Array.prototype.map.call(head.querySelectorAll(".pm-townnav-links a"), function (a) { return a.getBoundingClientRect().top; });
+          var edge = head.getBoundingClientRect().right - parseFloat(getComputedStyle(head).paddingRight);
+          if (pmRailStacked(tops, end ? end.getBoundingClientRect().right : 0, edge, head.scrollWidth > head.clientWidth + 1)) head.setAttribute("data-stacked", "");
+        };
+        try {
+          window.pmRailStack();
+          var again = function () { window.pmRailStack(); };
+          if (window.ResizeObserver) {
+            var ro = new ResizeObserver(again);
+            ["[data-townhead-end]", "[data-pm-alert]"].forEach(function (s) { var e = document.querySelector(s); if (e) ro.observe(e); });
+          }
+          window.addEventListener("resize", again);
+          if (document.fonts && document.fonts.ready) document.fonts.ready.then(again);
+        } catch (e) {}
       })();
     </script>
     <script is:inline>

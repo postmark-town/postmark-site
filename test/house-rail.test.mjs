@@ -344,8 +344,11 @@ test("TEXT PIN: Join is rendered from the rail's own lantern seat at the rail's 
 // The rail before the faces (site 6488d659, measured in a browser): on a desktop the header is one row that never wraps, and the nav's own box narrows
 // while its links wrap inside it, the first row keeping as many as fit. Until 2026-11-12 a first-paint script set data-rows="2" when the rail was full,
 // and the stylesheet then gave the nav's links a row of their own (flex-basis: 100%), all six under the end, the middle of the first row empty.
+// AT MOST TWO ROWS (Wright, 2026-11-12, from "split into a top and bottom row"): where the wrapping would take a third row beside a big household's corner
+// (a narrow window), or the corner would run into the padding, the rail takes the phone's layout (data-stacked), measured by the first-paint script.
 // TEXT PIN over the stylesheet's rules (the site's CI has no browser): the lane's sweep measures the render at every width from 861 to 1568 px, signed
-// out and at 1 to 10 faces. This reads every rule that sets the header's or the nav's own layout on a desktop, and compares the whole verdict.
+// out and at 1 to 10 faces. This reads every rule that sets the header's or the nav's own layout on a desktop, and compares the whole verdict; the
+// stacked fallback is read apart, and must be the phone's layout rule for rule.
 function cssRules(css) {
   const src = css.replace(/\/\*[\s\S]*?\*\//g, "");
   const out = [];
@@ -373,11 +376,15 @@ function cssRules(css) {
 }
 const PHONE = "@media (max-width: 860px)";
 const HEADER = /\.pm-townhead(\[[^\]]*\])*$/, NAV = /\.pm-townnav-links(\[[^\]]*\])*$/;
+const STACKED = ".pm .pm-townhead[data-stacked]";
+// the phone block's selector as the stacked fallback writes it: the header itself, or anything inside it, under [data-stacked]
+const stackedFor = (s) => (s === ".pm .pm-townhead" ? STACKED : s.replace(/^\.pm /, `${STACKED} `));
 function railVerdict(css, script) {
-  const v = { headerWraps: [], headerQualified: [], navWrap: [], navOwnRow: [], scriptSetsRows: /data-rows|pmRailRows/.test(script) };
+  const v = { headerWraps: [], headerQualified: [], navWrap: [], navOwnRow: [], stacked: [], scriptSetsRows: /data-rows|pmRailRows/.test(script) };
   for (const r of cssRules(css)) {
     const desktop = !r.media.includes(PHONE);
     for (const s of r.selectors) {
+      if (desktop && s.startsWith(STACKED)) { v.stacked.push(s); continue; }
       if (desktop && HEADER.test(s)) {
         if (/wrap/.test(r.decls["flex-wrap"] ?? "") && r.decls["flex-wrap"] !== "nowrap") v.headerWraps.push(s);
         if (/\[[^\]]*\]$/.test(s)) v.headerQualified.push(s);
@@ -390,15 +397,44 @@ function railVerdict(css, script) {
   }
   return v;
 }
-const SPLIT_LIKE_BEFORE = { headerWraps: [], headerQualified: [], navWrap: [".pm .pm-townnav-links wrap"], navOwnRow: [], scriptSetsRows: false };
-test("TEXT PIN: on a desktop the top rail splits as it did before the faces: the header never wraps and the nav's links wrap inside the nav, so the links that fit stay on the first row and no rule sends all six to a row of their own", () => {
+test("TEXT PIN: on a desktop the top rail splits as it did before the faces: the header never wraps and the nav's links wrap inside the nav, so the links that fit stay on the first row; the only other desktop layout is the phone's, rule for rule, under data-stacked", () => {
   const css = read("src/styles/postmark.css");
-  assert.deepEqual(railVerdict(css, firstPaintScript()), SPLIT_LIKE_BEFORE,
-    "the header is one row on a desktop; its nav wraps its own links; nothing gives the nav a row to itself, and no script decides the rows");
-  // the reader sees the phone's rules where they are (a presence control: the same instrument finds a full-width nav and a wrapping header there)
-  const phone = cssRules(css).filter((r) => r.media.includes(PHONE));
+  const rules = cssRules(css);
+  const phone = rules.filter((r) => r.media.includes(PHONE) && r.selectors.some((s) => /\.pm-town(head|nav-links)/.test(s)));
+  // a presence control: the same instrument finds the phone's full-width nav and wrapping header where they are
   assert.ok(phone.some((r) => r.selectors.some((s) => NAV.test(s)) && r.decls["flex-basis"] === "100%"), "the phone's own stacking is read, and stands");
   assert.ok(phone.some((r) => r.selectors.some((s) => HEADER.test(s)) && r.decls["flex-wrap"] === "wrap"), "and its header wraps");
+  assert.deepEqual(railVerdict(css, firstPaintScript()),
+    { headerWraps: [], headerQualified: [], navWrap: [".pm .pm-townnav-links wrap"], navOwnRow: [], stacked: phone.flatMap((r) => r.selectors.map(stackedFor)), scriptSetsRows: false },
+    "the header is one row on a desktop; its nav wraps its own links; nothing else gives the nav a row to itself; no row script of the old kind");
+  // the stacked fallback IS the phone's layout: each phone rule, under [data-stacked], with the same declarations
+  for (const r of phone) {
+    const twin = rules.find((x) => !x.media.includes(PHONE) && JSON.stringify(x.selectors) === JSON.stringify(r.selectors.map(stackedFor)));
+    assert.ok(twin, `the phone's ${r.selectors.join(", ")} has its stacked twin`);
+    assert.deepEqual(twin.decls, r.decls, `and the twin says the same: ${r.selectors.join(", ")}`);
+  }
+});
+
+// THE DECISION, lifted from the first-paint script (between its markers) and run: stacked only past two rows of links, or when the corner would
+// pass the rail's content edge, or the rail overflows. Two rows stay the old split (the 1568 and 1200 pictures: four links and two).
+const DECIDE_OPEN = "// pm-rail-stack:decide", DECIDE_CLOSE = "// /pm-rail-stack:decide";
+test("the rail stacks only past two rows of links, or when the corner would run into the padding: the decision, lifted and run", () => {
+  const script = firstPaintScript();
+  assert.equal(script.split(DECIDE_OPEN).length, 2, "one decision, between its markers");
+  const src = script.slice(script.indexOf(DECIDE_OPEN) + DECIDE_OPEN.length, script.indexOf(DECIDE_CLOSE));
+  const stacked = (tops, endRight, edge, overflow = false) => vm.runInNewContext(`${src}\npmRailStacked(tops, endRight, edge, overflow);`, { tops, endRight, edge, overflow });
+  const EDGE = 1340;
+  assert.equal(stacked([27, 27, 27, 27, 27, 27], 1300, EDGE), false, "one row of links: not stacked");
+  assert.equal(stacked([27, 27, 27, 27, 62, 62], 1300, EDGE), false, "two rows (four and two): not stacked, the old split stands");
+  assert.equal(stacked([27.4, 27, 26.8, 27.2, 62, 62.3], 1300, EDGE), false, "a row's links a fraction of a pixel apart are one row");
+  assert.equal(stacked([27, 27, 62, 62, 97, 97], 1300, EDGE), true, "three rows: stacked");
+  assert.equal(stacked([27, 62, 97, 132, 167, 202], 1300, EDGE), true, "six single links: stacked");
+  assert.equal(stacked([27, 27, 27, 27, 62, 62], EDGE + 1, EDGE), true, "the corner a pixel into the padding: stacked");
+  assert.equal(stacked([27, 27, 27, 27, 62, 62], EDGE + 0.4, EDGE), false, "a sub-pixel rounding is not the padding");
+  assert.equal(stacked([27, 27, 27, 27, 27, 27], 1300, EDGE, true), true, "a rail that overflows: stacked");
+  assert.match(script, /if \(pmRailStacked\(tops, end \? end\.getBoundingClientRect\(\)\.right : 0, edge, head\.scrollWidth > head\.clientWidth \+ 1\)\) head\.setAttribute\("data-stacked", ""\);/, "the measure feeds the decision and sets data-stacked");
+  assert.ok(script.indexOf('head.removeAttribute("data-stacked");') < script.indexOf("var tops ="), "it measures with the stacking off");
+  assert.match(script, /window\.matchMedia\("\(max-width: 860px\)"\)\.matches\) return;/, "and leaves a phone to its own layout");
 });
 test("the split's verdict goes red on the two-row rule it replaced (until 2026-11-12, every link under the end) and on a header that wraps the nav whole", () => {
   const css = read("src/styles/postmark.css");
@@ -413,7 +449,7 @@ test("the split's verdict goes red on the two-row rule it replaced (until 2026-1
   const old = railVerdict(css + "\n" + twoRows, script + '\nhead.setAttribute("data-rows", over ? "2" : "1");');
   assert.deepEqual(old.headerWraps, ['.pm .pm-townhead[data-rows="2"]'], "the old rule's wrapping header is seen");
   assert.ok(old.navOwnRow.includes('.pm .pm-townhead[data-rows="2"] .pm-townnav-links flex-basis: 100%') && old.scriptSetsRows, "and its nav row of their own, and its script");
-  assert.notDeepEqual(old, SPLIT_LIKE_BEFORE);
+  assert.notDeepEqual(old, railVerdict(css, script), "and the verdict differs from today's");
   const whole = railVerdict(css + "\n.pm .pm-townhead { flex-wrap: wrap; }\n.pm .pm-townnav-links { flex-basis: 100%; }", script);
   assert.deepEqual([whole.headerWraps, whole.navOwnRow], [[".pm .pm-townhead"], [".pm .pm-townnav-links flex-basis: 100%"]], "a desktop header that wraps the nav whole onto its own row is seen");
 });
