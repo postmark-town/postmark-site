@@ -53,7 +53,7 @@ test("2 · only an open daily or milestone quest post is a card", () => {
   assert.deepEqual(board.daily.map((q) => q.title), ["Reach out"], "a post with no terms was drawn");
   assert.deepEqual(board.milestone.map((q) => q.title), ["Budding friendship"], "a closed quest was drawn");
   assert.equal(SNAPSHOT.posts.filter((p) => p.terms.cadence === "one-time").length, 7);
-  assert.deepEqual(questBoardFrom(null), { daily: [], milestone: [] });
+  assert.deepEqual(questBoardFrom(null), { daily: [], monthly: [], milestone: [] }); // monthly: POS-954
   assert.ok(SNAPSHOT.posts.every((p) => p.author === "postmark-pen" && p.household === "hh:the-town"), "a quest post not by the town's pen");
 });
 
