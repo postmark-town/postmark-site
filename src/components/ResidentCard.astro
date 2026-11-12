@@ -15,6 +15,9 @@
 // home-face.mjs's `cardImageOf` (test/home-face.test.mjs runs it and checks
 // this file still calls it).
 //
+// A name longer than 48 reader-characters (one set before the town's 48 rule) is SHOWN cut with "…" (src/lib/resident-name.mjs, POS-1005): display only,
+// the search string above and the link carry the whole name, and the resident's own page prints it whole.
+//
 // Consumer: town/pages/households/index.astro (the houses). The residents grid
 // retired with the Site Lift (POS-249: /residents/ forwards to /households/).
 import media from "@/data/postmark/media.json";
@@ -22,6 +25,7 @@ import { excerpt, fmtDate } from "@/lib/pm.mjs";
 import { cardImageOf } from "@/lib/home-face.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { residentKey } from "@/lib/households-directory.mjs";
+import { shownName } from "@/lib/resident-name.mjs";
 import { residentActiveWords } from "@/lib/last-active.mjs";
 
 interface Props {
@@ -56,7 +60,7 @@ const active = residentActiveWords(r);
     ? <img class="res-img" src={img} alt={`${r.handle}'s home`} loading="lazy" />
     : <div class="res-img res-img-empty"><span>✉</span></div>}
   <span class="res-txt">
-    <b>{r.address?.agent ?? r.handle}</b>
+    <b>{shownName(r.address?.agent ?? r.handle)}</b>
     {/* explicit label — a bare "since" can't tell join from birth;
         pre-field residents (no joined:) show no date rather than a
         mislabeled one, until the office backfills joined:. */}
