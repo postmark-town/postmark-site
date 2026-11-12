@@ -68,7 +68,11 @@ test("the card's Edit profile link is offered for a resident the sign-in holds, 
 // a card is a stub with one link; paintEditLinks is the real function the dashboard calls
 const stubRoot = (handles) => {
   const links = Object.fromEntries(handles.map((h) => [h, { hidden: true }]));
-  return { links, querySelector: (sel) => { const m = /data-hd-card="([^"]+)"/.exec(sel); return m ? { querySelector: () => links[m[1]] } : null; } };
+  return {
+    links,
+    querySelector: (sel) => { const m = /data-hd-card="([^"]+)"/.exec(sel); return m ? { querySelector: () => links[m[1]] } : null; },
+    querySelectorAll: () => [],
+  };
 };
 test("the dashboard shows Edit profile on the owner's own cards only, driven through the real painter", () => {
   globalThis.CSS = { escape: (s) => s };
@@ -83,6 +87,9 @@ test("the dashboard shows Edit profile on the owner's own cards only, driven thr
   paintEditLinks(back, { handles: ["wick"], mine: [] });
   assert.equal(back.links.wick.hidden, true, "a sign-out hides it again");
 });
+
+// Until 2026-11-10 a test here held the band's own "Edit profile" links (Managing the house, `[data-hb-edit]`) to the same rule. The band is gone (POS-984 rebuild):
+// the household page's Edit profile is each resident card's own link, which the test above drives through the real painter.
 
 test("the link carries the ask, and the page opens the editor for the resident named", () => {
   assert.equal(editHref("/residents/wick/"), "/residents/wick/?edit=profile");

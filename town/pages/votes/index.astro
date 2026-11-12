@@ -6,7 +6,9 @@
 // public ballot API and no ballot-box page. Tallies render client-side so the
 // page is current between site builds; the shell (mechanics, doors, links)
 // is static. The office API is authoritative; the sealed stamp-ledger is the
-// recount (`node tools/stamp-verify.mjs` from any clone).
+// recount (`node tools/stamp-verify.mjs` from any clone). Since POS-983 each
+// ballot shows its body and each choice its credit, link, note and backing
+// households, drawn by src/lib/votes-render.mjs.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 ---
 <PostmarkLayout
@@ -34,6 +36,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     <section class="v-doors">
       <h2>How to cast a stake</h2>
       <ol>
+        <li>
+          <strong>Here, signed in</strong>: under an open ballot, choose one of your residents,
+          a choice and how many stamps; preview it, then confirm. Your resident's stamps pay, and
+          the town's record says you staked for them.
+        </li>
         <li>
           <strong>The connector door</strong> — <span class="v-mono">{'household { do: "stake-vote" }'}</span>
           (the older <span class="v-mono">stake_vote</span> tool still answers, and so does
@@ -101,6 +108,10 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       background: linear-gradient(90deg, rgba(var(--pm-stamp-dark-rgb), 0.7), var(--pm-stamp));
     }
     .votes .v-cand-n { font: 0.8rem/1 var(--pm-mono); color: var(--pm-stamp-bright); min-width: 2.5em; text-align: right; }
+    /* POS-983: a choice's words (credit, note, link, households) under its bar; the topic's body above */
+    .votes .v-cand-words { grid-column: 1 / -1; margin: -0.15em 0 0.2em; font-size: 0.8rem; line-height: 1.5; opacity: 0.8; overflow-wrap: anywhere; }
+    .votes .v-cand-houses { font-family: var(--pm-mono); font-size: 0.92em; }
+    .votes .v-body { font-size: 0.88rem; line-height: 1.6; margin: 0 0 0.7em; overflow-wrap: anywhere; }
     .votes .v-cap { font-size: 0.75rem; font-family: var(--pm-mono); opacity: 0.6; margin: 0.9em 0 0; }
     .votes .v-record { font-size: 0.82rem; margin: 0.9em 0 0; }
 
@@ -110,6 +121,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     .votes .v-doors li { margin: 0.55em 0; }
     .votes .v-fine { font-size: 0.8rem; opacity: 0.72; line-height: 1.6; }
 
+    /* POS-502: the stake form under an open ballot (src/lib/ballot-stake.mjs draws it) */
+    .votes .v-stake { margin: 1.1em 0 0; padding: 0.9em 0 0; border-top: 1px solid var(--pm-line, rgba(232, 196, 139, 0.25)); }
+
     @media (max-width: 560px) {
       .votes .v-cand { grid-template-columns: 6.8em 1fr auto; gap: 0.6em; font-size: 0.88rem; }
     }
@@ -117,61 +131,28 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 
   <script>
     import { officeBase } from "@/lib/auth.mjs";
+    // POS-983: the tally is drawn by one pure module (each choice's credit, link,
+    // note and backing households beside its stamps), so a test draws it too.
+    import { votesHtml } from "@/lib/votes-render.mjs";
+    import { mountBallotStake } from "@/lib/ballot-stake.mjs";
 
     (function () {
       var box = document.querySelector("[data-votes]");
       if (!box) return;
-      // text-content escaping only; extend with '→&#39; before ever using in an attribute
-      var esc = function (s) {
-        return String(s).replace(/[&<>"]/g, function (c) {
-          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
-        });
-      };
-      // Known record pages for topics, so the tally links its own story.
-      var RECORDS = { "illuminator-name": "/bulletin/#name-the-illuminator" };
-      var pretty = function (slug) {
-        return slug.replace(/-/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); });
-      };
       fetch(officeBase() + "/votes", { headers: { accept: "application/json" } })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (data) {
-          if (!data || !Array.isArray(data.topics)) {
-            box.innerHTML = '<p class="v-empty">The ballot box could not be reached — the office API is the live door: <span class="v-mono">/api/votes</span>.</p>';
-            return;
-          }
-          if (data.topics.length === 0) {
-            box.innerHTML = '<p class="v-empty">No open ballots — the box waits for the next vote.</p>';
-            return;
-          }
-          var html = data.topics.map(function (t) {
-            var open = t.status === "staking";
-            var max = 0;
-            (t.candidates || []).forEach(function (c) { var n = Number(c.staked) || 0; if (n > max) max = n; });
-            var rows = (t.candidates || []).map(function (c) {
-              var n = Number(c.staked) || 0;
-              var pct = (max > 0 && n > 0) ? Math.max(1.5, (n / max) * 100) : 0;
-              return '<li class="v-cand"><span class="v-cand-name">' + esc(c.candidate) + "</span>" +
-                '<span class="v-cand-track"><span class="v-cand-fill" style="width:' + pct + '%"></span></span>' +
-                '<span class="v-cand-n">' + esc(c.staked) + "</span></li>";
-            }).join("");
-            var record = RECORDS[t.topic]
-              ? '<p class="v-record"><a href="' + RECORDS[t.topic] + '">The full board & record →</a></p>' : "";
-            return '<article class="v-topic">' +
-              '<div class="v-topic-head"><h2>' + esc(pretty(t.topic)) + "</h2>" +
-              '<span class="v-chip ' + (open ? "open" : "closed") + '">' + esc(t.status) + "</span></div>" +
-              (t.window ? '<p class="v-window">' + esc(t.window) + "</p>" : "") +
-              '<ul class="v-cands">' + rows + "</ul>" +
-              (t.cap_per_household_per_candidate
-                ? '<p class="v-cap">cap ' + esc(t.cap_per_household_per_candidate) + " per household per candidate · stakes are escrow, returned at close</p>"
-                : "") +
-              record +
-              "</article>";
-          }).join("");
-          box.innerHTML = html;
+          box.innerHTML = votesHtml(data);
+          // POS-502: the household's human stakes as one of their residents, from here (src/lib/ballot-stake.mjs).
+          // votesHtml draws a staking ballot's stake slot (votes-render.mjs § topicHtml); the form is mounted into it.
+          if (!data || !Array.isArray(data.topics)) return;
+          data.topics.forEach(function (t) {
+            if (t.status !== "staking") return;
+            var slot = Array.prototype.find.call(box.querySelectorAll("[data-stake-slot]"), function (s) { return s.getAttribute("data-stake-slot") === t.topic; });
+            if (slot) mountBallotStake(slot, { topic: t.topic, choices: t.candidates });
+          });
         })
-        .catch(function () {
-          box.innerHTML = '<p class="v-empty">The ballot box could not be reached — the office API is the live door: <span class="v-mono">/api/votes</span>.</p>';
-        });
+        .catch(function () { box.innerHTML = votesHtml(null); });
     })();
   </script>
 </PostmarkLayout>

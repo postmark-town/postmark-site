@@ -109,7 +109,7 @@
 .hearth-stage .hd-needs li { padding: 0.65em 0; border-top: 1px dashed rgba(42, 33, 24, 0.25); }
 .hearth-stage .hd-needs li:first-child { border-top: 0; }
 .hearth-stage .hd-needs .k { font-family: var(--pm-mono); font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: #8a2f1f; }
-.hearth-stage .hd-needs .hd-calm { color: #3a7d3a; }
+.hearth-stage .hd-needs .hd-calm { color: #2d6a2d; }   /* the calm green, darkened to read on the paper (it was 4.3:1 there; the 1.4 lift in --hx-ok is for the dark glass) */
 .hearth-stage .hd-needs p { margin: 0.15em 0 0.25em; font-size: 0.93rem; }
 .hearth-stage .hd-needs a, .hearth-stage .hd-needs .hd-who { color: var(--hx-paper-ink); font-size: 0.9rem; }
 
@@ -183,16 +183,68 @@
   .hearth-stage .hx-bar-row { grid-template-columns: minmax(5em, 8em) minmax(0, 1fr) 3em; }
 }
 
-/* ── the site's own chrome above the stage: never part of a template ── */
-.hearth { --hx-chrome-ink: #cdc2ab; color: var(--hx-chrome-ink); }
-.hearth-bar { display: grid; gap: 0.6em; padding: 0.4em 0 1em; margin-bottom: 1.2em; border-bottom: 1px solid rgba(232, 196, 139, 0.22); }
-.hearth-bar h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2.1rem); color: #f4e9d7; line-height: 1.1; }
-.hearth-kicker { margin: 0; font-family: var(--pm-mono); text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.66rem; color: rgba(232, 196, 139, 0.8); }
-.hearth-tools { display: flex; flex-wrap: wrap; gap: 0.6em 1.2em; align-items: center; font-size: 0.9rem; }
-.hearth-tools a { color: #e8c48b; }
-.hearth-picker { display: inline-flex; align-items: center; gap: 0.5em; font-family: var(--pm-mono); font-size: 0.72rem; }
-.hearth-picker select { font: inherit; background: rgba(13, 20, 38, 0.8); color: #f4e9d7; border: 1px solid rgba(232, 196, 139, 0.4); border-radius: 6px; padding: 3px 8px; max-width: 100%; }
-.hearth-note { margin: 0; font-size: 0.85rem; opacity: 0.85; }
-.hearth-holo-note { margin: 1.2em 0 0; font-size: 0.8rem; opacity: 0.85; }
+/* ── the host's frame around the design (POS-984) ──
+ * A template's `:root`, `html` and `body` rules land on its own stage, where `margin` and `transform` are allowed, and the
+ * stage's own `contain: paint` clips its children, not itself. This frame clips the stage (paint containment) and is its
+ * own formatting context (a negative margin cannot collapse out through it), so a design can only move itself inside it,
+ * never over the site's strip above. */
+.hearth-frame { contain: paint; display: flow-root; }
+
+/* ── the site's own strip above the stage: never part of a template (POS-984) ──
+ * Where you are, then the household's sub-rail (HouseRail.astro, POS-999) with the Hearth dropdown and (for the house's own human) the settings in its
+ * far corner. The sub-rail's chips wear postmark.css's own `.pm-chip`. Every ink here is a token, and each is paired with
+ * the surface it sits on: the strip's ink is read on the page's night (the site has one colour scheme, the dark `color-scheme: dark` of global.css,
+ * and no light one), the field's ink on the field. No ink is borrowed from another surface; the contrast of every pair is held by the walk (qa-shots/hearth-walk.mjs ⑱). */
+.hearth {
+  --hx-chrome-ink: #cdc2ab;             /* text on the page's night */
+  --hx-chrome-link: #e8c48b;            /* links on the page's night */
+  --hx-chrome-field: #0d1426;           /* a field's surface ... */
+  --hx-chrome-field-ink: #f4e9d7;       /* ... and the ink that is read on it */
+  --hx-chrome-line: rgba(232, 196, 139, 0.45);
+  --hx-chrome-ok: #9be29b;              /* the save's green check, on the page's night (the stage's own --hx-ok) */
+  --hx-chrome-no: #e0846b;              /* the put-it-back x and a save that did not land, on the night (the stage's own --hx-coral) */
+  color: var(--hx-chrome-ink);
+}
+.hearth .hd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.hearth-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.3em 1.4em; margin: 0 0 0.7em; padding: 0 0 0.5em; border-bottom: 1px dashed var(--hx-chrome-line); font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.04em; }
+.hearth-bar [hidden] { display: none !important; }
+.hearth-crumbs { margin: 0; text-transform: uppercase; letter-spacing: 0.14em; color: var(--hx-chrome-link); }
+.hearth-crumbs a { color: var(--hx-chrome-link); text-decoration: none; }
+.hearth-crumbs a:hover, .hearth-crumbs a:focus-visible { text-decoration: underline; }
+/* the sub-rail is the strip's second line, the whole width; inside the strip it draws no rule of its own (the strip's is the one) */
+.hearth .hearth-bar > .pm-subrail { flex: 1 1 100%; margin: 0; padding: 0; border: 0; }
+.hearth .hearth-bar .pm-subrail-corner { font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.04em; }
+/* the settings, the house's own human's: a small round button, and a panel under it, at the corner's right edge */
+.hearth-settings { position: relative; }
+.hearth-gear { list-style: none; display: inline-grid; place-items: center; width: 28px; height: 28px; box-sizing: border-box; border-radius: 999px; cursor: pointer; color: var(--hx-chrome-link); border: 1px solid var(--hx-chrome-line); }
+.hearth-gear::-webkit-details-marker { display: none; }
+.hearth-gear:hover, .hearth-gear:focus-visible, .hearth-settings[open] > .hearth-gear { color: var(--hx-chrome-field-ink); background: var(--hx-chrome-field); }
+.hearth-settings-panel { position: absolute; z-index: 20; top: calc(100% + 6px); right: 0; width: max-content; max-width: min(22rem, calc(100vw - 2rem)); box-sizing: border-box; padding: 0.6em 0.8em; border-radius: 8px; border: 1px solid var(--hx-chrome-line); background: var(--hx-chrome-field); color: var(--hx-chrome-field-ink); }
+.hearth-settings-panel a { color: var(--hx-chrome-link); text-underline-offset: 2px; }
+.hearth-note { margin: 0; font-size: 0.85rem; }
+.hearth-bar .hearth-note { font: inherit; }   /* a note in the strip speaks in the strip's own small type */
+.hearth-bar > .hearth-note { flex: 1 1 100%; }
+.hearth-holo-note { margin: 1.2em 0 0; font-size: 0.8rem; }
 .hearth-holo-note[hidden] { display: none; }
 .hearth-note[hidden] { display: none; }
+
+/* the dropdown (POS-962; the dropdown alone by POS-999 round 3, Darko 2026-11-12 08:56 EST): the preview select every reader has, the design's credit, and for the
+ * house's signed-in human, while it shows another design than the kept one, a green check (save) and a red x (put it back) beside it. No words explain them;
+ * a save that did not land marks the dropdown. */
+.hearth-pickerband { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3em 0.6em; }
+.hearth-pickerband [hidden] { display: none; }
+.hearth-pick { font: inherit; background: var(--hx-chrome-field); color: var(--hx-chrome-field-ink); border: 1px solid var(--hx-chrome-line); border-radius: 6px; padding: 2px 8px; max-width: 100%; }
+.hearth-pick:disabled { opacity: 0.6; }
+.hearth-pick[aria-invalid="true"] { border-color: var(--hx-chrome-no); box-shadow: 0 0 0 1px var(--hx-chrome-no); }
+.hearth-acts { display: inline-flex; align-items: center; gap: 0.35em; }
+.hearth-acts button { display: inline-grid; place-items: center; width: 24px; height: 24px; box-sizing: border-box; padding: 0; border-radius: 999px; cursor: pointer; background: var(--hx-chrome-field); border: 1px solid currentColor; }
+.hearth-keep { color: var(--hx-chrome-ok); }
+.hearth-back { color: var(--hx-chrome-no); }
+.hearth-acts button:hover, .hearth-acts button:focus-visible { background: currentColor; }
+.hearth-acts button:hover > svg, .hearth-acts button:focus-visible > svg { color: var(--hx-chrome-field); }
+.hearth-acts button:disabled { opacity: 0.5; cursor: default; }
+.hearth-by { color: var(--hx-chrome-ink); white-space: nowrap; }
+.hearth-refused { color: var(--hx-chrome-no); }
+/* on a phone the corner's gaps are a little tighter, so the dropdown, its credit and the owner's settings keep one line (measured at 390 px: 4 px over at the
+   wider gaps, with "Postmark's default" and "Designed by postmark"); a longer title or author wraps, as before */
+@media (max-width: 520px) { .hearth-bar { font-size: 0.68rem; } .hearth-pickerband { justify-content: flex-start; column-gap: 0.4em; } .hearth .hearth-bar .pm-subrail-corner { column-gap: 0.6em; } }

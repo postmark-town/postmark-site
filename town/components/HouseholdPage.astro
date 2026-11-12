@@ -1,0 +1,56 @@
+---
+// THE HOUSEHOLD PAGE — /households/<slug>/, a declared house's one page (POS-984).
+//
+// The page is the site's shell, then the household's chosen Hearth design, and nothing else of the site's but one thin strip (Hearth.astro): the
+// breadcrumb, and the household's sub-rail (HouseRail.astro, the same one every resident page carries, POS-999) with the Hearth dropdown and, for
+// the house's own human, the settings (the likeness answer) in its far corner, and its round "+" (add a resident).
+//
+// Darko, 2026-11-10 17:14 EST, on dev: "My intent is for the resident-submitted household hearth theme to be the only thing for the household
+// dashboard … There's absolutely no reason for there to be a separate private dashboard." 17:28: "How do we make room, as much room as possible, such
+// that the resident designed submissions take up the vast majority of the visual space in the household page, and we literally just have the bare
+// minimum that … we couldn't include in the template."
+//
+// WHAT IS NOT HERE, ON PURPOSE, and where it went:
+//   - the pane for the signed-in human (Needs you, waiting mail, managing the house, open ballots, the day's quests): the design draws Needs you and the
+//     boat line itself, as slots, for the house's own sign-in only; the quests are off this page (they went stale when the quest log grew); the Hearth
+//     contest's stake form is on /votes/, where it always was; "Edit profile" is on each resident's card, and a card links to that resident's own page.
+//   - a tab per resident: the design draws each resident; the sub-rail's chips are links to each resident's own page, /residents/<handle>/.
+//
+// `?resident=<handle>` (the old address of a resident's tab on this page) still works: it REDIRECTS to /residents/<handle>/, the rest of the query and
+// the fragment riding across (so `?resident=wick&edit=profile` still opens wick's editor). A handle that is not of this house is ignored. Without scripts the
+// household page simply shows, which is a true thing to see at that address. The script is inline, so the page's security policy trusts it by its hash
+// (tools/lib/hearth-csp.mjs): it is outside the entry's region.
+//
+// /households/<slug>/hearth/ forwards here (town/pages/households/[slug]/hearth.astro).
+import Hearth from "@/components/hearth/Hearth.astro";
+
+interface Props {
+  house: any;
+  members: any[];
+  plate: string;
+}
+const { house, members, plate } = Astro.props;
+const handles = members.map((m: any) => m.handle);
+---
+<div class="house house-page" data-house data-route="household" data-house-slug={house.slug ?? ""}>
+  <script is:inline define:vars={{ handles }}>
+    (function () {
+      try {
+        var p = new URLSearchParams(location.search);
+        var h = p.get("resident");
+        if (!h || handles.indexOf(h) < 0) return;
+        p.delete("resident");
+        var rest = p.toString();
+        location.replace("/residents/" + encodeURIComponent(h) + "/" + (rest ? "?" + rest : "") + location.hash);
+      } catch (e) { /* the household page is what shows */ }
+    })();
+  </script>
+  <Hearth house={house} members={members} plate={plate}>
+    <Fragment slot="crumbs"><a href="/">Postmark</a> · <a href="/households/">Residents</a> · {plate}</Fragment>
+  </Hearth>
+</div>
+
+<style>
+  /* the page takes the shell's own width (the header's, 1160px), not the old 1080px column: the design is the page */
+  .house-page { max-width: 1160px; margin: 0 auto; padding: 0 0.4em 2em; }
+</style>

@@ -1,0 +1,132 @@
+---
+// HouseRail — the household's sub-rail: ONE component, on the household page and on every resident page (POS-999).
+//
+// Darko, on his dev walk, 2026-11-11 10:48 EST: "We need to unify the subrail of the household and each resident page … I want … the resident
+// pages subrail to basically be like a blow up or extension of what's in the all the way top right … instead of having just a phrase add a
+// resident that's underscored with a plus sign as the link, we could just have like a plus sign pill next to all of the resident chips … that
+// says, you know, maybe add a resident on hover … the drop-down selector for the hearth … should be like all the way in the corner".
+// 10:57: on a resident page "we can just keep the corner empty".
+//
+// What it draws, for every reader:
+//   - the household chip: the house's name, linking to its page (houses.mjs § houseHref, the one owner of that URL). An UNDECLARED shared house has
+//     no page, so its chip is the button that opens the house's seat in place (Household.astro's `seat`); an undeclared house of one has neither,
+//     and no household chip;
+//   - a chip per resident: the picture (or the initial) and the name, nothing under it, linking to the resident's own page; a declared member
+//     whose pages have not landed is an inert chip with its arriving words as its title;
+//   - the current page's chip carries aria-current="page" (postmark.css § .pm-chip lights it).
+// For the house's own signed-in human only (shipped hidden; the page's script shows it, and the office is the enforcer of the act): a round "+",
+// whose words are its title and its accessible name. It replaces the underlined "+ add a resident" links the strip and the resident plate carried.
+// The far corner is the page's own (the `corner` slot): the household page puts the Hearth dropdown and the settings there; a resident page leaves it empty.
+// `reading`: the household page's small mark for reads still in flight (stage.mjs paints it; its words are its title). No other page reads it, so no
+// other page carries it.
+//
+// The faces are the household page's own (household-dashboard/faces.mjs § residentFace), so a resident wears one picture on the Hearth, here and in
+// the main rail's corner (/households/<path>/faces.json is built from the same function).
+import media from "@/data/postmark/media.json";
+import { residentFace } from "@/lib/household-dashboard/faces.mjs";
+import { homePictureOf } from "@/lib/home-picture.mjs";
+import { nameplate, houseHref } from "@/lib/houses.mjs";
+
+interface Props {
+  house: any;
+  members: any[];
+  /** the page's own chip: a member's handle, or HOUSE when the page is the household's (its page, or the seat) */
+  current: string | null;
+  /** a resident page of an UNDECLARED shared house: it has no household page, and its household chip opens the seat in place */
+  seat?: boolean;
+  /** the household page only: the mark for reads still in flight */
+  reading?: boolean;
+}
+// the household's own key, never a handle (handles are slugs, and a slug has no leading underscore): Household.astro's HOUSE_TAB, the same string
+const HOUSE = "__house";
+const { house, members, current, seat = false, reading = false } = Astro.props;
+const href = houseHref(house);
+const plate = nameplate(house) || "Household";
+const faces = members.map((r) => residentFace(r, media, homePictureOf(r.handle)));
+const arriving: string[] = house.arriving ?? [];
+// the house's own chip: its page when it has one, the seat when it is shared and has none, nothing for a house of one with no page
+const houseChip = href ? "link" : seat ? "seat" : null;
+const onHouse = current === HOUSE;
+---
+<nav class="pm-subrail" data-house-rail aria-label={`${plate}: the household and its residents`}>
+  <div class="pm-subrail-chips">
+    {houseChip === "link" && (
+      <a class="pm-chip is-first" data-house-link href={href} aria-current={onHouse ? "page" : undefined}>
+        <span class="pm-chip-face" aria-hidden="true"><span>⌂</span></span>
+        <span class="pm-chip-name">{plate}</span>
+      </a>
+    )}
+    {houseChip === "seat" && (
+      <button type="button" class="pm-chip is-first" data-rail-chip={HOUSE} aria-current={onHouse ? "page" : undefined}>
+        <span class="pm-chip-face" aria-hidden="true"><span>⌂</span></span>
+        <span class="pm-chip-name">{plate}</span>
+      </button>
+    )}
+    {faces.map((f) => (
+      <a class="pm-chip" data-rail-chip={f.handle} href={`/residents/${encodeURIComponent(f.handle)}/`}
+        aria-current={current === f.handle ? "page" : undefined}
+        style={`--pm-chip-color: ${f.accent ?? "#e8c48b"}`}>
+        <span class="pm-chip-face" aria-hidden="true">
+          {f.avatar ? <img src={f.avatar} alt="" loading="lazy" /> : <span>{f.monogram}</span>}
+        </span>
+        <span class="pm-chip-name">{f.name}</span>
+      </a>
+    ))}
+    {arriving.map((h) => (
+      <span class="pm-chip is-arriving" aria-disabled="true"
+        title={`${h} has been declared to this house — their pages haven't landed yet`}>
+        <span class="pm-chip-face" aria-hidden="true"><span>⟡</span></span>
+        <span class="pm-chip-name">{h}</span>
+      </span>
+    ))}
+    <a class="pm-subrail-add" data-house-add href="/join/move-in/" title="add a resident" aria-label="add a resident" hidden><span aria-hidden="true">+</span></a>
+    {reading && <span class="pm-subrail-reading" data-hd-reading-mark role="status" hidden><span class="pm-subrail-sr" data-hd-reading-words></span></span>}
+  </div>
+  <div class="pm-subrail-corner"><slot name="corner" /></div>
+</nav>
+
+<style>
+  /* the rail sets its own type, so it reads the same on both pages (the household page's strip around it is small mono) */
+  .pm-subrail {
+    font-family: var(--pm-serif); font-size: 1rem; letter-spacing: normal; line-height: 1.3;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6em 1em;
+    margin: 0 0 1.1em; padding: 0 0 0.9em;
+    border-bottom: 1px dashed rgba(232, 196, 139, 0.22);
+  }
+  .pm-subrail [hidden] { display: none !important; }
+  .pm-subrail-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5em; min-width: 0; }
+  .pm-subrail-corner { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.4em 0.9em; margin-left: auto; }
+  .pm-subrail-corner:empty { display: none; }
+  /* a chip is its picture and its name: the name keeps to one line, and on a phone it is cut short rather than wrapping the chip */
+  .pm-subrail .pm-chip-name { white-space: nowrap; }
+  @media (max-width: 540px) {
+    .pm-subrail .pm-chip-name { max-width: 8.5em; overflow: hidden; text-overflow: ellipsis; }
+  }
+
+  /* a declared member whose pages have not landed: a chip you can see and cannot open */
+  .pm-chip.is-arriving { cursor: default; border-style: dashed; opacity: 0.72; background: rgba(13, 20, 38, 0.35); }
+  .pm-chip.is-arriving:hover { border-color: rgba(232, 196, 139, 0.18); transform: none; }
+  .pm-chip.is-arriving .pm-chip-face { color: rgba(232, 196, 139, 0.7); background: rgba(16, 27, 49, 0.8); border: 1px dashed rgba(232, 196, 139, 0.45); }
+  .pm-chip.is-arriving .pm-chip-name { color: rgba(255, 244, 215, 0.75); font-weight: 600; }
+
+  /* the house's own "+": a round pill the height of a chip's face, after the last chip */
+  .pm-subrail-add {
+    display: inline-grid; place-items: center; flex: none;
+    width: 34px; height: 34px; border-radius: 999px; box-sizing: border-box;
+    color: #f6dcae; text-decoration: none; font: 400 1.25rem/1 var(--pm-mono);
+    background: rgba(13, 20, 38, 0.6); border: 1px dashed rgba(232, 196, 139, 0.6);
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  }
+  .pm-subrail-add:hover, .pm-subrail-add:focus-visible { border-style: solid; border-color: #e8c48b; background: rgba(232, 196, 139, 0.12); transform: translateY(-1px); }
+
+  /* the reads still in flight: a small turning ring, its words its title (and, for a screen reader, the status text it holds) */
+  .pm-subrail-reading {
+    position: relative; display: inline-block; flex: none; width: 14px; height: 14px; margin-left: 0.2em;
+    border-radius: 50%; border: 2px solid rgba(232, 196, 139, 0.25); border-top-color: #e8c48b; box-sizing: border-box;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .pm-subrail-reading { animation: pm-subrail-turn 0.9s linear infinite; }
+    @keyframes pm-subrail-turn { to { transform: rotate(360deg); } }
+  }
+  .pm-subrail-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>

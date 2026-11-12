@@ -20,6 +20,22 @@ export function parseAt(v) {
 
 const leaf = (id) => String(id ?? "").split("/").pop().replace(/-/g, " ");
 
+// ── what is still being read (POS-984) ──────────────────────────────────────
+
+/** Nothing is out: the answer for a page that awaited its whole read, and the default for a context that carries none. */
+export const NOT_READING = Object.freeze({ residents: Object.freeze([]), house: Object.freeze([]) });
+
+/**
+ * What a partial answer is still waiting on, from readHouse()'s snapshot: the residents whose reads are out
+ * (their absence is "still coming", never "did not answer") and the house-wide reads not landed. A resident whose read
+ * failed is not in `residents`: they are read, and read as nothing.
+ */
+export function readingOf(reads) {
+  const residents = asArray(reads?.pending);
+  const house = asArray(reads?.waiting);
+  return residents.length || house.length ? { residents, house } : NOT_READING;
+}
+
 // ── the feed ────────────────────────────────────────────────────────────────
 
 /**

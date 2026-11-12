@@ -36,7 +36,7 @@
 //     gone; each teaser now links the posting's own page, `noticePath(b.slug)`
 //     at town/pages/index.astro:383, a static page and no anchor at all.)
 //   · Links built in script, e.g. `var RECORDS = { "illuminator-name":
-//     "/bulletin/#name-the-illuminator" }` (town/pages/votes/index.astro:127).
+//     "/bulletin/#name-the-illuminator" }` (src/lib/votes-render.mjs § RECORDS, drawn on /votes/).
 //     Same target as a real href below, so the class is already on the record.
 //   · Off-site links. Another site's anchors are not ours to hold.
 

@@ -213,11 +213,15 @@ test("every road that names moving in opens /join/move-in/", () => {
   assert.ok(!/href="\/mail\/compose\/">Give them an address/.test(JOIN),
     "the /join/ chat lane still sends `Give them an address →` to the writing desk");
 
-  const adds = HOUSE.match(/data-house-add href="\/join\/move-in\/"/g) ?? [];
-  assert.equal(adds.length, 2,
-    "the household page has two `+ add a resident` links (the plate and the solo row) and both must open the move-in page");
-  assert.ok(!/data-house-add href="\/join\/"/.test(HOUSE),
-    "a `+ add a resident` link still lands on /join/, whose own header comment says the add-resident panel was removed");
+  // Until 2026-11-11 the resident page had two `+ add a resident` links (the plate and the solo row). POS-999 made it ONE round + on the household's
+  // sub-rail, the same component on the household page and every resident page.
+  const RAIL = read("../src/components/HouseRail.astro");
+  const adds = RAIL.match(/data-house-add href="\/join\/move-in\/"/g) ?? [];
+  assert.equal(adds.length, 1,
+    "the household's sub-rail has one + and it must open the move-in page");
+  assert.ok(!/data-house-add href/.test(HOUSE), "the resident page carries no + of its own: the sub-rail's is the one");
+  assert.ok(!/data-house-add href="\/join\/"/.test(RAIL + HOUSE),
+    "a + still lands on /join/, whose own header comment says the add-resident panel was removed");
 
   // ONE NOTE NOW OFFERS THE MOVE-IN FORM. This loop held two: `join-no-git-needed`
   // rode `join:lane-chosen`, which nothing emitted, so it had never once appeared
