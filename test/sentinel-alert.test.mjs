@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { alertFromBoard, parseBoard, REBAKE_LINE, SENTINEL_BAD } from "../src/lib/sentinel-alert.mjs";
+import { alertFromBoard, parseBoard, REBAKE_LINE, SENTINEL_BAD, SETTLEMENT_LATE_LINE } from "../src/lib/sentinel-alert.mjs";
 
 const LAYOUT = new URL("../src/layouts/PostmarkLayout.astro", import.meta.url);
 
@@ -116,6 +116,50 @@ test("`since` is shown when the board carries it and omitted when it does not", 
 });
 
 // ---------------------------------------------------------------------------
+// a late settlement, in plain words (POS-1004)
+// ---------------------------------------------------------------------------
+//
+// LAW: Darko, 2026-11-12 09:06 EST: "1004 should just be lumped into the red exclamation point that already exists on the main
+// site." The glyph already rises for the `settlement` probe's DOWN, as for any DOWN; what this holds is its row's words. The
+// reason below is the sentinel's own DOWN wording for a missing tag (postmark-office tools/site-sentinel.mjs), invented values.
+
+const NOW = Date.parse("2026-11-12T19:05:00.000Z");
+const SENTINEL_REASON = "the 18:00Z sweep published and no settlement tag covers it after 1 h 5 min (S166): blocked, ours to unblock (postmark-telemetry SHIPPING.md § 9)";
+const lateBoard = (verdict, { ageMin = 2, extra = [] } = {}) => ({
+  ...liveBoard([...OK_PROBES, { key: "settlement", label: "the settlement", kind: "settlement", verdict, reason: SENTINEL_REASON, detail: { at: "2026-11-12T18:00:00Z", status: "published" } }, ...extra]),
+  generated_at: new Date(NOW - ageMin * 60_000).toISOString(),
+});
+const shown = (view) => view.rows.map((r) => `${r.label} — ${r.detail || r.reason}`);
+
+test("A LATE SETTLEMENT lights the glyph, and its row says the plain words instead of the sentinel's operator reason", () => {
+  const view = alertFromBoard(lateBoard("DOWN"), { nowMs: NOW });
+  assert.equal(view.show, true, "the settlement's DOWN raises the glyph");
+  assert.equal(view.rows.length, 1);
+  assert.equal(view.rows[0].key, "settlement");
+  assert.equal(view.rows[0].detail, SETTLEMENT_LATE_LINE, "the row's text, which the layout prints, is the plain line");
+  assert.equal(SETTLEMENT_LATE_LINE, "The latest World settlement is running late. It will show as soon as it's published.");
+  assert.ok(!shown(view).join(" ").includes("SHIPPING.md"), "and NOT the sentinel's operator reason");
+});
+
+test("LATE-SETTLEMENT CONTROLS: it clears when the settlement lands, and the plain words follow the notice's one judgment", () => {
+  assert.equal(alertFromBoard(lateBoard("OK"), { nowMs: NOW }).show, false, "the settlement landed and nothing else is bad: the glyph is gone");
+  // STALE and an old board still raise the glyph (the sentinel's own judgment, unchanged), but they are not "late": operator words
+  for (const [label, board] of [["STALE", lateBoard("STALE")], ["a 25-minute-old board", lateBoard("DOWN", { ageMin: 25 })]]) {
+    const view = alertFromBoard(board, { nowMs: NOW });
+    assert.equal(view.show, true, `${label}: the glyph still shows`);
+    assert.equal(view.rows[0].detail, null, `${label}: no plain line`);
+    assert.equal(view.rows[0].reason, SENTINEL_REASON, `${label}: the sentinel's own reason`);
+  }
+  // another probe's DOWN beside an OK settlement: that probe's row, never the settlement's words
+  const other = alertFromBoard(lateBoard("OK", { extra: [{ key: "settlement_tag", label: "the settlement tag", verdict: "DOWN", reason: "invented" }] }), { nowMs: NOW });
+  assert.equal(other.show, true);
+  assert.ok(!other.rows.some((r) => r.detail === SETTLEMENT_LATE_LINE), "no plain settlement line for another probe's DOWN, whatever its key says");
+  // and beside another bad probe, a late settlement is one row of several: each keeps its own words
+  const both = alertFromBoard(lateBoard("DOWN", { extra: [{ key: "site_refresh", label: "the box's site refresh", verdict: "DOWN", reason: "r", detail: "48 doors are missing" }] }), { nowMs: NOW });
+  assert.deepEqual(both.rows.map((r) => r.detail), [SETTLEMENT_LATE_LINE, "48 doors are missing"]);
+});
+
+// ---------------------------------------------------------------------------
 // source pins on the half that needs a browser to run
 // ---------------------------------------------------------------------------
 
@@ -133,7 +177,13 @@ test("the layout's glyph is HIDDEN in the markup and revealed only by the script
 test("the layout reads the sentinel's own published board, and fails to console.debug and nothing louder", () => {
   const src = readFileSync(LAYOUT, "utf8");
   assert.match(src, /data-pm-alert-origin=\{P\}/, "the origin crosses into the browser as an ATTRIBUTE");
-  assert.match(src, /origin \+ "\/ops\/sentinel\.json"/, "the town's board, at the town's origin \u2014 which keeps the harbor's mirrored vhost reading the TOWN's board");
+  // POS-1004: the ONE fetch of the board lives in the shared reader (src/lib/sentinel-alert.mjs § readBoardEvery), which the glyph
+  // and the late-settlement notice both subscribe to; the layout hands it the origin and keeps the alert judgment.
+  const reader = readFileSync(new URL("../src/lib/sentinel-alert.mjs", import.meta.url), "utf8");
+  assert.match(reader, /\(origin \|\| ""\) \+ BOARD_PATH/, "the town's board, at the town's origin \u2014 which keeps the harbor's mirrored vhost reading the TOWN's board");
+  assert.match(reader, /export const BOARD_PATH = "\/ops\/sentinel\.json"/);
+  assert.match(src, /readBoardEvery\(origin, paint\)/, "the glyph reads the board through the shared reader, not a second fetch");
+  assert.ok(!/fetch\(origin/.test(src), "the layout makes no board fetch of its own");
   // THE BUG THIS LINE EXISTS FOR, found by the rendered check and by nothing
   // else: the first cut wrote `fetch(`${P}/ops/sentinel.json`)` INSIDE the
   // client script. `P` is Astro frontmatter and does not cross into a browser
@@ -142,7 +192,7 @@ test("the layout reads the sentinel's own published board, and fails to console.
   // there. A server variable interpolated into a client script is the class.
   const clientScript = src.slice(src.indexOf("THE SENTINEL'S GLYPH"), src.indexOf("The notification bell"));
   assert.ok(!/\$\{P\}/.test(clientScript), "no frontmatter variable may be interpolated into the client script");
-  assert.match(src, /cache: "no-store"/, "no-store: the board is published with Cache-Control: no-cache and a stale board is a wrong alarm");
+  assert.match(reader, /cache: "no-store"/, "no-store: the board is published with Cache-Control: no-cache and a stale board is a wrong alarm");
   const script = src.slice(src.indexOf("THE SENTINEL'S GLYPH"), src.indexOf("The notification bell"));
   assert.ok(script.includes("console.debug"), "the failure paths speak at debug");
   for (const loud of ["console.warn", "console.error", "console.log", "alert("]) {
