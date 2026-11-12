@@ -605,10 +605,12 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       }
     })();
 
+    // ── BELL SCRIPT (POS-991: test/notification-bell.test.mjs runs this region, from here to the END marker) ──
     // The notification bell — a shoulder-tap for signed-in humans, computed
     // entirely from the site's own baked data + the office /me. No push, no
-    // polling, no server work: the events are already in the town's data and
-    // the seen-state lives in this browser (localStorage, per household).
+    // server work: the events are already in the town's data and the
+    // seen-state lives in this browser (localStorage, per household). The one
+    // timer it keeps is the CROSSING RECHECK below (POS-991).
     //
     // Two events, v1:
     //   1. new mail — inbox letters delivered to any of your household's
@@ -626,6 +628,18 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       const seenBtn = root.querySelector("[data-notif-seen]");
 
       const MAIL_TTL = 30 * 60 * 1000; // ~one crossing's worth; the town's clock is the ferry, not the millisecond
+      // THE FERRY'S CROSSINGS AND THE BAKE (POS-991, postmark#4436). Mail is delivered at 00:00 and 12:00 UTC, but this bell
+      // reads the site's BAKED letters.json, and a bake that carries a crossing's mail is published later, on the site's refresh
+      // (the :10/:40 timer plus a build of minutes). Wright, 2026-11-10: "the published bake governs": after a crossing, while the
+      // page is open, the bell looks again on a bounded schedule until it sees mail from that crossing, then stops, and it
+      // "never treats an older bake or the young local cache as fresh". The interval and bound are his example's, chosen here:
+      // every five minutes, until an hour after the crossing.
+      const CROSSING_MS = 12 * 60 * 60 * 1000;
+      const FOLLOW_EVERY_MS = 5 * 60 * 1000;
+      const FOLLOW_UNTIL_MS = 60 * 60 * 1000;
+      const lastCrossingAt = (t) => t - (t % CROSSING_MS);
+      const nextCrossingAt = (t) => lastCrossingAt(t) + CROSSING_MS;
+      let settledFor = null;                   // the crossing whose mail this page has seen: its follow-ups stop
       const getTok = () => { try { return JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch { return null; } };
       const readJSON = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; } };
       const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -660,16 +674,27 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       // household's received inbox mail, from the town's public baked data.
       // Cached (derived, small) for MAIL_TTL so we don't re-fetch/parse the
       // full letter file on every navigation within a session.
-      async function receivedMail(hh, handles) {
+      //
+      // A CACHE FILLED BEFORE THE LAST CROSSING IS STALE (POS-991): mail lands at a crossing, so rows read just before one cannot
+      // answer a read just after it, however young they are. A FORCED look (`opts.force`, the follow-ups below) skips the local
+      // cache altogether and asks the browser's own HTTP cache to revalidate the file, so neither a young post-crossing cache
+      // (another tab's look at the old bake) nor an old copy of the file can answer it. `opts.previous` is the rows on screen: a
+      // forced look that finds exactly those has found the SAME bake, and an unchanged older bake is not stamped fresh (the cache
+      // is left as it was). `opts.fallback` is what a failed look keeps (the rows already on screen), so a failure never blanks
+      // the bell.
+      const sameRows = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((r, i) => r.id === b[i].id);
+      async function receivedMail(hh, handles, opts = {}) {
         const set = new Set(handles);
         const cached = readJSON(cacheKey(hh), null);
-        if (cached && cached.ts && Date.now() - cached.ts < MAIL_TTL && Array.isArray(cached.rows)) return cached.rows;
+        const cachedRows = cached && Array.isArray(cached.rows) ? cached.rows : null;
+        if (!opts.force && cachedRows && cached.ts && Date.now() - cached.ts < MAIL_TTL && cached.ts >= lastCrossingAt(Date.now())) return cachedRows;
         let letters = [];
         try {
-          const res = await fetch("/data/letters.json", { headers: { accept: "application/json" } });
+          const res = await fetch("/data/letters.json", { headers: { accept: "application/json" }, ...(opts.force ? { cache: "no-cache" } : {}) });
           if (res.ok) letters = await res.json();
-          else if (cached && Array.isArray(cached.rows)) return cached.rows;
-        } catch { return cached && Array.isArray(cached.rows) ? cached.rows : []; }
+          else if (opts.fallback) return opts.fallback;
+          else if (cachedRows) return cachedRows;
+        } catch { return opts.fallback || cachedRows || []; }
         const rows = [];
         for (const l of letters) {
           if (l.box !== "inbox") continue;                 // delivered copy only
@@ -678,7 +703,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
           if (!to) continue;                                // not addressed to you
           rows.push({ id: l.id, from: l.from, to, date: l.date || "" });
         }
-        writeJSON(cacheKey(hh), { ts: Date.now(), rows });
+        if (!(opts.force && sameRows(rows, opts.previous))) writeJSON(cacheKey(hh), { ts: Date.now(), rows });
         return rows;
       }
 
@@ -706,7 +731,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       }
 
       // ---- unseen mail, grouped by correspondent (12 from one neighbor = 1 row) ----
-      const rows = await receivedMail(household, handles);
+      let rows = await receivedMail(household, handles);
       const seen = new Set((readJSON(seenKey(household), { ids: [] }).ids) || []);
       // Read mail STAYS in the panel (Keemin, 2026-07-30 — marking seen must
       // not make rows vanish; it clears the badge and mutes the cell). Groups
@@ -837,7 +862,48 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !panel.hidden) closePanel(); });
 
       render(); // paint the badge (panel stays closed)
+
+      // ---- THE FOLLOW-UPS AFTER A CROSSING (POS-991, postmark#4436) ----
+      // The page used to look once, at load, and trust a 30-minute cache: mail delivered at a crossing showed only on a later
+      // navigation, so a page left open (the usual case) rang late. Now, after each crossing (00:00 and 12:00 UTC), while this
+      // page is open (a page loaded inside the window joins it), the bell looks again every FOLLOW_EVERY_MS until mail it did not
+      // have shows up (the bake carrying the crossing has been published) or FOLLOW_UNTIL_MS after the crossing, whichever comes
+      // first; then it stops until the next crossing. Each look is forced (see receivedMail) and goes through the SAME
+      // receivedMail -> recomputeMail -> render path, so household namespaces, the seen set, grouping and the badge are untouched.
+      // A failed look keeps the rows on screen. One timer at a time; not a general poll.
+      // `forCrossing` is the crossing this look was SCHEDULED for. It, and not the crossing current when the callback finally
+      // runs, is what a seen delivery settles: a timer that is overdue (a tab asleep across a crossing) would otherwise find the
+      // OLD crossing's mail at the new crossing's time, settle the new crossing, and skip its follow-ups.
+      async function followUp(forCrossing) {
+        const was = rows;
+        let next;
+        try { next = await receivedMail(household, handles, { force: true, previous: was, fallback: was }); } catch { return; }
+        const known = new Set(was.map((r) => r.id));
+        const delivered = next.some((r) => !known.has(r.id));
+        rows = next;
+        recomputeMail();
+        render();
+        if (delivered) settledFor = forCrossing;   // mail from that crossing is in: no more looks in its window
+      }
+      // the next look: the next grid point inside this crossing's window (unless it is settled or past its bound), else the first
+      // look after the next crossing
+      function nextLookAt(now) {
+        const c = lastCrossingAt(now);
+        if (settledFor !== c) {
+          const n = c + FOLLOW_EVERY_MS * (Math.floor((now - c) / FOLLOW_EVERY_MS) + 1);
+          if (n <= c + FOLLOW_UNTIL_MS) return n;       // the bound: no look after FOLLOW_UNTIL_MS past the crossing
+        }
+        return nextCrossingAt(now) + FOLLOW_EVERY_MS;
+      }
+      function scheduleFollowUp() {
+        const now = Date.now();
+        const due = nextLookAt(now);
+        const forCrossing = lastCrossingAt(due);   // captured now: the crossing this look belongs to, however late it runs
+        setTimeout(async () => { await followUp(forCrossing); scheduleFollowUp(); }, due - now);
+      }
+      scheduleFollowUp();
     })();
+    // ── END BELL SCRIPT ──
   </script>
   <script>
     // Tutorial tracker — the bell's event-driven cousin: identity comes from

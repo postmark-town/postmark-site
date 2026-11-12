@@ -38,3 +38,11 @@ test("what the box holds takes its taps: the pill, and the open body", () => {
   assert.match(built, /class="pm-tt-body" hidden/);
   assert.doesNotMatch(PAGE, /\.pm-tt-(open|body)[^{]*\{[^}]*pointer-events: none/, "and nothing turns them off again");
 });
+
+test("POS-1006: the bar the button joins still passes taps through its box and takes them on what it holds; the card is a fixed box of its own", () => {
+  assert.match(ruleOf(".pm-tt"), /pointer-events: none;/, "the box still lets taps through to the map");
+  assert.match(ruleOf(".pm-tt > *"), /pointer-events: auto;/, "the bar (and so the pill and the button in it) takes its own");
+  assert.match(ruleOf(".pm-tt-bar"), /display: flex;/);
+  assert.doesNotMatch(PAGE, /\.pm-(tt-bar|bymail-btn)[^{]*\{[^}]*pointer-events: none/, "nothing turns them off");
+  assert.match(PAGE, /body \.wv-bymail\.pm-bymail-open:not\(\[hidden\]\) \{\s*display: block; position: fixed;/, "the open card is its own fixed box, not the map's strip");
+});
