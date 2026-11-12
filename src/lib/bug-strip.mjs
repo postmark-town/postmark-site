@@ -507,9 +507,10 @@ function cardEl(c, doc) {
   // a loose bug is the jar's "?"; a named one is its name, above the title; a legacy one has no name to show
   if (c.critter) head.append(el("span", "bc-name", c.critter));
   else if (!c.caught) jar.append(el("span", "bc-name bc-q", "?"));
-  if (c.namedBy) head.append(el("span", "bc-nb", `named by ${c.namedBy}`));
   head.append(el("span", "bc-title", c.title));
+  // the resident who caught it leads: "reported by", then "named by" (the opened card hides this "named by"; its body says it)
   if (c.reporter) head.append(el("span", "bc-by", `${c.legacy ? "caught" : "reported"} by ${c.reporter}`));
+  if (c.namedBy) head.append(el("span", "bc-nb", `named by ${c.namedBy}`));
   sum.append(jar, head, el("span", `bc-stage is-${c.stage}`, c.stageLabel));
   card.append(sum);
 
