@@ -208,11 +208,11 @@ test("the holo cap is the law's formula, not a stored number", () => {
   // `overCap`. That cannot work now: holo is inside its own base, so nudging
   // holo up raises the cap with it. The town-wide condition solves to
   // holo > ρ/(1−ρ) × primary, and at the launch dial ρ = 0.5 that is exactly
-  // holo > primary — i.e. "money's share of the town may not pass ρ", which is
-  // the constitutional sentence stated exactly ("money can come to own up to
-  // half of Postmark; it can never own more"). The OLD base capped money's share
-  // at ρ/(1+ρ) = 0.333, stricter than the constitution ever claimed. So the
-  // compounding base reads the ceiling MORE truly, not less.
+  // holo > primary — i.e. "money's share of the town may not pass ρ", which at
+  // the ceiling is NOMOS II.4.5.1's bound ("Money's share of any household's
+  // stamps is capped, and never above half"). The OLD base capped money's share
+  // at ρ/(1+ρ) = 0.333, stricter than that ceiling. So the compounding base
+  // reads the ceiling MORE truly, not less.
   assert.equal(readEconomy({ ...ECONOMY_FIXTURE, holo_issued: e.holoCap + 1 }).overCap, false,
     "one past the cap no longer trips it — the cap moved up with the input, and a probe that cannot fire is worth saying out loud");
   assert.equal(readEconomy({ ...ECONOMY_FIXTURE, holo_issued: e.primaryMint + 1 }).overCap, true,
@@ -309,10 +309,8 @@ test("the mintbar fixture agrees with the deeds it came from", () => {
 // ── holo is a balance (soulbound repealed, 2026-09-17) ──────────────────────
 
 test("holo is a SUBSET of what a household minted, and the tense arithmetic still closes", () => {
-  // THE LAW THIS USED TO ASSERT — capture doc § 9, quoted:
-  //   "Soulbound equity denomination: no stake, no vote, no transfer. Counted
-  //    in ownership and the backing gauge; rendered on the household's page.
-  //    Holographic — you can see it; there's nothing inside to spend."
+  // THE LAW THIS USED TO ASSERT — capture doc § 9: holo could not be staked,
+  // voted, transferred or spent.
   //
   // REPEALED. THE FOUNDER, 2026-09-17, verbatim: "non-spendable is repealed; the
   // stamps are like any other, but are holo to signify the special source." Holo
@@ -914,9 +912,9 @@ test("no built page teaches the expansion twice in flowing prose", { skip: !buil
 // standing.
 //
 // NOT ON THIS LIST, DELIBERATELY: "join the judgment". It was left off while
-// /stamps/ quoted the town's JOINING.md ("Money can join the ownership; it can
-// never join the judgment") inside a blockquote with its citation, since a
-// probe that reddened on it would have asked this repo to fork a quote. JOINING
+// /stamps/ quoted a line of the town's JOINING.md that used those words, inside
+// a blockquote with its citation, since a probe that reddened on it would have
+// asked this repo to fork a quote. JOINING
 // lost the line on 2026-10-06, and POS-1001 (2026-11-11) took the quote off
 // /docs/stamps/ with the seam's pull quote; POS-1001's own sweep, below, reads
 // the phrase on the pages it changed. Whether it joins this every-page list is
@@ -1074,7 +1072,10 @@ const POS1001_PAGES = [
       "the backing gauge", "Treasury ÷ holo ever minted"], now: ["are the town's own unit"] },
   { at: ["fund"], gone: ["the stamps it mints you vote"], now: ["any stamps it mints you vote like any other"] },
   { at: ["docs"], gone: ["The town's currency"], now: ["What a stamp is, how one is earned, and where a staked stamp goes."] },
-  { at: [], gone: ["founded by Keemin"], now: ["founded by Darko"] },
+  // The home page's footer: in public the founder is Darko, so the retired
+  // spelling is held as a pattern ("founded by" followed by anything else)
+  // rather than written out here.
+  { at: [], gone: [/founded by (?!Darko\b)\S/], now: ["founded by Darko"] },
   // POS-1001/d: the Marketplace building's who-line, under its coming-soon chip
   { at: ["town"], gone: ["residents asking stamps for goods"], now: ["residents offering things to one another"] },
 ];
@@ -1090,7 +1091,7 @@ test("POS-1001: the retired sentences are gone from the pages that carried them,
   for (const { p, gone, now } of rows) {
     const rel = p.slice(DIST.length) || "/";
     const text = pageText(readFileSync(p, "utf8"));
-    for (const g of gone) assert.equal(text.includes(g), false, `${rel}: "${g}" is still on the page`);
+    for (const g of gone) assert.equal(g instanceof RegExp ? g.test(text) : text.includes(g), false, `${rel}: "${g}" is still on the page`);
     for (const n of now) assert.ok(text.includes(n), `${rel}: "${n}" is not on the page`);
   }
   // A TEXT PIN, labelled so: /docs/numbers/'s ρ sentence renders one branch at a

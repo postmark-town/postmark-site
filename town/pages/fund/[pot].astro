@@ -40,27 +40,22 @@
 //    including vote; money's share of your household is capped, and stamps
 //    never turn into money."
 //
-// The second one CHANGED 2026-11-11 (POS-1001) to fit NOMOS II.4 ("Stamps are
-// not money. They can't be bought") and II.6.1 (NOMOS "grants no claim" on
-// owning Postmark or on money outside the town). Until then it read "this buys
-// stamps that do everything a stamp does, including vote, plus ownership and
-// memory; money's share of your household is capped, and it converts to real
-// value only if the town someday does". Before 2026-09-17, at the founder's
-// ruling ("holo does anything a normal stamp can; staking vs voting is a
-// nondistiction"), it read "this buys ownership and memory, NEVER VOICE, and
-// converts to real value only if the town someday does". The office ships the
-// twin of this sentence (postmark-office src/funding.mjs § WHAT_THIS_BUYS) and
-// moves with it: one sentence, two repos, never two spellings. Naming the cap
-// is not optional: a patron told their stamps vote and not told their share is
-// bounded has been told half the truth.
+// The second one was REWORDED 2026-11-11 (POS-1001) to fit NOMOS II.4 ("Stamps
+// are not money. They can't be bought") and II.6.1 (NOMOS "grants no claim" on
+// owning Postmark or on money outside the town). It now says a gift pays a bill
+// and is written down in the giver's name; that if the town staked on the pot,
+// the close thanks the giver in stamps that work like any stamp, vote
+// included; that money's share of a household is capped; and that stamps never
+// turn into money. The office ships the twin of this sentence (postmark-office
+// src/funding.mjs § WHAT_THIS_BUYS) and moves with it: one sentence, two repos,
+// never two spellings. Naming the cap is not optional: a patron told their
+// stamps vote and not told their share is bounded has been told half the truth.
 //
-// The fine print's law bullet moved with it. It read: "Funding buys NO SAY. The
-// folk-law is the whole of it: money can join the ownership, never the
-// judgment." From 2026-09-17 it said funding buys "a bounded say" and named
-// the bound; since 2026-11-11 (POS-1001) it says a giver's stamps work like
-// any stamp, and names the bound. The superseded wording is kept HERE and not
-// on the page on purpose: this is the money moment, and a struck sentence
-// rendered beside the live one is a sentence some patron will read as the rule.
+// The fine print's law bullet was reworded with it (POS-1001, 2026-11-11): it
+// says a giver's stamps work like any stamp, and names the bound (never more
+// than half, NOMOS II.4.5.1). Earlier wordings of both are in git history and
+// on neither the page nor this comment: this is the money moment, and a struck
+// sentence beside the live one is a sentence some patron will read as the rule.
 //
 // The QR is generated in-process (src/lib/qr.mjs) and inlined as SVG. No CDN,
 // no image service: a strict CSP would block it, and handing a third party the
