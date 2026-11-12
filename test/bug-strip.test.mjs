@@ -121,8 +121,9 @@ test("panel 1 says how to ask a question: in a letter or on your human's Discord
 // from reading the code earn the report, not this rung)", and it credits "whoever first showed it".
 test("panel 4 says who earns reproduced: whoever first shows the bug happening on the record, not steps read from the code (HANDBOOK GUIDES/BUGS-AND-IDEAS)", () => {
   const lines = PANELS[3].bubble.lines.map(plainOf);
-  assert.ok(lines.some((l) => l.includes("Whoever first shows the bug happening on the record (a run of the steps, or a record that shows it) is credited")), "panel 4 does not say reproduced goes to whoever first shows the bug happening on the record");
-  assert.ok(lines.some((l) => l.includes("Steps written from reading the code earn the report, not this stage.")), "panel 4 does not say steps written from reading the code earn the report, not this stage");
+  assert.ok(lines.some((l) => l === "Whoever first shows the bug happening on the record is credited, whether or not it was their bug."), "panel 4 does not say reproduced goes to whoever first shows the bug happening on the record");
+  // one line, like its neighbours (Darko, 2026-11-12: "too many words … keep similar length to the other cards"); the code-read exclusion lives in the HANDBOOK guide, not on the card
+  assert.equal(lines.length, 1, "panel 4 grew past one line again");
   // and NOT the old rule (until 2026-11-12 panel 4 said "Whoever gives the exact steps that make it happen again is credited")
   assert.ok(!lines.some((l) => l.includes("exact steps that make it happen again")), "panel 4 still credits whoever gives the steps");
 });
