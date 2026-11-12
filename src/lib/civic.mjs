@@ -8,7 +8,7 @@
 //    for other residents; blueprints are residents' asks for the town."
 //
 // Five lanes stand on that: the three asks, plus the marketplace (residents
-// demanding stamps for goods) and the ballot house (the town asking residents
+// offering things to one another) and the ballot house (the town asking residents
 // for their word). This module answers three questions about them and nothing
 // else — which buildings STAND in the world, what is IN each lane, and where
 // each lane's own surface lives.
@@ -327,7 +327,11 @@ export const LANES = [
     name: "the Marketplace",
     lane: "listings",
     place: "the-town/the-marketplace",
-    who: "residents asking stamps for goods",
+    // Reworded 2026-11-11 so the coming-soon lane promises no stamp-priced
+    // listings. POS-1001/d (Darko, 2026-11-11 20:07 EST): "Soften the "coming
+    // soon" line now, decide the rest at the launch-defaults sitting" — nothing
+    // is promised that NOMOS ends.
+    who: "residents offering things to one another",
     // COMING SOON, founder-ruled 2026-09-01: "they're not live yet and are
     // mostly thin redirects to the legacy places." The listing class has not
     // landed; a row is hand-set by the office on the bulletin's price board.
@@ -968,14 +972,35 @@ export const QUEST_REGISTRY = {
 // page so the boundary is a plain string compare and a test can hold it still. The post itself is
 // not touched: an open post past its end is only not offered, and /town/quests/ (the standings)
 // does not call this. No `today`, or no `ends`, keeps the card.
-export function questBoardFrom(questPosts, { today = null } = {}) {
-  const offered = (p) => !(typeof today === "string" && typeof p.terms.ends === "string" && p.terms.ends < today);
-  const open = (Array.isArray(questPosts?.posts) ? questPosts.posts : [])
-    .filter((p) => p?.class === "quest" && p.state === "open" && p.terms && offered(p));
-  const card = (p) => ({ title: p.terms.title, source: p.terms.source, reward: p.terms.reward, target: p.terms.target ?? null });
+//
+// THE MONTHLY QUESTS ARE DEFINED BY THE REGISTRY (POS-954; Wright for Darko, 2026-11-09: the civic quarter "shows the month's
+// quests, Bring a neighbour included, read from the same source as the office board"). A monthly quest is on the office's
+// board the day the town's registry carries it (`quest-registry.json`, which the office's board reads), but it has a quest
+// POST only once the office has put one up, so the posts alone cannot name it (Bring a neighbour, town #4424). `registry` is
+// the build's copy of that file (src/data/postmark/quest-registry.json, tools/lib/town-quest-registry.mjs): each of its rows
+// with a REGISTRY_CADENCES cadence is a card, in the registry's own order, with the registry's own terms, unless its quest
+// post says it is no longer asked (a closed post, as above) or its `ends` has passed. A monthly post the registry does not
+// carry is still drawn, after them. Daily and milestone cards stay the posts' (a registry row of those cadences with no post,
+// the review-in-progress milestone for one, is not drawn: this change adds the monthly cadence and no other). No registry
+// given, or one without rows, draws exactly what the posts alone drew.
+export const REGISTRY_CADENCES = Object.freeze(["monthly"]);
+export function questBoardFrom(questPosts, { today = null, registry = null } = {}) {
+  const offered = (ends) => !(typeof today === "string" && typeof ends === "string" && ends < today);
+  const posts = (Array.isArray(questPosts?.posts) ? questPosts.posts : []).filter((p) => p?.class === "quest" && p.terms);
+  const open = posts.filter((p) => p.state === "open" && offered(p.terms.ends));
+  const card = (t) => ({ title: t.title, source: t.source, reward: t.reward, target: t.target ?? null });
+  const postOf = new Map(posts.filter((p) => typeof p.fields?.quest === "string").map((p) => [p.fields.quest, p]));
+  const carried = (Array.isArray(registry?.quests) ? registry.quests : [])
+    .filter((q) => REGISTRY_CADENCES.includes(q?.cadence) && q.subtype !== "bounty" && typeof q.title === "string" && q.title);
+  const defined = carried.filter((q) => { const p = postOf.get(q.id); return (!p || p.state === "open") && offered(q.ends ?? p?.terms?.ends); });
+  // MEMBERSHIP IS THE REGISTRY'S, NOT WHAT WAS DRAWN: a quest the registry carries is the registry's to offer or to end. A row
+  // dropped for its `ends` (or a closed post) must not come back through its open post, which may carry no `ends` of its own.
+  const carriedIds = new Set(carried.map((q) => q.id));
+  const posted = (cadence) => open.filter((p) => p.terms.cadence === cadence && !carriedIds.has(p.fields?.quest));
   return {
-    daily: open.filter((p) => p.terms.cadence === "daily").map(card),
-    milestone: open.filter((p) => p.terms.cadence === "milestone").map(card),
+    daily: open.filter((p) => p.terms.cadence === "daily").map((p) => card(p.terms)),
+    monthly: [...defined.map(card), ...posted("monthly").map((p) => card(p.terms))],
+    milestone: open.filter((p) => p.terms.cadence === "milestone").map((p) => card(p.terms)),
   };
 }
 
@@ -1002,11 +1027,12 @@ export function townDay(now = new Date(), tz = process.env.TOWN_TZ ?? "America/N
 // it. The pair is named by title because that is the join every Guild card
 // already makes (the office's quest posts carry title, not id). "A first idea"
 // is a milestone but once per HOUSEHOLD, not a pair, so it gets no pair label.
-export const QUEST_KIND = Object.freeze({ daily: "Household · daily", pair: "Just you · pair" });
+export const QUEST_KIND = Object.freeze({ daily: "Household · daily", monthly: "monthly", pair: "Just you · pair" });
 export const PAIR_RULE = "A full household bar doesn't block anyone's pair quests.";
 const PAIR_TITLES = new Set(["Budding friendship"]);
 export function questKind(q, cadence) {
   if (cadence === "daily") return QUEST_KIND.daily;
+  if (cadence === "monthly") return QUEST_KIND.monthly;
   if (PAIR_TITLES.has(q?.title)) return QUEST_KIND.pair;
   return null;
 }
@@ -1023,6 +1049,7 @@ export function questCards(standings, registry = QUEST_REGISTRY) {
   const done = standings?.completedBy ?? {};
   const rows = [
     ...(registry.daily ?? []).map((q) => ({ ...q, cadence: questKind(q, "daily") })),
+    ...(registry.monthly ?? []).map((q) => ({ ...q, cadence: questKind(q, "monthly") })),
     ...(registry.milestone ?? []).map((q) => ({ ...q, cadence: questKind(q, "milestone") ?? "once, and kept" })),
   ];
   return rows.map((q) => ({

@@ -77,7 +77,7 @@ const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
 // law reads the surface its content actually sits on.
 //
 //   HUB      the quarter, the five buildings, the five lanes, the board, the pots
-//   TEACHING the one-breath head, the nine sections, the dials
+//   TEACHING the one-breath head, the eight sections, the dials
 //
 // Getting this wrong is not hypothetical: when the teaching moved back, every
 // content law in here went red at once while every sentence it asserts was
@@ -112,11 +112,14 @@ const cardsSrc = read(CARDS_PATH);
 const cardsRaw = prose(cardsSrc);
 const cardsBody = flat(cardsRaw);
 
-// The Rules panel's nine accordions, in teaching order. The router keys on this
+// The Rules panel's eight accordions, in teaching order. The router keys on this
 // same list, which is why a renamed one has to break something loudly.
+// Until 2026-11-11 the list was nine and carried "ownership", the "What your
+// share means" fold, which POS-1001/a removed from the site (Darko, 2026-11-11
+// 20:06 EST: "Remove it from the site").
 const RULE_IDS = [
   "what", "earning", "staking", "seam", "minterest",
-  "ownership", "faq", "glossary", "check",
+  "faq", "glossary", "check",
 ];
 // EVERY ID THE PORTAL ANSWERED TO, split by which surface carries it now.
 // All of them kept their WORDS through both moves — that is what made the
@@ -475,8 +478,10 @@ test("THE LAW: the Guild reads the pots, then the quest cards, then the standing
   const head = guild.indexOf("<LaneHead");
   const cards = guild.indexOf("questRows.map");
   const pots = guild.indexOf('<div id="pots"');
-  // the standings rows are one component since #3514 (the full board draws them too)
-  const standings = guild.indexOf("<QuestStandings");
+  // the standings rows are one component since #3514 (the full board draws them too).
+  // Until 2026-11-09 (POS-967) this block was <QuestStandings>; Ferry's Hall of
+  // Fame replaced it and keeps its place: still last, still one component.
+  const standings = guild.indexOf("<HallOfFame");
   assert.ok(head > 0 && cards > 0 && pots > 0 && standings > 0,
     `the Guild lost a block — head:${head} cards:${cards} pots:${pots} standings:${standings}`);
   assert.ok(head < pots, "the lane's head still opens it");
@@ -867,15 +872,31 @@ test("the head answers WHAT IS THIS unfolded, with the five things behind one cl
 
 // ── the teaching, re-homed as accordions ─────────────────────────────────────
 
-test("the teaching carries all nine sections, ids intact", () => {
+test("the teaching carries all eight sections, ids intact", () => {
   // RE-AIMED 2026-08-30 evening: these were a lane of the hub for one
   // afternoon; the founder sent them back to /stamps/ and they are the page's
   // body again. The law never changed — nine sections, ids intact — so it
   // follows the prose rather than staying pointed at the lane it left.
+  // Until 2026-11-11 this was "all nine sections"; POS-1001/a took one off.
   for (const id of RULE_IDS) {
     assert.ok(teachRaw.includes(`<details class="r-fold" id="${id}">`),
       `the teaching is missing #${id} — the move dropped a section`);
   }
+});
+
+test("POS-1001/a: 'What your share means' is off the teaching, its fold and its router id alike", () => {
+  // THE RULING, Darko 2026-11-11 20:06 EST, verbatim: "Remove it from the site"
+  // ("the site says only what NOMOS says; the economy notes keep their own text
+  // under their note"). The ruled removal's own falsifier: the fold and its
+  // heading are gone, the page's router list is the eight above, and the page
+  // has exactly those folds, so a leftover fold can't hide behind the list.
+  assert.equal(teachRaw.includes('id="ownership"'), false, "the teaching still carries the #ownership fold");
+  assert.equal(teachBody.includes("What your share means"), false, "the teaching still carries the section's heading");
+  const pageIds = /const RULE_IDS = \[([^\]]*)\]/.exec(teachSrc);
+  assert.ok(pageIds, "the teaching must know its own section ids");
+  assert.deepEqual(JSON.parse(`[${pageIds[1]}]`), RULE_IDS, "the router's list is the teaching's eight sections, in order");
+  const folds = [...teachRaw.matchAll(/<details class="r-fold" id="([\w-]+)">/g)].map((m) => m[1]);
+  assert.deepEqual(folds, RULE_IDS, "the page's folds are exactly the eight, in teaching order");
 });
 
 test("the teaching LEADS with the questions, and the dials sit under them", () => {
@@ -1340,24 +1361,23 @@ test("an elastic pot gets a bar against its floor, and the bar says the roll kee
   assert.equal(/\$5\b/.test(sBody), false, "the floor is read, never typed");
 });
 
-test("the estimate renders only where a close could run, and never as a promise", () => {
-  // THE RULING THIS ASSERTS — the founder, 2026-08-23: an estimated return may
-  // show "as of this moment", honestly: at today's roll and stakes, moving as
-  // both move, {HOLO_LINE} — never a promise. RE-HOMED 2026-08-26 by the card
-  // law: what a dollar mints is the FUND PAGE's detail, not the market's, so
-  // the assertions moved with the sentence.
+test("the money moment shows no per-dollar estimate (POS-1001)", () => {
+  // INVERTED 2026-11-11 (POS-1001). Until then this asserted the founder's
+  // 2026-08-23 word that an estimated return MAY show "as of this moment",
+  // honestly: "≈ N✦ per $1 if the close ran this moment … it moves as both
+  // move. Never a promise.", gated on funding.mjs § mintPerDollar. A figure of
+  // stamps per dollar prices stamps in money, and NOMOS II.4.5 reads: "The town
+  // rewards money by what it enables, never by a price list." So the fund page
+  // renders no estimate at all, typed or computed.
   const fund = read("../town/pages/fund/[pot].astro");
   const fbody = flat(fund.slice(fund.indexOf("---", 3) + 3));
+  assert.ok(fbody.includes("the fine print"), "the slice is the template");
 
-  assert.ok(fund.includes("{estimate != null && ("),
-    "the estimate is gated on the helper, which returns null where no close can run");
-  assert.ok(fbody.includes("if the close ran this moment"), "it says when it would apply");
-  assert.ok(fbody.includes("it moves as both move"), "and that it is not fixed");
-  assert.ok(fund.includes("{HOLO_LINE}"), "and the page carries the ruling's line");
-  // the number comes from the reader, not from the page
-  assert.ok(/const estimate = mintPerDollar\(pot\)/.test(fund),
-    "the math lives in funding.mjs and the page only calls it");
-  assert.equal(/per \$1[^<]*0\.\d/.test(fbody), false, "no estimate is typed into the markup");
+  assert.equal(fund.includes("mintPerDollar("), false, "the page no longer calls the per-dollar helper");
+  assert.equal(fund.includes("{estimate"), false, "and renders no estimate");
+  assert.equal(fbody.includes("per $1"), false, "no stamps-per-dollar figure on the page");
+  assert.equal(fbody.includes("if the close ran this moment"), false, "and no estimate's sentence");
+  assert.ok(fund.includes("{HOLO_LINE}"), "the page still carries the ruling's line");
 });
 
 test("the pots block says when its data was made", () => {

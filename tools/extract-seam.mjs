@@ -39,6 +39,7 @@ import { join, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { writeIfChanged } from "./lib/mirror.mjs";
 import { thankYouOf } from "../src/lib/funding.mjs";
+import { hallFromLedger } from "../src/lib/hall-of-fame.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SITE_ROOT = resolve(HERE, "..");
@@ -389,7 +390,14 @@ export function seamFromTown({ mint, entries: allEntries, potFiles, dial, asOf }
     };
   }
 
-  return { pots: potRows, deeds, economy };
+  // ── hall-of-fame.json — this month's earners, folded from the same ledger ──
+  // POS-967. The monthly earned read (src/lib/hall-of-fame.mjs) rides the same
+  // parse and the same classifyEntry as everything above, so a new row kind
+  // reaches it as the town's own classification and never as a second parser.
+  // Null without an as-of day: a month needs a town clock to be a month.
+  const hall = asOfDay ? hallFromLedger({ mint, entries: allEntries, asOf: asOfDay }) : null;
+
+  return { pots: potRows, deeds, economy, hall };
 }
 
 // ── the checkout side ────────────────────────────────────────────────────────
@@ -452,6 +460,11 @@ export async function emitSeam(townRoot, { dataDir = DATA_DIR } = {}) {
   write("deeds.json", seam.deeds);
   write("fund-thank-you.json", thankYouFromTown(townRoot));
   if (seam.economy && asOf) write("economy.json", seam.economy);
+  // compact on purpose: the pretty-printed first cut was 1.98 MB (POS-967)
+  if (seam.hall) {
+    const r = writeIfChanged(join(dataDir, "hall-of-fame.json"), JSON.stringify(seam.hall) + "\n");
+    console.log(`data/hall-of-fame.json: ${r}`);
+  }
 
   console.log(`seam: ${seam.pots.length} pot-epoch rows, ${seam.deeds.length} deeds, ` +
     `${seam.economy ? `${seam.economy.holo_issued}✧ issued, $${seam.economy.treasury_usd} witnessed` : "no dials"}`);

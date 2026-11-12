@@ -18,6 +18,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import {
   inlineScripts, hearthPolicy, withHearthPolicy, trustedHashes, applyHearthPolicy, hearthPages, inlineExecutableMarkup, withoutEntryRegion,
@@ -25,7 +26,7 @@ import {
 } from "../tools/lib/hearth-csp.mjs";
 import { prepareEntry } from "../src/lib/hearth/entries.mjs";
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = path.join(ROOT, "dist-town");
 const built = fs.existsSync(path.join(DIST, "households"));
 const sha = (t) => "sha256-" + createHash("sha256").update(t, "utf8").digest("base64");
@@ -173,6 +174,7 @@ function scratchBuild(houses) {
 test("applyHearthPolicy: each household page is checked against ITS OWN host scripts, written, and nothing else is touched (the forwarder and the resident pages included)", () => {
   const b = scratchBuild({ a: {}, b: {} });
   const before = b.read("households/a/hearth/index.html") + b.read("index.html") + b.read("residents/wick/index.html");
+  // the pages come back joined with io.join (path.join): "/" on Linux, "\" on Windows (POS-1002), so they are compared with "/" (slashes)
   assert.deepEqual(slashes(applyHearthPolicy(b.dest, io)).sort(), ["households/a/index.html", "households/b/index.html"]);
   assert.match(b.read("households/a/index.html"), /Content-Security-Policy/);
   assert.match(b.read("households/b/index.html"), /Content-Security-Policy/);
@@ -238,6 +240,7 @@ test("built: every household page carries exactly one policy, before its scripts
 test("built: NO other page carries a policy: the forwarder beside each household page, the resident pages and every other route are untouched", { skip: !built }, () => {
   const households = fs.readdirSync(path.join(DIST, "households")).filter((s) => fs.existsSync(path.join(DIST, "households", s, "index.html")));
   const governed = new Set(households.map((s) => `households/${s}/index.html`));
+  // compared with "/" whatever the OS joins with (POS-1002: on Windows path.join gives "\")
   const rel = (p) => path.relative(DIST, p).split(path.sep).join("/");
   const others = everyPage(DIST).filter((p) => !governed.has(rel(p)));
   assert.ok(others.length > 1000, "the rest of the site is in the build");

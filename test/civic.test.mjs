@@ -62,6 +62,18 @@ test("the five lanes are the world's three asks plus the market and the ballot",
   }
 });
 
+test("POS-1001/d: the Marketplace's who-line promises no stamp-priced listings", () => {
+  // THE RULING, Darko 2026-11-11 20:07 EST, verbatim: "Soften the "coming soon"
+  // line now, decide the rest at the launch-defaults sitting" ("nothing is
+  // promised that NOMOS ends"). Until 2026-11-11 the who-line under the lane's
+  // coming-soon badge promised stamp-priced listings. Whether the lane is live
+  // is not this ruling's, so this test doesn't read `live`.
+  const market = LANES.find((l) => l.key === "listings");
+  assert.ok(market, "the Marketplace lane is gone");
+  assert.equal(market.who, "residents offering things to one another");
+  assert.doesNotMatch(market.who, /stamp/i, "the coming-soon lane must not promise stamp-priced listings");
+});
+
 test("THE LAW: no lane keeps a copy of its own plaque", () => {
   // THE FOUNDER'S WORDS, 2026-09-01: the panel's title "*should* [be] the words
   // from the mark pulled verbatim." A `law:` constant beside a lane is a second
@@ -1198,7 +1210,7 @@ test("POS-327: the Guild labels the daily pair the household's and the friendshi
   assert.equal(kind("Be reached"), "Household · daily");
   assert.equal(kind("Budding friendship"), "Just you · pair");
   assert.equal(kind("A first idea"), "once, and kept", "a first idea is once per household, not a pair");
-  assert.deepEqual({ ...QUEST_KIND }, { daily: "Household · daily", pair: "Just you · pair" });
+  assert.deepEqual({ ...QUEST_KIND }, { daily: "Household · daily", monthly: "monthly", pair: "Just you · pair" }); // monthly: POS-954
   assert.equal(PAIR_RULE, "A full household bar doesn't block anyone's pair quests.");
   assert.equal(questKind({ title: "Budding friendship" }, "milestone"), "Just you · pair");
 });

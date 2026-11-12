@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { buildOfficeData, fetchBlueprints, fetchRollcall, fetchCrossings, jsonText, shortFetchPlan } from "./lib/fetch-town-data.mjs";
 import { worldPin } from "./lib/world-pin-publish.mjs";
 import { readProjectsFromCheckout } from "./lib/town-projects.mjs";
+import { readQuestRegistryFromCheckout } from "./lib/town-quest-registry.mjs";
 import { refuseLinkedCheckout } from "./lib/plain-checkout.mjs";
 import { writeIfChanged } from "./lib/mirror.mjs";
 import { bakeWorld } from "./lib/world-settlement.mjs";
@@ -166,6 +167,18 @@ try {
       writeDataFile("projects.json", readProjectsFromCheckout(TOWN, result.files["residents.json"]));
     } catch (error) {
       console.warn(`WARN fetch-town: the town's projects could not be read; keeping the committed snapshot (${error.message})`);
+    }
+  }
+  // ── THE TOWN'S QUEST REGISTRY (POS-954) ───────────────────────────────────
+  // The Quest Guild's monthly cards (civic.mjs § questBoardFrom) are defined by the registry the office's own board
+  // reads, `quest-registry.json` in the town checkout. A BUILD INPUT like the settlements record: the page reads it, nothing
+  // serves it, so it is written under src/data/postmark only (the job's `git add src/data/postmark` already holds it).
+  // Fail-soft like the projects: no checkout, or a file that is not a registry, keeps the committed snapshot.
+  if (TOWN) {
+    try {
+      writeBuildInput("quest-registry.json", readQuestRegistryFromCheckout(TOWN));
+    } catch (error) {
+      console.warn(`WARN fetch-town: the town's quest registry could not be read; keeping the committed snapshot (${error.message})`);
     }
   }
   // ── THE MEEPLINGS' BENCH (the site, reprojected — part 3) ──────────────────
