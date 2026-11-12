@@ -13,13 +13,14 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import {
   inlineScripts, hearthPolicy, withHearthPolicy, trustedHashes, applyHearthPolicy, hearthPages, inlineExecutableMarkup, HearthPolicyError,
 } from "../tools/lib/hearth-csp.mjs";
 import { prepareEntry } from "../src/lib/hearth/entries.mjs";
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = path.join(ROOT, "dist-town");
 const built = fs.existsSync(path.join(DIST, "households"));
 const sha = (t) => "sha256-" + createHash("sha256").update(t, "utf8").digest("base64");
@@ -146,7 +147,8 @@ function scratchBuild(houses) {
 test("applyHearthPolicy: each Hearth page is checked against ITS house's reference, written, and nothing else is touched", () => {
   const b = scratchBuild({ a: {}, b: {} });
   const before = b.read("households/a/index.html") + b.read("index.html");
-  assert.deepEqual(applyHearthPolicy(b.dest, io).sort(), ["households/a/hearth/index.html", "households/b/hearth/index.html"]);
+  // the pages come back joined with io.join (path.join), so the expected paths are joined the same way: "/" on Linux, "\" on Windows
+  assert.deepEqual(applyHearthPolicy(b.dest, io).sort(), [path.join("households", "a", "hearth", "index.html"), path.join("households", "b", "hearth", "index.html")]);
   assert.match(b.read("households/a/hearth/index.html"), /Content-Security-Policy/);
   assert.equal(b.read("households/a/index.html") + b.read("index.html"), before, "the household page and the rest of the site are untouched");
 });
@@ -206,7 +208,7 @@ test("built: every Hearth page carries exactly one policy, before its scripts, a
 });
 
 test("built: NO other page carries a policy: the household page, the rail and every other route are untouched", { skip: !built }, () => {
-  const others = everyPage(DIST).filter((p) => !/\/households\/[^/]+\/hearth\/index\.html$/.test(p));
+  const others = everyPage(DIST).filter((p) => !/\/households\/[^/]+\/hearth\/index\.html$/.test(p.split(path.sep).join("/")));
   assert.ok(others.length > 1000, "the rest of the site is in the build");
   const withPolicy = others.filter((p) => /http-equiv="?Content-Security-Policy/i.test(fs.readFileSync(p, "utf8")));
   assert.deepEqual(withPolicy, []);
