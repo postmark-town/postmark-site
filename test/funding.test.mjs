@@ -982,7 +982,12 @@ test("and the VOICE half is on the pages too, not merely absent", { skip: !(buil
     assert.match(html, /is capped/, `/${rel} states the vote and must state the bound in the same breath`);
   }
   const stamps = readFileSync(join(DIST, "docs", "stamps", "index.html"), "utf8");
-  assert.match(stamps, /cap on money/, "the Rules name what bounds money, now that no verb does");
+  // Until 2026-11-11 this matched /cap on money/, which the built page carried
+  // only on one line of the "What your share means" section's ECONOMY.md § 5
+  // quote. POS-1001/a removed that section from the site; the seam section's
+  // own sentence ("ρ, the cap on money’s share of a household") says the same
+  // words across a line break, so the match now allows the break.
+  assert.match(stamps, /cap\s+on\s+money/, "the Rules name what bounds money, now that no verb does");
 });
 
 // ── POS-1001 · the claims NOMOS doesn't make, and its note ───────────────────
@@ -1035,8 +1040,10 @@ test("POS-1001: the note is the first paragraph under the title of /docs/stamps/
 // The stale-phrase count, base against head (REDS-AND-CONTROLS § Greps as
 // instruments): each retired sentence by the page that carried it, with what
 // replaced it beside it, so a page that renders nothing can't pass. The stamps
-// page's "What your share means" section and its quotes are NOT here: they wait
-// on Darko's call (POS-1001/a), and so does /docs/numbers/'s backing gauge.
+// page's "What your share means" section and its quotes are here since Darko's
+// call (POS-1001/a, 2026-11-11 20:06 EST: "Remove it from the site"), with no
+// replacement. /docs/numbers/'s backing gauge is not here: it waits on Darko's
+// call (POS-1001/f).
 // "✦ per $1", not "per $1": a resident's handle ending in "-semper" beside a
 // "$10" on the roll reads as "per $1" to a bare includes().
 const POS1001_POT_GONE = ["plus ownership and memory", "converts to real value", "a bounded say", "manufacture ownership", "✦ per $1",
@@ -1052,7 +1059,11 @@ const POS1001_PAGES = [
       "This is your share.", "Money can join the ownership", "manufacture ownership", "Money can never leave as currency",
       "Value exits as", "Value leaves as goods", "durable income stream", "monetary policy by vote", "petition a dial ballot",
       "Money moves on crossings", "free forever at zero stamps", "at zero stamps, permanently",
-      "Dollars the town holds per ✧", "so there is nothing to back", "a ballot that moves a dial"],
+      "Dollars the town holds per ✧", "so there is nothing to back", "a ballot that moves a dial",
+      // POS-1001/a: the "What your share means" section, its heading, cards, paragraph and quotes
+      "What your share means", "We keep saying share and ownership", "pre-agreed table for sharing",
+      "a record, not a promise", "Old money cannot rule from the grave", "Law of the two claims",
+      "Plutocracy is excluded once", "the ratification mechanism is accession", "still accumulating their share"],
     now: ["Your lifetime count is your record here.", "It only rises, and it is public.",
       "A gift pays a bill; how much of a household's stamps can come from gifts is capped.",
       "Money cannot mint stamps for something nobody wanted", "Stamps never turn into money.", "No. Stamps never turn into money.",

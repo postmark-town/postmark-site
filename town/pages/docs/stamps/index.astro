@@ -8,7 +8,7 @@
 // belongs here. So /stamps/ is a page again, and it is the page it always
 // wanted to be — the questions, and the dials under them.
 //
-// WHAT LIVES HERE: the one-breath definition, the five things, the nine
+// WHAT LIVES HERE: the one-breath definition, the five things, the eight
 // teaching sections, and the economy's dials.
 // WHAT DOES NOT: the Bounty Board and the pots. Those are lanes, they moved to
 // the civic quarter, and a copy of either here would be the split that the
@@ -18,7 +18,7 @@
 // The founder's word: "lead with the questions now that the quest guild
 // absorbed the town's asks." The portal opened with the MARKET because a market
 // square does not open with its constitution nailed to the gate — but the
-// market is not here any more, and what is left is a teaching. So the nine
+// market is not here any more, and what is left is a teaching. So the eight
 // sections come first and the dials sit under them, rather than the reverse.
 // The head above them is the one-breath answer to WHAT IS THIS, which the
 // founder ruled unfolded on 2026-08-26 and which nothing since has moved.
@@ -110,8 +110,10 @@ const thin = close({
 // things that can drift from it independently.
 const { daily, milestone, arriving } = QUEST_REGISTRY;
 
-// The nine teaching sections, and the hash router's list at the same time.
-const RULE_IDS = ["what","earning","staking","seam","minterest","ownership","faq","glossary","check"];
+// The eight teaching sections, and the hash router's list at the same time.
+// "ownership" (What your share means) left the site 2026-11-11 (POS-1001/a):
+// the site says only what NOMOS says.
+const RULE_IDS = ["what","earning","staking","seam","minterest","faq","glossary","check"];
 
 // The lane fragments this route no longer carries, and where each one went.
 // #market was the portal's Market tab, whose two blocks are now the Bounty
@@ -698,81 +700,6 @@ const LANE_FRAGMENTS = { board: "board", market: "board" };
           over its backers, <code>M</code> is the global cumulative mint, and <code>q</code>
           is a town-set scalar.
           <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 9.1</a></cite>
-        </blockquote>
-      </details>
-          </div>
-        </details>
-        <details class="r-fold" id="ownership">
-          <summary><span class="r-sum">What your share means</span></summary>
-          <div class="r-body">
-      <p>
-        We keep saying <em>share</em> and <em>ownership</em>. The plain truth of it:
-      </p>
-      <div class="s-three">
-        <article class="s-card">
-          <p class="s-kind">today</p>
-          <p>
-            Your share is the town's public memory of who built it — your fraction of all
-            witnessed contribution. It pays nothing, redeems for nothing, and governs
-            nothing. Its value is that the record is real, and checkable by anyone.
-          </p>
-        </article>
-        <article class="s-card">
-          <p class="s-kind">someday, maybe</p>
-          <p>
-            If Postmark ever carries real-world value, this same ledger is the pre-agreed
-            table for sharing it — settled in public before there was anything to argue
-            over. A conditional claim, not enforceable today. Not an investment.
-          </p>
-        </article>
-        <article class="s-card">
-          <p class="s-kind">what it is not</p>
-          <p>
-            Not stock, not a token, not a promise of profit. The sentence the town holds
-            itself to: <b>a record, not a promise.</b> If anyone ever tells you otherwise,
-            this page is your receipt that the deal was never that.
-          </p>
-        </article>
-      </div>
-
-      <p>
-        <b>Old money cannot rule from the grave.</b> Steering runs entirely on liquid and
-        staked stamps, so the record itself governs nothing. And money cannot outrun
-        participation: what a gift mints is sized by what the town chose to stake and capped
-        so that money's share of that household never passes ρ. Arithmetic, not a promise — and published.
-      </p>
-
-      <details class="s-law">
-        <summary>The law, in its own words</summary>
-        <blockquote>
-          <b>Law of the two claims.</b> <i>Ownership honors contributed attention; control
-          follows living attention.</i> Equity (past tense) is the claim on the venture's
-          external value… It governs <b>nothing</b> inside the town. Steering — quest
-          ratification, marks, ballots, prices — runs entirely on liquid and staked stamps.
-          <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 5</a></cite>
-        </blockquote>
-        <blockquote>
-          Plutocracy is excluded once, by an amount and not by a verb: money buys stamps
-          through the funding seam, those stamps do everything a stamp does — including vote
-          — and what bounds them is ρ, the cap on money’s share of a household.
-          <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 5</a></cite>
-        </blockquote>
-        <blockquote>
-          the founding contribution is a residual, declared claim, never a priced one. …
-          The line is <b>constitutional, not economic</b>: it is never priced, only
-          <i>ratified</i> — and the ratification mechanism is <b>accession</b>. Everyone who
-          contributes under the posted rules after epoch accepts the genesis as part of the
-          law they are joining.
-          <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 6</a></cite>
-        </blockquote>
-        <blockquote>
-          It requires <b>local comprehensibility</b> (each interaction understandable at the
-          point of contact) and <b>safe ignorability</b> (a hard design constraint: ignoring
-          the economy must never be costly). A resident who only writes letters and never
-          learns what a pot is remains fully whole — still minting, still accumulating their
-          share, protected by the caps from being out-farmed. Corollary: no decay mechanics,
-          no use-it-or-lose-it, ever.
-          <cite><a href={`${ECON}`} target="_blank" rel="noopener">ECONOMY.md § 10</a></cite>
         </blockquote>
       </details>
           </div>

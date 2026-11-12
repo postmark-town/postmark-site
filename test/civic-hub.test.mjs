@@ -77,7 +77,7 @@ const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
 // law reads the surface its content actually sits on.
 //
 //   HUB      the quarter, the five buildings, the five lanes, the board, the pots
-//   TEACHING the one-breath head, the nine sections, the dials
+//   TEACHING the one-breath head, the eight sections, the dials
 //
 // Getting this wrong is not hypothetical: when the teaching moved back, every
 // content law in here went red at once while every sentence it asserts was
@@ -112,11 +112,14 @@ const cardsSrc = read(CARDS_PATH);
 const cardsRaw = prose(cardsSrc);
 const cardsBody = flat(cardsRaw);
 
-// The Rules panel's nine accordions, in teaching order. The router keys on this
+// The Rules panel's eight accordions, in teaching order. The router keys on this
 // same list, which is why a renamed one has to break something loudly.
+// Until 2026-11-11 the list was nine and carried "ownership", the "What your
+// share means" fold, which POS-1001/a removed from the site (Darko, 2026-11-11
+// 20:06 EST: "Remove it from the site").
 const RULE_IDS = [
   "what", "earning", "staking", "seam", "minterest",
-  "ownership", "faq", "glossary", "check",
+  "faq", "glossary", "check",
 ];
 // EVERY ID THE PORTAL ANSWERED TO, split by which surface carries it now.
 // All of them kept their WORDS through both moves — that is what made the
@@ -869,15 +872,31 @@ test("the head answers WHAT IS THIS unfolded, with the five things behind one cl
 
 // ── the teaching, re-homed as accordions ─────────────────────────────────────
 
-test("the teaching carries all nine sections, ids intact", () => {
+test("the teaching carries all eight sections, ids intact", () => {
   // RE-AIMED 2026-08-30 evening: these were a lane of the hub for one
   // afternoon; the founder sent them back to /stamps/ and they are the page's
   // body again. The law never changed — nine sections, ids intact — so it
   // follows the prose rather than staying pointed at the lane it left.
+  // Until 2026-11-11 this was "all nine sections"; POS-1001/a took one off.
   for (const id of RULE_IDS) {
     assert.ok(teachRaw.includes(`<details class="r-fold" id="${id}">`),
       `the teaching is missing #${id} — the move dropped a section`);
   }
+});
+
+test("POS-1001/a: 'What your share means' is off the teaching, its fold and its router id alike", () => {
+  // THE RULING, Darko 2026-11-11 20:06 EST, verbatim: "Remove it from the site"
+  // ("the site says only what NOMOS says; the economy notes keep their own text
+  // under their note"). The ruled removal's own falsifier: the fold and its
+  // heading are gone, the page's router list is the eight above, and the page
+  // has exactly those folds, so a leftover fold can't hide behind the list.
+  assert.equal(teachRaw.includes('id="ownership"'), false, "the teaching still carries the #ownership fold");
+  assert.equal(teachBody.includes("What your share means"), false, "the teaching still carries the section's heading");
+  const pageIds = /const RULE_IDS = \[([^\]]*)\]/.exec(teachSrc);
+  assert.ok(pageIds, "the teaching must know its own section ids");
+  assert.deepEqual(JSON.parse(`[${pageIds[1]}]`), RULE_IDS, "the router's list is the teaching's eight sections, in order");
+  const folds = [...teachRaw.matchAll(/<details class="r-fold" id="([\w-]+)">/g)].map((m) => m[1]);
+  assert.deepEqual(folds, RULE_IDS, "the page's folds are exactly the eight, in teaching order");
 });
 
 test("the teaching LEADS with the questions, and the dials sit under them", () => {
