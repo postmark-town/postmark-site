@@ -97,7 +97,8 @@ test("every disclosure the money moment owes is on the page, verbatim", () => {
   assert.ok(PAGE.includes("HOLO_LINE"), "the caption is the shared constant, never retyped");
   assert.equal(HOLO_LINE, "a record of contribution, not a promise of profit");
   // The scope-extension's second sentence, exact. REWORDED 2026-11-11 (POS-1001)
-  // to fit NOMOS II.4 ("Stamps are not money. They can't be bought") and II.6.1
+  // to fit NOMOS's definition of Stamp ("Stamps are not money. They can't be
+  // bought") and II.6.1
   // (NOMOS "grants no claim" on owning Postmark or on money outside the town);
   // until then this asserted the sentence's earlier wording, which is in git
   // history. The office ships the twin sentence (postmark-office

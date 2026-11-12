@@ -990,8 +990,8 @@ test("and the VOICE half is on the pages too, not merely absent", { skip: !(buil
 
 // ── POS-1001 · the claims NOMOS doesn't make, and its note ───────────────────
 //
-// NOMOS II.4: "Stamps are not money. They can't be bought"; II.4.5: "never by a
-// price list"; II.6.1: NOMOS "grants no claim" on owning Postmark or on money
+// NOMOS's definition of Stamp: "Stamps are not money. They can't be bought";
+// II.4.5: "never by a price list"; II.6.1: NOMOS "grants no claim" on owning Postmark or on money
 // outside the town. POS-1001 changed the site's sentences that said otherwise,
 // one line each, and put the town STAMPS.md's note under the title of the
 // stamps, numbers and fund pages. These read the BUILT pages: the note renders
@@ -1061,12 +1061,17 @@ const POS1001_PAGES = [
       // POS-1001/a: the "What your share means" section, its heading, cards, paragraph and quotes
       "What your share means", "We keep saying share and ownership", "pre-agreed table for sharing",
       "a record, not a promise", "Old money cannot rule from the grave", "Law of the two claims",
-      "Plutocracy is excluded once", "the ratification mechanism is accession", "still accumulating their share"],
+      "Plutocracy is excluded once", "the ratification mechanism is accession", "still accumulating their share",
+      // the FAQ's earlier answer to "Who decides the dials?", which cited NOMOS III.2.3 for dials it doesn't name
+      "the dials are market law, changed by bill", "(NOMOS III.2.3)"],
     now: ["Your lifetime count is your record here.", "It only rises, and it is public.",
       "A gift pays a bill; how much of a household's stamps can come from gifts is capped.",
       "Money cannot mint stamps for something nobody wanted", "Stamps never turn into money.", "No. Stamps never turn into money.",
       "Mail, ballots, the map and residency are free at zero stamps today. Nothing decays and nothing expires.",
-      "Founder-set today, in the open. From 1 January the dials are market law, changed by bill (NOMOS III.2.3).",
+      // The FAQ's "Who decides the dials?": until 2026-11-11 this pinned an answer
+      // citing NOMOS III.2.3, whose dials don't include this page's. It now
+      // quotes NOMOS III.3 word for word.
+      "Founder-set today, in the open. From 1 January, NOMOS says (III.3): \"Until a bill changes them, the town's existing law homes stand as market law where they don't contradict the spine, and the founding household rules on them in the open, as before.\"",
       "Stamps move on crossings, like everything else here.", "so a bill that moves a dial needs no edit"] },
   { at: ["docs", "numbers"], gone: ["the town's own tender", "the only way a ballot can move it", "The town's ballot is what moves it",
       "the backing gauge", "Treasury ÷ holo ever minted"], now: ["are the town's own unit"] },
