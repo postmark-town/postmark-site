@@ -60,12 +60,13 @@
 
 /* ── the town header (Postmark's OWN chrome — one rail, not two) ──
    The Postmark mark, the nav's run of links, and at the right the END: Join and the reader's own corner (the bell, the household, sign
-   in or out), PostmarkLayout.astro § THE TOP RAIL'S TWO ROWS. When they do not fit on one row, the end stays on the first row at the
-   right and the nav's links take the second row together (POS-999, Darko 2026-11-11 12:52 EST: "two rows in the top rail is actually
-   totally fine. The one rail or the single row is actually pretty unique to households who like barely have any residents").
-   The gap here (1.4em → 1em) and the nav links' side padding (0.75em → 0.55em) are trimmed so a small house keeps one row: measured at
-   1280 and 1568 px, one row holds up to seven faces in Windows' monospace (three without the trims) and up to three in a Mac's (SF Mono's
-   width; none without them). */
+   in or out), PostmarkLayout.astro § THE HOUSE'S CORNER. On a desktop the header is one row and never wraps: when everything does not
+   fit, the nav's box narrows and its links wrap inside it, the first row keeping as many as fit and only the rest going to a second row
+   beneath them, while the mark and the end stay where they are. That is how the rail wrapped before the household's faces came (POS-999,
+   Darko 2026-11-12 08:46 EST: "please look at how the main rail would overflow into a second row when there wasn't enough horizontal
+   space before we even incorporated the household and resident icons. I want the main rail to split into a top and bottom row; not put
+   the whole thing in the bottom and put a giant empty space in the middle"). Below 861px the phone's own stacking, further down, stands.
+   The gap here (1.4em → 1em) and the nav links' side padding (0.75em → 0.55em) are trimmed so a small house keeps one row. */
 .pm .pm-townhead {
   display: flex; align-items: center; gap: 1em;
   max-width: 1160px; margin: 0 auto;
@@ -142,15 +143,6 @@
 }
 /* the rail's END: Join, then the reader's own corner (PostmarkLayout.astro) */
 .pm .pm-townhead-end { display: inline-flex; align-items: center; gap: 0.6em; margin-left: auto; flex: none; }
-/* TWO ROWS, ON A DESKTOP (the layout's first-paint script measures and sets data-rows; without a script the old wrapping stands):
-   one row when everything fits; else the end stays on the first row at the right, and the nav's links move to the second row together,
-   at the right, never one link orphaned below the rest. */
-@media (min-width: 861px) {
-  .pm .pm-townhead[data-rows="1"] .pm-townnav-links { flex-wrap: nowrap; }
-  .pm .pm-townhead[data-rows="2"] { flex-wrap: wrap; row-gap: 0.3em; }
-  .pm .pm-townhead[data-rows="2"] .pm-townhead-end { order: 1; }
-  .pm .pm-townhead[data-rows="2"] .pm-townnav-links { order: 2; flex-basis: 100%; margin-left: 0; flex-wrap: nowrap; }
-}
 @media (max-width: 860px) {
   .pm .pm-townhead { flex-wrap: wrap; gap: 0.7em; padding-bottom: 1.1em; }
   .pm .pm-townnav-links { margin-left: 0; flex-basis: 100%; order: 2; }

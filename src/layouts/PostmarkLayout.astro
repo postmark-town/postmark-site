@@ -291,7 +291,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
           });
           wrap.append(faces);
         };
-        // the auth area's first paint (its own function: its early returns end the paint, not the row check below)
+        // the auth area's first paint (its own function: its early returns end only the paint)
         (function () {
           try {
             var root = document.querySelector("[data-auth]");
@@ -309,35 +309,8 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
             document.documentElement.setAttribute("data-lens", hs[0] || "signed-in");
           } catch (e) {}
         })();
-        // THE TOP RAIL'S TWO ROWS (POS-999; Darko, 2026-11-11 12:52 EST: "two rows in the top rail is actually totally fine … The one rail or the
-        // single row is actually pretty unique to households who like barely have any residents"). On a desktop: one row when everything fits;
-        // else the end (Join and the corner) stays on the first row at the right and the nav's links take the second row together
-        // (postmark.css § the town header). Measured here, before the first paint, and again whenever the rail's end or the sentinel's glyph
-        // changes size (the faces arriving), the window does, or a font lands. On a phone the stylesheet's own stacking stands. Without a
-        // script none of this runs, and the old wrapping is what shows.
-        window.pmRailRows = function () {
-          var head = document.querySelector(".pm-townhead");
-          if (!head) return;
-          if (window.matchMedia && window.matchMedia("(max-width: 860px)").matches) { head.removeAttribute("data-rows"); return; }
-          head.setAttribute("data-rows", "1");
-          // overflow is the end passing the header's content edge: a box's scrollWidth does not count overflow that only runs into its own
-          // padding, so up to the padding's width would go unseen (measured: four faces ran 3px past the edge with scrollWidth unchanged)
-          var end = head.querySelector("[data-townhead-end]");
-          var edge = head.getBoundingClientRect().right - parseFloat(getComputedStyle(head).paddingRight);
-          var over = head.scrollWidth > head.clientWidth + 1 || (end && end.getBoundingClientRect().right > edge + 0.5);
-          head.setAttribute("data-rows", over ? "2" : "1");
-        };
-        try {
-          window.pmRailRows();
-          var busy = false;
-          var again = function () { if (busy) return; busy = true; try { window.pmRailRows(); } finally { busy = false; } };
-          if (window.ResizeObserver) {
-            var ro = new ResizeObserver(again);
-            ["[data-townhead-end]", "[data-pm-alert]"].forEach(function (s) { var e = document.querySelector(s); if (e) ro.observe(e); });
-          }
-          window.addEventListener("resize", again);
-          if (document.fonts && document.fonts.ready) document.fonts.ready.then(again);
-        } catch (e) {}
+        // The top rail's rows are the stylesheet's alone (postmark.css § the town header): when the rail cannot hold everything on one row,
+        // the nav's links wrap inside the nav, as they did before the faces. No script measures them.
       })();
     </script>
     <script is:inline>
@@ -1114,22 +1087,30 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
   /* ── THE HOUSE'S CORNER (POS-999): the household's round icon, then its residents' faces as one honeycomb ──
      The faces run down two rows, column by column (1 over 2, 3 over 4 …), and the lower row sits half a step to the right and nests up into
      the upper one: two offset rows of 28px circles, 2px apart, 54px tall; the header's row grows with it and keeps every part centred. One
-     face alone is one 28px circle, the household icon's size.
+     face alone is one 28px circle.
      THE SIZE (Darko, 2026-11-11 12:50 EST, on dev: "the upper right corner is way too small … allot like maybe around twice the amount of
      horizontal space in the top rail for the household icon as well as the residents, and make their circles around twice as large"): twice
-     the first size (14px faces). Ten faces make a 199px corner; when the rail cannot hold it on one row, the rail takes two (12:52: "two
-     rows in the top rail is actually totally fine"), below § THE TOP RAIL'S TWO ROWS in the first-paint script. */
+     the first size (14px faces). Ten faces make a corner of about 205px; when the rail cannot hold it on one row, the nav's links wrap
+     inside the nav, as the rail did before the faces (Darko, 2026-11-12 08:46 EST: "I want the main rail to split into a top and bottom
+     row; not put the whole thing in the bottom and put a giant empty space in the middle"; postmark.css § the town header).
+     THE HOUSEHOLD ICON STANDS OUT (Darko, 2026-11-12 08:47 EST: "we should also make the household icon stand out more"): a lit gold
+     button, the fill the nav's current-page pill wears, with Join's soft glow, and a little larger than a face (34px), so it reads as
+     "your household" first and not as one more circle. Its glyph is the pill's dark ink, set under .pm-auth-who so the corner's own link
+     colour (.pm-auth-who a) does not paint gold on gold. */
   .pm-corner { display: inline-flex; align-items: center; gap: 6px; }
   /* the corner never squeezes: the nav beside it is the part that wraps ("never clip a section off the end — wrap instead"), and a pill never breaks its word */
   .pm-auth { flex-shrink: 0; }
   .pm-auth-out { white-space: nowrap; }
   .pm-corner-house {
     display: inline-grid; place-items: center; flex: none; box-sizing: border-box;
-    width: 28px; height: 28px; border-radius: 999px;
-    color: var(--pm-gold-bright, #f6dcae); text-decoration: none; font-size: 1rem; line-height: 1;
-    border: 1px solid rgba(232, 196, 139, 0.5); background: rgba(13, 20, 38, 0.6);
+    width: 34px; height: 34px; border-radius: 999px;
+    text-decoration: none; font-size: 1.25rem; font-weight: 700; line-height: 1;
+    border: 1px solid var(--pm-gold-bright, #f6dcae);
+    background: linear-gradient(180deg, var(--pm-gold-bright, #f6dcae), var(--pm-gold, #e8c48b));
+    box-shadow: 0 0 12px rgba(232, 196, 139, 0.35);
   }
-  .pm-auth-who .pm-corner-house:hover, .pm-corner-house:focus-visible { text-decoration: none; border-color: var(--pm-gold-bright, #f6dcae); background: rgba(232, 196, 139, 0.14); }
+  .pm-auth-who .pm-corner-house { color: #241505; }
+  .pm-auth-who .pm-corner-house:hover, .pm-corner-house:focus-visible { text-decoration: none; box-shadow: 0 0 0 2px rgba(246, 220, 174, 0.35), 0 0 18px rgba(232, 196, 139, 0.5); }
   .pm-corner-faces {
     display: inline-grid; flex: none;
     grid-auto-flow: column; grid-template-rows: 26px 28px; grid-auto-columns: 30px;

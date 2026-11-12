@@ -191,7 +191,8 @@ test("TEXT PIN + arithmetic: the faces honeycomb in two offset rows at 1, 3, 9 a
       assert.ok(dist >= d, `${n} faces: faces ${i + 1} and ${j + 1} are ${dist.toFixed(1)}px apart, centre to centre (they would overlap under ${d})`);
     }
     if (n === 10) assert.equal(d, 2 * 14, `the faces are twice the first size (14px, which Darko found "way too small"): ${d}px`);
-    if (n === 10) assert.equal(icon, 28, "and the household icon is the faces' size");
+    // until 2026-11-12 the icon was the faces' size (28px); Darko, 08:47 EST: "we should also make the household icon stand out more"
+    if (n === 10) assert.ok(icon > d && icon <= rowA + rowB, `and the household icon (${icon}px) is larger than a face (${d}px), within the faces' two rows (${rowA + rowB}px), so the header does not grow for it`);
     // honeycombed: the lower row sits between the upper row's faces, not under them
     if (n >= 3) assert.ok(Math.abs(Math.hypot(half, rowA) - pitch) <= 1, "a lower face is as far from its two upper neighbours as they are from each other");
   }
@@ -326,26 +327,95 @@ test("TEXT PIN: the + and the settings are the house's own human's: the househol
   assert.equal((read("src/components/HouseRail.astro").match(/data-house-add/g) ?? []).length, 1, "one + in the component");
 });
 
-// ── the top rail's end and its two rows (POS-999; Darko, 2026-11-11 12:52 EST) ──
-// "join is a special button that we want to keep at the top and like near the sign in or like auth stuff"; "two rows in the top rail is actually
-// totally fine". TEXT PINS: the walk in the lane's report measures the rows in a browser at 1, 3, 9 and 10 faces, signed in and out.
-test("TEXT PIN: Join is rendered from the rail's own lantern seat at the rail's end, outside the nav's links and outside the hidden auth block; the first paint measures the rows", () => {
+// ── the top rail's end, and how it splits into two rows (POS-999) ──
+// Darko, 2026-11-11 12:52 EST: "join is a special button that we want to keep at the top and like near the sign in or like auth stuff".
+test("TEXT PIN: Join is rendered from the rail's own lantern seat at the rail's end, outside the nav's links and outside the hidden auth block", () => {
   assert.match(LAYOUT, /\{RAIL\.filter\(\(n\) => !n\.lantern\)\.map\(/, "the nav's links are every seat but the lantern");
   const end = LAYOUT.indexOf('<div class="pm-townhead-end" data-townhead-end>');
   assert.ok(end > LAYOUT.indexOf('<nav class="pm-townnav-links"'), "the end follows the nav");
   const join = LAYOUT.indexOf('{RAIL.filter((n) => n.lantern).map((n) => (', end);
   assert.ok(join > end && join < LAYOUT.indexOf('<div class="pm-auth" data-auth hidden>'), "Join is in the end, before the auth block (which ships hidden), so it shows with no script");
   assert.match(LAYOUT.slice(join, join + 300), /class="pm-nav-join" aria-current=\{here\?\.key === n\.key \? "page" : undefined\}/, "it keeps its lantern class and lights when it is the page");
-  const script = firstPaintScript();
-  assert.match(script, /window\.pmRailRows = function \(\)/, "the first paint defines the row check");
-  // until the 1c sweep (2026-11-11) this read scrollWidth alone, which does not count overflow into the header's own padding: four faces ran 3px past the edge, called one row
-  assert.match(script, /var over = head\.scrollWidth > head\.clientWidth \+ 1 \|\| \(end && end\.getBoundingClientRect\(\)\.right > edge \+ 0\.5\);/, "two rows when one would overflow, the end passing the content edge included");
-  assert.match(script, /var edge = head\.getBoundingClientRect\(\)\.right - parseFloat\(getComputedStyle\(head\)\.paddingRight\);/, "the edge is the content edge, inside the padding");
-  assert.match(script, /head\.setAttribute\("data-rows", over \? "2" : "1"\);/);
-  assert.ok(script.indexOf("window.pmRailRows();") > script.indexOf("window.pmRailRows = function"), "and runs it before the first paint");
+});
+
+// THE SPLIT. Darko, 2026-11-12 08:46 EST, on dev, with ten residents: "top corner with 10 residents is still bad for the hearth; please look at how
+// the main rail would overflow into a second row when there wasn't enough horizontal space before we even incorporated the household and resident
+// icons. I want the main rail to split into a top and bottom row; not put the whole thing in the bottom and put a giant empty space in the middle".
+// The rail before the faces (site 6488d659, measured in a browser): on a desktop the header is one row that never wraps, and the nav's own box narrows
+// while its links wrap inside it, the first row keeping as many as fit. Until 2026-11-12 a first-paint script set data-rows="2" when the rail was full,
+// and the stylesheet then gave the nav's links a row of their own (flex-basis: 100%), all six under the end, the middle of the first row empty.
+// TEXT PIN over the stylesheet's rules (the site's CI has no browser): the lane's sweep measures the render at every width from 861 to 1568 px, signed
+// out and at 1 to 10 faces. This reads every rule that sets the header's or the nav's own layout on a desktop, and compares the whole verdict.
+function cssRules(css) {
+  const src = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const out = [];
+  const walk = (s, media) => {
+    let i = 0;
+    for (;;) {
+      const open = s.indexOf("{", i);
+      if (open < 0) return;
+      let head = s.slice(i, open);
+      head = head.slice(head.lastIndexOf(";") + 1).trim();
+      let depth = 1, j = open + 1;
+      while (j < s.length && depth) { if (s[j] === "{") depth += 1; else if (s[j] === "}") depth -= 1; j += 1; }
+      const body = s.slice(open + 1, j - 1);
+      if (/^@(media|supports)\b/.test(head)) walk(body, [...media, head.replace(/\s+/g, " ")]);
+      else if (!head.startsWith("@")) {
+        const decls = {};
+        for (const d of body.split(";")) { const k = d.indexOf(":"); if (k > 0) decls[d.slice(0, k).trim()] = d.slice(k + 1).trim(); }
+        out.push({ media, selectors: head.split(",").map((x) => x.trim().replace(/\s+/g, " ")), decls });
+      }
+      i = j;
+    }
+  };
+  walk(src, []);
+  return out;
+}
+const PHONE = "@media (max-width: 860px)";
+const HEADER = /\.pm-townhead(\[[^\]]*\])*$/, NAV = /\.pm-townnav-links(\[[^\]]*\])*$/;
+function railVerdict(css, script) {
+  const v = { headerWraps: [], headerQualified: [], navWrap: [], navOwnRow: [], scriptSetsRows: /data-rows|pmRailRows/.test(script) };
+  for (const r of cssRules(css)) {
+    const desktop = !r.media.includes(PHONE);
+    for (const s of r.selectors) {
+      if (desktop && HEADER.test(s)) {
+        if (/wrap/.test(r.decls["flex-wrap"] ?? "") && r.decls["flex-wrap"] !== "nowrap") v.headerWraps.push(s);
+        if (/\[[^\]]*\]$/.test(s)) v.headerQualified.push(s);
+      }
+      if (desktop && NAV.test(s)) {
+        if ("flex-wrap" in r.decls) v.navWrap.push(`${s} ${r.decls["flex-wrap"]}`);
+        for (const p of ["flex-basis", "width", "order", "flex"]) if (p in r.decls) v.navOwnRow.push(`${s} ${p}: ${r.decls[p]}`);
+      }
+    }
+  }
+  return v;
+}
+const SPLIT_LIKE_BEFORE = { headerWraps: [], headerQualified: [], navWrap: [".pm .pm-townnav-links wrap"], navOwnRow: [], scriptSetsRows: false };
+test("TEXT PIN: on a desktop the top rail splits as it did before the faces: the header never wraps and the nav's links wrap inside the nav, so the links that fit stay on the first row and no rule sends all six to a row of their own", () => {
   const css = read("src/styles/postmark.css");
-  assert.match(css, /\.pm \.pm-townhead\[data-rows="2"\] \.pm-townhead-end \{ order: 1; \}/, "two rows: the end stays on the first row");
-  assert.match(css, /\.pm \.pm-townhead\[data-rows="2"\] \.pm-townnav-links \{ order: 2; flex-basis: 100%; margin-left: 0; flex-wrap: nowrap; \}/, "and the nav's links take the second row together, unbroken");
+  assert.deepEqual(railVerdict(css, firstPaintScript()), SPLIT_LIKE_BEFORE,
+    "the header is one row on a desktop; its nav wraps its own links; nothing gives the nav a row to itself, and no script decides the rows");
+  // the reader sees the phone's rules where they are (a presence control: the same instrument finds a full-width nav and a wrapping header there)
+  const phone = cssRules(css).filter((r) => r.media.includes(PHONE));
+  assert.ok(phone.some((r) => r.selectors.some((s) => NAV.test(s)) && r.decls["flex-basis"] === "100%"), "the phone's own stacking is read, and stands");
+  assert.ok(phone.some((r) => r.selectors.some((s) => HEADER.test(s)) && r.decls["flex-wrap"] === "wrap"), "and its header wraps");
+});
+test("the split's verdict goes red on the two-row rule it replaced (until 2026-11-12, every link under the end) and on a header that wraps the nav whole", () => {
+  const css = read("src/styles/postmark.css");
+  const script = firstPaintScript();
+  // a7535457's own block, verbatim, and the script line that set the attribute it keys on
+  const twoRows = `@media (min-width: 861px) {
+  .pm .pm-townhead[data-rows="1"] .pm-townnav-links { flex-wrap: nowrap; }
+  .pm .pm-townhead[data-rows="2"] { flex-wrap: wrap; row-gap: 0.3em; }
+  .pm .pm-townhead[data-rows="2"] .pm-townhead-end { order: 1; }
+  .pm .pm-townhead[data-rows="2"] .pm-townnav-links { order: 2; flex-basis: 100%; margin-left: 0; flex-wrap: nowrap; }
+}`;
+  const old = railVerdict(css + "\n" + twoRows, script + '\nhead.setAttribute("data-rows", over ? "2" : "1");');
+  assert.deepEqual(old.headerWraps, ['.pm .pm-townhead[data-rows="2"]'], "the old rule's wrapping header is seen");
+  assert.ok(old.navOwnRow.includes('.pm .pm-townhead[data-rows="2"] .pm-townnav-links flex-basis: 100%') && old.scriptSetsRows, "and its nav row of their own, and its script");
+  assert.notDeepEqual(old, SPLIT_LIKE_BEFORE);
+  const whole = railVerdict(css + "\n.pm .pm-townhead { flex-wrap: wrap; }\n.pm .pm-townnav-links { flex-basis: 100%; }", script);
+  assert.deepEqual([whole.headerWraps, whole.navOwnRow], [[".pm .pm-townhead"], [".pm .pm-townnav-links flex-basis: 100%"]], "a desktop header that wraps the nav whole onto its own row is seen");
 });
 
 test("TEXT PIN: on a resident page a resident's chip is a link; a plain click switches the tab in place (the address moves to its page), any other click is the browser's", () => {
