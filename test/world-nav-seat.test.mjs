@@ -124,14 +124,10 @@ test("while the map shows a list, the site's floating chrome steps aside (phone 
   assert.match(worldPage, rule);
 });
 
-test("POS-1006: on a desktop time travel rests ABOVE the In-town-by-mail strip when they share columns, and the phone seat is untouched", () => {
-  // the lift is in the desktop branch of place() (the one that has a rail), and reads the viewer's own strip, never a second number
-  const desk = worldPage.slice(worldPage.indexOf("if (navBox && navBox.width > 0) {"), worldPage.indexOf("} else {", worldPage.indexOf("if (navBox && navBox.width > 0) {")));
-  assert.match(desk, /querySelector\("\.wv-bymail"\)/);
-  assert.match(desk, /s\.bottom = Math\.round\(document\.documentElement\.clientHeight - sb\.top \+ 10\) \+ "px"/);
-  // the phone branch (no rail) hangs from the top as before and never asks about the strip
-  const phone = worldPage.slice(worldPage.indexOf("} else {", worldPage.indexOf("if (navBox && navBox.width > 0) {")), worldPage.indexOf("var stripWatched"));
-  assert.doesNotMatch(phone, /wv-bymail/);
-  assert.match(phone, /s\.top = Math\.round\(low \? low \+ 10 : 92\) \+ "px";/);
-  // the rendered overlap check, with real geometry and the old placement as its falsifier, is test/world-time-travel-bymail.test.mjs
+test("POS-1006: time travel's seat is the rail and the cluster only; the In-town-by-mail button rides in its bar, and the phone seat is as it was", () => {
+  const place = worldPage.slice(worldPage.indexOf("function place() {"), worldPage.indexOf("function build() {"));
+  assert.doesNotMatch(place, /wv-bymail/, "place() never asks about the strip (the lift is gone)");
+  assert.match(place, /s\.left = Math\.round\(navBox\.right \+ 14\) \+ "px";/, "the desktop seat: just clear of the rail");
+  assert.match(place, /s\.top = Math\.round\(low \? low \+ 10 : 92\) \+ "px";/, "the phone seat: under the cluster");
+  assert.match(worldPage, /<div class="pm-tt-bar">/, "the bar holds the pill and, beside it, the button");
 });

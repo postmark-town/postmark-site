@@ -39,10 +39,10 @@ test("what the box holds takes its taps: the pill, and the open body", () => {
   assert.doesNotMatch(PAGE, /\.pm-tt-(open|body)[^{]*\{[^}]*pointer-events: none/, "and nothing turns them off again");
 });
 
-test("POS-1006: lifting the pill above the by-mail strip changes where the box sits, not what takes taps", () => {
-  const PAGEJS = PAGE.slice(PAGE.indexOf("function place()"), PAGE.indexOf("var stripWatched"));
-  assert.match(PAGEJS, /s\.bottom = Math\.round\(/, "the lift is a bottom offset on the same fixed box");
-  assert.doesNotMatch(PAGEJS, /pointerEvents|pointer-events/, "place() never touches pointer events");
+test("POS-1006: the bar the button joins still passes taps through its box and takes them on what it holds; the card is a fixed box of its own", () => {
   assert.match(ruleOf(".pm-tt"), /pointer-events: none;/, "the box still lets taps through to the map");
-  assert.match(ruleOf(".pm-tt > *"), /pointer-events: auto;/, "and the pill still takes its own");
+  assert.match(ruleOf(".pm-tt > *"), /pointer-events: auto;/, "the bar (and so the pill and the button in it) takes its own");
+  assert.match(ruleOf(".pm-tt-bar"), /display: flex;/);
+  assert.doesNotMatch(PAGE, /\.pm-(tt-bar|bymail-btn)[^{]*\{[^}]*pointer-events: none/, "nothing turns them off");
+  assert.match(PAGE, /body \.wv-bymail\.pm-bymail-open:not\(\[hidden\]\) \{\s*display: block; position: fixed;/, "the open card is its own fixed box, not the map's strip");
 });
