@@ -359,6 +359,16 @@ const html = rawHtml.replace(/<head>/i,
         s.left = Math.round(navBox.right + 14) + "px";
         s.right = "auto"; s.bottom = "14px"; s.top = "auto";
         s.alignItems = "flex-start";
+        // IN TOWN BY MAIL (POS-945) is a strip along the bottom of the painting, from the telling's edge (or, with the telling hidden, from
+        // the rail's) to the right. With the telling hidden the pill's patch IS the strip's left end, and the pill sat on its names
+        // (POS-1006, Little Bird: "the time travel button on top of the list of people"). So when the strip is showing and shares the pill's
+        // columns, the pill is LIFTED to rest just above it: both whole, nothing shortened or hidden. It comes back down when the strip goes.
+        var strip = document.querySelector(".wv-bymail");
+        if (strip && !strip.hidden && strip.getClientRects().length) {
+          var sb = strip.getBoundingClientRect();
+          var pb = panel.getBoundingClientRect();
+          if (pb.left < sb.right && pb.right > sb.left) s.bottom = Math.round(document.documentElement.clientHeight - sb.top + 10) + "px";
+        }
       } else {
         // Under BOTH the map's control row and the site's folded pill (WLD-47),
         // whichever reaches lower. The pill, not the whole cluster: an open list
@@ -377,6 +387,17 @@ const html = rawHtml.replace(/<head>/i,
         s.bottom = "auto"; s.left = "10px"; s.right = "10px";
         s.alignItems = "flex-end";
       }
+    }
+
+    // The strip is the viewer's and arrives (and changes size, and hides) on the viewer's own schedule, so the pill asks it rather than assuming:
+    // a ResizeObserver on the strip re-places the pill when the strip appears, grows, moves with the telling, or goes.
+    var stripWatched = null;
+    function watchStrip() {
+      var strip = document.querySelector(".wv-bymail");
+      if (!strip || stripWatched === strip) return;
+      stripWatched = strip;
+      if (typeof ResizeObserver === "function") new ResizeObserver(place).observe(strip);
+      place();
     }
 
     function build() {
@@ -402,6 +423,8 @@ const html = rawHtml.replace(/<head>/i,
       // the site cluster says when it has moved (it re-measures as the viewer's
       // control row arrives and changes size), and this hangs under it again
       window.addEventListener("pm-world-auth:placed", place);
+      // the viewer builds its shell after this runs: look for the strip until it is there (a page with no viewer just stops looking)
+      var looks = 0, lookTimer = setInterval(function () { watchStrip(); if (stripWatched || ++looks > 80) clearInterval(lookTimer); }, 250);
       openEl = panel.querySelector(".pm-tt-open");
       whenEl = panel.querySelector(".pm-tt-when");
       backEl = panel.querySelector(".pm-tt-back");
@@ -555,7 +578,7 @@ const html = rawHtml.replace(/<head>/i,
      (measured 2026-10-14 at 390 px: rows 1 and 2). While the viewer shows a list
      (search results, the bell's phone menu), that chrome steps aside, and it
      comes back the moment the list closes. Phone only: above 720 px the cluster
-     sits in the rail and time travel bottom-left, clear of both lists, and the
+     sits in the rail and time travel bottom-left, clear of both lists (and lifted above the In-town-by-mail strip when that shares its columns: place()), and the
      desktop page stays as it was. The 720 is the viewer's (world-nav-seat.mjs). */
   @media (max-width: 720px) {
     body:has(.wv-search-results:not([hidden]), .wv-bell-menu:not([hidden])) #pm-world-auth:not(.wa-slotted),

@@ -38,3 +38,11 @@ test("what the box holds takes its taps: the pill, and the open body", () => {
   assert.match(built, /class="pm-tt-body" hidden/);
   assert.doesNotMatch(PAGE, /\.pm-tt-(open|body)[^{]*\{[^}]*pointer-events: none/, "and nothing turns them off again");
 });
+
+test("POS-1006: lifting the pill above the by-mail strip changes where the box sits, not what takes taps", () => {
+  const PAGEJS = PAGE.slice(PAGE.indexOf("function place()"), PAGE.indexOf("var stripWatched"));
+  assert.match(PAGEJS, /s\.bottom = Math\.round\(/, "the lift is a bottom offset on the same fixed box");
+  assert.doesNotMatch(PAGEJS, /pointerEvents|pointer-events/, "place() never touches pointer events");
+  assert.match(ruleOf(".pm-tt"), /pointer-events: none;/, "the box still lets taps through to the map");
+  assert.match(ruleOf(".pm-tt > *"), /pointer-events: auto;/, "and the pill still takes its own");
+});
