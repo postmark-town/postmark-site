@@ -386,8 +386,9 @@ const html = rawHtml.replace(/<head>/i,
       panel = document.createElement("div");
       panel.className = "pm-tt" + (armed ? " is-armed" : "");
       panel.innerHTML =
-        '<button type="button" class="pm-tt-open" aria-expanded="false">' +
-          '<span class="pm-tt-dial">◷</span><span class="pm-tt-open-words">Time travel</span></button>' +
+        // the bar holds Time travel and, beside it, the site's In-town-by-mail button when the viewer's list has a name (POS-1006: the script at the end of this page)
+        '<div class="pm-tt-bar"><button type="button" class="pm-tt-open" aria-expanded="false">' +
+          '<span class="pm-tt-dial">◷</span><span class="pm-tt-open-words">Time travel</span></button></div>' +
         '<div class="pm-tt-body" hidden>' +
           '<p class="pm-tt-kicker">The world, earlier</p>' +
           '<div class="pm-tt-row">' +
@@ -484,6 +485,87 @@ const html = rawHtml.replace(/<head>/i,
   })();
 </script>
 
+<script>
+  // THE IN-TOWN-BY-MAIL BUTTON (POS-1006). The viewer keeps filling its one `.wv-bymail` list; this only reads it (lib/world-bymail-panel.mjs), shows a button beside
+  // Time travel while it holds a name, opens that same section as a panel, and closes it on a press outside (or Escape).
+  import { bymailCount, bymailLabel, panelBox, isOutside, nameSpan } from "@/lib/world-bymail-panel.mjs";
+
+  let button: HTMLButtonElement | null = null;
+  let section: HTMLElement | null = null;
+  const OPEN = "pm-bymail-open";
+
+  function place() {
+    if (!button || !section || !section.classList.contains(OPEN)) return;
+    const bar = document.querySelector(".pm-tt");
+    const fromTop = !!bar && (bar as HTMLElement).style.bottom === "auto";   // a phone hangs the controls from the top (place() in the Time travel script)
+    const b: any = panelBox(button.getBoundingClientRect(), { width: document.documentElement.clientWidth, height: document.documentElement.clientHeight, fromTop });
+    const st = section.style;
+    st.left = b.left + "px"; st.width = b.width + "px"; st.maxHeight = b.maxHeight + "px";
+    st.top = "top" in b ? b.top + "px" : "auto";
+    st.bottom = "bottom" in b ? b.bottom + "px" : "auto";
+  }
+  function close() {
+    if (!section || !button) return;
+    section.classList.remove(OPEN);
+    button.setAttribute("aria-expanded", "false");
+  }
+  function open() {
+    if (!section || !button) return;
+    // one panel at a time: Time travel's own body steps aside
+    const tt = document.querySelector(".pm-tt-body") as HTMLElement | null;
+    if (tt && !tt.hidden) (document.querySelector(".pm-tt-open") as HTMLElement | null)?.click();
+    section.classList.add(OPEN);
+    button.setAttribute("aria-expanded", "true");
+    place();
+  }
+  function sync() {
+    if (!button) return;
+    const n = bymailCount(section);
+    button.hidden = n === 0;
+    button.textContent = bymailLabel(n);
+    // the card's heading carries the count (the viewer's h2 is not rewritten, only marked), and a cut label keeps its full text as the link's title
+    section?.querySelector(".wv-bymail-head")?.setAttribute("data-pm-count", String(n));
+    section?.querySelectorAll<HTMLAnchorElement>(".wv-bymail-link").forEach((a) => {
+      if (!a.title) a.title = a.textContent ?? "";
+      const li = a.closest("li");
+      if (li) { const k = nameSpan(a.textContent ?? ""); if (k > 1) li.setAttribute("data-pm-span", String(k)); else li.removeAttribute("data-pm-span"); }
+    });
+    if (n === 0) close();   // the viewer emptied its list (or hid it): nothing to open
+    else place();
+  }
+
+  function mount() {
+    const bar = document.querySelector(".pm-tt-bar");
+    section = document.querySelector(".wv-bymail") as HTMLElement | null;
+    if (!bar || !section) return false;
+    button = document.createElement("button");
+    button.type = "button"; button.className = "pm-bymail-btn"; button.hidden = true;
+    button.setAttribute("aria-expanded", "false"); button.setAttribute("aria-controls", "pm-bymail");
+    section.id ||= "pm-bymail";
+    button.addEventListener("click", () => (section!.classList.contains(OPEN) ? close() : open()));
+    bar.appendChild(button);
+    // the viewer's one list: its `hidden` flag and its list's names are what the button follows, including back to empty
+    const list = section.querySelector(".wv-bymail-list");
+    const watch = new MutationObserver(sync);
+    watch.observe(section, { attributes: true, attributeFilter: ["hidden"] });
+    if (list) watch.observe(list, { childList: true });
+    document.addEventListener("pointerdown", (e) => { if (section!.classList.contains(OPEN) && isOutside(e.target as Node, section, button)) close(); }, true);
+    // THE INTERLOCK IS INPUT-INDEPENDENT (POS-1006 review): Time travel opens on its pill's `click`, which Enter and Space on a focused pill fire with NO
+    // pointer event, so the outside-press rule above never sees them. A click on Time travel's pill (by any input) closes this card, in the capture phase,
+    // before its own handler grows the body into the card's old coordinates. open() closes Time travel's body BEFORE it adds the open class, so its own
+    // programmatic click here is inert.
+    document.addEventListener("click", (e) => { if (section!.classList.contains(OPEN) && (e.target as Element | null)?.closest?.(".pm-tt-open")) close(); }, true);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && section!.classList.contains(OPEN)) { close(); button!.focus(); } });
+    window.addEventListener("resize", place);
+    window.addEventListener("pm-world-auth:placed", place);
+    sync();
+    return true;
+  }
+  // the Time travel bar and the viewer's shell both arrive after this runs: look for them until they are there (a page with no viewer just stops looking)
+  let looks = 0;
+  const timer = setInterval(() => { if (mount() || ++looks > 120) clearInterval(timer); }, 250);
+</script>
+
 <style is:global>
   .pm-tt {
     position: fixed; right: 14px; bottom: 14px; z-index: 8000;
@@ -500,6 +582,7 @@ const html = rawHtml.replace(/<head>/i,
     pointer-events: none;
   }
   .pm-tt > * { pointer-events: auto; }
+  .pm-tt-bar { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
   .pm-tt-open {
     display: inline-flex; align-items: center; gap: 0.5em; cursor: pointer;
     padding: 0.55em 0.9em; border-radius: 999px;
@@ -509,6 +592,46 @@ const html = rawHtml.replace(/<head>/i,
     box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
   }
   .pm-tt-open:hover { border-color: #f0d5a8; color: #f0d5a8; }
+  /* IN TOWN BY MAIL, BEHIND A BUTTON (POS-1006; Darko 2026-11-11 22:10 EST). The viewer's ONE list (.wv-bymail, which it fills and shows or hides itself)
+     is never open under the painting. The site's button beside Time travel opens THAT section as a panel (fixed, placed by lib/world-bymail-panel.mjs) and a
+     press outside closes it. Hidden here, the section takes no room from the map; the viewer's own [hidden] still means "nobody is in town by mail". */
+  body .wv-bymail { display: none; }
+  /* OPEN: a floating card of its own, in Time travel's panel look (.pm-tt-body): rounded, dark, bordered, shadowed, clear of the screen's edges and
+     bounded to the window (the module sets left/width/bottom|top/max-height), its own scroll inside. The viewer's strip styling (full width, a top rule,
+     a 7.5rem cap, wrapped inline names) is restated for the card, not layered under it. Names are one tidy row each, evenly spaced; a very long label
+     is cut with an ellipsis INSIDE the card (the text and the link stay whole in the DOM, and the full label is the link's title). */
+  body .wv-bymail.pm-bymail-open:not([hidden]) {
+    display: block; position: fixed; z-index: 8100; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+    padding: 0.9em 1em 1em; border: 1px solid rgba(232, 196, 139, 0.4); border-radius: 14px;
+    background: var(--panel, #1c2129); box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5); color: #b9ad93;   /* the page's own panel colour, FULLY opaque: nothing behind the card reads through it */
+    scrollbar-width: thin; scrollbar-color: rgba(232, 196, 139, 0.35) transparent;
+  }
+  body .wv-bymail.pm-bymail-open .wv-bymail-head {
+    margin: 0 0 0.7em; font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; color: rgba(232, 196, 139, 0.7);
+  }
+  body .wv-bymail.pm-bymail-open .wv-bymail-head[data-pm-count]::after { content: " · " attr(data-pm-count); }
+  /* Names in FITTING COLUMNS: three across at the card's width, an ordinary short handle one column; a longer name takes two or three columns (world.astro's module sets
+     data-pm-span from its length) and ends in an ellipsis only when even all three are not enough. */
+  body .wv-bymail.pm-bymail-open .wv-bymail-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px 10px;   /* the viewer's own order is kept (no dense reflow) */ font-size: 0.82rem; line-height: 1.4; }
+  body .wv-bymail.pm-bymail-open .wv-bymail-list li[data-pm-span="2"] { grid-column: span 2; }
+  body .wv-bymail.pm-bymail-open .wv-bymail-list li[data-pm-span="3"] { grid-column: 1 / -1; }
+  body .wv-bymail.pm-bymail-open .wv-bymail-list li { min-width: 0; }
+  body .wv-bymail.pm-bymail-open .wv-bymail-link,
+  body .wv-bymail.pm-bymail-open .wv-bymail-list li:not(:has(a)) {
+    display: block; min-width: 0; padding: 0.25em 0.2em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal;
+  }
+  body .wv-bymail.pm-bymail-open .wv-bymail-link { color: #e8c48b; }
+  body .wv-bymail.pm-bymail-open .wv-bymail-link:hover, body .wv-bymail.pm-bymail-open .wv-bymail-link:focus-visible { color: #f0d5a8; background: rgba(232, 196, 139, 0.1); border-radius: 6px; }
+  .pm-bymail-btn {
+    display: inline-flex; align-items: center; cursor: pointer;
+    padding: 0.55em 0.9em; border-radius: 999px;
+    font: inherit; font-size: 0.72rem; letter-spacing: 0.08em;
+    color: #e8c48b; background: rgba(13, 20, 38, 0.92);
+    border: 1px solid rgba(232, 196, 139, 0.5);
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+  }
+  .pm-bymail-btn[hidden] { display: none; }
+  .pm-bymail-btn:hover, .pm-bymail-btn[aria-expanded="true"] { border-color: #f0d5a8; color: #f0d5a8; }
   .pm-tt.is-armed .pm-tt-open { background: #e8c48b; color: #0d1426; border-color: #f0d5a8; }
   .pm-tt-dial { font-size: 0.95em; }
   .pm-tt-body {
@@ -548,7 +671,7 @@ const html = rawHtml.replace(/<head>/i,
      given rather than holding its 17rem. */
   @media (max-width: 30rem) {
     .pm-tt-body { width: auto; }
-    .pm-tt-open { align-self: flex-end; }
+    .pm-tt-bar { align-self: flex-end; }
   }
 
   /* AN OPEN LIST OF THE MAP'S IS ON TOP (WLD-47; Darko, 2026-10-14). On a phone
