@@ -76,3 +76,14 @@ test("world.astro wires it: the viewer's one section is hidden until opened, res
   assert.doesNotMatch(PAGE, /cloneNode|\.wv-bymail-list"\)\.innerHTML|wv-bymail-list[^\n]*innerHTML\s*=/, "the site never copies or rewrites the viewer's list");
   assert.doesNotMatch(PAGE, /place\(\)'s desktop branch|lifted above the In-town-by-mail strip/, "the superseded lift is gone, not layered");
 });
+
+test("POS-1006 review: the card closes when Time travel is ACTIVATED by any input, not only on an outside pointer press (Enter/Space fire a click with no pointerdown)", () => {
+  // the interlock: a capture-phase CLICK listener on Time travel's pill closes the open card; the pointerdown rule alone left the keyboard path open
+  assert.match(PAGE, /document\.addEventListener\("click", \(e\) => \{ if \(section!\.classList\.contains\(OPEN\) && \(e\.target as Element \| null\)\?\.closest\?\.\("\.pm-tt-open"\)\) close\(\); \}, true\);/);
+  // and Time travel itself still opens on a click, which is the event both a pointer and the keyboard produce
+  assert.match(PAGE, /openEl\.addEventListener\("click", function \(\) \{/);
+  // open() closes Time travel's body BEFORE it adds the open class, so that programmatic click cannot close the card it is about to open
+  const open = PAGE.slice(PAGE.indexOf("function open() {"), PAGE.indexOf("function sync() {"));
+  assert.ok(open.indexOf('.pm-tt-open") as HTMLElement | null)?.click()') < open.indexOf("section.classList.add(OPEN)"));
+  // the real-DOM keyboard run (Tab-free focus + Enter / Space on both buttons, in a real browser, before: card and Time travel both open and overlapping; after: card closed, Time travel open, no overlap) is on the PR
+});

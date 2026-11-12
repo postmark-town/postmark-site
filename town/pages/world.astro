@@ -543,6 +543,11 @@ const html = rawHtml.replace(/<head>/i,
     watch.observe(section, { attributes: true, attributeFilter: ["hidden"] });
     if (list) watch.observe(list, { childList: true });
     document.addEventListener("pointerdown", (e) => { if (section!.classList.contains(OPEN) && isOutside(e.target as Node, section, button)) close(); }, true);
+    // THE INTERLOCK IS INPUT-INDEPENDENT (POS-1006 review): Time travel opens on its pill's `click`, which Enter and Space on a focused pill fire with NO
+    // pointer event, so the outside-press rule above never sees them. A click on Time travel's pill (by any input) closes this card, in the capture phase,
+    // before its own handler grows the body into the card's old coordinates. open() closes Time travel's body BEFORE it adds the open class, so its own
+    // programmatic click here is inert.
+    document.addEventListener("click", (e) => { if (section!.classList.contains(OPEN) && (e.target as Element | null)?.closest?.(".pm-tt-open")) close(); }, true);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && section!.classList.contains(OPEN)) { close(); button!.focus(); } });
     window.addEventListener("resize", place);
     window.addEventListener("pm-world-auth:placed", place);
