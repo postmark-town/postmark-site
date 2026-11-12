@@ -61,8 +61,9 @@
 /* ── the town header (Postmark's OWN chrome — one rail, not two) ──
    The Postmark mark, the nav's run of links, and at the right the END: Join and the reader's own corner (the bell, the household, sign
    in or out), PostmarkLayout.astro § THE HOUSE'S CORNER. On a desktop the header is one row and never wraps: when everything does not
-   fit, the nav's box narrows and its links wrap inside it, the first row keeping as many as fit and only the rest going to a second row
-   beneath them, while the mark and the end stay where they are. That is how the rail wrapped before the household's faces came (POS-999,
+   fit, the nav's box narrows and its links wrap inside it, the first row keeping as many as fit and only the rest going beneath them (a
+   second row; a third or more only when a narrow window holds a big household's corner), while the mark and the end stay where they are.
+   That is how the rail wrapped before the household's faces came (POS-999,
    Darko 2026-11-12 08:46 EST: "please look at how the main rail would overflow into a second row when there wasn't enough horizontal
    space before we even incorporated the household and resident icons. I want the main rail to split into a top and bottom row; not put
    the whole thing in the bottom and put a giant empty space in the middle"). Below 861px the phone's own stacking, further down, stands.

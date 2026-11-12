@@ -160,7 +160,7 @@ test("the painter draws what the plan says: the round icon (named), then one fac
 // Until 2026-11-11 12:50 EST this held the faces (then 14px) under the bell's 30px height; then, briefly, ten 22px faces inside the 174px the header
 // left with the nav on one row. Darko, on dev, 12:50: "make their circles around twice as large"; 12:52: "two rows in the top rail is actually totally
 // fine". So the faces are twice the first 14px, the cluster is taller than the bell (the header's row grows with it), and no width bound holds the
-// corner: when the rail cannot hold it on one row it takes two (the layout's § THE TOP RAIL'S TWO ROWS, which the lane's walk measures in a browser).
+// corner: when the rail cannot hold it on one row, the nav's links wrap inside the nav (postmark.css § the town header; the split's pin is below).
 test("TEXT PIN + arithmetic: the faces honeycomb in two offset rows at 1, 3, 9 and 10 faces, twice the first size, no two faces touch, and none leaves its box", () => {
   const css = LAYOUT.slice(LAYOUT.indexOf("THE HOUSE'S CORNER (POS-999)"));
   const num = (re, what) => { const m = re.exec(css); assert.ok(m, `the stylesheet says ${what}`); return Number(m[1]); };
