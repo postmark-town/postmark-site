@@ -123,3 +123,11 @@ test("while the map shows a list, the site's floating chrome steps aside (phone 
   const rule = /@media \(max-width: 720px\) \{\s*body:has\(\.wv-search-results:not\(\[hidden\]\), \.wv-bell-menu:not\(\[hidden\]\)\) #pm-world-auth:not\(\.wa-slotted\),\s*body:has\(\.wv-search-results:not\(\[hidden\]\), \.wv-bell-menu:not\(\[hidden\]\)\) \.pm-tt \{\s*visibility: hidden;/;
   assert.match(worldPage, rule);
 });
+
+test("POS-1006: time travel's seat is the rail and the cluster only; the In-town-by-mail button rides in its bar, and the phone seat is as it was", () => {
+  const place = worldPage.slice(worldPage.indexOf("function place() {"), worldPage.indexOf("function build() {"));
+  assert.doesNotMatch(place, /wv-bymail/, "place() never asks about the strip (the lift is gone)");
+  assert.match(place, /s\.left = Math\.round\(navBox\.right \+ 14\) \+ "px";/, "the desktop seat: just clear of the rail");
+  assert.match(place, /s\.top = Math\.round\(low \? low \+ 10 : 92\) \+ "px";/, "the phone seat: under the cluster");
+  assert.match(worldPage, /<div class="pm-tt-bar">/, "the bar holds the pill and, beside it, the button");
+});
