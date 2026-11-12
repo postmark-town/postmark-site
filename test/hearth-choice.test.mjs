@@ -6,8 +6,11 @@
 //
 //   § 1  whichDesign (the ONE selector): saved, default, preview, unregistered, unavailable
 //   § 2  the read (signed out) and the write (signed in)
-//   § 3  the picker: a preview never saves; the save takes a second yes; refusals; the default
-//   § 4  the wiring: the only write is the confirmed save
+//   § 3  the picker: a preview never saves; the green check is the save, the red x puts it back; refusals; the default; the design's credit
+//   § 4  the wiring: the only write is the green check; the picker says no sentence but the credit
+//
+// POS-999 round 3 (Darko, 2026-11-12 08:56 EST: "please reduce it to just the dropdown -> if you select a different one, green checkbox vs red x. we don't
+// need words explaining obvious things"; 08:57: "listing Designed by {author}"). Until then § 3 held a second yes (ask() then confirm()) and the picker's lines.
 //
 //   node --test test/hearth-choice.test.mjs
 
@@ -117,11 +120,13 @@ test("§ 2 a save whose outcome is not known says so: no answer, or a success th
 
 test("§ 3 an unconfirmed save is said as one by the picker: the office's state is not claimed either way, and the shown choice is not moved", async () => {
   const { picker, log } = harness({ result: { ok: false, unconfirmed: true, status: 0, message: UNCONFIRMED_SAVE.noAnswer }, opts: { saved: "ledger" } });
-  picker.preview("orchard"); picker.ask();
-  const after = await picker.confirm();
+  picker.preview("orchard");
+  const after = await picker.keep();
   assert.equal(log.saves.length, 1, "one save was sent, and nothing resent it");
-  assert.equal(after.said, UNCONFIRMED_SAVE.noAnswer, "its own words, never 'Not saved'");
+  assert.equal(after.failed.message, UNCONFIRMED_SAVE.noAnswer, "its own words (for the status a screen reader reads), never 'Not saved'");
+  assert.equal(after.failed.say, "", "and no line on the page: the dropdown is marked instead");
   assert.equal(after.savedId, "ledger", "the picker claims no new saved choice");
+  assert.deepEqual([after.shown, after.pending], ["orchard", true], "the check and the x stay, on the design that was not confirmed");
 });
 
 // ── § 3 the picker ──────────────────────────────────────────────────────────
@@ -139,44 +144,62 @@ test("§ 3 a preview NEVER saves: previewing any number of entries sends nothing
   assert.deepEqual(log.saves, [], "no write was made");
   assert.equal(picker.view().savedId, "ledger");
   assert.deepEqual(log.draws, ["orchard", "default", "ledger", "orchard"]);
-  assert.equal(picker.view().previewing, true); assert.match(picker.view().previewLine, /not saved/);
+  assert.deepEqual([picker.view().changed, picker.view().pending], [true, true], "another design than the kept one: the check and the x show, and nothing was sent");
   picker.preview("not-registered"); assert.equal(picker.view().shown, "orchard", "an unregistered id is no preview");
 });
 
-test("§ 3 saving takes two more steps: ask() raises only a question; confirm() is the one write; cancel() writes nothing", async () => {
+test("§ 3 the green check is the one write; the red x writes nothing and puts the kept design back; on the kept design neither shows", async () => {
   const { picker, log } = harness();
+  assert.deepEqual([picker.view().pending, picker.view().canKeep], [false, false], "on the kept design: no check, no x");
   picker.preview("ledger");
-  assert.equal(picker.view().canSave, true);
-  const q = picker.ask();
-  assert.match(q.question, /Make The Ledger the Hearth everyone sees at \/households\/ember-lane\/\? You can change it any time\./);
-  assert.deepEqual(log.saves, [], "the question is not a save");
-  picker.cancel(); await picker.confirm(); assert.deepEqual(log.saves, [], "cancelled: nothing, and confirm() with nothing asked does nothing");
-  picker.ask(); const done = await picker.confirm();
+  assert.deepEqual([picker.view().pending, picker.view().canKeep], [true, true]);
+  assert.deepEqual(log.saves, [], "choosing is not a save");
+  const back = picker.back();
+  assert.deepEqual(log.saves, [], "the x sends nothing");
+  assert.deepEqual([back.shown, back.pending], ["default", false], "and the dropdown and the drawing are back on the kept design");
+  assert.deepEqual(log.draws, ["ledger", "default"]);
+  picker.preview("ledger");
+  const done = await picker.keep();
   assert.deepEqual(log.saves, [{ slug: "ember-lane", id: "ledger" }]);
-  assert.equal(done.savedId, "ledger"); assert.match(done.said, /Saved\. The Ledger is now this house/);
-  assert.equal(done.previewing, false);
+  assert.deepEqual([done.savedId, done.shown, done.pending, done.failed], ["ledger", "ledger", false, null], "saved: the check and the x go, nothing is marked");
+  await picker.keep();
+  assert.equal(log.saves.length, 1, "on the kept design the check does nothing");
 });
 
-test("§ 3 a refused save leaves the saved choice and says so in the office's words; the default goes back through the same confirmation", async () => {
+test("§ 3 a refused save keeps the kept choice, the check and the x; only a refusal the owner must read (401, 403) is a line, in the office's words; the default is saved by the same check", async () => {
   const refused = harness({ result: { ok: false, status: 403, message: "only an account the town's record binds to this household can choose its Hearth" } });
-  refused.picker.preview("orchard"); refused.picker.ask();
-  const after = await refused.picker.confirm();
-  assert.equal(after.savedId, null, "nothing was saved"); assert.match(after.said, /^Not saved: only an account/);
+  refused.picker.preview("orchard");
+  const after = await refused.picker.keep();
+  assert.equal(after.savedId, null, "nothing was saved");
+  assert.equal(after.failed.say, "only an account the town's record binds to this household can choose its Hearth", "the office's words, as they are, with no 'Not saved:' before them");
+  assert.deepEqual([after.shown, after.pending], ["orchard", true], "the check and the x stay");
+  assert.equal(refused.picker.preview("ledger").failed, null, "choosing again clears the mark");
+  const down = harness({ result: { ok: false, status: 503, message: "The office could not keep that." } });
+  down.picker.preview("orchard");
+  const d = await down.picker.keep();
+  assert.deepEqual([d.failed.say, d.failed.message], ["", "The office could not keep that."], "a 503: no line on the page, its reason in the status");
   const { picker, log } = harness({ opts: { saved: "ledger" } });
-  assert.equal(picker.view().canClear, true);
-  const q = picker.clear(); assert.match(q.question, /Go back to the default Hearth/);
-  assert.deepEqual(log.saves, []);
-  const cleared = await picker.confirm();
-  assert.deepEqual(log.saves, [{ slug: "ember-lane", id: null }]);
-  assert.equal(cleared.savedId, null); assert.match(cleared.said, /default Hearth/);
+  picker.preview("default");
+  assert.equal(picker.view().pending, true, "the default, chosen in the dropdown over a kept design, is another design too");
+  const cleared = await picker.keep();
+  assert.deepEqual(log.saves, [{ slug: "ember-lane", id: null }], "sent as null");
+  assert.deepEqual([cleared.savedId, cleared.shown, cleared.pending], [null, "default", false]);
 });
 
-test("§ 3 a visitor who is not the house's signed-in human has no way to save: no controls, and ask/clear/confirm do nothing", async () => {
+test("§ 3 the design's credit: the view carries the shown design's recorded author as it changes, and none for a design that records none", () => {
+  const AUTHORED = [{ id: "default", title: "Postmark", author: "postmark" }, { id: "ledger", title: "The Ledger", author: "wick" }, { id: "orchard", title: "Orchard" }];
+  const p = createPicker({ entries: AUTHORED, slug: "ember-lane", saved: null, save: async () => ({ ok: true, hearth: null }) });
+  assert.equal(p.view().author, "postmark", "the kept design's");
+  assert.equal(p.preview("ledger").author, "wick", "it follows the dropdown before any save");
+  assert.equal(p.preview("orchard").author, null, "a design with no recorded author: none (no line is drawn)");
+});
+
+test("§ 3 a visitor who is not the house's signed-in human has no way to save: no check, no x, and keep() does nothing", async () => {
   const { picker, log } = harness({ opts: { signedIn: false, saved: "ledger" } });
   picker.preview("orchard");
   const v = picker.view();
-  assert.deepEqual([v.controls, v.canSave, v.canClear], [false, false, false]);
-  picker.ask(); picker.clear(); await picker.confirm();
+  assert.deepEqual([v.controls, v.pending, v.canKeep], [false, false, false]);
+  await picker.keep();
   assert.deepEqual(log.saves, []);
   let state = false;
   const live = createPicker({ entries: ENTRIES, slug: "x", saved: null, signedIn: () => state, save: async () => ({ ok: true, hearth: "ledger" }) });
@@ -186,13 +209,14 @@ test("§ 3 a visitor who is not the house's signed-in human has no way to save: 
 
 // ── § 4 the wiring ──────────────────────────────────────────────────────────
 
-test("§ 4 the only code that writes the choice is choice.mjs § saveHearth, reached only from the confirmed save", () => {
+test("§ 4 the only code that writes the choice is choice.mjs § saveHearth, reached only from the green check", () => {
   const read = (p) => readFileSync(join(ROOT, p), "utf8");
   const writers = ["src/lib/hearth/stage.mjs", "src/lib/hearth/picker.mjs", "src/lib/hearth/choice.mjs", "src/components/hearth/Hearth.astro", "src/components/hearth/HearthPicker.astro"]
     .filter((p) => /method:\s*"PATCH"|\/hearth`/.test(read(p)));
   assert.deepEqual(writers, ["src/lib/hearth/choice.mjs"]);
   const picker = read("src/lib/hearth/picker.mjs");
-  assert.equal((picker.match(/await save\(/g) ?? []).length, 1, "one call to the write, in confirm()");
+  assert.equal((picker.match(/await save\(/g) ?? []).length, 1, "one call to the write");
+  assert.ok(picker.indexOf("await save(") > picker.indexOf("async keep() {") && picker.indexOf("await save(") < picker.indexOf("back() {"), "and it is in keep(), the green check");
   assert.match(read("src/lib/hearth/stage.mjs"), /whichDesign\(entries, \{ entry: asked, saved \}\)/, "the stage asks the one selector");
   assert.equal(/pickEntry/.test(read("src/lib/hearth/stage.mjs")), false, "and has no selection policy of its own");
   // POS-984 rebuild (Darko, 2026-11-10 17:28 EST): until then this asserted the picker stood in the site's band, in its private body, for the signed-in human only
@@ -201,4 +225,26 @@ test("§ 4 the only code that writes the choice is choice.mjs § saveHearth, rea
   assert.match(read("src/components/hearth/Hearth.astro"), /<HearthPicker entries=\{pickable\}/);
   assert.equal((read("src/components/hearth/Hearth.astro").match(/<HearthPicker /g) ?? []).length, 1, "one dropdown on the page");
   for (const f of ["town/components/Household.astro", "town/components/HouseholdPage.astro", "town/pages/households/[slug].astro"]) assert.doesNotMatch(read(f), /<HearthPicker /, `${f} draws no second one`);
+});
+
+// "we don't need words explaining obvious things" (Darko, 2026-11-12 08:56 EST). A STALE-PHRASE COUNT over the picker's two files, comments stripped: the words
+// POS-999 round 3 removed, one by one, and the component's markup, whose only text is the credit's expression. The walk (qa-shots/hearth-walk.mjs ⑭) reads the page.
+const unbrace = (s) => { let out = "", depth = 0; for (const ch of s) { if (ch === "{") depth += 1; else if (ch === "}") depth = Math.max(0, depth - 1); else if (!depth) out += ch; } return out; };
+test("§ 4 the picker says no sentence but the credit: none of the words it used to say, and its markup's only text is \"Designed by\" its design's author", () => {
+  const read = (p) => readFileSync(join(ROOT, p), "utf8");
+  const code = read("src/lib/hearth/picker.mjs").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+  const astro = read("src/components/hearth/HearthPicker.astro");
+  const markup = astro.slice(astro.indexOf("---", 3) + 3);
+  const REMOVED = ["Previewing", "It is not saved", "nothing is written", "This house’s Hearth:", "No Hearth chosen", "Make this our Hearth", "Back to the default", "Yes, save it", "Not now",
+    "the Hearth everyone sees", "Go back to the default Hearth", "You can change it any time", "You can choose again any time", "Saved.", "is now this house’s Hearth", "now uses the default Hearth",
+    "Not saved", "A preview shows how this house would look", "a second yes", "Preview this household in another Hearth design", "Confirm the household's Hearth"];
+  for (const words of REMOVED) {
+    assert.ok(!code.includes(words), `picker.mjs no longer says "${words}"`);
+    assert.ok(!markup.includes(words), `HearthPicker.astro no longer says "${words}"`);
+  }
+  assert.ok(code.includes("Designed by ${v.author}"), "a presence control: the instrument reads the one line the picker does say");
+  assert.equal(unbrace(markup).replace(/<[^>]*>/g, " ").trim(), "", "the markup carries no words of its own: every text is an expression (the credit) or a name inside a tag");
+  assert.ok(!/\stitle=/.test(markup), "and no tooltip prose");
+  assert.match(markup, /\{by \? `Designed by \$\{by\}` : ""\}/, "the credit, drawn by the server for the design it opens on");
+  assert.match(markup, /aria-label="Save this design"/); assert.match(markup, /aria-label="Put the design back"/);
 });

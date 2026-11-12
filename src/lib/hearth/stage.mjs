@@ -179,16 +179,16 @@ export function mountHearth(root) {
     const sel = e.target instanceof Element ? e.target.closest("[data-hd-who]") : null;
     if (sel) { ctx.filter.who = sel.value; draw(); }
   });
-  // THE DROPDOWN (POS-962): a preview draws another entry and keeps only the address (never a save); the save is picker.mjs's, behind a second yes.
-  // It binds for EVERY reader, once, after the choice read has answered (or failed): anyone may preview. What only the house's own human has is the SAVE
-  // controls, which picker.mjs shows when `signedIn()` holds: a sign-in that holds one of this house's residents, and never on a failed read (the kept
-  // choice is not known then, so nothing is offered to save over it). A visitor's ask() and clear() do nothing.
+  // THE DROPDOWN (POS-962): a preview draws another entry and keeps only the address (never a save); the save is picker.mjs's green check.
+  // It binds for EVERY reader, once, after the choice read has answered (or failed): anyone may preview. What only the house's own human has is the
+  // check and the x, which picker.mjs shows when `signedIn()` holds: a sign-in that holds one of this house's residents, and never on a failed read (the kept
+  // choice is not known then, so nothing is offered to save over it). A visitor's keep() does nothing.
   const pickerRoot = root.querySelector("[data-hearth-picker]");
   const api = officeOrigin();
   function mountPicker() {
     if (mounted || !pickerRoot || !savedDone) return;
     mounted = mountHearthPicker(pickerRoot, {
-      entries, slug: key, path: slug, saved: readOk ? (savedRead ?? null) : baked, token, api,
+      entries, slug: key, saved: readOk ? (savedRead ?? null) : baked, token, api,
       shown: root.dataset.hearthShowing,
       signedIn: () => readOk && mine().length > 0, onDraw,
     });

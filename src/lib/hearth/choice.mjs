@@ -12,7 +12,7 @@
 //   saved = await readSavedHearth(...)   // an id (string), null (chose nothing), or undefined (the read FAILED: say so, do not guess "nothing")
 //   draw  = whichDesign(entries, { entry: asked, saved })      // asked = ?entry= / the picker's preview, or null
 //   say   = designNote(entries, { entry: asked, saved })
-// A PREVIEW IS NEVER SAVED: nothing here turns `entry` into a write; the only write is saveHearth, called by the picker's confirmed button.
+// A PREVIEW IS NEVER SAVED: nothing here turns `entry` into a write; the only write is saveHearth, called by the picker's green check.
 // After a successful save call whichDesign again with saved = the id saveHearth answered and entry = null. The office, not the picker, decides who may save.
 
 import { DEFAULT_ENTRY, ENTRY_ID } from "./slots.mjs";

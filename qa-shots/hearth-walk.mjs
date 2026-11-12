@@ -362,7 +362,7 @@ const run = async () => {
       // POS-984 (review, paper cut): a signed-in reader of ANOTHER house is told so, plainly, not asked a bare question
       await page.waitForSelector("[data-hx-notyours]:not([hidden])", { timeout: 15000 });
       check("④ and says plainly that this is not their house (in the design's house slot), with no sign-in button and no bare question", (await visible(page, "[data-hx-notyours]")) && /isn’t your house/.test((await text(page, "[data-hx-notyours]")) ?? "") && !(await visible(page, "[data-hd-signin]")), await text(page, "[data-hearth-slot=house] .hx-public"));
-      check("④ and the strip shows that reader no owner link: no + add a resident, no likeness answer, no save controls", !(await visible(page, "[data-hearth-bar] [data-house-add]")) && !(await visible(page, "[data-hearth-bar] .hearth-likeness")) && !(await visible(page, "[data-hearth-owner]")));
+      check("④ and the strip shows that reader no owner link: no + add a resident, no likeness answer, no check or x", !(await visible(page, "[data-hearth-bar] [data-house-add]")) && !(await visible(page, "[data-hearth-bar] .hearth-likeness")) && !(await visible(page, "[data-hearth-acts]")) && (await page.locator("[data-hearth-acts]").count()) === 1);
       await page.context().close();
     }
 
@@ -517,7 +517,7 @@ const run = async () => {
       await ready(v);
       check("⑪ a visitor sees the design (the house slot), and its sign-in line, which is the design's own", (await visible(v, "[data-hearth-slot=house]")) && /Is this your house\?/.test((await text(v, "[data-hearth-slot=house] .hx-public")) ?? "") && (await visible(v, "[data-hearth-slot=house] [data-hd-signin]")));
       check("⑪ and the strip: the breadcrumb and the Hearth dropdown, enabled, for a visitor too", (await visible(v, "[data-hearth-bar] .hearth-crumbs")) && (await visible(v, "[data-hearth-bar] [data-hearth-pick]")) && (await v.locator("[data-hearth-pick]").isEnabled()));
-      check("⑪ and none of an owner's: no band, no Needs you, no boat line, no quests, no managing the house, no + add a resident, no likeness answer, no save", !(await v.locator("[data-hband]").count()) && !(await visible(v, "[data-hd-needs-box]")) && !(await visible(v, "[data-hd-boat]")) && !(await visible(v, "[data-quests]")) && !(await visible(v, "[data-house-add]")) && !(await visible(v, ".hearth-likeness")) && !(await visible(v, "[data-hearth-owner]")) && !(await visible(v, "[data-hearth-save]")));
+      check("⑪ and none of an owner's: no band, no Needs you, no boat line, no quests, no managing the house, no + add a resident, no likeness answer, no save", !(await v.locator("[data-hband]").count()) && !(await visible(v, "[data-hd-needs-box]")) && !(await visible(v, "[data-hd-boat]")) && !(await visible(v, "[data-quests]")) && !(await visible(v, "[data-house-add]")) && !(await visible(v, ".hearth-likeness")) && !(await visible(v, "[data-hearth-acts]")) && !(await visible(v, "[data-hearth-keep]")) && (await v.locator("[data-hearth-keep]").count()) === 1);
       check("⑪ exactly one sign-in line on the page", (await v.locator("[data-hd-signin]:visible").count()) === 1);
       // until 2026-11-11: "no pill rail above the Hearth". POS-999 put the household's sub-rail in the strip: the household's chip lit, a chip per resident, and still no old tab rail
       check("⑪ the household's sub-rail above the Hearth: its own chip lit, a chip per resident, and no old tab rail or nav row", (await v.locator("[data-hearth-bar] [data-house-rail] a[data-house-link][aria-current=page]").count()) === 1 && (await v.locator("[data-hearth-bar] [data-house-rail] [data-rail-chip]").count()) === A.length && (await v.locator("[data-house-tabs], [data-house-tab], .pm-chiprow, [role=tablist].house-tabs").count()) === 0);
@@ -661,11 +661,18 @@ const run = async () => {
     }
 
     // ── ⑭ A SAVED HEARTH (POS-962 folded into the one page): visitors see the kept design, and the dropdown PREVIEWS for them (anyone may); ?entry= previews over it
-    //     without saving; only the signed-in human's controls, in the strip, save, behind a second yes ──
+    //     without saving; only the signed-in human saves, with the green check beside the dropdown (POS-999 round 3, Darko 2026-11-12 08:56 EST: "reduce it to just the
+    //     dropdown -> if you select a different one, green checkbox vs red x. we don't need words explaining obvious things"; 08:57: "listing Designed by {author}") ──
     {
       const patches = () => log.filter((l) => l.path === `/households/${A_SLUG}/hearth`);
       const showing = (p) => p.locator("[data-hearth]").getAttribute("data-hearth-showing");
       const settleOn = (p, id) => p.waitForFunction((want) => document.querySelector("[data-hearth]")?.dataset.hearthShowing === want, id, { timeout: 15000 });
+      // the design's credit, from its own record (the town's hearth.md, synced to hearths.json); and every word the picker shows, the credit's included
+      const HEARTHS = JSON.parse(fs.readFileSync(path.join(ROOT, "src/data/postmark/hearths.json"), "utf8"));
+      const byLine = (id) => { const a = HEARTHS.find((h) => h.id === id)?.author; return a ? `Designed by ${a}` : null; };
+      const pickerWords = (p) => p.evaluate(() => [...document.querySelectorAll("[data-hearth-picker] span, [data-hearth-picker] p, [data-hearth-picker] label")]
+        .filter((e) => !e.classList.contains("hd-sr") && !e.closest("[hidden]") && e.getBoundingClientRect().width > 0 && e.children.length === 0).map((e) => e.textContent.trim()).filter(Boolean));
+      const onlyCredit = async (p, id) => JSON.stringify(await pickerWords(p)) === JSON.stringify(byLine(id) ? [byLine(id)] : []);
       savedHearth = "ledger";
       log.length = 0;
       const v = await newPage(browser);
@@ -674,7 +681,7 @@ const run = async () => {
       await settleOn(v, "ledger");
       check("⑭ a visitor sees the house's kept design (the ledger), drawn after the public read", (await showing(v)) === "ledger" && (await v.locator("[data-hearth-stage]").getAttribute("data-hearth-entry")) === "ledger");
       await v.waitForFunction(() => document.querySelector("[data-hearth-pick]")?.disabled === false, null, { timeout: 15000 });
-      check("⑭ the dropdown is there for a visitor, enabled, on the kept design; and no save controls, no owner block, nothing to change the kept choice with", (await visible(v, "[data-hearth-pick]")) && (await v.locator("[data-hearth-pick]").isEnabled()) && (await v.locator("[data-hearth-pick]").inputValue()) === "ledger" && !(await visible(v, "[data-hearth-save]")) && !(await visible(v, "[data-hearth-clear]")) && !(await visible(v, "[data-hearth-owner]")));
+      check("⑭ the dropdown is there for a visitor, enabled, on the kept design, with its credit and no other words; and no check or x, nothing to change the kept choice with", (await visible(v, "[data-hearth-pick]")) && (await v.locator("[data-hearth-pick]").isEnabled()) && (await v.locator("[data-hearth-pick]").inputValue()) === "ledger" && (await onlyCredit(v, "ledger")) && !(await visible(v, "[data-hearth-acts]")) && (await v.locator("[data-hearth-keep]").count()) === 1, JSON.stringify(await pickerWords(v)));
       check("⑭ the choice was read signed out: no bearer on the households read", log.filter((l) => l.path.startsWith("/households") && l.auth).length === 0 && log.some((l) => l.path.startsWith("/households?h=")), JSON.stringify(log.filter((l) => l.path.startsWith("/households"))));
       await shot(v, "19-saved-hearth-visitor-desktop", { fullPage: false });
       await cleanUnderPolicy(v, "⑭ (a visitor, a saved Hearth)");
@@ -686,23 +693,23 @@ const run = async () => {
       await v.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await settleOn(v, "ledger");
       check("⑭ without the preview in the address the kept design is back: the preview was never saved", (await showing(v)) === "ledger" && savedHearth === "ledger");
-      // A VISITOR PREVIEWS (Darko, 17:28 EST: "anyone can preview another Hearth with it"): a real choice in the dropdown draws that design, keeps only the address, says it is
-      // not saved, and sends nothing; no save control appears for them.
+      // A VISITOR PREVIEWS (Darko, 17:28 EST: "anyone can preview another Hearth with it"): a real choice in the dropdown draws that design, keeps only the address, its
+      // credit follows, no other word is said, and nothing is sent; no check or x appears for them.
       log.length = 0;
       await v.selectOption("[data-hearth-pick]", "default");
       await v.waitForFunction(() => document.querySelector("[data-hearth]")?.dataset.hearthShowing === "default", null, { timeout: 15000 });
-      check("⑭ a visitor's dropdown previews the default over the kept design: drawn, ?entry=default in the address, 'not saved' said, nothing sent, and still no save control", new URL(v.url()).searchParams.get("entry") === "default" && /Previewing .*not saved/.test((await text(v, "[data-hearth-bar] [data-hearth-preview-line]")) ?? "") && patches().length === 0 && !(await visible(v, "[data-hearth-save]")) && !(await visible(v, "[data-hearth-owner]")) && savedHearth === "ledger", `${v.url()} ${await text(v, "[data-hearth-bar] [data-hearth-preview-line]")}`);
-      // FORCED (review of 80af398fb): the save controls are hidden for a non-owner. Drive them through the DOM as a script would: a click on save and on the confirm.
-      // Nothing may be asked or written, and the address stays as it was.
+      check("⑭ a visitor's dropdown previews the default over the kept design: drawn, ?entry=default in the address, the default's credit and no other words, nothing sent, still no check or x", new URL(v.url()).searchParams.get("entry") === "default" && (await onlyCredit(v, "default")) && patches().length === 0 && !(await visible(v, "[data-hearth-acts]")) && savedHearth === "ledger", `${v.url()} ${JSON.stringify(await pickerWords(v))}`);
+      // FORCED (review of 80af398fb): the check is hidden for a non-owner. Drive it through the DOM as a script would: a click on the check.
+      // Nothing may be written, and the address stays as it was.
       const force = async (p) => {
         const before = await showing(p);
-        await p.evaluate(() => { for (const sel of ["[data-hearth-save]", "[data-hearth-clear]", "[data-hearth-confirm-yes]"]) document.querySelector(sel)?.click(); });
+        await p.evaluate(() => document.querySelector("[data-hearth-keep]")?.click());
         await p.waitForTimeout(700);
-        return { before, after: await showing(p), address: new URL(p.url()).search, asked: await p.evaluate(() => { const c = document.querySelector("[data-hearth-confirm]"); return !!c && !c.hidden; }) };
+        return { before, after: await showing(p), address: new URL(p.url()).search, marked: await p.evaluate(() => document.querySelector("[data-hearth-pick]")?.getAttribute("aria-invalid")) };
       };
       log.length = 0;
       const fv = await force(v);
-      check("⑭ a visitor's FORCED save and confirm ask nothing, change nothing, and send NOTHING", fv.after === fv.before && !fv.asked && fv.address === "?entry=default" && patches().length === 0, JSON.stringify({ ...fv, patches: patches().length }));
+      check("⑭ a visitor's FORCED check changes nothing, marks nothing, and sends NOTHING", fv.after === fv.before && !fv.marked && fv.address === "?entry=default" && patches().length === 0, JSON.stringify({ ...fv, patches: patches().length }));
       await v.context().close();
 
       // the signed-in human of ANOTHER house: the dropdown, and no owner controls, on house B's page
@@ -711,38 +718,52 @@ const run = async () => {
       await ready(x);
       await x.waitForSelector("[data-hx-notyours]:not([hidden])", { timeout: 15000 });
       await x.waitForTimeout(500);
-      check("⑭ a signed-in reader of another house has the dropdown to preview with, and no save controls, no add-a-resident, no likeness answer", (await visible(x, "[data-hearth-pick]")) && !(await visible(x, "[data-hearth-owner]")) && !(await visible(x, "[data-hearth-bar] [data-house-add]")) && !(await visible(x, "[data-hearth-bar] .hearth-likeness")));
+      check("⑭ a signed-in reader of another house has the dropdown to preview with, and no check or x, no add-a-resident, no likeness answer", (await visible(x, "[data-hearth-pick]")) && !(await visible(x, "[data-hearth-acts]")) && !(await visible(x, "[data-hearth-bar] [data-house-add]")) && !(await visible(x, "[data-hearth-bar] .hearth-likeness")));
+      await x.selectOption("[data-hearth-pick]", "ledger");
+      await x.waitForFunction(() => document.querySelector("[data-hearth]")?.dataset.hearthShowing === "ledger", null, { timeout: 15000 });
+      check("⑭ and choosing another design shows that reader no check or x either", !(await visible(x, "[data-hearth-acts]")));
       log.length = 0;
       const fx = await force(x);
-      check("⑭ and that reader's FORCED save and confirm, with their own valid bearer, ask nothing and send NOTHING to any house", fx.after === fx.before && !fx.asked && log.filter((l) => l.path.includes("/hearth") && l.path.startsWith("/households/")).length === 0, JSON.stringify({ ...fx, sent: log.filter((l) => l.path.startsWith("/households/")) }));
+      check("⑭ and that reader's FORCED check, with their own valid bearer, sends NOTHING to any house", fx.after === fx.before && !fx.marked && log.filter((l) => l.path.includes("/hearth") && l.path.startsWith("/households/")).length === 0, JSON.stringify({ ...fx, sent: log.filter((l) => l.path.startsWith("/households/")) }));
       await x.context().close();
 
-      // the owner: the dropdown and the save controls in the strip, a preview (nothing sent), a second yes, the save
+      // the owner: the dropdown in the strip; another design brings the check and the x; the x puts it back (nothing sent); the check saves
       log.length = 0;
       const o = await newPage(browser, { signedIn: true });
       await o.goto(`${BASE}/households/${A_SLUG}/`, { waitUntil: "load" });
       await ready(o);
-      await o.waitForSelector("[data-hearth-bar] [data-hearth-owner]:not([hidden])", { timeout: 20000 });
       await settleOn(o, "ledger");
-      check("⑭ the owner's controls are in the strip, above the design, and say what is kept", /^This house’s Hearth: The ledger\.$/.test((await text(o, "[data-hearth-bar] p[data-hearth-saved]")) ?? "") && await o.evaluate(() => !!(document.querySelector("[data-hearth-bar] [data-hearth-picker]").compareDocumentPosition(document.querySelector("[data-hearth-stage]")) & Node.DOCUMENT_POSITION_FOLLOWING)));
+      await o.waitForFunction(() => document.querySelector("[data-hearth-picker]")?.dataset.hearthSaved === "ledger" && document.querySelector("[data-hearth-pick]")?.disabled === false, null, { timeout: 20000 });
+      check("⑭ the owner's dropdown is in the strip, above the design, on the kept design with its credit and no other words, and no check or x (there is nothing to save)", (await o.locator("[data-hearth-pick]").inputValue()) === "ledger" && (await onlyCredit(o, "ledger")) && !(await visible(o, "[data-hearth-acts]")) && await o.evaluate(() => !!(document.querySelector("[data-hearth-bar] [data-hearth-picker]").compareDocumentPosition(document.querySelector("[data-hearth-stage]")) & Node.DOCUMENT_POSITION_FOLLOWING)), JSON.stringify(await pickerWords(o)));
       await o.selectOption("[data-hearth-pick]", "default");
       await o.waitForFunction(() => document.querySelector("[data-hearth]")?.dataset.hearthShowing === "default");
-      check("⑭ the dropdown previews the default over the kept choice, in the address, and says it is not saved", new URL(o.url()).searchParams.get("entry") === "default" && /Previewing .*not saved/.test((await text(o, "[data-hearth-bar] [data-hearth-preview-line]")) ?? "") && patches().length === 0);
-      await o.click("[data-hearth-save]");
-      check("⑭ 'Make this our Hearth' only raises a question; nothing is sent", (await visible(o, "[data-hearth-confirm]")) && /back to the default Hearth for everyone/.test((await text(o, "[data-hearth-question]")) ?? "") && patches().length === 0, await text(o, "[data-hearth-question]"));
-      await o.click("[data-hearth-confirm-no]");
-      check("⑭ 'Not now' drops the question; still nothing sent", !(await visible(o, "[data-hearth-confirm]")) && patches().length === 0);
-      await o.click("[data-hearth-save]");
-      await o.click("[data-hearth-confirm-yes]");
-      await o.waitForFunction(() => /Saved\./.test(document.querySelector("[data-hearth-said]")?.textContent ?? ""), null, { timeout: 10000 });
-      check("⑭ the second yes sends ONE save, with the owner's bearer, back to the default (null)", patches().length === 1 && patches()[0].auth === `Bearer ${OWNER_TOKEN}` && savedHearth === null, JSON.stringify(patches()));
-      check("⑭ and says it is saved; the address is clean (the saved choice is the default now)", /This house now uses the default Hearth/.test((await text(o, "[data-hearth-said]")) ?? "") && !new URL(o.url()).searchParams.has("entry"), o.url());
+      check("⑭ choosing the default previews it (in the address), its credit follows, and the check and the x appear beside the dropdown; nothing is sent and no other word is said", new URL(o.url()).searchParams.get("entry") === "default" && (await visible(o, "[data-hearth-keep]")) && (await visible(o, "[data-hearth-back]")) && (await onlyCredit(o, "default")) && patches().length === 0, JSON.stringify(await pickerWords(o)));
+      check("⑭ the check and the x are named for a screen reader, not in words on the page", (await o.locator("[data-hearth-keep]").getAttribute("aria-label")) === "Save this design" && (await o.locator("[data-hearth-back]").getAttribute("aria-label")) === "Put the design back" && !(await o.locator("[data-hearth-keep]").innerText()).trim() && !(await o.locator("[data-hearth-back]").innerText()).trim());
+      await shot(o, "20a-saved-hearth-owner-another-design-desktop", { fullPage: false });
+      await o.click("[data-hearth-back]");
+      await o.waitForFunction(() => document.querySelector("[data-hearth]")?.dataset.hearthShowing === "ledger", null, { timeout: 10000 });
+      check("⑭ the red x puts the dropdown and the drawing back on the kept design, cleans the address, sends nothing, and the check and the x go", (await o.locator("[data-hearth-pick]").inputValue()) === "ledger" && !new URL(o.url()).searchParams.has("entry") && !(await visible(o, "[data-hearth-acts]")) && patches().length === 0);
+      await o.selectOption("[data-hearth-pick]", "default");
+      await o.click("[data-hearth-keep]");
+      await o.waitForFunction(() => document.querySelector("[data-hearth-picker]")?.dataset.hearthSaved === "", null, { timeout: 10000 });
+      check("⑭ the green check sends ONE save, with the owner's bearer, back to the default (null)", patches().length === 1 && patches()[0].auth === `Bearer ${OWNER_TOKEN}` && savedHearth === null, JSON.stringify(patches()));
+      check("⑭ and once it is kept the check and the x go, nothing is said but the credit, and the address is clean (the saved choice is the default now)", !(await visible(o, "[data-hearth-acts]")) && (await onlyCredit(o, "default")) && !new URL(o.url()).searchParams.has("entry"), o.url());
       await shot(o, "20-saved-hearth-owner-picker-desktop", { fullPage: false });
       await o.selectOption("[data-hearth-pick]", "ledger");
-      await o.click("[data-hearth-save]");
-      await o.click("[data-hearth-confirm-yes]");
-      await o.waitForFunction(() => /Saved\. The ledger is now/.test(document.querySelector("[data-hearth-said]")?.textContent ?? ""), null, { timeout: 10000 });
-      check("⑭ saving the ledger sends a second save, and the office now keeps it", patches().length === 2 && savedHearth === "ledger", JSON.stringify(patches().map((p) => p.status)));
+      await o.click("[data-hearth-keep]");
+      await o.waitForFunction(() => document.querySelector("[data-hearth-picker]")?.dataset.hearthSaved === "ledger", null, { timeout: 10000 });
+      check("⑭ choosing the ledger and the check sends a second save, and the office now keeps it", patches().length === 2 && savedHearth === "ledger", JSON.stringify(patches().map((p) => p.status)));
+      // a save the office does not keep (its door answers 500): the dropdown is marked, the check and the x stay, the reason is in a status a screen reader reads; no line
+      fail = new Set([`/households/${A_SLUG}/hearth`]);
+      await o.selectOption("[data-hearth-pick]", "default");
+      await o.click("[data-hearth-keep]");
+      await o.waitForFunction(() => document.querySelector("[data-hearth-pick]")?.getAttribute("aria-invalid") === "true", null, { timeout: 10000 });
+      check("⑭ a save the office does not keep: the dropdown is marked, the check and the x stay, its reason is in the status (and the check's title), and no line is drawn; the kept choice is unchanged", (await visible(o, "[data-hearth-acts]")) && (await o.locator("[data-hearth-said]").textContent()) === "The office could not keep that." && (await o.locator("[data-hearth-keep]").getAttribute("title")) === "The office could not keep that." && !(await visible(o, "[data-hearth-refused]")) && savedHearth === "ledger" && (await o.locator("[data-hearth-picker]").getAttribute("data-hearth-saved")) === "ledger", JSON.stringify(await pickerWords(o)));
+      await shot(o, "20b-saved-hearth-owner-save-failed-desktop", { fullPage: false });
+      await o.click("[data-hearth-back]");
+      await o.waitForFunction(() => document.querySelector("[data-hearth]")?.dataset.hearthShowing === "ledger", null, { timeout: 10000 });
+      check("⑭ and the x clears the mark and goes back to the kept design", !(await o.locator("[data-hearth-pick]").getAttribute("aria-invalid")) && !(await visible(o, "[data-hearth-acts]")) && !(await o.locator("[data-hearth-said]").textContent()));
+      fail = new Set();
       await cleanUnderPolicy(o, "⑭ (the owner's picker, two saves)");
       await o.context().close();
       const again = await newPage(browser);
@@ -762,7 +783,7 @@ const run = async () => {
       await f.waitForFunction(() => /could not be read just now; showing the default/.test(document.querySelector("[data-hearth-note]")?.textContent ?? ""), null, { timeout: 15000 });
       check("⑮ the choice read fails: the default is drawn (not the kept design, not a blank), and the page says the read failed", (await f.locator("[data-hearth]").getAttribute("data-hearth-showing")) === "default" && (await visible(f, "[data-hearth-note]")), await text(f, "[data-hearth-note]"));
       await f.waitForFunction(() => document.querySelector("[data-hearth-pick]")?.disabled === false, null, { timeout: 15000 });
-      check("⑮ and the dropdown still previews for a visitor on a failed read (it starts from what the build carried), with no save control", (await visible(f, "[data-hearth-pick]")) && (await f.locator("[data-hearth-pick]").isEnabled()) && !(await visible(f, "[data-hearth-owner]")) && !(await visible(f, "[data-hearth-save]")));
+      check("⑮ and the dropdown still previews for a visitor on a failed read (it starts from what the build carried), with no check or x", (await visible(f, "[data-hearth-pick]")) && (await f.locator("[data-hearth-pick]").isEnabled()) && !(await visible(f, "[data-hearth-acts]")) && (await f.locator("[data-hearth-keep]").count()) === 1);
       await shot(f, "21-saved-hearth-read-failed-desktop", { fullPage: false });
       await f.context().close();
       // the same, as the house's OWN human: the SAVE is not offered on a failed read (the kept choice is not known, so nothing is offered to save over it); the dropdown still previews
@@ -772,7 +793,7 @@ const run = async () => {
       await fo.waitForSelector("[data-hearth-slot=needs-you]:not([hidden])", { timeout: 15000 });
       await fo.waitForFunction(() => /could not be read just now/.test(document.querySelector("[data-hearth-note]")?.textContent ?? ""), null, { timeout: 15000 });
       await fo.waitForTimeout(600);
-      check("⑮ as the owner too: the default is drawn, the page says the read failed, and the strip offers no save and no saved line (the dropdown still previews)", (await fo.locator("[data-hearth]").getAttribute("data-hearth-showing")) === "default" && (await visible(fo, "[data-hearth-pick]")) && !(await visible(fo, "[data-hearth-owner]")) && !(await visible(fo, "[data-hearth-save]")) && !(await visible(fo, "p[data-hearth-saved]")), await text(fo, "[data-hearth-bar]"));
+      check("⑮ as the owner too: the default is drawn, the page says the read failed, and the strip offers no save (the dropdown still previews, and choosing another design brings no check or x)", (await fo.locator("[data-hearth]").getAttribute("data-hearth-showing")) === "default" && (await visible(fo, "[data-hearth-pick]")) && !(await visible(fo, "[data-hearth-acts]")) && await (async () => { await fo.selectOption("[data-hearth-pick]", "ledger"); await fo.waitForTimeout(300); return !(await visible(fo, "[data-hearth-acts]")); })(), await text(fo, "[data-hearth-bar]"));
       await shot(fo, "22-saved-hearth-read-failed-owner-desktop", { fullPage: false });
       await fo.context().close();
       fail = new Set();

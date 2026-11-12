@@ -1,36 +1,38 @@
 ---
-// HearthPicker — the household page's Hearth dropdown, one composable piece (POS-962; on the one page by POS-984, in the strip by the rebuild of 2026-11-10).
+// HearthPicker — the household page's Hearth dropdown, one composable piece (POS-962; on the one page by POS-984, in the strip by the rebuild of 2026-11-10;
+// the dropdown alone by POS-999 round 3).
 //
-// Markup only; lib/hearth/picker.mjs (mountHearthPicker) binds it. It holds the PREVIEW select every reader has (a preview is only a preview:
-// nothing is saved, nothing is written) and the SAVE controls, which show only to the signed-in human of the house; the office makes the real
-// decision at the write. It is on the household page only, nowhere else on the site (Darko, 2026-11-10 17:28 EST).
+// Darko, 2026-11-12 08:56 EST: "we also need to streamline/simplify the UI for hearth selection flow. there is a LOT of unnecessary ceremony and words. please
+// reduce it to just the dropdown -> if you select a different one, green checkbox vs red x. we don't need words explaining obvious things". 08:57: "it's missing
+// the arguably ONE important thing: listing Designed by {author}".
 //
-// THE SELECT SHIPS DISABLED and is enabled when the picker mounts (stage.mjs, once the house's saved choice has been read, or has failed to be):
-// until then it would answer a change with nothing. The words that explain it are its title, not a paragraph: the strip takes as little room as it can.
+// Markup only; lib/hearth/picker.mjs (mountHearthPicker) binds it. Every reader has the dropdown, and choosing in it previews (nothing is saved). The house's own
+// signed-in human, when the dropdown shows a design other than the kept one, gets two small buttons beside it: the check saves it, the x puts it back. Their names
+// are their aria-labels, not words on the page. The one line of words is the design's credit, from its own record (hearth.md's `author`), for the design the
+// dropdown shows; a design that records no author has no line. A save that fails keeps the two buttons and marks the dropdown; only a refusal the owner must read
+// (the office's 401 or 403) is said as a line (`data-hearth-refused`), and the reason is always in a status a screen reader reads.
+//
+// THE SELECT SHIPS DISABLED and is enabled when the picker mounts (stage.mjs, once the house's saved choice has been read, or has failed to be): until then it would
+// answer a change with nothing. It is on the household page only, nowhere else on the site (Darko, 2026-11-10 17:28 EST).
 interface Props { entries: { id: string; title: string; author?: string | null }[]; selected?: string | null; }
 const { entries, selected = null } = Astro.props;
+const by = entries.find((e) => e.id === selected)?.author ?? null;
 ---
 <div class="hearth-pickerband" data-hearth-picker>
   {entries.length > 1 && (
-    <label class="hearth-picker" title="A preview shows how this house would look in another design, and nothing is saved. Only the house’s signed-in human can save a choice, and it takes a second yes.">
-      <span>Hearth</span>
-      <select data-hearth-pick disabled aria-label="Preview this household in another Hearth design">
-        {entries.map((e) => <option value={e.id} selected={selected === e.id}>{e.title}{e.author ? ` — ${e.author}` : ""}</option>)}
-      </select>
-    </label>
+    <select data-hearth-pick disabled class="hearth-pick" aria-label="Hearth design">
+      {entries.map((e) => <option value={e.id} selected={selected === e.id}>{e.title}</option>)}
+    </select>
   )}
-  <p class="hearth-note" data-hearth-preview-line hidden></p>
-  <div class="hearth-owner" data-hearth-owner hidden>
-    <p class="hearth-note" data-hearth-saved></p>
-    <div class="hearth-owner-acts">
-      <button type="button" data-hearth-save hidden>Make this our Hearth</button>
-      <button type="button" data-hearth-clear hidden>Back to the default</button>
-    </div>
-    <div class="hearth-confirm" data-hearth-confirm role="group" aria-label="Confirm the household's Hearth" hidden>
-      <p data-hearth-question></p>
-      <button type="button" data-hearth-confirm-yes>Yes, save it</button>
-      <button type="button" data-hearth-confirm-no>Not now</button>
-    </div>
-    <p class="hearth-note" data-hearth-said role="status" hidden></p>
-  </div>
+  <span class="hearth-acts" data-hearth-acts hidden>
+    <button type="button" class="hearth-keep" data-hearth-keep aria-label="Save this design">
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+    </button>
+    <button type="button" class="hearth-back" data-hearth-back aria-label="Put the design back">
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" /></svg>
+    </button>
+  </span>
+  <span class="hearth-by" data-hearth-by hidden={!by}>{by ? `Designed by ${by}` : ""}</span>
+  <span class="hearth-refused" data-hearth-refused hidden></span>
+  <span class="hd-sr" data-hearth-said role="status"></span>
 </div>

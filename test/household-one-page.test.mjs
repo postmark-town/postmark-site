@@ -38,6 +38,7 @@ const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const DIST = path.join(ROOT, "dist-town");
 const read = (p) => fs.readFileSync(path.join(ROOT, p), "utf8");
 const built = fs.existsSync(path.join(DIST, "households"));
+const HEARTHS = JSON.parse(read("src/data/postmark/hearths.json"));   // the registered designs, as the town records them (title, author)
 const dist = (...segs) => fs.readFileSync(path.join(DIST, ...segs), "utf8");
 const rows = JSON.parse(read("src/data/postmark/hearths.json"));
 const { entries } = prepareEntries(rows);
@@ -120,10 +121,17 @@ test("built: the strip sits above the design and outside the entry's region: the
     assert.equal((html.match(/data-hearth-picker/g) ?? []).length, 1, `${slug}: one dropdown`);
     assert.match(strip, /<select data-hearth-pick disabled /, `${slug}: the dropdown ships disabled and is enabled when it is bound`);
     assert.match(strip, /<span class="pm-subrail-reading" data-hd-reading-mark role="status" hidden[ >]/, `${slug}: the one reading mark`);
-    assert.ok(/data-hearth-own data-hearth-settings hidden/.test(strip) && /data-hearth-owner hidden/.test(strip), `${slug}: the settings and the save controls ship hidden`);
+    assert.ok(/data-hearth-own data-hearth-settings hidden/.test(strip) && /<span class="hearth-acts" data-hearth-acts hidden>/.test(strip), `${slug}: the settings, and the check and the x, ship hidden`);
     assert.match(strip, /<a class="pm-subrail-add" data-house-add href="\/join\/move-in\/"[^>]*\bhidden\b/, `${slug}: the round +, shipped hidden`);
     assert.match(strip.slice(strip.indexOf("data-hearth-settings")), /(Answer|Change) the likeness question/, `${slug}: the likeness answer, in the settings (a declared house)`);
-    assert.ok(!/data-hearth-save[^>]*>[^<]*<\/button>/.test(strip.replace(/data-hearth-save hidden>/g, "")), `${slug}: the save button ships hidden`);
+    const acts = strip.slice(strip.indexOf("data-hearth-acts"), strip.indexOf("</span>", strip.indexOf("data-hearth-keep")));
+    assert.ok(acts.includes("data-hearth-keep") && acts.includes("data-hearth-back"), `${slug}: the check and the x are inside that hidden group`);
+    // the design's credit (Darko, 2026-11-12 08:57 EST: "listing Designed by {author}"), from the design's own record (the town's hearth.md, synced to hearths.json)
+    const chosen = /<option value="([^"]+)" selected/.exec(strip)?.[1];
+    const author = HEARTHS.find((h) => h.id === chosen)?.author;
+    assert.ok(chosen, `${slug}: the dropdown has the design it opens on selected`);
+    if (author) assert.ok(strip.includes(`<span class="hearth-by" data-hearth-by>Designed by ${author}</span>`), `${slug}: "Designed by ${author}", the record's credit for ${chosen}`);
+    else assert.match(strip, /<span class="hearth-by" data-hearth-by hidden><\/span>/, `${slug}: no recorded author for ${chosen}, so no line`);
   }
 });
 
@@ -408,19 +416,17 @@ test("a saved choice is what the page draws; ?entry= previews over it WITHOUT sa
   assert.equal(whichDesign(DESIGNS, { entry: "orchard", saved: "ledger" }).id, "orchard", "?entry= previews over the saved choice");
   assert.equal(whichDesign(DESIGNS, { entry: "no-such", saved: "ledger" }).id, "ledger", "an unregistered preview draws the kept choice, not the default");
   assert.equal(whichDesign(DESIGNS, { saved: null }).id, "default", "a house that chose nothing draws the default");
-  // the preview, through the real picker with a write spy: previewing sends nothing; only ask() then confirm() writes, once
+  // the preview, through the real picker with a write spy: previewing sends nothing; only keep(), the green check, writes, once
   const writes = [];
   const drawn = [];
   const p = createPicker({ entries: DESIGNS, slug: "dreme-mynd", saved: "ledger", signedIn: true, onDraw: (id) => drawn.push(id), save: async (a) => { writes.push(a); return { ok: true, status: 200, hearth: a.id }; } });
   p.preview("orchard");
   assert.deepEqual(drawn, ["orchard"]);
   assert.equal(p.view().savedId, "ledger", "the kept choice is untouched by a preview");
-  assert.match(p.view().previewLine, /not saved/i);
+  assert.equal(p.view().pending, true, "the check and the x show");
   assert.deepEqual(writes, [], "a preview writes nothing");
-  p.ask();
-  assert.deepEqual(writes, [], "asking is only a question");
-  await p.confirm();
-  assert.deepEqual(writes, [{ slug: "dreme-mynd", id: "orchard" }], "the one write, after the second yes");
+  await p.keep();
+  assert.deepEqual(writes, [{ slug: "dreme-mynd", id: "orchard" }], "the one write, the green check");
   assert.equal(p.view().savedId, "orchard", "and only now is the kept choice the previewed one");
   assert.deepEqual(drawn, ["orchard", "orchard"], "drawn on the preview, and again on the successful save");
 });
@@ -453,14 +459,9 @@ test("a visitor, or a reader who is not the house's human, previews with the dro
     p.preview("orchard");
     assert.deepEqual(drawn, ["orchard"], "the preview DRAWS for a visitor: anyone may preview");
     assert.equal(p.view().shown, "orchard");
-    assert.match(p.view().previewLine, /not saved/i, "and says it is not saved");
-    p.ask(); p.clear();
-    assert.equal(p.view().canSave, false);
-    assert.equal(p.view().canClear, false);
-    assert.equal(p.view().asking, null, "no question can be raised");
-    assert.deepEqual(writes, [], "and nothing is written");
-    const v = await p.confirm();
-    assert.deepEqual(writes, [], `a forced confirm() with no question asked writes nothing (${JSON.stringify(v.said)})`);
+    assert.deepEqual([p.view().pending, p.view().canKeep], [false, false], "no check and no x");
+    const v = await p.keep();
+    assert.deepEqual(writes, [], `a forced keep() writes nothing (${JSON.stringify(v.failed)})`);
   }
   assert.equal(whichDesign(DESIGNS, { saved: "ledger" }).id, "ledger", "and the kept design is what a visitor draws");
 });
@@ -469,9 +470,9 @@ test("a picker mounted over a design the page is already previewing starts on TH
   const writes = [];
   const p = createPicker({ entries: DESIGNS, slug: "dreme-mynd", saved: "ledger", shown: "orchard", signedIn: true, save: async (a) => { writes.push(a); return { ok: true, hearth: a.id }; } });
   assert.equal(p.view().shown, "orchard", "the page opened on ?entry=orchard");
-  assert.equal(p.view().previewLine.startsWith("Previewing Orchard"), true);
-  assert.equal(p.view().canSave, true, "and it can be saved without choosing it again");
-  p.ask(); await p.confirm();
+  assert.equal(p.view().pending, true, "another design than the kept one: the check and the x show");
+  assert.equal(p.view().canKeep, true, "and it can be saved without choosing it again");
+  await p.keep();
   assert.deepEqual(writes, [{ slug: "dreme-mynd", id: "orchard" }]);
   const unknown = createPicker({ entries: DESIGNS, slug: "x", saved: "ledger", shown: "no-such" });
   assert.equal(unknown.view().shown, "ledger", "an unregistered design on screen is not taken as shown");
@@ -483,7 +484,7 @@ test("built: the dropdown is in the strip, above the design, outside the entry's
     const at = html.indexOf("data-hearth-picker");
     assert.ok(at > html.indexOf("data-hearth-bar") && at < html.indexOf(ENTRY_OPEN), `${slug}: the dropdown is inside the strip, above the design`);
     assert.equal((html.match(/data-hearth-picker/g) ?? []).length, 1, `${slug}: one dropdown`);
-    assert.ok(/data-hearth-owner hidden/.test(html), `${slug}: its save controls ship hidden`);
+    assert.ok(/data-hearth-acts hidden/.test(html), `${slug}: its check and x ship hidden`);
     assert.ok(!/data-hearth-picker/.test(html.slice(html.indexOf(ENTRY_OPEN), html.indexOf(ENTRY_CLOSE))), `${slug}: none in the entry's region`);
     assert.ok(!/data-hband-hearth/.test(html), `${slug}: and no band's Hearth section`);
   }
@@ -520,7 +521,7 @@ test("the saved choice is baked at build: the registry's `hearth` is on the hous
   assert.equal(whichDesign(DESIGNS, { saved: bySlug.get("plain").hearth }).id, "default");
   const page = read("src/components/hearth/Hearth.astro"), stage = read("src/lib/hearth/stage.mjs");
   assert.match(page, /const entry = whichDesign\(entries, \{ saved: house\.hearth \?\? null \}\);/);
-  assert.match(page, /data-hearth-baked=\{house\.hearth \?\? ""\}/, "the build's own copy has its own attribute: data-hearth-saved is the picker's note, and the picker root's saved id");
+  assert.match(page, /data-hearth-baked=\{house\.hearth \?\? ""\}/, "the build's own copy has its own attribute: data-hearth-saved is the picker root's saved id");
   assert.match(page, /selected=\{entry\?\.id \?\? null\}/, "the dropdown starts on what the server draws");
   assert.match(stage, /const baked = root\.dataset\.hearthBaked \|\| null;/);
   assert.match(stage, /const first = whichDesign\(entries, \{ entry: asked, saved: baked \}\);/, "the first draw starts from the baked choice");
