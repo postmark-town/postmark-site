@@ -117,6 +117,9 @@ test("ties: the house's own residents only, most letters first, with the newest 
   // two residents of the house who write each other: one row, not one from each side (control: a pair with an outsider keeps its row)
   const inside = tiesOf({ parts: { closer: { rows: [{ handle: "fox", with: "owl", out: 2, in: 1 }, { handle: "owl", with: "fox", out: 1, in: 2 }, { handle: "owl", with: "hare", out: 1, in: 0 }] } } }, HOUSE);
   assert.deepEqual(inside.rows.map((r) => `${r.handle}>${r.with}`), ["fox>owl", "owl>hare"]);
+  // the office lists the pair from the later-sorting side only (a per-resident top list): the pair still draws, once (review of #420)
+  const oneSide = tiesOf({ parts: { closer: { rows: [{ handle: "owl", with: "fox", out: 4, in: 4 }] } } }, HOUSE);
+  assert.deepEqual(oneSide.rows.map((r) => `${r.handle}>${r.with}`), ["owl>fox"]);
   // eight rows, quotes on the first three only (Darko 2026-11-11 on small text)
   const many = { parts: { closer: { rows: Array.from({ length: 11 }, (_, i) => ({ handle: "fox", with: "w" + i, out: 20 - i, in: 0 })) }, pairs: { rows: Array.from({ length: 11 }, (_, i) => ({ a: "fox", b: "w" + i, quote_a: "q" + i })) } } };
   const m = tiesOf(many, HOUSE);

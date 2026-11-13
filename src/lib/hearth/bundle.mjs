@@ -60,10 +60,17 @@ export function tiesOf(bundle, handles = []) {
   const pairs = new Map();
   for (const p of asArray(partOf(bundle, "pairs")?.rows)) pairs.set(`${str(p.a)}|${str(p.b)}`, p);
   const rows = [];
+  // TWO RESIDENTS OF THE HOUSE: one row for the pair, whichever side the office listed it from (review of #420: a per-resident list may carry
+  // the pair from one side only). Keyed by the pair, so the first side to come keeps the row and the other side is not a second row.
+  const insidePairs = new Set();
   for (const r of asArray(closer.rows)) {
     const handle = str(r.handle), other = str(r.with);
     if (!handle || !other || !house.has(handle)) continue;
-    if (house.has(other) && other < handle) continue;          // two residents of the house: one row for the pair, not one from each side
+    if (house.has(other)) {
+      const k = [handle, other].sort().join("|");
+      if (insidePairs.has(k)) continue;
+      insidePairs.add(k);
+    }
     const out = num(r.out) ?? 0, back = num(r.in) ?? 0;
     const pair = pairs.get(`${handle}|${other}`) ?? pairs.get(`${other}|${handle}`) ?? null;
     const flip = pair && str(pair.a) !== handle;
@@ -107,7 +114,7 @@ export function wentOf(bundle, handles = []) {
 }
 
 export const FEED_SORTS = Object.freeze(["newest", "backed", "near"]);
-const FEED_SHOWN = 12;
+export const FEED_SHOWN = 12;
 /** The town slot: the feed's rows, with the values each sort reads. null when the part did not come. */
 export function feedOf(bundle) {
   const feed = partOf(bundle, "feed");
@@ -122,7 +129,18 @@ export function feedOf(bundle) {
     near: num(r.near),
   })).filter((r) => r.title);
   rows.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
-  return { rows: rows.slice(0, FEED_SHOWN), sorts: FEED_SORTS.filter((s) => s !== "near" || rows.some((r) => r.near != null)) };
+  // EVERY answered row, uncut: the reader's sort runs over the whole list and only then is it cut (feedShown), so "most backed" is the most backed
+  // of the feed, not of its newest twelve (review of #420)
+  return { rows, sorts: FEED_SORTS.filter((s) => s !== "near" || rows.some((r) => r.near != null)) };
+}
+
+/** The rows the town slot shows for a sort: the whole feed sorted the reader's way, then cut to the first FEED_SHOWN. */
+export function feedShown(rows, sort = "newest") {
+  const out = [...asArray(rows)];
+  if (sort === "backed") out.sort((a, b) => b.backed - a.backed || (b.at ?? 0) - (a.at ?? 0));
+  else if (sort === "near") out.sort((a, b) => (a.near ?? Infinity) - (b.near ?? Infinity) || (b.at ?? 0) - (a.at ?? 0));
+  else out.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+  return out.slice(0, FEED_SHOWN);
 }
 
 /** The day slot: each resident's sentences, in the house's order. null when the part did not come. */

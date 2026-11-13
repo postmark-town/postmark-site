@@ -84,18 +84,98 @@ test("the human's other site writes send it too: the Hearth choice, the profile,
 });
 
 // ── the census (a TEXT PIN) ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// EACH WRITE IS JUDGED BY ITS OWN CALL (review of #420): the request options object that holds its method, found by matching braces in the
+// code (strings and comments skipped; an .astro file's <script> blocks only), so a bare write cannot pass beside a neighbour that has the header.
+// An exception is matched on that call's own address: the text from its `fetch` to its options object.
 // Not office acts, so not held to the header, each named with why: the sign-in's own authorization server (registering the client and trading the
-// code), the key mint (an auth door, on Darko's before-merge list as auth), the operator's desk (its route is the operator's, not the site's), the
-// fund page's chain verification (keyless, a read of Base), and the helper itself.
+// code), the key mint (an auth door, on Darko's before-merge list as auth), and the fund page's chain verification (keyless, a read of Base).
+// (Until the #420 review the operator's desk was excepted too; the office files no operator route, so its gift now sends the header like the rest.)
 const EXCEPTIONS = [
   { file: "src/layouts/PostmarkLayout.astro", near: "AS.register", why: "the sign-in's client registration" },
   { file: "src/layouts/PostmarkLayout.astro", near: "AS.token", why: "the sign-in's code exchange" },
   { file: "src/components/WorldSignIn.astro", near: "AS.register", why: "the viewer sign-in's client registration" },
   { file: "src/components/KeysCard.astro", near: '"/keys"', why: "the key mint: an auth door" },
-  { file: "town/pages/ops/desk/index.astro", near: '"/ops/gift"', why: "the operator's desk" },
   { file: "town/pages/fund/[pot].astro", near: '"/fund/verify"', why: "a keyless verification of a chain transaction" },
-  { file: "src/lib/office-write.mjs", near: "siteWriteHeaders(token)", why: "the helper itself" },
 ];
+// Two file-local helpers that carry the header, each pinned to its own definition below; allowed in their own file only.
+const LOCAL_HELPERS = [
+  { file: "town/pages/fund/[pot].astro", call: /headers: headers\(t\)/, def: /var headers = function \(t\) \{ return \{[^}]*"x-postmark-channel": "web"/ },
+  { file: "src/lib/sheet-upload.mjs", call: /\.\.\.bearer\(token\)/, def: /const bearer = \(token\) => \(\{ authorization: "Bearer " \+ token, \[CHANNEL_HEADER\]: CHANNEL_WEB \}\);/ },
+];
+const CARRIES = /siteWriteHeaders\(|\[CHANNEL_HEADER\]: CHANNEL_WEB|"x-postmark-channel": "web"/;
+
+/** Every `{` in `code` paired with its `}`, skipping strings, template text and comments: [[open, close], …]. */
+function braces(code) {
+  const pairs = [], stack = [], modes = [];   // modes: "code" | "tpl" (inside a template literal's text)
+  let mode = "code";
+  for (let i = 0; i < code.length; i++) {
+    const c = code[i], n = code[i + 1];
+    if (mode === "tpl") {
+      if (c === "\\") { i++; continue; }
+      if (c === "`") { mode = modes.pop() ?? "code"; continue; }
+      if (c === "$" && n === "{") { modes.push("tpl"); stack.push([i + 1, "tplexpr"]); mode = "code"; i++; }
+      continue;
+    }
+    if (c === "/" && n === "/") { const e = code.indexOf("\n", i); i = e === -1 ? code.length : e; continue; }
+    if (c === "/" && n === "*") { const e = code.indexOf("*/", i + 2); i = e === -1 ? code.length : e + 1; continue; }
+    if (c === '"' || c === "'") { let j = i + 1; while (j < code.length && code[j] !== c && code[j] !== "\n") j += code[j] === "\\" ? 2 : 1; i = j; continue; }
+    if (c === "`") { modes.push("code"); mode = "tpl"; continue; }
+    if (c === "{") stack.push([i, "obj"]);
+    else if (c === "}") {
+      const top = stack.pop();
+      if (!top) continue;
+      if (top[1] === "tplexpr") { mode = modes.pop() ?? "tpl"; continue; }
+      pairs.push([top[0], i]);
+    }
+  }
+  return pairs;
+}
+
+/** The writes in one file: { rel, opts (its options object's text), callee (from its fetch to the object) }. */
+function writesIn(rel, text) {
+  const method = new RegExp(["method", ":\\s*[\"'](POST|PATCH|PUT|DELETE)[\"']"].join(""), "g");   // assembled, so this file is not its own hit
+  const chunks = rel.endsWith(".astro")
+    ? [...text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1])
+    : [text];
+  const out = [];
+  for (const code of chunks) {
+    const pairs = braces(code);
+    for (const m of code.matchAll(method)) {
+      const own = pairs.filter(([a, b]) => a < m.index && m.index < b).sort((x, y) => (y[0] - x[0]))[0];
+      if (!own) { out.push({ rel, opts: "", callee: "" }); continue; }
+      const opts = code.slice(own[0], own[1] + 1);
+      const f = code.lastIndexOf("fetch", own[0]);
+      const callee = f !== -1 && own[0] - f < 300 ? code.slice(f, own[0]) : "";
+      out.push({ rel, opts, callee });
+    }
+  }
+  return out;
+}
+
+/** A write's verdict: "header", "exception: <why>", or "bare". */
+function verdict(w) {
+  if (CARRIES.test(w.opts)) return "header";
+  if (LOCAL_HELPERS.some((h) => h.file === w.rel && h.call.test(w.opts))) return "header";
+  const x = EXCEPTIONS.find((e) => e.file === w.rel && w.callee.includes(e.near));
+  return x ? "exception: " + x.why : "bare";
+}
+
+test("the census judges each write by its own call: a bare write beside one with the header is still bare (control on synthetic code)", () => {
+  const code = [
+    `async function a(t) { await fetch(API + "/household", { method: "POST", headers: siteWriteHeaders(t), body: "{}" }); }`,
+    `async function b(t) { await fetch(API + "/letters", { method: "POST", headers: { authorization: "Bearer " + t }, body: JSON.stringify({ x: "}{" }) }); }`,
+    `async function c() { await fetch(\`\${API}/x/\${id}\`, { method: "PATCH", headers: { "x-postmark-channel": "web" } }); }`,
+  ].join("\n");
+  const ws = writesIn("src/lib/synthetic.mjs", code);
+  assert.deepEqual(ws.map(verdict), ["header", "bare", "header"], "within 260 characters of a header, the old window passed b; each call is its own now");
+  // an exception is matched on the call's own address, not a neighbour's
+  const near = writesIn("src/components/KeysCard.astro", `<script>fetch(BASE + "/keys", { method: "POST" }); fetch(BASE + "/other", { method: "POST" });</script>`);
+  assert.deepEqual(near.map(verdict), ["exception: the key mint: an auth door", "bare"]);
+});
+
+test("the two file-local helpers carry the header in their own definitions", () => {
+  for (const h of LOCAL_HELPERS) assert.match(fs.readFileSync(path.join(ROOT, h.file), "utf8"), h.def, h.file);
+});
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -106,23 +186,16 @@ function walk(dir, out = []) {
   return out;
 }
 
-test("census (text pin): every office write in the site's pages, components and libraries sends the header, or is a named exception", () => {
-  const method = ["method", ":\\s*[\"'](POST|PATCH|PUT|DELETE)[\"']"].join("");   // assembled, so this file is not its own hit
+test("census (text pin): every office write in the site's pages, components and libraries sends the header on its own call, or is a named exception", () => {
   const found = [];
   for (const file of [...walk(path.join(ROOT, "src")), ...walk(path.join(ROOT, "town"))]) {
     const rel = path.relative(ROOT, file).split(path.sep).join("/");
-    const text = fs.readFileSync(file, "utf8");
-    for (const m of text.matchAll(new RegExp(method, "g"))) {
-      const call = text.slice(Math.max(0, m.index - 260), m.index + 260);
-      found.push({ rel, call });
-    }
+    found.push(...writesIn(rel, fs.readFileSync(file, "utf8")));
   }
-  assert.ok(found.length >= 15, `the census found the site's writes (${found.length}); a census that finds nothing proves nothing`);
-  const bare = found.filter(({ rel, call }) => {
-    if (/siteWriteHeaders\(|CHANNEL_HEADER|x-postmark-channel|headers: headers\(t\)|\.\.\.bearer\(token\)/.test(call)) return false;
-    return !EXCEPTIONS.some((x) => x.file === rel && call.includes(x.near));
-  }).map((x) => x.rel);
-  assert.deepEqual(bare, [], LAW + "; these writes send no site header: " + bare.join(", "));
+  assert.ok(found.length >= 20, `the census found the site's writes (${found.length}); a census that finds nothing proves nothing`);
+  assert.equal(found.filter((w) => !w.opts).length, 0, "every write's own options object was found (none fell back to a guess)");
+  const bare = found.filter((w) => verdict(w) === "bare").map((w) => `${w.rel}: ${w.callee.slice(0, 60)}`);
+  assert.deepEqual(bare, [], LAW + "; these writes send no site header: " + bare.join(" · "));
   // every exception still names a live write, so a stale one cannot hide a new write
-  for (const x of EXCEPTIONS) assert.ok(found.some((f) => f.rel === x.file && f.call.includes(x.near)), `the exception for ${x.why} names a write that is still there`);
+  for (const x of EXCEPTIONS) assert.ok(found.some((w) => verdict(w) === "exception: " + x.why), `the exception for ${x.why} names a write that is still there`);
 });

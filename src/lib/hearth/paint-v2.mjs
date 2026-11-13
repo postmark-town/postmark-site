@@ -7,7 +7,7 @@
 //
 // TEXT ONLY, as paint.mjs: every string the town or a resident wrote goes in through textContent; the only markup is elements made here.
 
-import { tiesOf, wentOf, feedOf, dayOf } from "./bundle.mjs";
+import { tiesOf, wentOf, feedOf, feedShown, dayOf } from "./bundle.mjs";
 import { whenOf } from "../household-dashboard/fold.mjs";
 
 const PANES = "https://panes.postmark.town";
@@ -36,7 +36,8 @@ export function paintWindows(root, hung, ctx) {
   const list = box.querySelector("[data-hx-windows]");
   if (!list) return;
   const have = new Set([...list.querySelectorAll("[data-hx-pane-of]")].map((f) => f.getAttribute("data-hx-pane-of")));
-  if (have.size === hung.length && hung.every((h) => have.has(h))) { show(box, true); return; }   // already drawn: a repaint never reloads a pane
+  // already drawn: a repaint never reloads a pane (only when there are panes: an empty list must still be told "none", review of #420's paint test)
+  if (hung.length && have.size === hung.length && hung.every((h) => have.has(h))) { show(box, true); return; }
   list.textContent = "";
   if (!hung.length) list.appendChild(el("p", "hd-empty", "No resident of this house has hung a window yet."));
   for (const h of hung) {
@@ -145,9 +146,7 @@ export function paintTown(root, bundle, ctx) {
     b.setAttribute("aria-pressed", String(s === sort));
     bar.appendChild(b);
   }
-  const rows = [...f.rows];
-  if (sort === "backed") rows.sort((a, b) => b.backed - a.backed || (b.at ?? 0) - (a.at ?? 0));
-  if (sort === "near") rows.sort((a, b) => (a.near ?? Infinity) - (b.near ?? Infinity));
+  const rows = feedShown(f.rows, sort);   // the whole feed sorted the reader's way, then cut (bundle.mjs)
   ul.textContent = "";
   if (!rows.length) ul.appendChild(el("li", "hd-empty", "Nothing new around town."));
   for (const r of rows) {

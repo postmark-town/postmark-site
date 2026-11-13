@@ -29,7 +29,7 @@
 
 import { siteWriteHeaders } from "./office-write.mjs";
 
-export const OPEN_PHASES =Object.freeze(["announced", "doors-open", "underway"]);
+export const OPEN_PHASES = Object.freeze(["announced", "doors-open", "underway"]);
 export const BUDGET_DEFAULT = 6;
 export const BUDGET_MAX = 60;
 
