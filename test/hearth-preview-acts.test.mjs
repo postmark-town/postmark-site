@@ -25,15 +25,25 @@ const fire = async (el, type) => { for (const f of el.listeners[type] ?? []) awa
 const until = async (cond, ms = 3000) => { const end = Date.now() + ms; while (!cond()) { if (Date.now() > end) throw new Error("timed out waiting"); await new Promise((r) => setTimeout(r, 10)); } };
 const define = (name, value) => Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
 
-/** Mount the real stage for the house `wick`, whose office says it kept `saved`, at the address `?entry=<entry>` (or none). The reader is wick's own human. */
-async function mount({ saved, entry = null }) {
+/**
+ * Mount the real stage for the house `wick`, whose office says it kept `saved`, at the address `?entry=<entry>` (or none). The reader is wick's own human.
+ * `baked` is the build's copy of the saved choice (data-hearth-baked). `registry` is how the office's saved-choice read goes: "ok", "fail" (a 503), or "hold"
+ * (it answers only when the test calls `release()`).
+ */
+async function mount({ saved, entry = null, baked = "", registry = "ok" }) {
   const calls = [];
   let kept = saved;
+  let release = () => {};
+  const held = new Promise((r) => { release = r; });
   define("fetch", async (url, init = {}) => {
     const u = new URL(String(url));
     calls.push({ method: init.method ?? "GET", path: decodeURIComponent(u.pathname), body: init.body ?? null });
     const json = (status, body) => ({ ok: status < 400, status, json: async () => body });
-    if (u.pathname === "/api/households" && !init.method) return json(200, { registry: { households: { [KEY]: { hearth: kept } } } });
+    if (u.pathname === "/api/households" && !init.method) {
+      if (registry === "fail") return json(503, {});
+      if (registry === "hold") await held;
+      return json(200, { registry: { households: { [KEY]: { hearth: kept } } } });
+    }
     if (init.method === "PATCH" && u.pathname === `/api/households/${KEY}/hearth`) { kept = JSON.parse(init.body).hearth; return json(200, { hearth: kept }); }
     if (init.method === "POST" && u.pathname === "/api/town/apex") return json(200, { staked: true });
     return json(404, {});
@@ -62,18 +72,18 @@ async function mount({ saved, entry = null }) {
     "[data-hearth-entries]": { textContent: JSON.stringify(entries) }, "[data-hearth-css]": stub(), "[data-hearth-note]": stub(), "[data-hearth-pick]": select,
     "[data-hearth-holo]": stub(), "[data-hearth-picker]": pickerRoot,
   };
-  const root = stub({ dataset: { hearthSlug: KEY, hearthKey: KEY, hearthBaked: "" }, querySelector: (s) => at[s] ?? null });
+  const root = stub({ dataset: { hearthSlug: KEY, hearthKey: KEY, hearthBaked: baked }, querySelector: (s) => at[s] ?? null });
 
   // the fake house script: every design's script keeps the `hearth` it was handed, by the design it was handed for
   const handed = [];
   const loadScript = async (url) => ({ default: (hearth) => { handed.push({ url, hearth }); } });
   const { mountHearth } = await import("../src/lib/hearth/stage.mjs");
   mountHearth(root, { loadScript });
-  // settled: the saved choice was read (the picker knows it), and the reader is known as the house's own (the owner view)
-  await until(() => root.dataset.hearthShowing && pickerRoot.dataset.hearthSaved !== undefined && stage.dataset.hearthView === "owner");
+  // settled: the reader is known as the house's own (the owner view), and, unless the read is held, the saved choice's read has answered or failed (the picker mounts)
+  await until(() => root.dataset.hearthShowing && stage.dataset.hearthView === "owner" && (registry === "hold" || pickerRoot.dataset.hearthSaved !== undefined));
   const newest = (id) => [...handed].reverse().find((h) => h.hearth.entry === id)?.hearth;
   const posts = () => calls.filter((c) => c.method === "POST");
-  return { root, stage, select, keep, acts, pickerRoot, handed, newest, posts, calls };
+  return { root, stage, select, keep, acts, pickerRoot, handed, newest, posts, calls, release };
 }
 
 test("RUN the stage, chosen: the house kept glow and the page draws it; its script's act is sent, as the house's own human", async () => {
@@ -108,6 +118,30 @@ test("RUN the stage, preview then kept: the owner keeps the previewed design wit
   await until(() => m.pickerRoot.dataset.hearthSaved === "glow" && m.handed.length > before);
   const r = await m.newest("glow").act(STAKE);
   assert.equal(r.ok, true, `kept, so chosen: ${R1029}`);
+  assert.equal(m.posts().length, 1);
+});
+
+// Truey's review of 567f1b23 (finding 1): the build's baked choice is only a cache of the office's. The ruling makes a preview "any design that isn't the house's
+// saved choice", and until the office confirms the choice it is not known: so the baked design is drawn, but read-only.
+test("RUN the stage, the read fails: the build baked glow (the office now holds ledger); glow is drawn from the bake, but its act is refused and sends nothing", async () => {
+  const m = await mount({ saved: "ledger", baked: "glow", registry: "fail" });
+  await until(() => m.newest("glow"));
+  assert.equal(m.root.dataset.hearthShowing, "glow", "the bake still draws (the page says the saved choice could not be read)");
+  const r = await m.newest("glow").act(STAKE);
+  assert.equal(r, PREVIEW_ONLY, `an unconfirmed choice acts as a preview: ${R1029}`);
+  assert.equal(m.posts().length, 0, "nothing sent");
+});
+
+test("RUN the stage, the read is held: the build baked glow and the office confirms glow; refused before the read answers, sent once it has", async () => {
+  const m = await mount({ saved: "glow", baked: "glow", registry: "hold" });
+  await until(() => m.newest("glow"));
+  assert.equal(m.root.dataset.hearthShowing, "glow");
+  assert.equal(await m.newest("glow").act(STAKE), PREVIEW_ONLY, "before the office answers, the choice is not known");
+  assert.equal(m.posts().length, 0);
+  m.release();
+  await until(() => m.pickerRoot.dataset.hearthSaved === "glow");
+  const r = await m.newest("glow").act(STAKE);
+  assert.equal(r.ok, true, "confirmed: the same design is the house's chosen one, and acts");
   assert.equal(m.posts().length, 1);
 });
 

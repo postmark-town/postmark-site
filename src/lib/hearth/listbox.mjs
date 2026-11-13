@@ -127,7 +127,8 @@ export function paintListbox(root) {
 
 /**
  * Bind a picker root's listbox to its select. Returns the instance ({ model, paint, tip }) or null when the root has no listbox. Binding twice returns the
- * first. The select is hidden here (it ships visible for a reader without scripts, disabled, as before).
+ * first. The select ships hidden (HearthPicker.astro) and is hidden again here; a reader without scripts sees the button, disabled, with the current design's
+ * name, as the disabled select showed it before.
  */
 export function bindListbox(root, { doc = globalThis.document, win = globalThis.window } = {}) {
   if (BOUND.has(root)) return BOUND.get(root);

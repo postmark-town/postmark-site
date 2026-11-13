@@ -87,9 +87,11 @@ export function mountHearth(root, { loadScript } = {}) {
   // same answer paints the site's v2 slots and is handed to the entry's script. `scriptState` is what the script's getters read (hearthApi).
   let bundle = null, hung = null, stopScript = () => {}, scriptSeq = 0;
   const listeners = { bundle: new Set(), view: new Set() };
-  // `saved` is the house's saved Hearth choice as this page knows it (knownSaved, below): a design that is not it is only a preview, and its script's
-  // acts are refused (script.mjs § isChosenDesign; POS-1029/a, "Where chosen; previews read-only").
-  const scriptState = { bundle: null, owner: false, token, saved: () => knownSaved };
+  // `saved` is the house's saved Hearth choice, CONFIRMED by the office's read (knownSaved once readOk, below): a design that is not it is only a preview,
+  // and its script's acts are refused (script.mjs § isChosenDesign; POS-1029/a, "Where chosen; previews read-only"). Until the read answers, and for the
+  // whole visit if it fails, the choice is not known: the build's baked copy may be a design the house has since dropped, so it draws but never acts
+  // (undefined chooses only the default). The save controls take the same stance (signedIn needs readOk, mountPicker).
+  const scriptState = { bundle: null, owner: false, token, saved: () => (readOk ? knownSaved : undefined) };
   const house = Object.freeze({
     slug, key, handles: [...handles],
     residents: handles.map((h) => Object.freeze({ handle: h, name: faces[h]?.name ?? h, accent: faces[h]?.accent ?? null, avatar: faces[h]?.avatar ?? null })),
