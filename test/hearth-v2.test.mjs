@@ -114,6 +114,14 @@ test("ties: the house's own residents only, most letters first, with the newest 
   assert.equal(t.rows[0].quoteIn, "Come by the mill.");
   assert.deepEqual(t.rows[0].milestones, ["first letter"]);
   assert.deepEqual(tiesOf({ parts: { closer: { rows: [] } } }, HOUSE).rows, [], "an answered closer with no rows is an honest none");
+  // two residents of the house who write each other: one row, not one from each side (control: a pair with an outsider keeps its row)
+  const inside = tiesOf({ parts: { closer: { rows: [{ handle: "fox", with: "owl", out: 2, in: 1 }, { handle: "owl", with: "fox", out: 1, in: 2 }, { handle: "owl", with: "hare", out: 1, in: 0 }] } } }, HOUSE);
+  assert.deepEqual(inside.rows.map((r) => `${r.handle}>${r.with}`), ["fox>owl", "owl>hare"]);
+  // eight rows, quotes on the first three only (Darko 2026-11-11 on small text)
+  const many = { parts: { closer: { rows: Array.from({ length: 11 }, (_, i) => ({ handle: "fox", with: "w" + i, out: 20 - i, in: 0 })) }, pairs: { rows: Array.from({ length: 11 }, (_, i) => ({ a: "fox", b: "w" + i, quote_a: "q" + i })) } } };
+  const m = tiesOf(many, HOUSE);
+  assert.deepEqual([m.rows.length, m.total], [8, 11]);
+  assert.deepEqual(m.rows.map((r) => r.quoteOut), ["q0", "q1", "q2", null, null, null, null, null]);
 });
 
 test("stamps that went: grouped by kind, totals from the rows, zero rows dropped, and an outside link never carried", () => {

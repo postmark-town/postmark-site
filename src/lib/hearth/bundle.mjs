@@ -45,7 +45,10 @@ export function partOf(bundle, name) {
   return p && typeof p === "object" ? p : null;
 }
 
-const TIES_SHOWN = 12;
+// eight ties, and the quotes on the first three only: Darko, 2026-11-11, on small text ("there's a certain point at which … the words
+// themselves don't mean anything to you anymore")
+const TIES_SHOWN = 8;
+const QUOTED = 3;
 /**
  * The ties slot: one row per pair a resident of the house writes with, most letters first. Quotes, when the pair read carries them, ride the
  * row (by rule, POS-1024/c: the first line of the newest letter each way). null when the closer part did not come.
@@ -60,6 +63,7 @@ export function tiesOf(bundle, handles = []) {
   for (const r of asArray(closer.rows)) {
     const handle = str(r.handle), other = str(r.with);
     if (!handle || !other || !house.has(handle)) continue;
+    if (house.has(other) && other < handle) continue;          // two residents of the house: one row for the pair, not one from each side
     const out = num(r.out) ?? 0, back = num(r.in) ?? 0;
     const pair = pairs.get(`${handle}|${other}`) ?? pairs.get(`${other}|${handle}`) ?? null;
     const flip = pair && str(pair.a) !== handle;
@@ -73,7 +77,9 @@ export function tiesOf(bundle, handles = []) {
     });
   }
   rows.sort((a, b) => b.letters - a.letters || (b.latest ?? 0) - (a.latest ?? 0) || a.with.localeCompare(b.with));
-  return { rows: rows.slice(0, TIES_SHOWN), total: rows.length };
+  const shown = rows.slice(0, TIES_SHOWN);
+  shown.forEach((r, i) => { if (i >= QUOTED) { r.quoteOut = null; r.quoteIn = null; } });
+  return { rows: shown, total: rows.length };
 }
 
 export const WENT_KINDS = Object.freeze(["mark", "idea", "ballot", "pot", "gift", "send", "burn"]);
