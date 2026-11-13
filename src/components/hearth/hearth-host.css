@@ -228,6 +228,16 @@
 .hearth-holo-note[hidden] { display: none; }
 .hearth-note[hidden] { display: none; }
 
+/* "Design your own" (POS-1021): a quiet summary beside the dropdown that opens a panel (the settings panel's pattern) holding the town's setup prompt in the site's own
+ * .prompt-box. The panel is wide enough to read the prompt, never wider than the view, and scrolls inside itself. */
+.hearth-setup { position: relative; }
+.hearth-setup-sum { list-style: none; cursor: pointer; display: inline-block; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--hx-chrome-line); color: var(--hx-chrome-link); white-space: nowrap; }
+.hearth-setup-sum::-webkit-details-marker { display: none; }
+.hearth-setup-sum:hover, .hearth-setup-sum:focus-visible, .hearth-setup[open] > .hearth-setup-sum { color: var(--hx-chrome-field-ink); background: var(--hx-chrome-field); }
+.hearth-setup-panel { position: absolute; z-index: 20; top: calc(100% + 6px); right: 0; width: min(34rem, calc(100vw - 2rem)); box-sizing: border-box; }
+.hearth-setup-panel .prompt-box { margin: 0; border-color: var(--hx-chrome-line); }
+.hearth-setup-panel .prompt-box pre { max-height: min(60vh, 26rem); }
+
 /* the dropdown (POS-962; the dropdown alone by POS-999 round 3, Darko 2026-11-12 08:56 EST): the preview select every reader has, the design's credit, and for the
  * house's signed-in human, while it shows another design than the kept one, a green check (save) and a red x (put it back) beside it. No words explain them;
  * a save that did not land marks the dropdown. */

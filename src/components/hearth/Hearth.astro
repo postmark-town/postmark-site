@@ -33,6 +33,7 @@
 // the house, paints the live parts, and swaps designs for a preview. Which design to draw is lib/hearth/which-design.mjs's answer, and nothing else's.
 import HearthSlot from "./HearthSlot.astro";
 import HearthPicker from "./HearthPicker.astro";
+import HearthSetup from "./HearthSetup.astro";
 import HouseRail from "@/components/HouseRail.astro";
 import "./hearth-host.css";
 import media from "@/data/postmark/media.json";
@@ -88,6 +89,8 @@ const slotProps = { house, faces, plate, slug, bulletin };
     <HouseRail house={house} members={members} current="__house" reading>
       <Fragment slot="corner">
         <HearthPicker entries={pickable} selected={entry?.id ?? null} />
+        {/* "Design your own" (POS-1021): the town's one setup prompt, copyable, beside the dropdown. It draws only when the town has HEARTH-SETUP.md. */}
+        <HearthSetup />
         {/* the house's own human only (stage.mjs shows it when the reader's sign-in holds a resident of this house; it ships hidden). A <details>, so the
             panel opens and closes without a script; stage.mjs closes it on a click elsewhere or Escape. */}
         {house.declared && house.slug && (
