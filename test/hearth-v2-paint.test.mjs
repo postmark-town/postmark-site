@@ -9,7 +9,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { paintWindows, paintTies, paintTown } from "../src/lib/hearth/paint-v2.mjs";
+import { paintWindows, paintTies, paintTown, paintWent, paintDay } from "../src/lib/hearth/paint-v2.mjs";
 import { FEED_SHOWN } from "../src/lib/hearth/bundle.mjs";
 
 // ── a minimal DOM ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -45,8 +45,10 @@ function stage() {
   const windows = el("section", { "data-hearth-slot": "windows" }, el("div", { "data-hx-windows": "" })); windows.hidden = true;
   const ties = el("section", { "data-hearth-slot": "ties" }, el("ul", { "data-hx-ties": "" })); ties.hidden = true;
   const town = el("section", { "data-hearth-slot": "town" }, el("div", { "data-hx-feed-sorts": "" }), el("ul", { "data-hx-feed": "" })); town.hidden = true;
-  s.appendChild(windows); s.appendChild(ties); s.appendChild(town);
-  return { s, windows, ties, town };
+  const went = el("section", { "data-hearth-slot": "stamps-went" }, el("div", { "data-hx-went": "" })); went.hidden = true;
+  const day = el("section", { "data-hearth-slot": "day" }, el("ul", { "data-hx-day": "" })); day.hidden = true;
+  s.appendChild(windows); s.appendChild(ties); s.appendChild(town); s.appendChild(went); s.appendChild(day);
+  return { s, windows, ties, town, went, day };
 }
 // POS-1027's envelope: { read: "hearth", household, parts }, each part { via, data }
 const env = (parts) => ({ read: "hearth", household: "fox-and-owl", parts });
@@ -122,4 +124,33 @@ test("town: 'most backed' sorts the whole feed before it is cut, so a well-backe
   assert.equal(titles().length, FEED_SHOWN);
   paintTown(s, null, CTX);
   assert.equal(town.hidden, true, "no bundle: hidden");
+});
+
+// ── unavailable is missing, not empty (review of #420 at 40993488) ──────────────────────────────────────────────────────────────────────────
+
+// LAW (POS-1027, Rivet): "unavailable history must not masquerade as a quiet day". One test per slot, so a red names its slot.
+const U = "the store could not be read: unknown, not none";
+for (const [name, key, paint, none] of [
+  ["ties", "closer", paintTies, /No letters have crossed/],
+  ["town", "feed", paintTown, /Nothing new around town\./],
+  ["went", "went", paintWent, /No stamps have gone out from this house yet\./],
+]) {
+  test(`painted: an answer the office marks unavailable draws nothing in ${name}; its unmarked twin says 'none'`, () => {
+    const st = stage();
+    paint(st.s, env({ [key]: part({ rows: [], unavailable: U }) }), CTX);
+    assert.equal(st[name].hidden, true, `${name}: an unavailable answer draws nothing`);
+    paint(st.s, env({ [key]: part({ rows: [] }) }), CTX);
+    assert.equal(st[name].hidden, false, `${name}: control, an answered none shows`);
+    assert.match(st[name].textContent, none, `${name}: and says so`);
+  });
+}
+
+test("painted: a resident's day the office could not read is 'not read.', never quiet; a whole unreadable collection draws nothing", () => {
+  const { s, day } = stage();
+  paintDay(s, env({ days: [part({ handle: "fox", date: "2026-11-13", sentences: ["A quiet day."] }), part({ handle: "owl", date: "2026-11-13", sentences: [], unavailable: U })] }), CTX);
+  assert.equal(day.hidden, false);
+  const rows = day.querySelector("[data-hx-day]").children.map((li) => li.textContent);
+  assert.deepEqual(rows, ["Fox: A quiet day.", "Owl: not read."], "the office's own quiet sentence for fox; owl's unreadable day is not read, not quiet");
+  paintDay(s, env({ days: { unavailable: U } }), CTX);
+  assert.equal(day.hidden, true, "a whole collection the office could not read draws nothing");
 });

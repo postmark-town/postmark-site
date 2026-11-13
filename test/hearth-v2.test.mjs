@@ -17,7 +17,7 @@ import { SLOTS, SLOT_NAMES, slotTag, LIMITS } from "../src/lib/hearth/slots.mjs"
 import { sanitizeHtml } from "../src/lib/hearth/sanitize-html.mjs";
 import { sanitizeCss, stageFor } from "../src/lib/hearth/sanitize-css.mjs";
 import { prepareEntry, fingerprint } from "../src/lib/hearth/entries.mjs";
-import { dataOf, collectionOf, pairsOf, tiesOf, wentOf, feedOf, dayOf, humanLogOf, partsFor, safeHref, bundleUrl, bundleFrom } from "../src/lib/hearth/bundle.mjs";
+import { dataOf, collectionOf, pairsOf, tiesOf, wentOf, feedOf, dayOf, humanLogOf, partsFor, safeHref, bundleUrl, bundleFrom, unavailable } from "../src/lib/hearth/bundle.mjs";
 import { scriptUrlOf, hearthApi, runEntryScript, emit, NOT_YOUR_HOUSE } from "../src/lib/hearth/script.mjs";
 import { syncHearths } from "../tools/sync-hearths.mjs";
 import { CHANNEL_HEADER } from "../src/lib/office-write.mjs";
@@ -197,6 +197,44 @@ test("a resident's day: in the house's order, the office's own sentences; a quie
   const d = dayOf(BUNDLE, [...HOUSE, "newt"]);
   assert.deepEqual(d.rows.map((r) => [r.handle, r.lines, r.answered]),
     [["fox", ["wrote 2 letters, to hare and wren"], true], ["owl", ["A quiet day."], true], ["newt", [], false]]);
+});
+
+// ── UNAVAILABLE IS MISSING, NOT EMPTY (review of #420 at 40993488), one test per slot so a red names its slot ──────────────────────────────
+// LAW (POS-1027, Rivet): "unavailable history must not masquerade as a quiet day"; the office's marker is `unavailable: "<why>"` beside its rows
+// (office house-bundle.mjs: `{ rows: [], unavailable: "… unknown, not none" }`). Each slot: the marked answer folds to null (its slot hidden),
+// rows beside the marker are not shown as if whole, and the control (the same answer without the marker) is an honest none.
+const U = "the store could not be read: unknown, not none";
+const with1 = (key, data) => ({ ...BUNDLE, parts: { ...BUNDLE.parts, [key]: part("household", key, data) } });
+const SOME = [{ with: "hare", letters: 2, from: "fox", stamps: 2, title: "t", hand: "human", verb: "x" }];
+for (const [name, key, fold, isNone] of [
+  ["ties (closer)", "closer", (b) => tiesOf(b, HOUSE), (r) => r.rows.length === 0],
+  ["stamps-went", "went", (b) => wentOf(b, HOUSE), (r) => r.groups.length === 0],
+  ["town (feed)", "feed", (b) => feedOf(b), (r) => r.rows.length === 0],
+  ["the human's record (happened)", "happened", (b) => humanLogOf(b), (r) => r.length === 0],
+]) {
+  test(`unavailable is missing, not empty: ${name}`, () => {
+    assert.equal(fold(with1(key, { rows: [], unavailable: U })), null, `${name}: an unavailable answer is missing, so its slot stays hidden`);
+    assert.equal(fold(with1(key, { rows: SOME, unavailable: U })), null, `${name}: rows beside the marker are not shown as if whole`);
+    assert.ok(isNone(fold(with1(key, { rows: [] }))), `${name}: control, the same answer without the marker is an honest none`);
+  });
+}
+
+test("unavailable is missing, not empty: a resident's day the office could not read is 'not read', never quiet", () => {
+  const days = { ...BUNDLE, parts: { ...BUNDLE.parts, days: [
+    part("household", "day", { handle: "fox", date: "2026-11-13", sentences: ["wrote 2 letters, to hare and wren"] }),
+    part("household", "day", { handle: "owl", date: "2026-11-13", sentences: [], counts: {}, unavailable: U }),
+  ] } };
+  assert.deepEqual(dayOf(days, HOUSE).rows.map((r) => [r.handle, r.answered]), [["fox", true], ["owl", false]]);
+});
+
+test("unavailable is missing, not empty: a pair the office could not read is left out, and its correspondent shows the house's total only", () => {
+  const pairs = { ...BUNDLE, parts: { ...BUNDLE.parts, pairs: [
+    part("town", "pair", { a: "fox", b: "hare", letters: { a_to_b: 4, b_to_a: 3 }, latest: { a_to_b: { line: "x" }, b_to_a: null }, unavailable: U }),
+  ] } };
+  assert.deepEqual(pairsOf(pairs, HOUSE), []);
+  const hare = tiesOf(pairs, HOUSE).rows.find((r) => r.with === "hare");
+  assert.deepEqual([hare.handle, hare.out, hare.quoteOut, hare.letters], [null, null, null, 7]);
+  assert.equal(unavailable({ rows: [], unavailable: "" }), false, "an empty marker is no marker");
 });
 
 test("the human's own record: the public happened rows whose hand is the human's", () => {

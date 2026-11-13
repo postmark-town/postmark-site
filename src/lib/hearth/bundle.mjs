@@ -48,17 +48,27 @@ export function bundleFrom(answer) {
   return answer;
 }
 
-/** One part's `data` (the standalone read's own answer), or null when the part is absent, has no data, or the bundle did not come. */
+/**
+ * An answer the office could not read: its own marker, `unavailable: "<why>"`, carried beside whatever it holds (often `rows: []`; office
+ * house-bundle.mjs: `{ rows: [], unavailable: "… unknown, not none" }`). Such an answer is MISSING, never empty: Rivet, POS-1027, "unavailable
+ * history must not masquerade as a quiet day", and "Unknown time/distance is not fabricated" (review of #420 at 40993488).
+ */
+export const unavailable = (data) => isObj(data) && data.unavailable != null && data.unavailable !== false && data.unavailable !== "";
+
+/** One part's `data` (the standalone read's own answer), or null when the part is absent, has no data, the office marked it unavailable, or the bundle did not come. */
 export function dataOf(bundle, key) {
   const p = isObj(bundle?.parts) ? bundle.parts[key] : null;
-  return isObj(p) && isObj(p.data) ? p.data : null;
+  return isObj(p) && isObj(p.data) && !unavailable(p.data) ? p.data : null;
 }
 
-/** A collection part's data, one per member: an array of `data`, or null when the collection is a named unavailability (not an array). */
+/**
+ * A collection part's data, one per member: an array of `data`, or null when the collection is a named unavailability (not an array). A member
+ * whose own data is marked unavailable is left out, so it reads as not read (a resident's day: "not read."), never as a quiet one.
+ */
 export function collectionOf(bundle, key) {
   const c = isObj(bundle?.parts) ? bundle.parts[key] : null;
   if (!Array.isArray(c)) return null;
-  return c.filter((p) => isObj(p) && isObj(p.data)).map((p) => p.data);
+  return c.filter((p) => isObj(p) && isObj(p.data) && !unavailable(p.data)).map((p) => p.data);
 }
 
 const quote = (latest) => (isObj(latest) ? str(latest.line).slice(0, 200) || null : null);
