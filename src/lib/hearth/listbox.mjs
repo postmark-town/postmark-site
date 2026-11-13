@@ -139,7 +139,8 @@ export function bindListbox(root, { doc = globalThis.document, win = globalThis.
   // THE PANE: one, shared by every badge. `pinned` holds it open after a tap or click until a tap elsewhere or Escape.
   let tipFor = null, pinned = false, keyboard = false;
   const inList = (el) => !!el && p.opts.some((o) => o.contains?.(el));
-  // under the current design's badge; for a badge in the open list, beside the list (so it covers no option), else under the list's badge
+  // under the current design's badge; for a badge in the open list, beside the list, or under the whole list where there is no room beside it (a phone), so it
+  // covers no option
   function placeTip(badge) {
     if (!p.tip || !badge?.getBoundingClientRect || !root.getBoundingClientRect) return;
     const b = badge.getBoundingClientRect(), band = root.getBoundingClientRect();
@@ -150,6 +151,7 @@ export function bindListbox(root, { doc = globalThis.document, win = globalThis.
       const l = p.list.getBoundingClientRect();
       if (l.right + 8 + w <= vw - 8) { left = l.right + 8; top = b.top - 4; }
       else if (l.left - 8 - w >= 8) { left = l.left - 8 - w; top = b.top - 4; }
+      else { left = Math.min(Math.max(l.left, 8), Math.max(8, vw - w - 8)); top = l.bottom + 6; }
     }
     p.tip.style.left = `${Math.round(left - band.left)}px`;
     p.tip.style.top = `${Math.round(top - band.top)}px`;
