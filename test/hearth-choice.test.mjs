@@ -247,4 +247,9 @@ test("§ 4 the picker says no sentence but the credit: none of the words it used
   assert.ok(!/\stitle=/.test(markup), "and no tooltip prose");
   assert.match(markup, /\{by \? `Designed by \$\{by\}` : ""\}/, "the credit, drawn by the server for the design it opens on");
   assert.match(markup, /aria-label="Save this design"/); assert.match(markup, /aria-label="Put the design back"/);
+  // Since 2026-11-13 the picker carries two more texts, by a newer ruling (Darko, 13:24 EST: "any hearths that have any scripting in it needs to be disclosed ...
+  // via a little badge next to the hearth's name in the dropdown ... an actual site UI pane hover ... super concise"): the badge's word and its pane's one
+  // sentence. Both are expressions from listbox.mjs, so the no-words check above still holds, and they are the only other text the markup draws.
+  const exprs = [...markup.matchAll(/>\s*\{([A-Z_]+)\}\s*</g)].map((m) => m[1]).sort();
+  assert.deepEqual(exprs, ["SCRIPT_BADGE", "SCRIPT_BADGE", "SCRIPT_NOTE"], "the badge (in the list and beside the current name) and its pane are the only added text");
 });

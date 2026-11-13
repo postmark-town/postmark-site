@@ -23,6 +23,7 @@
 
 import { DEFAULT_ENTRY } from "./slots.mjs";
 import { saveHearth } from "./choice.mjs";
+import { paintListbox } from "./listbox.mjs";
 
 // the words an owner must read when the office refuses: who may choose (403), and signing in (401)
 const MUST_READ = new Set([401, 403]);
@@ -107,6 +108,7 @@ export function mountHearthPicker(root, { entries, slug, saved, token, api, sign
     if ($.refused) { $.refused.textContent = v.failed?.say ?? ""; $.refused.hidden = !v.failed?.say; }
     if ($.said) $.said.textContent = v.failed?.message ?? "";
     root.dataset.hearthSaved = v.savedId ?? "";
+    paintListbox(root);   // the listbox draws the select (listbox.mjs): its name, its badge, enabled now that the picker is bound
   };
   select?.addEventListener("change", () => { picker.preview(select.value); paint(); });
   $.keep?.addEventListener("click", async () => { const p = picker.keep(); paint(); await p; paint(); });

@@ -14,16 +14,43 @@
 //
 // THE SELECT SHIPS DISABLED and is enabled when the picker mounts (stage.mjs, once the house's saved choice has been read, or has failed to be): until then it would
 // answer a change with nothing. It is on the household page only, nowhere else on the site (Darko, 2026-11-10 17:28 EST).
-interface Props { entries: { id: string; title: string; author?: string | null }[]; selected?: string | null; }
+//
+// THE SCRIPT BADGE (Darko, 2026-11-13 13:24 EST): "any hearths that have any scripting in it needs to be disclosed ... via a little badge next to the hearth's
+// name in the dropdown. Let's put it to the right. And on hover ... an actual site UI pane hover ... super concise". An <option> holds text only, so the
+// dropdown is drawn as a small listbox (lib/hearth/listbox.mjs): a combobox button and its list, each design's name with a "script" badge to its right when
+// the design runs its own script (`scripted`, from script.mjs § scriptUrlOf: the same test that decides whether it runs). The native select stays, hidden, as
+// the one source of truth that picker.mjs reads and writes. The current design's badge sits beside the button, outside the list; every badge opens the one
+// pane (`data-hearth-script-tip`), on hover, keyboard focus or a tap.
+import { SCRIPT_NOTE, SCRIPT_BADGE } from "@/lib/hearth/listbox.mjs";
+interface Props { entries: { id: string; title: string; author?: string | null; scripted?: boolean }[]; selected?: string | null; }
 const { entries, selected = null } = Astro.props;
 const by = entries.find((e) => e.id === selected)?.author ?? null;
+const current = entries.find((e) => e.id === selected) ?? entries[0] ?? null;
 ---
 <div class="hearth-pickerband" data-hearth-picker>
   {entries.length > 1 && (
-    <select data-hearth-pick disabled class="hearth-pick" aria-label="Hearth design">
+    <select data-hearth-pick disabled hidden class="hearth-pick" aria-label="Hearth design">
       {entries.map((e) => <option value={e.id} selected={selected === e.id}>{e.title}</option>)}
     </select>
   )}
+  {entries.length > 1 && (
+    <span class="hearth-lb" data-hearth-lb>
+      <button type="button" role="combobox" class="hearth-pick hearth-lb-btn" data-hearth-lb-btn aria-label="Hearth design" aria-haspopup="listbox" aria-expanded="false" aria-controls="hearth-lb-list" disabled>
+        <span data-hearth-lb-label>{current?.title ?? ""}</span>
+        <svg viewBox="0 0 12 12" width="9" height="9" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5L6 8l3.5-3.5" /></svg>
+      </button>
+      <ul class="hearth-lb-list" id="hearth-lb-list" role="listbox" aria-label="Hearth design" data-hearth-lb-list hidden>
+        {entries.map((e) => (
+          <li role="option" id={`hearth-opt-${e.id}`} data-value={e.id} data-title={e.title} aria-selected={selected === e.id ? "true" : "false"} data-scripted={e.scripted ? true : undefined} aria-describedby={e.scripted ? "hearth-script-tip" : undefined}>
+            <span class="hearth-lb-name">{e.title}</span>
+            {e.scripted && <span class="hearth-script" data-hearth-script aria-hidden="true">{SCRIPT_BADGE}</span>}
+          </li>
+        ))}
+      </ul>
+    </span>
+  )}
+  <button type="button" class="hearth-script hearth-script-now" data-hearth-script-now aria-describedby="hearth-script-tip" hidden={!current?.scripted}>{SCRIPT_BADGE}</button>
+  <span class="hearth-script-tip" id="hearth-script-tip" role="tooltip" data-hearth-script-tip hidden>{SCRIPT_NOTE}</span>
   <span class="hearth-acts" data-hearth-acts hidden>
     <button type="button" class="hearth-keep" data-hearth-keep aria-label="Save this design">
       <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>

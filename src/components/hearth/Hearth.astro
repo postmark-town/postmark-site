@@ -45,6 +45,7 @@ import { likenessLink, likenessWords } from "@/lib/appearance.mjs";
 import { entries } from "@/lib/hearth/registry.mjs";
 import { whichDesign } from "@/lib/hearth/which-design.mjs";
 import { SLOT_NAMES } from "@/lib/hearth/slots.mjs";
+import { isScripted } from "@/lib/hearth/listbox.mjs";
 import { HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
 
 interface Props {
@@ -66,8 +67,9 @@ const faces = members.map((r) => residentFace(r, media, homePictureOf(r.handle))
 const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   name: f.name, accent: f.accent, avatar: f.avatar, monogram: f.monogram, windowHung: f.windowHung,
 }]));
-// the dropdown lists the registered designs and starts on the one the server draws
-const pickable = entries.map((e) => ({ id: e.id, title: e.title, author: e.author }));
+// the dropdown lists the registered designs and starts on the one the server draws; a design that runs its own script carries the badge (listbox.mjs § isScripted:
+// the same test that decides whether the page runs it)
+const pickable = entries.map((e) => ({ id: e.id, title: e.title, author: e.author, scripted: isScripted(e) }));
 const likeness = likenessWords(house, faces.length);
 
 // the bulletin's open notices, newest first: public, baked, the same file the bulletin page reads

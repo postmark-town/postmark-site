@@ -40,6 +40,7 @@ import { whichDesign } from "./which-design.mjs";
 import { notYours, meAnswered } from "./not-yours.mjs";
 import { designNote, readSavedHearth } from "./choice.mjs";
 import { mountHearthPicker } from "./picker.mjs";
+import { bindListbox, paintListbox } from "./listbox.mjs";
 
 import { DEFAULT_ENTRY as DEFAULT } from "./slots.mjs";
 
@@ -196,7 +197,7 @@ export function mountHearth(root, { loadScript } = {}) {
     stage.replaceChildren(tpl.content);
     mountBehaviors(stage);
     startScript(entry);
-    if (picker) picker.value = entry.id;
+    if (picker) { picker.value = entry.id; paintListbox(pickerRoot); }
     root.dataset.hearthShowing = entry.id;
     say(asked && asked !== entry.id ? `No Hearth entry is registered as “${asked.slice(0, 40)}”; showing ${entry.title}.` : "");
     ctx.expanded = false;
@@ -234,6 +235,8 @@ export function mountHearth(root, { loadScript } = {}) {
   // check and the x, which picker.mjs shows when `signedIn()` holds: a sign-in that holds one of this house's residents, and never on a failed read (the kept
   // choice is not known then, so nothing is offered to save over it). A visitor's keep() does nothing.
   const pickerRoot = root.querySelector("[data-hearth-picker]");
+  // the dropdown is drawn as a listbox, so a scripted design carries its badge (listbox.mjs): bound now, disabled until the picker mounts (it mirrors the select)
+  if (pickerRoot) bindListbox(pickerRoot);
   const api = officeOrigin();
   function mountPicker() {
     if (mounted || !pickerRoot || !savedDone) return;
@@ -286,6 +289,6 @@ export function mountHearth(root, { loadScript } = {}) {
     const note = designNote(entries, { entry: asked, saved: read });
     if (note) say(!readOk && baked && drawn?.id === baked ? "The house's saved Hearth could not be read just now; showing the one this page was built with." : note);
     mountPicker();
-    if (picker && drawn) picker.value = drawn.id;
+    if (picker && drawn) { picker.value = drawn.id; paintListbox(pickerRoot); }
   });
 }
