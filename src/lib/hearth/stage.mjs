@@ -43,7 +43,9 @@ import { mountHearthPicker } from "./picker.mjs";
 
 import { DEFAULT_ENTRY as DEFAULT } from "./slots.mjs";
 
-export function mountHearth(root) {
+// `loadScript` is the importer for a design's own script (script.mjs § runEntryScript's `load`): the page passes nothing and gets the real import; a
+// test hands a fake, so it can run this whole stage with a house script on it.
+export function mountHearth(root, { loadScript } = {}) {
   const stage = root.querySelector("[data-hearth-stage]");
   if (!stage) return;
   // the site's own strip (Hearth.astro) sits above the stage, outside every template
@@ -84,7 +86,9 @@ export function mountHearth(root) {
   // same answer paints the site's v2 slots and is handed to the entry's script. `scriptState` is what the script's getters read (hearthApi).
   let bundle = null, hung = null, stopScript = () => {}, scriptSeq = 0;
   const listeners = { bundle: new Set(), view: new Set() };
-  const scriptState = { bundle: null, owner: false, token };
+  // `saved` is the house's saved Hearth choice as this page knows it (knownSaved, below): a design that is not it is only a preview, and its script's
+  // acts are refused (script.mjs § isChosenDesign; POS-1029/a, "Where chosen; previews read-only").
+  const scriptState = { bundle: null, owner: false, token, saved: () => knownSaved };
   const house = Object.freeze({
     slug, key, handles: [...handles],
     residents: handles.map((h) => Object.freeze({ handle: h, name: faces[h]?.name ?? h, accent: faces[h]?.accent ?? null, avatar: faces[h]?.avatar ?? null })),
@@ -104,7 +108,7 @@ export function mountHearth(root) {
     const seq = ++scriptSeq;
     if (!entry?.script) return;
     const hearth = hearthApi({ entryId: entry.id, stage, house, api: officeOrigin(), state: scriptState, listeners });
-    runEntryScript(entry, hearth).then((stop) => { if (seq === scriptSeq) stopScript = stop; else stop(); });
+    runEntryScript(entry, hearth, { load: loadScript }).then((stop) => { if (seq === scriptSeq) stopScript = stop; else stop(); });
   }
   let reads = null, extras = null, extrasAsked = false, readFor = "", stopCount = () => {};
   // THE SAVED CHOICE (POS-962). `baked` is the build's own copy (Hearth.astro bakes house.hearth from households.json, the registry readSavedHearth reads): the first
@@ -246,6 +250,8 @@ export function mountHearth(root) {
       if (id === (savedId ?? DEFAULT)) url.searchParams.delete("entry"); else url.searchParams.set("entry", id);
       history.replaceState(null, "", url);
     } catch { /* the entry still shows; only the address is not kept */ }
+    // the picker's kept design is the saved choice now (a green check moves it): a design the house just kept acts at once, without a reload
+    if (mounted) knownSaved = mounted.picker.view().savedId ?? null;
     compose(id);
   };
   phone.addEventListener?.("change", draw);

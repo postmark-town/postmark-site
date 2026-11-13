@@ -18,7 +18,7 @@ import { sanitizeHtml } from "../src/lib/hearth/sanitize-html.mjs";
 import { sanitizeCss, stageFor } from "../src/lib/hearth/sanitize-css.mjs";
 import { prepareEntry, fingerprint } from "../src/lib/hearth/entries.mjs";
 import { dataOf, collectionOf, pairsOf, tiesOf, wentOf, feedOf, dayOf, humanLogOf, partsFor, safeHref, bundleUrl, bundleFrom, unreadable, feedShown } from "../src/lib/hearth/bundle.mjs";
-import { scriptUrlOf, hearthApi, runEntryScript, emit, NOT_YOUR_HOUSE } from "../src/lib/hearth/script.mjs";
+import { scriptUrlOf, hearthApi, runEntryScript, emit, NOT_YOUR_HOUSE, PREVIEW_ONLY, isChosenDesign } from "../src/lib/hearth/script.mjs";
 import { syncHearths } from "../tools/sync-hearths.mjs";
 import { CHANNEL_HEADER } from "../src/lib/office-write.mjs";
 import { hearthPolicy } from "../tools/lib/hearth-csp.mjs";
@@ -364,7 +364,8 @@ test("the script runs with the public bundle, hears it land, and its stop runs w
 test("a script reads public data signed out, and acts only for the house's own signed-in human, through the doors' web twins with the site header", async () => {
   const seen = [];
   const fetchImpl = async (url, init) => { seen.push({ url, init }); return { ok: true, status: 200, json: async () => ({ fine: true }) }; };
-  const state = { bundle: null, owner: false, token: () => "reader-token" };
+  // `saved` names this design: the house chose it (POS-1029/a). Until 2026-11-13 the state carried no saved choice and the owner acted on any drawn design.
+  const state = { bundle: null, owner: false, token: () => "reader-token", saved: () => "glow" };
   const hearth = hearthApi({ entryId: "glow", stage: fakeStage(), house: {}, api: "https://o.test", state, listeners: { bundle: new Set(), view: new Set() }, fetchImpl });
   assert.deepEqual(await hearth.read("/mail/fox?box=outbox"), { fine: true });
   assert.equal(seen[0].url, "https://o.test/mail/fox?box=outbox");
@@ -382,6 +383,80 @@ test("a script reads public data signed out, and acts only for the house's own s
   assert.equal(seen[1].init.headers[CHANNEL_HEADER], "web", "the act files as the human's, on the site");
   assert.deepEqual(JSON.parse(seen[1].init.body), { do: "stake", args: { post: "p", stamps: 1 } });
   assert.equal(hearth.view, "owner");
+});
+
+// ── POS-1029/a: previews read-only ────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// LAW (Darko, 2026-11-13 13:1x EST, POS-1029/a): "Where chosen; previews read-only". A house that picks a scripted design gets its script in full. In a
+// preview (`?entry=`, or any design that isn't the house's saved choice), the script runs, but `hearth.act` does nothing and says so.
+const R1029 = "POS-1029/a: \"Where chosen; previews read-only\"";
+
+function actRig({ entryId = "glow", owner = true, saved }) {
+  const seen = [];
+  const fetchImpl = async (url, init) => { seen.push({ url, init }); return { ok: true, status: 200, json: async () => ({ fine: true }) }; };
+  const state = { bundle: null, owner, token: () => "reader-token", ...(saved === undefined ? {} : { saved: () => saved }) };
+  const hearth = hearthApi({ entryId, stage: fakeStage(), house: {}, api: "https://o.test", state, listeners: { bundle: new Set(), view: new Set() }, fetchImpl });
+  return { hearth, seen, state };
+}
+const STAKE = { door: "town", do: "stake", args: { post: "p", stamps: 1 } };
+
+test("chosen + owner: the house's own human acts through the design the house saved", async () => {
+  const { hearth, seen } = actRig({ saved: "glow" });
+  const r = await hearth.act(STAKE);
+  assert.equal(r.ok, true, R1029);
+  assert.equal(seen.length, 1, "one act sent");
+  assert.equal(seen[0].url, "https://o.test/town/apex");
+  assert.notEqual(r, PREVIEW_ONLY);
+});
+
+test("preview + owner: a design that is not the house's saved choice runs, but its act is refused, says so, and sends nothing", async () => {
+  // control first: the same rig with only `saved` changed acts (the rig's writer is live, so "nothing sent" below is the gate's doing)
+  const control = actRig({ saved: "glow" });
+  assert.equal((await control.hearth.act(STAKE)).ok, true, "control: chosen, the same rig sends");
+  assert.equal(control.seen.length, 1);
+  for (const saved of ["ledger", null]) {   // another design kept, or none kept (the default is the house's Hearth then)
+    const { hearth, seen } = actRig({ saved });
+    const r = await hearth.act(STAKE);
+    assert.equal(r, PREVIEW_ONLY, `saved ${saved}: ${R1029}`);
+    assert.equal(r.ok, false);
+    assert.equal(r.refused, "preview");
+    assert.match(r.body.defect, /only being previewed here; it can act only on a house that chose it/, "it says so");
+    assert.equal(seen.length, 0, `saved ${saved}: a preview's act sends nothing`);
+    assert.equal(hearth.view, "owner", "the reader is the owner: the refusal is the preview's, not the sign-in's");
+  }
+});
+
+test("preview via ?entry=: the stage's saved choice is what decides, so a link's design is read-only even for the owner, and acts once the house keeps it", async () => {
+  // the stage hands state.saved = () => knownSaved; a ?entry=glow link on a house that kept ledger draws glow with saved still "ledger"
+  let saved = "ledger";
+  const { hearth, seen } = actRig({ saved: "x" });
+  const state = { bundle: null, owner: true, token: () => "reader-token", saved: () => saved };
+  const fetchImpl = async (url, init) => { seen.push({ url, init }); return { ok: true, status: 200, json: async () => ({ fine: true }) }; };
+  const linked = hearthApi({ entryId: "glow", stage: fakeStage(), house: {}, api: "https://o.test", state, listeners: { bundle: new Set(), view: new Set() }, fetchImpl });
+  assert.equal(await linked.act(STAKE), PREVIEW_ONLY, R1029);
+  assert.equal(seen.length, 0);
+  saved = "glow";   // the owner keeps it (the picker's green check): checked at each act, so it acts now without a reload
+  assert.equal((await linked.act(STAKE)).ok, true);
+  assert.equal(seen.length, 1);
+  assert.equal((await hearth.act(STAKE)), PREVIEW_ONLY, "and the rig's other design (saved \"x\") is still read-only");
+});
+
+test("visitor: refused as before, NOT_YOUR_HOUSE, on the chosen design and on a preview alike; nothing sent", async () => {
+  for (const saved of ["glow", "ledger"]) {
+    const { hearth, seen } = actRig({ owner: false, saved });
+    assert.equal(await hearth.act(STAKE), NOT_YOUR_HOUSE, `saved ${saved}`);
+    assert.equal(seen.length, 0);
+  }
+});
+
+test("isChosenDesign: the saved id, or the default when the house chose nothing; a caller that never says chooses only the default (fail closed)", () => {
+  const cases = [
+    ["glow", "glow", true], ["glow", "ledger", false], ["glow", null, false], ["glow", undefined, false], ["glow", "", false],
+    ["default", null, true], ["default", undefined, true], ["default", "glow", false], [undefined, undefined, false], ["", "", false],
+  ];
+  const got = Object.fromEntries(cases.map(([e, s]) => [`${e}|${s}`, isChosenDesign(e, s)]));
+  assert.deepEqual(got, Object.fromEntries(cases.map(([e, s, want]) => [`${e}|${s}`, want])));
+  // a state without `saved` (an old caller): a scripted design's act is refused
+  return actRig({ saved: undefined }).hearth.act(STAKE).then((r) => assert.equal(r, PREVIEW_ONLY));
 });
 
 test("NO SANDBOX (text pin, comments stripped): the scripted part is a module of the page, never a frame; the windows slot keeps the windows' own frame", () => {

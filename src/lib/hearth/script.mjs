@@ -23,6 +23,8 @@
 //   hearth.read(p)   a public office read by path ("/mail/wright?box=outbox"), signed out; the answer or null
 //   hearth.act(a)    { door: "household"|"world"|"town", do, args }: one act through that door's web twin, the same call MCP makes, as the
 //                    site (office-write.mjs). Only the house's OWN signed-in human acts: on anyone else's sign-in it refuses and sends nothing.
+//                    And only WHERE CHOSEN: a design drawn as a preview (`?entry=`, the dropdown, any design that is not the house's saved
+//                    Hearth) still runs, but its act answers PREVIEW_ONLY and sends nothing (below, isChosenDesign).
 //   hearth.api       the office's address
 //
 // A script exports a default function (or `mount`) taking `hearth`; it may return a function, called when the reader switches to another design.
@@ -30,6 +32,7 @@
 
 import { sendAct } from "../office-write.mjs";
 import { partsFor } from "./bundle.mjs";
+import { DEFAULT_ENTRY } from "./slots.mjs";
 
 /** The address an entry's script is served at, versioned by its content so a new merge is never read from a stale cache. null without a script. */
 export function scriptUrlOf(entry) {
@@ -44,9 +47,31 @@ export const NOT_YOUR_HOUSE = Object.freeze({
   body: { defect: "only this house's own signed-in human acts from its Hearth", hint: "sign in with GitHub as this house's human" },
 });
 
+// THE RULING (Darko, 2026-11-13 13:1x EST, POS-1029/a): "Where chosen; previews read-only". A house that picks a scripted design gets its script in
+// full. In a preview (`?entry=`, or any design that isn't the house's saved choice), the script runs, but `hearth.act` does nothing and says so, so a
+// link can never make someone act through a design they didn't choose.
+export const PREVIEW_ONLY = Object.freeze({
+  ok: false, status: 403, refused: "preview",
+  body: Object.freeze({
+    defect: "This design is only being previewed here; it can act only on a house that chose it.",
+    hint: "the house's own human can keep this design in the Hearth dropdown; then it acts",
+  }),
+});
+
 /**
- * The object a script is handed. `state` is the stage's live view of the page: { bundle, owner, token }, read through getters so the script
- * always sees the newest; `listeners` is where on() keeps its callbacks.
+ * Is `entryId` the house's own chosen design? `saved` is the house's saved choice as the page knows it (stage.mjs § knownSaved): an entry id, or
+ * null when the house chose nothing, whose Hearth is Postmark's default. Anything else (undefined: a caller that never said) chooses only the default,
+ * so a scripted design is read-only unless the saved choice names it.
+ */
+export function isChosenDesign(entryId, saved) {
+  const chosen = typeof saved === "string" && saved ? saved : DEFAULT_ENTRY;
+  return typeof entryId === "string" && entryId === chosen;
+}
+
+/**
+ * The object a script is handed. `state` is the stage's live view of the page: { bundle, owner, token, saved }, read through getters so the script
+ * always sees the newest (`saved()` is the house's saved Hearth choice, which decides whether this design is chosen or only previewed); `listeners`
+ * is where on() keeps its callbacks.
  */
 export function hearthApi({ entryId, stage, house, api, state, listeners, fetchImpl = globalThis.fetch }) {
   const on = (event, fn) => {
@@ -74,6 +99,7 @@ export function hearthApi({ entryId, stage, house, api, state, listeners, fetchI
     },
     async act({ door, do: verb, args } = {}) {
       if (!state.owner) return NOT_YOUR_HOUSE;
+      if (!isChosenDesign(entryId, state.saved?.())) return PREVIEW_ONLY;   // POS-1029/a: previews read-only, checked at each act (a save can change it)
       const token = state.token?.();
       if (!token) return NOT_YOUR_HOUSE;
       return sendAct({ base: api, door, body: { do: verb, args: args ?? {} }, token, fetchImpl });
