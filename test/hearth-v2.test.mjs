@@ -17,7 +17,7 @@ import { SLOTS, SLOT_NAMES, slotTag, LIMITS } from "../src/lib/hearth/slots.mjs"
 import { sanitizeHtml } from "../src/lib/hearth/sanitize-html.mjs";
 import { sanitizeCss, stageFor } from "../src/lib/hearth/sanitize-css.mjs";
 import { prepareEntry, fingerprint } from "../src/lib/hearth/entries.mjs";
-import { partOf, tiesOf, wentOf, feedOf, dayOf, safeHref, bundleUrl, bundleFrom } from "../src/lib/hearth/bundle.mjs";
+import { dataOf, collectionOf, pairsOf, tiesOf, wentOf, feedOf, dayOf, humanLogOf, partsFor, safeHref, bundleUrl, bundleFrom } from "../src/lib/hearth/bundle.mjs";
 import { scriptUrlOf, hearthApi, runEntryScript, emit, NOT_YOUR_HOUSE } from "../src/lib/hearth/script.mjs";
 import { syncHearths } from "../tools/sync-hearths.mjs";
 import { CHANNEL_HEADER } from "../src/lib/office-write.mjs";
@@ -68,85 +68,140 @@ test("a design may style the owner's view apart from a visitor's (data-hearth-vi
   assert.ok((slot.match(/data-hearth-part="caption"/g) ?? []).length >= 10);
 });
 
-// ── the bundle (coded against the proposal's draft shape; POS-1027 had posted none) ──────────────────────────────────────────────────────────
+// ── the bundle: POS-1027's settled envelope (Rivet, 2026-11-13) ──────────────────────────────────────────────────────────────────────────────
+// Until 2026-11-13 these tests read the proposal's draft shape (closer rows per resident with out/in, pairs as rows with quote_a/quote_b, a `day`
+// map). The office settled `{ read: "hearth", household, parts }`, each part `{ via, data }` with `data` the standalone read's own answer; the
+// tests below hold the same rules on that shape.
 
 const HOUSE = ["fox", "owl"];
+const via = (door, read, args = {}) => ({ door, read, args });
+const part = (door, read, data, args) => ({ via: via(door, read, args), data });
 const BUNDLE = {
-  household: "fox+owl",
+  read: "hearth", household: "fox-and-owl",
   parts: {
-    closer: { read: "closer", rows: [
-      { handle: "fox", with: "hare", out: 4, in: 3, stamps: 5, latest_at: "2026-11-12T10:00:00Z", milestones: [{ name: "first letter" }] },
-      { handle: "owl", with: "wren", out: 1, in: 0 },
-      { handle: "stranger", with: "hare", out: 50, in: 50 },
-    ] },
-    pairs: { read: "pair", rows: [{ a: "hare", b: "fox", quote_a: "Come by the mill.", quote_b: "I will, at dusk." }] },
-    went: { read: "stamps", view: "went", rows: [
-      { at: "2026-11-10T00:00:00Z", handle: "fox", kind: "pot", stamps: 5, title: "the meeps fund", href: "/fund/meeps-fund/" },
-      { at: "2026-11-11T00:00:00Z", handle: "owl", kind: "idea", stamps: 2, title: "a bigger porch", href: "https://evil.example/" },
-      { at: "2026-11-11T00:00:00Z", handle: "fox", kind: "pot", stamps: 3, title: "again" },
-      { handle: "fox", kind: "pot", stamps: 0 },
-    ] },
-    feed: { read: "feed", rows: [
-      { kind: "idea", at: "2026-11-12T00:00:00Z", title: "Lanterns on the quay", href: "/posts/x/", backed: 2 },
-      { kind: "event", at: "2026-11-13T00:00:00Z", title: "Bread night", backed: 9 },
-      { kind: "idea", title: "" },
-    ] },
-    day: { read: "day", residents: { fox: { date: "2026-11-13", lines: ["wrote 2 letters, to hare and wren"] }, owl: { date: "2026-11-13", lines: [] } } },
+    closer: part("household", "closer", { read: "closer", household: "fox-and-owl", rows: [
+      { with: "hare", of: "The Warren", letters: 7, milestones: [{ by: "fox", rung: "first letter", day: "2026-11-01" }], stamps_between: 5, last_at: "2026-11-12T10:00:00Z" },
+      { with: "wren", of: null, letters: 1, last_at: "2026-11-10T00:00:00Z" },
+      { with: "robin", of: null, letters: 2, last_at: "2026-11-09T00:00:00Z" },
+      { with: "owl", letters: 50 },        // a housemate: the office never lists one (closerRows), and the site never draws one
+      { with: "hare", letters: 3 },        // a correspondent listed twice: one row
+    ] }, { household: "fox-and-owl", limit: 10 }),
+    pairs: [
+      part("town", "pair", { a: "fox", b: "hare", letters: { a_to_b: 4, b_to_a: 3 }, milestones: [],
+        latest: { a_to_b: { id: "l1", delivered_at: "2026-11-11T12:00:00Z", line: "I will, at dusk." }, b_to_a: { id: "l2", delivered_at: "2026-11-12T10:00:00Z", line: "Come by the mill." } } }, { a: "fox", b: "hare" }),
+      part("town", "pair", { a: "owl", b: "hare", letters: { a_to_b: 1, b_to_a: 0 }, latest: { a_to_b: { line: "Hello, hare." }, b_to_a: null } }, { a: "owl", b: "hare" }),
+      part("town", "pair", { a: "owl", b: "wren", letters: { a_to_b: 1, b_to_a: 0 }, latest: { a_to_b: null, b_to_a: null } }, { a: "owl", b: "wren" }),
+    ],
+    went: part("household", "stamps", { read: "stamps", view: "went", rows: [
+      { at: "2026-11-10T00:00:00Z", date: "2026-11-10", from: "fox", to: "meeps-fund", stamps: 5, for: "the-meeps-fund", kind: "pot", href: "/fund/meeps-fund/" },
+      { at: "2026-11-11T00:00:00Z", date: "2026-11-11", from: "owl", to: "wren/a-bigger-porch", stamps: 2, for: "a-bigger-porch", kind: "idea", href: "https://evil.example/" },
+      { at: "2026-11-11T00:00:00Z", date: "2026-11-11", from: "fox", to: "meeps-fund", stamps: 3, for: "again", kind: "pot" },
+      { from: "fox", stamps: 0, kind: "pot" },
+      { from: "stranger", to: "x", stamps: 9, kind: "gift" },
+    ] }),
+    happened: part("household", "happened", { read: "happened", rows: [
+      { at: "2026-11-13T10:00:00Z", hand: "human", for: "fox", verb: "rsvp", object: "bread-night", by: "Fox and Owl's human for fox" },
+      { at: "2026-11-13T11:00:00Z", hand: "owl", for: "owl", verb: "say", object: null },
+    ] }),
+    feed: part("town", "feed", { sort: "newest", kinds: null, cursor: "c1", rows: [
+      { id: "i1", kind: "idea", at: "2026-11-12T00:00:00Z", title: "Lanterns on the quay", href: "/posts/x/", backing: 2 },
+      { id: "e1", kind: "event", at: "2026-11-13T00:00:00Z", title: "Bread night", backing: 9 },
+      { id: "x", kind: "idea", title: "" },
+    ] }),
+    days: [
+      part("household", "day", { handle: "fox", date: "2026-11-13", sentences: ["wrote 2 letters, to hare and wren"], counts: { letters: 2 } }, { handle: "fox", date: "2026-11-13" }),
+      part("household", "day", { handle: "owl", date: "2026-11-13", sentences: ["A quiet day."], counts: {} }, { handle: "owl", date: "2026-11-13" }),
+    ],
   },
 };
 
-test("a bundle that did not come, or a part it does not carry, folds to null: its slot draws nothing", () => {
-  for (const f of [tiesOf, wentOf, dayOf]) assert.equal(f(null, HOUSE), null);
-  assert.equal(feedOf(null), null);
-  assert.equal(tiesOf({ parts: {} }, HOUSE), null, "no closer part: no ties, not 'no ties'");
-  assert.equal(partOf({ closer: { rows: [] } }, "closer").rows.length, 0, "a flat answer reads the same way");
+test("THE ENVELOPE (POS-1027): only { read: \"hearth\", household, parts } is a bundle; each part's data is read through its { via, data }", () => {
+  // LAW (POS-1027, Rivet): "The response is `{ read: \"hearth\", household: \"<canonical slug>\", parts }`." "Each part is `{ via: { door, read, args }, data }`".
+  assert.equal(bundleFrom(BUNDLE), BUNDLE);
+  assert.equal(bundleFrom({ ...BUNDLE, read: "house" }), null, "another read is not the bundle");
+  assert.equal(bundleFrom({ household: "fox-and-owl", parts: BUNDLE.parts }), null, "no `read`: not the bundle (the draft shape had none)");
+  assert.equal(bundleFrom({ read: "hearth", parts: BUNDLE.parts }), null, "no household: not the bundle");
+  assert.equal(bundleFrom({ read: "hearth", household: "x" }), null, "no parts: not the bundle");
+  assert.equal(bundleFrom({ read: "hearth", household: "x", parts: [] }), null, "parts must be keyed, not a list");
   assert.equal(bundleFrom({ error: "no such read" }), null, "a refusal (the read not shipped yet) is not a bundle");
   assert.equal(bundleFrom([]), null);
-  assert.ok(bundleFrom(BUNDLE));
+  assert.equal(dataOf(BUNDLE, "closer").rows.length, 5, "a part's data is the standalone read's answer");
+  assert.equal(dataOf({ ...BUNDLE, parts: { closer: { via: via("household", "closer") } } }, "closer"), null, "a part with no data is no answer");
+  assert.equal(dataOf({ ...BUNDLE, parts: { closer: BUNDLE.parts.closer.data } }, "closer"), null, "a bare answer without its { via, data } is not a part");
+  assert.equal(collectionOf(BUNDLE, "days").length, 2);
+  assert.equal(collectionOf({ ...BUNDLE, parts: { days: { unavailable: "the house could not be read" } } }, "days"), null,
+    "a named unavailability (not an array) is no collection: 'return its named unavailability rather than inventing an empty `days` or `pairs`'");
   assert.equal(bundleUrl("https://postmark.town/api", "fox+owl"), "https://postmark.town/api/household?read=hearth&household=fox%2Bowl");
 });
 
-test("ties: the house's own residents only, most letters first, with the newest line each way by rule, the right way round", () => {
+test("a bundle that did not come, or a part it does not carry, folds to null: its slot draws nothing", () => {
+  for (const f of [tiesOf, wentOf, dayOf, pairsOf]) assert.equal(f(null, HOUSE), null);
+  assert.equal(feedOf(null), null);
+  assert.equal(humanLogOf(null), null);
+  assert.equal(tiesOf({ ...BUNDLE, parts: {} }, HOUSE), null, "no closer part: no ties, not 'no ties'");
+  assert.equal(dayOf({ ...BUNDLE, parts: { days: { unavailable: "x" } } }, HOUSE), null, "an unavailable collection draws nothing, not a quiet day");
+  assert.deepEqual(Object.keys(partsFor(BUNDLE, HOUSE)).sort(), ["days", "feed", "humanLog", "pairs", "ties", "went"], "what a house's script reads as hearth.parts");
+  assert.deepEqual(Object.values(partsFor(null, HOUSE)), [null, null, null, null, null, null]);
+});
+
+test("ties: one row per correspondent, most letters first, joined to the resident who writes them most, with the newest line each way, the right way round", () => {
   const t = tiesOf(BUNDLE, HOUSE);
-  assert.deepEqual(t.rows.map((r) => [r.handle, r.with, r.letters]), [["fox", "hare", 7], ["owl", "wren", 1]], "a resident of another house is not drawn here");
-  // the pair is stored hare→fox; for fox's row, fox's own line is quote_b
-  assert.equal(t.rows[0].quoteOut, "I will, at dusk.");
-  assert.equal(t.rows[0].quoteIn, "Come by the mill.");
+  assert.deepEqual(t.rows.map((r) => [r.handle, r.with, r.letters]), [["fox", "hare", 7], [null, "robin", 2], ["owl", "wren", 1]],
+    "a housemate is never drawn; a correspondent listed twice is one row; one with no pair on the page is the house's");
+  // fox wrote hare "I will, at dusk." (a_to_b, fox being a) and hare wrote fox "Come by the mill." (b_to_a)
+  assert.deepEqual([t.rows[0].out, t.rows[0].in, t.rows[0].quoteOut, t.rows[0].quoteIn], [4, 3, "I will, at dusk.", "Come by the mill."]);
   assert.deepEqual(t.rows[0].milestones, ["first letter"]);
-  assert.deepEqual(tiesOf({ parts: { closer: { rows: [] } } }, HOUSE).rows, [], "an answered closer with no rows is an honest none");
-  // two residents of the house who write each other: one row, not one from each side (control: a pair with an outsider keeps its row)
-  const inside = tiesOf({ parts: { closer: { rows: [{ handle: "fox", with: "owl", out: 2, in: 1 }, { handle: "owl", with: "fox", out: 1, in: 2 }, { handle: "owl", with: "hare", out: 1, in: 0 }] } } }, HOUSE);
-  assert.deepEqual(inside.rows.map((r) => `${r.handle}>${r.with}`), ["fox>owl", "owl>hare"]);
-  // the office lists the pair from the later-sorting side only (a per-resident top list): the pair still draws, once (review of #420)
-  const oneSide = tiesOf({ parts: { closer: { rows: [{ handle: "owl", with: "fox", out: 4, in: 4 }] } } }, HOUSE);
-  assert.deepEqual(oneSide.rows.map((r) => `${r.handle}>${r.with}`), ["owl>fox"]);
+  assert.equal(t.rows[0].stamps, 5);
+  assert.deepEqual([t.rows[1].out, t.rows[1].in], [null, null], "no pair: no direction is made up");
+  assert.deepEqual([t.rows[2].quoteOut, t.rows[2].quoteIn], [null, null], "a pair with no letter delivered either way has no quote");
+  assert.deepEqual(tiesOf({ ...BUNDLE, parts: { closer: part("household", "closer", { rows: [] }) } }, HOUSE).rows, [], "an answered closer with no rows is an honest none");
+  // the strongest pair wins whichever order the office lists them in (until 2026-11-13: the in-house pair from either side, on the draft shape)
+  const flipped = { ...BUNDLE, parts: { ...BUNDLE.parts, pairs: [...BUNDLE.parts.pairs].reverse() } };
+  assert.equal(tiesOf(flipped, HOUSE).rows[0].handle, "fox");
   // eight rows, quotes on the first three only (Darko 2026-11-11 on small text)
-  const many = { parts: { closer: { rows: Array.from({ length: 11 }, (_, i) => ({ handle: "fox", with: "w" + i, out: 20 - i, in: 0 })) }, pairs: { rows: Array.from({ length: 11 }, (_, i) => ({ a: "fox", b: "w" + i, quote_a: "q" + i })) } } };
+  const many = { ...BUNDLE, parts: {
+    closer: part("household", "closer", { rows: Array.from({ length: 11 }, (_, i) => ({ with: "w" + i, letters: 20 - i })) }),
+    pairs: Array.from({ length: 11 }, (_, i) => part("town", "pair", { a: "fox", b: "w" + i, letters: { a_to_b: 20 - i, b_to_a: 0 }, latest: { a_to_b: { line: "q" + i }, b_to_a: null } })),
+  } };
   const m = tiesOf(many, HOUSE);
   assert.deepEqual([m.rows.length, m.total], [8, 11]);
   assert.deepEqual(m.rows.map((r) => r.quoteOut), ["q0", "q1", "q2", null, null, null, null, null]);
 });
 
-test("stamps that went: grouped by kind, totals from the rows, zero rows dropped, and an outside link never carried", () => {
+test("pairs (what a script draws ties from): the house's residents to outsiders only, letters each way, strongest first", () => {
+  const p = pairsOf(BUNDLE, HOUSE);
+  assert.deepEqual(p.map((r) => [r.handle, r.with, r.out, r.in]), [["fox", "hare", 4, 3], ["owl", "hare", 1, 0], ["owl", "wren", 1, 0]]);
+  const odd = { ...BUNDLE, parts: { pairs: [part("town", "pair", { a: "fox", b: "owl", letters: { a_to_b: 9, b_to_a: 9 } }), part("town", "pair", { a: "stranger", b: "hare", letters: { a_to_b: 9 } })] } };
+  assert.deepEqual(pairsOf(odd, HOUSE), [], "a pair inside the house, or one whose `a` is not the house's, is not drawn");
+});
+
+test("stamps that went: grouped by kind, totals from the rows, zero rows dropped, another house's row dropped, an outside link never carried", () => {
   const w = wentOf(BUNDLE, HOUSE);
   assert.deepEqual(w.groups.map((g) => [g.kind, g.total, g.rows.length]), [["pot", 8, 2], ["idea", 2, 1]]);
   assert.equal(w.total, 10);
   assert.equal(w.groups[1].rows[0].href, null, "a https link from the bundle is not put on the page");
   assert.equal(w.groups[0].rows.find((r) => r.title === "the meeps fund").href, "/fund/meeps-fund/");
+  assert.equal(wentOf({ ...BUNDLE, parts: { went: part("household", "stamps", { rows: [{ from: "fox", stamps: 4 }] }) } }, HOUSE).groups[0].kind, "other", "a row with no kind yet is 'elsewhere', not dropped");
   assert.equal(safeHref("//evil.example/"), null);
   assert.equal(safeHref("javascript:alert(1)"), null);
 });
 
-test("the town feed: titled rows only, newest first, and 'nearest' offered only when a row carries a distance", () => {
+test("the town feed: titled rows only, newest first, backing read; 'nearest' offered only when a row carries a distance", () => {
   const f = feedOf(BUNDLE);
-  assert.deepEqual(f.rows.map((r) => r.title), ["Bread night", "Lanterns on the quay"]);
+  assert.deepEqual(f.rows.map((r) => [r.title, r.backed]), [["Bread night", 9], ["Lanterns on the quay", 2]]);
   assert.deepEqual(f.sorts, ["newest", "backed"]);
-  assert.deepEqual(feedOf({ parts: { feed: { rows: [{ title: "x", near: 40 }] } } }).sorts, ["newest", "backed", "near"]);
+  assert.deepEqual(feedOf({ ...BUNDLE, parts: { feed: part("town", "feed", { rows: [{ title: "x", distance: 40 }] }) } }).sorts, ["newest", "backed", "near"]);
 });
 
-test("a resident's day: in the house's order; a quiet day is said as answered, a missing one as not read", () => {
+test("a resident's day: in the house's order, the office's own sentences; a quiet day is the office's quiet sentence, a resident it did not read is not read", () => {
   const d = dayOf(BUNDLE, [...HOUSE, "newt"]);
-  assert.deepEqual(d.rows.map((r) => [r.handle, r.lines.length, r.answered]), [["fox", 1, true], ["owl", 0, true], ["newt", 0, false]]);
+  assert.deepEqual(d.rows.map((r) => [r.handle, r.lines, r.answered]),
+    [["fox", ["wrote 2 letters, to hare and wren"], true], ["owl", ["A quiet day."], true], ["newt", [], false]]);
+});
+
+test("the human's own record: the public happened rows whose hand is the human's", () => {
+  assert.deepEqual(humanLogOf(BUNDLE).map((r) => [r.words, r.for]), [["rsvp bread night", "fox"]]);
+  assert.deepEqual(humanLogOf({ ...BUNDLE, parts: { happened: part("household", "happened", { rows: [] }) } }), [], "answered, none: an honest none");
 });
 
 // ── the house's own script ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -210,6 +265,9 @@ test("the script runs with the public bundle, hears it land, and its stop runs w
   emit(listeners, "bundle", BUNDLE);
   assert.equal(heard, BUNDLE);
   assert.equal(hearth.bundle, BUNDLE, "the getter reads the newest");
+  // hearth.parts: the same bundle, folded by the site, so a script never parses the office's rows (this house is fox alone: owl's pairs are not its)
+  assert.equal(hearth.parts.pairs[0].with, "hare");
+  assert.equal(hearth.parts.humanLog[0].words, "rsvp bread night");
   stop();
   assert.equal(stopped, 1);
   const quiet = console.error; console.error = () => {};

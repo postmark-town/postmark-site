@@ -1,48 +1,86 @@
 // bundle.mjs — the office's public Hearth bundle, and what each v2 slot draws from it (POS-1024, POS-1028).
 //
-// THE READ (POS-1027, R6 in the 11-13 proposal): `household { read: "hearth", args: { household } }`, public, one answer holding everything a
-// Hearth draws for a named house. The site reads it once per page through the household door's web twin, signed out
-// (`GET /household?read=hearth&household=<key>`: the twin hands its query to the apex as the read's args), and hands the SAME answer to the
-// site's slots and to a house's own script (script.mjs). Public data only: it is read with no bearer, so it holds exactly what a signed-out
-// visitor may see (POS-1024/b: "Yes, minus private acts").
+// THE READ (POS-1027, settled by Rivet on 2026-11-13): `household { read: "hearth", args: { household: "<slug>" } }`, through the household
+// door and its web twin. Public for every caller, the owner included. The site reads it once per page, signed out
+// (`GET /household?read=hearth&household=<key>`: the twin hands its query to the apex as the read's args), and its slots and a house's own
+// script (script.mjs) draw from the same answer.
 //
-// ⚑ THE SHAPE IS A DRAFT. POS-1027 (Rivet's office half) had posted no read shape when this was built (2026-11-13), so this codes against the
-// proposal's draft: "A bundle, built the way the doorstep is: each part names the read it is." THIS FILE IS THE ONE PLACE THAT KNOWS THE SHAPE;
-// when the office's answer lands, it changes here and nowhere else. The draft:
+// THIS FILE IS THE ONE PLACE THAT KNOWS THE OFFICE'S ROW SHAPES. Everything else (the slots' painter, paint-v2.mjs; a house's script, through
+// hearth.parts) takes the FOLDS below, whose shapes are the site's own and are documented in the town README's rule 7.
 //
-//   { household: "<key>", as_of: "<iso>",
-//     parts: {
-//       closer: { read: "closer",  rows: [{ handle, with, out, in, stamps?, latest_at?, milestones?: [{ name, at? }] }] },
-//       pairs:  { read: "pair",    rows: [{ a, b, a_to_b, b_to_a, first_at?, latest_at?, quote_a?, quote_b? }] },    // quotes by rule (POS-1024/c)
-//       went:   { read: "stamps", view: "went", rows: [{ at, handle, kind, stamps, for?, title?, href? }] },        // kind: mark|idea|ballot|pot|gift|burn|send
-//       happened: { read: "happened", rows: [...] },                                                               // public rows, `hand` on each
-//       feed:   { read: "feed",    rows: [{ kind, at, title, href?, by?, backed?, near? }] },
-//       day:    { read: "day",     residents: { "<handle>": { date, lines: ["wrote 3 letters, to …", …] } } },
-//     } }
+// THE ENVELOPE (POS-1027, Rivet's words): "The response is `{ read: "hearth", household: "<canonical slug>", parts }`." "Each part is
+// `{ via: { door, read, args }, data }`: `via` is the exact standalone public call, and `data` is that call's answer, with its own paging,
+// cursors, unavailable markers and source dates intact." The keys the site reads:
 //
-// A part that is absent, or a bundle that did not answer, folds to null: its slot draws nothing (hidden), never "nothing happened". A part
-// that answered with no rows is an honest none and the slot says so.
+//   parts.closer  { via, data }   household closer: data.rows [{ with, of, letters, milestones: [{ by, rung, day }], stamps_between, last_at }]
+//                                 (the house's correspondents outside it; a housemate is never one)
+//   parts.pairs   [{ via, data }] town pair, one per (resident a, correspondent b) on the ties page: data { a, b, first,
+//                                 letters: { a_to_b, b_to_a }, latest: { a_to_b, b_to_a } (each null or { id, date, delivered_at, href, line }),
+//                                 milestones }. `line` is the literal first body line: the quote, by rule (POS-1024/c).
+//   parts.went    { via, data }   household stamps, view "went": data.rows [{ at, date, from, to, stamps, for?, via?, kind? }]
+//   parts.happened { via, data }  household happened: data.rows [{ at, hand, for, verb, object, place, by? }]
+//   parts.feed    { via, data }   town feed: data.rows [{ id, kind, at, href, title, by?, backing?, distance? }]
+//   parts.days    [{ via, data }] household day, one per ashore member, in the house's order: data { handle, date, sentences, counts }
+//   (parts.house and parts.posts are carried too; the site draws those slots from its own reads, as before.)
+//
+// "If a missing house/ties source prevents determining a collection's scope, return its named unavailability rather than inventing an empty
+// `days` or `pairs` collection": a collection that is not an array, or a part with no `data`, folds to null here, so its slot draws nothing.
+// A part that answered with no rows is an honest none, and the slot says so.
 
 const asArray = (v) => (Array.isArray(v) ? v : []);
 const str = (v) => (v == null ? "" : String(v));
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const time = (v) => { const t = typeof v === "number" ? v : Date.parse(str(v)); return Number.isFinite(t) ? t : null; };
+const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 
 /** The read's address for a named house: the household door's web twin, signed out. */
 export function bundleUrl(api, key) {
   return `${api}/household?read=hearth&household=${encodeURIComponent(key)}`;
 }
 
-/** An answer that is a bundle, or null (an error, an array, nothing). The fetch is reads.mjs § readHearthBundle, the page's one reader. */
+/**
+ * The answer, if it is the Hearth bundle's envelope: `{ read: "hearth", household, parts }`. Anything else (an error, a refusal, another read,
+ * an answer with no `parts`) is null: no bundle, and every bundle part stays hidden.
+ */
 export function bundleFrom(answer) {
-  return answer && typeof answer === "object" && !Array.isArray(answer) && !answer.error && !answer.defect ? answer : null;
+  if (!isObj(answer) || answer.error || answer.defect) return null;
+  if (answer.read !== "hearth" || typeof answer.household !== "string" || !isObj(answer.parts)) return null;
+  return answer;
 }
 
-/** One part of the bundle by its name, or null. The draft nests parts under `parts`; a flat answer is read the same way. */
-export function partOf(bundle, name) {
-  if (!bundle || typeof bundle !== "object") return null;
-  const p = bundle.parts && typeof bundle.parts === "object" ? bundle.parts[name] : bundle[name];
-  return p && typeof p === "object" ? p : null;
+/** One part's `data` (the standalone read's own answer), or null when the part is absent, has no data, or the bundle did not come. */
+export function dataOf(bundle, key) {
+  const p = isObj(bundle?.parts) ? bundle.parts[key] : null;
+  return isObj(p) && isObj(p.data) ? p.data : null;
+}
+
+/** A collection part's data, one per member: an array of `data`, or null when the collection is a named unavailability (not an array). */
+export function collectionOf(bundle, key) {
+  const c = isObj(bundle?.parts) ? bundle.parts[key] : null;
+  if (!Array.isArray(c)) return null;
+  return c.filter((p) => isObj(p) && isObj(p.data)).map((p) => p.data);
+}
+
+const quote = (latest) => (isObj(latest) ? str(latest.line).slice(0, 200) || null : null);
+
+/**
+ * The pairs: one row per (resident of the house, correspondent), from the `pairs` collection. Letters each way, and the quote each way by rule.
+ * null when the collection did not come. This is what a house's script draws ties from (hearth.parts.pairs).
+ */
+export function pairsOf(bundle, handles = []) {
+  const all = collectionOf(bundle, "pairs");
+  if (!all) return null;
+  const house = new Set(handles);
+  const rows = [];
+  for (const d of all) {
+    const handle = str(d.a), other = str(d.b);
+    if (!handle || !other || (house.size && !house.has(handle)) || house.has(other)) continue;
+    const out = num(d.letters?.a_to_b) ?? 0, back = num(d.letters?.b_to_a) ?? 0;
+    const latestAt = [d.latest?.a_to_b, d.latest?.b_to_a].map((l) => time(l?.delivered_at ?? l?.date)).filter((t) => t != null).sort((a, b) => b - a)[0] ?? null;
+    rows.push({ handle, with: other, out, in: back, letters: out + back, latest: latestAt, quoteOut: quote(d.latest?.a_to_b), quoteIn: quote(d.latest?.b_to_a) });
+  }
+  rows.sort((a, b) => b.letters - a.letters || (b.latest ?? 0) - (a.latest ?? 0) || a.handle.localeCompare(b.handle) || a.with.localeCompare(b.with));
+  return rows;
 }
 
 // eight ties, and the quotes on the first three only: Darko, 2026-11-11, on small text ("there's a certain point at which … the words
@@ -50,37 +88,31 @@ export function partOf(bundle, name) {
 const TIES_SHOWN = 8;
 const QUOTED = 3;
 /**
- * The ties slot: one row per pair a resident of the house writes with, most letters first. Quotes, when the pair read carries them, ride the
- * row (by rule, POS-1024/c: the first line of the newest letter each way). null when the closer part did not come.
+ * The ties slot: one row per correspondent of the house (the `closer` page), most letters first, each joined to the resident who writes them
+ * most (its strongest pair) for the letters each way and the quotes. A correspondent with no pair on the page is the house's, with its total.
+ * null when the closer part did not come.
  */
 export function tiesOf(bundle, handles = []) {
-  const closer = partOf(bundle, "closer");
+  const closer = dataOf(bundle, "closer");
   if (!closer) return null;
   const house = new Set(handles);
-  const pairs = new Map();
-  for (const p of asArray(partOf(bundle, "pairs")?.rows)) pairs.set(`${str(p.a)}|${str(p.b)}`, p);
+  const best = new Map();
+  for (const p of pairsOf(bundle, handles) ?? []) if (!best.has(p.with)) best.set(p.with, p);   // pairsOf is sorted, so the first is the strongest
   const rows = [];
-  // TWO RESIDENTS OF THE HOUSE: one row for the pair, whichever side the office listed it from (review of #420: a per-resident list may carry
-  // the pair from one side only). Keyed by the pair, so the first side to come keeps the row and the other side is not a second row.
-  const insidePairs = new Set();
+  const seen = new Set();
   for (const r of asArray(closer.rows)) {
-    const handle = str(r.handle), other = str(r.with);
-    if (!handle || !other || !house.has(handle)) continue;
-    if (house.has(other)) {
-      const k = [handle, other].sort().join("|");
-      if (insidePairs.has(k)) continue;
-      insidePairs.add(k);
-    }
-    const out = num(r.out) ?? 0, back = num(r.in) ?? 0;
-    const pair = pairs.get(`${handle}|${other}`) ?? pairs.get(`${other}|${handle}`) ?? null;
-    const flip = pair && str(pair.a) !== handle;
+    const other = str(r.with);
+    // a housemate is never a correspondent (office household-read-v2 § closerRows); and a correspondent is one row, however the page lists it
+    if (!other || house.has(other) || seen.has(other)) continue;
+    seen.add(other);
+    const p = best.get(other) ?? null;
     rows.push({
-      handle, with: other, out, in: back, letters: out + back,
-      stamps: num(r.stamps),
-      latest: time(r.latest_at ?? pair?.latest_at),
-      milestones: asArray(r.milestones).map((m) => str(m?.name ?? m)).filter(Boolean).slice(0, 3),
-      quoteOut: str(flip ? pair?.quote_b : pair?.quote_a).slice(0, 200) || null,
-      quoteIn: str(flip ? pair?.quote_a : pair?.quote_b).slice(0, 200) || null,
+      handle: p?.handle ?? null, with: other, of: str(r.of) || null,
+      letters: num(r.letters) ?? p?.letters ?? 0, out: p?.out ?? null, in: p?.in ?? null,
+      stamps: num(r.stamps_between),
+      latest: time(r.last_at) ?? p?.latest ?? null,
+      milestones: [...new Set(asArray(r.milestones).map((m) => str(m?.rung ?? m?.name ?? m)).filter(Boolean))].slice(0, 3),
+      quoteOut: p?.quoteOut ?? null, quoteIn: p?.quoteIn ?? null,
     });
   }
   rows.sort((a, b) => b.letters - a.letters || (b.latest ?? 0) - (a.latest ?? 0) || a.with.localeCompare(b.with));
@@ -90,22 +122,23 @@ export function tiesOf(bundle, handles = []) {
 }
 
 export const WENT_KINDS = Object.freeze(["mark", "idea", "ballot", "pot", "gift", "send", "burn"]);
-const WENT_WORDS = Object.freeze({ mark: "behind marks", idea: "behind ideas", ballot: "on ballots", pot: "into pots", gift: "given", send: "sent", burn: "burned" });
+const WENT_WORDS = Object.freeze({ mark: "behind marks", idea: "behind ideas", ballot: "on ballots", pot: "into pots", gift: "given", send: "sent", burn: "burned", other: "elsewhere" });
 /** The stamps-went slot: the house's flows grouped by kind, each with its total and its newest rows. null when the part did not come. */
 export function wentOf(bundle, handles = []) {
-  const went = partOf(bundle, "went");
+  const went = dataOf(bundle, "went");
   if (!went) return null;
   const house = new Set(handles);
   const groups = new Map();
   for (const r of asArray(went.rows)) {
     const n = num(r.stamps);
     if (n == null || n <= 0) continue;
-    if (r.handle != null && house.size && !house.has(str(r.handle))) continue;
+    const from = str(r.from);
+    if (from && house.size && !house.has(from)) continue;
     const kind = WENT_KINDS.includes(str(r.kind)) ? str(r.kind) : "other";
-    if (!groups.has(kind)) groups.set(kind, { kind, words: WENT_WORDS[kind] ?? "elsewhere", total: 0, rows: [] });
+    if (!groups.has(kind)) groups.set(kind, { kind, words: WENT_WORDS[kind], total: 0, rows: [] });
     const g = groups.get(kind);
     g.total += n;
-    g.rows.push({ at: time(r.at), handle: str(r.handle) || null, stamps: n, title: str(r.title ?? r.for).slice(0, 120), href: safeHref(r.href) });
+    g.rows.push({ at: time(r.at ?? r.date), handle: from || null, stamps: n, title: str(r.for ?? r.to).replace(/-/g, " ").slice(0, 120), href: safeHref(r.href) });
   }
   const out = [...groups.values()];
   for (const g of out) { g.rows.sort((a, b) => (b.at ?? 0) - (a.at ?? 0)); g.rows = g.rows.slice(0, 4); }
@@ -115,18 +148,22 @@ export function wentOf(bundle, handles = []) {
 
 export const FEED_SORTS = Object.freeze(["newest", "backed", "near"]);
 export const FEED_SHOWN = 12;
-/** The town slot: the feed's rows, with the values each sort reads. null when the part did not come. */
+/**
+ * The town slot: every answered feed row, with the values each sort reads. null when the part did not come. Backing and distance are read under
+ * `backing`/`distance` (POS-1027's words) or `backed`/`near`; unknown is never made up.
+ */
 export function feedOf(bundle) {
-  const feed = partOf(bundle, "feed");
+  const feed = dataOf(bundle, "feed");
   if (!feed) return null;
   const rows = asArray(feed.rows).map((r) => ({
+    id: str(r.id) || null,
     kind: str(r.kind).slice(0, 20) || "post",
     at: time(r.at),
     title: str(r.title).slice(0, 140),
     href: safeHref(r.href),
     by: str(r.by).slice(0, 60) || null,
-    backed: num(r.backed) ?? 0,
-    near: num(r.near),
+    backed: num(r.backing) ?? num(r.backed) ?? 0,
+    near: num(r.distance) ?? num(r.near),
   })).filter((r) => r.title);
   rows.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
   // EVERY answered row, uncut: the reader's sort runs over the whole list and only then is it cut (feedShown), so "most backed" is the most backed
@@ -143,17 +180,40 @@ export function feedShown(rows, sort = "newest") {
   return out.slice(0, FEED_SHOWN);
 }
 
-/** The day slot: each resident's sentences, in the house's order. null when the part did not come. */
+/** The day slot: each resident's sentences, in the house's order. A resident the collection does not carry is "not read". null when it did not come. */
 export function dayOf(bundle, handles = []) {
-  const day = partOf(bundle, "day");
-  if (!day) return null;
-  const by = day.residents && typeof day.residents === "object" ? day.residents : {};
+  const days = collectionOf(bundle, "days");
+  if (!days) return null;
+  const by = new Map(days.map((d) => [str(d.handle), d]));
   return {
     rows: handles.map((h) => {
-      const d = by[h];
-      const lines = asArray(d?.lines).map((l) => str(l).slice(0, 240)).filter(Boolean).slice(0, 6);
+      const d = by.get(h);
+      const lines = asArray(d?.sentences).map((l) => str(l).slice(0, 240)).filter(Boolean).slice(0, 6);
       return { handle: h, date: str(d?.date).slice(0, 10) || null, lines, answered: !!d };
     }),
+  };
+}
+
+/** The human's own record: the house's public `happened` rows whose hand is the human's, newest first. null when the part did not come. */
+export function humanLogOf(bundle, shown = 6) {
+  const happened = dataOf(bundle, "happened");
+  if (!happened) return null;
+  return asArray(happened.rows)
+    .filter((r) => r?.hand === "human")
+    .map((r) => ({ at: time(r.at), words: [str(r.verb), str(r.object)].filter(Boolean).join(" ").replace(/-/g, " ").slice(0, 160), for: str(r.for) || null, by: str(r.by) || null }))
+    .sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
+    .slice(0, shown);
+}
+
+/** Every fold at once: what a house's script reads as `hearth.parts` (script.mjs). Each is null while its part has not come. */
+export function partsFor(bundle, handles = []) {
+  return {
+    pairs: pairsOf(bundle, handles),
+    ties: tiesOf(bundle, handles),
+    went: wentOf(bundle, handles),
+    feed: feedOf(bundle),
+    days: dayOf(bundle, handles),
+    humanLog: humanLogOf(bundle),
   };
 }
 

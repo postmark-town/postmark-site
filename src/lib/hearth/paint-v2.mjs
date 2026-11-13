@@ -79,10 +79,11 @@ export function paintTies(root, bundle, ctx) {
   if (!t.rows.length) ul.appendChild(el("li", "hd-empty", "No letters have crossed between these residents and others yet."));
   for (const r of t.rows) {
     const li = el("li", "hx-tie");
-    li.appendChild(who(ctx, r.handle));
-    li.appendChild(document.createTextNode(" and "));
+    // the resident who writes them most, when the pairs page names one; else the house's correspondent, with the house's total
+    if (r.handle) { li.appendChild(who(ctx, r.handle)); li.appendChild(document.createTextNode(" and ")); }
     li.appendChild(other(r.with));
-    li.appendChild(el("span", "hx-with", ` · ${r.out} out, ${r.in} back` + (r.stamps ? ` · ✦${r.stamps} between` : "") + (r.latest ? ` · ${whenOf(r.latest, ctx.now)}` : "")));
+    const count = r.out != null && r.in != null ? `${r.out} out, ${r.in} back` : `${r.letters} letter${r.letters === 1 ? "" : "s"} with the house`;
+    li.appendChild(el("span", "hx-with", ` · ${count}` + (r.stamps ? ` · ✦${r.stamps} between` : "") + (r.latest ? ` · ${whenOf(r.latest, ctx.now)}` : "")));
     if (r.milestones.length) li.appendChild(el("span", "hx-milestones", " · " + r.milestones.join(", ")));
     for (const [q, dir] of [[r.quoteOut, "out"], [r.quoteIn, "in"]]) {
       if (!q) continue;

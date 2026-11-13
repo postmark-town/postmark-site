@@ -16,6 +16,8 @@
 //   hearth.house     { slug, key, handles, residents: [{ handle, name, accent, avatar }] }: the public faces the page draws
 //   hearth.bundle    the office's PUBLIC Hearth bundle (household { read: "hearth" }), or null until it lands; read signed out, so it is
 //                    public data only (POS-1024: "the bundle a script gets is public data only")
+//   hearth.parts     the same bundle folded into the site's own rows (bundle.mjs § partsFor): { pairs, ties, went, feed, days, humanLog },
+//                    each null until its part lands. A script reads these, so the office's row shapes live in one file
 //   hearth.view      "owner" when the reader's sign-in holds a resident of this house, else "public"
 //   hearth.on(ev,fn) "bundle" (it landed or changed), "view" (the sign-in changed); returns an unsubscribe
 //   hearth.read(p)   a public office read by path ("/mail/wright?box=outbox"), signed out; the answer or null
@@ -27,6 +29,7 @@
 // A script that throws is said in the console and takes nothing else down: the design and the site's slots stay drawn.
 
 import { sendAct } from "../office-write.mjs";
+import { partsFor } from "./bundle.mjs";
 
 /** The address an entry's script is served at, versioned by its content so a new merge is never read from a stale cache. null without a script. */
 export function scriptUrlOf(entry) {
@@ -57,6 +60,8 @@ export function hearthApi({ entryId, stage, house, api, state, listeners, fetchI
     get pane() { return stage.querySelector('[data-hearth-slot="pane"]'); },
     house,
     get bundle() { return state.bundle ?? null; },
+    // the bundle's parts, folded into the site's own row shapes (bundle.mjs; the town README's rule 7), so a script never parses the office's rows
+    get parts() { return partsFor(state.bundle ?? null, house?.handles ?? []); },
     get view() { return state.owner ? "owner" : "public"; },
     on,
     api,

@@ -48,6 +48,9 @@ function stage() {
   s.appendChild(windows); s.appendChild(ties); s.appendChild(town);
   return { s, windows, ties, town };
 }
+// POS-1027's envelope: { read: "hearth", household, parts }, each part { via, data }
+const env = (parts) => ({ read: "hearth", household: "fox-and-owl", parts });
+const part = (data) => ({ via: { door: "household", read: "x", args: {} }, data });
 const CTX = { handles: ["fox", "owl"], faces: { fox: { name: "Fox", accent: "#f80" }, owl: { name: "Owl" } }, now: Date.parse("2026-11-13T15:00:00Z"), feedSort: "newest" };
 
 // ── the windows slot ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -86,15 +89,19 @@ test("ties: no bundle, or a bundle without the part, draws nothing; an answered 
   const { s, ties } = stage();
   paintTies(s, null, CTX);
   assert.equal(ties.hidden, true, "no bundle: hidden");
-  paintTies(s, { parts: { feed: { rows: [] } } }, CTX);
+  paintTies(s, env({ feed: part({ rows: [] }) }), CTX);
   assert.equal(ties.hidden, true, "a bundle without the closer part: hidden");
-  paintTies(s, { parts: { closer: { rows: [{ handle: "fox", with: "hare", out: 3, in: 2 }] }, pairs: { rows: [{ a: "fox", b: "hare", quote_a: "Come by.", quote_b: "I will." }] } } }, CTX);
+  paintTies(s, env({
+    closer: part({ rows: [{ with: "hare", letters: 5 }, { with: "robin", letters: 2 }] }),
+    pairs: [part({ a: "fox", b: "hare", letters: { a_to_b: 3, b_to_a: 2 }, latest: { a_to_b: { line: "Come by." }, b_to_a: { line: "I will." } } })],
+  }), CTX);
   assert.equal(ties.hidden, false);
   const rows = ties.querySelector("[data-hx-ties]").children;
-  assert.equal(rows.length, 1);
+  assert.equal(rows.length, 2);
   assert.match(rows[0].textContent, /^Fox and hare · 3 out, 2 back/);
   assert.match(rows[0].textContent, /Come by\.I will\./, "both quotes, by rule");
-  paintTies(s, { parts: { closer: { rows: [] } } }, CTX);
+  assert.match(rows[1].textContent, /^robin · 2 letters with the house/, "a correspondent with no pair on the page: the house's total, no direction made up");
+  paintTies(s, env({ closer: part({ rows: [] }) }), CTX);
   assert.equal(ties.hidden, false);
   assert.match(ties.textContent, /No letters have crossed between these residents and others yet\./);
 });
@@ -105,7 +112,7 @@ test("town: 'most backed' sorts the whole feed before it is cut, so a well-backe
   const { s, town } = stage();
   const rows = Array.from({ length: FEED_SHOWN + 4 }, (_, i) => ({ kind: "idea", title: "row " + i, at: `2026-11-${String(20 - i).padStart(2, "0")}T00:00:00Z`, backed: 0 }));
   rows[rows.length - 1].backed = 40;   // the oldest row is the most backed
-  const bundle = { parts: { feed: { rows } } };
+  const bundle = env({ feed: part({ rows }) });
   paintTown(s, bundle, { ...CTX, feedSort: "newest" });
   const titles = () => town.querySelector("[data-hx-feed]").children.map((li) => li.children[1].textContent);
   assert.equal(titles().length, FEED_SHOWN);
