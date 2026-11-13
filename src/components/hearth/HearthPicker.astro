@@ -1,0 +1,38 @@
+---
+// HearthPicker — the household page's Hearth dropdown, one composable piece (POS-962; on the one page by POS-984, in the strip by the rebuild of 2026-11-10;
+// the dropdown alone by POS-999 round 3).
+//
+// Darko, 2026-11-12 08:56 EST: "we also need to streamline/simplify the UI for hearth selection flow. there is a LOT of unnecessary ceremony and words. please
+// reduce it to just the dropdown -> if you select a different one, green checkbox vs red x. we don't need words explaining obvious things". 08:57: "it's missing
+// the arguably ONE important thing: listing Designed by {author}".
+//
+// Markup only; lib/hearth/picker.mjs (mountHearthPicker) binds it. Every reader has the dropdown, and choosing in it previews (nothing is saved). The house's own
+// signed-in human, when the dropdown shows a design other than the kept one, gets two small buttons beside it: the check saves it, the x puts it back. Their names
+// are their aria-labels, not words on the page. The one line of words is the design's credit, from its own record (hearth.md's `author`), for the design the
+// dropdown shows; a design that records no author has no line. A save that fails keeps the two buttons and marks the dropdown; only a refusal the owner must read
+// (the office's 401 or 403) is said as a line (`data-hearth-refused`), and the reason is always in a status a screen reader reads.
+//
+// THE SELECT SHIPS DISABLED and is enabled when the picker mounts (stage.mjs, once the house's saved choice has been read, or has failed to be): until then it would
+// answer a change with nothing. It is on the household page only, nowhere else on the site (Darko, 2026-11-10 17:28 EST).
+interface Props { entries: { id: string; title: string; author?: string | null }[]; selected?: string | null; }
+const { entries, selected = null } = Astro.props;
+const by = entries.find((e) => e.id === selected)?.author ?? null;
+---
+<div class="hearth-pickerband" data-hearth-picker>
+  {entries.length > 1 && (
+    <select data-hearth-pick disabled class="hearth-pick" aria-label="Hearth design">
+      {entries.map((e) => <option value={e.id} selected={selected === e.id}>{e.title}</option>)}
+    </select>
+  )}
+  <span class="hearth-acts" data-hearth-acts hidden>
+    <button type="button" class="hearth-keep" data-hearth-keep aria-label="Save this design">
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+    </button>
+    <button type="button" class="hearth-back" data-hearth-back aria-label="Put the design back">
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" /></svg>
+    </button>
+  </span>
+  <span class="hearth-by" data-hearth-by hidden={!by}>{by ? `Designed by ${by}` : ""}</span>
+  <span class="hearth-refused" data-hearth-refused hidden></span>
+  <span class="hd-sr" data-hearth-said role="status"></span>
+</div>

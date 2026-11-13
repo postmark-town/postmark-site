@@ -1,35 +1,23 @@
 ---
-// A declared household's own front door.
+// A declared household's one page.
 //
-// The same wrapper every resident page wears, entered by the house instead of
-// by one of its residents: this address lands on the HOUSEHOLD SEAT — the
-// house's own dashboard, the rail's first tab (ruling 2026-08-07) — and moving
-// to a member keeps this address (?resident=<handle>) rather than walking off
-// to a resident page. Only DECLARED houses have a door here — an undeclared
-// group is still a household on its members' pages, but it has no name to hang
-// a sign on, and a slug nobody declared 404s honestly.
+// THE ONE HOUSEHOLD PAGE (POS-984, Darko 2026-11-09 14:34 EST; rebuilt 2026-11-10 17:28 EST): this address draws the house in its Hearth design, for
+// everyone, under the site's shell and one thin strip, and nothing else (town/components/HouseholdPage.astro says what is on it, what is not, and
+// where each thing went). A resident's tab used to live here as `?resident=<handle>`: that address redirects to the resident's own page.
+// /households/<slug>/hearth/ forwards here, `?entry=` included.
 //
-// A declared house of ONE lands on its seat too (Keemin, 2026-09-27: "solo
-// residents should still have a household page now that households are the
-// primary key right"): the dashboard with one resident, under a rail of
-// [Household][that resident]. Only the solo's own resident page stays folded.
+// Only DECLARED houses have a door here — an undeclared group is still a household on its members' pages, but it has no name to hang a sign on,
+// and a slug nobody declared 404s honestly. A declared house of ONE has its page too (Keemin, 2026-09-27: "solo residents should still have a
+// household page now that households are the primary key right"). Only the solo's own resident page stays folded.
 //
-// The key this page hands the layout is `household`, which is nobody's own seat
-// key, and that is deliberate — it is one of the `alsoKeys` of The Households
-// seat (`alsoKeys: ["household", "residents"]` in src/lib/nav.mjs), so the rail
-// lights THE HOUSEHOLDS above a house rather than The Town. It used to hand over
-// `residents` directly, which lit The Town, because residents was a room of the
-// town then: the reader clicked one seat and watched a different one turn on.
+// The key this page hands the layout is `household`, which is nobody's own seat key, and that is deliberate — it is one of the `alsoKeys` of The
+// Households seat (`alsoKeys: ["household", "residents"]` in src/lib/nav.mjs), so the rail lights THE HOUSEHOLDS above a house rather than The
+// Town. See `alsoKeys` in src/lib/nav.mjs for the reasoning and `test/nav.test.mjs` for the guard.
 //
-// The rescue used to hang off the YOUR HOUSE seat, which is retired as of
-// 2026-08-25 ("the resident names when signed in more than suffice"). The key
-// moved to the Residents seat with the same one-line mechanism, renamed
-// `alsoKeys` (once the singular `alsoKey`) now that no house seat carries it;
-// The Households later took the Residents seat's place and kept both keys. See
-// `alsoKeys` in src/lib/nav.mjs for the reasoning and `test/nav.test.mjs` for
-// the guard.
+// The page draws its own chip row, the household's sub-rail (HouseRail.astro, POS-999), so it takes `ownChips` and the shell adds no row of chips
+// above it (test/nav.test.mjs holds the flag).
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import Household from "../../components/Household.astro";
+import HouseholdPage from "../../components/HouseholdPage.astro";
 import { declaredHouses, membersOf, nameplate } from "@/lib/household.mjs";
 import media from "@/data/postmark/media.json";
 import { homePictureOf } from "@/lib/home-picture.mjs";
@@ -45,10 +33,6 @@ const plate = nameplate(house);
 const who = members.map((m) => m.address?.agent ?? m.handle).join(", ");
 // A shared link previews with the house's own faces (POS-616): see og-image.mjs.
 const preview = householdPreview(members, { media, homePicture: homePictureOf });
-// EVERY HOUSE'S OWN PAGE DRAWS ITS OWN MEMBER RAIL, a house of one included
-// (2026-09-27), so it takes no row from the nav. Before the rail was
-// reprojected (part 6) this never mattered: `household` lit a seat with no row.
-// Now it lights The Households, whose row would stack over the house's own.
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "residents" }', get: "/api/residents" }}
@@ -59,5 +43,5 @@ const preview = householdPreview(members, { media, homePicture: homePictureOf })
   card={preview.card}
   ownChips={true}
 >
-  <Household house={house} members={members} active="__house" route="household" />
+  <HouseholdPage house={house} members={members} plate={plate} />
 </PostmarkLayout>

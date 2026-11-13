@@ -21,7 +21,9 @@
 //                function off the list, no `position: fixed`, no `!important`.
 //
 // A template cannot load anything, cannot reach the site's own boxes, and cannot
-// hide the site's chrome (the stage clips to itself).
+// hide the site's chrome: the stage clips its children, and the host's frame around the stage
+// (Hearth.astro, `.hearth-frame { contain: paint }`) clips the stage itself, which a rooted
+// rule (:root, html, body) lands on and where margin and transform are allowed (POS-984).
 
 import { ALLOWED_TAGS, CLASS_PREFIX } from "./sanitize-html.mjs";
 import { SLOT_TAGS, LIMITS } from "./slots.mjs";

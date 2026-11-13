@@ -2,16 +2,17 @@
 // A resident's page — now the household's page with that resident's tab open.
 //
 // The whole page is the household wrapper (town/components/Household.astro):
-// house chrome once, a tab per member. This URL is CANONICAL and always was —
+// house chrome once, a tab per member. Every resident page draws the household's
+// sub-rail (HouseRail.astro, POS-999), a house of one's included, so it takes no
+// chip row from the nav (`ownChips`). This URL is CANONICAL and always was —
 // it renders the house with this resident preselected and redirects nowhere
 // (the #1179 lesson: a published path never breaks). A resident who shares a
-// house with nobody is a house of one, and the wrapper folds to exactly the
-// page this file used to render on its own.
+// house with nobody is a house of one: the same page, with one resident.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import Household from "../../components/Household.astro";
 import PageFreshness from "@/components/PageFreshness.astro";
 import residents from "@/data/postmark/residents.json";
-import { houseOf, membersOf, isShared } from "@/lib/household.mjs";
+import { houseOf, membersOf } from "@/lib/household.mjs";
 import { excerpt } from "@/lib/pm.mjs";
 import media from "@/data/postmark/media.json";
 import { homePictureOf } from "@/lib/home-picture.mjs";
@@ -35,7 +36,7 @@ const preview = residentPreview(r, members, { media, homePicture: homePictureOf 
   active="residents"
   image={preview.image}
   card={preview.card}
-  ownChips={isShared(house, members)}
+  ownChips={true}
 >
   <Household house={house} members={members} active={r.handle} route="resident" />
   {/* A resident's page is the doorstep a visitor actually opens, and the mail

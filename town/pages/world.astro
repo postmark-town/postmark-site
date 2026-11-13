@@ -28,6 +28,7 @@ import rawHtml from 'postmark-world/spectator/index.html?raw';
 import WorldSignIn from '@/components/WorldSignIn.astro';
 import WorldTourHold from '@/components/WorldTourHold.astro';
 import WorldCockpit from '@/components/WorldCockpit.astro';
+import SettlementNotice from '@/components/SettlementNotice.astro';
 import HalloweenWorldFrame from '@/components/HalloweenWorldFrame.astro';
 import HalloweenMotif from '@/components/HalloweenMotif.astro';
 import { sectionCard, LARGE } from '@/lib/og-image.mjs';
@@ -109,6 +110,8 @@ const html = rawHtml.replace(/<head>/i,
 ---
 <Fragment set:html={html} />
 <WorldSignIn />
+{/* THE LATE-SETTLEMENT NOTICE (POS-1004): below the viewer's top controls, above the view; hidden unless the sentinel says the settlement is DOWN */}
+<SettlementNotice variant="over" />
 <WorldTourHold armedOnly={true} />
 {/* THE COCKPIT, INSIDE PORTAL GROUND ONLY (2026-08-26, the founder's scope
     ruling). Seated here with the page's other islands rather than inside the

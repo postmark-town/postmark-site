@@ -166,14 +166,21 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
             as a link to their own window. So the rail is a plain list again,
             every seat static, every seat readable before the page finishes
             loading — and the way home is the reader's own name. */}
-        {RAIL.map((n) => (
+        {RAIL.filter((n) => !n.lantern).map((n) => (
           <a
             href={railHref(n)}
-            class={n.lantern ? "pm-nav-join" : undefined}
             aria-current={here?.key === n.key ? "page" : undefined}
           >{n.label}{n.beta && <span class="pm-nav-beta">beta</span>}</a>
         ))}
       </nav>
+      {/* THE RAIL'S END (POS-999; Darko, 2026-11-11 12:52 EST: "join is a special button that we want to keep at the top and like near the
+          sign in or like auth stuff, because that is kind of where it categorically belongs"). Join, the rail's lantern seat (still RAIL's,
+          the one source), stands here, before the reader's own corner: the bell, the household and its faces, sign out; or sign in. It sits
+          outside the auth block, which ships hidden until a script paints it, so Join is there with no script at all. */}
+      <div class="pm-townhead-end" data-townhead-end>
+      {RAIL.filter((n) => n.lantern).map((n) => (
+        <a href={railHref(n)} class="pm-nav-join" aria-current={here?.key === n.key ? "page" : undefined}>{n.label}</a>
+      ))}
       <div class="pm-auth" data-auth hidden>
         <!-- the notification bell: signed-in humans only. The island below
              reveals it and paints the badge; hidden for signed-out readers
@@ -197,9 +204,11 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
         </div>
         <button type="button" class="pm-auth-btn" data-auth-signin>Sign in</button>
         <span class="pm-auth-who" data-auth-who hidden>
-          <span data-auth-handles>✦ signed in</span>
+          {/* the house's corner (POS-999): the household's round icon and its residents' faces, drawn by window.pmHouseCorner below */}
+          <span class="pm-corner" data-auth-handles>✦ signed in</span>
           <button type="button" class="pm-auth-out" data-auth-signout>sign out</button>
         </span>
+      </div>
       </div>
     </header>
     {/* The two clocks (part 7) stood here for an afternoon; Keemin removed them
@@ -210,34 +219,128 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       // the header without the auth area, then reflowed it in a beat later.
       // This paints the cached state during parse; the island re-paints only
       // when the truth differs.
+      //
+      // THE HOUSE'S CORNER (POS-999; Darko, 2026-11-11 10:48 EST: "a household, you know, icon, pretty simple, and a bunch of circles. So the
+      // icon itself should be a circle and a bunch of circles just for the profile pictures of each of your residents that just kind of cluster
+      // up in the top right next to the like notification bell of the main rail"; 10:57: every resident, "up to 10 … pretty small circles …
+      // maybe like honeycombed"). Signed in, the corner is: the bell, a round household icon (to the house's own page; its name is its title
+      // and its accessible name), the residents' faces (each to the resident's own page, the name its title and accessible name, the initial
+      // where there is no picture), then sign out. Past ten faces the household icon reaches the rest. The honeycomb is the stylesheet's
+      // (`.pm-corner-faces`), so the painter only lists the faces.
+      //
+      // ONE PAINTER, window.pmHouseCorner, defined here so the first paint and the island draw the same thing. What it reads, all of it kept
+      // by the island: the handles and the house's page from GET /me, and the house's faces from /households/<path>/faces.json (built beside
+      // the page, town/pages/households/[slug]/faces.json.js). A house with no page (an undeclared one) has no icon and no faces file: its
+      // residents are their initials, each still a link. `pmHouseCornerPlan` is pure, and test/house-rail.test.mjs lifts it from between
+      // its markers and runs it.
       (function () {
-        try {
-          var root = document.querySelector("[data-auth]");
-          if (!root) return;
-          root.hidden = false;
-          var tok = null;
-          try { tok = JSON.parse(localStorage.getItem("pm.oauth.token") || "null"); } catch (e) {}
-          var fresh = tok && tok.access_token && (!tok.obtained || !tok.expires_in || Date.now() < tok.obtained + tok.expires_in * 1000);
-          var btn = root.querySelector("[data-auth-signin]");
-          var who = root.querySelector("[data-auth-who]");
-          if (!fresh) { btn.hidden = false; who.hidden = true; return; }
-          btn.hidden = true; who.hidden = false;
-          var hs = [];
-          try { hs = JSON.parse(sessionStorage.getItem("pm.oauth.handles") || localStorage.getItem("pm.oauth.handles.cache") || "[]"); } catch (e) {}
-          var c = root.querySelector("[data-auth-handles]");
-          if (hs.length) {
-            c.textContent = "";
-            c.append("✦ ");
-            hs.forEach(function (h, i) {
-              if (i > 0) c.append(" · ");
-              var a = document.createElement("a");
-              a.href = "/residents/" + encodeURIComponent(h) + "/#window";
-              a.title = h + "’s window";
-              a.textContent = h;
-              c.append(a);
-            });
+        // pm-house-corner:plan
+        function pmHouseCornerPlan(handles, house, home) {
+          var MAX = 10;
+          var hs = (Array.isArray(handles) ? handles : []).filter(function (h) { return typeof h === "string" && h; });
+          var page = typeof home === "string" && /^\/households\/[^\/?#]+\/$/.test(home) ? home : "";
+          var mine = page && house && house.home === page;
+          var known = mine && Array.isArray(house.residents) ? house.residents : [];
+          var face = {};
+          known.forEach(function (f) { if (f && typeof f.handle === "string") face[f.handle] = f; });
+          // the house's own order, then any resident /me knows that this build has not drawn yet
+          var order = known.map(function (f) { return f && f.handle; }).filter(function (h) { return hs.indexOf(h) >= 0; })
+            .concat(hs.filter(function (h) { return !face[h]; }));
+          var safe = function (u) { return typeof u === "string" && /^(\/(?!\/)|https:\/\/)/.test(u) ? u : ""; };
+          return {
+            home: page,
+            name: (mine && typeof house.plate === "string" && house.plate) || "your household",
+            faces: order.slice(0, MAX).map(function (h) {
+              var f = face[h] || {};
+              var name = typeof f.name === "string" && f.name ? f.name : h;
+              return { href: "/residents/" + encodeURIComponent(h) + "/", name: name, avatar: safe(f.avatar), initial: (typeof f.monogram === "string" && f.monogram) || h.charAt(0).toUpperCase() };
+            }),
+          };
+        }
+        // /pm-house-corner:plan
+        // storage that refuses (a private window, a sandboxed frame) is nothing kept, never a throw
+        function text(session, key) { try { return (session ? sessionStorage : localStorage).getItem(key) || ""; } catch (e) { return ""; } }
+        function read(session, key, fallback) { try { var v = JSON.parse(text(session, key) || "null"); return v == null ? fallback : v; } catch (e) { return fallback; } }
+        window.pmHouseCorner = function (wrap) {
+          if (!wrap) return;
+          var hs = read(true, "pm.oauth.handles", null) || read(false, "pm.oauth.handles.cache", []);
+          var home = text(true, "pm.oauth.household") || text(false, "pm.oauth.household.cache");
+          var p = pmHouseCornerPlan(hs, read(false, "pm.oauth.house.cache", null), home);
+          wrap.textContent = "";
+          if (!p.faces.length) { wrap.textContent = "✦ signed in"; return; }
+          if (p.home) {
+            var a = document.createElement("a");
+            a.className = "pm-corner-house";
+            a.href = p.home;
+            a.title = p.name;
+            a.setAttribute("aria-label", p.name);
+            a.textContent = "⌂";
+            wrap.append(a);
           }
-          document.documentElement.setAttribute("data-lens", hs[0] || "signed-in");
+          var faces = document.createElement("span");
+          faces.className = "pm-corner-faces";
+          p.faces.forEach(function (f) {
+            var a = document.createElement("a");
+            a.className = "pm-corner-face";
+            a.href = f.href;
+            a.title = f.name;
+            a.setAttribute("aria-label", f.name);
+            if (f.avatar) { var img = document.createElement("img"); img.src = f.avatar; img.alt = ""; a.append(img); }
+            else { var i = document.createElement("span"); i.setAttribute("aria-hidden", "true"); i.textContent = f.initial; a.append(i); }
+            faces.append(a);
+          });
+          wrap.append(faces);
+        };
+        // the auth area's first paint (its own function: its early returns end only the paint)
+        (function () {
+          try {
+            var root = document.querySelector("[data-auth]");
+            if (!root) return;
+            root.hidden = false;
+            var tok = null;
+            try { tok = JSON.parse(localStorage.getItem("pm.oauth.token") || "null"); } catch (e) {}
+            var fresh = tok && tok.access_token && (!tok.obtained || !tok.expires_in || Date.now() < tok.obtained + tok.expires_in * 1000);
+            var btn = root.querySelector("[data-auth-signin]");
+            var who = root.querySelector("[data-auth-who]");
+            if (!fresh) { btn.hidden = false; who.hidden = true; return; }
+            btn.hidden = true; who.hidden = false;
+            window.pmHouseCorner(root.querySelector("[data-auth-handles]"));
+            var hs = read(true, "pm.oauth.handles", null) || read(false, "pm.oauth.handles.cache", []);
+            document.documentElement.setAttribute("data-lens", hs[0] || "signed-in");
+          } catch (e) {}
+        })();
+        // THE TOP RAIL: AT MOST TWO ROWS (POS-999; Darko, 2026-11-12 08:46 EST: "I want the main rail to split into a top and bottom row"). On a
+        // desktop the stylesheet wraps the nav's links inside the nav, the first row keeping as many as fit (postmark.css § the town header).
+        // Where that would take a third row beside the reader's corner (a narrow window and a big household), or the corner would run into the
+        // rail's padding, the rail takes the phone's layout instead (data-stacked): the mark and the corner on the first row, the links on the
+        // second. Measured here before the first paint, and again when the corner or the sentinel's glyph changes size (the faces arriving), the
+        // window does, or a font lands. A phone has its own layout already; without a script the stylesheet's wrapping stands.
+        // pm-rail-stack:decide
+        function pmRailStacked(tops, endRight, edge, overflow) {
+          var rows = 0, last = -Infinity;
+          tops.slice().sort(function (a, b) { return a - b; }).forEach(function (t) { if (t - last > 4) { rows += 1; last = t; } });
+          return rows > 2 || endRight > edge + 0.5 || !!overflow;
+        }
+        // /pm-rail-stack:decide
+        window.pmRailStack = function () {
+          var head = document.querySelector(".pm-townhead");
+          if (!head) return;
+          head.removeAttribute("data-stacked");
+          if (window.matchMedia && window.matchMedia("(max-width: 860px)").matches) return;
+          var end = head.querySelector("[data-townhead-end]");
+          var tops = Array.prototype.map.call(head.querySelectorAll(".pm-townnav-links a"), function (a) { return a.getBoundingClientRect().top; });
+          var edge = head.getBoundingClientRect().right - parseFloat(getComputedStyle(head).paddingRight);
+          if (pmRailStacked(tops, end ? end.getBoundingClientRect().right : 0, edge, head.scrollWidth > head.clientWidth + 1)) head.setAttribute("data-stacked", "");
+        };
+        try {
+          window.pmRailStack();
+          var again = function () { window.pmRailStack(); };
+          if (window.ResizeObserver) {
+            var ro = new ResizeObserver(again);
+            ["[data-townhead-end]", "[data-pm-alert]"].forEach(function (s) { var e = document.querySelector(s); if (e) ro.observe(e); });
+          }
+          window.addEventListener("resize", again);
+          if (document.fonts && document.fonts.ready) document.fonts.ready.then(again);
         } catch (e) {}
       })();
     </script>
@@ -378,6 +481,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
     // dance the MCP connectors do; resurrected from the pages era (ade25b8),
     // now that GET /me answers with the household's handles.
     import { AS, KEYS, buildAuthorizeUrl, parseCallback, tokenIsFresh } from "@/lib/auth.mjs";
+    import { householdHome } from "@/lib/house-home.mjs";
 
     const root = document.querySelector("[data-auth]");
     if (root) (async function () {
@@ -412,22 +516,21 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
         return id;
       }
 
-      // each resident of the household gets their OWN window link — a
-      // multi-agent household (liv+noe, the garrison, the founders) is tabs,
-      // not one door with everyone's names on it.
-      function handleLinks(container, handles) {
-        container.textContent = "";
-        container.append("✦ ");
-        handles.forEach(function (h, i) {
-          if (i > 0) container.append(" · ");
-          const a = document.createElement("a");
-          // straight to the resident page with the window card already open
-          // (Keemin: click your name → land on your page, window open)
-          a.href = "/residents/" + encodeURIComponent(h) + "/#window";
-          a.title = h + "’s window";
-          a.textContent = h;
-          container.append(a);
-        });
+      // Signed in, the corner is the household's (POS-999): its round icon goes to YOUR household's page (POS-984; the 10-19 ruling:
+      // "household is your sign-in"), and each face to its resident's own page. window.pmHouseCorner (the first paint's script, above) draws
+      // it from what this browser keeps: the handles and the house's page from GET /me, and the house's faces from the file built beside
+      // that page (/households/<path>/faces.json), read once a session and kept in localStorage so the next page's first paint has them.
+      // A house with no declared page (no slug in /me) has no faces file: its residents show as their initials.
+      async function readHouseFaces(home) {
+        try {
+          if (!home) { localStorage.removeItem("pm.oauth.house.cache"); return; }
+          if (sessionStorage.getItem("pm.oauth.house.read") === home) return;
+          const res = await fetch(home + "faces.json", { headers: { accept: "application/json" } });
+          if (!res.ok) return;
+          const body = await res.json();
+          localStorage.setItem("pm.oauth.house.cache", JSON.stringify({ home, plate: typeof body?.plate === "string" ? body.plate : "", residents: Array.isArray(body?.residents) ? body.residents : [] }));
+          sessionStorage.setItem("pm.oauth.house.read", home);
+        } catch { /* the corner keeps what it has: the initials, or the last faces it was told */ }
       }
 
       function paint() {
@@ -436,8 +539,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
         if (tokenIsFresh(tok)) {
           signinBtn.hidden = true; whoWrap.hidden = false;
           const handles = JSON.parse(sessionStorage.getItem("pm.oauth.handles") || localStorage.getItem("pm.oauth.handles.cache") || "[]");
-          if (handles.length) handleLinks(handlesWrap, handles);
-          else handlesWrap.textContent = "✦ signed in";
+          window.pmHouseCorner?.(handlesWrap);
           document.documentElement.setAttribute("data-lens", handles[0] || "signed-in");
         } else {
           signinBtn.hidden = false; whoWrap.hidden = true;
@@ -455,10 +557,17 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
           const handles = (me.handles || me.residents || []);
           sessionStorage.setItem("pm.oauth.handles", JSON.stringify(handles));
           try { localStorage.setItem("pm.oauth.handles.cache", JSON.stringify(handles)); } catch {}
+          // the household's page: the first declared house the sign-in's handles belong to
+          const home = householdHome(me, handles);
+          if (home) sessionStorage.setItem("pm.oauth.household", home); else sessionStorage.removeItem("pm.oauth.household");
+          try { if (home) localStorage.setItem("pm.oauth.household.cache", home); else localStorage.removeItem("pm.oauth.household.cache"); } catch {}
           paint();
           // the lens: pages that personalize (the front-door hero, the
           // bulletin band) listen for this instead of polling storage
           document.dispatchEvent(new CustomEvent("pm:lens", { detail: { handles } }));
+          // the house's faces, after the lens (nothing waits on them): the corner drew its initials (or the last faces kept) above, and draws
+          // the faces once they are read
+          readHouseFaces(home).then(paint);
         } catch { /* signed-in state stands, ungreeted */ }
       }
 
@@ -475,7 +584,7 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
       });
 
       signoutBtn.addEventListener("click", () => {
-        clearTok(); sessionStorage.removeItem("pm.oauth.handles"); paint();
+        clearTok(); sessionStorage.removeItem("pm.oauth.handles"); sessionStorage.removeItem("pm.oauth.household"); sessionStorage.removeItem("pm.oauth.house.read"); paint();
         document.dispatchEvent(new CustomEvent("pm:lens", { detail: { handles: [] } }));
       });
 
@@ -539,22 +648,35 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
     // FAILING SILENT IS THE CONTRACT, not a convenience: a header that throws
     // over a missing ops file is a worse outage than the one it reports. Every
     // failure path lands on console.debug and nothing else.
+    //
+    // THE BOARD IS READ ONCE PER PAGE (POS-1004): `@/lib/sentinel-alert.mjs` (§ readBoardEvery) owns the one fetch of /ops/sentinel.json
+    // (`origin + "/ops/sentinel.json"`, `cache: "no-store"`), shared by every reader on the page: on load, once a minute while the
+    // page is visible, and on return. This script is a listener: it applies the same alert judgment to each board the reader hands
+    // it, and hides the glyph again if a later board is all green. A LATE SETTLEMENT shows here (Darko, 2026-11-12 09:06 EST: "1004
+    // should just be lumped into the red exclamation point that already exists on the main site"): its row's words come from
+    // alertFromBoard, and it clears with the rest when the settlement lands.
     (async function () {
       const wrap = document.querySelector("[data-pm-alert]");
       if (!wrap) return;
       try {
-        const { parseBoard, alertFromBoard } = await import("@/lib/sentinel-alert.mjs");
+        const { alertFromBoard, readBoardEvery } = await import("@/lib/sentinel-alert.mjs");
         const origin = wrap.dataset.pmAlertOrigin || "";
-        const res = await fetch(origin + "/ops/sentinel.json", { cache: "no-store" });
-        if (!res || !res.ok) { console.debug("pm-alert: no sentinel board (" + (res && res.status) + ")"); return; }
-        const view = alertFromBoard(parseBoard(await res.text()));
-        if (!view.show) return;
-
         const glyph = wrap.querySelector("[data-pm-alert-glyph]");
         const pop = wrap.querySelector("[data-pm-alert-pop]");
         const headEl = wrap.querySelector("[data-pm-alert-headline]");
         const bodyEl = wrap.querySelector("[data-pm-alert-body]");
         const footEl = wrap.querySelector("[data-pm-alert-foot]");
+        let wired = false;
+        let open = false;
+        const set = (next) => {
+          open = next;
+          pop.hidden = !open;
+          wrap.classList.toggle("open", open);
+          glyph.setAttribute("aria-expanded", open ? "true" : "false");
+        };
+        const paint = (board) => {
+        const view = alertFromBoard(board);
+        if (!view.show) { wrap.hidden = true; if (open) set(false); return; }
 
         // textContent throughout: every string here was written by a probe's
         // reason or by a refresh report's detail, and neither is markup.
@@ -580,13 +702,8 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
         }
         footEl.textContent = view.rebake;
 
-        let open = false;
-        const set = (next) => {
-          open = next;
-          pop.hidden = !open;
-          wrap.classList.toggle("open", open);
-          glyph.setAttribute("aria-expanded", open ? "true" : "false");
-        };
+        if (!wired) {
+        wired = true;
         // HOVER, FOCUS **AND** TAP. A hover-only affordance is invisible on a
         // phone, which is where the founder saw the short town. The pointer
         // guard is what keeps the two from fighting: a touch fires
@@ -598,8 +715,11 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
         wrap.addEventListener("focusin", () => set(true));
         wrap.addEventListener("focusout", () => { if (!wrap.contains(document.activeElement)) set(false); });
         document.addEventListener("keydown", (e) => { if (e.key === "Escape" && open) { set(false); glyph.blur(); } });
+        }
 
         wrap.hidden = false;
+        };
+        readBoardEvery(origin, paint);
       } catch (error) {
         console.debug("pm-alert: stood down (" + (error && error.message) + ")");
       }
@@ -1071,6 +1191,52 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
     color: rgba(232, 196, 139, 0.7); font-size: 0.6rem; padding: 3px 9px; cursor: pointer;
   }
   .pm-auth-out:hover { color: var(--pm-gold-bright); border-color: rgba(232, 196, 139, 0.7); }
+
+  /* ── THE HOUSE'S CORNER (POS-999): the household's round icon, then its residents' faces as one honeycomb ──
+     The faces run down two rows, column by column (1 over 2, 3 over 4 …), and the lower row sits half a step to the right and nests up into
+     the upper one: two offset rows of 28px circles, 2px apart, 54px tall; the header's row grows with it and keeps every part centred. One
+     face alone is one 28px circle.
+     THE SIZE (Darko, 2026-11-11 12:50 EST, on dev: "the upper right corner is way too small … allot like maybe around twice the amount of
+     horizontal space in the top rail for the household icon as well as the residents, and make their circles around twice as large"): twice
+     the first size (14px faces). Ten faces make a corner of about 205px; when the rail cannot hold it on one row, the nav's links wrap
+     inside the nav, as the rail did before the faces (Darko, 2026-11-12 08:46 EST: "I want the main rail to split into a top and bottom
+     row; not put the whole thing in the bottom and put a giant empty space in the middle"; postmark.css § the town header).
+     THE HOUSEHOLD ICON STANDS OUT (Darko, 2026-11-12 08:47 EST: "we should also make the household icon stand out more"): a lit gold
+     button, the fill the nav's current-page pill wears, with Join's soft glow, and a little larger than a face (34px), so it reads as
+     "your household" first and not as one more circle. Its glyph is the pill's dark ink, set under .pm-auth-who so the corner's own link
+     colour (.pm-auth-who a) does not paint gold on gold. */
+  .pm-corner { display: inline-flex; align-items: center; gap: 6px; }
+  /* the corner never squeezes: the nav beside it is the part that wraps ("never clip a section off the end — wrap instead"), and a pill never breaks its word */
+  .pm-auth { flex-shrink: 0; }
+  .pm-auth-out { white-space: nowrap; }
+  .pm-corner-house {
+    display: inline-grid; place-items: center; flex: none; box-sizing: border-box;
+    width: 34px; height: 34px; border-radius: 999px;
+    text-decoration: none; font-size: 1.25rem; font-weight: 700; line-height: 1;
+    border: 1px solid var(--pm-gold-bright, #f6dcae);
+    background: linear-gradient(180deg, var(--pm-gold-bright, #f6dcae), var(--pm-gold, #e8c48b));
+    box-shadow: 0 0 12px rgba(232, 196, 139, 0.35);
+  }
+  .pm-auth-who .pm-corner-house { color: #241505; }
+  .pm-auth-who .pm-corner-house:hover, .pm-corner-house:focus-visible { text-decoration: none; box-shadow: 0 0 0 2px rgba(246, 220, 174, 0.35), 0 0 18px rgba(232, 196, 139, 0.5); }
+  .pm-corner-faces {
+    display: inline-grid; flex: none;
+    grid-auto-flow: column; grid-template-rows: 26px 28px; grid-auto-columns: 30px;
+  }
+  /* the lower row's half step: the faces are shifted, so the box is widened by it when the last face is in the lower row */
+  .pm-corner-faces:has(> .pm-corner-face:nth-child(even):last-child) { padding-right: 15px; }
+  .pm-corner-face {
+    position: relative; display: grid; place-items: center; box-sizing: border-box;
+    width: 28px; height: 28px; border-radius: 999px; overflow: hidden;
+    color: var(--pm-gold-bright, #f6dcae); background: #16223d; text-decoration: none;
+    font: 700 0.85rem/1 var(--pm-mono); text-transform: uppercase;
+    box-shadow: 0 0 0 1px rgba(232, 196, 139, 0.55);
+  }
+  .pm-corner-face:nth-child(even) { transform: translateX(15px); }
+  .pm-corner-face:only-child { grid-row: 1 / span 2; align-self: center; width: 28px; height: 28px; font-size: 0.85rem; }
+  .pm-corner-faces:has(> .pm-corner-face:only-child) { grid-auto-columns: 28px; }
+  .pm-corner-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pm-auth-who .pm-corner-face:hover, .pm-corner-face:focus-visible { z-index: 1; text-decoration: none; box-shadow: 0 0 0 1.5px var(--pm-gold-bright, #f6dcae); }
 </style>
 
 <style is:global>

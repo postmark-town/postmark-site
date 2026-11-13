@@ -28,7 +28,12 @@ export function doorstep(handle, { owner = false, n = 0 } = {}) {
 }
 
 export const outbox = (handle) => [{ id: `fx-out-${handle}-1`, to: "an-outside-friend", delivered_at: ago(25), first_line: `A synthetic note from ${handle}.` }];
-export const quests = () => ({ today: { day: "2026-11-08" }, quests: [] });
+// two synthetic daily rows (the shape the office answers, as test/quest-board-render.test.mjs holds it) so the quest reads the house makes (readHouse, once each now the board is off the household page) have a board to answer (POS-984)
+const HH = { size: 4, total: 2, cap_shared: false };
+export const quests = () => ({ today: { day: "2026-11-08" }, quests: [
+  { id: "correspond-send", title: "Reach out", cadence: "daily", target: 5, reward: "1 stamp each", source: "Send a letter to 5 different residents. Resets daily.", progress: 2, complete: false, counted: ["a-synthetic-friend", "another-synthetic-friend"], household: HH },
+  { id: "correspond-receive", title: "Be reached", cadence: "daily", target: 5, reward: "1 stamp each", source: "Get a letter from 5 different residents. Resets daily.", progress: 1, complete: false, counted: ["a-synthetic-friend"], household: { ...HH, total: 1 } },
+] });
 export const walkers = (handles) => ({ walkers: handles.map((h, i) => ({ handle: h, mark_id: i % 2 ? "current-the-reader/the-snug-harbour" : "current-the-reader/the-long-wharf", moving: false })) });
 export const conversations = (handles) => ({ live: [{ id: "fx-talk", place: "the snug harbour", voices: [{ handle: handles[0], said: "A synthetic line, said aloud.", at_ms: now() - 15 * 60_000 }] }], closed: [] });
 export const calendar = (hostHandle) => ({
@@ -46,3 +51,20 @@ export const posts = (cls, handles) => ({
     { class: cls, id: "a-stranger/not-this-house", title: "A post that is not this house's", author: "a-stranger", household: "hh:elsewhere", state: "posted", latest: { act: "post", at: ago(100) }, responses: 0 },
   ],
 });
+
+// ── an open ballot, and the household door's stake-vote (POS-984, hosting POS-502): invented choices and numbers ──
+// `tally` is the walk's own mutable record of what each choice holds; a confirmed stake adds to it.
+export const votes = (tally, { open = true } = {}) => ({
+  topics: [
+    ...(open ? [{ topic: "hearth-contest", status: "staking", window: "four weeks from the announcement", cap_per_household_per_candidate: 20,
+      candidates: Object.entries(tally).map(([candidate, staked]) => ({ candidate, staked })) }] : []),
+    { topic: "a-closed-ballot", status: "closed", candidates: [{ candidate: "iris", staked: 40 }] },
+  ],
+});
+export const votesStanding = (tally, headroom) => ({ candidates: Object.entries(tally).map(([candidate, staked]) => ({ candidate, staked })), your_household: { headroom: { "the-ledger": headroom } } });
+export const stakeResult = ({ from, candidate, stamps, preview }, tally) => ({ result: {
+  ...(preview ? { preview: true } : { commit: "fx0123456789" }),
+  handle: from, candidate, requested: stamps, applied: stamps, clipped: false,
+  household_headroom_before: 20 - (tally[candidate] ?? 0) % 20, household_headroom_after: 20 - (tally[candidate] ?? 0) % 20 - stamps,
+  balance_before: 100, balance_after: 100 - stamps, vote_minted: false,
+} });

@@ -160,18 +160,30 @@ test("private slots ship hidden and marked private, in the static page and in ev
 
 test("the stage reads with the reader's bearer only on residents the sign-in holds, and nowhere else", () => {
   const stage = read("src/lib/hearth/stage.mjs");
-  assert.match(stage, /readHouse\(handles, \{ token: own\.length \? token\(\) : null, mine: own \}\)/);
+  // until 2026-11-10 this asserted the call ended at `mine: own }` (the stage awaited the whole read); it carries `onProgress` now (POS-984, test/household-reads-progress.test.mjs)
+  assert.match(stage, /readHouse\(handles, \{\s*token: own\.length \? token\(\) : null, mine: own,\s*onProgress: /);
   assert.match(stage, /const mine = \(\) => \(token\(\) \? held\(\)\.filter\(\(h\) => handles\.includes\(h\)\) : \[\]\)/);
   const reads = read("src/lib/household-dashboard/reads.mjs");
   assert.match(reads, /getJSON\(`\$\{api\}\/doorstep\/\$\{e\(h\)\}`, token && own\.has\(h\) \? token : null\)/);
   assert.ok(!/authorization|Bearer/i.test(reads.slice(reads.indexOf("export async function readHearthExtras"))), "the Hearth's own extra reads are public and carry no bearer");
 });
 
-test("the Hearth is beside the household page, not instead of it: routes, link, and the layout's rail untouched", () => {
+// POS-984 (Darko, 2026-11-09 14:34 EST): the Hearth is the household's page, not a page beside it. Until 2026-11-09 this asserted the Hearth had its
+// own route and that the household page linked to it ("the Hearth →"). /households/<slug>/hearth/ forwards now (test/household-one-page.test.mjs
+// runs the forwarder), the household page draws the Hearth as its seat, and nothing links to a second page.
+test("the Hearth is the household page, not a page beside it: the old route forwards, the household page draws the Hearth, and no link to a second page remains", () => {
   const route = read("town/pages/households/[slug]/hearth.astro");
-  assert.match(route, /declaredHouses\(\)\.map/, "only declared houses have a Hearth; any other slug 404s");
+  assert.match(route, /declaredHouses\(\)\.map/, "only declared houses have the old address; any other slug 404s");
+  assert.match(route, /location\.replace\(to \+ location\.search \+ location\.hash\)/, "it forwards, and the preview's query rides across");
+  assert.ok(!/Hearth \/>|<Hearth\b/.test(route), "the old route draws nothing of its own");
   assert.ok(fs.existsSync(path.join(ROOT, "town/pages/households/[slug].astro")), "the household page stays");
-  assert.match(read("src/components/household-dashboard/HouseDashboard.astro"), /href=\{`\/households\/\$\{slug\}\/hearth\/`\}/, "the household page links to its Hearth");
-  const readme = ["register", "preview"].every((w) => /household-hearths/.test(read("src/components/hearth/Hearth.astro")) || w);
-  assert.ok(readme);
+  // the rebuild of 2026-11-10 (Darko, 17:14–17:28 EST): the household page is HouseholdPage.astro, the Hearth under the shell with one strip, and no band; Household.astro is the resident page's wrapper
+  const page = read("town/components/HouseholdPage.astro");
+  assert.match(page, /<Hearth house=\{house\} members=\{members\} plate=\{plate\}>/, "the household page is the Hearth");
+  assert.ok(!/HouseBand|band/.test(page.replace(/\/\/[^\n]*/g, "")), "with no band");
+  assert.match(read("town/pages/households/[slug].astro"), /<HouseholdPage house=\{house\} members=\{members\} plate=\{plate\} \/>/, "and the household's address draws it");
+  const house = read("town/components/Household.astro");
+  assert.ok(!/<Hearth\b|HouseBand/.test(house), "the resident wrapper draws neither");
+  assert.ok(!/hearth\/`|\/hearth\//.test(read("src/components/household-dashboard/HouseDashboard.astro")), "the dashboard no longer links to a second page");
+  assert.ok(!/The household’s page →/.test(read("src/components/hearth/Hearth.astro")), "and the Hearth no longer links back to one");
 });

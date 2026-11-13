@@ -9,7 +9,7 @@
 
 import {
   feedOf, splitAtLook, countKinds, lastActOf, standsAtOf, hungOf, cardNumbersOf, holdsOf,
-  clocksOf, needsOf, comingUpOf, questsOf, numbersOf, readLook, writeLook, whenOf, dayWordOf,
+  clocksOf, needsOf, comingUpOf, questsOf, numbersOf, readLook, writeLook, whenOf, dayWordOf, NOT_READING,
 } from "./fold.mjs";
 import { hungLine } from "./hung-line.mjs";
 import { editLinkShown } from "../profile-edit.mjs";
@@ -82,14 +82,19 @@ function feedLine(it, ctx) {
   return li;
 }
 
-/** The whole live page, drawn from one readHouse() answer. */
+/**
+ * The whole live page, drawn from one readHouse() answer, or from a partial one (POS-984): `ctx.reading` (fold.mjs
+ * readingOf) says what is still out, and every part that would say "nothing" or "did not answer" for a read that is only
+ * still coming says "still reading" instead, or keeps its placeholder.
+ */
 export function paintHouse(root, reads, ctx) {
   const { handles, faces, slug, owner } = ctx;
   const now = ctx.now;
   const items = feedOf(handles, reads, now);
   root.dataset.hdView = owner ? "owner" : "public";
 
-  paintClocks(root, clocksOf(handles, reads.doorsteps), now);
+  paintReading(root, ctx.reading ?? NOT_READING);
+  paintClocks(root, clocksOf(handles, reads.doorsteps), now, ctx.reading ?? NOT_READING);
   paintFeed(root, items, ctx);
   const needs = needsOf(handles, reads.doorsteps);
   if (owner) paintNeeds(root, needs, ctx);
@@ -103,7 +108,35 @@ export function paintHouse(root, reads, ctx) {
   return items;
 }
 
-function paintClocks(root, clocks, now) {
+/** What is still out, in words: how many residents, else the town's record, else "" (nothing is out). */
+export function readingWords(reading) {
+  const n = reading.residents.length;
+  return n ? `still reading ${plural(n, "resident")}…` : reading.house.length ? "still reading the town’s record…" : "";
+}
+
+/** The plain line that says a page is part-read, for a page that carries one (paintHouse asks; since POS-999 the household page carries the mark
+ *  below instead, and no page of the site carries this line). */
+export function paintReading(root, reading) {
+  const line = root.querySelector("[data-hd-reading]");
+  if (!line) return;
+  const words = readingWords(reading);
+  line.textContent = words;
+  line.hidden = !words;
+}
+
+/** The household page's small mark for the same (POS-999: in the sub-rail, HouseRail.astro): shown while anything is out, its words its title and,
+ *  for a screen reader, its status text; gone once every read has answered. */
+export function paintReadingMark(root, reading) {
+  const mark = root.querySelector("[data-hd-reading-mark]");
+  if (!mark) return;
+  const words = readingWords(reading);
+  mark.title = words;
+  const said = mark.querySelector("[data-hd-reading-words]");
+  if (said) said.textContent = words;
+  mark.hidden = !words;
+}
+
+function paintClocks(root, clocks, now, reading = NOT_READING) {
   const box = root.querySelector("[data-hd-clocks]");
   if (!box || !clocks) return;
   const set = (key, v, n) => {
@@ -116,7 +149,7 @@ function paintClocks(root, clocks, now) {
   const t = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   const s = clocks.settlement;
   if (s?.at) set("settlement", dayWordOf(s.at, now) + ", " + t(s.at),
-    !s.complete ? "not every resident’s stakes answered"
+    !s.complete ? (reading.residents.length ? "counted from the residents read so far" : "not every resident’s stakes answered")
       : s.atRisk > 0 ? plural(s.atRisk, "mark") + " of the house’s at risk" : "nothing of the house’s at risk");
   const c = clocks.crossing;
   if (c?.at) set("crossing", (c.n != null ? "No. " + c.n + " · " : "") + t(c.at), "a letter written before then rides it");
@@ -160,7 +193,11 @@ function paintFeed(root, items, ctx) {
   // a phone shows the newest five, so Needs you is one scroll away, not twelve
   const cap = ctx.expanded ? shown.length : ctx.phone ? 5 : FEED_MAX;
   shown.slice(0, cap).forEach((i) => list.appendChild(feedLine(i, ctx)));
-  if (!shown.length) {
+  const reading = ctx.reading ?? NOT_READING;
+  if (!shown.length && (reading.residents.length || reading.house.includes("conversations"))) {
+    // not "nothing on the record": the lines that would fill it are still coming
+    list.appendChild(el("li", "hd-empty", "reading the house’s record…"));
+  } else if (!shown.length) {
     list.appendChild(el("li", "hd-empty", ctx.owner
       ? (looked == null ? "Nothing on the house’s record in the last day." : "Nothing new since you last looked.")
       : "Nothing on the house’s record lately."));
@@ -215,10 +252,11 @@ function paintNeeds(root, needs, ctx) {
     risk.appendChild(el("p", null, `${plural(needs.atRisk, "mark")} of the house’s ${needs.atRisk === 1 ? "is" : "are"} at risk: published without stamps behind ${needs.atRisk === 1 ? "it" : "them"}.`));
     ul.appendChild(risk);
   }
-  // the box stays up when it is empty, so the house sees it was checked
+  // the box stays up when it is empty, so the house sees it was checked; while residents are still being read it says so, never that nothing needs the house
   if (!ul.children.length) {
     const li = el("li");
-    li.appendChild(el("p", "hd-calm", "Nothing needs you right now."));
+    if (ctx.reading?.residents.length) li.appendChild(el("p", "hd-empty", "Still reading the house’s record…"));
+    else li.appendChild(el("p", "hd-calm", "Nothing needs you right now."));
     ul.appendChild(li);
   }
   root.querySelector("[data-hd-needs-box]")?.removeAttribute("hidden");
@@ -267,10 +305,14 @@ function paintCards(root, items, reads, ctx) {
       if (dd) { dd.textContent = text ?? ""; dd.hidden = !text; }
       if (dt) dt.hidden = !text;
     };
-    if (act) {
+    // a resident whose own reads are still out has not shown their last act, whatever the town's conversations already say of them
+    // (a letter of theirs may be newer), and with the conversations still out, no act yet is not "nothing on the record"
+    const reading = ctx.reading ?? NOT_READING;
+    if (reading.residents.includes(h)) set("[data-hd-last]", "still reading…");
+    else if (act) {
       const what = act.kind === "said" ? "said" + (act.place ? ", in " + act.place : "") : "a letter to " + (act.other ?? "someone");
       set("[data-hd-last]", whenOf(act.at, ctx.now) + " — " + what);
-    } else set("[data-hd-last]", "nothing on the record lately");
+    } else set("[data-hd-last]", reading.house.includes("conversations") ? "still reading…" : "nothing on the record lately");
     row("stands", stands ? (stands.moving ? "walking toward " : "") + stands.place : null);
     row("doing", act?.text ? "“" + clip(act.text, 120) + "”" : null);
     if (live) live.hidden = false;

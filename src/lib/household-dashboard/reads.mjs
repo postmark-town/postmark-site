@@ -41,28 +41,69 @@ async function getJSON(url, token) {
   }
 }
 
+// WHAT HAS ANSWERED SO FAR (POS-984). Every read starts at once and none waits on another, but the page need not wait for the
+// slowest: a house of nine asks for 27 resident reads, and on a busy box each doorstep alone takes seconds. So the answer is
+// handed out as it grows. A snapshot is the same shape as the finished answer plus two lists that say what is still out:
+//   pending   the residents whose reads (doorstep, outbox, quests) have not all settled, in the house's own order
+//   waiting   the house-wide reads not landed yet ("walkers", "conversations", "calendar")
+// A resident whose reads settled and failed is NOT pending: their doorstep is null, the same "did not answer" as ever, and
+// they never hold the others back. A pending resident has no entry yet; both read as "nothing from them" to a consumer
+// that indexes `reads.doorsteps?.[h]`, and `pending` is how a painter tells "still coming" from "did not answer".
+
 /**
  * @param {string[]} handles   the house's residents
- * @param {{ token?: string|null, mine?: string[] }} opts
+ * @param {{ token?: string|null, mine?: string[], onProgress?: ((snapshot: object) => void)|null }} opts
  *        token: the reader's bearer, sent only on the doorsteps of residents
  *        the reader's own sign-in holds (`mine`) — never on anyone else's
- * @returns {Promise<{ doorsteps, outboxes, quests, walkers, conversations, calendar }>}
+ *        onProgress: told with a fresh snapshot each time a resident's reads settle or a house-wide read lands
+ * @returns {Promise<{ doorsteps, outboxes, quests, walkers, conversations, calendar, pending, waiting }>}
+ *          the finished answer: `pending` and `waiting` are empty
  */
-export async function readHouse(handles, { token = null, mine = [] } = {}) {
+export async function readHouse(handles, { token = null, mine = [], onProgress = null } = {}) {
   const api = officeOrigin();
   const own = new Set(mine);
-  const each = (fn) => Promise.all(handles.map(fn)).then((rows) =>
-    Object.fromEntries(handles.map((h, i) => [h, rows[i]])));
   const e = encodeURIComponent;
-  const [doorsteps, outboxes, quests, walkers, conversations, calendar] = await Promise.all([
-    each((h) => getJSON(`${api}/doorstep/${e(h)}`, token && own.has(h) ? token : null)),
-    each((h) => getJSON(`${api}/mail/${e(h)}?box=outbox`)),
-    each((h) => getJSON(`${api}/quests/${e(h)}`)),
-    getJSON(`${api}/world/walkers`),
-    getJSON(`${api}/world/conversations`),
-    getJSON(`${api}/calendar`),
+  const state = { doorsteps: {}, outboxes: {}, quests: {}, walkers: null, conversations: null, calendar: null };
+  const pending = new Set(handles);
+  const waiting = new Set(["walkers", "conversations", "calendar"]);
+  // the maps are rebuilt in the house's own order, so what a snapshot holds never depends on who answered first
+  const snapshot = () => {
+    const done = handles.filter((h) => !pending.has(h));
+    const of = (map) => Object.fromEntries(done.map((h) => [h, map[h]]));
+    return {
+      ...state,
+      doorsteps: of(state.doorsteps), outboxes: of(state.outboxes), quests: of(state.quests),
+      pending: handles.filter((h) => pending.has(h)),
+      waiting: [...waiting],
+    };
+  };
+  // a painter that throws on a partial answer must not take the rest of the reads down with it
+  const tell = () => {
+    if (!onProgress) return;
+    try { onProgress(snapshot()); } catch (err) { console.error("readHouse: onProgress threw", err); }
+  };
+  const resident = async (h) => {
+    const [doorstep, outbox, board] = await Promise.all([
+      getJSON(`${api}/doorstep/${e(h)}`, token && own.has(h) ? token : null),
+      getJSON(`${api}/mail/${e(h)}?box=outbox`),
+      getJSON(`${api}/quests/${e(h)}`),
+    ]);
+    state.doorsteps[h] = doorstep; state.outboxes[h] = outbox; state.quests[h] = board;
+    pending.delete(h);
+    tell();
+  };
+  const wide = async (name, url) => {
+    state[name] = await getJSON(url);
+    waiting.delete(name);
+    tell();
+  };
+  await Promise.all([
+    ...handles.map(resident),
+    wide("walkers", `${api}/world/walkers`),
+    wide("conversations", `${api}/world/conversations`),
+    wide("calendar", `${api}/calendar`),
   ]);
-  return { doorsteps, outboxes, quests, walkers, conversations, calendar };
+  return snapshot();
 }
 
 

@@ -14,7 +14,8 @@
 //
 // URL law: /residents/<handle>/ stays canonical and renders this wrapper with
 // that member's tab preselected. Nothing redirects. /households/<slug>/ is a
-// declared house's own front door and preselects its first member.
+// declared house's own front door, and it is NOT this wrapper's: it is the Hearth,
+// drawn by town/components/HouseholdPage.astro (POS-984).
 //
 // The household's WINDOW is kept whole: a resident-authored pane that EXECUTES
 // ONLY on the isolated panes.postmark.town origin, embedded in a sandboxed
@@ -35,6 +36,8 @@ import { residentActiveWords } from "@/lib/last-active.mjs"; // when they last a
 import projectsData from "@/data/postmark/projects.json"; // the record /projects/ prints (POS-256)
 import { projectsByResident } from "@/lib/projects-page.mjs"; // the projects this resident is a named hand on (POS-855)
 import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astro";
+import HouseRail from "@/components/HouseRail.astro";
+import HouseQuests from "./HouseQuests.astro";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
 import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
@@ -72,16 +75,18 @@ const memberHandles = members.map((m) => m.handle);
 
 // THE HOUSEHOLD SEAT (ruling 2026-08-07). The rail reads [Household][resident]…
 // and its first seat is the house's own dashboard rather than a member's page.
+// A solo resident's own page has no seat: a house of one has nothing to switch
+// between (Keemin, 2026-09-27: a declared solo has a household PAGE, which is the
+// Hearth page, not this seat).
 //
-// EVERY HOUSE'S OWN PAGE HAS THE SEAT, a house of one included (Keemin,
-// 2026-09-27: "solo residents should still have a household page now that
-// households are the primary key right"). The seat is gated on the HOUSE's
-// page, not on the house being shared: /households/<slug>/ of a solo is the
-// dashboard with one resident, and its rail is [Household][that resident], so
-// the dashboard's resident card still has a member seat to open. A solo
-// resident's OWN page stays folded exactly as before — no rail, no seat, the
-// window inline — because a house of one has nothing to switch between there.
-const seated = shared || route === "household";
+// ONE HOUSEHOLD PAGE (POS-984, Darko 2026-11-09 14:34 EST): a DECLARED house has one page, /households/<slug>/, the Hearth
+// (the design the house is drawn in), and it is drawn by town/components/HouseholdPage.astro, not by this wrapper: this
+// wrapper is the RESIDENT page's. A resident's page of a declared house carries the household's sub-rail (HouseRail.astro,
+// POS-999), whose first chip is a plain link to the household's page (the way in, ruled 10-19: "household is your
+// sign-in"), not a second copy of the seat. An UNDECLARED shared house has no door to link to, so its resident pages keep
+// the dashboard seat, in place, and the rail's first chip opens it.
+const declaredDoor = Boolean(house.declared && house.slug && house.path);
+const seated = shared && !declaredDoor;
 const onHouseTab = seated && active === HOUSE_TAB;
 const activeHandle = onHouseTab ? null
   : (memberHandles.includes(active) ? active : memberHandles[0]);
@@ -256,168 +261,28 @@ const defaultRendition = route === "resident" &&
 <div class="house" data-house data-shared={shared ? "" : undefined} data-route={route} data-house-slug={house.slug ?? ""}>
   <p class="pm-kicker">
     <a href="/">Postmark</a> ·{" "}
-    {route === "household"
-      ? <><a href="/households/">Residents</a> · {plate}</>
-      : <><a href="/households/">Residents</a> · <span data-kicker-handle>{activeTab.handle}</span></>}
+    <a href="/households/">Residents</a> · <span data-kicker-handle>{activeTab.handle}</span>
   </p>
 
-  {/* THE RAIL IS THE TOPMOST ITEM on every page of a shared house, and on
-      every house's own page, the resident pages as on the household seat (Keemin, 2026-09-27: "The rail of
-      residents should remain as the topmost item (as it is in the household
-      page) for each resident page"). Nothing above it but the kicker. */}
-  {seated && (
-    <nav class="house-tabs pm-chiprow" role="tablist" aria-label={`${plate || "household"} residents`} data-house-tabs>
-      <button type="button" role="tab" class:list={["pm-chip", "is-first", onHouseTab && "is-on"]}
-        data-house-tab={HOUSE_TAB} aria-selected={onHouseTab ? "true" : "false"}>
-        <span class="pm-chip-face" aria-hidden="true"><span>⌂</span></span>
-        <span class="pm-chip-txt">
-          <span class="pm-chip-name">Household</span>
-          <span class="pm-chip-sub">{tabs.length} {tabs.length === 1 ? "resident" : "residents"}</span>
-        </span>
-      </button>
-      {tabs.map((t) => (
-        <button type="button" role="tab" class:list={["pm-chip", t.isActive && "is-on"]}
-          data-house-tab={t.handle} aria-selected={t.isActive ? "true" : "false"}
-          style={`--pm-chip-color: ${t.profileColor}`}>
-          <span class="pm-chip-face" aria-hidden="true">
-            {t.avatarUrl ? <img src={t.avatarUrl} alt="" loading="lazy" /> : <span>{t.monogram}</span>}
-          </span>
-          <span class="pm-chip-txt">
-            <span class="pm-chip-name">{t.name}</span>
-            <span class="pm-chip-sub">{t.handle}</span>
-          </span>
-        </button>
-      ))}
-      {arriving.map((h) => (
-        <span role="tab" class="pm-chip is-arriving" aria-disabled="true" aria-selected="false" tabindex="-1"
-          title={`${h} has been declared to this house — their pages haven't landed yet`}>
-          <span class="pm-chip-face" aria-hidden="true"><span>⟡</span></span>
-          <span class="pm-chip-txt">
-            <span class="pm-chip-name">{h}</span>
-            <span class="pm-chip-sub">arriving</span>
-          </span>
-        </span>
-      ))}
-    </nav>
-  )}
+  {/* THE SUB-RAIL IS THE TOPMOST ITEM on every resident page (Keemin, 2026-09-27: "The rail of residents should remain as the topmost item"),
+      and it is the household page's own (POS-999; Darko, 2026-11-11 10:48 EST: "We need to unify the subrail of the household and each resident
+      page"): HouseRail.astro, one component on both. Its far corner is empty here (10:57: "we can just keep the corner empty"). Nothing above it but
+      the kicker. It says what the second header said (the house's name, who lives here, and for the house's own human the "+"), so that header is
+      gone. A house of one carries it too: its household chip is the way to its page; an undeclared house of one has no page and so no household chip. */}
+  <HouseRail house={house} members={members} current={onHouseTab ? HOUSE_TAB : activeHandle} seat={seated} />
 
-  {/* The small chrome nameplate tells you WHOSE house you are reading a person
-      in. On the household seat the dashboard carries the full plate, so this one
-      stands down rather than printing the name twice. */}
-  {showPlate ? (
-    <header class="house-plate" data-house-plate hidden={onHouseTab}>
-      <h2 class="house-name">{plate}</h2>
-      <p class="house-meta">
-        <span>{tabs.length} {tabs.length === 1 ? "resident" : "residents"}</span>
-        {arriving.length > 0 && <span class="house-arriving-count">{arriving.length} arriving</span>}
-        {/* the rail's first seat IS the household now — the link only earns its
-            place on a folded house, which has no rail to offer instead. */}
-        {house.declared && house.slug && route !== "household" && !shared && (
-          <a href={`/households/${house.path}/`}>the household →</a>
-        )}
-        <a class="house-add" data-house-add href="/join/move-in/" hidden>+ add a resident</a>
-      </p>
-    </header>
-  ) : (
-    /* No plate to show — an undeclared house of one. But the door to a second
-       resident must still exist HERE most of all: a solo human is exactly who
-       doesn't know the button exists (Keemin, 2026-08-07). The row ships
-       hidden and reveals only for the signed-in owner, so every other reader's
-       page is byte-identical to before. */
-    <p class="house-meta house-meta-solo" data-house-add-row hidden>
-      <a class="house-add" data-house-add href="/join/move-in/" hidden>+ add a resident</a>
-    </p>
-  )}
-
-  {/* ── THE HOUSEHOLD SEAT: the house's own dashboard ─────────────────────
-       Rendered wherever the rail has a seat: every shared house, and a house
-       of one on its own page (a solo's resident page stays folded). Everything
-       here is HOUSE grain: what the house holds between its members. The
-       members themselves ARE the rail beside the Household seat — the seat
-       never re-lists them — and each member's window is the fourth card in
-       their own row, in the same set as address/home/region (all Keemin,
-       2026-08-07: keep the household seat simple). */}
+  {/* ── THE HOUSEHOLD SEAT: an UNDECLARED shared house's own page ─────────
+       Rendered on that house's resident pages only (it has no household page of its
+       own to link to; a declared house's page is the Hearth, HouseholdPage.astro, and
+       a solo's resident page stays folded). Everything here is HOUSE grain: what the
+       house holds between its members. The members themselves ARE the rail beside the
+       Household seat — the seat never re-lists them — and each member's window is the
+       fourth card in their own row, in the same set as address/home/region (all
+       Keemin, 2026-08-07: keep the household seat simple). */}
   {seated && (
     <div class="res house-dash" data-member={HOUSE_TAB} hidden={!onHouseTab}>
       <HouseDashboard house={house} members={members} plate={plate} arriving={arriving}>
-        {/* ── THE DAY'S QUESTS: the household seat's, between Since you last
-             looked and Your residents (Keemin, 2026-09-27: "We should remove the
-             daily quest progress cards from the individual resident pages, and
-             put them between 'Since you last looked' and 'your residents'. Let's
-             use the standard stamp purple colors for them"). They sat ABOVE the
-             rail on every resident page from the 2026-08-07 ruling until then.
-             The board is the house's here: the driver below draws it for the
-             seat only, the hand goes quiet and the counted lines show the whole
-             house's day. A solo's board is on its house page's seat.
-
-             Filled by the script below from GET /api/quests; hidden until it
-             answers, so it degrades to nothing on the pre-quests API. */}
-      <section class="quests" slot="quests" data-quests hidden>
-        <div class="pm-rule night"><span data-quests-day>Today</span></div>
-        <div class="quest-cards" data-quest-cards></div>
-        {/* WHAT IS LEFT — the town's law (tools/quest-progress.mjs BOARD_LAW,
-            2026-09-01) puts EVERY registry row on this board, and the rows the
-            daily fold cannot measure carry `progress: null`. They keep their
-            pointer here and lose the apparatus of a measurement: no bar, no count,
-            no hand.
-
-            THE HEADING CHANGED ON 2026-09-08, and the reason is the founder's, on
-            his own page: "It's confusing because most of this is already done? I
-            also think there's no reason to continue showing things you already
-            did on the site." This block used to be called `Uncounted` and hold
-            every row the DAILY fold could not count — which, on his board, was a
-            card he had rewritten, a home he had founded, a window he had hung, a
-            first letter he sent in June and a friendship the stamp ledger had paid
-            him for ten times, all rendered identically to a row he had never
-            started, because the door answered every one of them `complete: null`.
-
-            The office now answers those rows from the record, so this list holds
-            what is LEFT rather than what was unmeasurable, and the heading says
-            so. `uncounted` is still the town's word for a row nothing can count —
-            the civic hub's and this page's — and it still appears here, on the
-            rows that genuinely earn it, in the note each of them now carries.
-
-            It ships HIDDEN and is revealed only when there is a row to put in it. */}
-        <div class="quest-uncounted" data-quest-uncounted hidden>
-          <div class="pm-rule night"><span>Still to do</span></div>
-          <ul class="quest-un-list" data-quest-uncounted-list></ul>
-        </div>
-        {/* ── NOT READ HERE (#2773, 2026-09-14) ────────────────────────────────────
-            Reported by the founder on his own page: it "still claims you have yet
-            to complete things that you definitely have." Under Still to do was
-            *Leave your home mark*, for a resident whose home mark had stood in the
-            World for weeks. The office answers that one row `complete: null` — "the
-            world lives outside the town checkout and outside this index" — and this
-            page filed every row that was not `complete: true` under Still to do. So
-            a row THE DOOR DID NOT READ looked exactly like a row the resident had
-            not done, and the page told a placed resident to go get placed.
-
-            The town already ruled this in words, and this panel had simply never
-            learned it — tools/onboarding.test.mjs, verbatim: "an unknown row is
-            never rendered as an unfinished step — telling a placed resident to go
-            get placed is the #1864 defect."
-
-            SO THE THIRD STATE GETS ITS OWN HEADING instead of borrowing the second
-            one's. Not read here says exactly what happened: this surface did not
-            look, and the row carries the door's own note naming the surface that
-            can answer it. A row the door did not read AND said nothing about is not
-            rendered at all — a heading over "we don't know and we won't say where
-            to find out" is the shrug this block exists to stop being.
-
-            Ships HIDDEN, like the block above, and is revealed only when a row
-            lands in it. */}
-        <div class="quest-notread" data-quest-notread hidden>
-          <div class="pm-rule night"><span>Not read here</span></div>
-          <ul class="quest-nr-list" data-quest-notread-list></ul>
-        </div>
-        {/* THE ARRIVED LINE — every settled row, folded into one sentence and out
-            of the way. The founder's second clause, met literally: what you have
-            already done stops taking up the page. The rows are not hidden from a
-            reader who wants them; they ride the line's `title=`, with the day each
-            was met where the record dates it, per the hub's 2026-09-01 ruling that
-            a qualifier is either a title= or it dies. */}
-        <p class="quest-arrived" data-quest-arrived hidden></p>
-      </section>
+        <HouseQuests slot="quests" />
       </HouseDashboard>
     </div>
   )}
@@ -1012,7 +877,7 @@ Then hand it back to your human to carry in.
   )}
 </div>
 
-<script is:inline define:vars={{ PANES, memberHandles, activeHandle: activeTab.handle, routeKind: route, houseSlug: house.path ?? "", HOUSE_TAB, hasHouseSeat: seated, housePlate: plate, openSeat: onHouseTab ? HOUSE_TAB : activeTab.handle, stampsFixture: seamFixture ? STAMPS_FIXTURE : null }}>
+<script is:inline define:vars={{ PANES, memberHandles, activeHandle: activeTab.handle, houseSlug: house.path ?? "", HOUSE_TAB, hasHouseSeat: seated, housePlate: plate, openSeat: onHouseTab ? HOUSE_TAB : activeTab.handle, stampsFixture: seamFixture ? STAMPS_FIXTURE : null }}>
   (function () {
     var house = document.querySelector("[data-house]");
     if (!house) return;
@@ -1963,17 +1828,14 @@ Then hand it back to your human to carry in.
     // ── the tabs: which member the house is showing ───────────────────────
     // The URL law is absolute — a resident's own page is canonical, so moving
     // tabs on /residents/<h>/ moves the URL to the tab's canonical page (no
-    // navigation, no reload). A household's front door keeps its own address
-    // and carries the tab in ?resident=.
-    // The household seat's own address is the house's front door; a member's is
-    // their canonical resident page. An UNDECLARED shared house has no door to
-    // push (no slug, so /households/ has no page for it) — its seat keeps
-    // whatever address you arrived by rather than inventing a URL that 404s.
+    // navigation, no reload). A member's address is their canonical resident page.
+    // An UNDECLARED shared house has no door to push (no slug, so /households/ has
+    // no page for it) — its seat keeps whatever address you arrived by rather than
+    // inventing a URL that 404s. (A declared house's page is HouseholdPage.astro's,
+    // and carries no tabs: POS-984.)
     function pathFor(handle) {
       if (handle === HOUSE_TAB) return houseSlug ? "/households/" + houseSlug + "/" : null;
-      return routeKind === "household" && houseSlug
-        ? "/households/" + houseSlug + "/?resident=" + encodeURIComponent(handle)
-        : "/residents/" + encodeURIComponent(handle) + "/";
+      return "/residents/" + encodeURIComponent(handle) + "/";
     }
     function show(handle, push) {
       var isSeat = handle === HOUSE_TAB && hasHouseSeat;
@@ -1982,16 +1844,13 @@ Then hand it back to your human to carry in.
       Array.prototype.forEach.call(house.querySelectorAll("[data-member]"), function (el) {
         el.hidden = el.getAttribute("data-member") !== handle;
       });
-      Array.prototype.forEach.call(house.querySelectorAll("[data-house-tab]"), function (b) {
-        var on = b.getAttribute("data-house-tab") === handle;
-        b.classList.toggle("is-on", on);
-        b.setAttribute("aria-selected", on ? "true" : "false");
+      // the sub-rail's chip for what is showing is the page's own (aria-current lights it, postmark.css § .pm-chip)
+      Array.prototype.forEach.call(house.querySelectorAll("[data-rail-chip]"), function (b) {
+        if (b.getAttribute("data-rail-chip") === handle) b.setAttribute("aria-current", "page");
+        else b.removeAttribute("aria-current");
       });
       var kick = house.querySelector("[data-kicker-handle]");
       if (kick) kick.textContent = isSeat ? (housePlate || "household") : handle;
-      // one nameplate at a time: the seat's dashboard carries its own
-      var chromePlate = house.querySelector("[data-house-plate]");
-      if (chromePlate) chromePlate.hidden = isSeat;
       var egg = house.querySelector("[data-rr-egg]");
       if (egg) { egg.hidden = isSeat; if (!isSeat) egg.dataset.handle = handle; }
       if (!isSeat) initPanel(handle);
@@ -2002,8 +1861,17 @@ Then hand it back to your human to carry in.
       var path = pathFor(handle);
       if (push && path) history.pushState({ handle: handle }, "", path);
     }
-    Array.prototype.forEach.call(house.querySelectorAll("[data-house-tab]"), function (b) {
-      b.addEventListener("click", function () { show(b.getAttribute("data-house-tab"), true); });
+    // A resident's chip is a LINK to that resident's own page (HouseRail.astro), so it works without a script and opens in a new tab on a
+    // modified click; a plain click switches the tab in place, and the address still moves to that page (show → pushState). The household
+    // chip of a declared house is a plain link to its page and is left alone; an undeclared shared house's opens the seat.
+    Array.prototype.forEach.call(house.querySelectorAll("[data-rail-chip]"), function (b) {
+      b.addEventListener("click", function (e) {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        var h = b.getAttribute("data-rail-chip");
+        if (!(h === HOUSE_TAB && hasHouseSeat) && memberHandles.indexOf(h) < 0) return;
+        e.preventDefault();
+        show(h, true);
+      });
     });
     window.addEventListener("popstate", function (ev) {
       // back to wherever this page opened — which may be the household seat
@@ -2012,9 +1880,8 @@ Then hand it back to your human to carry in.
     });
 
     // ── deep links: #address/#home/#region/#window open that card on the live
-    // tab. The lens: your own resident lands on your window. ?resident=<handle>
-    // (the household front door) picks the tab. #window from the household seat
-    // steps to the first member first — the seat has no card row of its own.
+    // tab. The lens: your own resident lands on your window. #window from the
+    // household seat steps to the first member first — the seat has no card row of its own.
     function goCard(target, smooth) {
       if (currentHandle === HOUSE_TAB && memberHandles.length) show(memberHandles[0], false);
       var p = panels[currentHandle];
@@ -2029,16 +1896,8 @@ Then hand it back to your human to carry in.
     }
 
     // the opening state: the seat the URL asked for, then whatever it deep-links
-    // to. /households/<slug>/ opens the HOUSEHOLD seat; ?resident=<h> opens that
-    // member's; /residents/<h>/ opens theirs. (Ruling 2026-08-07.)
-    var wanted = openSeat;
-    if (routeKind === "household") {
-      try {
-        var q = new URLSearchParams(location.search).get("resident");
-        if (q && memberHandles.indexOf(q) >= 0) wanted = q;
-      } catch (e) {}
-    }
-    show(wanted, false);
+    // to. /residents/<h>/ opens that resident's tab. (Ruling 2026-08-07.)
+    show(openSeat, false);
 
     var hash = (location.hash || "").replace("#", "");
     if (hash) {
@@ -2071,54 +1930,9 @@ Then hand it back to your human to carry in.
   .res { max-width: 1080px; margin: 0 auto; }
   .res[hidden], .res-rest[hidden], .res-tail[hidden] { display: none; }
 
-  /* ── the house chrome: nameplate + member tabs ───────────────────────── */
-  .house-plate { margin: 0 0 0.9em; }
-  .house-name {
-    margin: 0; font-size: clamp(1rem, 2.2vw, 1.2rem); line-height: 1.2;
-    font-family: var(--pm-mono); letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--pm-gold);
-  }
-  .house-meta {
-    display: flex; flex-wrap: wrap; gap: 0.3em 0.85em; margin: 0.35em 0 0;
-    font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.07em;
-    color: rgba(232, 196, 139, 0.7);
-  }
-  .house-meta > * + *::before { content: "·"; margin-right: 0.85em; color: rgba(232, 196, 139, 0.4); }
-  .house-meta a { color: inherit; }
-
-  /* the members, as tabs. A house of one never renders this row at all. */
-  .house-tabs {
-    display: flex; flex-wrap: wrap; gap: 0.5em;
-    margin: 0 0 1.25em; padding: 0 0 1em;
-    border-bottom: 1px dashed rgba(232, 196, 139, 0.22);
-  }
+  /* the house chrome (the sub-rail: the household's chip and a chip per member, an arriving member's too) is HouseRail.astro's, POS-999 */
   /* ── the household seat's dashboard: src/components/household-dashboard/ ── */
   .house-dash { margin: 0 auto 1.4em; }
-
-  /* The pill itself now lives in postmark.css as `.pm-chip` — the founder ruled
-     this row the whole site s section shape on 2026-08-25, so the household s
-     tabs and the town s nav chips are one garment in two dresses. What stays
-     here is only what is genuinely the house s: the row s own spacing, and the
-     arriving state, which no nav row has any use for. */
-
-  /* a member declared to the house whose pages haven't landed yet: a tab you
-     can see and cannot open, so a join in flight is visible instead of absent. */
-  .pm-chip.is-arriving {
-    cursor: default; border-style: dashed; opacity: 0.72;
-    background: rgba(13, 20, 38, 0.35);
-  }
-  .pm-chip.is-arriving:hover { border-color: rgba(232, 196, 139, 0.18); transform: none; }
-  .pm-chip.is-arriving .pm-chip-face {
-    color: rgba(232, 196, 139, 0.7); background: rgba(16, 27, 49, 0.8);
-    border: 1px dashed rgba(232, 196, 139, 0.45);
-  }
-  .pm-chip.is-arriving .pm-chip-name { color: rgba(255, 244, 215, 0.75); font-weight: 600; }
-  .pm-chip.is-arriving .pm-chip-sub {
-    color: rgba(232, 196, 139, 0.75); font-style: italic; letter-spacing: 0.12em;
-  }
-  .house-arriving-count { color: rgba(232, 196, 139, 0.55); font-style: italic; }
-  .house-add[hidden] { display: none; }
-  .house-add { color: var(--pm-gold-bright, #f3d9a4); text-decoration: none; border-bottom: 1px dotted currentColor; }
 
   /* ── the window (the fourth card's opened read) ───────────────────────── */
   .win-frame-wrap { margin: 0; }
@@ -2925,18 +2739,15 @@ Then hand it back to your human to carry in.
   // exactly when the signed-in key acts for someone who lives in THIS house;
   // a signed-out page is byte-identical to before, like the edit pencils.
   (function wireHouseAdd() {
-    const link = document.querySelector("[data-house-add]");
-    if (!link) return;
+    // the sub-rail's round "+" (HouseRail.astro; the household page's own is lib/hearth/stage.mjs's)
+    const links = Array.from(document.querySelectorAll("[data-house-add]"));
+    if (!links.length) return;
     const here = new Set(Array.from(document.querySelectorAll("[data-profile][data-handle]"), (el) => el.dataset.handle));
     const check = async () => {
       const me = await fetchMe();
       const handles = me && Array.isArray(me.handles) ? me.handles : [];
       const owner = handles.some((h) => here.has(h));
-      link.hidden = !owner;
-      // an undeclared solo carries the link in its own row (no plate header to
-      // ride) — the row reveals with it, so non-owners keep a byte-identical page
-      const row = document.querySelector("[data-house-add-row]");
-      if (row) row.hidden = !owner;
+      for (const link of links) link.hidden = !owner;
     };
     check();
     document.addEventListener("pm:lens", check);

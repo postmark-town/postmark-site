@@ -21,28 +21,34 @@ const built = (...segs) => existsSync(join(DIST, ...segs));
 const page = (...segs) => readFileSync(join(DIST, ...segs), "utf8");
 const at = (html, needle) => { const i = html.indexOf(needle); assert.ok(i >= 0, `the page carries ${needle}`); return i; };
 
-test("a resident page of a shared house opens on the rail and carries no quest board",
+// POS-984 (Darko, 2026-11-09 14:34 EST): a declared house has ONE page, /households/<slug>/. Until 2026-11-09 these two
+// asserted a resident page of a shared house carried the seat's board (hidden, behind the Household tab) and that the
+// seat put the quests between "Since you last looked" and the residents. The seat is the Hearth now; a resident's page of
+// a declared house carries no seat at all. Until 2026-11-10 the quests sat in the site's band above the Hearth, for the
+// signed-in human; the band is gone and the day's quests are off the household page (Darko, 17:14 EST: stale since the
+// quest log grew), so they remain only on an UNDECLARED shared house's seat (HouseDashboard), on its resident pages.
+// Until 2026-11-11 the rail here was the resident page's own tab rail, over a nameplate. POS-999 (Darko, 2026-11-11 10:48 EST: "We need to unify the subrail of
+// the household and each resident page") made it the household's sub-rail, the household page's own, and took the nameplate (the sub-rail says it).
+test("a resident page of a shared house opens on the household's sub-rail, whose first chip is a link to the household page, and carries no quest board",
   { skip: !built("residents", "wright", "index.html") }, () => {
     const html = page("residents", "wright", "index.html");
     const house = html.slice(at(html, "data-house "));
-    const rail = at(house, "data-house-tabs");
-    assert.ok(rail < at(house, "data-house-plate"), "the rail stands above the nameplate");
+    const rail = at(house, "data-house-rail");
+    assert.equal(house.includes("data-house-plate"), false, "no nameplate under it");
     assert.ok(rail < at(house, "data-profile-bubble"), "the rail stands above the profile");
-    // the board is on the household seat only; the page's one copy of it is
-    // inside the seat's dashboard, never before the rail
-    const board = house.indexOf("data-quests ");
-    assert.ok(board > rail, "no quest board above the rail");
-    assert.ok(board > at(house, "data-hd "), "the board is inside the household dashboard");
+    assert.match(house.slice(rail, rail + 400), /<a class="pm-chip is-first" data-house-link href="\/households\/starforge\/"/, "the rail's first chip goes to the household's page");
+    assert.equal(house.includes("data-house-tab=\"__house\""), false, "no second copy of the seat on a resident's page");
+    assert.equal(house.indexOf("data-quests "), -1, "the board is on the household page only");
   });
 
-test("the household seat puts the day's quests between Since you last looked and the residents",
+test("the household page carries no day's quests and no band: the design draws the house",
   { skip: !built("households", "starforge", "index.html") }, () => {
     const html = page("households", "starforge", "index.html");
-    const feed = at(html, 'id="hd-feed-h"');
-    const board = at(html, "data-quests ");
-    const residents = at(html, 'id="hd-res-h"');
-    assert.ok(feed < board && board < residents, "feed → quests → residents");
+    at(html, "data-hearth-stage ");
+    assert.equal(html.includes("data-quests "), false, "no quest board on the household page");
+    assert.equal(html.includes("data-hband"), false, "and no band to host one");
     assert.equal(html.includes("data-hd-quests"), false, "the dashboard's old small quest panel is gone");
+    assert.equal(html.includes('id="hd-feed-h"'), false, "the old dashboard's feed is not on the one page: the design draws the house");
   });
 
 test("a solo resident's page has no board (a house of one has no seat)",
@@ -85,20 +91,26 @@ test("The Mail's letter cards are on the letter paper", () => {
 // Keemin, 2026-09-27: "solo residents should still have a household page now
 // that households are the primary key right". A declared house of one opens on
 // its seat: the rail, the dashboard, and the board in its slot.
-test("a declared house of one has its household page: rail, dashboard, board",
+// Until 2026-11-11 this held "no rail" on a house of one's page. POS-999 put the household's sub-rail in every household page's strip, a house of one's too.
+test("a declared house of one has its household page: the strip with its sub-rail, then the design, with no band and no board",
   { skip: !built("households", "casa-nera", "index.html") }, () => {
     const html = page("households", "casa-nera", "index.html");
     const house = html.slice(at(html, "data-house "));
-    assert.ok(at(house, "data-house-tabs") < at(house, "data-hd "), "the rail tops the page");
-    const feed = at(house, 'id="hd-feed-h"');
-    const board = at(house, "data-quests ");
-    assert.ok(feed < board && board < at(house, 'id="hd-res-h"'), "feed → quests → the resident");
-    assert.equal(/data-shared/.test(house.slice(0, 200)), false, "a house of one is not marked shared, so its whole board shows");
+    assert.ok(at(house, "data-hearth-bar") < at(house, "data-hearth-stage "), "the strip tops the design");
+    assert.ok(at(house, "data-hearth-bar") < at(house, "data-house-rail") && at(house, "data-house-rail") < at(house, "data-hearth-stage "), "the sub-rail is in the strip");
+    assert.equal(house.includes("data-house-tabs"), false, "no old tab rail");
+    assert.equal(house.includes("data-hband"), false, "no band");
+    assert.equal(house.includes("data-quests "), false, "no board");
+    assert.equal(/data-shared/.test(house.slice(0, 200)), false, "a house of one is not marked shared");
   });
 
-test("a solo resident's own page stays folded: no rail, no dashboard",
+// Until 2026-11-11 a solo resident's page stayed folded, with no rail. POS-999 put the household's sub-rail on every resident page: on a house of one it is
+// the way to the household's page (the nameplate's "the household →" link is gone with the nameplate). It still has no dashboard.
+test("a solo resident's own page carries the household's sub-rail (its household chip, its own chip) and no dashboard",
   { skip: !built("residents", "vellix", "index.html") }, () => {
     const html = page("residents", "vellix", "index.html");
     assert.equal(html.includes("data-house-tabs"), false);
+    assert.match(html, /<a class="pm-chip is-first" data-house-link href="\/households\/[^"]+\/"/, "its household chip links to its household page");
+    assert.match(html, /data-rail-chip="vellix" href="\/residents\/vellix\/" aria-current="page"/, "its own chip is lit");
     assert.equal(html.includes("data-hd "), false);
   });

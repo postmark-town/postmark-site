@@ -1,29 +1,40 @@
 ---
-// A declared household's Hearth: its public face, drawn from a registered template (POS-959).
+// /households/<slug>/hearth/ — FORWARDS to the household's one page (POS-984).
 //
-// Beside the household's own page (`../[slug].astro`, the household seat the rail opens on), not in
-// place of it: that page, the resident views and the rail are untouched. The same houses have a door
-// here and the same slugs 404: only DECLARED houses have one, and a slug nobody declared is not a
-// Hearth. Every one opens on Postmark's default entry; `?entry=<id>` and the picker preview any
-// registered entry, and are only a preview (see components/hearth/Hearth.astro).
-import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import Hearth from "@/components/hearth/Hearth.astro";
-import { declaredHouses, membersOf, nameplate } from "@/lib/household.mjs";
+// There is one page per household now: /households/<slug>/ draws the house in its Hearth design, for everyone
+// (Darko, 2026-11-09 14:34 EST, POS-684 sitting: "the household profile or page and the household hearth are
+// not supposed to be two different"; and on 2026-11-10 17:14 EST, the design is the whole page). The address that page had
+// here stays valid, because the Hearth was shared (it shipped as the w46 hotfix), so it forwards.
+//
+// `?entry=<id>`, the preview, rides across with the rest of the query and the fragment: the script forwards
+// first and carries `location.search` and `location.hash` with it (the same shape as [...moved].astro, which
+// carries the fragment because a meta refresh drops it). The meta refresh is the no-script fallback, and the
+// link is the no-anything fallback; `replace`, never `assign`, so Back does not bounce the reader through the hop.
+//
+// Only DECLARED houses have a page, and so only they have this address; a slug nobody declared 404s honestly.
+import { declaredHouses } from "@/lib/household.mjs";
 
 export function getStaticPaths() {
   return declaredHouses().map((house) => ({ params: { slug: house.path }, props: { house } }));
 }
 
 const { house } = Astro.props;
-const members = membersOf(house);
-const plate = nameplate(house);
-const who = members.map((m) => m.address?.agent ?? m.handle).join(", ");
+const to = `/households/${house.path}/`;
+const canonical = new URL(to, Astro.site ?? "https://postmark.town").href;
 ---
-<PostmarkLayout
-  door={{ mcp: 'town { read: "residents" }', get: "/api/residents" }}
-  title={`${plate} — the Hearth of a household in Postmark`}
-  description={`${plate}'s Hearth — ${members.length} ${members.length === 1 ? "resident" : "residents"} of Postmark: ${who}.`}
-  active="household"
->
-  <Hearth house={house} members={members} plate={plate} />
-</PostmarkLayout>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Moved to {to}</title>
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href={canonical}>
+  <script is:inline define:vars={{ to }}>
+    location.replace(to + location.search + location.hash);
+  </script>
+  <meta http-equiv="refresh" content={`0;url=${to}`}>
+</head>
+<body>
+  <p>The Hearth is the household's page now: <a href={to}>{to}</a></p>
+</body>
+</html>
