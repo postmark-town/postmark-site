@@ -49,36 +49,44 @@ export function bundleFrom(answer) {
 }
 
 /**
- * An answer the office could not read: its own marker, `unavailable: "<why>"`, carried beside whatever it holds (often `rows: []`; office
- * house-bundle.mjs: `{ rows: [], unavailable: "… unknown, not none" }`). Such an answer is MISSING, never empty: Rivet, POS-1027, "unavailable
- * history must not masquerade as a quiet day", and "Unknown time/distance is not fabricated" (review of #420 at 40993488).
+ * An answer the office could not give, in either of its two forms, so it is MISSING, never empty:
+ *   - its own marker, `unavailable: "<why>"`, beside whatever it holds (often `rows: []`; office house-bundle.mjs: `{ rows: [], unavailable:
+ *     "… unknown, not none" }`; review of #420 at 40993488);
+ *   - a refusal passed through as the part's data, `{ error: "bounce", … }` (office hearth-bundle.mjs; town-index-store.mjs UNREACHABLE):
+ *     the office's own isRefusal is `error != null` (review of #420 at d625ad36).
+ * Rivet, POS-1027: "unavailable history must not masquerade as a quiet day", and "Unknown time/distance is not fabricated".
  */
-export const unavailable = (data) => isObj(data) && data.unavailable != null && data.unavailable !== false && data.unavailable !== "";
+export const unreadable = (data) => isObj(data) && ((data.unavailable != null && data.unavailable !== false && data.unavailable !== "") || data.error != null);
 
-/** One part's `data` (the standalone read's own answer), or null when the part is absent, has no data, the office marked it unavailable, or the bundle did not come. */
+/** One part's `data` (the standalone read's own answer), or null when the part is absent, has no data, the office could not give it, or the bundle did not come. */
 export function dataOf(bundle, key) {
   const p = isObj(bundle?.parts) ? bundle.parts[key] : null;
-  return isObj(p) && isObj(p.data) && !unavailable(p.data) ? p.data : null;
+  return isObj(p) && isObj(p.data) && !unreadable(p.data) ? p.data : null;
 }
 
 /**
- * A collection part's data, one per member: an array of `data`, or null when the collection is a named unavailability (not an array). A member
- * whose own data is marked unavailable is left out, so it reads as not read (a resident's day: "not read."), never as a quiet one.
+ * A collection part's data, one per member: an array of `data`, or null when the collection is a named unavailability (not an array).
+ * A member the office could not give is left out, so it reads as not read (a resident's day: "not read."), never as a quiet one. With
+ * `whole: true` a collection missing any member is null instead: the caller cannot tell a partial set from a whole one (the pairs, review
+ * of #420 at d625ad36: a house's script falls back to its own reads rather than draw a set with a hole in it).
  */
-export function collectionOf(bundle, key) {
+export function collectionOf(bundle, key, { whole = false } = {}) {
   const c = isObj(bundle?.parts) ? bundle.parts[key] : null;
   if (!Array.isArray(c)) return null;
-  return c.filter((p) => isObj(p) && isObj(p.data) && !unavailable(p.data)).map((p) => p.data);
+  const read = c.filter((p) => isObj(p) && isObj(p.data) && !unreadable(p.data));
+  if (whole && read.length !== c.length) return null;
+  return read.map((p) => p.data);
 }
 
 const quote = (latest) => (isObj(latest) ? str(latest.line).slice(0, 200) || null : null);
 
 /**
  * The pairs: one row per (resident of the house, correspondent), from the `pairs` collection. Letters each way, and the quote each way by rule.
- * null when the collection did not come. This is what a house's script draws ties from (hearth.parts.pairs).
+ * null when the collection did not come, or when any pair in it could not be read: a set with a hole in it is not drawn as whole, so the
+ * constellation keeps its own mail fallback. This is what a house's script draws ties from (hearth.parts.pairs).
  */
 export function pairsOf(bundle, handles = []) {
-  const all = collectionOf(bundle, "pairs");
+  const all = collectionOf(bundle, "pairs", { whole: true });
   if (!all) return null;
   const house = new Set(handles);
   const rows = [];
@@ -159,8 +167,11 @@ export function wentOf(bundle, handles = []) {
 export const FEED_SORTS = Object.freeze(["newest", "backed", "near"]);
 export const FEED_SHOWN = 12;
 /**
- * The town slot: every answered feed row, with the values each sort reads. null when the part did not come. Backing and distance are read under
- * `backing`/`distance` (POS-1027's words) or `backed`/`near`; unknown is never made up.
+ * The town slot: every answered feed row, with the values each sort reads. null when the part did not come.
+ * The office's fields (Rivet, POS-1027): `backing` (the public stamp backing) and `distance` (metres from the public near origin); "unknown or
+ * not-applicable values are null or absent, never zero", and `backed`/`near` are sort tokens, not fields. So the fold's `backed` and `near`
+ * read only `backing` and `distance`, and an unknown stays null: it shows as absent, never as 0, and sorts after every known value.
+ * A sort is offered only when a row carries its value.
  */
 export function feedOf(bundle) {
   const feed = dataOf(bundle, "feed");
@@ -172,19 +183,20 @@ export function feedOf(bundle) {
     title: str(r.title).slice(0, 140),
     href: safeHref(r.href),
     by: str(r.by).slice(0, 60) || null,
-    backed: num(r.backing) ?? num(r.backed) ?? 0,
-    near: num(r.distance) ?? num(r.near),
+    backed: num(r.backing),
+    near: num(r.distance),
   })).filter((r) => r.title);
   rows.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
   // EVERY answered row, uncut: the reader's sort runs over the whole list and only then is it cut (feedShown), so "most backed" is the most backed
   // of the feed, not of its newest twelve (review of #420)
-  return { rows, sorts: FEED_SORTS.filter((s) => s !== "near" || rows.some((r) => r.near != null)) };
+  const carries = { backed: rows.some((r) => r.backed != null), near: rows.some((r) => r.near != null) };
+  return { rows, sorts: FEED_SORTS.filter((s) => s === "newest" || carries[s]) };
 }
 
-/** The rows the town slot shows for a sort: the whole feed sorted the reader's way, then cut to the first FEED_SHOWN. */
+/** The rows the town slot shows for a sort: the whole feed sorted the reader's way, then cut to the first FEED_SHOWN. An unknown value sorts last. */
 export function feedShown(rows, sort = "newest") {
   const out = [...asArray(rows)];
-  if (sort === "backed") out.sort((a, b) => b.backed - a.backed || (b.at ?? 0) - (a.at ?? 0));
+  if (sort === "backed") out.sort((a, b) => (b.backed ?? -Infinity) - (a.backed ?? -Infinity) || (b.at ?? 0) - (a.at ?? 0));
   else if (sort === "near") out.sort((a, b) => (a.near ?? Infinity) - (b.near ?? Infinity) || (b.at ?? 0) - (a.at ?? 0));
   else out.sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
   return out.slice(0, FEED_SHOWN);

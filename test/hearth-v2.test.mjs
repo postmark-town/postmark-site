@@ -17,7 +17,7 @@ import { SLOTS, SLOT_NAMES, slotTag, LIMITS } from "../src/lib/hearth/slots.mjs"
 import { sanitizeHtml } from "../src/lib/hearth/sanitize-html.mjs";
 import { sanitizeCss, stageFor } from "../src/lib/hearth/sanitize-css.mjs";
 import { prepareEntry, fingerprint } from "../src/lib/hearth/entries.mjs";
-import { dataOf, collectionOf, pairsOf, tiesOf, wentOf, feedOf, dayOf, humanLogOf, partsFor, safeHref, bundleUrl, bundleFrom, unavailable } from "../src/lib/hearth/bundle.mjs";
+import { dataOf, collectionOf, pairsOf, tiesOf, wentOf, feedOf, dayOf, humanLogOf, partsFor, safeHref, bundleUrl, bundleFrom, unreadable, feedShown } from "../src/lib/hearth/bundle.mjs";
 import { scriptUrlOf, hearthApi, runEntryScript, emit, NOT_YOUR_HOUSE } from "../src/lib/hearth/script.mjs";
 import { syncHearths } from "../tools/sync-hearths.mjs";
 import { CHANNEL_HEADER } from "../src/lib/office-write.mjs";
@@ -186,11 +186,29 @@ test("stamps that went: grouped by kind, totals from the rows, zero rows dropped
   assert.equal(safeHref("javascript:alert(1)"), null);
 });
 
-test("the town feed: titled rows only, newest first, backing read; 'nearest' offered only when a row carries a distance", () => {
+test("the town feed: titled rows only, newest first, backing read; each sort offered only when a row carries its value", () => {
   const f = feedOf(BUNDLE);
   assert.deepEqual(f.rows.map((r) => [r.title, r.backed]), [["Bread night", 9], ["Lanterns on the quay", 2]]);
   assert.deepEqual(f.sorts, ["newest", "backed"]);
-  assert.deepEqual(feedOf({ ...BUNDLE, parts: { feed: part("town", "feed", { rows: [{ title: "x", distance: 40 }] }) } }).sorts, ["newest", "backed", "near"]);
+  // until 2026-11-13 (review at d625ad36) a feed with no backing still offered "most backed", every row reading 0
+  assert.deepEqual(feedOf({ ...BUNDLE, parts: { feed: part("town", "feed", { rows: [{ title: "x", distance: 40 }] }) } }).sorts, ["newest", "near"]);
+});
+
+test("the feed's fields are the office's (POS-1027, Rivet): `backing` and `distance` only; an unknown is null, never 0, and sorts last", () => {
+  // LAW (POS-1027, Rivet): "Unknown or not-applicable values are null or absent, never zero"; `backed` and `near` are sort tokens, not field names
+  const rows = feedOf({ ...BUNDLE, parts: { feed: part("town", "feed", { rows: [
+    { id: "a", title: "known", at: "2026-11-10T00:00:00Z", backing: 3, distance: 120 },
+    { id: "b", title: "unknown", at: "2026-11-12T00:00:00Z", backing: null },
+    { id: "c", title: "absent", at: "2026-11-11T00:00:00Z" },
+    { id: "d", title: "old names", at: "2026-11-09T00:00:00Z", backed: 50, near: 5 },
+  ] }) } }).rows;
+  const by = Object.fromEntries(rows.map((r) => [r.title, [r.backed, r.near]]));
+  assert.deepEqual(by.known, [3, 120]);
+  assert.deepEqual(by.unknown, [null, null], "a null backing is unknown, not 0");
+  assert.deepEqual(by.absent, [null, null], "an absent backing is unknown, not 0");
+  assert.deepEqual(by["old names"], [null, null], "`backed` and `near` are sort tokens, never read as fields");
+  assert.deepEqual(feedShown(rows, "backed").map((r) => r.title), ["known", "unknown", "absent", "old names"], "most backed: the known first, then the unknown by date");
+  assert.deepEqual(feedShown(rows, "near").map((r) => r.title), ["known", "unknown", "absent", "old names"], "nearest: the known first, then the unknown by date");
 });
 
 test("a resident's day: in the house's order, the office's own sentences; a quiet day is the office's quiet sentence, a resident it did not read is not read", () => {
@@ -217,6 +235,13 @@ for (const [name, key, fold, isNone] of [
     assert.equal(fold(with1(key, { rows: SOME, unavailable: U })), null, `${name}: rows beside the marker are not shown as if whole`);
     assert.ok(isNone(fold(with1(key, { rows: [] }))), `${name}: control, the same answer without the marker is an honest none`);
   });
+  // REFUSED IS MISSING TOO (review of #420 at d625ad36): the office passes a failed read through as the part's data, `{ error: "bounce", … }`
+  // (office hearth-bundle.mjs; town-index-store.mjs UNREACHABLE), and its own isRefusal is `error != null`
+  test(`refused is missing, not empty: ${name}`, () => {
+    assert.equal(fold(with1(key, { error: "bounce", code: 503, defect: "the town index is unreachable" })), null, `${name}: a refused read is missing, never "none"`);
+    assert.equal(fold(with1(key, { error: "bounce", rows: [] })), null, `${name}: even with an empty rows beside it`);
+    assert.ok(isNone(fold(with1(key, { rows: [] }))), `${name}: control, the same answer without the refusal is an honest none`);
+  });
 }
 
 test("unavailable is missing, not empty: a resident's day the office could not read is 'not read', never quiet", () => {
@@ -227,14 +252,32 @@ test("unavailable is missing, not empty: a resident's day the office could not r
   assert.deepEqual(dayOf(days, HOUSE).rows.map((r) => [r.handle, r.answered]), [["fox", true], ["owl", false]]);
 });
 
-test("unavailable is missing, not empty: a pair the office could not read is left out, and its correspondent shows the house's total only", () => {
-  const pairs = { ...BUNDLE, parts: { ...BUNDLE.parts, pairs: [
-    part("town", "pair", { a: "fox", b: "hare", letters: { a_to_b: 4, b_to_a: 3 }, latest: { a_to_b: { line: "x" }, b_to_a: null }, unavailable: U }),
+test("refused is missing, not empty: a resident's day the office refused is 'not read', never quiet", () => {
+  const days = { ...BUNDLE, parts: { ...BUNDLE.parts, days: [
+    part("household", "day", { handle: "fox", date: "2026-11-13", sentences: ["A quiet day."] }),
+    // the refusal names whose day it was (so only the refusal check, not a missing handle, can make it "not read")
+    part("household", "day", { error: "bounce", code: 503, handle: "owl", date: "2026-11-13", sentences: [] }),
   ] } };
-  assert.deepEqual(pairsOf(pairs, HOUSE), []);
-  const hare = tiesOf(pairs, HOUSE).rows.find((r) => r.with === "hare");
-  assert.deepEqual([hare.handle, hare.out, hare.quoteOut, hare.letters], [null, null, null, 7]);
-  assert.equal(unavailable({ rows: [], unavailable: "" }), false, "an empty marker is no marker");
+  assert.deepEqual(dayOf(days, HOUSE).rows.map((r) => [r.handle, r.answered, r.lines.length]), [["fox", true, 1], ["owl", false, 0]]);
+});
+
+test("unavailable is missing, not empty: a set of pairs with an unreadable member is no set (null, so a script keeps its own fallback); the ties show house totals", () => {
+  // until 2026-11-13 (review at d625ad36) pairsOf answered [] here, which a script read as "this house writes no one": the constellation drew
+  // an empty sky instead of falling back to the residents' public mail
+  for (const bad of [{ unavailable: U }, { error: "bounce" }]) {
+    const pairs = { ...BUNDLE, parts: { ...BUNDLE.parts, pairs: [
+      BUNDLE.parts.pairs[2],
+      part("town", "pair", { a: "fox", b: "hare", letters: { a_to_b: 4, b_to_a: 3 }, latest: { a_to_b: { line: "x" }, b_to_a: null }, ...bad }),
+    ] } };
+    assert.equal(pairsOf(pairs, HOUSE), null, `one ${Object.keys(bad)[0]} pair: the set is not drawn as whole`);
+    assert.equal(partsFor(pairs, HOUSE).pairs, null, "and a script's hearth.parts.pairs is null, so it falls back");
+    const hare = tiesOf(pairs, HOUSE).rows.find((r) => r.with === "hare");
+    assert.deepEqual([hare.handle, hare.out, hare.quoteOut, hare.letters], [null, null, null, 7], "the ties keep the house's own total, no direction made up");
+  }
+  // control: the same set with every member read is drawn
+  assert.equal(pairsOf(BUNDLE, HOUSE).length, 3);
+  assert.equal(unreadable({ rows: [], unavailable: "" }), false, "an empty marker is no marker");
+  assert.equal(unreadable({ rows: [], error: null }), false, "a null error is no refusal");
 });
 
 test("the human's own record: the public happened rows whose hand is the human's", () => {

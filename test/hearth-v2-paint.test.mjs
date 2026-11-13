@@ -112,8 +112,8 @@ test("ties: no bundle, or a bundle without the part, draws nothing; an answered 
 
 test("town: 'most backed' sorts the whole feed before it is cut, so a well-backed older row is not lost behind the newest twelve", () => {
   const { s, town } = stage();
-  const rows = Array.from({ length: FEED_SHOWN + 4 }, (_, i) => ({ kind: "idea", title: "row " + i, at: `2026-11-${String(20 - i).padStart(2, "0")}T00:00:00Z`, backed: 0 }));
-  rows[rows.length - 1].backed = 40;   // the oldest row is the most backed
+  const rows = Array.from({ length: FEED_SHOWN + 4 }, (_, i) => ({ kind: "idea", title: "row " + i, at: `2026-11-${String(20 - i).padStart(2, "0")}T00:00:00Z`, backing: 0 }));
+  rows[rows.length - 1].backing = 40;   // the oldest row is the most backed (the office's field: `backing`, POS-1027)
   const bundle = env({ feed: part({ rows }) });
   paintTown(s, bundle, { ...CTX, feedSort: "newest" });
   const titles = () => town.querySelector("[data-hx-feed]").children.map((li) => li.children[1].textContent);
@@ -139,6 +139,8 @@ for (const [name, key, paint, none] of [
     const st = stage();
     paint(st.s, env({ [key]: part({ rows: [], unavailable: U }) }), CTX);
     assert.equal(st[name].hidden, true, `${name}: an unavailable answer draws nothing`);
+    paint(st.s, env({ [key]: part({ error: "bounce", code: 503 }) }), CTX);
+    assert.equal(st[name].hidden, true, `${name}: a refused answer (the office's { error }) draws nothing, never "none"`);
     paint(st.s, env({ [key]: part({ rows: [] }) }), CTX);
     assert.equal(st[name].hidden, false, `${name}: control, an answered none shows`);
     assert.match(st[name].textContent, none, `${name}: and says so`);
