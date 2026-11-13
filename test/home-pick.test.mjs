@@ -84,7 +84,9 @@ test("8. only the owner path reveals it: mount() wires it after /me names this h
 test("9. Save sends { assets } alone to the office's existing PATCH /home verb, with the household's bearer", () => {
   assert.match(WIRE_PICK, /fetch\(OFFICE_BASE \+ "\/home\/" \+ encodeURIComponent\(handle\), \{/);
   assert.match(WIRE_PICK, /method: "PATCH"/);
-  assert.match(WIRE_PICK, /authorization: "Bearer " \+ tok\.access_token/);
+  // until 2026-11-13 this asserted the headers were spelled inline (`authorization: "Bearer " + tok.access_token`); every site write now goes through
+  // office-write.mjs § siteWriteHeaders, which carries the same bearer and the site's header (POS-1028; test/office-write.test.mjs runs it)
+  assert.match(WIRE_PICK, /headers: siteWriteHeaders\(tok\.access_token\)/);
   assert.match(WIRE_PICK, /body: JSON\.stringify\(\{ assets \}\)/, "the body and the title are not sent, so the prose cannot be touched");
   assert.equal((WIRE_PICK.match(/fetch\(/g) ?? []).length, 1, "one request, no second write path");
 });

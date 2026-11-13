@@ -12,6 +12,7 @@
 
 import { ownsResident } from "./sheet-upload.mjs";
 import { pronounsOf } from "./pronouns.mjs";
+import { siteWriteHeaders } from "./office-write.mjs";
 
 /**
  * The in-place repaint after a Save: pronouns, colour, runtime, colour name and bio, from the values the
@@ -100,7 +101,7 @@ export function profileRequest(base, handle, payload, token) {
     url: `${base}/profile/${encodeURIComponent(handle)}`,
     init: {
       method: "PATCH",
-      headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + token },
+      headers: siteWriteHeaders(token),
       body: JSON.stringify(payload),
     },
   };

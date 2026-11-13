@@ -5,7 +5,7 @@
 //
 //   node tools/sync-hearths.mjs --town <path-to-postmark-checkout>
 //
-// Writes src/data/postmark/hearths.json: [{ id, title, author, line, html, css }] RAW. Nothing is made safe
+// Writes src/data/postmark/hearths.json: [{ id, title, author, line, html, css, js? }] RAW (`js` is the entry's own hearth.js, v2, POS-1024). Nothing is made safe
 // here: src/lib/hearth/entries.mjs sanitizes at build (sanitize-html.mjs, sanitize-css.mjs), so the one
 // place a template becomes page is the one place that is tested.
 //
@@ -61,11 +61,14 @@ export function syncHearths(town = TOWN) {
         }
         const css = readEntryFile(entryDir, "hearth.css", { label: `${id}/hearth.css` });
         const meta = readEntryFile(entryDir, "hearth.md", { label: `${id}/hearth.md` });
+        // v2 (POS-1024/a): the house's own script, under the same file boundary. Copied raw: it was read by hand at the town PR, which is its gate.
+        const js = readEntryFile(entryDir, "hearth.js", { label: `${id}/hearth.js` });
         rows.push({
           id,
           ...readMeta(meta ?? "", id),
           html: html.replace(/\r\n/g, "\n"),
           css: css == null ? "" : css.replace(/\r\n/g, "\n"),
+          ...(js == null ? {} : { js: js.replace(/\r\n/g, "\n") }),
         });
       } catch (err) {
         if (!(err instanceof RefusedFile)) throw err;

@@ -22,9 +22,11 @@
 // could omit would be a consent the human could not change. A household that has not answered is also asked by the layout's corner card
 // (LikenessPrompt.astro, WLD-83).
 //
-// WHAT A DESIGN IS (unchanged by this page): HTML and CSS in the page, sanitized at build (lib/hearth/sanitize-html.mjs, sanitize-css.mjs): no script,
+// WHAT A DESIGN IS: HTML and CSS in the page, sanitized at build (lib/hearth/sanitize-html.mjs, sanitize-css.mjs): no script in the markup,
 // no event handler, no frame, no external load. The slots are the site's own (HearthSlot.astro draws each; the dashboard's reads fill them);
 // private ones (Needs you, Mail, the boat line) show only to the house's own sign-in. A design places a slot; it never receives what is in it.
+// v2 (POS-1024): a design may also carry its own script, `hearth.js`, which runs ON THIS PAGE as an ordinary module from /hearths/<id>.js, with
+// the office's public Hearth bundle (lib/hearth/script.mjs). No frame and no sandbox (Darko, 2026-11-13 09:21 EST); its gate is the town PR.
 //
 //   - EVERY HOUSEHOLD HAS ONE: it opens on Postmark's default entry, or its saved choice (POS-962; lib/hearth/choice.mjs).
 //   - ANY REGISTERED ENTRY PREVIEWS ON ANY HOUSEHOLD: `?entry=<id>` or the dropdown. A preview is not saved: nothing is written to the office.
@@ -75,7 +77,8 @@ const bulletin = (bulletinAll as any[])
   .slice(0, 3)
   .map((b) => ({ slug: String(b.slug), title: String(b.data.title), posted: b.data.posted ? String(b.data.posted) : null }));
 
-const forClient = entries.map((e) => ({ id: e.id, title: e.title, author: e.author, line: e.line, css: e.css, html: e.html }));
+// `script` is the entry's script's fingerprint only, never its code: the page imports the code from /hearths/<id>.js (lib/hearth/script.mjs)
+const forClient = entries.map((e) => ({ id: e.id, title: e.title, author: e.author, line: e.line, css: e.css, html: e.html, script: e.script ?? null }));
 const json = (v: unknown) => JSON.stringify(v).split("<").join("\\u003c").split("\u2028").join("\\u2028").split("\u2029").join("\\u2029");
 const slotProps = { house, faces, plate, slug, bulletin };
 ---
@@ -121,7 +124,7 @@ const slotProps = { house, faces, plate, slug, bulletin };
   {entry ? (
     <>
       <style is:inline data-hearth-css set:html={entry.css}></style>
-      <div class="hearth-stage" data-hearth-stage data-hearth-entry={entry.id} data-hd data-hd-view="public" data-hd-slug={slug}>
+      <div class="hearth-stage" data-hearth-stage data-hearth-entry={entry.id} data-hd data-hd-view="public" data-hearth-view="public" data-hd-slug={slug}>
         {entry.segments.map((s: any) => s.slot
           ? <HearthSlot name={s.slot} {...slotProps} />
           : <Fragment set:html={s.html} />)}

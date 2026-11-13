@@ -623,6 +623,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     // This module only relays. The office decides who may speak, how often, and
     // what bounces; when it says no, its words go on the page verbatim.
     import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
+    import { siteWriteHeaders } from "@/lib/office-write.mjs";
 
     const OFFICE_BASE = officeBase();
     const HUMAN = "__human__";     // a select value no handle can collide with
@@ -719,7 +720,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       try {
         res = await fetch(OFFICE_BASE + "/world/say", {
           method: "POST",
-          headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + tok.access_token },
+          headers: siteWriteHeaders(tok.access_token),
           body: JSON.stringify(payload),
         });
         data = await res.json().catch(() => ({}));

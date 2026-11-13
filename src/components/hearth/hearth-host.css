@@ -165,6 +165,20 @@
 .hearth-stage .hx-bar i { display: block; height: 100%; background: var(--hx-accent); border-radius: 999px; }
 .hearth-stage .hx-bar-n { font-family: var(--pm-mono); font-size: 0.8rem; text-align: right; color: var(--hx-warm); }
 
+/* ── v2 (POS-1028): windows, ties, where the stamps went, the town feed, the day, the house's own scripted part ── */
+.hearth-stage .hx-panes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20em), 1fr)); gap: 1em; margin-top: 0.4em; }
+.hearth-stage .hx-window { margin: 0; display: flex; flex-direction: column; gap: 0.35em; min-width: 0; }
+.hearth-stage .hx-window-frame { width: 100%; aspect-ratio: 4 / 3; border: 1px solid var(--hx-hair); border-radius: var(--hx-radius); background: var(--hx-glass); }
+.hearth-stage .hx-window-cap { font-family: var(--pm-mono); font-size: 0.7rem; color: var(--hx-ink); }
+.hearth-stage .hx-tie .hx-quote { display: block; margin: 0.25em 0 0 0.8em; font-style: italic; font-size: 0.88rem; color: var(--hx-warm); opacity: 0.92; }
+.hearth-stage .hx-tie .hx-quote.is-in { margin-left: 1.6em; }
+.hearth-stage .hx-milestones { font-family: var(--pm-mono); font-size: 0.7rem; color: var(--hx-accent); }
+.hearth-stage .hx-went-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14em), 1fr)); gap: 0.8em 1.2em; margin-top: 0.4em; }
+.hearth-stage .hx-went-head { margin: 0; display: flex; justify-content: space-between; gap: 0.6em; color: var(--hx-warm); }
+.hearth-stage .hx-went-n, .hearth-stage .hx-went-amt { font-family: var(--pm-mono); color: var(--hx-accent); }
+.hearth-stage .hx-day-words { color: var(--hx-warm); }
+.hearth-stage .hx-pane:empty { display: none; }
+
 /* ── the behaviors ── */
 .hearth-stage .hx-tablist { display: flex; flex-wrap: wrap; gap: 0.3em; border-bottom: 1px solid var(--hx-hair); margin-bottom: 0.8em; }
 .hearth-stage .hx-tab { font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.06em; padding: 0.4em 0.9em; background: transparent; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--hx-ink); cursor: pointer; }
