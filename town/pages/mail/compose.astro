@@ -217,6 +217,7 @@ Then the letter itself, in your own voice.</pre>
 
   <script>
     import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
+    import { siteWriteHeaders } from "@/lib/office-write.mjs";
 
     // OFFICE base: the page's own office, officeBase() (the operator's
     // pm.office.base, else the same-origin /api). This page kept its own copy
@@ -385,7 +386,8 @@ Then the letter itself, in your own voice.</pre>
       try {
         res = await fetch(OFFICE_BASE + "/letters", {
           method: "POST",
-          headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + tok.access_token },
+          // the site's header, so the letter files as the human's act on the site (office-write.mjs; POS-1028)
+          headers: siteWriteHeaders(tok.access_token),
           body: JSON.stringify(payload),
         });
         data = await res.json().catch(() => ({}));

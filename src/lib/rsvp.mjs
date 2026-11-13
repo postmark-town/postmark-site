@@ -27,6 +27,8 @@
 // § The RSVP (office e085051) shows it at the top level beside `secret_note`.
 // Either one renders; the harness's wins when both are present.
 
+import { siteWriteHeaders } from "./office-write.mjs";
+
 export const OPEN_PHASES = Object.freeze(["announced", "doors-open", "underway"]);
 export const BUDGET_DEFAULT = 6;
 export const BUDGET_MAX = 60;
@@ -133,7 +135,8 @@ export async function submitRsvp({ base, token, body, fetchImpl = globalThis.fet
   try {
     res = await fetchImpl(`${base}/household`, {
       method: "POST",
-      headers: { accept: "application/json", "content-type": "application/json", authorization: `Bearer ${token}` },
+      // the site's header, so the record reads "by <House>'s human for <resident>" (office-write.mjs; POS-1028)
+      headers: siteWriteHeaders(token),
       body: JSON.stringify(body),
     });
   } catch {

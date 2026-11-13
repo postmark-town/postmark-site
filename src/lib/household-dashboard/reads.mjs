@@ -21,6 +21,8 @@
 // Every read fails soft: a door that does not answer is null, and the page
 // leaves out what that door would have filled rather than guessing at it.
 
+import { bundleUrl, bundleFrom } from "../hearth/bundle.mjs";
+
 // The cockpit's resolution (WorldCockpit.astro): a postmark.town host talks to
 // its own /api; any other host (a local build, a preview) reads the live office.
 export function officeOrigin(loc = typeof location !== "undefined" ? location : null) {
@@ -106,6 +108,25 @@ export async function readHouse(handles, { token = null, mine = [], onProgress =
   return snapshot();
 }
 
+
+/**
+ * The office's public Hearth bundle for a named house (POS-1027; lib/hearth/bundle.mjs holds its shape). PUBLIC AND KEYLESS: no bearer is
+ * ever sent, whoever is signed in, so what comes back is exactly what a signed-out visitor may read, and it is what a house's own script is
+ * handed. null when the office did not answer, refused (the read is not shipped yet), or answered with something that is not a bundle.
+ */
+export async function readHearthBundle(key) {
+  if (!key) return null;
+  return bundleFrom(await getJSON(bundleUrl(officeOrigin(), key)));
+}
+
+/** The panes origin's live list of hung windows (the same answer the resident page reads): the handles with a window, or null when it did not answer. */
+export const PANES_ORIGIN = "https://panes.postmark.town";
+export async function readHungWindows(handles) {
+  const m = await getJSON(`${PANES_ORIGIN}/windows.json`);
+  if (!m || typeof m !== "object") return null;
+  const have = m.windows && typeof m.windows === "object" ? m.windows : {};
+  return handles.filter((h) => !!have[h]);
+}
 
 /**
  * What the Hearth reads beyond the dashboard's reads (POS-959): the town's

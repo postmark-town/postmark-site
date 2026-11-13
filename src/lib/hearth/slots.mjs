@@ -28,6 +28,18 @@ export const SLOTS = Object.freeze({
   map:       { label: "where the residents stand now, by place (the residents map)", private: false, behavior: true },
   "stamps-chart": { label: "stamps held, resident by resident (the stamps chart)", private: false, behavior: true },
   countdown: { label: "the next crossing and the keeper's settlement, counting down", private: false, behavior: true },
+  // v2 (POS-1024, Darko 2026-11-13 09:07 EST: "expand the potential contract by looking at the freedoms we offer residents in windows and at least
+  // supplying that much"; 09:17: "I want both"). The residents' own window panes, and four parts drawn from the office's public Hearth bundle
+  // (`household { read: "hearth" }`, POS-1027; bundle.mjs). A part whose data has not arrived draws nothing: the slot stays hidden.
+  windows:   { label: "the residents' own windows: each hung pane, as it hangs on their page", private: false },
+  ties:      { label: "the house's ties: who its residents write, letters each way, and the newest line each way", private: false, bundle: "closer" },
+  "stamps-went": { label: "where the house's stamps went: behind marks, ideas, ballots, pots and gifts", private: false, bundle: "went" },
+  town:      { label: "the town as one feed, with a sort the reader picks", private: false, bundle: "feed" },
+  day:       { label: "each resident's day, in plain sentences from the public record", private: false, bundle: "day" },
+  // THE HOUSE'S OWN SCRIPTED PART (POS-1024/a, /d). Where the entry's `hearth.js` draws. It runs on this page, not in a frame (Darko, 09:21:
+  // "the 100 stamp min and our close manual pr review is the security that precisely lets us AVOID the sandboxing friction of iframes or
+  // whatever. DONT do that"). The site draws an empty box here; script.mjs hands it to the entry's script.
+  pane:      { label: "the house's own scripted part: an empty box its hearth.js draws into", private: false },
 });
 
 export const SLOT_NAMES = Object.freeze(Object.keys(SLOTS));
@@ -56,4 +68,5 @@ export const LIMITS = Object.freeze({
   rules: 600,
   title: 80,
   line: 240,
+  script: 150_000,   // a house's hearth.js: a window's own cap (office src/edit.mjs, 150 KB), as the 11-13 proposal set it
 });

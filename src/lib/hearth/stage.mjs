@@ -16,6 +16,9 @@
 //   PAINT    the dashboard's own paintHouse for the parts it already draws (feed, Needs you, the
 //            numbers, the cards, the clocks), then hearth/paint.mjs for the rest.
 //   BEHAVE   behaviors.mjs on the template's own markup.
+//   v2       (POS-1024, POS-1028) reads the office's PUBLIC Hearth bundle once, signed out, and the panes origin's list of hung windows, and paints
+//            the v2 slots from them (paint-v2.mjs); runs the drawn entry's own script ON THIS PAGE, handing it the same public bundle (script.mjs),
+//            and stops it when another entry is drawn. Sets `data-hearth-view` (owner | public) on the stage, a design's styling hook.
 //
 // THE STRIP (`[data-hearth-bar]`, Hearth.astro) is the site's, above the stage and outside every design. It holds the household's sub-rail
 // (HouseRail.astro) with its "+" (add a resident) and its mark for reads still in flight, and in the rail's corner the Hearth dropdown and the
@@ -26,7 +29,9 @@
 // `data-hd-view` is `public` until the reader's sign-in holds a resident of this house.
 
 import { KEYS, tokenIsFresh } from "../auth.mjs";
-import { readHouse, readHearthExtras, officeOrigin } from "../household-dashboard/reads.mjs";
+import { readHouse, readHearthExtras, readHearthBundle, readHungWindows, officeOrigin } from "../household-dashboard/reads.mjs";
+import { paintV2 } from "./paint-v2.mjs";
+import { hearthApi, runEntryScript, emit } from "./script.mjs";
 import { paintHouse, paintReadingMark, writeLook } from "../household-dashboard/paint.mjs";
 import { readingOf } from "../household-dashboard/fold.mjs";
 import { paintExtras, startCountdown } from "./paint.mjs";
@@ -35,10 +40,13 @@ import { whichDesign } from "./which-design.mjs";
 import { notYours, meAnswered } from "./not-yours.mjs";
 import { designNote, readSavedHearth } from "./choice.mjs";
 import { mountHearthPicker } from "./picker.mjs";
+import { bindListbox, paintListbox } from "./listbox.mjs";
 
 import { DEFAULT_ENTRY as DEFAULT } from "./slots.mjs";
 
-export function mountHearth(root) {
+// `loadScript` is the importer for a design's own script (script.mjs § runEntryScript's `load`): the page passes nothing and gets the real import; a
+// test hands a fake, so it can run this whole stage with a house script on it.
+export function mountHearth(root, { loadScript } = {}) {
   const stage = root.querySelector("[data-hearth-stage]");
   if (!stage) return;
   // the site's own strip (Hearth.astro) sits above the stage, outside every template
@@ -73,7 +81,38 @@ export function mountHearth(root) {
   const mine = () => (token() ? held().filter((h) => handles.includes(h)) : []);
 
   const phone = window.matchMedia("(max-width: 760px)");
-  const ctx = { handles, faces, slug, seatHref, storage, filter: { kind: "all", who: "all" }, expanded: false };
+  const ctx = { handles, faces, slug, seatHref, residentHref: seatHref, storage, filter: { kind: "all", who: "all" }, expanded: false, feedSort: "newest" };
+
+  // v2: THE PUBLIC BUNDLE, THE HUNG WINDOWS AND THE HOUSE'S OWN SCRIPT. The bundle is read once, signed out (reads.mjs § readHearthBundle), and the
+  // same answer paints the site's v2 slots and is handed to the entry's script. `scriptState` is what the script's getters read (hearthApi).
+  let bundle = null, hung = null, stopScript = () => {}, scriptSeq = 0;
+  const listeners = { bundle: new Set(), view: new Set() };
+  // `saved` is the house's saved Hearth choice, CONFIRMED by the office's read (knownSaved once readOk, below): a design that is not it is only a preview,
+  // and its script's acts are refused (script.mjs § isChosenDesign; POS-1029/a, "Where chosen; previews read-only"). Until the read answers, and for the
+  // whole visit if it fails, the choice is not known: the build's baked copy may be a design the house has since dropped, so it draws but never acts
+  // (undefined chooses only the default). The save controls take the same stance (signedIn needs readOk, mountPicker).
+  const scriptState = { bundle: null, owner: false, token, saved: () => (readOk ? knownSaved : undefined) };
+  const house = Object.freeze({
+    slug, key, handles: [...handles],
+    residents: handles.map((h) => Object.freeze({ handle: h, name: faces[h]?.name ?? h, accent: faces[h]?.accent ?? null, avatar: faces[h]?.avatar ?? null })),
+  });
+  function drawV2() {
+    ctx.now = Date.now();
+    const owner = mine().length > 0;
+    ctx.owner = owner;
+    stage.dataset.hearthView = owner ? "owner" : "public";
+    paintV2(stage, { bundle, hung }, ctx);
+    if (scriptState.owner !== owner) { scriptState.owner = owner; emit(listeners, "view", owner ? "owner" : "public"); }
+  }
+  function startScript(entry) {
+    stopScript();
+    stopScript = () => {};
+    for (const set of Object.values(listeners)) set.clear();
+    const seq = ++scriptSeq;
+    if (!entry?.script) return;
+    const hearth = hearthApi({ entryId: entry.id, stage, house, api: officeOrigin(), state: scriptState, listeners });
+    runEntryScript(entry, hearth, { load: loadScript }).then((stop) => { if (seq === scriptSeq) stopScript = stop; else stop(); });
+  }
   let reads = null, extras = null, extrasAsked = false, readFor = "", stopCount = () => {};
   // THE SAVED CHOICE (POS-962). `baked` is the build's own copy (Hearth.astro bakes house.hearth from households.json, the registry readSavedHearth reads): the first
   // draw starts from it, so a house with a saved choice does not flash the default. The browser read corrects a stale one. `mounted` is the dropdown, bound.
@@ -112,6 +151,7 @@ export function mountHearth(root) {
     mountPicker();
     paintHouse(stage, reads, ctx);
     paintExtras(stage, reads, extras, ctx);
+    drawV2();
     stopCount();
     stopCount = startCountdown(stage, reads, ctx);
     // the page's one holo expansion shows when the stamps slot shows a holo count
@@ -158,7 +198,8 @@ export function mountHearth(root) {
     stage.dataset.hearthEntry = entry.id;
     stage.replaceChildren(tpl.content);
     mountBehaviors(stage);
-    if (picker) picker.value = entry.id;
+    startScript(entry);
+    if (picker) { picker.value = entry.id; paintListbox(pickerRoot); }
     root.dataset.hearthShowing = entry.id;
     say(asked && asked !== entry.id ? `No Hearth entry is registered as “${asked.slice(0, 40)}”; showing ${entry.title}.` : "");
     ctx.expanded = false;
@@ -174,6 +215,18 @@ export function mountHearth(root) {
     if (t.closest("[data-hd-more]")) { ctx.expanded = true; draw(); return; }
     if (t.closest("[data-hd-seen]")) { writeLook(storage, slug, Date.now()); ctx.expanded = false; draw(); return; }
     if (t.closest("[data-hd-signin]")) document.querySelector("[data-auth-signin]")?.click();
+    const sort = t.closest("[data-hx-feed-sort]");
+    if (sort) { ctx.feedSort = sort.getAttribute("data-hx-feed-sort"); drawV2(); }
+  });
+  // A RESIDENT'S WINDOW ASKS, THE PAGE DECIDES (the resident page's own bridge, Household.astro): a pane in the windows slot may ask to move the page to a
+  // site path. Its sandbox makes its origin opaque, so it is known by SOURCE: only one of this stage's own window frames is heard.
+  window.addEventListener?.("message", (ev) => {
+    const frames = [...stage.querySelectorAll('[data-hearth-slot="windows"] [data-win-frame]')];
+    if (!frames.some((f) => ev.source === f.contentWindow)) return;
+    const d = ev.data;
+    if (!d || d.type !== "nav" || typeof d.path !== "string") return;
+    if (!/^\/[a-zA-Z0-9._~\/-]*(\?[a-zA-Z0-9=&._~-]*)?$/.test(d.path) || d.path.startsWith("//")) return;
+    window.location.href = d.path;
   });
   stage.addEventListener("change", (e) => {
     const sel = e.target instanceof Element ? e.target.closest("[data-hd-who]") : null;
@@ -184,6 +237,8 @@ export function mountHearth(root) {
   // check and the x, which picker.mjs shows when `signedIn()` holds: a sign-in that holds one of this house's residents, and never on a failed read (the kept
   // choice is not known then, so nothing is offered to save over it). A visitor's keep() does nothing.
   const pickerRoot = root.querySelector("[data-hearth-picker]");
+  // the dropdown is drawn as a listbox, so a scripted design carries its badge (listbox.mjs): bound now, disabled until the picker mounts (it mirrors the select)
+  if (pickerRoot) bindListbox(pickerRoot);
   const api = officeOrigin();
   function mountPicker() {
     if (mounted || !pickerRoot || !savedDone) return;
@@ -200,6 +255,8 @@ export function mountHearth(root) {
       if (id === (savedId ?? DEFAULT)) url.searchParams.delete("entry"); else url.searchParams.set("entry", id);
       history.replaceState(null, "", url);
     } catch { /* the entry still shows; only the address is not kept */ }
+    // the picker's kept design is the saved choice now (a green check moves it): a design the house just kept acts at once, without a reload
+    if (mounted) knownSaved = mounted.picker.view().savedId ?? null;
     compose(id);
   };
   phone.addEventListener?.("change", draw);
@@ -212,10 +269,14 @@ export function mountHearth(root) {
   const first = whichDesign(entries, { entry: asked, saved: baked });
   if (first && stage.dataset.hearthEntry === first.id) {
     mountBehaviors(stage);
+    startScript(first);
     root.dataset.hearthShowing = first.id;
     say(asked && asked !== first.id ? `No Hearth entry is registered as “${asked.slice(0, 40)}”; showing ${first.title}.` : "");
   } else compose(asked, { asked });   // whichDesign answers for "nothing asked": the default today, a saved choice later (POS-962 folds it into the one function)
   load();
+  // v2: the public bundle and the hung windows, each once; a part draws when its answer lands, and the script hears "bundle"
+  readHearthBundle(key).then((b) => { bundle = b; scriptState.bundle = b; drawV2(); if (b) emit(listeners, "bundle", b); });
+  readHungWindows(handles).then((h) => { hung = h; drawV2(); });
 
   // THE SAVED CHOICE: the office keeps it and reads it signed out, so a reload (and every other visitor) draws what the house chose.
   // whichDesign answers which entry to draw; a preview in the address still wins on this visit, and is not saved.
@@ -230,6 +291,6 @@ export function mountHearth(root) {
     const note = designNote(entries, { entry: asked, saved: read });
     if (note) say(!readOk && baked && drawn?.id === baked ? "The house's saved Hearth could not be read just now; showing the one this page was built with." : note);
     mountPicker();
-    if (picker && drawn) picker.value = drawn.id;
+    if (picker && drawn) { picker.value = drawn.id; paintListbox(pickerRoot); }
   });
 }

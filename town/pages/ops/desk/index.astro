@@ -231,6 +231,7 @@ const pickable = residents
 
   <script>
     import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
+    import { siteWriteHeaders } from "@/lib/office-write.mjs";
 
     const root = document.querySelector("[data-ops]");
     if (root) (function () {
@@ -304,7 +305,8 @@ const pickable = residents
         try {
           res = await fetch(OFFICE_BASE + "/ops/gift", {
             method: "POST",
-            headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + tok.access_token },
+            // the site's header, like every site write (office-write.mjs; POS-1028): the office files no operator route, so without it the gift files as `api`
+            headers: siteWriteHeaders(tok.access_token),
             body: JSON.stringify(payload),
           });
           data = await res.json().catch(() => ({}));

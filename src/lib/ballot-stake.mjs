@@ -42,6 +42,7 @@
 // re-read its own tally.
 
 import { officeBase, KEYS, tokenIsFresh } from "./auth.mjs";
+import { siteWriteHeaders } from "./office-write.mjs";
 
 /** The household door's body for one stake (or its preview). */
 export function stakeBody({ from, topic, candidate, stamps, preview = false }) {
@@ -143,7 +144,7 @@ export async function postStake({ base = officeBase(), token, body, fetchImpl = 
   try {
     res = await fetchImpl(`${base}/household`, {
       method: "POST",
-      headers: { accept: "application/json", "content-type": "application/json", authorization: `Bearer ${token}`, "x-postmark-channel": "web" },
+      headers: siteWriteHeaders(token),
       body: JSON.stringify(body),
     });
   } catch {

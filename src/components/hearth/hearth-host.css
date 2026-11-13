@@ -165,6 +165,20 @@
 .hearth-stage .hx-bar i { display: block; height: 100%; background: var(--hx-accent); border-radius: 999px; }
 .hearth-stage .hx-bar-n { font-family: var(--pm-mono); font-size: 0.8rem; text-align: right; color: var(--hx-warm); }
 
+/* ── v2 (POS-1028): windows, ties, where the stamps went, the town feed, the day, the house's own scripted part ── */
+.hearth-stage .hx-panes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20em), 1fr)); gap: 1em; margin-top: 0.4em; }
+.hearth-stage .hx-window { margin: 0; display: flex; flex-direction: column; gap: 0.35em; min-width: 0; }
+.hearth-stage .hx-window-frame { width: 100%; aspect-ratio: 4 / 3; border: 1px solid var(--hx-hair); border-radius: var(--hx-radius); background: var(--hx-glass); }
+.hearth-stage .hx-window-cap { font-family: var(--pm-mono); font-size: 0.7rem; color: var(--hx-ink); }
+.hearth-stage .hx-tie .hx-quote { display: block; margin: 0.25em 0 0 0.8em; font-style: italic; font-size: 0.88rem; color: var(--hx-warm); opacity: 0.92; }
+.hearth-stage .hx-tie .hx-quote.is-in { margin-left: 1.6em; }
+.hearth-stage .hx-milestones { font-family: var(--pm-mono); font-size: 0.7rem; color: var(--hx-accent); }
+.hearth-stage .hx-went-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14em), 1fr)); gap: 0.8em 1.2em; margin-top: 0.4em; }
+.hearth-stage .hx-went-head { margin: 0; display: flex; justify-content: space-between; gap: 0.6em; color: var(--hx-warm); }
+.hearth-stage .hx-went-n, .hearth-stage .hx-went-amt { font-family: var(--pm-mono); color: var(--hx-accent); }
+.hearth-stage .hx-day-words { color: var(--hx-warm); }
+.hearth-stage .hx-pane:empty { display: none; }
+
 /* ── the behaviors ── */
 .hearth-stage .hx-tablist { display: flex; flex-wrap: wrap; gap: 0.3em; border-bottom: 1px solid var(--hx-hair); margin-bottom: 0.8em; }
 .hearth-stage .hx-tab { font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.06em; padding: 0.4em 0.9em; background: transparent; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--hx-ink); cursor: pointer; }
@@ -203,6 +217,8 @@
   --hx-chrome-line: rgba(232, 196, 139, 0.45);
   --hx-chrome-ok: #9be29b;              /* the save's green check, on the page's night (the stage's own --hx-ok) */
   --hx-chrome-no: #e0846b;              /* the put-it-back x and a save that did not land, on the night (the stage's own --hx-coral) */
+  --hx-chrome-hover: rgba(232, 196, 139, 0.16);   /* the dropdown list's active option, over the field (the field's ink on it: 11:1) */
+  --hx-chrome-shade: rgba(0, 0, 0, 0.45);         /* the shadow under the dropdown list and the script badge's pane */
   color: var(--hx-chrome-ink);
 }
 .hearth .hd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -245,6 +261,23 @@
 .hearth-acts button:disabled { opacity: 0.5; cursor: default; }
 .hearth-by { color: var(--hx-chrome-ink); white-space: nowrap; }
 .hearth-refused { color: var(--hx-chrome-no); }
+/* the dropdown drawn as a listbox (lib/hearth/listbox.mjs), so a design that runs its own script carries a badge to the right of its name (Darko, 2026-11-13
+ * 13:24 EST), and the badge's one pane, in the strip's own colours: the field's surface and ink, the strip's line. The button wears `.hearth-pick`. */
+.hearth-pickerband { position: relative; }
+.hearth-lb { position: relative; display: inline-block; max-width: 100%; }
+.hearth-lb-btn { display: inline-flex; align-items: center; gap: 0.5em; cursor: pointer; text-align: left; letter-spacing: inherit; }
+.hearth-lb-btn:disabled { cursor: default; opacity: 0.6; }
+.hearth-lb-btn:focus-visible { outline: 2px solid var(--hx-chrome-link); outline-offset: 1px; }
+.hearth-lb-btn[aria-invalid="true"] { border-color: var(--hx-chrome-no); box-shadow: 0 0 0 1px var(--hx-chrome-no); }
+.hearth-lb-list { position: absolute; z-index: 25; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content; max-width: min(22rem, calc(100vw - 1rem)); max-height: 60vh; overflow: auto; box-sizing: border-box; margin: 0; padding: 4px 0; list-style: none; border-radius: 8px; border: 1px solid var(--hx-chrome-line); background: var(--hx-chrome-field); color: var(--hx-chrome-field-ink); box-shadow: 0 6px 18px var(--hx-chrome-shade); }
+.hearth-lb-list > li { display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
+.hearth-lb-list > li[aria-selected="true"] .hearth-lb-name { color: var(--hx-chrome-link); }
+.hearth-lb-list > li[aria-selected="true"] .hearth-lb-name::before { content: "\2022\00a0"; }
+.hearth-lb-list > li.is-active, .hearth-lb-list > li:hover { background: var(--hx-chrome-hover); }
+.hearth-script { display: inline-block; box-sizing: border-box; padding: 0 6px; border-radius: 999px; border: 1px solid var(--hx-chrome-line); background: transparent; color: var(--hx-chrome-link); font: inherit; font-size: 0.85em; line-height: 1.5; letter-spacing: 0.06em; cursor: help; }
+button.hearth-script:hover, button.hearth-script:focus-visible { border-color: var(--hx-chrome-link); outline: none; }
+button.hearth-script:focus-visible { box-shadow: 0 0 0 1px var(--hx-chrome-link); }
+.hearth-script-tip { position: absolute; z-index: 30; left: 0; top: 100%; width: max-content; max-width: min(17rem, calc(100vw - 2rem)); box-sizing: border-box; padding: 0.5em 0.7em; border-radius: 8px; border: 1px solid var(--hx-chrome-line); background: var(--hx-chrome-field); color: var(--hx-chrome-field-ink); line-height: 1.45; white-space: normal; pointer-events: none; box-shadow: 0 6px 18px var(--hx-chrome-shade); }
 /* on a phone the corner's gaps are a little tighter, so the dropdown, its credit and the owner's settings keep one line (measured at 390 px: 4 px over at the
    wider gaps, with "Postmark's default" and "Designed by postmark"); a longer title or author wraps, as before */
 @media (max-width: 520px) { .hearth-bar { font-size: 0.68rem; } .hearth-pickerband { justify-content: flex-start; column-gap: 0.4em; } .hearth .hearth-bar .pm-subrail-corner { column-gap: 0.6em; } }
