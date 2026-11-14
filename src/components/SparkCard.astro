@@ -1,0 +1,71 @@
+---
+// SparkCard — one spark as the office serves it (CORE-82; the common Spark view of POS-1035 / WLD-173).
+//
+// The event page shows the event's own spark (its root, the completion's) and the sparks that came of its rooms (the gallery).
+// Every word here is the producer's: the headline is the spark's `body`, the recounting, the credit (`by`, `household`) and the
+// picture are fields it carries. The card works nothing out. A spark with NO picture still has its headline, its recounting and its
+// credit, and draws no picture tile at all (CORE-82: "no empty picture tile"). Resident-authored words render as TEXT through Astro's
+// escaping, never set:html; a picture is drawn only from a site path or an https address (calendar.mjs pictureOf).
+import { pictureOf, roomHref, roomIdOf, utcText } from "@/lib/calendar.mjs";
+
+interface Props {
+  spark: any;
+  /** handles that have a page under /residents/ */
+  roll?: Set<string>;
+  /** the event's own spark: drawn larger, the page's headline spark */
+  root?: boolean;
+}
+const { spark: s, roll = new Set(), root = false } = Astro.props;
+const pic = pictureOf(s);
+const by = typeof s?.credit?.by === "string" ? s.credit.by : null;
+const household = typeof s?.credit?.household === "string" ? s.credit.household : null;
+const headline = typeof s?.body === "string" && s.body.trim() ? s.body.trim() : null;
+const recounting = typeof s?.recounting === "string" && s.recounting.trim() ? s.recounting.trim() : null;
+const rooms = Array.isArray(s?.rooms) ? s.rooms.map(roomIdOf).filter(Boolean) : [];
+---
+<article class:list={["spark-card", "pm-paper", { "is-root": root, "has-picture": !!pic }]} data-spark={s?.id ?? ""} data-spark-root={root ? "" : undefined}>
+  {pic && (
+    <figure class="spark-pic" data-spark-picture>
+      <img src={pic.src} alt={pic.alt ?? (headline ?? "")} loading="lazy" decoding="async" />
+    </figure>
+  )}
+  <div class="spark-body">
+    {headline ? (root ? <h2 class="spark-head" data-spark-headline>{headline}</h2> : <h3 class="spark-head" data-spark-headline>{headline}</h3>) : null}
+    {recounting && <p class="spark-recounting" data-spark-recounting>{recounting}</p>}
+    <p class="spark-credit" data-spark-credit>
+      {by
+        ? <>by {roll.has(by) ? <a href={`/residents/${by}/`}>{by}</a> : by}{household && <span class="soft"> of {household}</span>}</>
+        : <span class="soft">credit not served</span>}
+    </p>
+    {s?.experienced_at && (
+      <p class="spark-when soft" data-spark-when>
+        <time datetime={s.experienced_at} title={`${s.experienced_at} (UTC)`}>{utcText(s.experienced_at)}</time>
+        {s.experienced_until && <> to <time datetime={s.experienced_until} title={`${s.experienced_until} (UTC)`}>{utcText(s.experienced_until)}</time></>}
+      </p>
+    )}
+    {rooms.length > 0 && (
+      <p class="spark-rooms soft" data-spark-rooms>
+        {rooms.length === 1 ? "From the talk in " : "From the talk in "}
+        {rooms.map((r, i) => <>{i > 0 && ", "}<a href={roomHref(r)}>{r}</a></>)}
+      </p>
+    )}
+  </div>
+</article>
+
+<style>
+  .spark-card { display: grid; gap: 0.8em; padding: 0.9em 1.1em; margin: 0 0 0.9em; }
+  .spark-card.has-picture { grid-template-columns: minmax(0, 9.5rem) minmax(0, 1fr); align-items: start; }
+  .spark-card.is-root.has-picture { grid-template-columns: minmax(0, 14rem) minmax(0, 1fr); }
+  .spark-pic { margin: 0; }
+  .spark-pic img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--pm-line); }
+  .spark-head { margin: 0 0 0.35em; font-size: 1.05em; line-height: 1.3; overflow-wrap: anywhere; }
+  .spark-card.is-root .spark-head { font-size: 1.3em; }
+  .spark-recounting { margin: 0.3em 0; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-line; }
+  .spark-credit, .spark-when, .spark-rooms { margin: 0.25em 0; font-size: 0.9rem; overflow-wrap: anywhere; }
+  .spark-card .soft { color: var(--pm-ink-soft); }
+  .spark-card a { color: var(--pm-wax); text-decoration: underline; }
+  @media (max-width: 520px) {
+    .spark-card.has-picture, .spark-card.is-root.has-picture { grid-template-columns: minmax(0, 1fr); }
+    .spark-pic { max-width: 16rem; }
+  }
+</style>

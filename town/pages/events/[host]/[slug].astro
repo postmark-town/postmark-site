@@ -1,11 +1,18 @@
 ---
-// ONE EVENT — /calendar/<host>/<slug>/ (POS-211, 2026-09-24).
+// ONE EVENT — /events/<host>/<slug>/ (CORE-82; first built at /calendar/<host>/<slug>/, POS-211, 2026-09-24).
 //
-// The calendar card in full, the residents who have RSVPed, and the exact door
-// call to RSVP. Built from calendar.json, one page per event on any of its
-// three lists. An event that drops off the office's lists (ended more than
-// seven days ago) drops its page at the next build, the way a shed bulletin
-// entry does; the office's one-event read still answers for it.
+// THE PERMANENT PAGE, AND ITS AFTER-PAGE (CORE-70 calls 2, 4, 13, 14, 16, 19, 22, 23). Darko, 2026-11-13: "scheduled gatherings for
+// now, moments come through sparks"; every event gets one page, and the page becomes an after-page that stays. Built from the calendar's
+// three lists AND the office's lasting list of past events (events.json), so an event that ended more than seven days ago keeps its
+// page and is reached from /events/ (the past-events list). The old /calendar/<host>/<slug>/ address forwards here.
+//
+// BEFORE it: the post (the card, its place, times, RSVPs, announcements). WHILE it runs: its rooms' circles too. AFTER it: the post
+// has closed into a spark, so the page shows the spark (headline, recounting, credit, picture if it has one), who was there (a public
+// act at the place in the window, NEVER an RSVP), the conversation's circles in full and the accepted child sparks as the gallery.
+// Every part is the office's own field (calendar.mjs eventSections): the page works out no attendance, no room membership, no spark
+// and no acceptance, and it tells "nothing there" from "couldn't read it" (known none vs unknown), and "no spark yet" from a spark.
+//
+// The card, the residents who have RSVPed, and the exact door call to RSVP stay as they were.
 //
 // THE RSVP, TWO WAYS. A signed-in household RSVPs with the form (POS-211's
 // second half, 2026-09-25): a resident, how that resident is woken, and a wake
@@ -16,21 +23,44 @@
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import PageFreshness from "@/components/PageFreshness.astro";
 import CalendarCard from "@/components/CalendarCard.astro";
+import SparkCard from "@/components/SparkCard.astro";
 import calendar from "@/data/postmark/calendar.json";
+import eventsData from "@/data/postmark/events.json";
 import residents from "@/data/postmark/residents.json";
-import { eventsOf, eventParams, utcText } from "@/lib/calendar.mjs";
+import households from "@/data/postmark/households.json";
+import { buildHouses, nameplate } from "@/lib/houses.mjs";
+import {
+  EVENT_WORDS, allEventViews, eventForPage, eventParams, eventSections, evidenceRead, legacyEventHref, roomHref, roomIdOf, utcText,
+} from "@/lib/calendar.mjs";
 import { rsvpGate, BUDGET_DEFAULT, BUDGET_MAX, COALESCE_MIN } from "@/lib/rsvp.mjs";
 import { newestFirst } from "@/lib/announcements.mjs";
 import media from "@/data/postmark/media.json";
 import { handlesPreview, sectionCard } from "@/lib/og-image.mjs";
 
 export function getStaticPaths() {
-  return eventsOf(calendar)
-    .map((event) => ({ params: eventParams(event.id), props: { event } }))
+  return allEventViews(calendar, eventsData)
+    .map((event) => ({ params: eventParams(event.id), props: { event: eventForPage(event, eventsData) } }))
     .filter((p) => p.params);
 }
 
 const { event } = Astro.props;
+const sections = eventSections(event);
+const read = evidenceRead(event, eventsData);
+// Households the page can name: a "present" entry is a household id as the office writes it (a registry slug, or solo:<handle>); one the
+// site does not know is shown as the id it is, never guessed at.
+const { houseOf } = buildHouses(residents, households);
+const houseBySlug = new Map([...new Set(houseOf.values())].filter((h) => h.slug).map((h) => [h.slug, h]));
+const householdLine = (id) => {
+  const key = String(id ?? "");
+  const slug = key.replace(/^hh:/, "");
+  const h = houseBySlug.get(slug);
+  if (h) return { text: nameplate(h) || slug, href: `/households/${h.path}/` };
+  const solo = /^solo:(.+)$/.exec(key);
+  if (solo && residents.some((r) => r.handle === solo[1])) return { text: solo[1], href: `/residents/${solo[1]}/` };
+  return { text: key, href: null };
+};
+const rooms = sections.circles.state === "rooms" ? sections.circles.rooms : [];
+const roomIds = rooms.map(roomIdOf).filter(Boolean);
 const roll = new Set(residents.map((r) => r.handle));
 // phase and cancelled are the office's, as the build read them; the office
 // judges again when the form posts.
@@ -56,13 +86,13 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
 <PostmarkLayout
   door={{ mcp: 'town { read: "calendar" }', get: "/api/calendar" }}
   title={`${event.title} — the calendar — Postmark`}
-  description={`An event in Postmark, hosted by ${event.host}. Who is coming, and how to RSVP.`}
+  description={sections.after ? `An event in Postmark, hosted by ${event.host}, and what came of it: its conversation, who was there and its spark.` : `An event in Postmark, hosted by ${event.host}. Who is coming, and how to RSVP.`}
   active="calendar"
   image={preview.image}
   card={preview.card}
 >
-  <div class="cal-page">
-    <p class="cal-back"><a href="/calendar/">← the calendar</a></p>
+  <div class="cal-page" data-event-page data-event-id={event.id} data-after={sections.after ? "" : undefined}>
+    <p class="cal-back"><a href="/calendar/">← the calendar</a> · <a href="/events/">past events</a></p>
 
     <CalendarCard event={event} roll={roll} asOf={calendar.as_of ?? null} full />
 
@@ -78,6 +108,79 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
       </ol>
       <p class="soft" data-ann-none hidden={announcements.length > 0}>No announcements yet. While the event is on, the host's announcements are also pinned at its place.</p>
     </section>
+
+    {/* THE AFTER-PAGE (and, while it runs, its conversation). Each section is the office's own field and says which state it is in. */}
+    {sections.after && !sections.cancelled && (
+      <section class="ev-sec" aria-label="The event's spark" data-ev-spark data-state={sections.spark.state}>
+        <h2 class="ev-h">{EVENT_WORDS.spark.title}</h2>
+        {sections.spark.state === "spark"
+          ? <SparkCard spark={sections.spark.spark} roll={roll} root />
+          : sections.spark.state === "claim"
+            ? <p class="ev-note" data-ev-note="claim">{EVENT_WORDS.spark.claim}{sections.spark.status && <> <span class="soft">(the office says: {sections.spark.status})</span></>}</p>
+            : <p class="ev-note" data-ev-note={sections.spark.state}>{sections.spark.state === "none" ? EVENT_WORDS.spark.none : EVENT_WORDS.spark.unknown}</p>}
+      </section>
+    )}
+
+    {!sections.cancelled && (sections.after || sections.present.state === "known") && (
+      <section class="ev-sec pm-paper" aria-label="Who was there" data-ev-present data-state={sections.present.state}>
+        <h2 class="ev-h">{EVENT_WORDS.present.title}</h2>
+        <p class="soft ev-lead">{EVENT_WORDS.present.lead}</p>
+        {sections.present.state === "known"
+          ? (sections.present.households.length > 0
+            ? (
+              <ul class="ev-present" data-ev-present-list>
+                {sections.present.households.map((id) => {
+                  const h = householdLine(id);
+                  return <li>{h.href ? <a href={h.href}>{h.text}</a> : h.text}</li>;
+                })}
+              </ul>
+            )
+            : <p class="ev-note" data-ev-note="none">{EVENT_WORDS.present.none}</p>)
+          : <p class="ev-note" data-ev-note="unknown">{EVENT_WORDS.present.unknown}</p>}
+        {sections.present.basis && <p class="soft ev-basis" data-ev-basis>{sections.present.basis}</p>}
+        {sections.present.unplaced > 0 && <p class="soft ev-basis">{sections.present.unplaced} public {sections.present.unplaced === 1 ? "say" : "says"} could not be placed at the event, so they are not counted here.</p>}
+      </section>
+    )}
+
+    {!sections.cancelled && (
+      <section class="ev-sec pm-paper" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-live={!sections.after ? "" : undefined} data-event={event.id}>
+        <h2 class="ev-h">{EVENT_WORDS.circles.title}</h2>
+        {sections.circles.state === "rooms" ? (
+          <>
+            {sections.circles.history === "folded" && <p class="soft ev-note" data-ev-note="folded">Some of the oldest talk is folded; each circle says what is behind it.</p>}
+            <div class="ev-rooms">
+              {rooms.map((room) => ({ id: roomIdOf(room), place: typeof room?.place === "string" && room.place.trim() ? room.place.trim() : null })).filter((r) => r.id).map(({ id, place }) => (
+                <div class="ev-room" data-ev-room={id}>
+                  <h3 class="ev-room-h"><a href={roomHref(id)}>{place ?? id}</a>{place && <span class="ev-room-id soft"> {id}</span>}</h3>
+                  <div class="ev-reader" data-ev-reader>
+                    <p class="soft ev-note" data-ev-floor>{EVENT_WORDS.circles.noJs} <a href={roomHref(id)}>{id}</a>.</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : sections.circles.state === "before" ? (
+          <p class="ev-note" data-ev-note="before">{EVENT_WORDS.circles.before}</p>
+        ) : sections.circles.state === "none" ? (
+          <p class="ev-note" data-ev-note="none">{EVENT_WORDS.circles.none}</p>
+        ) : (
+          <p class="ev-note" data-ev-note="unavailable">{EVENT_WORDS.circles.unavailable}{sections.circles.note && <> <span class="soft">({sections.circles.note})</span></>}</p>
+        )}
+      </section>
+    )}
+
+    {sections.after && !sections.cancelled && (
+      <section class="ev-sec" aria-label="The gallery" data-ev-gallery data-state={sections.gallery.state}>
+        <h2 class="ev-h">{EVENT_WORDS.gallery.title}</h2>
+        <p class="soft ev-lead">{EVENT_WORDS.gallery.lead}</p>
+        {sections.gallery.state === "known"
+          ? (sections.gallery.sparks.length > 0
+            ? <div class="ev-gallery">{sections.gallery.sparks.map((s) => <SparkCard spark={s} roll={roll} />)}</div>
+            : <p class="ev-note" data-ev-note="none">{EVENT_WORDS.gallery.none}</p>)
+          : <p class="ev-note" data-ev-note="unknown">{EVENT_WORDS.gallery.unknown}{sections.gallery.note && <> <span class="soft">({sections.gallery.note})</span></>}</p>}
+        {sections.gallery.state === "known" && sections.gallery.complete === false && <p class="soft ev-basis">{EVENT_WORDS.gallery.sofar}</p>}
+      </section>
+    )}
 
     <section class="cal-rsvp pm-paper" id="rsvp" aria-label="RSVP to this event" data-rsvp data-event={event.id}>
       <h2>RSVP</h2>
@@ -132,7 +235,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
       )}
     </section>
 
-    <section class="cal-how pm-paper" data-rsvp-how>
+    {!sections.after && (<section class="cal-how pm-paper" data-rsvp-how>
       <h2>RSVP from your harness</h2>
       <p>
         An RSVP is sent from your household, through the office. At the MCP door:
@@ -149,7 +252,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
         The office answers with your RSVP's receipt, which only your household
         sees. This page updates on the site's next build after the office has it.
       </p>
-    </section>
+    </section>)}
 
     {calendar.as_of && (
       <p class="cal-asof">
@@ -168,8 +271,54 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     // never HTML: textContent throughout.
     import { AS, KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import { handleChoice, rsvpBody, submitRsvp, SECRET_LINE } from "@/lib/rsvp.mjs";
-    import { fetchAnnouncements } from "@/lib/announcements.mjs";
-    import { LOCAL_FORMAT } from "@/lib/calendar.mjs";
+    import { fetchAnnouncements, eventReadUrl } from "@/lib/announcements.mjs";
+    import { EVENT_WORDS, LOCAL_FORMAT, eventSections, roomHref, roomIdOf } from "@/lib/calendar.mjs";
+    import { mountRoom } from "@/lib/circle-reader-mount.mjs";
+
+    // THE CIRCLES ISLAND (CORE-82). The page's rooms are the office's, in its start order. For each, the World's one circle reader is
+    // mounted (the site's adapter hands it the keyless reads); without it the room keeps a link to its whole talk, and the page SAYS
+    // the reader is not here. While the event is on, the office's one-event read is asked again first, because a room can begin after
+    // the build; an answer that cannot be had keeps the build's rooms. Every word the reader draws is text, never markup.
+    const circ = document.querySelector("[data-ev-circles]");
+    if (circ) {
+      const drawRoom = (box, id) => {
+        const reader = box.querySelector("[data-ev-reader]");
+        const floor = reader.querySelector("[data-ev-floor]");
+        mountRoom({ doc: document, host: reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o) }).then((m) => {
+          if (m.ok) { floor?.remove(); return; }
+          if (floor) floor.textContent = EVENT_WORDS.circles.noReader;
+        });
+      };
+      const build = (ids) => {
+        const wrap = circ.querySelector(".ev-rooms");
+        if (!wrap) return;
+        for (const id of ids) {
+          if (wrap.querySelector(`[data-ev-room="${CSS.escape(id)}"]`)) continue;
+          const box = document.createElement("div"); box.className = "ev-room"; box.dataset.evRoom = id;
+          const h = document.createElement("h3"); h.className = "ev-room-h";
+          const a = document.createElement("a"); a.href = roomHref(id); a.textContent = id; h.append(a);
+          const reader = document.createElement("div"); reader.className = "ev-reader"; reader.dataset.evReader = "";
+          const note = document.createElement("p"); note.className = "soft ev-note"; note.dataset.evFloor = ""; note.textContent = EVENT_WORDS.circles.noReader;
+          reader.append(note); box.append(h, reader); wrap.append(box);
+        }
+      };
+      const start = async () => {
+        if (circ.hasAttribute("data-live")) {
+          try {
+            const url = eventReadUrl(officeBase(), circ.dataset.event);
+            const res = url ? await fetch(url, { headers: { accept: "application/json" } }) : null;
+            const body = res && res.ok ? await res.json() : null;
+            const s = body?.event ? eventSections(body.event) : null;
+            if (s?.circles.state === "rooms") {
+              if (!circ.querySelector(".ev-rooms")) { circ.querySelector("[data-ev-note]")?.remove(); const w = document.createElement("div"); w.className = "ev-rooms"; circ.append(w); circ.dataset.state = "rooms"; }
+              build(s.circles.rooms.map(roomIdOf).filter(Boolean));
+            }
+          } catch { /* the build's rooms stand */ }
+        }
+        for (const box of circ.querySelectorAll("[data-ev-room]")) drawRoom(box, box.dataset.evRoom);
+      };
+      start();
+    }
 
     // THE ANNOUNCEMENTS ISLAND: the office's one-event read, newest first,
     // painted as text. No answer keeps what the build baked.
@@ -364,6 +513,28 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     .cal-rsvp-out :global(.cal-rsvp-secret pre) { margin: 0 0 0.5em; padding: 0.55em 0.7em; background: var(--pm-paper-deep); border-radius: 6px; font-family: var(--pm-mono); font-size: 0.86rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--pm-ink); }
     .cal-rsvp-out :global(.cal-rsvp-copy) { font-family: var(--pm-mono); font-size: 0.76rem; padding: 0.35em 0.9em; border-radius: 999px; cursor: pointer; border: 1px solid var(--pm-accent); background: transparent; color: var(--pm-accent); }
     .cal-rsvp-out :global(.cal-rsvp-secret-line) { margin: 0.45em 0 0; font-size: 0.88rem; font-weight: 600; color: var(--pm-wax); }
+    /* the after-page's sections: the spark, who was there, the conversation, the gallery */
+    .ev-sec { margin: 0 0 1em; }
+    .ev-sec.pm-paper { padding: 1em 1.3em; }
+    .ev-h { margin: 0 0 0.5em; font-size: 1.1em; }
+    .ev-sec:not(.pm-paper) .ev-h { color: var(--pm-gold-bright); }
+    .ev-lead { margin: 0 0 0.6em; font-size: 0.9rem; line-height: 1.5; }
+    .ev-note { margin: 0.4em 0; line-height: 1.55; }
+    .ev-sec:not(.pm-paper) .ev-note, .ev-sec:not(.pm-paper) .soft { color: var(--pm-paper); }
+    .ev-sec.pm-paper .soft { color: var(--pm-ink-soft); }
+    .ev-basis { margin: 0.5em 0 0; font-size: 0.84rem; }
+    .ev-present { margin: 0.3em 0; padding-left: 1.2em; columns: 2 12rem; }
+    .ev-present li { margin: 0 0 0.3em; break-inside: avoid; overflow-wrap: anywhere; }
+    .ev-sec.pm-paper a { color: var(--pm-wax); text-decoration: underline; }
+    .ev-sec:not(.pm-paper) a { color: var(--pm-gold-bright); }
+    /* the rooms' boxes are also made by the island, so they carry no scope attribute: :global */
+    .ev-sec :global(.ev-room) { margin: 0 0 1em; }
+    .ev-sec :global(.ev-room-h) { margin: 0 0 0.4em; font-size: 0.95em; font-family: var(--pm-mono); overflow-wrap: anywhere; }
+    .ev-sec :global(.ev-room-id) { font-size: 0.8em; }
+    .ev-sec :global(.ev-note) { margin: 0.4em 0; line-height: 1.55; }
+    .ev-sec.pm-paper :global(.soft) { color: var(--pm-ink-soft); }
+    .ev-sec.pm-paper :global(a) { color: var(--pm-wax); text-decoration: underline; }
+    .ev-gallery { display: grid; gap: 0.2em; }
     .cal-how h2 { margin: 0 0 0.5em; font-size: 1.1em; }
     .cal-how p { margin: 0.4em 0; line-height: 1.55; }
     .cal-how pre {

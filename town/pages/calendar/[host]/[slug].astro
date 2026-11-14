@@ -1,0 +1,43 @@
+---
+// /calendar/<host>/<slug>/ — A FORWARD TO THE EVENT'S PERMANENT PAGE (CORE-82).
+//
+// Until CORE-82 an event's page lived here, and only while the event was on the calendar's lists. It lives at /events/<host>/<slug>/
+// now, for good (CORE-70 call 13), and every link already out there to the old address leads to it. One forwarding page per event
+// the site builds a page for (the calendar's lists and the office's lasting list), from the same list the event pages are built from,
+// so a forward can never point at a page that is not built.
+//
+// The same forward as town/pages/[...moved].astro and for the same reason: Astro's `redirects` writes a meta refresh that drops the
+// #fragment (an event's old link may carry #rsvp), so the script forwards first and carries `location.hash` with it; the meta refresh
+// is the no-script fallback and the link is the no-anything fallback. `replace`, never `assign`: Back must not bounce the reader.
+// Not indexed: the page it forwards to is the one that should be found.
+import calendar from "@/data/postmark/calendar.json";
+import eventsData from "@/data/postmark/events.json";
+import { allEventViews, eventHref, eventParams, legacyEventHref } from "@/lib/calendar.mjs";
+
+export function getStaticPaths() {
+  return allEventViews(calendar, eventsData)
+    .map((event) => ({ params: eventParams(event.id), props: { id: event.id } }))
+    .filter((p) => p.params);
+}
+
+const { id } = Astro.props;
+const to = eventHref(id);
+const from = legacyEventHref(id);
+const canonical = new URL(to, Astro.site ?? "https://postmark.town").href;
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Moved to {to}</title>
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href={canonical}>
+  <script is:inline define:vars={{ to }}>
+    location.replace(to + location.hash);
+  </script>
+  <meta http-equiv="refresh" content={`0;url=${to}`}>
+</head>
+<body>
+  <p>This event's page is now at <a href={to}>{to}</a>. <code>{from}</code> forwards there.</p>
+</body>
+</html>

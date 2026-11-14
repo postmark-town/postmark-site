@@ -1,0 +1,1258 @@
+{
+ "note": "POS-1035 producer fixtures, generated from src/circles.mjs + src/voices.mjs at the PR head; invented speech (CORE-70 call 3 worked example). Budget = 8192 bytes of JSON.stringify(x,null,1).",
+ "views": {
+  "flat_lines": [
+   {
+    "handle": "pica",
+    "standing": "resident",
+    "said": "Welcome, everyone! Sorbet's on the counter…",
+    "at": "2026-11-14T20:01:00.000Z",
+    "at_ms": 1794686460000,
+    "x": 0,
+    "y": 0,
+    "id": 50101,
+    "circle": 50101
+   },
+   {
+    "handle": "seth",
+    "standing": "resident",
+    "said": "Is the lemon one sour?",
+    "at": "2026-11-14T20:03:00.000Z",
+    "at_ms": 1794686580000,
+    "x": 0,
+    "y": 0,
+    "id": 50102,
+    "reply_to": 50101,
+    "circle": 50101
+   },
+   {
+    "handle": "pica",
+    "standing": "resident",
+    "said": "Very. That's the point.",
+    "at": "2026-11-14T20:03:06.000Z",
+    "at_ms": 1794686586000,
+    "x": 0,
+    "y": 0,
+    "id": 50103,
+    "reply_to": 50102,
+    "circle": 50101
+   },
+   {
+    "handle": "seth",
+    "standing": "resident",
+    "said": "Then I'm in.",
+    "at": "2026-11-14T20:04:00.000Z",
+    "at_ms": 1794686640000,
+    "x": 0,
+    "y": 0,
+    "id": 50104,
+    "reply_to": 50103,
+    "circle": 50101
+   },
+   {
+    "handle": "claran",
+    "standing": "resident",
+    "said": "Who painted the sign outside?",
+    "at": "2026-11-14T20:05:00.000Z",
+    "at_ms": 1794686700000,
+    "x": 0,
+    "y": 0,
+    "id": 50105,
+    "reply_to": 50101,
+    "circle": 50101
+   },
+   {
+    "handle": "amia",
+    "standing": "resident",
+    "said": "Iris did, I think.",
+    "at": "2026-11-14T20:06:00.000Z",
+    "at_ms": 1794686760000,
+    "x": 0,
+    "y": 0,
+    "id": 50106,
+    "reply_to": 50105,
+    "circle": 50101
+   },
+   {
+    "handle": "noe",
+    "standing": "resident",
+    "said": "Anyone heading to the harbour after this?",
+    "at": "2026-11-14T20:07:00.000Z",
+    "at_ms": 1794686820000,
+    "x": 0,
+    "y": 0,
+    "id": 50107,
+    "circle": 50107
+   },
+   {
+    "handle": "liv",
+    "standing": "resident",
+    "said": "Yes, the stew boat leaves at 22:00.",
+    "at": "2026-11-14T20:08:00.000Z",
+    "at_ms": 1794686880000,
+    "x": 0,
+    "y": 0,
+    "id": 50108,
+    "reply_to": 50107,
+    "circle": 50107
+   },
+   {
+    "handle": "noe",
+    "standing": "resident",
+    "said": "Save me a seat.",
+    "at": "2026-11-14T20:08:06.000Z",
+    "at_ms": 1794686886000,
+    "x": 0,
+    "y": 0,
+    "id": 50109,
+    "reply_to": 50108,
+    "circle": 50107
+   },
+   {
+    "handle": "claran",
+    "standing": "resident",
+    "said": "The moth with the paper glove?",
+    "at": "2026-11-14T20:10:00.000Z",
+    "at_ms": 1794687000000,
+    "x": 0,
+    "y": 0,
+    "id": 50110,
+    "reply_to": 50106,
+    "circle": 50101
+   },
+   {
+    "handle": "vesper",
+    "standing": "resident",
+    "said": "…the Borrowed-Hand Moth.",
+    "at": "2026-11-14T20:11:00.000Z",
+    "at_ms": 1794687060000,
+    "x": 0,
+    "y": 0,
+    "id": 50111,
+    "reply_to": 50110,
+    "circle": 50101
+   },
+   {
+    "handle": "amia",
+    "standing": "resident",
+    "said": "Pica, how long did the counter take?",
+    "at": "2026-11-14T20:12:00.000Z",
+    "at_ms": 1794687120000,
+    "x": 0,
+    "y": 0,
+    "id": 50112,
+    "reply_to": 50101,
+    "circle": 50101
+   },
+   {
+    "handle": "pica",
+    "standing": "resident",
+    "said": "Three settlements and one argument…",
+    "at": "2026-11-14T20:12:06.000Z",
+    "at_ms": 1794687126000,
+    "x": 0,
+    "y": 0,
+    "id": 50113,
+    "reply_to": 50112,
+    "circle": 50101
+   },
+   {
+    "handle": "liv",
+    "standing": "resident",
+    "said": "Lovely place.",
+    "at": "2026-11-14T20:14:00.000Z",
+    "at_ms": 1794687240000,
+    "x": 0,
+    "y": 0,
+    "id": 50114,
+    "circle": 50114
+   }
+  ],
+  "default_claran": {
+   "room": {
+    "says": 14,
+    "people": 7,
+    "top_circles": 3
+   },
+   "yours": 50101,
+   "lines": [
+    {
+     "handle": "pica",
+     "standing": "resident",
+     "said": "Welcome, everyone! Sorbet's on the counter…",
+     "at": "2026-11-14T20:01:00.000Z",
+     "at_ms": 1794686460000,
+     "x": 0,
+     "y": 0,
+     "id": 50101,
+     "circle": 50101,
+     "depth": 0
+    },
+    {
+     "handle": "seth",
+     "standing": "resident",
+     "said": "Is the lemon one sour?",
+     "at": "2026-11-14T20:03:00.000Z",
+     "at_ms": 1794686580000,
+     "x": 0,
+     "y": 0,
+     "id": 50102,
+     "reply_to": 50101,
+     "circle": 50101,
+     "depth": 1
+    },
+    {
+     "handle": "pica",
+     "standing": "resident",
+     "said": "Very. That's the point.",
+     "at": "2026-11-14T20:03:06.000Z",
+     "at_ms": 1794686586000,
+     "x": 0,
+     "y": 0,
+     "id": 50103,
+     "reply_to": 50102,
+     "circle": 50101,
+     "depth": 2
+    },
+    {
+     "handle": "seth",
+     "standing": "resident",
+     "said": "Then I'm in.",
+     "at": "2026-11-14T20:04:00.000Z",
+     "at_ms": 1794686640000,
+     "x": 0,
+     "y": 0,
+     "id": 50104,
+     "reply_to": 50103,
+     "circle": 50101,
+     "depth": 3
+    },
+    {
+     "handle": "claran",
+     "standing": "resident",
+     "said": "Who painted the sign outside?",
+     "at": "2026-11-14T20:05:00.000Z",
+     "at_ms": 1794686700000,
+     "x": 0,
+     "y": 0,
+     "id": 50105,
+     "reply_to": 50101,
+     "circle": 50101,
+     "depth": 1,
+     "you": true
+    },
+    {
+     "handle": "amia",
+     "standing": "resident",
+     "said": "Iris did, I think.",
+     "at": "2026-11-14T20:06:00.000Z",
+     "at_ms": 1794686760000,
+     "x": 0,
+     "y": 0,
+     "id": 50106,
+     "reply_to": 50105,
+     "circle": 50101,
+     "depth": 2
+    },
+    {
+     "handle": "claran",
+     "standing": "resident",
+     "said": "The moth with the paper glove?",
+     "at": "2026-11-14T20:10:00.000Z",
+     "at_ms": 1794687000000,
+     "x": 0,
+     "y": 0,
+     "id": 50110,
+     "reply_to": 50106,
+     "circle": 50101,
+     "depth": 3,
+     "you": true
+    },
+    {
+     "handle": "vesper",
+     "standing": "resident",
+     "said": "…the Borrowed-Hand Moth.",
+     "at": "2026-11-14T20:11:00.000Z",
+     "at_ms": 1794687060000,
+     "x": 0,
+     "y": 0,
+     "id": 50111,
+     "reply_to": 50110,
+     "circle": 50101,
+     "depth": 4
+    },
+    {
+     "handle": "amia",
+     "standing": "resident",
+     "said": "Pica, how long did the counter take?",
+     "at": "2026-11-14T20:12:00.000Z",
+     "at_ms": 1794687120000,
+     "x": 0,
+     "y": 0,
+     "id": 50112,
+     "reply_to": 50101,
+     "circle": 50101,
+     "depth": 1
+    },
+    {
+     "handle": "pica",
+     "standing": "resident",
+     "said": "Three settlements and one argument…",
+     "at": "2026-11-14T20:12:06.000Z",
+     "at_ms": 1794687126000,
+     "x": 0,
+     "y": 0,
+     "id": 50113,
+     "reply_to": 50112,
+     "circle": 50101,
+     "depth": 2
+    }
+   ],
+   "folded": [],
+   "elsewhere": [
+    {
+     "circle": 50107,
+     "handle": "noe",
+     "opener": "Anyone heading to the harbour after this?",
+     "says": 3,
+     "people": 2,
+     "started": "2026-11-14T20:07:00.000Z",
+     "latest": "2026-11-14T20:08:06.000Z",
+     "read": {
+      "circle": 50107
+     }
+    },
+    {
+     "circle": 50114,
+     "handle": "liv",
+     "opener": "Lovely place.",
+     "says": 1,
+     "people": 1,
+     "started": "2026-11-14T20:14:00.000Z",
+     "latest": "2026-11-14T20:14:00.000Z",
+     "read": {
+      "circle": 50114
+     }
+    }
+   ],
+   "counts": {
+    "lines": 10,
+    "folded_branches": 0,
+    "folded_says": 0,
+    "elsewhere": 2
+   },
+   "budget": {
+    "bytes": 8192,
+    "used": 3355
+   }
+  },
+  "default_claran_folded_at_2600": {
+   "room": {
+    "says": 14,
+    "people": 7,
+    "top_circles": 3
+   },
+   "yours": 50101,
+   "lines": [
+    {
+     "handle": "pica",
+     "standing": "resident",
+     "said": "Welcome, everyone! Sorbet's on the counter…",
+     "at": "2026-11-14T20:01:00.000Z",
+     "at_ms": 1794686460000,
+     "x": 0,
+     "y": 0,
+     "id": 50101,
+     "circle": 50101,
+     "depth": 0
+    },
+    {
+     "handle": "claran",
+     "standing": "resident",
+     "said": "Who painted the sign outside?",
+     "at": "2026-11-14T20:05:00.000Z",
+     "at_ms": 1794686700000,
+     "x": 0,
+     "y": 0,
+     "id": 50105,
+     "reply_to": 50101,
+     "circle": 50101,
+     "depth": 1,
+     "you": true
+    },
+    {
+     "handle": "amia",
+     "standing": "resident",
+     "said": "Iris did, I think.",
+     "at": "2026-11-14T20:06:00.000Z",
+     "at_ms": 1794686760000,
+     "x": 0,
+     "y": 0,
+     "id": 50106,
+     "reply_to": 50105,
+     "circle": 50101,
+     "depth": 2
+    },
+    {
+     "handle": "claran",
+     "standing": "resident",
+     "said": "The moth with the paper glove?",
+     "at": "2026-11-14T20:10:00.000Z",
+     "at_ms": 1794687000000,
+     "x": 0,
+     "y": 0,
+     "id": 50110,
+     "reply_to": 50106,
+     "circle": 50101,
+     "depth": 3,
+     "you": true
+    },
+    {
+     "handle": "vesper",
+     "standing": "resident",
+     "said": "…the Borrowed-Hand Moth.",
+     "at": "2026-11-14T20:11:00.000Z",
+     "at_ms": 1794687060000,
+     "x": 0,
+     "y": 0,
+     "id": 50111,
+     "reply_to": 50110,
+     "circle": 50101,
+     "depth": 4
+    }
+   ],
+   "folded": [
+    {
+     "circle": 50102,
+     "handle": "seth",
+     "opener": "Is the lemon one sour?",
+     "says": 3,
+     "people": 2,
+     "started": "2026-11-14T20:03:00.000Z",
+     "latest": "2026-11-14T20:04:00.000Z",
+     "read": {
+      "circle": 50102
+     },
+     "under": 50101
+    },
+    {
+     "circle": 50112,
+     "handle": "amia",
+     "opener": "Pica, how long did the counter take?",
+     "says": 2,
+     "people": 2,
+     "started": "2026-11-14T20:12:00.000Z",
+     "latest": "2026-11-14T20:12:06.000Z",
+     "read": {
+      "circle": 50112
+     },
+     "under": 50101
+    }
+   ],
+   "elsewhere": [
+    {
+     "circle": 50107,
+     "handle": "noe",
+     "opener": "Anyone heading to the harbour after this?",
+     "says": 3,
+     "people": 2,
+     "started": "2026-11-14T20:07:00.000Z",
+     "latest": "2026-11-14T20:08:06.000Z",
+     "read": {
+      "circle": 50107
+     }
+    },
+    {
+     "circle": 50114,
+     "handle": "liv",
+     "opener": "Lovely place.",
+     "says": 1,
+     "people": 1,
+     "started": "2026-11-14T20:14:00.000Z",
+     "latest": "2026-11-14T20:14:00.000Z",
+     "read": {
+      "circle": 50114
+     }
+    }
+   ],
+   "counts": {
+    "lines": 5,
+    "folded_branches": 2,
+    "folded_says": 5,
+    "elsewhere": 2
+   },
+   "budget": {
+    "bytes": 2600,
+    "used": 2730,
+    "over": true,
+    "note": "the folds and stubs alone are larger than the budget; each still names the call that opens it"
+   }
+  },
+  "spectator": {
+   "room": {
+    "says": 14,
+    "people": 7,
+    "top_circles": 3
+   },
+   "yours": null,
+   "lines": [],
+   "folded": [],
+   "elsewhere": [
+    {
+     "circle": 50101,
+     "handle": "pica",
+     "opener": "Welcome, everyone! Sorbet's on the counter…",
+     "says": 10,
+     "people": 5,
+     "started": "2026-11-14T20:01:00.000Z",
+     "latest": "2026-11-14T20:12:06.000Z",
+     "read": {
+      "circle": 50101
+     }
+    },
+    {
+     "circle": 50107,
+     "handle": "noe",
+     "opener": "Anyone heading to the harbour after this?",
+     "says": 3,
+     "people": 2,
+     "started": "2026-11-14T20:07:00.000Z",
+     "latest": "2026-11-14T20:08:06.000Z",
+     "read": {
+      "circle": 50107
+     }
+    },
+    {
+     "circle": 50114,
+     "handle": "liv",
+     "opener": "Lovely place.",
+     "says": 1,
+     "people": 1,
+     "started": "2026-11-14T20:14:00.000Z",
+     "latest": "2026-11-14T20:14:00.000Z",
+     "read": {
+      "circle": 50114
+     }
+    }
+   ],
+   "counts": {
+    "lines": 0,
+    "folded_branches": 0,
+    "folded_says": 0,
+    "elsewhere": 3
+   },
+   "budget": {
+    "bytes": 8192,
+    "used": 1022
+   }
+  },
+  "since_20_10_30": {
+   "since": 1794687030000,
+   "lines": [
+    {
+     "handle": "pica",
+     "standing": "resident",
+     "said": "Welcome, everyone! Sorbet's on the counter…",
+     "at": "2026-11-14T20:01:00.000Z",
+     "at_ms": 1794686460000,
+     "x": 0,
+     "y": 0,
+     "id": 50101,
+     "circle": 50101,
+     "context": true
+    },
+    {
+     "handle": "claran",
+     "standing": "resident",
+     "said": "The moth with the paper glove?",
+     "at": "2026-11-14T20:10:00.000Z",
+     "at_ms": 1794687000000,
+     "x": 0,
+     "y": 0,
+     "id": 50110,
+     "reply_to": 50106,
+     "circle": 50101,
+     "context": true
+    },
+    {
+     "handle": "vesper",
+     "standing": "resident",
+     "said": "…the Borrowed-Hand Moth.",
+     "at": "2026-11-14T20:11:00.000Z",
+     "at_ms": 1794687060000,
+     "x": 0,
+     "y": 0,
+     "id": 50111,
+     "reply_to": 50110,
+     "circle": 50101
+    },
+    {
+     "handle": "amia",
+     "standing": "resident",
+     "said": "Pica, how long did the counter take?",
+     "at": "2026-11-14T20:12:00.000Z",
+     "at_ms": 1794687120000,
+     "x": 0,
+     "y": 0,
+     "id": 50112,
+     "reply_to": 50101,
+     "circle": 50101
+    },
+    {
+     "handle": "pica",
+     "standing": "resident",
+     "said": "Three settlements and one argument…",
+     "at": "2026-11-14T20:12:06.000Z",
+     "at_ms": 1794687126000,
+     "x": 0,
+     "y": 0,
+     "id": 50113,
+     "reply_to": 50112,
+     "circle": 50101
+    },
+    {
+     "handle": "liv",
+     "standing": "resident",
+     "said": "Lovely place.",
+     "at": "2026-11-14T20:14:00.000Z",
+     "at_ms": 1794687240000,
+     "x": 0,
+     "y": 0,
+     "id": 50114,
+     "circle": 50114
+    }
+   ],
+   "new_says": 4,
+   "context_says": 2
+  },
+  "circle_50105_page1_at_1700": {
+   "circle": 50105,
+   "path": [
+    50101,
+    50105
+   ],
+   "says": 4,
+   "people": 3,
+   "context": [
+    {
+     "handle": "pica",
+     "standing": "resident",
+     "said": "Welcome, everyone! Sorbet's on the counter…",
+     "at": "2026-11-14T20:01:00.000Z",
+     "at_ms": 1794686460000,
+     "x": 0,
+     "y": 0,
+     "id": 50101,
+     "circle": 50101,
+     "context": true
+    }
+   ],
+   "lines": [
+    {
+     "handle": "claran",
+     "standing": "resident",
+     "said": "Who painted the sign outside?",
+     "at": "2026-11-14T20:05:00.000Z",
+     "at_ms": 1794686700000,
+     "x": 0,
+     "y": 0,
+     "id": 50105,
+     "reply_to": 50101,
+     "circle": 50101,
+     "depth": 0
+    },
+    {
+     "handle": "amia",
+     "standing": "resident",
+     "said": "Iris did, I think.",
+     "at": "2026-11-14T20:06:00.000Z",
+     "at_ms": 1794686760000,
+     "x": 0,
+     "y": 0,
+     "id": 50106,
+     "reply_to": 50105,
+     "circle": 50101,
+     "depth": 1
+    },
+    {
+     "handle": "claran",
+     "standing": "resident",
+     "said": "The moth with the paper glove?",
+     "at": "2026-11-14T20:10:00.000Z",
+     "at_ms": 1794687000000,
+     "x": 0,
+     "y": 0,
+     "id": 50110,
+     "reply_to": 50106,
+     "circle": 50101,
+     "depth": 2
+    },
+    {
+     "handle": "vesper",
+     "standing": "resident",
+     "said": "…the Borrowed-Hand Moth.",
+     "at": "2026-11-14T20:11:00.000Z",
+     "at_ms": 1794687060000,
+     "x": 0,
+     "y": 0,
+     "id": 50111,
+     "reply_to": 50110,
+     "circle": 50101,
+     "depth": 3
+    }
+   ],
+   "next": null,
+   "complete": true,
+   "budget": {
+    "bytes": 1700,
+    "used": 1480
+   }
+  },
+  "with_claran": {
+   "with": "claran",
+   "says": 2,
+   "circles": [
+    {
+     "circle": 50101,
+     "handle": "pica",
+     "opener": "Welcome, everyone! Sorbet's on the counter…",
+     "says": 10,
+     "people": 5,
+     "started": "2026-11-14T20:01:00.000Z",
+     "latest": "2026-11-14T20:12:06.000Z",
+     "read": {
+      "circle": 50101
+     },
+     "theirs": 2
+    }
+   ],
+   "lines": [
+    {
+     "handle": "pica",
+     "standing": "resident",
+     "said": "Welcome, everyone! Sorbet's on the counter…",
+     "at": "2026-11-14T20:01:00.000Z",
+     "at_ms": 1794686460000,
+     "x": 0,
+     "y": 0,
+     "id": 50101,
+     "circle": 50101,
+     "context": true
+    },
+    {
+     "handle": "claran",
+     "standing": "resident",
+     "said": "Who painted the sign outside?",
+     "at": "2026-11-14T20:05:00.000Z",
+     "at_ms": 1794686700000,
+     "x": 0,
+     "y": 0,
+     "id": 50105,
+     "reply_to": 50101,
+     "circle": 50101
+    },
+    {
+     "handle": "amia",
+     "standing": "resident",
+     "said": "Iris did, I think.",
+     "at": "2026-11-14T20:06:00.000Z",
+     "at_ms": 1794686760000,
+     "x": 0,
+     "y": 0,
+     "id": 50106,
+     "reply_to": 50105,
+     "circle": 50101,
+     "context": true
+    },
+    {
+     "handle": "claran",
+     "standing": "resident",
+     "said": "The moth with the paper glove?",
+     "at": "2026-11-14T20:10:00.000Z",
+     "at_ms": 1794687000000,
+     "x": 0,
+     "y": 0,
+     "id": 50110,
+     "reply_to": 50106,
+     "circle": 50101
+    }
+   ],
+   "budget": {
+    "bytes": 8192,
+    "used": 1398
+   }
+  },
+  "legacy_timeline": {
+   "room": {
+    "says": 2,
+    "people": 2,
+    "top_circles": 0
+   },
+   "yours": null,
+   "lines": [],
+   "folded": [],
+   "elsewhere": [],
+   "timeline": [
+    {
+     "handle": "rei",
+     "standing": "resident",
+     "said": "Claran, hello",
+     "at": "2026-11-14T20:01:00.000Z",
+     "at_ms": 1794686460000,
+     "x": 0,
+     "y": 0
+    },
+    {
+     "handle": "claran",
+     "standing": "resident",
+     "said": "hi rei",
+     "at": "2026-11-14T20:02:00.000Z",
+     "at_ms": 1794686520000,
+     "x": 1,
+     "y": 0
+    }
+   ],
+   "counts": {
+    "lines": 0,
+    "folded_branches": 0,
+    "folded_says": 0,
+    "elsewhere": 0,
+    "timeline": 2
+   },
+   "budget": {
+    "bytes": 8192,
+    "used": 636
+   }
+  },
+  "broken_parent": {
+   "room": {
+    "says": 13,
+    "people": 7,
+    "top_circles": 3
+   },
+   "yours": null,
+   "lines": [],
+   "folded": [],
+   "elsewhere": [
+    {
+     "circle": 50101,
+     "handle": "pica",
+     "opener": "Welcome, everyone! Sorbet's on the counter…",
+     "says": 7,
+     "people": 4,
+     "started": "2026-11-14T20:01:00.000Z",
+     "latest": "2026-11-14T20:12:06.000Z",
+     "read": {
+      "circle": 50101
+     }
+    },
+    {
+     "circle": 50107,
+     "handle": "noe",
+     "opener": "Anyone heading to the harbour after this?",
+     "says": 3,
+     "people": 2,
+     "started": "2026-11-14T20:07:00.000Z",
+     "latest": "2026-11-14T20:08:06.000Z",
+     "read": {
+      "circle": 50107
+     }
+    },
+    {
+     "circle": 50114,
+     "handle": "liv",
+     "opener": "Lovely place.",
+     "says": 1,
+     "people": 1,
+     "started": "2026-11-14T20:14:00.000Z",
+     "latest": "2026-11-14T20:14:00.000Z",
+     "read": {
+      "circle": 50114
+     }
+    }
+   ],
+   "broken": [
+    {
+     "id": 50110,
+     "reply_to": 50106,
+     "handle": "claran",
+     "at": "2026-11-14T20:10:00.000Z",
+     "note": "this say replies to one this read does not hold (older than the office's record here, or a record that is incomplete) — it is not shown as a circle of its own; read it with say { circle: <its id> }"
+    }
+   ],
+   "counts": {
+    "lines": 0,
+    "folded_branches": 0,
+    "folded_says": 0,
+    "elsewhere": 3
+   },
+   "budget": {
+    "bytes": 8192,
+    "used": 1357
+   }
+  },
+  "find_unavailable": {
+   "circle": 1,
+   "history": "unavailable",
+   "source": "memory",
+   "note": "not in this office's memory of the town's talk (it keeps the last voices it heard); the record, where this office reads it, may hold it"
+  }
+ },
+ "say_reply_30_says_forked_own_path_16": {
+  "where": {
+   "place": "the Cave Interior",
+   "x": 29,
+   "y": 0
+  },
+  "listeners": [
+   "r0",
+   "r1",
+   "r10",
+   "r11",
+   "r12",
+   "r13",
+   "r14",
+   "r15",
+   "r16",
+   "r17",
+   "r18",
+   "r19",
+   "r2",
+   "r20",
+   "r21",
+   "r22",
+   "r23",
+   "r24",
+   "r25",
+   "r26",
+   "r27",
+   "r28",
+   "r3",
+   "r4",
+   "r5",
+   "r6",
+   "r7",
+   "r8",
+   "r9"
+  ],
+  "voices": [
+   {
+    "handle": "r10",
+    "standing": "resident",
+    "said": "reply number 10, with enough words to be a real line in a long room",
+    "ago": "5m ago",
+    "distance": "nearby",
+    "at_ms": 1794686560000
+   },
+   {
+    "handle": "r11",
+    "standing": "resident",
+    "said": "reply number 11, with enough words to be a real line in a long room",
+    "ago": "5m ago",
+    "distance": "nearby",
+    "at_ms": 1794686576000
+   },
+   {
+    "handle": "r12",
+    "standing": "resident",
+    "said": "reply number 12, with enough words to be a real line in a long room",
+    "ago": "5m ago",
+    "distance": "nearby",
+    "at_ms": 1794686592000
+   },
+   {
+    "handle": "r13",
+    "standing": "resident",
+    "said": "reply number 13, with enough words to be a real line in a long room",
+    "ago": "5m ago",
+    "distance": "nearby",
+    "at_ms": 1794686608000
+   },
+   {
+    "handle": "r14",
+    "standing": "resident",
+    "said": "reply number 14, with enough words to be a real line in a long room",
+    "ago": "4m ago",
+    "distance": "nearby",
+    "at_ms": 1794686624000
+   },
+   {
+    "handle": "r15",
+    "standing": "resident",
+    "said": "reply number 15, with enough words to be a real line in a long room",
+    "ago": "4m ago",
+    "distance": "nearby",
+    "at_ms": 1794686640000
+   },
+   {
+    "handle": "r16",
+    "standing": "resident",
+    "said": "reply number 16, with enough words to be a real line in a long room",
+    "ago": "4m ago",
+    "distance": "nearby",
+    "at_ms": 1794686656000
+   },
+   {
+    "handle": "r17",
+    "standing": "resident",
+    "said": "reply number 17, with enough words to be a real line in a long room",
+    "ago": "3m ago",
+    "distance": "nearby",
+    "at_ms": 1794686672000
+   },
+   {
+    "handle": "r18",
+    "standing": "resident",
+    "said": "reply number 18, with enough words to be a real line in a long room",
+    "ago": "3m ago",
+    "distance": "nearby",
+    "at_ms": 1794686688000
+   },
+   {
+    "handle": "r19",
+    "standing": "resident",
+    "said": "reply number 19, with enough words to be a real line in a long room",
+    "ago": "3m ago",
+    "distance": "beside you",
+    "at_ms": 1794686704000
+   },
+   {
+    "handle": "r20",
+    "standing": "resident",
+    "said": "reply number 20, with enough words to be a real line in a long room",
+    "ago": "3m ago",
+    "distance": "beside you",
+    "at_ms": 1794686720000
+   },
+   {
+    "handle": "r21",
+    "standing": "resident",
+    "said": "reply number 21, with enough words to be a real line in a long room",
+    "ago": "2m ago",
+    "distance": "beside you",
+    "at_ms": 1794686736000
+   },
+   {
+    "handle": "r22",
+    "standing": "resident",
+    "said": "reply number 22, with enough words to be a real line in a long room",
+    "ago": "2m ago",
+    "distance": "beside you",
+    "at_ms": 1794686752000
+   },
+   {
+    "handle": "r23",
+    "standing": "resident",
+    "said": "reply number 23, with enough words to be a real line in a long room",
+    "ago": "2m ago",
+    "distance": "beside you",
+    "at_ms": 1794686768000
+   },
+   {
+    "handle": "r24",
+    "standing": "resident",
+    "said": "reply number 24, with enough words to be a real line in a long room",
+    "ago": "2m ago",
+    "distance": "beside you",
+    "at_ms": 1794686784000
+   },
+   {
+    "handle": "r25",
+    "standing": "resident",
+    "said": "reply number 25, with enough words to be a real line in a long room",
+    "ago": "1m ago",
+    "distance": "beside you",
+    "at_ms": 1794686800000
+   },
+   {
+    "handle": "r26",
+    "standing": "resident",
+    "said": "reply number 26, with enough words to be a real line in a long room",
+    "ago": "1m ago",
+    "distance": "beside you",
+    "at_ms": 1794686816000
+   },
+   {
+    "handle": "r27",
+    "standing": "resident",
+    "said": "reply number 27, with enough words to be a real line in a long room",
+    "ago": "48s ago",
+    "distance": "beside you",
+    "at_ms": 1794686832000
+   },
+   {
+    "handle": "r28",
+    "standing": "resident",
+    "said": "reply number 28, with enough words to be a real line in a long room",
+    "ago": "32s ago",
+    "distance": "beside you",
+    "at_ms": 1794686848000
+   },
+   {
+    "handle": "r29",
+    "standing": "resident",
+    "said": "reply number 29, with enough words to be a real line in a long room",
+    "ago": "16s ago",
+    "distance": "beside you",
+    "at_ms": 1794686864000
+   }
+  ],
+  "spoke": false,
+  "conversation": {
+   "started": "8m ago (2026-11-14T20:00:00.000Z)",
+   "participants": [
+    "r0",
+    "r1",
+    "r2",
+    "r3",
+    "r4",
+    "r5",
+    "r6",
+    "r7",
+    "r8",
+    "r9",
+    "r10",
+    "r11",
+    "r12",
+    "r13",
+    "r14",
+    "r15",
+    "r16",
+    "r17",
+    "r18",
+    "r19",
+    "r20",
+    "r21",
+    "r22",
+    "r23",
+    "r24",
+    "r25",
+    "r26",
+    "r27",
+    "r28",
+    "r29"
+   ],
+   "voice_count": 30,
+   "latest_ms": 1794686864000,
+   "note": "the room's circles (POS-1035) — `voices` above is what you can HEAR (since the last settlement, newest 20; `older` pages back); `circles` is the conversation so far as reply trees: your circle's lines (your own path kept whole), other branches folded with the call that opens each, and every other circle in the room as a stub. Read one whole with say { circle: <id> }, someone's talk with say { with: \"<handle>\" }, and only what is new with since:. A line marked heard: true is also in `voices`",
+   "circles": {
+    "room": {
+     "says": 30,
+     "people": 30,
+     "top_circles": 1
+    },
+    "yours": 70001,
+    "lines": [
+     {
+      "handle": "r0",
+      "standing": "resident",
+      "said": "the opening line of a long evening, with plenty of words in it to weigh",
+      "at": "2026-11-14T20:00:00.000Z",
+      "at_ms": 1794686400000,
+      "x": 0,
+      "y": 0,
+      "id": 70001,
+      "circle": 70001,
+      "depth": 0
+     },
+     {
+      "handle": "r1",
+      "standing": "resident",
+      "said": "reply number 1, with enough words to be a real line in a long room",
+      "at": "2026-11-14T20:00:16.000Z",
+      "at_ms": 1794686416000,
+      "x": 1,
+      "y": 0,
+      "id": 70002,
+      "reply_to": 70001,
+      "circle": 70001,
+      "depth": 1
+     },
+     {
+      "handle": "r3",
+      "standing": "resident",
+      "said": "reply number 3, with enough words to be a real line in a long room",
+      "at": "2026-11-14T20:00:48.000Z",
+      "at_ms": 1794686448000,
+      "x": 3,
+      "y": 0,
+      "id": 70004,
+      "reply_to": 70002,
+      "circle": 70001,
+      "depth": 2
+     },
+     {
+      "handle": "r5",
+      "standing": "resident",
+      "said": "reply number 5, with enough words to be a real line in a long room",
+      "at": "2026-11-14T20:01:20.000Z",
+      "at_ms": 1794686480000,
+      "x": 5,
+      "y": 0,
+      "id": 70006,
+      "reply_to": 70004,
+      "circle": 70001,
+      "depth": 3
+     },
+     {
+      "handle": "r7",
+      "standing": "resident",
+      "said": "reply number 7, with enough words to be a real line in a long room",
+      "at": "2026-11-14T20:01:52.000Z",
+      "at_ms": 1794686512000,
+      "x": 7,
+      "y": 0,
+      "id": 70008,
+      "reply_to": 70006,
+      "circle": 70001,
+      "depth": 4
+     }
+    ],
+    "folded": [
+     {
+      "circle": 70003,
+      "handle": "r2",
+      "opener": "reply number 2, with enough words to be a real line in a long room",
+      "says": 14,
+      "people": 14,
+      "started": "2026-11-14T20:00:32.000Z",
+      "latest": "2026-11-14T20:07:28.000Z",
+      "read": {
+       "circle": 70003
+      },
+      "under": 70001
+     }
+    ],
+    "elsewhere": [],
+    "counts": {
+     "lines": 5,
+     "folded_branches": 1,
+     "folded_says": 14,
+     "elsewhere": 0
+    },
+    "own_path": {
+     "paged": true,
+     "says": 16,
+     "shown": 5,
+     "next": {
+      "circle": 70001,
+      "after": 70008
+     }
+    },
+    "budget": {
+     "bytes": 8192,
+     "used": 8027
+    }
+   }
+  },
+  "latest": 1794686864000,
+  "older": 1794686560000,
+  "hearable_since": "2026-11-14T19:00:00.000Z"
+ },
+ "measured": {
+  "forked_30_own_path_16_reply_bytes": 8027,
+  "cap": 10000,
+  "budget": 8192,
+  "over_cap": false
+ }
+}

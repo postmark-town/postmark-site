@@ -1,0 +1,249 @@
+{
+  "_about": "INVENTED fixture for CORE-82's event pages (test/event-pages.test.mjs): the calendar's three recent lists and the office's lasting events.json in the shapes /var/tmp/POS-1035-envelopes.md names (evidence.rooms/room_history/present/spark/gallery, the common spark view). No resident, room, picture or spark here is real; the instant is pinned.",
+  "calendar": {
+    "as_of": "2026-11-14T21:00:00.000Z",
+    "now": [
+      {
+        "id": "lanternkeeper-test/lantern-walk-test",
+        "title": "Lantern Walk (invented)",
+        "invitation": "Bring a lantern. Walk with us along the quay.",
+        "host": "lanternkeeper-test",
+        "household": "hh:lantern-test-house",
+        "place": { "mark": null, "name": "The Quay Steps", "x": 12, "y": 40 },
+        "doors_open": "2026-11-14T20:00:00.000Z",
+        "starts": "2026-11-14T20:00:00.000Z",
+        "ends": "2026-11-14T23:00:00.000Z",
+        "phase": "underway",
+        "starts_in_s": -3600,
+        "ends_in_s": 7200,
+        "rsvps": { "total": 2, "residents": ["lanternkeeper-test", "walker-test"] },
+        "revised": 0,
+        "cancelled": false
+      }
+    ],
+    "coming": [
+      {
+        "id": "readerkeeper-test/reading-by-the-lamp-test",
+        "title": "Reading by the lamp (invented)",
+        "invitation": "An hour of reading aloud.",
+        "host": "readerkeeper-test",
+        "household": "hh:reader-test-house",
+        "place": { "mark": null, "name": null, "x": 120, "y": 64 },
+        "doors_open": "2026-11-15T00:00:00.000Z",
+        "starts": "2026-11-15T00:00:00.000Z",
+        "ends": "2026-11-15T01:00:00.000Z",
+        "phase": "announced",
+        "starts_in_s": 10800,
+        "ends_in_s": 14400,
+        "rsvps": { "total": 0, "residents": [] },
+        "revised": 0,
+        "cancelled": false
+      }
+    ],
+    "ended": [
+      {
+        "id": "sorbetkeeper-test/sorbet-night-test",
+        "title": "Sorbet Night (invented)",
+        "invitation": "Sorbet on the counter, all evening.",
+        "host": "sorbetkeeper-test",
+        "household": "hh:sorbet-test-house",
+        "place": { "mark": null, "name": "The Cave Interior", "x": 0, "y": 0 },
+        "doors_open": "2026-11-11T20:00:00.000Z",
+        "starts": "2026-11-11T20:00:00.000Z",
+        "ends": "2026-11-11T22:00:00.000Z",
+        "phase": "ended",
+        "starts_in_s": -259200,
+        "ends_in_s": -252000,
+        "rsvps": { "total": 1, "residents": ["sorbetkeeper-test"] },
+        "revised": 0,
+        "cancelled": false
+      }
+    ],
+    "total": 3
+  },
+  "events": {
+    "as_of": "2026-11-14T21:00:00.000Z",
+    "past": {
+      "read": "office",
+      "note": "INVENTED lasting list: 40 a page, newest end first",
+      "next": { "past": true, "before": "2026-10-01T00:00:00.000Z" },
+      "events": [
+        {
+          "id": "supperkeeper-test/harvest-supper-test",
+          "title": "Harvest Supper (invented; ended outside the seven-day list)",
+          "invitation": "Bring a dish. We eat at dusk.",
+          "host": "supperkeeper-test",
+          "household": "hh:supper-test-house",
+          "place": { "mark": null, "name": "The Long Table", "x": 300, "y": -200 },
+          "doors_open": "2026-10-20T18:00:00.000Z",
+          "starts": "2026-10-20T18:00:00.000Z",
+          "ends": "2026-10-20T21:00:00.000Z",
+          "phase": "ended",
+          "starts_in_s": -2000000,
+          "ends_in_s": -1990000,
+          "rsvps": { "total": 3, "residents": ["supperkeeper-test", "rsvponly-test", "guest-test"] },
+          "revised": 0,
+          "cancelled": false
+        },
+        {
+          "id": "teakeeper-test/quiet-tea-test",
+          "title": "Quiet Tea (invented; nobody spoke)",
+          "invitation": "Tea, and no talk required.",
+          "host": "teakeeper-test",
+          "household": "hh:tea-test-house",
+          "place": { "mark": null, "name": "The Tea Corner", "x": -80, "y": 15 },
+          "doors_open": "2026-10-15T15:00:00.000Z",
+          "starts": "2026-10-15T15:00:00.000Z",
+          "ends": "2026-10-15T16:00:00.000Z",
+          "phase": "ended",
+          "starts_in_s": -2500000,
+          "ends_in_s": -2496000,
+          "rsvps": { "total": 1, "residents": ["teakeeper-test"] },
+          "revised": 0,
+          "cancelled": false
+        },
+        {
+          "id": "lostkeeper-test/lost-read-test",
+          "title": "Lost Read (invented; its one-event read failed)",
+          "invitation": "An event whose evidence could not be read at build time.",
+          "host": "lostkeeper-test",
+          "household": "hh:lost-test-house",
+          "place": { "mark": null, "name": "The Lost Lane", "x": 5, "y": 5 },
+          "doors_open": "2026-10-10T12:00:00.000Z",
+          "starts": "2026-10-10T12:00:00.000Z",
+          "ends": "2026-10-10T13:00:00.000Z",
+          "phase": "ended",
+          "starts_in_s": -3000000,
+          "ends_in_s": -2996000,
+          "rsvps": { "total": 0, "residents": [] },
+          "revised": 0,
+          "cancelled": false
+        },
+        {
+          "id": "oldkeeper-test/before-the-record-test",
+          "title": "Before the record (invented; history unavailable)",
+          "invitation": "An event older than the office's say record.",
+          "host": "oldkeeper-test",
+          "household": "hh:old-test-house",
+          "place": { "mark": null, "name": "The Old Green", "x": -400, "y": 90 },
+          "doors_open": "2026-10-05T12:00:00.000Z",
+          "starts": "2026-10-05T12:00:00.000Z",
+          "ends": "2026-10-05T14:00:00.000Z",
+          "phase": "ended",
+          "starts_in_s": -3400000,
+          "ends_in_s": -3392800,
+          "rsvps": { "total": 0, "residents": [] },
+          "revised": 0,
+          "cancelled": false
+        }
+      ]
+    },
+    "evidence": {
+      "lanternkeeper-test/lantern-walk-test": {
+        "read": "ok",
+        "event": {
+          "id": "lanternkeeper-test/lantern-walk-test",
+          "phase": "underway",
+          "cancelled": false,
+          "evidence": {
+            "window": { "from": "2026-11-14T20:00:00.000Z", "to": "2026-11-14T23:00:00.000Z", "as_of": "2026-11-14T21:00:00.000Z" },
+            "complete": false,
+            "rooms": [
+              { "id": "t1794686460000-walker-test", "live": true, "place": "The Quay Steps", "at": { "x": 12, "y": 40 }, "started": "2026-11-14T20:10:00.000Z", "latest": "2026-11-14T20:55:00.000Z", "participants": ["walker-test", "lanternkeeper-test"], "voice_count": 6, "frame": { "room": "t1794686460000-walker-test", "at": { "x": 12, "y": 40 }, "extent": { "w": 30, "h": 20 } } }
+            ],
+            "room_history": "complete",
+            "present": ["hh:lantern-test-house", "hh:walker-test-house"],
+            "present_basis": "the distinct households of public acts within 60 m of the place in the window; an RSVP is not one",
+            "spark": null,
+            "gallery": { "rooms": ["t1794686460000-walker-test"], "sparks": [] }
+          }
+        }
+      },
+      "sorbetkeeper-test/sorbet-night-test": {
+        "read": "ok",
+        "event": {
+          "id": "sorbetkeeper-test/sorbet-night-test",
+          "phase": "ended",
+          "cancelled": false,
+          "evidence": {
+            "window": { "from": "2026-11-11T20:00:00.000Z", "to": "2026-11-11T22:00:00.000Z", "as_of": "2026-11-11T22:00:00.000Z" },
+            "complete": true,
+            "rooms": [
+              { "id": "t1794427260000-pica-test", "live": false, "place": "The Cave Interior", "at": { "x": 0, "y": 0 }, "started": "2026-11-11T20:01:00.000Z", "latest": "2026-11-11T21:40:00.000Z", "participants": ["pica-test", "seth-test", "claran-test"], "voice_count": 14, "frame": { "room": "t1794427260000-pica-test", "at": { "x": 0, "y": 0 }, "extent": { "w": 12, "h": 12 } } }
+            ],
+            "room_history": "complete",
+            "present": ["hh:sorbet-test-house"],
+            "present_basis": "the distinct households of public acts within 60 m of the place in the window; an RSVP is not one",
+            "spark": { "id": "sorbetkeeper-test/sorbet-night-test", "credit": { "by": "sorbetkeeper-test", "household": "hh:sorbet-test-house" }, "body": "Sorbet Night (invented)", "accepted": true, "recounting": "Seven of us ate lemon sorbet in the cave and argued about the sign.", "experienced_at": "2026-11-11T20:00:00.000Z", "experienced_until": "2026-11-11T22:00:00.000Z", "rooms": ["t1794427260000-pica-test"], "event": "sorbetkeeper-test/sorbet-night-test" },
+            "gallery": { "rooms": ["t1794427260000-pica-test"], "sparks": [] }
+          }
+        }
+      },
+      "supperkeeper-test/harvest-supper-test": {
+        "read": "ok",
+        "event": {
+          "id": "supperkeeper-test/harvest-supper-test",
+          "phase": "ended",
+          "cancelled": false,
+          "evidence": {
+            "window": { "from": "2026-10-20T18:00:00.000Z", "to": "2026-10-20T21:00:00.000Z", "as_of": "2026-10-20T21:00:00.000Z" },
+            "complete": true,
+            "rooms": [
+              { "id": "t1792519260000-supperkeeper-test", "live": false, "place": "The Long Table", "at": { "x": 300, "y": -200 }, "started": "2026-10-20T18:01:00.000Z", "latest": "2026-10-20T20:30:00.000Z", "participants": ["supperkeeper-test", "guest-test"], "voice_count": 9, "frame": { "room": "t1792519260000-supperkeeper-test", "at": { "x": 300, "y": -200 }, "extent": { "w": 18, "h": 10 } } },
+              { "id": "t1792520400000-guest-test", "live": false, "place": "The Long Table (the far end)", "at": { "x": 318, "y": -196 }, "started": "2026-10-20T18:20:00.000Z", "latest": "2026-10-20T19:10:00.000Z", "participants": ["guest-test"], "voice_count": 3, "frame": { "room": "t1792520400000-guest-test", "at": { "x": 318, "y": -196 }, "extent": { "w": 4, "h": 4 } } }
+            ],
+            "room_history": "complete",
+            "present": ["hh:supper-test-house", "solo:guest-test"],
+            "present_basis": "the distinct households of public acts within 60 m of the place in the window; an RSVP is not one",
+            "spark": { "id": "supperkeeper-test/harvest-supper-test", "credit": { "by": "supperkeeper-test", "household": "hh:supper-test-house" }, "body": "Harvest Supper (invented; ended outside the seven-day list)", "accepted": true, "recounting": "A long table, too many dishes, and one very serious argument about pie.", "picture": "/media/invented-harvest-supper.png", "experienced_at": "2026-10-20T18:00:00.000Z", "experienced_until": "2026-10-20T21:00:00.000Z", "rooms": ["t1792519260000-supperkeeper-test", "t1792520400000-guest-test"], "event": "supperkeeper-test/harvest-supper-test" },
+            "gallery": {
+              "rooms": ["t1792519260000-supperkeeper-test", "t1792520400000-guest-test"],
+              "sparks": [
+                { "id": "guest-test/the-pie-argument", "credit": { "by": "guest-test", "household": "solo:guest-test" }, "body": "The pie argument", "accepted": true, "recounting": "Apple versus pear, settled by a show of forks.", "picture": "/media/invented-pie-argument.png", "rooms": ["t1792519260000-supperkeeper-test"], "circle": 70101 },
+                { "id": "supperkeeper-test/the-last-slice", "credit": { "by": "supperkeeper-test", "household": "hh:supper-test-house" }, "body": "The last slice", "accepted": true, "recounting": "Nobody would take it, so it went to the dog.", "rooms": ["t1792519260000-supperkeeper-test"], "circle": 70105 }
+              ]
+            }
+          }
+        }
+      },
+      "teakeeper-test/quiet-tea-test": {
+        "read": "ok",
+        "event": {
+          "id": "teakeeper-test/quiet-tea-test",
+          "phase": "ended",
+          "cancelled": false,
+          "evidence": {
+            "window": { "from": "2026-10-15T15:00:00.000Z", "to": "2026-10-15T16:00:00.000Z", "as_of": "2026-10-15T16:00:00.000Z" },
+            "complete": true,
+            "rooms": [],
+            "room_history": "complete",
+            "present": [],
+            "present_basis": "the distinct households of public acts within 60 m of the place in the window; an RSVP is not one",
+            "spark": null,
+            "gallery": { "rooms": [], "sparks": [] }
+          }
+        }
+      },
+      "lostkeeper-test/lost-read-test": { "read": "unavailable" },
+      "oldkeeper-test/before-the-record-test": {
+        "read": "ok",
+        "event": {
+          "id": "oldkeeper-test/before-the-record-test",
+          "phase": "ended",
+          "cancelled": false,
+          "evidence": {
+            "window": { "from": "2026-10-05T12:00:00.000Z", "to": "2026-10-05T14:00:00.000Z" },
+            "complete": true,
+            "rooms": [],
+            "room_history": "unavailable",
+            "room_note": "the window opens before the oldest settlement this office reads",
+            "present": null,
+            "spark": { "id": "oldkeeper-test/before-the-record-test", "accepted": false, "status": "claim awaiting acceptance" },
+            "gallery": null,
+            "gallery_note": "the rooms cannot be told, so the gallery is unknown"
+          }
+        }
+      }
+    }
+  }
+}

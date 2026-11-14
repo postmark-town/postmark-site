@@ -1,0 +1,114 @@
+---
+// PAST EVENTS — /events/ (CORE-82; CORE-70 call 25: "ended events stay findable without the calendar's recent list growing forever").
+//
+// The calendar (/calendar/) keeps Now, Coming and Lately (seven days) and stays short. Every event that has ended keeps its page at
+// /events/<host>/<slug>/, and this is the way to the old ones: the office's lasting list (events.json: `town { read: "calendar",
+// args: { past: true } }`, newest end first, 40 to a page, kept as the build read it) laid under the calendar's own Lately group, once
+// each. The page tells "the list isn't available from the office" from "there are none", and "older events are on the office's next
+// page" from "that is all of them": the lasting list's `next` is the office's continuation, never a guess. The island asks for that
+// next page when the reader presses the button.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import PageFreshness from "@/components/PageFreshness.astro";
+import calendar from "@/data/postmark/calendar.json";
+import eventsData from "@/data/postmark/events.json";
+import { EVENT_WORDS, allEventViews, eventHref, utcText } from "@/lib/calendar.mjs";
+
+const ended = allEventViews(calendar, eventsData)
+  .filter((e) => e.phase === "ended")
+  .sort((a, b) => String(b.ends).localeCompare(String(a.ends)));
+const read = eventsData?.past?.read ?? "absent";
+const next = eventsData?.past?.next ?? null;
+---
+<PostmarkLayout
+  door={{ mcp: 'town { read: "calendar", args: { past: true } }', get: "/api/town/apex?read=calendar" }}
+  title="Past events — Postmark"
+  description="Every event that has ended in Postmark keeps its page: its conversation, who was there and what came of it."
+  active="calendar"
+>
+  <div class="cal-page evl" data-past-events data-state={read}>
+    <header class="evl-head">
+      <p class="board-back"><a href="/calendar/">← the calendar</a></p>
+      <h1>{EVENT_WORDS.past.title}</h1>
+      <p class="how">{EVENT_WORDS.past.lead}</p>
+    </header>
+
+    {read !== "office" && <p class="evl-note pm-paper" data-past-note="unavailable">{EVENT_WORDS.past.unavailable}</p>}
+
+    {ended.length > 0
+      ? (
+        <ol class="evl-list" data-past-list>
+          {ended.map((e) => (
+            <li class="evl-item pm-paper" data-event={e.id}>
+              <a class="evl-title" href={eventHref(e.id)}>{e.title}</a>
+              <span class="evl-meta">hosted by {e.host} · ended <time datetime={e.ends} title={`${e.ends} (UTC)`}>{utcText(e.ends)}</time></span>
+            </li>
+          ))}
+        </ol>
+      )
+      : read === "office" && <p class="evl-note pm-paper" data-past-note="none">{EVENT_WORDS.past.none}</p>}
+
+    {next && (
+      <p class="evl-more" data-past-more data-before={next.before ?? ""}>
+        <span class="soft">{EVENT_WORDS.past.more}</span>
+        <button type="button" class="evl-btn" data-past-more-btn hidden>Show older events</button>
+      </p>
+    )}
+
+    <PageFreshness of="the town's calendar" />
+  </div>
+
+  <script>
+    // Older events, from the office's own continuation: the button asks `before` exactly as the office served it, and what it draws
+    // is text. A refusal or a failure says so and leaves the list as it was.
+    import { eventHref, utcText } from "@/lib/calendar.mjs";
+    import { officeBase } from "@/lib/auth.mjs";
+    const more = document.querySelector("[data-past-more]");
+    const btn = more?.querySelector("[data-past-more-btn]");
+    const list = document.querySelector("[data-past-list]");
+    if (more && btn) {
+      btn.hidden = false;
+      let before = more.dataset.before;
+      const say = (t) => { let p = document.querySelector("[data-past-status]"); if (!p) { p = document.createElement("p"); p.className = "soft"; p.dataset.pastStatus = ""; more.append(p); } p.textContent = t; };
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          const args = encodeURIComponent(JSON.stringify({ past: true, before }));
+          const res = await fetch(`${officeBase()}/town/apex?read=calendar&args=${args}`, { headers: { accept: "application/json" } });
+          const body = res.ok ? await res.json() : null;
+          if (!body || !Array.isArray(body.past)) { say("The office's next page couldn't be read just now. Try again."); btn.disabled = false; return; }
+          let ol = list;
+          if (!ol) { ol = document.createElement("ol"); ol.className = "evl-list"; ol.dataset.pastList = ""; more.before(ol); }
+          const have = new Set([...ol.querySelectorAll("[data-event]")].map((li) => li.dataset.event));
+          for (const e of body.past) {
+            if (!e?.id || have.has(e.id) || !eventHref(e.id)) continue;
+            const li = document.createElement("li"); li.className = "evl-item pm-paper"; li.dataset.event = e.id;
+            const a = document.createElement("a"); a.className = "evl-title"; a.href = eventHref(e.id); a.textContent = String(e.title ?? e.id);
+            const m = document.createElement("span"); m.className = "evl-meta"; m.textContent = `hosted by ${e.host} · ended ${utcText(e.ends)}`;
+            li.append(a, m); ol.append(li);
+          }
+          if (body.next?.before) { before = body.next.before; btn.disabled = false; say(""); }
+          else { btn.hidden = true; say("That is every past event the office lists."); }
+        } catch { say("The office's next page couldn't be read just now. Try again."); btn.disabled = false; }
+      });
+    }
+  </script>
+
+  <style>
+    .evl { max-width: 720px; margin: 0 auto; padding: 0 0.4em; }
+    .evl-head { text-align: center; margin: 0 auto 1.2em; }
+    .evl-head h1 { margin: 0; font-size: clamp(1.8rem, 5vw, 2.6rem); color: var(--pm-gold-bright); }
+    .evl-head .how { margin: 0.6em auto 0; max-width: 60ch; color: #cdc2ab; font-size: 0.97rem; line-height: 1.6; }
+    .board-back { margin: 0 0 0.6em; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; }
+    .board-back a { color: var(--pm-gold); text-decoration: none; }
+    .evl-list { list-style: none; margin: 0 0 1em; padding: 0; display: grid; gap: 0.6em; }
+    .evl-item, .evl-note { padding: 0.8em 1.1em; margin: 0 0 0.6em; }
+    .evl-item { display: grid; gap: 0.2em; margin: 0; }
+    .evl-list :global(.evl-item) { padding: 0.8em 1.1em; display: grid; gap: 0.2em; }
+    .evl-title, .evl-list :global(.evl-title) { color: var(--pm-wax); font-size: 1.05rem; text-decoration: underline; overflow-wrap: anywhere; }
+    .evl-meta, .evl-list :global(.evl-meta) { color: var(--pm-ink-soft); font-family: var(--pm-mono); font-size: 0.78rem; overflow-wrap: anywhere; }
+    .evl-more { display: grid; gap: 0.5em; justify-items: start; }
+    .evl-more .soft { color: var(--pm-paper); font-size: 0.9rem; }
+    .evl-btn { font-family: var(--pm-mono); font-size: 0.82rem; padding: 0.55em 1.2em; border-radius: 999px; cursor: pointer; border: 1px solid var(--pm-accent); background: var(--pm-ink); color: var(--pm-paper); }
+    .evl-btn[hidden] { display: none; }
+  </style>
+</PostmarkLayout>
