@@ -387,7 +387,12 @@ const GEOM = `(() => { const r = document.querySelector("[data-fallback]"), c = 
 const CONTRAST = `(() => {
   const rgb = (s) => { const m = /rgba?\\(([^)]+)\\)/.exec(s); if (!m) return null; const [r, g, b, a = 1] = m[1].split(/[ ,\\/]+/).filter(Boolean).map(Number); return { r, g, b, a }; };
   const lum = ({ r, g, b }) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
-  const bgOf = (el) => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c && c.a === 1) return c; } return { r: 255, g: 255, b: 255, a: 1 }; };
+  // the surface a text sits on: its own and its ancestors' background colours, translucent washes composited over the first opaque one (a gradient image is not counted)
+  const bgOf = (el) => { const layers = []; let base = { r: 255, g: 255, b: 255, a: 1 };
+    for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c && c.a > 0) { layers.push(c); if (c.a === 1) break; } }
+    if (layers.length && layers[layers.length - 1].a === 1) base = layers.pop();
+    for (const c of layers.reverse()) base = { r: c.r * c.a + base.r * (1 - c.a), g: c.g * c.a + base.g * (1 - c.a), b: c.b * c.a + base.b * (1 - c.a), a: 1 };
+    return base; };
   const out = [];
   for (const el of document.querySelectorAll("[data-fallback] h1, [data-fallback] p, [data-fallback] a, [data-fallback] li, [data-fallback] button, [data-fallback] .pf-note")) {
     if (el.closest("[hidden]") || !el.textContent.trim() || el.getBoundingClientRect().width === 0) continue;
@@ -412,5 +417,13 @@ for (const [label, width] of [["desktop 1280", 1280], ["phone 390", 390]]) {
       assert.ok(rows.length >= 6, "the measure found the card's text");
       for (const r of rows) assert.ok(r.ratio >= 4.5, `${label}: ${r.el} reads ${r.ratio.toFixed(2)}:1, under 4.5:1 (the site draws one colour scheme; this is the one a reader gets)`);
     } finally { await p.close(); }
+    // the unchecked answer draws the one button ("Check again"): it must read too, and be inside the screen
+    const u = await openPage(browser, base, "/residents/ada-test/", { width, office: () => ({ status: 503, body: { error: "bounce", code: 503 } }) });
+    try {
+      await waitState(u, "unchecked");
+      const g = await u.evalJs(GEOM);
+      assert.ok(g.docW <= g.vw && g.targets.some((t) => t.text === "Check again" && t.hits && t.left >= 0 && t.right <= g.vw), `${label}: Check again is inside the screen and clickable`);
+      for (const r of await u.evalJs(CONTRAST)) assert.ok(r.ratio >= 4.5, `${label} (unchecked): ${r.el} reads ${r.ratio.toFixed(2)}:1, under 4.5:1`);
+    } finally { await u.close(); }
   });
 }

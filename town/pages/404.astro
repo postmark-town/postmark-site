@@ -57,6 +57,9 @@ const floor = WORDS.other;
   /* GLOBAL on purpose: the record link is made by the script, so it carries no scope attribute. The paper's own link colour (--pm-accent) reads 4.17:1 on --pm-paper, under the 4.5:1 a reader needs (measured by the browser test); the wax tone, the paper's strong colour, reads above it. */
   .pm .pf-card a { color: var(--pm-wax); text-decoration: underline; }
   .pm .pf-card a:hover { color: var(--pm-ink); }
+  /* the shared .pm-btn.ghost is cream text on a translucent wash, drawn for the dark page; on the paper it reads as grey on grey, so the one button here wears the paper's ink */
+  .pm .pf-card .pm-btn { background: var(--pm-ink); color: var(--pm-paper); box-shadow: none; border: 0; }
+  .pm .pf-card .pm-btn:hover { background: var(--pm-wax); color: var(--pm-paper); transform: none; }
 </style>
 
 <script>
