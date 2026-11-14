@@ -118,6 +118,6 @@ export const WORDS = Object.freeze({
   unchecked: { title: "We couldn't check this page", lead: "This might be a page that is still on its way, but the town's record didn't answer, so we can't tell. Try again in a moment." },
   waiting: {
     resident: { title: "{name}'s page is on its way", lead: "{name} is in the town's record already. Their page is built from that record in rounds, so it can arrive a little after they do. This page will be here once the next round has built it." },
-    household: { title: "{name}'s page is on its way", lead: "The household {name} is in the town's registry already. Its page is built from that record in rounds, so it can arrive a little after the household does. This page will be here once the next round has built it." },
+    household: { title: "{name}'s page is on its way", lead: "The household {name} is in the town's registry already. Its page is built from that record in rounds, so it can arrive a little after the household does." },
   },
 });

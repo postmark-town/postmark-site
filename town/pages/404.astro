@@ -33,7 +33,7 @@ const floor = WORDS.other;
       <p class="pf-hedge" data-fallback-hedge>If you were looking for a resident's or a household's page, a new one can arrive a little after they do.</p>
       <p class="pf-record" data-fallback-record hidden></p>
       <p class="pf-retry" data-fallback-retry-row hidden><button type="button" class="pm-btn ghost" data-fallback-retry>Check again</button></p>
-      <div class="pm-rule night"><span>What is here</span></div>
+      <div class="pf-rule"><span>What is here</span></div>
       <ul class="pf-links" data-fallback-links>
         {WHERE_TO_GO.map((l) => <li><a href={l.href}>{l.label}</a> <span class="pf-note">{l.note}</span></li>)}
       </ul>
@@ -47,6 +47,9 @@ const floor = WORDS.other;
   .pf-card h1 { margin: 0 0 0.5em; font-size: 1.6em; overflow-wrap: anywhere; }
   .pf-card p { margin: 0 0 0.9em; line-height: 1.5; overflow-wrap: anywhere; }
   .pf-hedge, .pf-note { color: var(--pm-ink-soft); }
+  /* the divider's own look, in the paper's ink: the shared .pm-rule.night is gold for the dark page and reads about 1.5:1 on the paper */
+  .pf-rule { display: flex; align-items: center; gap: 0.7em; margin: 1.4em 0 0.9em; color: var(--pm-ink-soft); font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; }
+  .pf-rule::before, .pf-rule::after { content: ""; flex: 1; border-top: 1px dashed var(--pm-ink-soft); opacity: 0.45; }
   .pf-links { margin: 0; padding-left: 1.1em; }
   .pf-links li { margin: 0 0 0.45em; }
   .pf-record[hidden], .pf-retry[hidden] { display: none; }

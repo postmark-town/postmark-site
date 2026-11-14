@@ -141,5 +141,8 @@ test("the words promise no build time and the page points at places that exist",
   assert.match(WORDS.unchecked.title, /couldn't check/i, "an unchecked answer says it could not be checked");
   assert.doesNotMatch(WORDS.unchecked.lead + WORDS.unchecked.title, /arrived|isn't here|doesn't know/i, "and claims neither arrival nor absence");
   assert.doesNotMatch(WORDS.unknown.lead, /on its way/, "unknown never says on its way");
+  // LAW (src/lib/houses.mjs buildHouses): "a house with nobody ashore yet has no page" — a registry row alone is not a promise of a page, so a household's words stop at "can arrive a little after".
+  assert.doesNotMatch(WORDS.waiting.household.lead, /next round|once .* has built/, "no next-round promise for a household");
+  assert.match(WORDS.waiting.household.lead, /can arrive a little after the household does\.$/);
   assert.ok(WHERE_TO_GO.length >= 2 && WHERE_TO_GO.every((l) => l.href.startsWith("/") && l.label && l.note));
 });

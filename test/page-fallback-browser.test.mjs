@@ -276,6 +276,7 @@ test("a registered household, with no page built: 'on its way' by its name; a re
     assert.equal(p.docStatus, 404);
     assert.equal(v.title, "Fox Hearth Test's page is on its way");
     assert.match(v.lead, /^The household Fox Hearth Test is in the town's registry already\./);
+    assert.doesNotMatch(v.lead, /next round|once .* has built/, "a registered house with nobody ashore is never built (houses.mjs skips it): the page does not promise the next round for a household");
     assert.equal(v.recordShown, false, "a household has no per-house record link");
     assert.deepEqual(p.asked, ["/api/households"]);
   } finally { await p.close(); }
@@ -394,10 +395,12 @@ const CONTRAST = `(() => {
     for (const c of layers.reverse()) base = { r: c.r * c.a + base.r * (1 - c.a), g: c.g * c.a + base.g * (1 - c.a), b: c.b * c.a + base.b * (1 - c.a), a: 1 };
     return base; };
   const out = [];
-  for (const el of document.querySelectorAll("[data-fallback] h1, [data-fallback] p, [data-fallback] a, [data-fallback] li, [data-fallback] button, [data-fallback] .pf-note")) {
-    if (el.closest("[hidden]") || !el.textContent.trim() || el.getBoundingClientRect().width === 0) continue;
+  // EVERY element in the card that holds text of its own (a text node child), by what it is and not by a list of the classes the author remembered: the divider's label was left out of an earlier list and read 1.5:1
+  for (const el of document.querySelectorAll("[data-fallback], [data-fallback] *")) {
+    if (![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
+    if (el.closest("[hidden]") || el.getBoundingClientRect().width === 0) continue;
     const fg = rgb(getComputedStyle(el).color), bg = bgOf(el), L1 = lum(fg), L2 = lum(bg);
-    out.push({ el: el.tagName.toLowerCase() + (el.className ? "." + String(el.className).split(" ")[0] : ""), size: parseFloat(getComputedStyle(el).fontSize), ratio: (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05) });
+    out.push({ rule: !!el.closest(".pf-rule"), el: el.tagName.toLowerCase() + (el.className ? "." + String(el.className).split(" ")[0] : ""), size: parseFloat(getComputedStyle(el).fontSize), ratio: (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05) });
   }
   return out; })()`;
 
@@ -415,6 +418,7 @@ for (const [label, width] of [["desktop 1280", 1280], ["phone 390", 390]]) {
       for (const t of g.targets) assert.ok(t.hits, `${label}: "${t.text}" is what a click at its centre lands on`);
       const rows = await p.evalJs(CONTRAST);
       assert.ok(rows.length >= 6, "the measure found the card's text");
+      assert.ok(rows.some((r) => r.rule), "and it measured the divider's label, 'What is here' (the one text a class list left out)");
       for (const r of rows) assert.ok(r.ratio >= 4.5, `${label}: ${r.el} reads ${r.ratio.toFixed(2)}:1, under 4.5:1 (the site draws one colour scheme; this is the one a reader gets)`);
     } finally { await p.close(); }
     // the unchecked answer draws the one button ("Check again"): it must read too, and be inside the screen
