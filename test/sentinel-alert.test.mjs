@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { alertFromBoard, parseBoard, REBAKE_LINE, SENTINEL_BAD, SETTLEMENT_LATE_LINE } from "../src/lib/sentinel-alert.mjs";
+import { alertFromBoard, parseBoard, REBAKE_LINE, SENTINEL_BAD, SETTLEMENT_LATE_LINE, SETTLEMENT_MAYBE_LATE_LINE } from "../src/lib/sentinel-alert.mjs";
 
 const LAYOUT = new URL("../src/layouts/PostmarkLayout.astro", import.meta.url);
 
@@ -143,13 +143,25 @@ test("A LATE SETTLEMENT lights the glyph, and its row says the plain words inste
 
 test("LATE-SETTLEMENT CONTROLS: it clears when the settlement lands, and the plain words follow the notice's one judgment", () => {
   assert.equal(alertFromBoard(lateBoard("OK"), { nowMs: NOW }).show, false, "the settlement landed and nothing else is bad: the glyph is gone");
-  // STALE and an old board still raise the glyph (the sentinel's own judgment, unchanged), but they are not "late": operator words
-  for (const [label, board] of [["STALE", lateBoard("STALE")], ["a 25-minute-old board", lateBoard("DOWN", { ageMin: 25 })]]) {
+  // STALE, an old board and a board dated ahead of the visitor's clock still raise the glyph (the sentinel's own judgment, unchanged),
+  // but they cannot say "late": the row says "may be", in plain words, and the operator reason (it names a private repo's section,
+  // CORE-41) is carried on NO branch. Wright, 2026-11-12: "every resident-facing reason in that popover plain words".
+  for (const [label, board] of [
+    ["STALE", lateBoard("STALE")],
+    ["a 25-minute-old board", lateBoard("DOWN", { ageMin: 25 })],
+    ["a board dated 10 minutes ahead of the visitor's clock", lateBoard("DOWN", { ageMin: -10 })],
+    ["a STALE settlement on an old board", lateBoard("STALE", { ageMin: 25 })],
+  ]) {
     const view = alertFromBoard(board, { nowMs: NOW });
     assert.equal(view.show, true, `${label}: the glyph still shows`);
-    assert.equal(view.rows[0].detail, null, `${label}: no plain line`);
-    assert.equal(view.rows[0].reason, SENTINEL_REASON, `${label}: the sentinel's own reason`);
+    assert.equal(view.rows[0].detail, SETTLEMENT_MAYBE_LATE_LINE, `${label}: the hedged plain line`);
+    assert.equal(view.rows[0].reason, "", `${label}: the sentinel's operator reason is not carried`);
+    assert.equal(SETTLEMENT_MAYBE_LATE_LINE, "The latest World settlement may be running late. It will show as soon as it's published.");
+    const said = shown(view).join(" ");
+    assert.ok(!/SHIPPING|postmark-telemetry|§|sweep|tag covers|ours to unblock/i.test(said), `${label}: no operator word escapes (${said})`);
   }
+  // and the one probe whose bad reading is a plain DOWN on a fresh board is the only one that says "is running late"
+  assert.notEqual(SETTLEMENT_MAYBE_LATE_LINE, SETTLEMENT_LATE_LINE);
   // another probe's DOWN beside an OK settlement: that probe's row, never the settlement's words
   const other = alertFromBoard(lateBoard("OK", { extra: [{ key: "settlement_tag", label: "the settlement tag", verdict: "DOWN", reason: "invented" }] }), { nowMs: NOW });
   assert.equal(other.show, true);

@@ -86,16 +86,22 @@ export function alertFromBoard(board, { nowMs = Date.now() } = {}) {
     if (p == null || typeof p !== "object") continue;
     if (!SENTINEL_BAD.has(p.verdict)) continue;
     const sinceMs = typeof p.since === "number" ? p.since : Date.parse(p.since ?? "");
+    // THE SETTLEMENT ROW IS ALWAYS IN RESIDENT WORDS (CORE-41; Wright, 2026-11-12: "Whoever fixes the tap gives every
+    // resident-facing reason in that popover plain words, with no private repo or section named"). Its probe's own reason is an
+    // operator instruction (it names a private repo's section), so it is never carried onto the row, whichever branch the board
+    // lands in: a fresh DOWN says it is late; any other bad reading (STALE, a board over BOARD_MAX_AGE_MS old, a board dated ahead of
+    // a visitor's clock) says it MAY be, since that board cannot say how late.
+    const settlement = p.key === SETTLEMENT_PROBE_KEY;
     rows.push({
       key: typeof p.key === "string" ? p.key : null,
       verdict: p.verdict,
       label: typeof p.label === "string" && p.label !== "" ? p.label : (p.key ?? "a probe"),
-      reason: typeof p.reason === "string" ? p.reason : "",
+      reason: settlement ? "" : (typeof p.reason === "string" ? p.reason : ""),
       // `detail` is the refresh report's own sentence, carried onto the board by
       // the office's site_refresh probe so this popover can say "48 doors are
-      // missing" rather than only "failed". For a late settlement it is the
-      // plain line above.
-      detail: late && p.key === SETTLEMENT_PROBE_KEY ? SETTLEMENT_LATE_LINE
+      // missing" rather than only "failed". For the settlement it is the
+      // plain line above, always.
+      detail: settlement ? (late && p.verdict === "DOWN" ? SETTLEMENT_LATE_LINE : SETTLEMENT_MAYBE_LATE_LINE)
         : (typeof p.detail === "string" && p.detail !== "" ? p.detail : null),
       age: Number.isFinite(sinceMs) ? humanAge(nowMs - sinceMs) : null,
     });
@@ -149,6 +155,10 @@ export const SETTLEMENT_NOTICE_TEXT = "The latest World settlement is running la
 /** The same words for the header glyph's row (alertFromBoard, above), less "here": the glyph is on the front page and every other
  *  layout page, never on the World page, which is where the settlement shows. */
 export const SETTLEMENT_LATE_LINE = "The latest World settlement is running late. It will show as soon as it's published.";
+
+/** The header mark's row when the settlement probe is bad but the board cannot say it is late: STALE, a board older than
+ *  BOARD_MAX_AGE_MS, or one dated ahead of the visitor's clock. Plain words, and no claim the board cannot back. */
+export const SETTLEMENT_MAYBE_LATE_LINE = "The latest World settlement may be running late. It will show as soon as it's published.";
 
 /** A board older than this says nothing about the settlement: the watchman's own beat is the board's `generated_at`. */
 export const BOARD_MAX_AGE_MS = 20 * 60 * 1000;
