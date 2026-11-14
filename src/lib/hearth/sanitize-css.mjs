@@ -60,7 +60,11 @@ const FUNCS = new Set((
 const PSEUDO_CLASS = new Set(["hover", "focus", "focus-visible", "focus-within", "active", "first-child", "last-child", "only-child",
   "first-of-type", "last-of-type", "only-of-type", "empty", "target"]);
 const PSEUDO_ELEMENT = new Set(["before", "after", "first-line", "first-letter", "marker", "selection"]);
-const ATTRS = new Set(["data-tab", "data-panel", "data-hearth-behavior", "data-hearth-slot", "data-hearth-state", "data-single", "lang", "open", "aria-expanded", "aria-selected", "aria-hidden"]);
+// v2 (POS-1024, gaps 9 and 10): `data-hearth-view` ("owner" or "public") is on the stage, so `:root[data-hearth-view="owner"] …` styles the owner's
+// view apart from a visitor's (looks only: private content stays in the private slots). `data-hearth-part="caption"` marks every slot's small caption,
+// so a design can shrink or hide them.
+const ATTRS = new Set(["data-tab", "data-panel", "data-hearth-behavior", "data-hearth-slot", "data-hearth-state", "data-single", "lang", "open", "aria-expanded", "aria-selected", "aria-hidden",
+  "data-hearth-view", "data-hearth-part"]);
 
 const strip = (s) => s.replace(/\/\*[\s\S]*?(\*\/|$)/g, " ");
 

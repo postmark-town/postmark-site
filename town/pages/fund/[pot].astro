@@ -886,7 +886,9 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
       if (!t.obtained || !t.expires_in) return true;
       return Date.now() < t.obtained + t.expires_in * 1000;
     };
-    var headers = function (t) { return { accept: "application/json", "content-type": "application/json", authorization: "Bearer " + t.access_token }; };
+    // the site's header on every office call from this page, so the pot stake files as the human's act on the site (POS-1028). This script is
+    // is:inline and cannot import src/lib/office-write.mjs, so it names the header itself; test/office-write.test.mjs holds it to that file.
+    var headers = function (t) { return { accept: "application/json", "content-type": "application/json", "x-postmark-channel": "web", authorization: "Bearer " + t.access_token }; };
     var estate = null;
 
     signinBtn.addEventListener("click", function () {

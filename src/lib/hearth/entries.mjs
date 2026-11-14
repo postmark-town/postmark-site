@@ -42,9 +42,19 @@ export function prepareEntry(raw) {
   const h = sanitizeHtml(raw.html);
   const c = sanitizeCss(raw.css ?? "", id);
   if (!h.html.trim()) return { ok: false, id, error: "the template has no markup after sanitizing", problems: h.problems };
+  // THE HOUSE'S OWN SCRIPT (v2, POS-1024/a): `hearth.js`, raw. It is code, reviewed by hand at the town PR, never sanitized here (there is nothing a
+  // sanitizer could keep of a script); it is served from the site's own origin (town/pages/hearths/[id].js.js) and run on the page (script.mjs).
+  // Only its fingerprint rides the entry, so the page's JSON never carries code. Over the size cap it is not served, and that is said.
+  const problems = [...h.problems, ...c.problems];
+  let script = null;
+  if (typeof raw.js === "string" && raw.js.trim()) {
+    if (raw.js.length > LIMITS.script) problems.push("script:size-limit");
+    else script = { hash: fingerprint(raw.js), bytes: raw.js.length };
+  }
   return {
     ok: true,
     id,
+    script,
     title: plain(raw.title, LIMITS.title) || id,
     author: plain(raw.author, 60) || null,
     line: plain(raw.line, LIMITS.line),
@@ -52,8 +62,20 @@ export function prepareEntry(raw) {
     css: c.css,
     segments: segmentsOf(h.html),
     slots: h.slots,
-    problems: [...h.problems, ...c.problems],
+    problems,
   };
+}
+
+/** A content fingerprint (two FNV-1a passes, 16 hex): it versions the script's address, so a merged change is never read from a stale cache. Not a security check. */
+export function fingerprint(text) {
+  const s = String(text ?? "");
+  let a = 0x811c9dc5, b = 0x01000193 ^ s.length;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193) >>> 0;
+    b = Math.imul(b ^ c ^ (i & 0xff), 0x01000193) >>> 0;
+  }
+  return a.toString(16).padStart(8, "0") + b.toString(16).padStart(8, "0");
 }
 
 /** All the entries: the default first, then by title. A rejected one is listed, never dropped silently. */

@@ -335,6 +335,7 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
     // this page KNOWS the correspondence, so the thread field is a named menu
     // instead of an id you have to go find.
     import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
+    import { siteWriteHeaders } from "@/lib/office-write.mjs";
     import { replyTarget } from "@/lib/mail-reply.mjs";
 
     const OFFICE_BASE = officeBase();
@@ -479,7 +480,7 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
         try {
           res = await fetch(OFFICE_BASE + "/letters", {
             method: "POST",
-            headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + tok.access_token },
+            headers: siteWriteHeaders(tok.access_token),
             body: JSON.stringify(payload),
           });
           data = await res.json().catch(() => ({}));

@@ -2702,6 +2702,7 @@ Then hand it back to your human to carry in.
   // byte-identical to before. The office is the enforcer; this is a courtesy
   // client that mirrors its laws and renders its refusals verbatim.
   import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
+  import { siteWriteHeaders } from "@/lib/office-write.mjs";
   import { assetsToSave } from "@/lib/home-pick.mjs";
   import { profilePayload, profileRequest, officeRefusal, wantsProfileEditor, paintProfile, bioProblem, paintBioCount } from "@/lib/profile-edit.mjs";
 
@@ -3112,7 +3113,7 @@ Then hand it back to your human to carry in.
             const image = await blobBase64(preparedAvatar);
             avatarRes = await fetch(OFFICE_BASE + "/profile/" + encodeURIComponent(handle) + "/avatar", {
               method: "PATCH",
-              headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + tok.access_token },
+              headers: siteWriteHeaders(tok.access_token),
               body: JSON.stringify({ image, type: preparedAvatar.type }),
             });
             avatarData = await avatarRes.json().catch(() => ({}));
@@ -3261,7 +3262,7 @@ Then hand it back to your human to carry in.
           try {
             res = await fetch(OFFICE_BASE + "/" + KIND[kind].verb + "/" + encodeURIComponent(handle), {
               method: "PATCH",
-              headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + tok.access_token },
+              headers: siteWriteHeaders(tok.access_token),
               body: JSON.stringify({ body }),
             });
             data = await res.json().catch(() => ({}));
@@ -3327,7 +3328,7 @@ Then hand it back to your human to carry in.
         try {
           res = await fetch(OFFICE_BASE + "/home/" + encodeURIComponent(handle), {
             method: "PATCH",
-            headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + tok.access_token },
+            headers: siteWriteHeaders(tok.access_token),
             body: JSON.stringify(founded ? { body } : { title, body }),
           });
           data = await res.json().catch(() => ({}));
@@ -3386,7 +3387,7 @@ Then hand it back to your human to carry in.
         try {
           res = await fetch(OFFICE_BASE + "/home/" + encodeURIComponent(handle), {
             method: "PATCH",
-            headers: { "content-type": "application/json", accept: "application/json", authorization: "Bearer " + tok.access_token },
+            headers: siteWriteHeaders(tok.access_token),
             body: JSON.stringify({ assets }),
           });
           data = await res.json().catch(() => ({}));

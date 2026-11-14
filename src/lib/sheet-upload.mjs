@@ -17,6 +17,7 @@
 
 import { atTownMediaDoor } from "./media-door.mjs";
 import { tokenIsFresh } from "./auth.mjs";
+import { CHANNEL_HEADER, CHANNEL_WEB } from "./office-write.mjs";
 
 /**
  * What the page SAYS the limit is. The byte law caps an upload at 1.5 MB
@@ -58,7 +59,8 @@ export function urlProblem(raw) {
   return null;
 }
 
-const bearer = (token) => ({ authorization: "Bearer " + token });
+// every office write here carries the site's header too (office-write.mjs; POS-1028): the bearer, and the route the office files it by
+const bearer = (token) => ({ authorization: "Bearer " + token, [CHANNEL_HEADER]: CHANNEL_WEB });
 
 /** Step 1a: a picked file, as the raw-bytes door takes it. The File itself is the body (it carries its Content-Length). */
 export function uploadFileRequest(base, handle, file, token) {

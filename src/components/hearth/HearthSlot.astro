@@ -41,7 +41,7 @@ const closer = name === "closer"
 ---
 {name === "house" && (
   <section class="hx hx-house" data-hearth-slot="house" aria-label="the house">
-    <p class="hd-label">a household in Postmark{house.since && <> · since {fmtDate(house.since)}</>}</p>
+    <p class="hd-label" data-hearth-part="caption">a household in Postmark{house.since && <> · since {fmtDate(house.since)}</>}</p>
     <p class="hx-name">{plate || "a shared household"}</p>
     <p class="hd-sub">
       <b>{`${faces.length} ${faces.length === 1 ? "resident" : "residents"}`}</b>
@@ -72,7 +72,7 @@ const closer = name === "closer"
 {name === "needs-you" && (
   <aside class="hx hx-needs hd-needs" data-hearth-slot="needs-you" data-private data-hd-needs-box hidden aria-labelledby="hx-needs-h">
     <h2 id="hx-needs-h">Needs you</h2>
-    <p class="hd-meta">what is waiting on a word from this house</p>
+    <p class="hd-meta" data-hearth-part="caption">what is waiting on a word from this house</p>
     <ul data-hd-needs></ul>
   </aside>
 )}
@@ -95,7 +95,7 @@ const closer = name === "closer"
 {name === "posts" && (
   <section class="hx hx-posts" data-hearth-slot="posts" aria-labelledby="hx-posts-h">
     <h2 id="hx-posts-h">Posts</h2>
-    <p class="hd-meta">the ideas and bugs this house’s residents put up</p>
+    <p class="hd-meta" data-hearth-part="caption">the ideas and bugs this house’s residents put up</p>
     <ul class="hx-list" data-hx-posts><li class="hd-empty">reading the town’s posts…</li></ul>
     <p class="hx-note" data-hx-posts-note hidden></p>
   </section>
@@ -104,7 +104,7 @@ const closer = name === "closer"
 {name === "marks" && (
   <section class="hx hx-marks" data-hearth-slot="marks" aria-labelledby="hx-marks-h">
     <h2 id="hx-marks-h">Marks</h2>
-    <p class="hd-meta">what the crossings decided about this house’s marks</p>
+    <p class="hd-meta" data-hearth-part="caption">what the crossings decided about this house’s marks</p>
     <ul class="hx-list" data-hx-marks><li class="hd-empty">reading the house’s record…</li></ul>
   </section>
 )}
@@ -112,7 +112,7 @@ const closer = name === "closer"
 {name === "closer" && (
   <section class="hx hx-closer" data-hearth-slot="closer" aria-labelledby="hx-closer-h">
     <h2 id="hx-closer-h">Closest correspondents</h2>
-    <p class="hd-meta">who each resident has written with most, by letters that crossed</p>
+    <p class="hd-meta" data-hearth-part="caption">who each resident has written with most, by letters that crossed</p>
     {closer.length === 0
       ? <p class="hd-empty">No letters have crossed between these residents and others yet.</p>
       : <ul class="hx-list">
@@ -158,7 +158,7 @@ const closer = name === "closer"
 {name === "mail" && (
   <section class="hx hx-mail" data-hearth-slot="mail" data-private data-hx-mail hidden aria-labelledby="hx-mail-h">
     <h2 id="hx-mail-h">Mail</h2>
-    <p class="hd-meta">private to this house: what is new, what waits on a word, what rides the next crossing</p>
+    <p class="hd-meta" data-hearth-part="caption">private to this house: what is new, what waits on a word, what rides the next crossing</p>
     <ul class="hx-list" data-hx-mail-list></ul>
   </section>
 )}
@@ -188,7 +188,7 @@ const closer = name === "closer"
 {name === "map" && (
   <section class="hx hx-map" data-hearth-slot="map" aria-labelledby="hx-map-h">
     <h2 id="hx-map-h">Where they stand</h2>
-    <p class="hd-meta">the residents’ places in the world right now, from the walkers’ roll</p>
+    <p class="hd-meta" data-hearth-part="caption">the residents’ places in the world right now, from the walkers’ roll</p>
     <div class="hx-places" data-hx-map><p class="hd-empty">reading the world…</p></div>
   </section>
 )}
@@ -196,9 +196,57 @@ const closer = name === "closer"
 {name === "stamps-chart" && (
   <section class="hx hx-chart" data-hearth-slot="stamps-chart" aria-labelledby="hx-chart-h">
     <h2 id="hx-chart-h">Stamps held</h2>
-    <p class="hd-meta">each resident’s stamps, as their doorstep counts them</p>
+    <p class="hd-meta" data-hearth-part="caption">each resident’s stamps, as their doorstep counts them</p>
     <div class="hx-bars" data-hx-chart><p class="hd-empty">reading the stamps…</p></div>
   </section>
+)}
+
+{/* ── v2 (POS-1024, POS-1028). Every part below but the pane SHIPS HIDDEN and draws nothing until its answer is here (lib/hearth/paint-v2.mjs):
+     the windows from the panes origin's live list, the rest from the office's public Hearth bundle (household { read: "hearth" }, POS-1027). */}
+{name === "windows" && (
+  <section class="hx hx-windows" data-hearth-slot="windows" hidden aria-labelledby="hx-windows-h">
+    <h2 id="hx-windows-h">Windows</h2>
+    <p class="hd-meta" data-hearth-part="caption">each resident’s own window, as it hangs on their page</p>
+    <div class="hx-panes" data-hx-windows></div>
+  </section>
+)}
+
+{name === "ties" && (
+  <section class="hx hx-ties" data-hearth-slot="ties" hidden aria-labelledby="hx-ties-h">
+    <h2 id="hx-ties-h">Ties</h2>
+    <p class="hd-meta" data-hearth-part="caption">who the residents write, letters each way, and the newest line each way</p>
+    <ul class="hx-list" data-hx-ties></ul>
+  </section>
+)}
+
+{name === "stamps-went" && (
+  <section class="hx hx-went" data-hearth-slot="stamps-went" hidden aria-labelledby="hx-went-h">
+    <h2 id="hx-went-h">Where the stamps went</h2>
+    <p class="hd-meta" data-hearth-part="caption">behind marks and ideas, on ballots, into pots, and given</p>
+    <div class="hx-went-groups" data-hx-went></div>
+  </section>
+)}
+
+{name === "town" && (
+  <section class="hx hx-feed" data-hearth-slot="town" hidden aria-labelledby="hx-feed-h">
+    <h2 id="hx-feed-h">Around town, lately</h2>
+    <div class="hd-filters" role="group" aria-label="sort" data-hx-feed-sorts></div>
+    <ul class="hx-list" data-hx-feed></ul>
+  </section>
+)}
+
+{name === "day" && (
+  <section class="hx hx-day" data-hearth-slot="day" hidden aria-labelledby="hx-day-h">
+    <h2 id="hx-day-h">Today</h2>
+    <p class="hd-meta" data-hearth-part="caption">each resident’s day, from the town’s public record</p>
+    <ul class="hx-list" data-hx-day></ul>
+  </section>
+)}
+
+{/* THE HOUSE'S OWN SCRIPTED PART: an empty box. The entry's hearth.js draws here, on this page (lib/hearth/script.mjs; Darko 2026-11-13 09:21 EST:
+     no iframe, no sandbox). A design without a script leaves it empty, and an empty box takes no room. */}
+{name === "pane" && (
+  <div class="hx hx-pane" data-hearth-slot="pane"></div>
 )}
 
 {name === "countdown" && (

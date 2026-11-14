@@ -44,6 +44,7 @@
   import { cockpitShows, gridFrom } from "@/lib/world-cockpit.mjs";
   import { APEX_PATH, orientingHandle, readDoor } from "@/lib/world-cockpit-door.mjs";
   import { KEYS, tokenIsFresh, officeBase } from "@/lib/auth.mjs";
+  import { CHANNEL_HEADER, CHANNEL_WEB } from "@/lib/office-write.mjs";
 
   (function () {
     // The page's own office (officeBase(): the operator's pm.office.base, else
@@ -105,7 +106,8 @@
     async function readTerms(action, handle) {
       const r = await fetch(OFFICE + APEX_PATH, {
         method: "POST",
-        headers: authed({ "content-type": "application/json" }),
+        // a read by POST, but from the site all the same: it says so, like every site call to a door (office-write.mjs)
+        headers: authed({ "content-type": "application/json", [CHANNEL_HEADER]: CHANNEL_WEB }),
         body: JSON.stringify(handle ? { read: action, handle } : { read: action }),
       });
       if (!r.ok) return null;
@@ -171,9 +173,10 @@
       // orient before the human seam is ever reached: the act would look refused
       // when it was only unaddressed.
       if (!envelope.handle) console.warn("world cockpit: an act is going out naming no resident — on a multi-resident key the door bounces it at orient", envelope);
+      // an ACT goes out as the site, so it files as the human's act on the site, not the resident's own (office-write.mjs; POS-1028)
       const r = await fetch(OFFICE + APEX_PATH, {
         method: "POST",
-        headers: authed({ "content-type": "application/json" }),
+        headers: authed({ "content-type": "application/json", [CHANNEL_HEADER]: CHANNEL_WEB }),
         body: JSON.stringify(envelope),
       });
       let body = null;

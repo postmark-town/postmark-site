@@ -16,6 +16,7 @@
 // After a successful save call whichDesign again with saved = the id saveHearth answered and entry = null. The office, not the picker, decides who may save.
 
 import { DEFAULT_ENTRY, ENTRY_ID } from "./slots.mjs";
+import { siteWriteHeaders } from "../office-write.mjs";
 
 /** The line to say beside the drawing: a saved id this build does not know, a preview that is not registered, a failed read. "" when there is nothing to say. */
 export function designNote(entries = [], { entry = null, saved } = {}) {   // `saved` has NO default: undefined means "the read failed"
@@ -69,7 +70,7 @@ export async function saveHearth({ slug, id, token, api, fetchImpl = globalThis.
   try {
     const r = await fetchImpl(`${api}/households/${encodeURIComponent(slug)}/hearth`, {
       method: "PATCH",
-      headers: { "content-type": "application/json", accept: "application/json", authorization: `Bearer ${token}` },
+      headers: siteWriteHeaders(token),
       body: JSON.stringify({ hearth: id === null || id === DEFAULT_ENTRY ? null : id }),
     });
     const body = await r.json().catch(() => undefined);

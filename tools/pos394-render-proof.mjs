@@ -90,6 +90,10 @@ export const SOURCES = Object.freeze([
   "src/components/hearth/hearth-host.css", "town/components/HouseQuests.astro", "src/lib/house-home.mjs",
   "src/lib/hearth/behaviors.mjs", "src/lib/hearth/entries.mjs", "src/lib/hearth/fold.mjs", "src/lib/hearth/paint.mjs", "src/lib/hearth/registry.mjs",
   "src/lib/hearth/sanitize-css.mjs", "src/lib/hearth/sanitize-html.mjs", "src/lib/hearth/slots.mjs", "src/lib/hearth/stage.mjs", "src/lib/hearth/not-yours.mjs", "src/lib/hearth/choice.mjs", "src/lib/hearth/picker.mjs", "src/components/hearth/HearthPicker.astro", "src/components/hearth/HearthSetup.astro", "src/lib/hearth/which-design.mjs",
+  // POS-1028: the Hearth v2 slots' bundle and painter, the house's own script runner, and the one write helper (and the world door's path it takes)
+  "src/lib/hearth/bundle.mjs", "src/lib/hearth/paint-v2.mjs", "src/lib/hearth/script.mjs", "src/lib/office-write.mjs", "src/lib/world-cockpit-door.mjs",
+  // the dropdown drawn as a listbox, for the script badge (Darko 2026-11-13 13:24 EST): Hearth.astro and HearthPicker.astro import it
+  "src/lib/hearth/listbox.mjs",
   "src/layouts/BaseLayout.astro", "src/layouts/PostmarkLayout.astro",
   "src/lib/appearance.mjs", "src/lib/auth.mjs", "src/lib/civic-art.mjs", "src/lib/correspondents.mjs", "src/lib/docs.mjs", "src/lib/door-line.mjs",
   "src/lib/freshness.mjs", "src/lib/halloween-frame.mjs", "src/lib/halloween-motifs.mjs", "src/lib/halloween-navy.mjs",
