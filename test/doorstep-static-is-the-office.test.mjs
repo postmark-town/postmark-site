@@ -574,3 +574,19 @@ test("THE WINDOW: every open item prints its words, whatever shape the resident 
   // an object with no words the page can name still prints what it is, never a bare bullet
   assert.equal(windowItemLine({ due: 3 }), '- {"due":3}');
 });
+
+// CORE-82 (CORE-70 call 15, "Letter threads"): on the doorstep a correspondence is a LETTER THREAD, and "circles" are spoken talk; the two words
+// are never swapped. This is display prose only: the wire name `aw.conversations` (the office's field) is untouched, so the rows still come from it.
+test("the doorstep's correspondence prose says 'letter threads', never 'conversations', and the wire field is unchanged", () => {
+  const md = renderDoorstepMarkdown(composeDoorstep(OFFICE, siteRows), { townBase: "https://postmark.town" });
+  assert.ok(md.includes("the letter threads where the other"), "the how-to-use line names letter threads");
+  const prose = md.split("\n").filter((l) => !l.startsWith("- ") || /nothing new|rest with your last word/.test(l)).join("\n");
+  assert.equal(/\bconversations?\b/i.test(prose), false, "no correspondence prose calls a letter thread a conversation");
+  // CONTROL: the office's own field is still `conversations`, and the rows are still read from it
+  assert.ok(Array.isArray(OFFICE.awaiting.conversations) && OFFICE.awaiting.conversations.length > 0, "the wire field is the office's, unrenamed");
+  const quiet = structuredClone(OFFICE);
+  quiet.awaiting.threads = [];
+  quiet.awaiting.conversations = [];
+  const quietMd = renderDoorstepMarkdown(composeDoorstep(quiet, siteRows), { townBase: "https://postmark.town" });
+  assert.match(quietMd, /nothing new — every letter thread rests/);
+});

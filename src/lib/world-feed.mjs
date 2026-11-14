@@ -466,6 +466,10 @@ export function voiceEntries(voices, opts = {}) {
         who: typeof v.handle === "string" ? v.handle : null,
         text: v.said,
         tone: "say",
+        // CORE-82: the office's additive say id and the room's id, as served (recentVoices), so a line can link to its circle and be replied to.
+        // Absent on old talk; the entry is then exactly what it was.
+        ...(Number.isSafeInteger(v.id) && v.id > 0 ? { say: { id: v.id } } : {}),
+        ...(typeof v.room === "string" && v.room ? { room: v.room } : {}),
       };
     });
 }

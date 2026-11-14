@@ -1232,6 +1232,71 @@ export function chatShaped(card) {
   return (card?.fields ?? []).every((f) => f === prose || !f.required);
 }
 
+// ── THE REPLY TARGET (CORE-82, CORE-70 call 3) ──────────────────────────────
+//
+// A say may answer another say: the act's optional `reply_to` is that say's act number (or { handle, at }). The cockpit never works a
+// reply link out. A reader PRESSES REPLY on a say the cockpit already shows, or the conversations page / the event page's circle reader
+// hands one in over `pm:reply-target`; either way the id is the one the OFFICE served on that say (the additive `id` on a flat say line),
+// and these functions only validate it, say it in words and attach it. Whether a reply was "linked by name" is the office's to say, in its
+// receipt (`said.note`), and is shown as served. The browser never guesses an id, never reads a name out of the words, never picks a parent.
+
+/** The field name the door's say card uses for the target. The cockpit asks the CARD whether it has it; no verb is named. */
+export const REPLY_FIELD = "reply_to";
+
+/** Does this act's card take a reply target? (Decided by the card the door sent, never by the act's name.) */
+export const takesReply = (card) => Array.isArray(card?.fields) && card.fields.some((f) => f?.name === REPLY_FIELD);
+
+/** The fields a FORM draws: the raw `reply_to` is never one of them (a person never types an id; the target drives it). */
+export const formFieldsOf = (card) => (Array.isArray(card?.fields) ? card.fields.filter((f) => f?.name !== REPLY_FIELD) : []);
+
+/**
+ * A reply target from whatever handed it in ({ id, handle, said, circle? }), or null. The id must be a whole number the office served: a
+ * string of digits is taken, anything else (a name, a time, a float, zero, negative) is refused, because a target the browser has to
+ * interpret is a target the browser is guessing.
+ */
+export function replyTargetOf(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const id = typeof raw.id === "number" ? raw.id : (typeof raw.id === "string" && /^[0-9]{1,15}$/.test(raw.id) ? Number(raw.id) : NaN);
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
+  const circle = Number.isSafeInteger(Number(raw.circle)) && Number(raw.circle) > 0 ? Number(raw.circle) : null;
+  return { id, handle: typeof raw.handle === "string" ? raw.handle : "", said: typeof raw.said === "string" ? raw.said : "", circle };
+}
+
+/** "replying to <handle>: <their words, cut at 80 characters>". Their words are content: the caller sets this with textContent or esc(). */
+export function replyWords(target) {
+  if (!target) return "";
+  const chars = [...String(target.said ?? "")];
+  const said = chars.length > 80 ? `${chars.slice(0, 80).join("")}…` : chars.join("");
+  return `replying to ${target.handle || "a say"}${said ? `: ${said}` : ""}`;
+}
+
+/** The act's args with `reply_to` added ONLY when a target is chosen, the card declares the field, and the args do not already name it. */
+export function withReplyTarget(args, card, target) {
+  const out = { ...(args ?? {}) };
+  if (target && takesReply(card) && !(REPLY_FIELD in out)) out[REPLY_FIELD] = target.id;
+  return out;
+}
+
+/**
+ * The office's own words about how a reply was linked, from a say receipt: `said.note` ("linked by name") and `said.id_note` (why there is no
+ * act number), shown exactly as served and never composed here. The receipt may sit at the body's top or under `result`.
+ */
+export function saidNotes(body) {
+  const said = [body?.said, body?.result?.said, body?.receipt?.said].find((s) => s && typeof s === "object") ?? null;
+  return [said?.note, said?.id_note].filter((n) => typeof n === "string" && n.trim()).map((n) => n.trim());
+}
+
+/**
+ * Where a spoken line in the feed links: its CIRCLE when the office served the say's id (`/conversations/#circle-<id>`, which the page
+ * resolves to that say's circle through the office), else the room's own anchor, else nowhere. Nothing here derives a circle.
+ */
+export function speechHref(entry) {
+  const id = replyTargetOf({ id: entry?.say?.id })?.id;
+  if (id) return `/conversations/#circle-${id}`;
+  const room = typeof entry?.room === "string" && entry.room ? entry.room : null;
+  return room ? `/conversations/#${encodeURIComponent(room)}` : null;
+}
+
 /**
  * What arrives already filled in, as `{ fieldName: value }`.
  *
@@ -1822,6 +1887,10 @@ export function recentVoices(body, opts = {}) {
       out.push({
         handle: typeof v.handle === "string" ? v.handle : "",
         said,
+        // THE OFFICE'S ADDITIVE SAY FIELDS (CORE-82), carried as served and never worked out: the say's act number, and the room's id
+        // (the conversations page's anchor). Old unthreaded talk carries neither, and the voice is then exactly what it was.
+        ...(Number.isSafeInteger(v.id) && v.id > 0 ? { id: v.id } : {}),
+        ...(typeof t.id === "string" && t.id ? { room: t.id } : {}),
         at: { x: v.x, y: v.y },
         ageMs: age,
         // 1 at the moment it was said, 0 as it leaves — the door's own fade,
