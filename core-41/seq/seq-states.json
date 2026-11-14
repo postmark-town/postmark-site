@@ -1,0 +1,84 @@
+{
+  "head": "952b0c18c3b0693775e3f245c7047d5aaa9a3735",
+  "viewport": "390x844 @2x, mobile, touch emulation (CDP Input.dispatchTouchEvent), headless Chrome",
+  "board": "invented: settlement DOWN, 2 min old",
+  "frames": [
+    {
+      "file": "seq-1-rest.png",
+      "what": "at rest: the red mark is shown, the popover is closed",
+      "state": {
+        "popoverOpen": false,
+        "ariaExpanded": "false",
+        "rows": [
+          "DOWNthe settlement — The latest World settlement is running late. It will show as soon as it's published."
+        ],
+        "coarsePointer": true,
+        "maxTouchPoints": 1
+      }
+    },
+    {
+      "file": "seq-2-after-one-tap.png",
+      "what": "0.9 s after ONE real tap on the mark: open, words readable",
+      "tap": {
+        "x": 306.171875,
+        "y": 42.984375
+      },
+      "state": {
+        "popoverOpen": true,
+        "ariaExpanded": "true",
+        "rows": [
+          "DOWNthe settlement — The latest World settlement is running late. It will show as soon as it's published."
+        ],
+        "coarsePointer": true,
+        "maxTouchPoints": 1
+      }
+    },
+    {
+      "file": "seq-3-still-open-2s-later.png",
+      "what": "3 s after the tap, no further input: still open (the base build had shut it by now)",
+      "state": {
+        "popoverOpen": true,
+        "ariaExpanded": "true",
+        "rows": [
+          "DOWNthe settlement — The latest World settlement is running late. It will show as soon as it's published."
+        ],
+        "coarsePointer": true,
+        "maxTouchPoints": 1
+      }
+    },
+    {
+      "file": "seq-4-tap-on-its-words.png",
+      "what": "a tap on the popover's own words: still open",
+      "tap": {
+        "x": 195,
+        "y": 151.828125
+      },
+      "state": {
+        "popoverOpen": true,
+        "ariaExpanded": "true",
+        "rows": [
+          "DOWNthe settlement — The latest World settlement is running late. It will show as soon as it's published."
+        ],
+        "coarsePointer": true,
+        "maxTouchPoints": 1
+      }
+    },
+    {
+      "file": "seq-5-outside-tap-dismissed.png",
+      "what": "a tap outside the mark and popover: dismissed",
+      "tap": {
+        "x": 200,
+        "y": 700
+      },
+      "state": {
+        "popoverOpen": false,
+        "ariaExpanded": "false",
+        "rows": [
+          "DOWNthe settlement — The latest World settlement is running late. It will show as soon as it's published."
+        ],
+        "coarsePointer": true,
+        "maxTouchPoints": 1
+      }
+    }
+  ]
+}
