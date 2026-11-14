@@ -15,6 +15,8 @@ const WORLD = { sha: "256db2fe02b4c786f4f6182629d896c38cd2b442", from: "package-
 // is the false all-clear this file exists to refuse. Fixtures that assert "no
 // notes" carry this for the same reason they carry WORLD.
 const NO_PROBLEMS = [];
+// …and, since POS-1034, the office index version the pass sampled before it built (the office's x-postmark-town-index-as-of: a town commit). Fixtures that assert "no notes" carry it too.
+const INDEX = "e".repeat(40);
 
 /** The served manifest, where a `gather()` fixture's problems list comes from. */
 function writeManifestAt(root, problems = []) {
@@ -38,7 +40,7 @@ test("the release lane stamps two shas on two different clocks", () => {
     codeRef: "release/2026-w35.1",
     townDataSha: "bbbbbbbbbbbbbbbb",
     townSha: "cccccccccccccccc",
-    crossing: 149,
+    crossing: 149, townIndexAsOf: INDEX,
     builtAt: AT,
     world: WORLD,
     problems: NO_PROBLEMS,
@@ -124,7 +126,7 @@ test("gather reads HEAD, not github.sha, and survives a git that will not answer
 test("the stamp names the TOWN record it read and the crossing it reflects", () => {
   const s = composeStamp({
     channel: "release", codeSha: "a".repeat(40), codeRef: "release/2026-w35.1",
-    townDataSha: "b".repeat(40), townSha: "c".repeat(40), crossing: 149, builtAt: AT, world: WORLD, problems: NO_PROBLEMS,
+    townDataSha: "b".repeat(40), townSha: "c".repeat(40), crossing: 149, townIndexAsOf: INDEX, builtAt: AT, world: WORLD, problems: NO_PROBLEMS,
   });
   assert.equal(s.town_sha, "c".repeat(40));
   assert.equal(s.crossing, 149);
@@ -137,7 +139,7 @@ test("crossing ZERO is a real crossing and must survive — the falsifier for a 
   // `if (crossing)` would drop 0, and 0 is the town's first ferry. The bug
   // would be invisible for the rest of the town's life and wrong on the one
   // day it mattered, which is exactly the kind that ships.
-  const s = composeStamp({ channel: "release", codeSha: "a", codeRef: "r", townDataSha: "b", townSha: "c", crossing: 0, builtAt: AT });
+  const s = composeStamp({ channel: "release", codeSha: "a", codeRef: "r", townDataSha: "b", townSha: "c", crossing: 0, townIndexAsOf: INDEX, builtAt: AT });
   assert.equal(s.crossing, 0);
   assert.deepEqual(s.notes.filter((n) => /crossing/.test(n)), [], "zero is known, not unknown");
 });
@@ -150,7 +152,7 @@ test("an unreachable office is null plus a note — NEVER crossing 0, which is a
   // ferries behind — a loud, confident lie, which is worse than the silence.
   for (const raw of ["", "   ", undefined, "not-a-number", "-3"]) {
     const s = gather({
-      env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), ...(raw === undefined ? {} : { BUILD_CROSSING: raw }) },
+      env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_TOWN_INDEX_AS_OF: INDEX, ...(raw === undefined ? {} : { BUILD_CROSSING: raw }) },
       exec: () => "a".repeat(40) + "\n",
       now: () => new Date(AT),
     });
@@ -161,7 +163,7 @@ test("an unreachable office is null plus a note — NEVER crossing 0, which is a
 
   // and a real number still gets through the same gate
   assert.equal(gather({
-    env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "149" },
+    env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "149", BUILD_TOWN_INDEX_AS_OF: INDEX },
     exec: () => "a".repeat(40) + "\n", now: () => new Date(AT),
   }).crossing, 149);
 });
@@ -170,7 +172,7 @@ test("a town sha that is not a sha is unknown, not repeated back", () => {
   // The box passes this through a shell too. A stamp that echoes "none" or a
   // half-written value would put it on the page as if it were a commit.
   for (const bad of [null, "", "none", "HEAD", "not a sha"]) {
-    const s = composeStamp({ channel: "release", codeSha: "a", codeRef: "r", townDataSha: "b", townSha: bad, crossing: 1, builtAt: AT });
+    const s = composeStamp({ channel: "release", codeSha: "a", codeRef: "r", townDataSha: "b", townSha: bad, crossing: 1, townIndexAsOf: INDEX, builtAt: AT });
     assert.equal(s.town_sha, null);
     assert.ok(s.notes.some((n) => /which town record it reflects/.test(n)));
   }
@@ -218,7 +220,7 @@ test("world_sha is read from the tree the stamper runs in — the BUILD tree, ne
   writeFileSync(join(main, "package-lock.json"), LOCK("ecc63613a063ca2e3da262c6306c34b72ae3b9f8"));
   writeFileSync(join(build, "package-lock.json"), LOCK(S63));
   writeManifestAt(build);   // a complete build also knows its fetch got everything (POS-180)
-  const env = { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "release/2026-w37.6", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "178" };
+  const env = { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "release/2026-w37.6", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "178", BUILD_TOWN_INDEX_AS_OF: INDEX };
   const s = gather({ env, exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root: build });
   assert.equal(s.world_sha, S63);
   assert.equal(s.world_from, "package-lock.json");
@@ -234,7 +236,7 @@ test("THE FALSIFIER: flip the lockfile's resolved sha and the stamp follows — 
   // must name the LOCK's sha — the compiled one — and never the spec's.
   writeFileSync(join(root, "package.json"), JSON.stringify({ dependencies: { "postmark-world": `github:postmark-town/postmark-world#${S63}` } }));
   writeFileSync(join(root, "package-lock.json"), LOCK(S63));
-  const read = () => gather({ env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "1" }, exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root });
+  const read = () => gather({ env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "1", BUILD_TOWN_INDEX_AS_OF: INDEX }, exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root });
   assert.equal(read().world_sha, S63);
   writeFileSync(join(root, "package-lock.json"), LOCK(TRAIN));
   assert.equal(read().world_sha, TRAIN, "the lockfile moved and the stamp did not — it would be reporting a world it did not compile");
@@ -260,7 +262,7 @@ test("readWorldSha falls back to the installed package only when the lockfile ca
 });
 
 test("world_ref is the lane's name for the world, or null — never derived from the sha", () => {
-  const base = { channel: "release", codeSha: "a", codeRef: "r", townDataSha: "b", townSha: "c".repeat(40), crossing: 1, builtAt: AT, world: WORLD, problems: NO_PROBLEMS };
+  const base = { channel: "release", codeSha: "a", codeRef: "r", townDataSha: "b", townSha: "c".repeat(40), crossing: 1, townIndexAsOf: INDEX, builtAt: AT, world: WORLD, problems: NO_PROBLEMS };
   assert.equal(composeStamp({ ...base, worldRef: "settlement/S63" }).world_ref, "settlement/S63");
   for (const empty of ["", "   ", null, undefined]) assert.equal(composeStamp({ ...base, worldRef: empty }).world_ref, null, `BUILD_WORLD_REF=${JSON.stringify(empty)} is "the lane did not say"`);
   // and a hold on the floor (the box script passes an empty ref) leaves the sha standing on its own
@@ -278,7 +280,7 @@ test("main writes world_sha and world_ref into the JSON the sentinel reads", () 
   console.log = (m) => logged.push(String(m));
   try {
     main(["node", "build-stamp.mjs", "--out", out], {
-      env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "release/2026-w37.6", BUILD_TOWN_DATA_SHA: "b".repeat(40), BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "178", BUILD_WORLD_REF: "settlement/S63" },
+      env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "release/2026-w37.6", BUILD_TOWN_DATA_SHA: "b".repeat(40), BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "178", BUILD_TOWN_INDEX_AS_OF: INDEX, BUILD_WORLD_REF: "settlement/S63" },
       exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root,
     });
   } finally { console.log = realLog; }
@@ -306,7 +308,7 @@ test("the problems list travels from the served manifest onto the stamp", () => 
   writeFileSync(join(root, "package-lock.json"), LOCK(S63));
   writeManifestAt(root, ['residents: the roll named "wright" and the card door answered 404 — HELD OVER']);
   const s = gather({
-    env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "203" },
+    env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "203", BUILD_TOWN_INDEX_AS_OF: INDEX },
     exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root,
   });
   assert.equal(s.problems.length, 1);
@@ -327,7 +329,7 @@ test("an UNREADABLE manifest is null plus a note — never [], which would be a 
   const root = mkdtempSync(join(tmpdir(), "build-stamp-noman-"));
   writeFileSync(join(root, "package-lock.json"), LOCK(S63));
   const s = gather({
-    env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "203" },
+    env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "203", BUILD_TOWN_INDEX_AS_OF: INDEX },
     exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root,
   });
   assert.equal(s.problems, null, "unread is not clean");
@@ -340,7 +342,7 @@ test("an UNREADABLE manifest is null plus a note — never [], which would be a 
   mkdirSync(join(root, "public", "atelier", "postmark", "data"), { recursive: true });
   writeFileSync(join(root, "public", "atelier", "postmark", "data", "index.json"), JSON.stringify({ as_of: "abc", endpoint_gaps: [] }));
   const old = gather({
-    env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "203" },
+    env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "203", BUILD_TOWN_INDEX_AS_OF: INDEX },
     exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root,
   });
   assert.equal(old.problems, null);
@@ -353,7 +355,7 @@ test("an EMPTY problems list leaves the stamp byte-compatible with today's reade
   // of them knows the new key.
   const before = composeStamp({
     channel: "release", codeSha: "a".repeat(40), codeRef: "release/2026-w40.1",
-    townDataSha: "b".repeat(40), townSha: "c".repeat(40), crossing: 203, builtAt: AT, world: WORLD,
+    townDataSha: "b".repeat(40), townSha: "c".repeat(40), crossing: 203, townIndexAsOf: INDEX, builtAt: AT, world: WORLD,
     worldRef: "settlement/S63", problems: [],
   });
   for (const key of ["schema", "channel", "built_at", "code_sha", "code_ref", "town_data_sha",
@@ -366,7 +368,7 @@ test("an EMPTY problems list leaves the stamp byte-compatible with today's reade
   const legacyKeys = Object.keys(before).filter((k) => k !== "problems");
   const legacy = composeStamp({
     channel: "release", codeSha: "a".repeat(40), codeRef: "release/2026-w40.1",
-    townDataSha: "b".repeat(40), townSha: "c".repeat(40), crossing: 203, builtAt: AT, world: WORLD,
+    townDataSha: "b".repeat(40), townSha: "c".repeat(40), crossing: 203, townIndexAsOf: INDEX, builtAt: AT, world: WORLD,
     worldRef: "settlement/S63", problems: [],
   });
   for (const k of legacyKeys) assert.deepEqual(legacy[k], before[k]);
@@ -381,7 +383,7 @@ test("main writes problems into the JSON the sentinel reads, and names the count
   console.log = (m) => logged.push(String(m));
   try {
     main(["node", "build-stamp.mjs", "--out", out], {
-      env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "release/2026-w40.1", BUILD_TOWN_DATA_SHA: "b".repeat(40), BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "203" },
+      env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "release/2026-w40.1", BUILD_TOWN_DATA_SHA: "b".repeat(40), BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "203", BUILD_TOWN_INDEX_AS_OF: INDEX },
       exec: () => "a".repeat(40) + "\n", now: () => new Date(AT), root,
     });
   } finally { console.log = realLog; }
@@ -391,4 +393,55 @@ test("main writes problems into the JSON the sentinel reads, and names the count
   assert.ok(logged.some((l) => /problems 1/.test(l)),
     "the box journal answers the question without curl — the same courtesy the world line already pays");
   assert.ok(logged.some((l) => /problem: bulletin:/.test(l)), "and it prints the line itself, not only the count");
+});
+
+// ── POS-1034: the office index version the build sampled ────────────────────
+const tmpTree = () => mkdtempSync(join(tmpdir(), "build-stamp-idx-"));
+//
+// Meddy's page was missing from a build whose town_sha was current: the site builds its resident lists from the OFFICE's API, which reads the office's town index, and
+// nothing on the stamp said how current that was. `town_index_as_of` is the version the refresh pass sampled before building, carried from that pass.
+
+test("POS-1034 · the stamp names the office index version the pass sampled, next to town_sha, and nothing else moves", () => {
+  const base = { channel: "release", codeSha: "a", codeRef: "r", townDataSha: "b", townSha: "c".repeat(40), crossing: 1, builtAt: AT, world: WORLD, problems: NO_PROBLEMS };
+  const s = composeStamp({ ...base, townIndexAsOf: INDEX });
+  assert.equal(s.town_index_as_of, INDEX);
+  assert.equal(s.town_sha, "c".repeat(40));
+  assert.deepEqual(s.notes, [], "a complete release build, index version included, says nothing is missing");
+  // the field sits right after the crossing, beside town_sha's family (a reader of the JSON finds them together)
+  const keys = Object.keys(s);
+  assert.equal(keys[keys.indexOf("crossing") + 1], "town_index_as_of");
+});
+
+test("POS-1034 · THE FALSIFIER: an unknown index version is null plus a note — never a stand-in, never today's date, never a number a shell's empty string parses to", () => {
+  const base = { channel: "release", codeSha: "a", codeRef: "r", townDataSha: "b", townSha: "c".repeat(40), crossing: 1, builtAt: AT, world: WORLD, problems: NO_PROBLEMS };
+  for (const raw of [undefined, null, "", "   ", "two words", "x".repeat(81), "a\nb", "<script>"]) {
+    const s = composeStamp({ ...base, townIndexAsOf: raw });
+    assert.equal(s.town_index_as_of, null, `${JSON.stringify(raw)} is unknown`);
+    assert.ok(s.notes.some((n) => /office index version/.test(n)), `${JSON.stringify(raw)} says so in notes`);
+  }
+  // an older caller that does not pass it at all: the old stamp plus the null and its note, no failure
+  const old = composeStamp(base);
+  assert.equal(old.town_index_as_of, null);
+  assert.equal(old.channel, "release");
+  assert.equal(old.crossing, 1);
+});
+
+test("POS-1034 · gather() carries BUILD_TOWN_INDEX_AS_OF from the pass's environment; unset or blank (the box's empty `$(index_as_of)`) is unknown, and the snapshot lane stays quiet", () => {
+  const env = { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "7" };
+  const root = tmpTree();
+  const run = (extra) => gather({ env: { ...env, ...extra }, exec: () => "a".repeat(40), now: () => new Date(AT), root });
+  assert.equal(run({ BUILD_TOWN_INDEX_AS_OF: INDEX }).town_index_as_of, INDEX);
+  assert.equal(run({}).town_index_as_of, null);
+  assert.equal(run({ BUILD_TOWN_INDEX_AS_OF: "" }).town_index_as_of, null);
+  const dev = gather({ env: { PUBLIC_CHANNEL: "snapshot", BUILD_CODE_REF: "main" }, exec: () => "a".repeat(40), now: () => new Date(AT), root });
+  assert.equal(dev.town_index_as_of, null);
+  assert.deepEqual(dev.notes.filter((n) => /office index version/.test(n)), [], "the snapshot lane has no box refresh asking the office: no standing complaint");
+});
+
+test("POS-1034 · main() writes town_index_as_of into the build.json the sentinel reads", () => {
+  const root = tmpTree();
+  const out = join(root, "dist-town", "build.json");
+  const realLog = console.log; console.log = () => {};
+  try { main(["node", "build-stamp.mjs", "--out", out], { env: { PUBLIC_CHANNEL: "release", BUILD_CODE_REF: "r", BUILD_TOWN_DATA_SHA: "b", BUILD_TOWN_SHA: "c".repeat(40), BUILD_CROSSING: "7", BUILD_TOWN_INDEX_AS_OF: INDEX }, exec: () => "a".repeat(40), now: () => new Date(AT), root }); } finally { console.log = realLog; }
+  assert.equal(JSON.parse(readFileSync(out, "utf8")).town_index_as_of, INDEX);
 });
