@@ -55,6 +55,11 @@
 //        BUILD_CROSSING         that moment in ferry crossings, asked of the
 //                               office (GET /api/ -> crossing.number). Never
 //                               derived here: one clock, and it is the office's.
+//        BUILD_TOWN_INDEX_AS_OF the office's town-index version this build's refresh pass
+//                               SAMPLED before it built (GET /api/residents' header
+//                               x-postmark-town-index-as-of; POS-1034). A sampled value,
+//                               not a snapshot guarantee: the build read the office's API
+//                               over minutes, and the stamp says what the pass saw first.
 //        BUILD_WORLD_REF        the settlement tag the world was advanced to,
 //                               when the lane knows it (settlement/S63); empty
 //                               or unset otherwise. NEVER the sha — see below.
@@ -102,7 +107,7 @@ export const SCHEMA = 1;
  * wrong is worse than one that admits it cannot say, because the watcher
  * downstream believes it.
  */
-export function composeStamp({ channel, codeSha, codeRef, townDataSha, townSha, crossing, builtAt, world = null, worldRef = null, problems = null, settlement = null }) {
+export function composeStamp({ channel, codeSha, codeRef, townDataSha, townSha, crossing, townIndexAsOf = null, builtAt, world = null, worldRef = null, problems = null, settlement = null }) {
   const notes = [];
   const lane = channel === "release" || channel === "snapshot" ? channel : null;
   if (!lane) notes.push("PUBLIC_CHANNEL was not release or snapshot, so the lane is unknown");
@@ -158,6 +163,18 @@ export function composeStamp({ channel, codeSha, codeRef, townDataSha, townSha, 
     if (cross === null) notes.push("no crossing number for this build — the office was not reachable when it was made, so the page cannot say which ferry crossing it reflects");
   }
 
+  // ── THE OFFICE INDEX THE PAGES WERE BUILT FROM (POS-1034) ─────────────────
+  //
+  // `town_sha` says what the site's CHECKOUT of the town was; it does not say how current the OFFICE data was that the resident and household lists were built from
+  // (tools/fetch-town.mjs walks the office's GET /api/residents, which reads the office's own town index, refreshed on its own timer). Meddy's page was missing from a
+  // build whose town_sha was current, and the stamp could not say why. `town_index_as_of` is the index version the refresh pass SAMPLED before it built, carried from that
+  // pass (not a later look). Absent-not-guessed, like every field here: unset, blank or unreadable is null plus a note, never a stand-in, and (release lane only, for the
+  // reason above) the note says the pass could not tell how current the office's index was.
+  const indexRaw = String(townIndexAsOf ?? "").trim();
+  const indexAsOf = /^[A-Za-z0-9._:+-]{1,80}$/.test(indexRaw) ? indexRaw : null;
+  if (lane === "release" && indexAsOf === null)
+    notes.push("this build did not report the office index version it sampled — the page cannot say how current the office's resident list was when it was built");
+
   // ── THE WORLD, ON BOTH LANES ──────────────────────────────────────────────
   //
   // Unlike the town fields this is noted on the snapshot lane too: dev serves
@@ -189,6 +206,7 @@ export function composeStamp({ channel, codeSha, codeRef, townDataSha, townSha, 
     town_data_from: dataFrom,
     town_sha: town,
     crossing: cross,
+    town_index_as_of: indexAsOf,
     // The postmark-world this build compiled the /world/ page from, read from
     // the build tree's own lockfile; and the settlement tag's name for it when
     // the lane advanced to one (null is "the lane did not say", never a guess).
@@ -303,6 +321,7 @@ export function gather({ env = process.env, exec = execFileSync, now = () => new
     townDataSha: env.BUILD_TOWN_DATA_SHA ?? null,
     townSha: env.BUILD_TOWN_SHA ?? null,
     crossing: /^\d+$/.test(rawCrossing) ? Number(rawCrossing) : null,
+    townIndexAsOf: env.BUILD_TOWN_INDEX_AS_OF ?? null,
     builtAt: now().toISOString(),
     world: readWorldSha(read ? { root, read } : { root }),
     worldRef: env.BUILD_WORLD_REF ?? null,
