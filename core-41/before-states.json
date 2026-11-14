@@ -1,4 +1,18 @@
 {
+  "desktop-1280-mixed": {
+    "open": true,
+    "rows": [
+      "DOWNthe box's site refresh — failed: SNAPSHOT SHORT — residents.json keeps 134 rows; the checkout has 182 households; 48 doors are missing (postmark-telemetry SHIPPING.md § 9; /srv/postmark-site-refresh)",
+      "STALEthe box's root disk — at 91% used. Look at /tmp, /srv/postmark-site-refresh and /srv/world2-lab first"
+    ]
+  },
+  "phone-390-tap-mixed": {
+    "open": false,
+    "rows": [
+      "DOWNthe box's site refresh — failed: SNAPSHOT SHORT — residents.json keeps 134 rows; the checkout has 182 households; 48 doors are missing (postmark-telemetry SHIPPING.md § 9; /srv/postmark-site-refresh)",
+      "STALEthe box's root disk — at 91% used. Look at /tmp, /srv/postmark-site-refresh and /srv/world2-lab first"
+    ]
+  },
   "desktop-fresh": {
     "open": true,
     "rows": [

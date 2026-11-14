@@ -1,4 +1,18 @@
 {
+  "desktop-1280-mixed": {
+    "open": true,
+    "rows": [
+      "DOWNthe site's rebuild — The site isn't rebuilding as it should, so its pages may be out of date. 48 households' pages are missing from the site.",
+      "STALEthe server — The server is running low on space."
+    ]
+  },
+  "phone-390-tap-mixed": {
+    "open": true,
+    "rows": [
+      "DOWNthe site's rebuild — The site isn't rebuilding as it should, so its pages may be out of date. 48 households' pages are missing from the site.",
+      "STALEthe server — The server is running low on space."
+    ]
+  },
   "desktop-fresh": {
     "open": true,
     "rows": [
