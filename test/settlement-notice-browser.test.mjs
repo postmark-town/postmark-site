@@ -34,7 +34,9 @@ const BASE_URL = process.env.SETTLEMENT_NOTICE_BASE_URL || null;
 const WORDS = "The latest World settlement is running late. It will show here as soon as it's published.";
 const GLYPH_WORDS = "The latest World settlement is running late. It will show as soon as it's published.";   // the header mark's row (no "here": it is never on the World page)
 
-const builtPages = existsSync(join(DIST, "index.html")) && existsSync(join(DIST, "world", "index.html"));
+const MAYBE_WORDS = "The latest World settlement may be running late. It will show as soon as it's published.";   // the same row when the board cannot call it late (STALE, an old board)
+
+const builtPages =existsSync(join(DIST, "index.html")) && existsSync(join(DIST, "world", "index.html"));
 const SKIP = BASE_URL || builtPages ? false : "no built pages (dist-town/) and no SETTLEMENT_NOTICE_BASE_URL: nothing to render";
 
 function findChrome() {
@@ -117,12 +119,13 @@ async function launch(chrome) {
   };
 }
 
-async function openPage(b, base, path, { width, height = 900, board, walkers = null }) {
+async function openPage(b, base, path, { width, height = 900, board, walkers = null, touch = false }) {
   const { targetId } = await b.send("Target.createTarget", { url: "about:blank" });
   const { sessionId } = await b.send("Target.attachToTarget", { targetId, flatten: true });
   const S = (m, p) => b.send(m, p, sessionId);
   await S("Page.enable");
   await S("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 600 });
+  if (touch) await S("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });   // touch EMULATION: real input events, not a phone (CORE-41)
   // THE FORCED BOARD: this test answers /ops/sentinel.json. `board.body()` is read at request time, so a step can change it.
   // `walkers` (invented handles, no position) is answered for the viewer's by-mail list, so the button has names to show.
   await S("Fetch.enable", { patterns: [{ urlPattern: "*/ops/sentinel.json*", requestStage: "Request" }, ...(walkers ? [{ urlPattern: "*/api/*", requestStage: "Request" }] : [])] });
@@ -152,7 +155,29 @@ async function openPage(b, base, path, { width, height = 900, board, walkers = n
     for (const t0 = Date.now(); Date.now() - t0 < ms;) { if (await evalJs(predicateJs)) return; await new Promise((ok) => setTimeout(ok, 100)); }
     throw new Error(`timed out waiting for ${what}`);
   };
-  return { evalJs, until, close: async () => { b.listeners.splice(b.listeners.indexOf(listener), 1); await b.send("Target.closeTarget", { targetId }).catch(() => {}); } };
+  // REAL INPUT at a point, through the browser's own input pipeline (CORE-41): a touch tap (touchStart, touchEnd: the browser makes the
+  // focus and the click itself) or a coordinate mouse click. `centre` is an element's middle, so a tap lands where a finger would.
+  const centre = async (selector) => {
+    const c = await evalJs(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    return c;
+  };
+  const tapAt = async (x, y) => {
+    await S("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    await S("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await new Promise((ok) => setTimeout(ok, 350));   // the whole gesture, the synthesised click and any handler it wakes
+  };
+  const clickAt = async (x, y) => {
+    await S("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+    await S("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
+    await S("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 });
+    await new Promise((ok) => setTimeout(ok, 350));
+  };
+  const key = async (k, code) => {
+    await S("Input.dispatchKeyEvent", { type: "keyDown", key: k, code, windowsVirtualKeyCode: k === "Escape" ? 27 : 9 });
+    await S("Input.dispatchKeyEvent", { type: "keyUp", key: k, code, windowsVirtualKeyCode: k === "Escape" ? 27 : 9 });
+    await new Promise((ok) => setTimeout(ok, 250));
+  };
+  return { evalJs, until, send: S, centre, tapAt, clickAt, key, close: async () => { b.listeners.splice(b.listeners.indexOf(listener), 1); await b.send("Target.closeTarget", { targetId }).catch(() => {}); } };
 }
 
 const state = { bodyFn: () => null, reads: 0 };
@@ -263,6 +288,104 @@ for (const [name, path] of PAGES) {
   });
 }
 
+// ── THE RED MARK ON A PHONE TAP (CORE-41) ────────────────────────────────────────────────────────────────────────────────────────
+// Wright, 2026-11-14: "On a phone, tapping the site's red '!' mark opens it and keeps it open until it's dismissed, so its words can
+// be read." The oracle is a REAL tap through the browser's input pipeline (Input.dispatchTouchEvent on a touch-emulating 390 px view:
+// the browser raises the focus, then the click, itself), never element.click(), which skips focus and so skipped the bug. Touch
+// EMULATION is not a phone: no test here is a physical-phone pass.
+const OPEN = `(${GLYPH})?.open === true`, SHUT = `(${GLYPH})?.open === false`;
+const outsidePoint = `(() => { const pt = [[200, 700], [60, 600], [300, 500], [195, 850]].find(([x, y]) => { const e = document.elementFromPoint(x, y); return e && !e.closest("[data-pm-alert]") && !e.closest("a[href], button, input, summary"); }); return pt ? { x: pt[0], y: pt[1] } : null; })()`;
+
+test("a PHONE TAP (390 px, touch, a real tap) on the red mark opens its popover and LEAVES IT OPEN with the words readable; the next tap, or a tap outside, shuts it", { skip: SKIP, timeout: 120_000 }, async () => {
+  await boot();
+  state.bodyFn = fresh("DOWN");
+  const p = await openPage(browser, base, "/", { width: 390, board, touch: true });
+  try {
+    await p.until(`(${GLYPH})?.shown === true`, "the red mark at 390 px");
+    assert.equal(await p.evalJs(`navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches`), true, "the view is touch-emulating (a coarse pointer), so the tap below is a touch");
+    const g0 = await p.centre("[data-pm-alert-glyph]");
+    // 1. one tap opens, and it is STILL open a second later (at base the tap's focus opened it and its click shut it in the same gesture)
+    await p.tapAt(g0.x, g0.y);
+    await new Promise((ok) => setTimeout(ok, 800));
+    assert.equal((await p.evalJs(GLYPH)).open, true, "one real tap opens the popover and it stays open");
+    const g = await p.evalJs(GLYPH);
+    assert.ok(g.rows.some((r) => r.endsWith(GLYPH_WORDS)), `its words are there to read (${JSON.stringify(g.rows)})`);
+    assert.ok(g.pop.left >= 0 && g.pop.right <= 390, `and inside the 390 px view (left ${g.pop.left}, right ${g.pop.right})`);
+    assert.equal(await p.evalJs(`document.querySelector("[data-pm-alert-glyph]").getAttribute("aria-expanded")`), "true");
+    // a tap INSIDE the popover (to read, or to select its words) keeps it open
+    const row = await p.centre(".pm-alert-row");
+    await p.tapAt(row.x, row.y);
+    assert.equal((await p.evalJs(GLYPH)).open, true, "a tap on its own words does not close it");
+    // 2. the next tap on the mark closes it: a later deliberate tap is NOT swallowed
+    await p.tapAt(g0.x, g0.y);
+    assert.equal((await p.evalJs(GLYPH)).open, false, "the next tap on the mark shuts it");
+    assert.equal(await p.evalJs(`document.querySelector("[data-pm-alert-glyph]").getAttribute("aria-expanded")`), "false");
+    // ... and the one after that opens it again, so every tap does what it says
+    await p.tapAt(g0.x, g0.y);
+    assert.equal((await p.evalJs(GLYPH)).open, true, "a third tap opens it again");
+    // 3. a tap outside shuts it
+    const out = await p.evalJs(outsidePoint);
+    assert.ok(out, "found a plain point outside the mark and the popover");
+    await p.tapAt(out.x, out.y);
+    assert.equal((await p.evalJs(GLYPH)).open, false, "a tap outside dismisses it");
+    // and a tap on the mark after an outside dismissal opens it first time (no swallowed tap)
+    await p.tapAt(g0.x, g0.y);
+    assert.equal((await p.evalJs(GLYPH)).open, true, "and the next tap on the mark opens it, none swallowed");
+  } finally { await p.close(); }
+});
+
+test("EVERY WORD IN THE POPOVER is plain, through the real popover on a real tap: a non-settlement row and the sentinel's headline say resident words, keep the missing-door count, and name no repo, section, path or timestamp", { skip: SKIP, timeout: 120_000 }, async () => {
+  await boot();
+  const OP = "failed: SNAPSHOT SHORT — residents.json keeps 134 rows; the checkout has 182 households; 48 doors are missing (postmark-telemetry SHIPPING.md § 9; /srv/postmark-site-refresh)";
+  state.bodyFn = () => JSON.stringify({
+    schema: 1, generated_at: new Date(Date.now() - 2 * 60_000).toISOString(), status: "DOWN",
+    headline: "DOWN · 2 down, 0 stale, 12 green. 1 parked (see the board). (2026-11-14T06:00:00.000Z) postmark-telemetry SHIPPING.md § 9",
+    probes: [{ key: "site_home", verdict: "OK" },
+      { key: "site_refresh", label: "the box's site refresh", kind: "refresh", verdict: "DOWN", reason: "the box's site refresh " + OP, detail: OP },
+      { key: "disk_root", label: "the box's root disk", kind: "disk", verdict: "STALE", reason: "at 91% used. Look at /tmp, /srv/postmark-site-refresh and /srv/world2-lab first" }],
+  });
+  const p = await openPage(browser, base, "/", { width: 390, board, touch: true });
+  try {
+    await p.until(`(${GLYPH})?.shown === true`, "the red mark");
+    const c = await p.centre("[data-pm-alert-glyph]");
+    await p.tapAt(c.x, c.y);
+    await p.until(OPEN, "the popover to open on a real tap");
+    const said = await p.evalJs(`(() => { const pop = document.querySelector("[data-pm-alert-pop]"); return { text: pop.innerText.replace(/\\s+/g, " ").trim(), headline: pop.querySelector("[data-pm-alert-headline]").textContent, rows: [...pop.querySelectorAll(".pm-alert-row")].map((l) => l.textContent.replace(/\\s+/g, " ").trim()) }; })()`);
+    assert.equal(said.headline, "2 things aren't working as they should.", "the headline is plain (not the sentinel's), and true of rows that are not pages");
+    assert.equal(said.rows.length, 2);
+    assert.ok(said.rows[0].endsWith("the site's rebuild — The site isn't rebuilding as it should, so its pages may be out of date. 48 households' pages are missing from the site."), `the refresh row keeps its count in plain words (${said.rows[0]})`);
+    assert.ok(said.rows[1].endsWith("the server — The server is running low on space."), `the disk row (${said.rows[1]})`);
+    assert.ok(!/SHIPPING|postmark-telemetry|§|\/srv|\/tmp|residents\.json|checkout|SNAPSHOT|green|see the board|2026-|sweep|box's/i.test(said.text), `no operator word anywhere in the popover (${said.text})`);
+  } finally { await p.close(); }
+});
+
+test("KEYBOARD and DESKTOP MOUSE are unchanged: Tab to the mark opens it, Escape shuts it; hovering opens it and leaving shuts it; a click is a toggle", { skip: SKIP, timeout: 120_000 }, async () => {
+  await boot();
+  state.bodyFn = fresh("DOWN");
+  const p = await openPage(browser, base, "/", { width: 1280, board });
+  try {
+    await p.until(`(${GLYPH})?.shown === true`, "the red mark at 1280 px");
+    // keyboard: real Tab presses until the mark has focus
+    for (let i = 0; i < 40 && !(await p.evalJs(`document.activeElement === document.querySelector("[data-pm-alert-glyph]")`)); i += 1) await p.key("Tab", "Tab");
+    assert.equal(await p.evalJs(`document.activeElement === document.querySelector("[data-pm-alert-glyph]")`), true, "Tab reached the mark");
+    assert.equal((await p.evalJs(GLYPH)).open, true, "keyboard focus opens the popover");
+    await p.key("Escape", "Escape");
+    assert.equal((await p.evalJs(GLYPH)).open, false, "Escape shuts it");
+    await p.evalJs(`document.activeElement && document.activeElement.blur(); true`);
+    // mouse: hover opens, leaving shuts
+    const c = await p.centre("[data-pm-alert-glyph]");
+    await p.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: c.x, y: c.y });
+    await p.until(OPEN, "the popover to open on hover");
+    await p.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 640, y: 700 });
+    await p.until(SHUT, "the popover to shut when the pointer leaves");
+    // mouse click: a toggle, as on base (hover opened it, so the click shuts it; a second click opens it)
+    await p.clickAt(c.x, c.y);
+    const afterFirst = (await p.evalJs(GLYPH)).open;
+    await p.clickAt(c.x, c.y);
+    assert.notEqual((await p.evalJs(GLYPH)).open, afterFirst, "two real clicks leave the popover in opposite states: a click toggles");
+  } finally { await p.close(); }
+});
+
 // ── THE FRONT PAGE: no line of its own; a late settlement is the header's red mark (Darko, 2026-11-12 09:06 EST) ─────────────
 // Until 2026-11-12 these asserted a notice line below the live ticker and above the hero, that never stepped aside for the World's lists.
 
@@ -313,6 +436,11 @@ test("the front page: CONTROLS, the plain words appear for a fresh settlement DO
       const g = await p.evalJs(GLYPH);
       assert.equal(g.shown, lit, `${label}: the mark ${lit ? "shows" : "does not show"}`);
       assert.ok(!g.rows.some((r) => r.includes(GLYPH_WORDS)), `${label}: no plain settlement line (${JSON.stringify(g.rows)})`);
+      // CORE-41: a bad settlement the board cannot call late is still said in plain words ("may be"), never the sentinel's reason
+      if (label === "STALE" || label === "a 25-minute-old DOWN") {
+        assert.ok(g.rows.some((r) => r.endsWith("the settlement — " + MAYBE_WORDS)), `${label}: the hedged plain line (${JSON.stringify(g.rows)})`);
+        assert.ok(!g.rows.some((r) => r.includes("forced by the test")), `${label}: the probe's own reason is not shown`);
+      }
       assert.equal(await p.evalJs(`document.querySelectorAll("[data-settlement-notice]").length`), 0, `${label}: no notice line`);
     } finally { await p.close(); }
   }
