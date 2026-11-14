@@ -55,6 +55,84 @@ export function humanAge(ms) {
   return `${Math.floor(h / 24)} d`;
 }
 
+// ── THE WORDS (CORE-41) ────────────────────────────────────────────────────────────────────────────────────────────────────────
+// What a resident reads for each bad probe: a short topic and one sentence, by the probe's `key`, then its `kind`, then the
+// generic line. They say the CONDITION and what it means for the reader, and they carry no operator instruction, private repo,
+// section, path, command or timestamp. The board's own `reason`/`detail` are never printed (see alertFromBoard); the only things
+// taken out of them are the counts in COUNTS below, which are numbers a resident can use.
+
+/** The line for a probe this file has no words for (a new probe, an unknown kind): nothing from the board is printed. */
+export const GENERIC_ROW = { label: "part of the town", detail: "Part of the town isn't working as it should." };
+
+// An entry is `{ label, detail }`, or `{ label, DOWN, STALE }` when the producer's two bad verdicts mean different things (DOWN: it
+// reports a fault; STALE: it has not reported). A sentence says only what the board establishes: no cause, and no word that someone
+// is already fixing it. Every lookup below is an OWN-property read (`own`): a probe whose key or kind is `constructor` or `__proto__`
+// is an unknown probe, never a table hit and never a throw.
+const own = (table, k) => (typeof k === "string" && Object.hasOwn(table, k) ? table[k] : undefined);
+
+const UP = (what) => ({ label: what, detail: "It isn't loading as it should right now." });
+const BY_KEY = {
+  site_home: UP("the town's front page"),
+  site_daily: UP("the Daily page"),
+  site_world: UP("the World page"),
+  site_bulletin: UP("the bulletin"),
+  office_api: { label: "the town's office", detail: "It isn't answering as it should, so signing in and sending mail may not work right now." },
+  site_crossing: { label: "the site's crossing", detail: "The site is showing an older crossing than the town's latest." },
+  site_code: { label: "the site", detail: "The site is running older code than it should." },
+  site_town_data: { label: "the town's data on the site", detail: "The site is showing older town data than the town has." },
+  office_as_of: { label: "the town's records", detail: "The town's records are behind, so the newest changes may not show yet." },
+  site_daily_content: { label: "Ferry's Daily", detail: "The Daily on the site isn't the latest one." },
+  usdc_watch: { label: "payment checks", detail: "A background check on payments hasn't run when it should." },
+  stripe_watch: { label: "payment checks", detail: "A background check on payments hasn't run when it should." },
+  town_clone: { label: "the town's records", detail: "The office's copy of the town isn't in the state it should be, so the newest changes may not show yet." },
+  disk_root: { label: "the server", detail: "The server is running low on space." },
+  // the helper watch: DOWN is the record REPORTING a problem; STALE is the record missing, unreadable or old
+  meeps: { label: "the town's helpers", DOWN: "The town's helper agents are reporting a problem.", STALE: "The watch on the town's helper agents hasn't reported in lately." },
+  // the law pen: DOWN is a refused law, a held pin or a bad last run; STALE is a pen that has not run or has stopped writing
+  law_pen: { label: "the town's law", DOWN: "A change to the town's law isn't taking effect right now.", STALE: "The check on the town's law hasn't reported in lately, so a recent change may not have taken effect yet." },
+  // the site's own Deploy workflow (kind "workflow" is shared with the Linear handler's per-repo rows, which are operator tooling and
+  // say nothing about the site: those, and any other workflow key, are unknown probes and get the generic line)
+  workflow_deploy: { label: "the site's updates", detail: "The site's last automatic update didn't go through, so a recent change may not have reached it." },
+  // PUBLISHED, but its build could not get N things: not a freshness probe, though its kind is "fresh"
+  site_build_problems: { label: "the site's build", detail: "The site was published without everything it asked for, so some pages may be missing details." },
+};
+// By kind only where the kind alone is unambiguous. "workflow" and "fresh" are NOT here: each is shared by probes that mean
+// different things, so a key this file does not know under them is the generic line.
+const BY_KIND = {
+  watcher: { label: "a background check", detail: "A background check hasn't run when it should." },
+  refresh: { label: "the site's rebuild", detail: "The site isn't rebuilding as it should, so its pages may be out of date." },
+  up: { label: "a page", detail: "It isn't loading as it should right now." },
+};
+// The counts a resident can use, read out of the operator's prose (never the prose itself). Each takes the probe's `reason` and
+// `detail` text and answers a sentence, or null.
+const COUNTS = {
+  refresh: (s) => {
+    const m = /(\d[\d,]*)\s+doors?\s+(?:is|are)\s+missing/i.exec(s);
+    return m ? `${m[1]} ${m[1] === "1" ? "household's page is" : "households' pages are"} missing from the site.` : null;
+  },
+  site_build_problems: (s) => {
+    const m = /with (\d+) problems?/i.exec(s);
+    return m ? `${m[1]} ${m[1] === "1" ? "thing" : "things"} couldn't be fetched.` : null;
+  },
+};
+
+/** `{ label, detail }`, in resident words, for one bad probe. Pure; never throws; never returns a board string. */
+export function plainRow(p, { lateSettlement = false } = {}) {
+  const key = typeof p?.key === "string" ? p.key : "";
+  const kind = typeof p?.kind === "string" ? p.kind : "";
+  if (key === SETTLEMENT_PROBE_KEY) {
+    return { label: "the settlement", detail: lateSettlement && p.verdict === "DOWN" ? SETTLEMENT_LATE_LINE : SETTLEMENT_MAYBE_LATE_LINE };
+  }
+  // the refresh probe is known by its key as well as its kind, so a board that omits `kind` still gets its words
+  const as = key === "site_refresh" ? "refresh" : kind;
+  const base = own(BY_KEY, key) ?? own(BY_KIND, as) ?? GENERIC_ROW;
+  const known = base !== GENERIC_ROW;
+  const said = (typeof base.detail === "string" ? base.detail : own(base, p?.verdict)) ?? GENERIC_ROW.detail;
+  const prose = `${typeof p?.reason === "string" ? p.reason : ""}\n${typeof p?.detail === "string" ? p.detail : ""}`;
+  const counted = known ? (own(COUNTS, key) ?? own(COUNTS, as))?.(prose) ?? null : null;
+  return { label: base.label, detail: counted ? `${said} ${counted}` : said };
+}
+
 /**
  * What the header should show for this board.
  *
@@ -86,25 +164,28 @@ export function alertFromBoard(board, { nowMs = Date.now() } = {}) {
     if (p == null || typeof p !== "object") continue;
     if (!SENTINEL_BAD.has(p.verdict)) continue;
     const sinceMs = typeof p.since === "number" ? p.since : Date.parse(p.since ?? "");
+    // EVERY ROW IS IN RESIDENT WORDS (CORE-41; Wright, 2026-11-12: "Whoever fixes the tap gives every resident-facing reason in that
+    // popover plain words, with no private repo or section named"). A probe's own `reason` and `detail` are the sentinel's operator
+    // prose (they name private repos, sections, paths and commands), so they are NEVER printed: plainRow says the condition in
+    // resident words by the probe's key and kind, takes only the COUNTS it recognises out of that prose, and anything it does not
+    // know says the generic line. A settlement that is bad but cannot be called late (STALE, a board over BOARD_MAX_AGE_MS old, or
+    // one dated ahead of a visitor's clock) says it MAY be.
+    const plain = plainRow(p, { lateSettlement: late });
     rows.push({
       key: typeof p.key === "string" ? p.key : null,
       verdict: p.verdict,
-      label: typeof p.label === "string" && p.label !== "" ? p.label : (p.key ?? "a probe"),
-      reason: typeof p.reason === "string" ? p.reason : "",
-      // `detail` is the refresh report's own sentence, carried onto the board by
-      // the office's site_refresh probe so this popover can say "48 doors are
-      // missing" rather than only "failed". For a late settlement it is the
-      // plain line above.
-      detail: late && p.key === SETTLEMENT_PROBE_KEY ? SETTLEMENT_LATE_LINE
-        : (typeof p.detail === "string" && p.detail !== "" ? p.detail : null),
+      label: plain.label,
+      reason: "",
+      detail: plain.detail,
       age: Number.isFinite(sinceMs) ? humanAge(nowMs - sinceMs) : null,
     });
   }
   if (rows.length === 0) return none;
 
-  const headline = typeof board.headline === "string" && board.headline !== ""
-    ? board.headline
-    : (typeof board.summary === "string" ? board.summary : null);
+  // The board's own headline is the sentinel's operator summary ("DOWN · 1 down, 13 green … (see the board) (2026-…Z)"): it is
+  // not printed. The popover opens with a plain count of what is not right, which is the rows below it. The rows are not all pages
+  // (a disk, payment checks, the helpers, the law), so the count says "things", never "pages".
+  const headline = rows.length === 1 ? "One thing isn't working as it should." : `${rows.length} things aren't working as they should.`;
 
   return {
     show: true,
@@ -149,6 +230,10 @@ export const SETTLEMENT_NOTICE_TEXT = "The latest World settlement is running la
 /** The same words for the header glyph's row (alertFromBoard, above), less "here": the glyph is on the front page and every other
  *  layout page, never on the World page, which is where the settlement shows. */
 export const SETTLEMENT_LATE_LINE = "The latest World settlement is running late. It will show as soon as it's published.";
+
+/** The header mark's row when the settlement probe is bad but the board cannot say it is late: STALE, a board older than
+ *  BOARD_MAX_AGE_MS, or one dated ahead of the visitor's clock. Plain words, and no claim the board cannot back. */
+export const SETTLEMENT_MAYBE_LATE_LINE = "The latest World settlement may be running late. It will show as soon as it's published.";
 
 /** A board older than this says nothing about the settlement: the watchman's own beat is the board's `generated_at`. */
 export const BOARD_MAX_AGE_MS = 20 * 60 * 1000;

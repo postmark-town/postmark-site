@@ -709,11 +709,23 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
         // guard is what keeps the two from fighting: a touch fires
         // pointerenter too, and without the mouse test the tap would open on
         // enter and close on click in the same gesture.
+        // CORE-41: the same fight was in the focus. A tap on a button focuses it, so focusin opened the popover and the tap's own
+        // click then shut it: the red mark flashed and was gone on a phone. Focus opens only when it arrived by KEYBOARD
+        // (:focus-visible, which a tap or a mouse press does not raise on a button); a tap's open is its click. An old browser with
+        // no :focus-visible keeps the old behaviour of opening on any focus.
+        const keyboardFocus = () => { try { return glyph.matches(":focus-visible"); } catch (e) { return true; } };
         glyph.addEventListener("click", () => set(!open));
         wrap.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") set(true); });
         wrap.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") set(false); });
-        wrap.addEventListener("focusin", () => set(true));
-        wrap.addEventListener("focusout", () => { if (!wrap.contains(document.activeElement)) set(false); });
+        wrap.addEventListener("focusin", () => { if (keyboardFocus()) set(true); });
+        // A tap (or click) anywhere outside the mark and its popover puts it away: a phone has no pointerleave to do it.
+        document.addEventListener("pointerdown", (e) => { if (open && !wrap.contains(e.target)) set(false); });
+        // Focus leaving puts it away for a keyboard reader (Tab on). A pointer's dismissal is the pointerdown above: a tap on the
+        // popover's own words blurs the button (the words take no focus) and must not close it.
+        let byKey = false;
+        document.addEventListener("keydown", () => { byKey = true; }, true);
+        document.addEventListener("pointerdown", () => { byKey = false; }, true);
+        wrap.addEventListener("focusout", () => { if (byKey && !wrap.contains(document.activeElement)) set(false); });
         document.addEventListener("keydown", (e) => { if (e.key === "Escape" && open) { set(false); glyph.blur(); } });
         }
 
