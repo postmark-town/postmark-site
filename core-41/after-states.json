@@ -1,0 +1,26 @@
+{
+  "desktop-fresh": {
+    "open": true,
+    "rows": [
+      "DOWNthe settlement — The latest World settlement is running late. It will show as soon as it's published."
+    ]
+  },
+  "desktop-old-board": {
+    "open": true,
+    "rows": [
+      "DOWNthe settlement — The latest World settlement may be running late. It will show as soon as it's published."
+    ]
+  },
+  "phone-fresh": {
+    "open": true,
+    "rows": [
+      "DOWNthe settlement — The latest World settlement is running late. It will show as soon as it's published."
+    ]
+  },
+  "phone-old-board": {
+    "open": true,
+    "rows": [
+      "DOWNthe settlement — The latest World settlement may be running late. It will show as soon as it's published."
+    ]
+  }
+}

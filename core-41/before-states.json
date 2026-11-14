@@ -1,0 +1,26 @@
+{
+  "desktop-fresh": {
+    "open": true,
+    "rows": [
+      "DOWNthe settlement — The latest World settlement is running late. It will show as soon as it's published."
+    ]
+  },
+  "desktop-old-board": {
+    "open": true,
+    "rows": [
+      "DOWNthe settlement — the 18:00Z sweep published and no settlement tag covers it after 1 h 5 min (S166): blocked, ours to unblock (postmark-telemetry SHIPPING.md § 9)"
+    ]
+  },
+  "phone-fresh": {
+    "open": false,
+    "rows": [
+      "DOWNthe settlement — The latest World settlement is running late. It will show as soon as it's published."
+    ]
+  },
+  "phone-old-board": {
+    "open": false,
+    "rows": [
+      "DOWNthe settlement — the 18:00Z sweep published and no settlement tag covers it after 1 h 5 min (S166): blocked, ours to unblock (postmark-telemetry SHIPPING.md § 9)"
+    ]
+  }
+}
