@@ -123,7 +123,7 @@ const likeness = likenessWords(house, house?.residents?.length ?? 1);
 
 <script>
   import { officeOrigin } from "@/lib/household-dashboard/reads.mjs";
-  import { appearanceRows, appearanceUnread, liveLikenessLine, sheetView } from "@/lib/appearance.mjs";
+  import { appearanceRows, appearanceUnread, liveLikenessLine, sheetView, townSheetWords } from "@/lib/appearance.mjs";
   import { KEYS, officeBase } from "@/lib/auth.mjs";
   import { fileProblem, urlProblem, uploadFileRequest, uploadUrlRequest, ownerGate, setSheetFlow } from "@/lib/sheet-upload.mjs";
 
@@ -177,7 +177,13 @@ const likeness = likenessWords(house, house?.residents?.length ?? 1);
         const held = $("[data-ap-held]");
         if (held) { held.textContent = `The town holds ${view.held} sheet${view.held === 1 ? "" : "s"} of this resident, made before the household answered: unused and unshown until its human says yes.`; held.hidden = false; }
       }
-      if (view.sheets.some((s) => s.townMade)) $("[data-ap-town-note]")?.removeAttribute("hidden");
+      if (view.sheets.some((s) => s.townMade)) {
+        // CORE-52: the town sheet's own words from its record (when and from what the town made it); the page's one-line note stays only where the record says nothing
+        const note = $("[data-ap-town-note]");
+        const words = townSheetWords(view);
+        if (note && words) note.textContent = words;
+        note?.removeAttribute("hidden");
+      }
       if (view.template) {
         const pre = $("[data-ap-template-text]"); if (pre) pre.textContent = view.template;
         $("[data-ap-template]")?.removeAttribute("hidden");

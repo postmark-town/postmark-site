@@ -11,7 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { likenessOf, likenessLink, likenessWords, liveLikenessLine, appearanceRows, appearanceUnread, sheetView } from "../src/lib/appearance.mjs";
+import { likenessOf, likenessLink, likenessWords, liveLikenessLine, appearanceRows, appearanceUnread, sheetView, townSheetWords } from "../src/lib/appearance.mjs";
 import { buildHouses } from "../src/lib/houses.mjs";
 
 test("the likeness answer: given only on yes; no and unanswered both read as not given, each in its own words", () => {
@@ -66,6 +66,25 @@ test("the town's own sheet is marked a starting default, and the template note n
   assert.doesNotMatch(page, /style plate|data-ap-plate/i);
   assert.match(page, /This is the town’s starting default — your household is free to remake it to your liking\./);
   assert.match(page, /attach \{face\.name\}’s profile picture, and render it/);
+});
+
+test("CORE-52 · under the town's sheet, the record's own words: its source and note, as sentences; the page's own note only where the record says nothing", () => {
+  const town = (s) => ({ url: "https://media.postmark.town/media/the-town/s.webp", own: false, made_by: "the-town", ...s });
+  const own = { url: "https://media.postmark.town/media/x/own.webp", own: true, made_by: "lantern-row", source: "the household's own" };
+  // the plain wording CORE-52 proposes for the 22 rows, as the record would carry it once reworded
+  const PLAIN = "Painted by the town on 1 October 2026 from your household's profile picture, for the town's videos. It isn't made from anything you upload, and nothing redraws it.";
+  const reworded = sheetView({ read: "sheet", likeness: "given", sheets: [town({ source: PLAIN, note: "the town's starting default; your household is free to remake it to your liking" }), own] });
+  assert.equal(townSheetWords(reworded), `${PLAIN} The town's starting default; your household is free to remake it to your liking.`,
+    "the source first, then the note, each a sentence; the household's own sheet's words are never used");
+  // the row as it reads today: the words are the record's, whatever they say, and a later rewording reaches the page with no site change
+  const today = sheetView({ read: "sheet", likeness: "given", sheets: [town({ source: "the Snug Harbour six-view sheet (2026-10-01, repainted from the household's own profile picture)" })] });
+  assert.equal(townSheetWords(today), "The Snug Harbour six-view sheet (2026-10-01, repainted from the household's own profile picture).");
+  // nothing on the row, or no town sheet: null, and the page keeps its own note
+  assert.equal(townSheetWords(sheetView({ read: "sheet", likeness: "given", sheets: [town({})] })), null);
+  assert.equal(townSheetWords(sheetView({ read: "sheet", likeness: "given", sheets: [own] })), null);
+  assert.equal(townSheetWords(null), null);
+  const page = readFileSync(new URL("../town/pages/residents/[handle]/appearance.astro", import.meta.url), "utf8");
+  assert.match(page, /const words = townSheetWords\(view\);\s*if \(note && words\) note\.textContent = words;/, "the page draws the record's words as text");
 });
 
 test("the page sets every resident word as text, reads through the office's origin, and is linked from the resident's page", () => {
