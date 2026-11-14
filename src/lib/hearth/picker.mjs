@@ -110,9 +110,22 @@ export function mountHearthPicker(root, { entries, slug, saved, token, api, sign
     root.dataset.hearthSaved = v.savedId ?? "";
     paintListbox(root);   // the listbox draws the select (listbox.mjs): its name, its badge, enabled now that the picker is bound
   };
+  // CORE-40: the check and the x hide themselves once they have done their work, so the button that had focus is gone. Focus goes to the dropdown (the
+  // listbox's button, which is what a reader sees and presses; the select itself stays hidden), and a save that landed is said in the status, to a screen
+  // reader only. A save that did not land keeps both buttons, so focus stays where it was and the status keeps its reason.
+  const dropdown = q("[data-hearth-lb-btn]") ?? select;
+  const settle = (said = "") => {
+    if ($.acts?.hidden) dropdown?.focus?.();
+    if (said && $.said) $.said.textContent = said;
+  };
   select?.addEventListener("change", () => { picker.preview(select.value); paint(); });
-  $.keep?.addEventListener("click", async () => { const p = picker.keep(); paint(); await p; paint(); });
-  $.back?.addEventListener("click", () => { picker.back(); paint(); });
+  $.keep?.addEventListener("click", async () => {
+    const could = picker.view().canKeep;
+    const p = picker.keep(); paint();
+    const v = await p; paint();
+    settle(could && !v.failed && !v.changed ? "Saved" : "");
+  });
+  $.back?.addEventListener("click", () => { picker.back(); paint(); settle(); });
   paint();
   return { picker, refresh: paint };
 }
