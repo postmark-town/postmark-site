@@ -334,6 +334,31 @@ test("a PHONE TAP (390 px, touch, a real tap) on the red mark opens its popover 
   } finally { await p.close(); }
 });
 
+test("EVERY WORD IN THE POPOVER is plain, through the real popover on a real tap: a non-settlement row and the sentinel's headline say resident words, keep the missing-door count, and name no repo, section, path or timestamp", { skip: SKIP, timeout: 120_000 }, async () => {
+  await boot();
+  const OP = "failed: SNAPSHOT SHORT — residents.json keeps 134 rows; the checkout has 182 households; 48 doors are missing (postmark-telemetry SHIPPING.md § 9; /srv/postmark-site-refresh)";
+  state.bodyFn = () => JSON.stringify({
+    schema: 1, generated_at: new Date(Date.now() - 2 * 60_000).toISOString(), status: "DOWN",
+    headline: "DOWN · 2 down, 0 stale, 12 green. 1 parked (see the board). (2026-11-14T06:00:00.000Z) postmark-telemetry SHIPPING.md § 9",
+    probes: [{ key: "site_home", verdict: "OK" },
+      { key: "site_refresh", label: "the box's site refresh", kind: "refresh", verdict: "DOWN", reason: "the box's site refresh " + OP, detail: OP },
+      { key: "disk_root", label: "the box's root disk", kind: "disk", verdict: "STALE", reason: "at 91% used. Look at /tmp, /srv/postmark-site-refresh and /srv/world2-lab first" }],
+  });
+  const p = await openPage(browser, base, "/", { width: 390, board, touch: true });
+  try {
+    await p.until(`(${GLYPH})?.shown === true`, "the red mark");
+    const c = await p.centre("[data-pm-alert-glyph]");
+    await p.tapAt(c.x, c.y);
+    await p.until(OPEN, "the popover to open on a real tap");
+    const said = await p.evalJs(`(() => { const pop = document.querySelector("[data-pm-alert-pop]"); return { text: pop.innerText.replace(/\\s+/g, " ").trim(), headline: pop.querySelector("[data-pm-alert-headline]").textContent, rows: [...pop.querySelectorAll(".pm-alert-row")].map((l) => l.textContent.replace(/\\s+/g, " ").trim()) }; })()`);
+    assert.equal(said.headline, "2 things on the town's pages aren't right.", "the headline is plain (not the sentinel's)");
+    assert.equal(said.rows.length, 2);
+    assert.ok(said.rows[0].endsWith("the site's rebuild — The site isn't rebuilding as it should, so its pages may be out of date. 48 households' pages are missing from the site."), `the refresh row keeps its count in plain words (${said.rows[0]})`);
+    assert.ok(said.rows[1].endsWith("the server — The server is running low on space."), `the disk row (${said.rows[1]})`);
+    assert.ok(!/SHIPPING|postmark-telemetry|§|\/srv|\/tmp|residents\.json|checkout|SNAPSHOT|green|see the board|2026-|sweep|box's/i.test(said.text), `no operator word anywhere in the popover (${said.text})`);
+  } finally { await p.close(); }
+});
+
 test("KEYBOARD and DESKTOP MOUSE are unchanged: Tab to the mark opens it, Escape shuts it; hovering opens it and leaving shuts it; a click is a toggle", { skip: SKIP, timeout: 120_000 }, async () => {
   await boot();
   state.bodyFn = fresh("DOWN");

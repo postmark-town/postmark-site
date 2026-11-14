@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { alertFromBoard, parseBoard, REBAKE_LINE, SENTINEL_BAD, SETTLEMENT_LATE_LINE, SETTLEMENT_MAYBE_LATE_LINE } from "../src/lib/sentinel-alert.mjs";
+import { alertFromBoard, GENERIC_ROW, parseBoard, plainRow, REBAKE_LINE, SENTINEL_BAD, SETTLEMENT_LATE_LINE, SETTLEMENT_MAYBE_LATE_LINE } from "../src/lib/sentinel-alert.mjs";
 
 const LAYOUT = new URL("../src/layouts/PostmarkLayout.astro", import.meta.url);
 
@@ -60,10 +60,12 @@ test("ONE DOWN PROBE: the glyph shows, and the popover carries the board's headl
   const view = alertFromBoard(board);
   assert.equal(view.show, true, "a DOWN probe must raise the glyph");
   assert.equal(view.status, "DOWN");
-  assert.match(view.headline, /1 down, 0 stale, 13 green/);
+  assert.equal(view.headline, "One thing on the town's pages isn't right.", "the headline is plain and counts the rows; the sentinel's own is not printed (CORE-41)");
+  assert.ok(!/green|DOWN|see the board|2026-/.test(view.headline), "no operator count, verdict word or timestamp in the headline");
   assert.equal(view.rows.length, 1, "only the bad probe is listed \u2014 the popover is not the whole board");
-  assert.equal(view.rows[0].label, "the box's site refresh");
-  assert.match(view.rows[0].detail, /48 doors are missing/, "the refresh's own detail is what the founder reads, not the word 'failed'");
+  assert.equal(view.rows[0].label, "the site's rebuild");
+  assert.match(view.rows[0].detail, /48 households' pages are missing from the site\./, "the refresh's useful count survives, in resident words (not 'doors', not the checkout's file names)");
+  assert.ok(!/fetch-town|residents\.json|checkout|SNAPSHOT/.test(`${view.rows[0].detail} ${view.rows[0].reason}`), "and none of the operator prose");
   assert.equal(view.rebake, REBAKE_LINE);
   assert.match(view.rebake, /rebake at :10 and :40/);
 });
@@ -101,7 +103,8 @@ test("A 404 / NO BOARD / A BROKEN BOARD all render nothing, and none of them thr
   const mixed = alertFromBoard(liveBoard([null, 7, "x", { verdict: "DOWN", key: "site_home", reason: "HTTP 503" }]));
   assert.equal(mixed.show, true);
   assert.equal(mixed.rows.length, 1);
-  assert.equal(mixed.rows[0].label, "site_home", "a probe with no label falls back to its key rather than rendering 'undefined'");
+  assert.equal(mixed.rows[0].label, "the town's front page", "a probe renders its resident label, never 'undefined' and never the board's own words");
+  assert.equal(mixed.rows[0].detail.includes("503"), false, "and not the operator reason");
 });
 
 test("`since` is shown when the board carries it and omitted when it does not", () => {
@@ -113,6 +116,50 @@ test("`since` is shown when the board carries it and omitted when it does not", 
   const without = alertFromBoard(liveBoard([{ key: "site_home", label: "postmark.town", verdict: "DOWN", reason: "HTTP 503" }]));
   assert.equal(without.rows[0].age, null,
     "TODAY'S BOARD CARRIES NO `since` \u2014 the sentinel keeps a probe's onset in its own state file, not on the published board. The popover must omit the age rather than invent one; most reasons say it in prose (\"ticked 8 min ago\").");
+});
+
+// ---------------------------------------------------------------------------
+// EVERY ROW IS IN RESIDENT WORDS (CORE-41; Wright, 2026-11-12: "every resident-facing reason in that popover plain words, with no
+// private repo or section named"). Each probe key and kind the sentinel publishes (postmark-office tools/site-sentinel.mjs), with an
+// operator reason that names a private repo, a section, a path, a command and a timestamp, must come out with none of them.
+// ---------------------------------------------------------------------------
+
+const OPERATOR = "(postmark-telemetry SHIPPING.md § 9) /srv/postmark-site-refresh git pull --rebase fetch-town.mjs 2026-11-12T18:00:00Z journalctl -u postmark-site-refresh";
+const BAD_KEYS = [
+  ["site_home", "up"], ["site_daily", "up"], ["site_world", "up"], ["site_bulletin", "up"], ["office_api", "up"], ["dev_site", "up"],
+  ["site_crossing", "fresh"], ["site_build_problems", "fresh"], ["site_code", "fresh"], ["site_town_data", "fresh"], ["office_as_of", "fresh"], ["site_daily_content", "fresh"],
+  ["usdc_watch", "watcher"], ["stripe_watch", "watcher"], ["site_refresh", "refresh"], ["town_clone", "clone"], ["disk_root", "disk"], ["meeps", "meeps"],
+  ["settlement", "settlement"], ["law_pen", "law_pen"], ["linear_handler", "workflow"], ["some_new_probe", "some_new_kind"], [undefined, undefined],
+];
+const OPERATOR_WORDS = /SHIPPING|postmark-telemetry|§|\/srv|git |fetch-town|journalctl|2026-|\.mjs|\.json|timer|sentinel|probe|cadence|mtime|workflow "|crossing \d|checkout/i;
+
+test("EVERY BAD ROW, for every probe key and kind, is in resident words: no operator reason, repo, section, path, command or timestamp escapes", () => {
+  for (const verdict of ["DOWN", "STALE"]) {
+    for (const [key, kind] of BAD_KEYS) {
+      const board = lateBoard("OK", { extra: [{ key, kind, label: `the operator's label for ${key}`, verdict, reason: OPERATOR, detail: OPERATOR }] });
+      const view = alertFromBoard(board, { nowMs: NOW });
+      assert.equal(view.show, true, `${key}/${kind}/${verdict}: the glyph shows (classification unchanged)`);
+      const said = [view.headline, ...view.rows.flatMap((r) => [r.label, r.detail, r.reason])].join(" | ");
+      assert.ok(!OPERATOR_WORDS.test(said) && !said.includes("operator's label"), `${key}/${kind}/${verdict}: nothing operator escapes (${said})`);
+      assert.ok(view.rows[0].detail && view.rows[0].detail.length > 10, `${key}/${kind}/${verdict}: it says something`);
+    }
+  }
+  // an unknown probe says the generic line and prints nothing of the board's
+  const odd = alertFromBoard(lateBoard("OK", { extra: [{ key: "some_new_probe", kind: "some_new_kind", verdict: "DOWN", reason: OPERATOR }] }), { nowMs: NOW });
+  assert.equal(odd.rows[0].detail, GENERIC_ROW.detail);
+});
+
+test("USEFUL COUNTS survive in plain words, and the sentinel's own headline is replaced by a plain count of the rows", () => {
+  const refresh = (detail) => alertFromBoard(liveBoard([{ key: "site_refresh", kind: "refresh", label: "x", verdict: "DOWN", reason: `x failed: ${detail}`, detail }]), { nowMs: NOW });
+  assert.match(refresh("SNAPSHOT SHORT — residents.json keeps 134 rows; the checkout has 182 households; 48 doors are missing").rows[0].detail, /48 households' pages are missing from the site\.$/);
+  assert.match(refresh("1 door is missing").rows[0].detail, /1 household's page is missing from the site\.$/);
+  assert.equal(refresh("fetch-town.mjs tripped").rows[0].detail, "The site isn't rebuilding as it should, so its pages may be out of date.", "no count in the prose: no count printed");
+  const problems = alertFromBoard(liveBoard([{ key: "site_build_problems", kind: "fresh", verdict: "DOWN", reason: "the site published with 3 problems its build could not get: a · b · c" }]));
+  assert.match(problems.rows[0].detail, /couldn't get 3 things it asked for/);
+  assert.ok(!problems.rows[0].detail.includes("a · b"), "and not the problems' own operator text");
+  const two = alertFromBoard(lateBoard("DOWN", { extra: [{ key: "disk_root", kind: "disk", verdict: "DOWN", reason: OPERATOR }] }), { nowMs: NOW });
+  assert.equal(two.headline, "2 things on the town's pages aren't right.");
+  assert.equal(plainRow(null).detail, GENERIC_ROW.detail, "plainRow never throws on junk");
 });
 
 // ---------------------------------------------------------------------------
@@ -168,7 +215,7 @@ test("LATE-SETTLEMENT CONTROLS: it clears when the settlement lands, and the pla
   assert.ok(!other.rows.some((r) => r.detail === SETTLEMENT_LATE_LINE), "no plain settlement line for another probe's DOWN, whatever its key says");
   // and beside another bad probe, a late settlement is one row of several: each keeps its own words
   const both = alertFromBoard(lateBoard("DOWN", { extra: [{ key: "site_refresh", label: "the box's site refresh", verdict: "DOWN", reason: "r", detail: "48 doors are missing" }] }), { nowMs: NOW });
-  assert.deepEqual(both.rows.map((r) => r.detail), [SETTLEMENT_LATE_LINE, "48 doors are missing"]);
+  assert.deepEqual(both.rows.map((r) => r.detail), [SETTLEMENT_LATE_LINE, "The site isn't rebuilding as it should, so its pages may be out of date. 48 households' pages are missing from the site."]);
 });
 
 // ---------------------------------------------------------------------------
