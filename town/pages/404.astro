@@ -1,0 +1,121 @@
+---
+// 404 — the page the web server shows for a path the site did not build (CORE-79).
+//
+// Darko, 2026-11-13: "she's getting a 404 nginx error on her resident page … we shouldn't just be displaying 404s. There should be
+// like some kind of graceful fallback, like your resident is still being processed or something."
+// Wright's go, 2026-11-14: "A resident or household page that isn't built yet shows a kind page instead of nginx's 404: say the page
+// is on its way and point to what exists."
+//
+// THIS FILE ONLY BUILDS /404.html. Astro writes it; it is the web server that decides to show it, for an absent path, with the status
+// still 404 (nginx `error_page 404 /404.html`, scoped, which is the office's half of CORE-79 and is not installed by this page).
+// Nothing here redirects, and the page is noindex: an unbuilt page is never offered to a crawler as if it were the page.
+//
+// WHAT IT SAYS is src/lib/page-fallback.mjs's, from the office's anonymous reads, and it is one of four honest answers: the page is
+// on its way (the office knows the resident or house), there is nothing by that name (the office answered no), it could not be
+// checked (the office did not answer), or it is not a resident's or a house's page at all. Without JavaScript the baked floor stands:
+// the plain "isn't here" with the places that do exist, and one sentence that a new resident's page can arrive after they do. It
+// promises no build time: the page never prints a cadence it does not control (page-freshness.mjs).
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import { WHERE_TO_GO, WORDS } from "@/lib/page-fallback.mjs";
+
+const floor = WORDS.other;
+---
+<PostmarkLayout
+  door={null}
+  title="Page not found — Postmark"
+  description="This page isn't here. If it is a new resident's or household's page, it may still be on its way."
+  noindex={true}
+>
+  <main class="pm-wrap pf">
+    <section class="pf-card pm-paper" data-fallback data-state="floor" aria-live="polite">
+      <h1 data-fallback-title>{floor.title}</h1>
+      <p data-fallback-lead>{floor.lead}</p>
+      <p class="pf-hedge" data-fallback-hedge>If you were looking for a resident's or a household's page, a new one can arrive a little after they do.</p>
+      <p class="pf-record" data-fallback-record hidden></p>
+      <p class="pf-retry" data-fallback-retry-row hidden><button type="button" class="pm-btn ghost" data-fallback-retry>Check again</button></p>
+      <div class="pf-rule"><span>What is here</span></div>
+      <ul class="pf-links" data-fallback-links>
+        {WHERE_TO_GO.map((l) => <li><a href={l.href}>{l.label}</a> <span class="pf-note">{l.note}</span></li>)}
+      </ul>
+    </section>
+  </main>
+</PostmarkLayout>
+
+<style>
+  .pf { max-width: 40rem; margin: 2rem auto; padding: 0 16px; }
+  .pf-card { padding: 1.4rem 1.6rem 1.2rem; }
+  .pf-card h1 { margin: 0 0 0.5em; font-size: 1.6em; overflow-wrap: anywhere; }
+  .pf-card p { margin: 0 0 0.9em; line-height: 1.5; overflow-wrap: anywhere; }
+  .pf-hedge, .pf-note { color: var(--pm-ink-soft); }
+  /* the divider's own look, in the paper's ink: the shared .pm-rule.night is gold for the dark page and reads about 1.5:1 on the paper */
+  .pf-rule { display: flex; align-items: center; gap: 0.7em; margin: 1.4em 0 0.9em; color: var(--pm-ink-soft); font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; }
+  .pf-rule::before, .pf-rule::after { content: ""; flex: 1; border-top: 1px dashed var(--pm-ink-soft); opacity: 0.45; }
+  .pf-links { margin: 0; padding-left: 1.1em; }
+  .pf-links li { margin: 0 0 0.45em; }
+  .pf-record[hidden], .pf-retry[hidden] { display: none; }
+  @media (max-width: 480px) { .pf { margin: 1rem auto; } .pf-card { padding: 1.1rem 1.1rem 1rem; } }
+</style>
+
+<style is:global>
+  /* GLOBAL on purpose: the record link is made by the script, so it carries no scope attribute. The paper's own link colour (--pm-accent) reads 4.17:1 on --pm-paper, under the 4.5:1 a reader needs (measured by the browser test); the wax tone, the paper's strong colour, reads above it. */
+  .pm .pf-card a { color: var(--pm-wax); text-decoration: underline; }
+  .pm .pf-card a:hover { color: var(--pm-ink); }
+  /* the shared .pm-btn.ghost is cream text on a translucent wash, drawn for the dark page; on the paper it reads as grey on grey, so the one button here wears the paper's ink */
+  .pm .pf-card .pm-btn { background: var(--pm-ink); color: var(--pm-paper); box-shadow: none; border: 0; }
+  .pm .pf-card .pm-btn:hover { background: var(--pm-wax); color: var(--pm-paper); transform: none; }
+</style>
+
+<script>
+  import { whereIs, checkPage, WORDS } from "@/lib/page-fallback.mjs";
+
+  const root = document.querySelector("[data-fallback]");
+  if (root) {
+    const title = root.querySelector("[data-fallback-title]");
+    const lead = root.querySelector("[data-fallback-lead]");
+    const hedge = root.querySelector("[data-fallback-hedge]");
+    const record = root.querySelector("[data-fallback-record]");
+    const retryRow = root.querySelector("[data-fallback-retry-row]");
+    const retry = root.querySelector("[data-fallback-retry]");
+    const where = whereIs(location.pathname);
+
+    // Every name reaches the page through textContent: a resident's or household's name is content the page shows, never markup.
+    const fill = (s, name) => String(s).replace(/\{name\}/g, name ?? "");
+    const show = (state, words, name) => {
+      root.setAttribute("data-state", state);
+      title.textContent = fill(words.title, name);
+      lead.textContent = fill(words.lead, name);
+      document.title = `${fill(words.title, name)} — Postmark`;
+    };
+
+    const run = async () => {
+      if (where.kind === "other") { show("other", WORDS.other); hedge.hidden = true; return; }   // not a resident's or a house's page: the baked floor's words, without the hedge about new pages
+      show("checking", WORDS.checking);
+      hedge.hidden = true; retryRow.hidden = true; record.hidden = true;
+      const r = await checkPage(where, (u, o) => fetch(u, o));
+      if (r.state === "waiting") {
+        show("waiting", WORDS.waiting[r.kind], r.name);
+        hedge.hidden = true;
+        if (r.kind === "resident") {
+          record.replaceChildren();
+          record.append("Their record is readable now: ");
+          const a = document.createElement("a");
+          a.href = `/api/residents/${encodeURIComponent(r.handle)}`;
+          a.textContent = `/api/residents/${r.handle}`;
+          record.append(a, ".");
+          record.hidden = false;
+        }
+      } else if (r.state === "unknown") {
+        show("unknown", WORDS.unknown);
+        hedge.hidden = true;
+      } else if (r.state === "unchecked") {
+        show("unchecked", WORDS.unchecked);
+        hedge.hidden = true;
+        retryRow.hidden = false;
+      } else {
+        show("other", WORDS.other);
+      }
+    };
+    retry?.addEventListener("click", () => { run(); });
+    run();
+  }
+</script>
