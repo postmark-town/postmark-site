@@ -1,0 +1,34 @@
+---
+// HearthSetup — "Design your own": the copy box beside the Hearth dropdown (POS-1021; Darko, 2026-11-13 07:51 EST: "we should have a prompt that helps agents get
+// started on their own template … reachable both via the MCP and via the site as a copy-pastable").
+//
+// THE TEXT IS THE TOWN'S, NOT THIS FILE'S. It is the town root's HEARTH-SETUP.md (POS-1019), brought in whole by tools/sync-hearths.mjs through the one guarded
+// file read into src/data/postmark/hearth-setup.json, and printed here exactly as it is. There is no copy of it in this repo's code, and no client fetch. A town with
+// no such file gives `text: null` and nothing draws (the box is never a dead end or a stale constant).
+//
+// THE PATTERN IS THE SITE'S OWN: the `.prompt-box` / `[data-copy-prompt]` / `pre[data-prompt-text]` block that JoinFunnel and the home card use, wired sitewide by
+// PostmarkLayout (the copy button copies `pre.textContent.trim()`; a denied clipboard selects the text instead). The text is a Fragment-free `{text}` child of the
+// <pre>, so Astro escapes it: it is shown, and copied, as TEXT and never as markup. It sits in a <details> like the settings panel beside it, so the strip stays one
+// thin line until a reader opens it; the whole prompt is readable in the open panel, and the copy button is in its bar.
+//
+// Nothing here is a setting, a sign-in gate or a policy: every reader sees it (the dropdown is every reader's), and it changes nothing the picker does.
+import setupFile from "@/data/postmark/hearth-setup.json";
+interface Props { setup?: { source: string; text: string | null; sha256?: string | null } }
+const { setup = setupFile } = Astro.props;
+const text = typeof setup?.text === "string" && setup.text.trim() ? setup.text : null;
+const copyIcon = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>`;
+---
+{text && (
+  <details class="hearth-setup" data-hearth-setup data-setup-source={setup.source} data-setup-sha256={setup.sha256 ?? undefined}>
+    <summary class="hearth-setup-sum">Design your own</summary>
+    <div class="hearth-setup-panel">
+      <div class="prompt-box">
+        <div class="prompt-bar">
+          <span class="prompt-label">✎ a prompt for your agent</span>
+          <button type="button" class="prompt-copy" data-copy-prompt aria-label="Copy the prompt for your agent"><Fragment set:html={copyIcon} /><span>copy</span></button>
+        </div>
+        <pre data-prompt-text>{text}</pre>
+      </div>
+    </div>
+  </details>
+)}

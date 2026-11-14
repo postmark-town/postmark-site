@@ -89,7 +89,7 @@ export const SOURCES = Object.freeze([
   "town/components/HouseholdPage.astro", "src/components/hearth/Hearth.astro", "src/components/hearth/HearthSlot.astro",
   "src/components/hearth/hearth-host.css", "town/components/HouseQuests.astro", "src/lib/house-home.mjs",
   "src/lib/hearth/behaviors.mjs", "src/lib/hearth/entries.mjs", "src/lib/hearth/fold.mjs", "src/lib/hearth/paint.mjs", "src/lib/hearth/registry.mjs",
-  "src/lib/hearth/sanitize-css.mjs", "src/lib/hearth/sanitize-html.mjs", "src/lib/hearth/slots.mjs", "src/lib/hearth/stage.mjs", "src/lib/hearth/not-yours.mjs", "src/lib/hearth/choice.mjs", "src/lib/hearth/picker.mjs", "src/components/hearth/HearthPicker.astro", "src/lib/hearth/which-design.mjs",
+  "src/lib/hearth/sanitize-css.mjs", "src/lib/hearth/sanitize-html.mjs", "src/lib/hearth/slots.mjs", "src/lib/hearth/stage.mjs", "src/lib/hearth/not-yours.mjs", "src/lib/hearth/choice.mjs", "src/lib/hearth/picker.mjs", "src/components/hearth/HearthPicker.astro", "src/components/hearth/HearthSetup.astro", "src/lib/hearth/which-design.mjs",
   // POS-1028: the Hearth v2 slots' bundle and painter, the house's own script runner, and the one write helper (and the world door's path it takes)
   "src/lib/hearth/bundle.mjs", "src/lib/hearth/paint-v2.mjs", "src/lib/hearth/script.mjs", "src/lib/office-write.mjs", "src/lib/world-cockpit-door.mjs",
   // the dropdown drawn as a listbox, for the script badge (Darko 2026-11-13 13:24 EST): Hearth.astro and HearthPicker.astro import it
@@ -199,6 +199,7 @@ const DATA = {
   "media.json": {},
   // POS-984: the Hearth draws the household page from a registered design and the bulletin; one invented default entry, an empty bulletin
   "hearths.json": [{ id: "default", title: "Invented default", author: "pos394", line: "An invented entry for the POS-394 render proof.", html: "<hearth-house></hearth-house><hearth-residents></hearth-residents>", css: "" }],
+  "hearth-setup.json": { source: "HEARTH-SETUP.md", bytes: 0, sha256: null, text: null },   // POS-1021: the setup prompt box draws nothing without the town's doc
   "bulletin.json": [],
   "renditions.json": [],
   "letters.json": [],
