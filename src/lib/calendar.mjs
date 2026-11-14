@@ -67,10 +67,171 @@ export function eventParams(id) {
   return m ? { host: m[1], slug: m[2] } : null;
 }
 
+// THE EVENT'S PERMANENT ADDRESS (CORE-82, Darko's CORE-70 call 13: "/events/<host>/<slug>/", kept forever). The old
+// /calendar/<host>/<slug>/ address is a forwarding page to it (calendar/[host]/[slug].astro), so every link already out there leads here.
 export function eventHref(id) {
+  const p = eventParams(id);
+  return p ? `/events/${p.host}/${p.slug}/` : null;
+}
+
+/** The address events had until CORE-82: now only a forward to eventHref. */
+export function legacyEventHref(id) {
   const p = eventParams(id);
   return p ? `/calendar/${p.host}/${p.slug}/` : null;
 }
+
+// ── THE LASTING EVENT LIST, AND WHAT EACH EVENT PAGE MAY SAY (CORE-82) ──────────────────────────────────────────────────────
+//
+// events.json is the office's lasting list (`town { read: "calendar", args: { past: true } }`: every ended event, newest end first,
+// paged, past the calendar's seven days) plus, per event, the office's one-event read (`GET /calendar/<host>/<slug>`, whose
+// `evidence` carries the rooms, who was there, the spark and the gallery once the doors have opened). Both are the office's words,
+// kept as the build read them; the page's island repaints them from the same reads.
+//
+// THE PAGE NEVER WORKS ANY OF IT OUT. It does not turn an RSVP into attendance, a room's membership into a footprint, a clock into a
+// spark, or a missing field into an empty one. `eventSections` below turns the office's fields into the states the page draws, and
+// each state is one the office's contract defines: "Empty arrays are known none; null is unknown" (POS-1035 envelopes).
+
+/** Every event the site can build a page for, once each: the calendar's three lists first (they are the newest word), then the lasting list. */
+export function allEventViews(calendar, events) {
+  const seen = new Set();
+  const out = [];
+  for (const e of [...eventsOf(calendar), ...(Array.isArray(events?.past?.events) ? events.past.events : [])]) {
+    if (!e || !eventParams(e.id) || seen.has(e.id)) continue;
+    seen.add(e.id);
+    out.push(e);
+  }
+  return out;
+}
+
+/** An event as its page reads it: the list's view with the one-event read's `evidence` laid over it when the build has that read. */
+export function eventForPage(event, events) {
+  const read = events?.evidence?.[event.id];
+  const one = read && read.read === "ok" && read.event && typeof read.event === "object" ? read.event : null;
+  return one ? { ...event, ...one } : event;
+}
+
+/** What the build knows about the one-event read of this event: "ok", "unavailable" (asked, did not answer) or "absent" (never asked). */
+export function evidenceRead(event, events) {
+  return events?.evidence?.[event.id]?.read ?? "absent";
+}
+
+const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+
+/**
+ * The states of one event page, from the office's own fields and nothing else. Pure.
+ *
+ *   circles   before | rooms | none | unavailable | cancelled
+ *   present   unknown | known (list, maybe empty)
+ *   spark     none | spark | claim | unknown
+ *   gallery   unknown | known (sparks, maybe empty)
+ *
+ * `before` is the office's phase word "announced" (its doors have not opened, and the evidence is only served once they have); it
+ * is never worked out from a clock. A missing `evidence` on any other phase is UNAVAILABLE, not empty: the office did not serve it.
+ */
+export function eventSections(event) {
+  const phase = String(event?.phase ?? "");
+  const ev = isObj(event?.evidence) ? event.evidence : null;
+  const after = phase === "ended";
+  const cancelled = Boolean(event?.cancelled);
+  const out = { after, cancelled, phase };
+  if (cancelled) {
+    // "never on a cancelled event": the office serves no evidence, so there is nothing to say and nothing is claimed.
+    return { ...out, circles: { state: "cancelled" }, present: { state: "unknown" }, spark: { state: "unknown" }, gallery: { state: "unknown" } };
+  }
+  if (!ev) {
+    const before = phase === "announced";
+    const gone = { state: before ? "before" : "unavailable" };
+    return { ...out, circles: gone, present: { state: "unknown", before }, spark: { state: before ? "none" : "unknown", before }, gallery: { state: "unknown", before } };
+  }
+  // circles: every qualifying room, in the office's start order, never ranked or chosen
+  const rooms = Array.isArray(ev.rooms) ? ev.rooms : null;
+  let circles;
+  if (!rooms) circles = { state: "unavailable", note: ev.room_note ?? null };
+  else if (ev.room_history === "unavailable") circles = { state: "unavailable", rooms, note: ev.room_note ?? null };
+  else if (rooms.length === 0) circles = ev.room_history === "complete" ? { state: "none" } : { state: "unavailable", note: ev.room_note ?? null };
+  else circles = { state: "rooms", rooms, history: ev.room_history ?? null, note: ev.room_note ?? null };
+  // who was there: a public act at the place in the window (never an RSVP); [] is known none, null/absent is unknown
+  const present = Array.isArray(ev.present)
+    ? { state: "known", households: ev.present, basis: typeof ev.present_basis === "string" ? ev.present_basis : null, unplaced: Number(ev.unplaced_says) > 0 ? Number(ev.unplaced_says) : 0 }
+    : { state: "unknown", basis: typeof ev.present_basis === "string" ? ev.present_basis : null };
+  // the root spark, by the completion id: null before completion; an accepted view; or { id, accepted:false, status }
+  let spark;
+  if (ev.spark === null) spark = { state: "none" };
+  else if (isObj(ev.spark) && ev.spark.accepted === false) spark = { state: "claim", id: ev.spark.id ?? null, status: typeof ev.spark.status === "string" ? ev.spark.status : null };
+  else if (isObj(ev.spark)) spark = { state: "spark", spark: ev.spark };
+  else spark = { state: "unknown" };
+  // the gallery: accepted child sparks across every covered room; null is unknown (never an empty gallery)
+  let gallery;
+  if (isObj(ev.gallery) && Array.isArray(ev.gallery.sparks)) {
+    gallery = { state: "known", rooms: Array.isArray(ev.gallery.rooms) ? ev.gallery.rooms : [], sparks: ev.gallery.sparks, complete: ev.complete !== false, note: typeof ev.gallery_note === "string" ? ev.gallery_note : null };
+  } else gallery = { state: "unknown", note: typeof ev.gallery_note === "string" ? ev.gallery_note : null };
+  return { ...out, circles, present, spark, gallery, window: isObj(ev.window) ? ev.window : null, complete: ev.complete === true };
+}
+
+/**
+ * A spark's picture, only when the office served one the page can draw: a site path or an https address, as a string or `{url|src, alt}`.
+ * Anything else is no picture, and the card then has no picture tile at all (a spark with no picture still has its headline).
+ */
+export function pictureOf(spark) {
+  const p = spark?.picture;
+  const raw = typeof p === "string" ? p : isObj(p) ? (p.url ?? p.src ?? null) : null;
+  if (typeof raw !== "string") return null;
+  const src = raw.trim();
+  if (!(/^\/(?!\/)/.test(src) || /^https:\/\//i.test(src))) return null;
+  const alt = isObj(p) && typeof p.alt === "string" && p.alt.trim() ? p.alt.trim() : null;
+  return { src, alt };
+}
+
+/** A room's anchor on the conversations page: the one place the whole transcript lives. */
+export const roomHref = (id) => `/conversations/#${encodeURIComponent(String(id ?? ""))}`;
+
+/** The id a room header carries (the office's thread header: `{ id, … }`, or a bare id in the gallery's coverage list). */
+export const roomIdOf = (room) => (typeof room === "string" ? room : room?.id ?? null);
+
+/**
+ * The words of the event page's states, one table, so the baked page and its island read the same sentences and the tests pin them.
+ * "Letter threads" are correspondence and "circles" are spoken talk (CORE-70 call 15): the two words are never swapped.
+ */
+export const EVENT_WORDS = Object.freeze({
+  circles: {
+    title: "The conversation",
+    before: "The conversation shows here once the doors open.",
+    cancelled: "This event was cancelled, so there is no conversation to show.",
+    none: "No conversation formed at the place during the event.",
+    unavailable: "The conversation couldn't be read just now, so this page cannot say whether there was one. That is not the same as there being none.",
+    noReader: "The circles show here once the page can load the town's reader; the whole talk is on the conversations page.",
+    noJs: "The circles load with JavaScript. Without it, each room's whole talk is on the conversations page:",
+    loadFailed: "This room's circles couldn't be loaded.",
+  },
+  present: {
+    title: "Who was there",
+    lead: "Residents' households who did a public act at the place during the event (spoke, walked, gave, left a mark, staked). Saying you will come (an RSVP) does not count.",
+    none: "No public act at the place during the event is on record.",
+    unknown: "Who was there couldn't be read, so this page cannot say. That is not the same as no one.",
+    before: "Who was there is shown once the event has run.",
+  },
+  spark: {
+    title: "The spark",
+    none: "No spark has been made from this event yet.",
+    claim: "A spark for this event has been put forward and is waiting on acceptance.",
+    refused: "A spark was put forward for this event and was not accepted.",
+    unknown: "Whether this event has a spark couldn't be read just now.",
+  },
+  gallery: {
+    title: "The gallery",
+    lead: "Sparks that came of this event's talk, accepted ones only.",
+    none: "No accepted sparks yet from the talk at this event.",
+    unknown: "The gallery couldn't be read just now, so this page cannot say whether it is empty.",
+    sofar: "These are the sparks so far; the event is still on.",
+  },
+  past: {
+    title: "Past events",
+    lead: "Every event that has ended stays here, past the calendar's recent list.",
+    none: "No past events are listed.",
+    unavailable: "The list of past events isn't available from the office yet, so this page shows only the events the calendar still lists. That is not the same as there being no others.",
+    more: "Older events are listed on the office's next page; they are not shown here yet.",
+  },
+});
 
 // A coordinate is a number or a numeric string. Number(null) and Number("") are
 // 0, which is how an event with no recorded point used to print "(0, 0)" and

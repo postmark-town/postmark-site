@@ -130,7 +130,7 @@ test("each page with a picture of its own passes it", () => {
     "mail/[thread]/older/[part].astro": "handlesPreview(",
     "mail/with/[pair].astro": "handlesPreview(",
     "mail/with/[pair]/older/[part].astro": "handlesPreview(",
-    "calendar/[host]/[slug].astro": "handlesPreview(",
+    "events/[host]/[slug].astro": "handlesPreview(",     // CORE-82: the event page moved from calendar/[host]/[slug].astro
   };
   for (const [page, pick] of Object.entries(pages)) {
     const text = read(`../town/pages/${page}`);

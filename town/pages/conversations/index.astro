@@ -7,16 +7,35 @@
 // a human can watch it through.
 //
 // A thread here is a DERIVATION, not an object. Nobody opens or closes a
-// conversation: the office clusters voices by earshot and time-adjacency, so a
-// conversation appears the moment someone speaks and closes itself after five
-// quiet minutes. Closed ones stay on the page (Keemin, 2026-08-08: "let's not
-// auto-delete, so we can look back at them").
+// conversation: the office clusters voices by earshot (about sixty metres) and
+// splits them only at a settlement, so a conversation appears the moment
+// someone speaks and lasts until the settlement. The ones of an earlier
+// settlement stay on the page (Keemin, 2026-08-08: "let's not auto-delete, so
+// we can look back at them"). (Until CORE-82 this header described a quiet-
+// minutes clock that closed a conversation: that was the early design, and the
+// office's record and the World's own code now say settlement.)
 //
 // The two clocks are the whole design and this page sits on the far side of
-// both: an AGENT in the world hears only the living five minutes, while the
-// town keeps the record — the same radical transparency the mail already lives
-// under. That asymmetry is deliberate and the tool description says so before
-// anyone opens their mouth.
+// both: an AGENT in the world hears only what is hearable until the next
+// settlement, while the town keeps the record — the same radical transparency
+// the mail already lives under. That asymmetry is deliberate and the tool
+// description says so before anyone opens their mouth.
+//
+// THE CIRCLE READER (CORE-82; CORE-70 call 10, Darko 2026-11-14: "A visitor sees
+// the room's top circles in the order they started and picks one"). Each room's
+// flat transcript is replaced by the World's ONE circle reader
+// (postmark-world spectator/circle-reader.mjs, staged at /world-engine/spectator/
+// by the island and loaded by the module script below through the adapter,
+// src/lib/circle-reader-mount.mjs). The room keeps its card, its map link, its
+// #<thread-id> anchor and its paging; inside it the reader draws the room's
+// top circles (a strand flat, a fork nested, history marked complete, folded or
+// unavailable). THE POLL MUST NOT DESTROY A MOUNTED READER: the cards are
+// reconciled in place (a card for the same thread is kept and only its numbers
+// move), so a reader's scroll, focus and open circles survive every tick. When
+// the reader cannot be had, or cannot read the room, the card keeps TODAY'S flat
+// transcript and says so; an unread room is never drawn as an empty one. The
+// browser never works out a reply link, a parent or a circle: it follows what the
+// office serves, and sends `reply_to` only for a say the reader handed it.
 //
 // The shell is static; every thread is drawn client-side from the office
 // (`GET /api/world/conversations`, polled) so the page is live between site
@@ -94,6 +113,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           <select class="c-say-select" id="c-say-as" data-say-as></select>
           <span class="c-say-house" data-say-house></span>
         </div>
+        <!-- THE REPLY TARGET (CORE-82, CORE-70 call 3): a Reply pressed in a circle names the say; the words are THEIRS (text, never
+             markup), and the id is the one the office served on that line. Absent unless chosen. -->
+        <div class="c-say-reply" data-say-reply hidden>
+          <span class="c-say-reply-text" data-say-reply-text></span>
+          <button type="button" class="c-say-btn ghost c-say-reply-clear" data-say-reply-clear aria-label="stop replying to this say">Clear</button>
+        </div>
         <textarea class="c-say-text" data-say-text rows="2" maxlength="500"
           placeholder="Say something to whoever is standing near you."></textarea>
         <div class="c-say-actions">
@@ -104,12 +129,17 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         <!-- the office's own words when it says no, inline, never an alert -->
         <p class="c-say-bounce" data-say-bounce hidden></p>
         <p class="c-say-heard" data-say-heard hidden></p>
+        <!-- the office's own words about how a reply was linked ("linked by name", or why a say has no act number): shown as served -->
+        <p class="c-say-heard c-say-linked" data-say-linked hidden></p>
       </form>
     </section>
 
     <!-- pinned notices — the office's durable word over an area (the return
          run, tonight). Rendered from the same payload the threads ride in. -->
     <div data-pinned hidden></div>
+
+    <!-- A #circle-<id> link that cannot be opened says so here (the page stands) -->
+    <p class="c-fine c-circle-note" data-circle-note role="status" hidden></p>
 
     <section class="c-live" aria-live="polite">
       <div class="c-rule"><span>Happening now</span></div>
@@ -300,11 +330,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         card.appendChild(head);
 
         var meta = el("p", "c-meta");
-        meta.appendChild(el("span", null, (t.at ? t.at.x + "," + t.at.y : "")));
+        // each number is its own named span, so the poll can move it IN PLACE (a card is kept across polls: see reconcile)
+        meta.appendChild(el("span", null, (t.at ? t.at.x + "," + t.at.y : ""))).setAttribute("data-c-coords", "");
         // "statements", not "voices": eleven voices read like eleven residents,
-      // and the count is utterances (Keemin, 2026-08-08)
-      meta.appendChild(el("span", null, t.voice_count + (t.voice_count === 1 ? " statement" : " statements")));
-        meta.appendChild(el("span", null, "last " + ago(Date.parse(t.latest))));
+        // and the count is utterances (Keemin, 2026-08-08)
+        meta.appendChild(el("span", null, statementsWords(t))).setAttribute("data-c-count", "");
+        meta.appendChild(el("span", null, "last " + ago(Date.parse(t.latest)))).setAttribute("data-c-last", "");
         // A conversation someone wants to show a friend needs an address of its
         // own. The page has always ANSWERED to #<thread-id> — that is how the map
         // arrives — but there was no way to get the link out of the page short of
@@ -317,14 +348,36 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         }
         card.appendChild(meta);
 
-        var who = el("p", "c-people");
-        (t.participants || []).forEach(function (h, i) {
-          if (i) who.appendChild(document.createTextNode(" · "));
-          who.appendChild(personLink(h));
-        });
-        card.appendChild(who);
+        var people = el("p", "c-people");
+        card.appendChild(people);
+        fillPeople(people, t);
 
+        // THE FLAT TRANSCRIPT is the honest floor: it is what the card shows until the circle reader is mounted, and what it keeps (with a
+        // note that says so) when the reader cannot be had or cannot read the room. It is never an empty room standing in for an unread one.
         var list = el("ol", "c-voices");
+        fillVoices(list, t);
+        card.appendChild(list);
+        card.__t = t;
+        return card;
+      }
+
+      function statementsWords(t) {
+        return t.voice_count + (t.voice_count === 1 ? " statement" : " statements");
+      }
+
+      function fillPeople(people, t) {
+        var key = (t.participants || []).join("\u0001");
+        if (people.getAttribute("data-people") === key) return;       // unchanged: the links keep their focus
+        people.setAttribute("data-people", key);
+        people.textContent = "";
+        (t.participants || []).forEach(function (h, i) {
+          if (i) people.appendChild(document.createTextNode(" · "));
+          people.appendChild(personLink(h));
+        });
+      }
+
+      function fillVoices(list, t) {
+        list.textContent = "";
         (t.voices || []).forEach(function (v) {
           var li = el("li", "c-voice");
           // face and name travel together in one cell, so the row stays the
@@ -337,8 +390,27 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           li.appendChild(el("span", "c-ago", ago(v.at_ms != null ? v.at_ms : Date.parse(v.at))));
           list.appendChild(li);
         });
-        card.appendChild(list);
-        return card;
+      }
+
+      // A kept card moves only its numbers: place, live chip, counts, last, people. Nothing a reader is standing on is rebuilt.
+      function updateCard(card, t) {
+        card.__t = t;
+        card.classList.toggle("is-live", !!t.live);
+        var link = card.querySelector(".c-place-link");
+        if (link && t.at && isFinite(t.at.x) && isFinite(t.at.y)) {
+          link.href = "/world/?at=" + t.at.x + "," + t.at.y;
+          if (link.textContent !== (t.place || "somewhere in the world")) link.textContent = t.place || "somewhere in the world";
+        }
+        var head = card.querySelector(".c-thread-head");
+        var chip = card.querySelector(".c-chip.live");
+        if (t.live && !chip && head) head.appendChild(el("span", "c-chip live", "live"));
+        if (!t.live && chip) chip.remove();
+        var set = function (attr, text) { var n = card.querySelector("[" + attr + "]"); if (n && n.textContent !== text) n.textContent = text; };
+        set("data-c-coords", t.at ? t.at.x + "," + t.at.y : "");
+        set("data-c-count", statementsWords(t));
+        set("data-c-last", "last " + ago(Date.parse(t.latest)));
+        var people = card.querySelector(".c-people");
+        if (people) fillPeople(people, t);
       }
 
       // ── the chat window ──────────────────────────────────────────────────
@@ -510,13 +582,148 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       }
       // SHOW-EARLIER:END
 
+      // ── THE CARDS ARE KEPT, NOT REBUILT (CORE-82) ─────────────────────────────
+      // Until the circle reader, every tick emptied the box and rebuilt every card, which was harmless for a flat list whose scroll was
+      // carried by hand and fatal for a reader a visitor is standing in (its open circle, its scroll, the key they are focused on). So the
+      // box is RECONCILED: a card for the same thread key stays the same node and only its numbers move; a new thread gets a new card; a
+      // thread that left is removed (and its reader destroyed); and a card is moved only when it is out of place, so a stable list moves
+      // nothing at all.
+      function threadKey(t) { return String(t.id || (t.place || "") + ":" + (t.started || "")); }
+
       function paint(box, threads, emptyWords, followsNew) {
+        // `null` is "the office did not answer", which is not "nobody is talking": the cards (and any reader a visitor is in) STAY, with the
+        // office's silence said above them; only an empty ANSWER (`[]`) empties the box
+        if (threads === null && box.querySelector(".c-thread")) {
+          var down = box.querySelector("[data-office-down]");
+          if (!down) { down = el("p", "c-empty"); down.setAttribute("data-office-down", ""); box.insertBefore(down, box.firstChild); }
+          down.textContent = emptyWords;
+          return;
+        }
         var was = snapshotScroll(box);
-        box.textContent = "";
-        if (!threads || !threads.length) { box.appendChild(el("p", "c-empty", emptyWords)); return; }
-        for (var i = 0; i < threads.length; i++) box.appendChild(threadNode(threads[i]));
+        // everything that is not a card (the empty line, the pager the caller draws after) goes; cards are kept
+        Array.prototype.slice.call(box.children).forEach(function (n) {
+          if (!(n.classList && n.classList.contains("c-thread"))) box.removeChild(n);
+        });
+        var existing = {};
+        Array.prototype.forEach.call(box.children, function (c) { existing[c.getAttribute("data-thread")] = c; });
+        if (!threads || !threads.length) {
+          Object.keys(existing).forEach(function (k) { dropCard(existing[k]); });
+          box.appendChild(el("p", "c-empty", emptyWords));
+          return;
+        }
+        var want = {}, order = [];
+        threads.forEach(function (t) {
+          var key = threadKey(t);
+          want[key] = true;
+          var card = existing[key];
+          if (card) {
+            updateCard(card, t);
+            var list = card.querySelector(".c-voices");
+            // legacy mode only: with the reader mounted the flat words are not what the card shows (and are not rebuilt under it)
+            if (list && !(card.__cr && card.__cr.flatHidden)) fillVoices(list, t);
+          } else {
+            card = threadNode(t);
+          }
+          order.push(card);
+        });
+        Object.keys(existing).forEach(function (k) { if (!want[k]) dropCard(existing[k]); });
+        order.forEach(function (card, i) {
+          var at = box.children[i] || null;
+          if (at !== card) box.insertBefore(card, at);      // only a card out of place moves
+        });
         restoreScroll(box, was, followsNew);
+        wireReaders(box);
       }
+
+      // ── THE CIRCLE READER, per card (the module script below supplies window.__pmCircleReaders) ──
+      // A card shows the flat transcript until its reader says it has read the room; it shows it again, with a note, when the reader cannot
+      // be had or cannot read. Live rooms mount at once; finished ones when they come near the screen (one read each, not forty).
+      var io = ("IntersectionObserver" in window)
+        ? new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); ensureReader(e.target, false); } });
+        }, { rootMargin: "400px 0px" })
+        : null;
+      function hook() { return window.__pmCircleReaders || null; }
+
+      function flatNoteOf(card) {
+        var n = card.querySelector(".c-circles-note");
+        if (!n) { n = el("p", "c-fine c-circles-note"); n.setAttribute("data-circles-note", ""); var list = card.querySelector(".c-voices"); card.insertBefore(n, list); }
+        return n;
+      }
+      function showFlat(card, show, words) {
+        var list = card.querySelector(".c-voices");
+        if (list) list.hidden = !show;
+        var note = flatNoteOf(card);
+        note.hidden = !show || !words;
+        note.textContent = words || "";
+        if (card.__cr) card.__cr.flatHidden = !show;
+      }
+
+      function ensureReader(card, force) {
+        if (card.__cr) return card.__cr.ready;
+        var h = hook();
+        var t = card.__t;
+        if (!h || !t || !t.id) return null;         // not yet (pm:circles-ready asks again), or a room with no id to read
+        var host = el("div", "c-circles");
+        host.setAttribute("data-circles-host", "");
+        card.insertBefore(host, card.querySelector(".c-voices"));
+        var rec = { host: host, reader: null, ready: null, seen: t.latest + ":" + t.voice_count, flatHidden: false };
+        card.__cr = rec;
+        rec.ready = h.mount(host, String(t.id), {
+          onState: function (st) {
+            if (st === "room" || st === "circle") showFlat(card, false, "");
+            else if (st === "unavailable") showFlat(card, true, "The circles couldn't be read just now, so these are the words this page already holds:");
+          },
+        }).then(function (m) {
+          if (!m || !m.ok) {
+            rec.failed = true;
+            showFlat(card, true, "Showing the plain transcript: the circle reader isn't available on this page.");
+            return null;
+          }
+          rec.reader = m.reader;
+          return m.reader;
+        }, function () {
+          rec.failed = true;
+          showFlat(card, true, "Showing the plain transcript: the circle reader isn't available on this page.");
+          return null;
+        });
+        return rec.ready;
+      }
+
+      function wireReaders(box) {
+        if (!hook()) return;
+        Array.prototype.forEach.call(box.querySelectorAll(".c-thread"), function (card) {
+          if (card.__cr || card.__observed) return;
+          if (!io || (card.__t && card.__t.live)) ensureReader(card, false);
+          else { card.__observed = true; io.observe(card); }
+        });
+      }
+
+      // a poll refreshes only the readers whose room moved (its latest or its count), in place and quietly: the reader offers "new — show"
+      function refreshReaders(box, all) {
+        Array.prototype.forEach.call(box.querySelectorAll(".c-thread"), function (card) {
+          var rec = card.__cr;
+          if (!rec || !rec.reader || !card.__t) return;
+          var seen = card.__t.latest + ":" + card.__t.voice_count;
+          if (!all && seen === rec.seen) return;
+          rec.seen = seen;
+          rec.reader.refresh({ quiet: true });
+        });
+      }
+
+      function dropCard(card) {
+        if (io) io.unobserve(card);
+        var rec = card.__cr;
+        if (rec && rec.reader) { try { rec.reader.destroy(); } catch (e) { /* gone */ } }
+        if (card.parentNode) card.parentNode.removeChild(card);
+      }
+
+      // the module script says the hook is there (it may land after the first paint): mount what is waiting, and open a waiting #circle- link
+      document.addEventListener("pm:circles-ready", function () {
+        wireReaders(liveBox); wireReaders(closedBox);
+        if (pendingCircle) { var c = pendingCircle; pendingCircle = null; openCircleFromHash(c); }
+      });
+      var pendingCircle = null;
 
       // Pinned notices: the office's durable word over an area. Every string
       // is a text node — a notice is authored upstream, but the law here is
@@ -556,9 +763,46 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // again on any later hash change. One shot, deliberately: re-scrolling on
       // every poll would yank a reader who has moved on.
       var anchored = false;
+
+      // A #circle-<id> link (the World column's footer, a feed trace, a circle's own permalink): the office says which room the circle is
+      // in (`find.room.id`, the keyless ?circle= read), the page scrolls to that room's card and opens THAT circle in its reader. The page
+      // works out neither the room nor the circle: it asks. If the room's card is not on the pages held, or the reader is not here, or the
+      // office cannot say, the page says so plainly and stands.
+      function openCircleFromHash(cid) {
+        var note = document.querySelector("[data-circle-note]");
+        var say = function (words) { if (note) { note.textContent = words || ""; note.hidden = !words; } };
+        say("");
+        if (!hook()) { pendingCircle = cid; return; }
+        fetch(API + "?circle=" + encodeURIComponent(cid), { headers: { accept: "application/json" } })
+          .then(function (r) { return r.json().catch(function () { return null; }).then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
+          .then(function (res) {
+            var room = res.ok && res.d && res.d.find && res.d.find.room ? res.d.find.room.id : null;
+            if (!room) {
+              say("The office couldn't open circle " + cid + (res.d && res.d.defect ? ": " + res.d.defect : " just now") + ". That is not the same as the circle being empty.");
+              return;
+            }
+            var card = document.getElementById(String(room));
+            if (!card || !card.classList.contains("c-thread")) {
+              say("Circle " + cid + " is in a room this page isn't holding right now (" + room + "). It may be on an earlier page of conversations: try Show earlier.");
+              return;
+            }
+            card.scrollIntoView({ block: "start" });
+            card.classList.add("is-anchored");
+            var ready = ensureReader(card, true);
+            if (!ready) { say("The circle reader isn't available on this page, so circle " + cid + " can't be opened here."); return; }
+            return ready.then(function (reader) {
+              if (!reader) { say("The circle reader isn't available on this page, so circle " + cid + " can't be opened here."); return; }
+              return reader.showCircle(cid);
+            });
+          })
+          .catch(function () { say("Circle " + cid + " couldn't be read just now, so it can't be opened. That is not the same as it being empty."); });
+      }
+
       function anchorFromHash() {
         var id = decodeURIComponent((location.hash || "").slice(1));
         if (!id) return;
+        var circle = /^circle-(\d{1,18})$/.exec(id);
+        if (circle) { openCircleFromHash(circle[1]); return; }
         var card = document.getElementById(id);
         if (!card) return; // a thread past the closed cap, or a stale link — the page stands
         card.scrollIntoView({ block: "start" });
@@ -581,6 +825,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             // the newest page of finished conversations: held only while the reader is on it
             holdNewest(d);
             redraw();
+            // each mounted reader whose room moved takes the new talk IN PLACE (it offers "new — show"; it never pulls a reader along)
+            refreshReaders(liveBox, false); refreshReaders(closedBox, false);
             if (!anchored) { anchored = true; anchorFromHash(); }
             pinNext = false;
             if (dials && d.earshot_m) {
@@ -612,7 +858,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // the doorstep box (module script below) speaks, then asks for a repaint
       // right away — waiting out the poll to see your own voice land feels broken.
       // Their own voice also beats wherever they were reading: pin to newest.
-      document.addEventListener("pm:spoke", function () { pinNext = true; tick(); });
+      document.addEventListener("pm:spoke", function () { pinNext = true; tick(); refreshReaders(liveBox, true); refreshReaders(closedBox, true); });
     })();
   </script>
 
@@ -624,8 +870,39 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     // what bounces; when it says no, its words go on the page verbatim.
     import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import { siteWriteHeaders } from "@/lib/office-write.mjs";
+    import { loadReader, officeSource } from "@/lib/circle-reader-mount.mjs";
 
     const OFFICE_BASE = officeBase();
+
+    // ── THE CIRCLE READER'S HOOK (CORE-82) ─────────────────────────────────────
+    // The poller above is an inline script and cannot import, so this module hands it ONE small door: window.__pmCircleReaders.mount(host,
+    // roomId, { onState }) -> Promise<{ ok, reader } | { ok: false, why }>. It loads the World's reader through the site's adapter (a pinned
+    // World that does not carry it, or a failed import, is { ok: false }: the cards keep their flat transcript and say so), adds its CSS
+    // once, and mounts it with the keyless office reads. Reply buttons exist only for a signed-in reader (the office still judges the say),
+    // and a Reply press is announced as a `pm:reply-target` event for the speak box below. Nothing here derives a link, a parent or a circle.
+    const __getTok = () => { try { return JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch { return null; } };
+    window.__pmCircleReaders = {
+      async mount(host, roomId, { onState = null } = {}) {
+        const mod = await loadReader({});
+        if (!mod) return { ok: false, why: "the circle reader is not on this site's pinned World yet" };
+        if (typeof mod.READER_CSS === "string" && mod.READER_CSS && !document.querySelector("style[data-circle-reader-css]")) {
+          const style = document.createElement("style");
+          style.setAttribute("data-circle-reader-css", "");
+          style.textContent = mod.READER_CSS;
+          document.head.append(style);
+        }
+        const reader = mod.createCircleReader({
+          doc: document, host, source: officeSource({ base: OFFICE_BASE }), roomId,
+          canReply: tokenIsFresh(__getTok()),
+          onReply: (target) => document.dispatchEvent(new CustomEvent("pm:reply-target", { detail: target })),
+          onState,
+          hrefForCircle: (c) => `#circle-${encodeURIComponent(c)}`,
+        });
+        await reader.showRoom(roomId);
+        return { ok: true, reader };
+      },
+    };
+    document.dispatchEvent(new CustomEvent("pm:circles-ready"));
     const HUMAN = "__human__";     // a select value no handle can collide with
     const MAX = 500;
 
@@ -643,6 +920,31 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     const statusEl = $("[data-say-status]");
     const bounceEl = $("[data-say-bounce]");
     const heardEl = $("[data-say-heard]");
+    const linkedEl = $("[data-say-linked]");
+    const replyEl = $("[data-say-reply]");
+    const replyTextEl = $("[data-say-reply-text]");
+
+    // ── the reply target ─────────────────────────────────────────────────────
+    // A Reply pressed in a circle hands over { id, handle, said }: the id is the one the OFFICE served on that line, the words are
+    // theirs (text, cut for the row). `reply_to` rides the say only while a target is chosen, and is cleared once the say lands.
+    let replyTarget = null;
+    const SAID_CUT = 80;
+    function renderReply() {
+      if (!replyEl) return;
+      replyEl.hidden = !replyTarget;
+      if (!replyTarget) { replyTextEl.textContent = ""; return; }
+      const said = [...replyTarget.said];
+      replyTextEl.textContent = "replying to " + replyTarget.handle + ": " + (said.length > SAID_CUT ? said.slice(0, SAID_CUT).join("") + "…" : replyTarget.said);
+    }
+    document.addEventListener("pm:reply-target", (ev) => {
+      const t = ev.detail;
+      if (!t || t.id === undefined || t.id === null || !form || form.hidden) return;
+      replyTarget = { id: t.id, handle: String(t.handle ?? ""), said: String(t.said ?? "") };
+      renderReply();
+      form.scrollIntoView?.({ block: "nearest" });
+      textEl?.focus();
+    });
+    $("[data-say-reply-clear]")?.addEventListener("click", () => { replyTarget = null; renderReply(); textEl?.focus(); });
 
     function only(el) {
       for (const s of [gateOut, gateVisitor, form]) if (s) s.hidden = s !== el;
@@ -711,10 +1013,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       const tok = getTok();
       if (!tokenIsFresh(tok)) { boot(); return; }
       const as = asEl.value;
-      const payload = as === HUMAN ? { human: true, text } : { handle: as, text };
+      // reply_to is ADDITIVE: absent unless a Reply was chosen, and exactly the id the office served on that line
+      const payload = { ...(as === HUMAN ? { human: true, text } : { handle: as, text }), ...(replyTarget ? { reply_to: replyTarget.id } : {}) };
 
       clearBounce();
       heardEl.hidden = true;
+      linkedEl.hidden = true; linkedEl.textContent = "";
       speaking = true; sendBtn.disabled = true; setStatus("saying it…");
       let res, data;
       try {
@@ -738,6 +1042,10 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       textEl.value = "";
       syncCount();
       showHeard(data);
+      // the office's own sentence about the link (`said.note`: "linked by name"; `said.id_note`: why a say has no act number), as served
+      const notes = [data.said?.note, data.said?.id_note].filter((n) => typeof n === "string" && n.trim()).map((n) => n.trim());
+      if (notes.length) { linkedEl.textContent = notes.join(" "); linkedEl.hidden = false; }
+      replyTarget = null; renderReply();      // a reply is answered once; the next say starts clean
       // the threads are painted by the inline poller; ask it for an immediate
       // repaint so the speaker watches their own voice arrive
       document.dispatchEvent(new CustomEvent("pm:spoke"));
@@ -1020,5 +1328,19 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     .convo .c-foot { margin: 2.5rem 0 1rem; padding-top: 1.2rem; border-top: 1px dashed rgba(232, 196, 139, 0.22); }
     .convo .c-foot p { margin: 0 0 0.6em; line-height: 1.6; }
     .convo .c-fine { font-size: 0.78rem; color: rgba(185, 173, 147, 0.85); }
+
+    /* CORE-82: the circle reader's host inside a room card, the flat floor's note, the reply target and the #circle- note.
+       The reader brings its own stylesheet (READER_CSS, added once by the module script). */
+    .convo .c-circles { margin: 0.7em 0 0; color: #f0e6d0; font-size: 0.92rem; line-height: 1.55; overflow-wrap: anywhere; }
+    .convo .c-circles-note { margin: 0.7em 0 0.3em; }
+    .convo .c-voices[hidden], .convo .c-circles-note[hidden], .convo .c-say-reply[hidden], .convo .c-say-linked[hidden], .convo .c-circle-note[hidden] { display: none; }
+    .convo .c-circle-note { margin: 0.4em 0 1em; }
+    .convo .c-say-reply {
+      display: flex; align-items: center; gap: 0.7em; flex-wrap: wrap; margin: 0 0 0.5em;
+      padding: 0.5em 0.8em; border-radius: 8px; border: 1px dashed rgba(232, 196, 139, 0.4);
+      color: rgba(246, 230, 196, 0.95); font-size: 0.86rem; line-height: 1.5;
+    }
+    .convo .c-say-reply-text { min-width: 0; overflow-wrap: anywhere; }
+    .convo .c-say-linked { font-style: normal; }
   </style>
 </PostmarkLayout>

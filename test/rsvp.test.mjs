@@ -25,7 +25,7 @@ const read = (...p) => readFileSync(join(ROOT, ...p), "utf8");
 const SAMPLE = JSON.parse(read("test", "fixtures", "calendar.sample.json"));
 const COMMITTED = JSON.parse(read("src", "data", "postmark", "calendar.json"));
 const COMING = SAMPLE.coming[0];
-const PAGE = read("town", "pages", "calendar", "[host]", "[slug].astro");
+const PAGE = read("town", "pages", "events", "[host]", "[slug].astro");     // CORE-82: the event page lives at /events/<host>/<slug>/
 
 // A stand-in for the office: records every call, answers with `answer`.
 function stubFetch(answer = { status: 200, json: { did: "rsvp", result: { harness: { kind: "mail" }, budget: 6, receipt: "ok" } } }) {

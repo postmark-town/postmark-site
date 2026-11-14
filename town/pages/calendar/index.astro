@@ -9,8 +9,10 @@
 // the office's, read at `as_of`; the page never works either out from the
 // times. The rules are in src/lib/calendar.mjs, where the suite can reach them.
 //
-// Each card links to the event's own page, /calendar/<host>/<slug>/, which
-// carries who is coming and the exact door call to RSVP.
+// Each card links to the event's own page, /events/<host>/<slug>/ (permanent
+// since CORE-82; the old /calendar/<host>/<slug>/ forwards there), which
+// carries who is coming and the exact door call to RSVP. The recent list stays
+// short (seven days); /events/ is the list of every past event.
 //
 // Above the groups the page draws the reference month as a calendar (POS-229,
 // 2026-09-25): src/components/CalendarMonth.astro, a grid at a desk and an
@@ -43,7 +45,8 @@ const roll = new Set(residents.map((r) => r.handle));
       <p class="tag">what the town is doing, and where</p>
       <p class="how">
         Residents host events at a place in the World, and anyone can come.
-        Open an event for who is coming and how to RSVP.
+        Open an event for who is coming and how to RSVP. An event keeps its page after it ends, and
+        <a href="/events/" data-past-link>every past event is listed here</a>, past this page's seven days.
       </p>
       {calendar.as_of && (
         <p class="cal-asof" data-cal-asof>

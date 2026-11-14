@@ -41,6 +41,7 @@ export const DATA_FILES = [
   "docs.json",
   "stats.json",
   "calendar.json",
+  "events.json",
   "quest-posts.json",
   "idea-posts.json",
   "renames.json",
@@ -1062,6 +1063,11 @@ export async function buildOfficeData({
   const calendar = calendarRead.missing ? readSnapshot("calendar.json", EMPTY_CALENDAR) : calendarRead.calendar;
   if (calendarRead.missing) endpointGaps.push(CALENDAR_GAP);
 
+  // THE LASTING EVENTS (CORE-82): the past-events list and each event's evidence, kept beside the calendar. Never fatal: a door that
+  // is not live says "unavailable" in the file and a gap here, and the committed snapshot's events stand.
+  const eventsRead = await fetchEvents({ apiBase, fetchImpl, retries, gate, calendar, snapshot: readSnapshot("events.json", EMPTY_EVENTS) });
+  endpointGaps.push(...eventsRead.gaps);
+
   const questRead = await fetchQuestPosts({ apiBase, fetchImpl, retries, gate });
   const questPosts = questRead.missing ? readSnapshot("quest-posts.json", EMPTY_QUEST_POSTS) : questRead.questPosts;
   if (questRead.missing) endpointGaps.push(questRead.gap);
@@ -1100,6 +1106,7 @@ export async function buildOfficeData({
       "docs.json": docs,
       "stats.json": buildStats({ town, metrics, residents, letters, ledger, snapshotStats }),
       "calendar.json": calendar,
+      "events.json": eventsRead.events,
       "quest-posts.json": questPosts,
       "idea-posts.json": ideaPosts,
       "renames.json": renames,
@@ -1179,6 +1186,97 @@ export async function fetchCalendar({ apiBase, fetchImpl = fetch, retries = 3, g
   }
   return { missing: false, calendar: body };
 }
+
+// ── THE LASTING EVENTS (CORE-82, 2026-11-14) ────────────────────────────────
+// An event keeps its page after it ends (CORE-70 calls 13 and 25), so the site needs two reads the calendar does not give:
+//
+//   the lasting list   `town { read: "calendar", args: { past: true } }` through the keyless apex twin
+//                      `GET /town/apex?read=calendar&args={"past":true[,"before":<ends ISO>]}`:
+//                      { as_of, past: [eventView…], next: { past: true, before }|null, note }, newest end first, 40 a page
+//   the one-event read `GET /calendar/<host>/<slug>`: { event: { …, evidence } } once the doors have opened, never on a cancelled event
+//
+// Both are the office's POS-1035 producer reads. Until the office serves them the door answers 404/422 ("unknown argument past"),
+// and that is NOT an empty list: the file says `read: "unavailable"` so the page says the list isn't available, and the committed
+// snapshot's events (if any) are kept. A single event whose read fails is `read: "unavailable"` too, which the page shows as "couldn't
+// read it", never as no conversation and no gallery. The site works out none of it (no attendance, no spark, no membership).
+//
+// events.json = { as_of, past: { events, next, note, read: "office"|"unavailable"|"absent" }, evidence: { <id>: { read: "ok"|"unavailable", event? } } }
+export const EMPTY_EVENTS = Object.freeze({ as_of: null, past: { events: [], next: null, note: null, read: "absent" }, evidence: {} });
+export const EVENTS_GAP = "events.json: the office's lasting list of past events is not served yet (GET /town/apex?read=calendar&args={past:true} was refused), so /events/ lists only what the calendar still carries and says so";
+export const PAST_PAGES_MAX = 25;      // 40 a page: up to 1,000 past events a build
+export const EVIDENCE_MAX = 400;       // one-event reads per build, newest ends first
+const REFUSED = new Set([400, 404, 405, 422]);
+
+export async function fetchPastEvents({ apiBase, fetchImpl = fetch, retries = 3, gate = null, maxPages = PAST_PAGES_MAX } = {}) {
+  const events = [];
+  let next = null;
+  let note = null;
+  let asOf = null;
+  let before = null;
+  for (let page = 0; page < maxPages; page++) {
+    const args = encodeURIComponent(JSON.stringify({ past: true, ...(before ? { before } : {}) }));
+    let body;
+    try {
+      ({ body } = await apiGet(`/town/apex?read=calendar&args=${args}`, { apiBase, fetchImpl, retries, gate }));
+    } catch (error) {
+      if (REFUSED.has(error?.status)) return page === 0 ? { read: "unavailable", events: [], next: null, note: null, asOf: null } : { read: "office", events, next: { past: true, before }, note, asOf };
+      throw error;
+    }
+    if (!Array.isArray(body?.past)) throw new Error(`/town/apex?read=calendar&args={past}: "past" is not an array, so this is not the lasting list the contract names`);
+    events.push(...body.past);
+    asOf = body.as_of ?? asOf;
+    note = body.note ?? note;
+    next = body.next && typeof body.next === "object" && body.next.before ? body.next : null;
+    if (!next) break;
+    before = next.before;
+  }
+  return { read: "office", events, next, note, asOf };
+}
+
+/** The one-event read for each event that has had its doors open and is not cancelled; a failure is `unavailable`, never an empty answer. */
+export async function fetchEventEvidence({ apiBase, fetchImpl = fetch, retries = 3, gate = null, events = [], max = EVIDENCE_MAX } = {}) {
+  const wanted = events
+    .filter((e) => e && typeof e.id === "string" && /^[^/]+\/[^/]+$/.test(e.id) && e.phase !== "announced" && !e.cancelled)
+    .sort((a, b) => String(b.ends).localeCompare(String(a.ends)))
+    .slice(0, max);
+  const evidence = {};
+  const BATCH = 4;
+  for (let i = 0; i < wanted.length; i += BATCH) {
+    await Promise.all(wanted.slice(i, i + BATCH).map(async (e) => {
+      const [host, slug] = e.id.split("/");
+      try {
+        const { body } = await apiGet(`/calendar/${encodeURIComponent(host)}/${encodeURIComponent(slug)}`, { apiBase, fetchImpl, retries, gate });
+        evidence[e.id] = body?.event && typeof body.event === "object" ? { read: "ok", event: body.event } : { read: "unavailable" };
+      } catch {
+        evidence[e.id] = { read: "unavailable" };
+      }
+    }));
+  }
+  return evidence;
+}
+
+/** Both reads, as events.json. `snapshot` is the committed file: its events stand while the lasting list is not served. */
+export async function fetchEvents({ apiBase, fetchImpl = fetch, retries = 3, gate = null, calendar = EMPTY_CALENDAR, snapshot = EMPTY_EVENTS } = {}) {
+  const past = await fetchPastEvents({ apiBase, fetchImpl, retries, gate });
+  const kept = past.read === "unavailable" && Array.isArray(snapshot?.past?.events) ? snapshot.past.events : [];
+  const pastEvents = past.read === "unavailable" ? kept : past.events;
+  const seen = new Set();
+  const all = [...GROUP_KEYS.flatMap((k) => (Array.isArray(calendar?.[k]) ? calendar[k] : [])), ...pastEvents].filter((e) => e && !seen.has(e.id) && seen.add(e.id));
+  const evidence = await fetchEventEvidence({ apiBase, fetchImpl, retries, gate, events: all });
+  const failed = Object.values(evidence).filter((v) => v.read !== "ok").length;
+  return {
+    events: {
+      as_of: past.asOf ?? calendar?.as_of ?? null,
+      past: { events: pastEvents, next: past.read === "unavailable" ? null : past.next, note: past.note, read: past.read },
+      evidence,
+    },
+    gaps: [
+      ...(past.read === "unavailable" ? [EVENTS_GAP] : []),
+      ...(failed ? [`events.json: ${failed} of ${Object.keys(evidence).length} one-event reads were not served, so those events' pages say their evidence couldn't be read`] : []),
+    ],
+  };
+}
+const GROUP_KEYS = ["now", "coming", "ended"];
 
 // ── THE QUEST POSTS (POS-294, 2026-09-28) ───────────────────────────────────
 // The town's quests are its posts (Keemin, 2026-09-28), and the Quest Guild

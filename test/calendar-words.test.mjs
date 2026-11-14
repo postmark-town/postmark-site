@@ -24,7 +24,7 @@ import { PHASE_WORDS, ZONE_FLOOR, placeOf, whenLine, zoneLine } from "../src/lib
 const ROOT = join(import.meta.dirname, "..");
 const read = (...p) => readFileSync(join(ROOT, ...p), "utf8");
 const INDEX = read("town", "pages", "calendar", "index.astro");
-const EVENT = read("town", "pages", "calendar", "[host]", "[slug].astro");
+const EVENT = read("town", "pages", "events", "[host]", "[slug].astro");     // CORE-82: the event page lives at /events/<host>/<slug>/
 const MONTH_PAGE = read("town", "pages", "calendar", "[month].astro");
 const CARD = read("src", "components", "CalendarCard.astro");
 const MONTH = read("src", "components", "CalendarMonth.astro");

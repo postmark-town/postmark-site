@@ -303,7 +303,13 @@ test("a press while one is in flight asks nothing more; an office that does not 
 test("source pins (text pins, labelled): the poll asks for one page; the old lazy accumulation is gone; the page holds the map's 40", () => {
   assert.match(page, /fetch\(pageUrl\(null\)/, "the poll asks for the newest page");
   assert.doesNotMatch(page, /shown \+= CHUNK/, "no chunked growth");
-  assert.doesNotMatch(page, /new IntersectionObserver/, "no scroll-triggered growth");
-  assert.match(page, /for \(var i = 0; i < threads\.length; i\+\+\) box\.appendChild\(threadNode\(threads\[i\]\)\)/, "one card per thread of the page held");
+  // CORE-82: an IntersectionObserver now exists, but ONLY to mount a finished room's circle reader when it nears the screen (ensureReader):
+  // it never grows the list. The pin is that nothing near it touches closedList / the page held.
+  const io = page.slice(page.indexOf("new IntersectionObserver"), page.indexOf("function hook()"));
+  assert.match(io, /ensureReader\(e\.target, false\)/, "the observer mounts a reader");
+  assert.doesNotMatch(io, /closedList|CLOSED_PAGE|showEarlier|goPage/, "and grows no page: no scroll-triggered growth");
+  // CORE-82: the cards are RECONCILED (kept by thread key), still one per thread of the page held
+  assert.match(page, /threads\.forEach\(function \(t\) \{\s*var key = threadKey\(t\);/, "one card per thread of the page held, kept by its key");
+  assert.match(page, /if \(at !== card\) box\.insertBefore\(card, at\)/, "a card moves only when it is out of place");
   assert.match(page, /var CLOSED_PAGE = 40;/);
 });
