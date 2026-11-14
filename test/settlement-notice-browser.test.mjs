@@ -351,7 +351,7 @@ test("EVERY WORD IN THE POPOVER is plain, through the real popover on a real tap
     await p.tapAt(c.x, c.y);
     await p.until(OPEN, "the popover to open on a real tap");
     const said = await p.evalJs(`(() => { const pop = document.querySelector("[data-pm-alert-pop]"); return { text: pop.innerText.replace(/\\s+/g, " ").trim(), headline: pop.querySelector("[data-pm-alert-headline]").textContent, rows: [...pop.querySelectorAll(".pm-alert-row")].map((l) => l.textContent.replace(/\\s+/g, " ").trim()) }; })()`);
-    assert.equal(said.headline, "2 things on the town's pages aren't right.", "the headline is plain (not the sentinel's)");
+    assert.equal(said.headline, "2 things aren't working as they should.", "the headline is plain (not the sentinel's), and true of rows that are not pages");
     assert.equal(said.rows.length, 2);
     assert.ok(said.rows[0].endsWith("the site's rebuild — The site isn't rebuilding as it should, so its pages may be out of date. 48 households' pages are missing from the site."), `the refresh row keeps its count in plain words (${said.rows[0]})`);
     assert.ok(said.rows[1].endsWith("the server — The server is running low on space."), `the disk row (${said.rows[1]})`);

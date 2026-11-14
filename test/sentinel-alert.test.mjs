@@ -60,7 +60,7 @@ test("ONE DOWN PROBE: the glyph shows, and the popover carries the board's headl
   const view = alertFromBoard(board);
   assert.equal(view.show, true, "a DOWN probe must raise the glyph");
   assert.equal(view.status, "DOWN");
-  assert.equal(view.headline, "One thing on the town's pages isn't right.", "the headline is plain and counts the rows; the sentinel's own is not printed (CORE-41)");
+  assert.equal(view.headline, "One thing isn't working as it should.", "the headline is plain and counts the rows; the sentinel's own is not printed (CORE-41)");
   assert.ok(!/green|DOWN|see the board|2026-/.test(view.headline), "no operator count, verdict word or timestamp in the headline");
   assert.equal(view.rows.length, 1, "only the bad probe is listed \u2014 the popover is not the whole board");
   assert.equal(view.rows[0].label, "the site's rebuild");
@@ -129,9 +129,10 @@ const BAD_KEYS = [
   ["site_home", "up"], ["site_daily", "up"], ["site_world", "up"], ["site_bulletin", "up"], ["office_api", "up"], ["dev_site", "up"],
   ["site_crossing", "fresh"], ["site_build_problems", "fresh"], ["site_code", "fresh"], ["site_town_data", "fresh"], ["office_as_of", "fresh"], ["site_daily_content", "fresh"],
   ["usdc_watch", "watcher"], ["stripe_watch", "watcher"], ["site_refresh", "refresh"], ["town_clone", "clone"], ["disk_root", "disk"], ["meeps", "meeps"],
-  ["settlement", "settlement"], ["law_pen", "law_pen"], ["linear_handler", "workflow"], ["some_new_probe", "some_new_kind"], [undefined, undefined],
+  ["settlement", "settlement"], ["law_pen", "law_pen"], ["workflow_deploy", "workflow"], ["linear_handler_postmark_office", "workflow"], ["linear_handler_postmark_telemetry", "workflow"],
+  ["constructor", "constructor"], ["__proto__", "__proto__"], ["toString", "hasOwnProperty"], ["valueOf", "toString"], ["hasOwnProperty", "refresh"], [undefined, "__proto__"], ["some_new_probe", "some_new_kind"], [undefined, undefined],
 ];
-const OPERATOR_WORDS = /SHIPPING|postmark-telemetry|§|\/srv|git |fetch-town|journalctl|2026-|\.mjs|\.json|timer|sentinel|probe|cadence|mtime|workflow "|crossing \d|checkout/i;
+const OPERATOR_WORDS = /SHIPPING|postmark-telemetry|§|\/srv|git |fetch-town|journalctl|2026-|\.mjs|\.json|timer|sentinel|probe|cadence|mtime|workflow "|crossing \d|checkout|linear|handler|undefined|\[object|looked at|waiting on a fix|working on|fixing/i;
 
 test("EVERY BAD ROW, for every probe key and kind, is in resident words: no operator reason, repo, section, path, command or timestamp escapes", () => {
   for (const verdict of ["DOWN", "STALE"]) {
@@ -149,16 +150,58 @@ test("EVERY BAD ROW, for every probe key and kind, is in resident words: no oper
   assert.equal(odd.rows[0].detail, GENERIC_ROW.detail);
 });
 
+test("THE WORDS SAY ONLY WHAT EACH PROBE ESTABLISHES: shared kinds, DOWN versus STALE, no cause, no 'someone is on it' (CORE-41 review)", () => {
+  const row = (extra) => alertFromBoard(lateBoard("OK", { extra: [extra] }), { nowMs: NOW }).rows[0];
+  // kind "workflow" is shared: the site's Deploy workflow says the site's update; the Linear handler's per-repo rows are operator tooling and say nothing about the site
+  assert.match(row({ key: "workflow_deploy", kind: "workflow", verdict: "DOWN", reason: OPERATOR }).detail, /^The site's last automatic update didn't go through/);
+  for (const key of ["linear_handler_postmark_office", "linear_handler_postmark_telemetry", "workflow_some_new_workflow"]) {
+    assert.equal(row({ key, kind: "workflow", verdict: "DOWN", reason: OPERATOR }).detail, GENERIC_ROW.detail, `${key}: nothing about the site is claimed`);
+  }
+  // kind "fresh" is shared: the build-problems probe PUBLISHED, so it is not "behind the town"
+  const bp = row({ key: "site_build_problems", kind: "fresh", verdict: "STALE", reason: "the site published with 3 problems its build could not get: a · b" });
+  assert.ok(!/behind|older|newest/.test(bp.detail), `a published site with missing pieces is not 'behind' (${bp.detail})`);
+  assert.match(bp.detail, /published without everything it asked for/);
+  assert.equal(row({ key: "some_new_freshness_probe", kind: "fresh", verdict: "STALE", reason: OPERATOR }).detail, GENERIC_ROW.detail, "an unknown freshness probe is not called 'behind the town'");
+  // DOWN and STALE mean different things for the law pen and the helper watch
+  for (const key of ["law_pen", "meeps"]) {
+    const d = row({ key, kind: key, verdict: "DOWN", reason: OPERATOR }).detail, s = row({ key, kind: key, verdict: "STALE", reason: OPERATOR }).detail;
+    assert.notEqual(d, s, `${key}: DOWN and STALE are not the same sentence`);
+  }
+  assert.match(row({ key: "meeps", kind: "meeps", verdict: "DOWN" }).detail, /reporting a problem/, "a helper record that reports DOWN is not 'hasn't reported'");
+  assert.match(row({ key: "meeps", kind: "meeps", verdict: "STALE" }).detail, /hasn't reported in lately/);
+  assert.match(row({ key: "law_pen", kind: "law_pen", verdict: "STALE" }).detail, /hasn't reported in lately/, "a pen that has not run is not 'waiting on a fix'");
+  assert.match(row({ key: "law_pen", kind: "law_pen", verdict: "DOWN" }).detail, /isn't taking effect/);
+  // no sentence anywhere says anyone is already on it, or names a cause
+  const everything = BAD_KEYS.flatMap(([key, kind]) => ["DOWN", "STALE"].map((verdict) => row({ key, kind, verdict, reason: OPERATOR }).detail)).join(" | ");
+  assert.ok(!/looked at|being (?:fixed|handled|worked)|we're|we are|working on|waiting on a fix/i.test(everything), `no promise of attention (${everything})`);
+});
+
+test("A PROBE WHOSE KEY OR KIND IS AN INHERITED PROPERTY NAME is an unknown probe: it prints no prose, prints no 'undefined', and never throws, through alertFromBoard", () => {
+  for (const name of ["constructor", "__proto__", "toString", "valueOf", "hasOwnProperty", "isPrototypeOf"]) {
+    for (const probe of [{ key: name }, { kind: name }, { key: name, kind: name }]) {
+      for (const verdict of ["DOWN", "STALE"]) {
+        let view;
+        assert.doesNotThrow(() => { view = alertFromBoard(lateBoard("OK", { extra: [{ ...probe, verdict, reason: OPERATOR, detail: OPERATOR }] }), { nowMs: NOW }); }, `${JSON.stringify(probe)}/${verdict} does not throw`);
+        assert.equal(view.show, true, "classification unchanged: the glyph still shows");
+        assert.equal(view.rows[0].detail, GENERIC_ROW.detail, `${JSON.stringify(probe)}/${verdict}: the generic line, no board prose, no 'undefined'`);
+        assert.equal(view.rows[0].label, GENERIC_ROW.label);
+      }
+    }
+  }
+  assert.doesNotThrow(() => plainRow({ key: "refresh", kind: "__proto__", verdict: "constructor" }));
+});
+
 test("USEFUL COUNTS survive in plain words, and the sentinel's own headline is replaced by a plain count of the rows", () => {
   const refresh = (detail) => alertFromBoard(liveBoard([{ key: "site_refresh", kind: "refresh", label: "x", verdict: "DOWN", reason: `x failed: ${detail}`, detail }]), { nowMs: NOW });
   assert.match(refresh("SNAPSHOT SHORT — residents.json keeps 134 rows; the checkout has 182 households; 48 doors are missing").rows[0].detail, /48 households' pages are missing from the site\.$/);
   assert.match(refresh("1 door is missing").rows[0].detail, /1 household's page is missing from the site\.$/);
   assert.equal(refresh("fetch-town.mjs tripped").rows[0].detail, "The site isn't rebuilding as it should, so its pages may be out of date.", "no count in the prose: no count printed");
   const problems = alertFromBoard(liveBoard([{ key: "site_build_problems", kind: "fresh", verdict: "DOWN", reason: "the site published with 3 problems its build could not get: a · b · c" }]));
-  assert.match(problems.rows[0].detail, /couldn't get 3 things it asked for/);
+  assert.equal(problems.rows[0].detail, "The site was published without everything it asked for, so some pages may be missing details. 3 things couldn't be fetched.");
   assert.ok(!problems.rows[0].detail.includes("a · b"), "and not the problems' own operator text");
   const two = alertFromBoard(lateBoard("DOWN", { extra: [{ key: "disk_root", kind: "disk", verdict: "DOWN", reason: OPERATOR }] }), { nowMs: NOW });
-  assert.equal(two.headline, "2 things on the town's pages aren't right.");
+  assert.equal(two.headline, "2 things aren't working as they should.");
+  assert.ok(!/pages/.test(two.headline), "the rows are not all pages (a disk, payment checks, the helpers, the law), so the headline says things");
   assert.equal(plainRow(null).detail, GENERIC_ROW.detail, "plainRow never throws on junk");
 });
 
