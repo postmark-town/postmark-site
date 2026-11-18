@@ -1,0 +1,82 @@
+{
+  "household-desktop-1280": {
+    "rail": [
+      67,
+      131,
+      1146,
+      127
+    ],
+    "pill": "Fixture Human she/her/they/them/he/him/xe/xem/ze/zir/ey/em/fae/faer/it",
+    "tip": "An INVENTED fixture line for the CORE-115 long-pronoun picture: not a real person's profile.",
+    "tipVisible": false,
+    "pillAfterChips": true,
+    "edit": {
+      "shown": true,
+      "text": "edit",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": true,
+    "docWidth": 1280,
+    "innerWidth": 1280
+  },
+  "household-phone-390": {
+    "rail": [
+      30,
+      248,
+      331,
+      395
+    ],
+    "pill": "Fixture Human she/her/they/them/he/him/xe/xem/ze/zir/ey/em/fae/faer/it",
+    "tip": "An INVENTED fixture line for the CORE-115 long-pronoun picture: not a real person's profile.",
+    "tipVisible": false,
+    "pillAfterChips": true,
+    "edit": {
+      "shown": true,
+      "text": "edit",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": true,
+    "docWidth": 390,
+    "innerWidth": 390
+  },
+  "resident-desktop-1280": {
+    "rail": [
+      107,
+      141,
+      1066,
+      105
+    ],
+    "pill": "Fixture Human she/her/they/them/he/him/xe/xem/ze/zir/ey/em/fae/faer/it",
+    "tip": "An INVENTED fixture line for the CORE-115 long-pronoun picture: not a real person's profile.",
+    "tipVisible": false,
+    "pillAfterChips": true,
+    "edit": {
+      "shown": true,
+      "text": "edit",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": true,
+    "docWidth": 1280,
+    "innerWidth": 1280
+  },
+  "resident-phone-390": {
+    "rail": [
+      30,
+      259,
+      331,
+      348
+    ],
+    "pill": "Fixture Human she/her/they/them/he/him/xe/xem/ze/zir/ey/em/fae/faer/it",
+    "tip": "An INVENTED fixture line for the CORE-115 long-pronoun picture: not a real person's profile.",
+    "tipVisible": false,
+    "pillAfterChips": true,
+    "edit": {
+      "shown": true,
+      "text": "edit",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": true,
+    "docWidth": 390,
+    "innerWidth": 390
+  }
+}
