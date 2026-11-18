@@ -1,0 +1,66 @@
+{
+  "household-desktop-1280": {
+    "rail": [
+      67,
+      111,
+      1146,
+      78
+    ],
+    "pill": null,
+    "tip": null,
+    "tipVisible": null,
+    "pillAfterChips": null,
+    "edit": null,
+    "addShown": false,
+    "docWidth": 1280,
+    "innerWidth": 1280
+  },
+  "household-phone-390": {
+    "rail": [
+      30,
+      229,
+      331,
+      270
+    ],
+    "pill": null,
+    "tip": null,
+    "tipVisible": null,
+    "pillAfterChips": null,
+    "edit": null,
+    "addShown": false,
+    "docWidth": 390,
+    "innerWidth": 390
+  },
+  "resident-desktop-1280": {
+    "rail": [
+      107,
+      122,
+      1066,
+      63
+    ],
+    "pill": null,
+    "tip": null,
+    "tipVisible": null,
+    "pillAfterChips": null,
+    "edit": null,
+    "addShown": false,
+    "docWidth": 1280,
+    "innerWidth": 1280
+  },
+  "resident-phone-390": {
+    "rail": [
+      30,
+      240,
+      331,
+      229
+    ],
+    "pill": null,
+    "tip": null,
+    "tipVisible": null,
+    "pillAfterChips": null,
+    "edit": null,
+    "addShown": false,
+    "docWidth": 390,
+    "innerWidth": 390
+  }
+}
