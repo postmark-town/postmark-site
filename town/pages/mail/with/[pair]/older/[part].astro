@@ -5,38 +5,23 @@
 // markup the JSON chunk beside it carries.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import MailLetters from "@/components/MailLetters.astro";
-import letters from "@/data/postmark/letters.json";
-import threads from "@/data/postmark/threads.json";
-import media from "@/data/postmark/media.json";
-import ledger from "@/data/postmark/ledger.json";
-import { fmtDate } from "@/lib/pm.mjs";
 import { letterPartHref } from "@/lib/mail.mjs";
-import { pairViews, deliveredOnOf, pairLettersHtml } from "@/lib/mail-letter.mjs";
-import { residentHref } from "@/lib/resident-pages.mjs";
-import residents from "@/data/postmark/residents.json";
-import { handlesPreview, sectionCard } from "@/lib/og-image.mjs";
+import { pairOlderPagePaths } from "@/lib/mail-routes.mjs";
 
+// INCREMENTAL (POS-1085): this page reads ONLY its props (src/lib/mail-routes.mjs
+// makes them, the share card included). Import no data/postmark JSON here:
+// test/incremental-pages.test.mjs.
 export function getStaticPaths() {
-  const deliveredOn = deliveredOnOf(ledger);
-  return [...pairViews(letters, threads, ledger).values()].flatMap((view) =>
-    view.parts.slice(1).map((ls, i) => ({
-      params: { pair: view.key, part: String(i + 2) },
-      props: { view, part: i + 2, html: pairLettersHtml(view, ls, { media, deliveredOn, hrefOf: residentHref }), ls },
-    })));
+  return pairOlderPagePaths();
 }
 
-const { view, part, html, ls } = Astro.props;
-const { a, b } = view;
-const base = `/mail/with/${view.key}/`;
-const parts = view.parts.length;
-// A shared link previews with the first correspondent's face, then the
-// other's, then the Mail's card (POS-616, og-image.mjs).
-const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r])), sectionCard("mail"), { media });
+const { key, a, b, part, parts, count, firstDate, lastDate, html, preview } = Astro.props;
+const base = `/mail/with/${key}/`;
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "letters" }', get: "/api/letters" }}
   title={`${a} & ${b}, older letters (${part} of ${parts}) — a Postmark correspondence`}
-  description={`Letters between ${a} and ${b}, ${fmtDate(ls[0].date)} to ${fmtDate(ls[ls.length - 1].date)}.`}
+  description={`Letters between ${a} and ${b}, ${firstDate} to ${lastDate}.`}
   active="mail"
   image={preview.image}
   card={preview.card}
@@ -47,7 +32,7 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
     </p>
     <header class="older-head">
       <h1><a href={base}>{a} <span class="amp">&amp;</span> {b}</a></h1>
-      <p class="tag">{ls.length} older letters, {fmtDate(ls[0].date)} to {fmtDate(ls[ls.length - 1].date)}</p>
+      <p class="tag">{count} older letters, {firstDate} to {lastDate}</p>
     </header>
     <nav class="older-steps" aria-label="parts of this correspondence">
       <a class="pm-btn ghost" href={letterPartHref(part - 1, base)}>↓ newer letters</a>

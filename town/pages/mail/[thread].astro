@@ -5,32 +5,24 @@
 // The letters load in parts (POS-274): the page renders the newest
 // LETTERS_PART_SIZE; the older ones are static pages at older/<k>/ and JSON
 // chunks at older/<k>.json from the same build (MailLetters, MailOlder).
+//
+// INCREMENTAL (POS-1085): this page reads ONLY its props. The opener's share
+// card, each participant's page link and the letters' markup are made in
+// getStaticPaths (src/lib/mail-routes.mjs) and ride in as props, so the route's
+// key is the hash of everything the page shows. Import no data/postmark JSON and
+// no resident-pages here: test/incremental-pages.test.mjs fails if one comes back.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import MailLetters from "@/components/MailLetters.astro";
-import threads from "@/data/postmark/threads.json";
-import letters from "@/data/postmark/letters.json";
-import media from "@/data/postmark/media.json";
 import { threadTitle } from "@/lib/pm.mjs";
-import { threadViews, threadLettersHtml } from "@/lib/mail-letter.mjs";
-import { residentHref } from "@/lib/resident-pages.mjs";
-import residents from "@/data/postmark/residents.json";
-import { handlesPreview, openerFirst, sectionCard } from "@/lib/og-image.mjs";
+import { threadPagePaths } from "@/lib/mail-routes.mjs";
 
 export function getStaticPaths() {
-  return threadViews(threads, letters).map(({ thread, parts }) => ({
-    params: { thread: thread.key },
-    props: { thread, parts },
-  }));
+  return threadPagePaths();
 }
 
-const { thread, parts } = Astro.props;
+const { thread, preview, links, olderIds, html } = Astro.props;
 const title = threadTitle(thread.key);
-const olderIds = parts.slice(1).map((part) => part.map((l) => l.id));
-// A shared link previews with the opener's face, then the other
-// correspondent's, then the Mail's card (POS-616, og-image.mjs).
-const opener = letters.find((l) => l.id === thread.letterIds[0])?.from;
-const preview = handlesPreview(openerFirst(thread.participants, opener),
-  new Map(residents.map((r) => [r.handle, r])), sectionCard("mail"), { media });
+const linkOf = new Map(links.map((l) => [l.handle, l.href]));
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "letter" }', get: "/api/letters/{id}" }}
@@ -49,7 +41,7 @@ const preview = handlesPreview(openerFirst(thread.participants, opener),
       <h1>{title}</h1>
       <p class="tag">
         {thread.participants.map((p, i) => (
-          <>{i > 0 && " · "}{residentHref(p) ? <a href={residentHref(p)}>{p}</a> : p}</>
+          <>{i > 0 && " · "}{linkOf.get(p) ? <a href={linkOf.get(p)}>{p}</a> : p}</>
         ))}
         {" — "}{thread.size} {thread.size === 1 ? "letter" : "letters"}
         {thread.participants.length === 2 && (
@@ -58,7 +50,7 @@ const preview = handlesPreview(openerFirst(thread.participants, opener),
       </p>
     </header>
 
-    <MailLetters html={threadLettersHtml(parts[0], { media, hrefOf: residentHref, threadKey: thread.key })} base={`/mail/${thread.key}/`} olderIds={olderIds} />
+    <MailLetters html={html} base={`/mail/${thread.key}/`} olderIds={olderIds} />
 
     <p class="thread-foot">
       <a class="pm-btn ghost" href="/mail/">← All the mail</a>
