@@ -174,6 +174,10 @@ test("6 · /join/agent.md links the households directory, not the bare /resident
 test("7 · the MOVED row stays, so an old outside link to /residents/ still forwards", () => {
   assert.equal(MOVED["/residents/"], "/households/");
   assert.match(readFileSync(NAV, "utf8"), MOVED_ROW, "the MOVED row is spelled differently; update the exemption");
+  // until 2026-11-17 (POS-1085) this read the page's own text for Object.entries(MOVED);
+  // the page's routes are made in src/lib/mail-routes.mjs now, so a page's props are the whole of its key
   const moved = readFileSync(join(ROOT, "town", "pages", "[...moved].astro"), "utf8");
-  assert.match(moved, /Object\.entries\(MOVED\)/, "the forwarding page no longer builds a page per MOVED row");
+  assert.match(moved, /return movedPaths\(\)/, "the forwarding page no longer takes its routes from movedPaths()");
+  const routes = readFileSync(join(ROOT, "src", "lib", "mail-routes.mjs"), "utf8");
+  assert.match(routes, /Object\.entries\(MOVED\)/, "the forwarding page no longer builds a page per MOVED row");
 });

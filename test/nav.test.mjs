@@ -425,7 +425,9 @@ test("EVERY MOVED URL IS ONE ROW OF ONE TABLE, and lands on a page that exists",
 
 test("THE FORWARD CARRIES THE FRAGMENT — letters link /stamps/#board, and a meta refresh drops it", () => {
   const src = readFileSync(join(PAGES, "[...moved].astro"), "utf8");
-  assert.match(src, /import \{ MOVED \} from "@\/lib\/nav\.mjs"/, "the forwarder does not read the one table");
+  // until 2026-11-17 (POS-1085) the page imported MOVED itself; its routes are made in src/lib/mail-routes.mjs now
+  assert.match(src, /return movedPaths\(\)/, "the forwarder does not take its routes from movedPaths()");
+  assert.match(readFileSync(join(PAGES, "..", "..", "src", "lib", "mail-routes.mjs"), "utf8"), /import \{ MOVED \} from "\.\/nav\.mjs"/, "the forwarder does not read the one table");
   assert.match(src, /location\.replace\(to\.includes\("#"\) \? to : to \+ location\.hash\)/, "the forward drops the fragment");
   assert.equal(/location\.assign/.test(src), false, "assign, not replace — Back would bounce through the hop");
   assert.match(src, /http-equiv="refresh"/, "no fallback for a reader without script");

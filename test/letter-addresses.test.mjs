@@ -125,8 +125,11 @@ const page = (path) => {
 };
 
 test("the forwarder is the Site Lift's one forwarding page, fed by the helper", () => {
-  const src = SRC("town", "pages", "[...moved].astro");
-  assert.match(src, /import \{ letterAddresses \} from "@\/lib\/mail\.mjs"/, "the letter forwards are not written from the one letter map");
+  // until 2026-11-17 (POS-1085) these read the page's own text; its routes are made in
+  // src/lib/mail-routes.mjs now (movedPaths), so the page reads only its props
+  assert.match(SRC("town", "pages", "[...moved].astro"), /return movedPaths\(\)/, "the forwarder does not take its routes from movedPaths()");
+  const src = SRC("src", "lib", "mail-routes.mjs");
+  assert.match(src, /import \{ letterAddresses \} from "\.\/mail\.mjs"/, "the letter forwards are not written from the one letter map");
   assert.match(src, /params: \{ moved: `mail\/\$\{id\}` \}/);
   assert.match(src, /filter\(\(\[id, at\]\) => id !== at\.thread\)/, "a first letter's address is the conversation's real page; a forward there would shadow it");
 });

@@ -132,9 +132,12 @@ test("each page with a picture of its own passes it", () => {
     "mail/with/[pair]/older/[part].astro": "handlesPreview(",
     "calendar/[host]/[slug].astro": "handlesPreview(",
   };
+  // until 2026-11-17 (POS-1085) the four mail pages picked in their own text; they build their
+  // share card in src/lib/mail-routes.mjs now and the page only hands it on (its prop)
+  const inRoutes = new Set(["mail/[thread].astro", "mail/[thread]/older/[part].astro", "mail/with/[pair].astro", "mail/with/[pair]/older/[part].astro"]);
   for (const [page, pick] of Object.entries(pages)) {
     const text = read(`../town/pages/${page}`);
-    assert.ok(text.includes(pick), `${page} picks with ${pick}`);
+    assert.ok((inRoutes.has(page) ? read("../src/lib/mail-routes.mjs") : text).includes(pick), `${page} picks with ${pick}`);
     assert.match(text, /image=\{preview\.image\}\s+card=\{preview\.card\}/, `${page} hands the pick to the layout`);
   }
   for (const page of ["fund/index.astro", "fund/[pot].astro"])
