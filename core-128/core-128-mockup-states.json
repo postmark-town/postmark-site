@@ -1,0 +1,26 @@
+{
+  "desktop-1280": {
+    "lines": 6,
+    "y0": 713,
+    "y1": 1423,
+    "sw": 1280,
+    "iw": 1280,
+    "says": 6,
+    "faces": 6,
+    "humanChip": 1,
+    "monoChips": 0,
+    "imgFaces": 5
+  },
+  "phone-390": {
+    "lines": 6,
+    "y0": 1054,
+    "y1": 2145,
+    "sw": 390,
+    "iw": 390,
+    "says": 6,
+    "faces": 6,
+    "humanChip": 1,
+    "monoChips": 0,
+    "imgFaces": 5
+  }
+}
