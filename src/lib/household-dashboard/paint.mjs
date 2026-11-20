@@ -231,8 +231,11 @@ function paintNeeds(root, needs, ctx) {
     const p = el("p", null, "Marks set down over ground your house holds, waiting for a stance: ");
     needs.stances.by.forEach((x, i) => {
       if (i) p.append(", ");
-      const w = who(ctx.faces, x.handle, ctx.seatHref);
-      p.append(w, " " + x.n);
+      if (x.household) p.append("household-wide " + x.n);
+      else {
+        const w = who(ctx.faces, x.handle, ctx.seatHref);
+        p.append(w, " " + x.n);
+      }
     });
     p.append(".");
     li.appendChild(p);

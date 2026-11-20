@@ -104,3 +104,16 @@ test("countdownOf and leftWords: the clocks' two moments, and what is left of th
   assert.equal(leftWords(t, t), null, "once it has come there is nothing left to count");
   assert.equal(leftWords(t - 1, t), null);
 });
+
+// The Hearth must use the same house-wide stance count as the dashboard (issue #4679).
+test("#4679: the Hearth mail summary does not multiply household stance decisions", () => {
+  const five = ["a", "b", "c", "d", "e"];
+  const ids = ["m1", "m2", "m3", "m4", "m5"];
+  const ds = Object.fromEntries(five.map((h) => [h, {
+    stances: { stances_awaiting: 5, stances_awaiting_ground: "household", awaiting: ids.map((mark) => ({ mark })), complete: true },
+    awaiting: { summary: { new_inbound: 1 }, unplaced_bounces: [] },
+  }]));
+  const summary = mailOf(five, ds);
+  assert.equal(summary.awaitingStance, 5);
+  assert.equal(summary.newInbound, 5, "new inbound correspondence still adds per resident");
+});

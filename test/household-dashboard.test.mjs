@@ -19,7 +19,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { residentFace, accentOf, bioLineOf, spriteOf } from "../src/lib/household-dashboard/faces.mjs";
 import {
   feedOf, splitAtLook, lastActOf, standsAtOf, hungOf, clocksOf, needsOf, comingUpOf,
-  questsOf, numbersOf, readLook, writeLook, parseAt,
+  questsOf, numbersOf, readLook, writeLook, parseAt, stancesOf,
 } from "../src/lib/household-dashboard/fold.mjs";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
@@ -281,4 +281,23 @@ test("both callers pass the canonical house key to readHouse (the Hearth stage a
   // the separate keyless Hearth-script bundle is not handed any private dashboard input
   const reads = read("../src/lib/household-dashboard/reads.mjs");
   assert.match(reads, /readHearthBundle\(key\)[\s\S]{0,200}getJSON\(bundleUrl\(officeOrigin\(\), key\)\)/, "the bundle read is keyless");
+});
+
+// Issue #4679: the office repeats a household-wide stance count on each resident doorstep.
+test("#4679: repeated household marks count once, with overlap and partial reads", () => {
+  const ids = ["a/one", "b/two", "c/three", "d/four", "e/five"];
+  const door = (marks, extra = {}) => ({ stances: {
+    stances_awaiting: marks.length, stances_awaiting_ground: "household",
+    awaiting: marks.map((mark) => ({ mark })), complete: true, ...extra,
+  } });
+  const five = ["a", "b", "c", "d", "e"];
+  const repeated = Object.fromEntries(five.map((handle) => [handle, door(ids)]));
+  assert.equal(needsOf(five, repeated).stances.total, 5, "five copies of five are five, not 25");
+  assert.equal(needsOf(["a"], repeated).stances.total, 5);
+  assert.equal(needsOf(["a", "b"], { a: door(ids.slice(0, 3)), b: door(ids.slice(2)) }).stances.total, 5);
+  assert.equal(needsOf(["a"], { a: door([]) }).stances.total, 0);
+  const partial = stancesOf(["a", "b"], { a: door([ids[0]], { complete: false, stances_awaiting: 5 }) });
+  assert.equal(partial.total, 5, "use the household scope's reported total, not the short page's one ID");
+  assert.equal(partial.complete, false, "do not pretend an absent doorstep answered");
+  assert.equal(needsOf(["a", "b"], { a: { stances: { stances_awaiting: 2 } }, b: { stances: { stances_awaiting: 3 } } }).stances.total, 5, "resident counts remain additive");
 });
