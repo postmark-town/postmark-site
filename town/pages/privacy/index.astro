@@ -1,0 +1,12 @@
+---
+// /privacy/ — the town's privacy policy (CORE-143). The text is blueprints' PRIVACY.md, shown as it stands; see LegalPage.
+import LegalPage from "@/components/LegalPage.astro";
+import markdown from "@/data/legal/PRIVACY.md?raw";
+---
+<LegalPage
+  title="Privacy — Postmark"
+  description="Postmark's privacy policy: what the town keeps, what is public by design, and who to ask."
+  source="PRIVACY.md"
+  markdown={markdown}
+  canonical="/privacy/"
+/>

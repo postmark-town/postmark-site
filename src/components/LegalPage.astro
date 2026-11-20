@@ -1,0 +1,46 @@
+---
+// LegalPage — one of the town's two plain policy pages (CORE-143): /privacy/ and /terms/.
+//
+// The text is the approved text from postmark-blueprints (root PRIVACY.md and TERMS.md, merged in
+// blueprints#93, e5cb8356f28d8f64d8a20878f7cac9899bf1543d) and is shown AS IT STANDS. The site has no build-time
+// read of that repo for these two files (the chest's fetch is for its proposals), and Wright's ruling allowed a
+// verbatim copy with a note pointing at the source over new fetch machinery, so src/data/legal/ holds the
+// byte-identical copies and test/legal-pages.test.mjs holds them to the pinned hashes. A change to the policy is
+// made in blueprints, then re-copied here with a new pin; nothing is written or rewritten in this repo.
+import { marked } from "marked";
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+
+interface Props {
+  title: string;
+  description: string;
+  source: string;       // the file's name in postmark-blueprints
+  markdown: string;     // its text, exactly
+  canonical: string;    // the trailing-slash path
+}
+const { title, description, source, markdown, canonical } = Astro.props;
+// the policy is the town's own approved text: rendered as markdown, nothing added to it
+const html = marked.parse(markdown, { async: false }) as string;
+const PIN = "e5cb8356f28d8f64d8a20878f7cac9899bf1543d";
+---
+<PostmarkLayout door={null} title={title} description={description} canonical={canonical}>
+  <main class="legal" data-legal>
+    <article class="legal-text" set:html={html} />
+    <p class="legal-source" data-legal-source>
+      This is the text of <a href={`https://github.com/postmark-town/postmark-blueprints/blob/${PIN}/${source}`} rel="noopener">{source}</a>
+      in postmark-blueprints, shown as it stands there.
+    </p>
+  </main>
+</PostmarkLayout>
+
+<style is:global>
+  .legal { max-width: 44rem; margin: 0 auto; padding: 0 0.4em 2em; color: #e6dcc6; line-height: 1.65; overflow-wrap: anywhere; }
+  .legal-text h1 { font-size: 1.8rem; margin: 0.4em 0 0.5em; color: #f4e6c4; }
+  .legal-text h2 { font-size: 1.2rem; margin: 1.6em 0 0.4em; color: #f0dcae; }
+  .legal-text p, .legal-text li { font-size: 1rem; }
+  .legal-text ul { padding-left: 1.3em; }
+  .legal-text li { margin: 0.3em 0; }
+  .legal-text a { color: var(--pm-gold-bright, #f6dcae); }
+  .legal-text code { font-family: var(--pm-mono, monospace); font-size: 0.92em; background: rgba(232, 196, 139, 0.08); padding: 0 0.3em; border-radius: 4px; }
+  .legal-source { margin: 2.2em 0 0; padding-top: 0.9em; border-top: 1px solid rgba(232, 196, 139, 0.16); font-size: 0.8rem; color: rgba(232, 196, 139, 0.65); }
+  .legal-source a { color: inherit; }
+</style>

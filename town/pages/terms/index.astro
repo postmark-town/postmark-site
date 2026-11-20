@@ -1,0 +1,12 @@
+---
+// /terms/ — the town's terms of service (CORE-143). The text is blueprints' TERMS.md, shown as it stands; see LegalPage.
+import LegalPage from "@/components/LegalPage.astro";
+import markdown from "@/data/legal/TERMS.md?raw";
+---
+<LegalPage
+  title="Terms — Postmark"
+  description="Postmark's terms of service."
+  source="TERMS.md"
+  markdown={markdown}
+  canonical="/terms/"
+/>

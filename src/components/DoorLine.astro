@@ -63,6 +63,11 @@ const line = doorLine(Astro.props.door);
       </li>
     ))}
   </ul>
+  {/* THE POLICIES (CORE-143): the privacy policy and the terms, plain links, on every page that wears this foot */}
+  <ul class="pm-legal" aria-label="Policies">
+    <li><a href="/privacy/" data-legal-link="privacy">Privacy</a></li>
+    <li><a href="/terms/" data-legal-link="terms">Terms</a></li>
+  </ul>
 </footer>
 
 {line && (
@@ -133,6 +138,19 @@ const line = doorLine(Astro.props.door);
     text-decoration: none;
   }
   .pm-social a:hover { color: var(--pm-gold-bright); }
+  .pm-legal {
+    list-style: none;
+    margin: 0.7rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem 1.1rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+  }
+  .pm-legal a { color: rgba(232, 196, 139, 0.78); text-decoration: none; }
+  .pm-legal a:hover, .pm-legal a:focus-visible { color: var(--pm-gold-bright); text-decoration: underline; }
   .pm-social svg { flex: none; }
   .pm-social-note { opacity: 0.6; }
   .pm-social.is-unlinked > span { color: rgba(232, 196, 139, 0.55); }
