@@ -303,6 +303,10 @@
       padding: 9px 12px; font-size: 0.8rem; text-align: left; text-decoration: none;
     }
     .wa-open:not(.wa-slotted) .wa-list .wa-btn:hover { background: rgba(232, 197, 106, 0.16); }
+    /* CORE-54 (Darko 2026-11-20, "4. Small targets"): the rows of the list, "replay" among them, are 44 px tall */
+    .wa-open:not(.wa-slotted) .wa-list .wa-btn { min-height: 44px; display: flex; align-items: center; box-sizing: border-box; }
+    .wa-open:not(.wa-slotted) .wa-list [data-wa-signin],
+    .wa-open:not(.wa-slotted) .wa-list [data-wa-signout] { justify-content: center; }
     .wa-open:not(.wa-slotted) .wa-list .wa-lens { font-size: 0.68rem; letter-spacing: 0.14em; }
     /* sign in is last, and gold: the one action in a list of places */
     .wa-open:not(.wa-slotted) .wa-list [data-wa-signin],
