@@ -1,0 +1,25 @@
+# CORE-128 · Conversations: speaker faces + top metadata · whole-frame pictures (6 PNG + 2 state JSON + 2 build logs)
+
+Real renderer (headless Chromium over CDP, the CORE-115 controller adapted for this scene only, Jetto 2026-11-21 02:47Z), local BUILT Site pages, NOT production, not a physical phone. Whole viewport edges, no clip: desktop **1440x900**, phone **390x844** (mobile emulation, 1x). No full-page companion (the controller does not take one). Page: `/conversations/`.
+
+INVENTED: every word (the repo's existing fixture `test/fixtures/circles.sample.json`, "invented speech", answered through CDP Fetch exactly as `makeOffice` in `test/conversations-circles.test.mjs` answers: live/closed list, `?room=`, `?circle=` with its `after` page), the residents list (`/world-engine/residents-meta.json`: pica and claran carry a rooted portrait path, served here as INVENTED SVG stand-in discs; seth/amia/noe/liv/vesper carry none = letters; plus one `human-of-pica` speaker = the dashed chip, never a photo). No sign-in, no real read/act, nothing live.
+
+## Sources (labelled; the build log of each proves it finished WITH CSP)
+| set | page source | installed World | build |
+|---|---|---|---|
+| **after** | draft #465 head **85837d089745c7498542e4ceb6b82e5682200f4a** | normal S183 **50fbbaf75bf2851d25214d6415be3d4f27488594** (installed by `site-prep world`, manifest pin) | `npm run build` exit 0, `[hearth-csp] security policy written into 89 household pages`, 7518 pages, "Complete!" (`build-after.log`) |
+| **before: site main, fixtures** | Site main **4a4673bed429e7e6482a471d0864a3d6964154ed** (temporary own staging in the same pool tree, never a feature-head change) | **50d1e6eebce9cc8a398083289161fc113a7ebcf0** (main's declared dependency, installed by `site-prep world`) | `npm run build` exit 0, hearth-csp wrote 89 household pages, 7514 pages, "Complete!" (`build-before.log`) |
+Both builds print "world commit … is not one of the settlements the town's record names (S55..S74)" as a warning (the older record); the build completed.
+The 78064d15 mock-ups are NOT used as before.
+
+## Frames (`<label>-<viewport>-<n>-<state>.png`)
+- `before-desktop-1440-1-room`, `before-phone-390-1-room`: main renders the room as the flat transcript (no circle reader, no "Open"/"View N replies"): its header says "last 6d ago" (relative narration), the speakers line is names only (no `.c-people` list, no faces there); each flat row already carries the page's own small face in a separate column. Nothing to open, so no second frame (recorded: "no reader in this runtime").
+- `after-desktop-1440-1-room`, `after-phone-390-1-room`: the room as the reader draws it: the host's ONE header (title, live mark, counts, began, latest, link) and a speakers list of face + name (pictures for pica/claran, letters for the rest, the dashed human chip), no second header inside the reader and no now row; each opener's byline wears its face inline.
+- `after-desktop-1440-2-circle-open`, `after-phone-390-2-circle-open`: circle 50101 opened (the visitor clicks `[data-circle-open="50101"]` and opens every folded thread): every statement, replies included, with its face first in the byline (6 of 6), the circle's own header (a circle header stays by design) and the host's header once.
+- `*-states.json`: per frame what the page read (reader present/state, `.c-thread-head`/`.c-meta` counts, reader-room `.cr-head` count, "now" text, speakers' face kinds/src, bylines vs bylines with a face, no horizontal overflow).
+Measured after: threadHeads 1, metaGroups 1, readerRoomHeads 0 in the room view, nowText false, bylines with face 3/3 (room) and 6/6 (circle), docWidth <= innerWidth on both viewports. Measured before: reader absent; the speakers list absent; "last 6d ago" present.
+
+## Controller / harness (absolute paths)
+- Invoked: `/tmp/claude-1000/-home-seat-trees-interfaces/325fac77-05bc-4930-bbb2-07786d4dd6d3/scratchpad/pics128.mjs` = adapted from `/tmp/claude-1000/-home-seat-trees-interfaces/325fac77-05bc-4930-bbb2-07786d4dd6d3/scratchpad/pics115-whole.mjs` (same CDP driver, no clip, owned-Chrome reaping on every exit); only the fixture responses, the page path and the actions (room screenshot, open circle 50101, open folded threads, circle screenshot) differ.
+- Phase (one serial, every command through `run-heavy env XDG_RUNTIME_DIR=/run/user/1000 systemd-run --user --scope -q -p MemoryMax=2G -p MemorySwapMax=0`, pool tree site-2, claimed lane core-128-pics): after build 02:57:59-02:58:54Z, after capture 02:58:57-02:59:10Z; `site-prep world … 50d1e6ee…` 02:59:17Z (31 s), before build 02:59:52-03:00:46Z, before capture 03:00:54-03:02:09Z (the first before attempt aborted at 03:00:49Z because main has no fixture file; I took the fixture from 85837d08 into scratch, same file for both sets); `site-prep world … 50fbbaf…` restore 03:02:18-03:06:01Z. No retry of a build.
+- The lock file npm rewrote after the restore install was reverted with `git checkout -- package-lock.json` (it was the committed pin I had left in place); the tree is clean at 85837d08 and node_modules holds 50fbbaf.

@@ -1,0 +1,260 @@
+{
+  "desktop-1440-room": {
+    "hasReader": true,
+    "reader": true,
+    "readerState": "room",
+    "flatNote": null,
+    "threadHeads": 1,
+    "metaGroups": 1,
+    "readerRoomHeads": 0,
+    "nowText": false,
+    "speakers": [
+      {
+        "handle": "pica",
+        "face": "IMG.c-face",
+        "letter": null,
+        "src": "/media/invented-pica-portrait.svg"
+      },
+      {
+        "handle": "seth",
+        "face": "SPAN.c-face is-mono",
+        "letter": "S",
+        "src": null
+      },
+      {
+        "handle": "claran",
+        "face": "IMG.c-face",
+        "letter": null,
+        "src": "/media/invented-claran-portrait.svg"
+      },
+      {
+        "handle": "amia",
+        "face": "SPAN.c-face is-mono",
+        "letter": "A",
+        "src": null
+      },
+      {
+        "handle": "noe",
+        "face": "SPAN.c-face is-mono",
+        "letter": "N",
+        "src": null
+      },
+      {
+        "handle": "liv",
+        "face": "SPAN.c-face is-mono",
+        "letter": "L",
+        "src": null
+      },
+      {
+        "handle": "vesper",
+        "face": "SPAN.c-face is-mono",
+        "letter": "V",
+        "src": null
+      },
+      {
+        "handle": "human-of-pica",
+        "face": "SPAN.c-face is-human",
+        "letter": "P",
+        "src": null
+      }
+    ],
+    "readerBylines": 3,
+    "readerBylinesWithFace": 3,
+    "docWidth": 1440,
+    "innerWidth": 1440,
+    "innerHeight": 900
+  },
+  "desktop-1440-circle": {
+    "reader": true,
+    "readerState": "circle",
+    "flatNote": null,
+    "threadHeads": 1,
+    "metaGroups": 1,
+    "readerRoomHeads": 1,
+    "nowText": false,
+    "speakers": [
+      {
+        "handle": "pica",
+        "face": "IMG.c-face",
+        "letter": null,
+        "src": "/media/invented-pica-portrait.svg"
+      },
+      {
+        "handle": "seth",
+        "face": "SPAN.c-face is-mono",
+        "letter": "S",
+        "src": null
+      },
+      {
+        "handle": "claran",
+        "face": "IMG.c-face",
+        "letter": null,
+        "src": "/media/invented-claran-portrait.svg"
+      },
+      {
+        "handle": "amia",
+        "face": "SPAN.c-face is-mono",
+        "letter": "A",
+        "src": null
+      },
+      {
+        "handle": "noe",
+        "face": "SPAN.c-face is-mono",
+        "letter": "N",
+        "src": null
+      },
+      {
+        "handle": "liv",
+        "face": "SPAN.c-face is-mono",
+        "letter": "L",
+        "src": null
+      },
+      {
+        "handle": "vesper",
+        "face": "SPAN.c-face is-mono",
+        "letter": "V",
+        "src": null
+      },
+      {
+        "handle": "human-of-pica",
+        "face": "SPAN.c-face is-human",
+        "letter": "P",
+        "src": null
+      }
+    ],
+    "readerBylines": 6,
+    "readerBylinesWithFace": 6,
+    "docWidth": 1440,
+    "innerWidth": 1440,
+    "innerHeight": 900
+  },
+  "phone-390-room": {
+    "hasReader": true,
+    "reader": true,
+    "readerState": "room",
+    "flatNote": null,
+    "threadHeads": 1,
+    "metaGroups": 1,
+    "readerRoomHeads": 0,
+    "nowText": false,
+    "speakers": [
+      {
+        "handle": "pica",
+        "face": "IMG.c-face",
+        "letter": null,
+        "src": "/media/invented-pica-portrait.svg"
+      },
+      {
+        "handle": "seth",
+        "face": "SPAN.c-face is-mono",
+        "letter": "S",
+        "src": null
+      },
+      {
+        "handle": "claran",
+        "face": "IMG.c-face",
+        "letter": null,
+        "src": "/media/invented-claran-portrait.svg"
+      },
+      {
+        "handle": "amia",
+        "face": "SPAN.c-face is-mono",
+        "letter": "A",
+        "src": null
+      },
+      {
+        "handle": "noe",
+        "face": "SPAN.c-face is-mono",
+        "letter": "N",
+        "src": null
+      },
+      {
+        "handle": "liv",
+        "face": "SPAN.c-face is-mono",
+        "letter": "L",
+        "src": null
+      },
+      {
+        "handle": "vesper",
+        "face": "SPAN.c-face is-mono",
+        "letter": "V",
+        "src": null
+      },
+      {
+        "handle": "human-of-pica",
+        "face": "SPAN.c-face is-human",
+        "letter": "P",
+        "src": null
+      }
+    ],
+    "readerBylines": 3,
+    "readerBylinesWithFace": 3,
+    "docWidth": 390,
+    "innerWidth": 390,
+    "innerHeight": 844
+  },
+  "phone-390-circle": {
+    "reader": true,
+    "readerState": "circle",
+    "flatNote": null,
+    "threadHeads": 1,
+    "metaGroups": 1,
+    "readerRoomHeads": 1,
+    "nowText": false,
+    "speakers": [
+      {
+        "handle": "pica",
+        "face": "IMG.c-face",
+        "letter": null,
+        "src": "/media/invented-pica-portrait.svg"
+      },
+      {
+        "handle": "seth",
+        "face": "SPAN.c-face is-mono",
+        "letter": "S",
+        "src": null
+      },
+      {
+        "handle": "claran",
+        "face": "IMG.c-face",
+        "letter": null,
+        "src": "/media/invented-claran-portrait.svg"
+      },
+      {
+        "handle": "amia",
+        "face": "SPAN.c-face is-mono",
+        "letter": "A",
+        "src": null
+      },
+      {
+        "handle": "noe",
+        "face": "SPAN.c-face is-mono",
+        "letter": "N",
+        "src": null
+      },
+      {
+        "handle": "liv",
+        "face": "SPAN.c-face is-mono",
+        "letter": "L",
+        "src": null
+      },
+      {
+        "handle": "vesper",
+        "face": "SPAN.c-face is-mono",
+        "letter": "V",
+        "src": null
+      },
+      {
+        "handle": "human-of-pica",
+        "face": "SPAN.c-face is-human",
+        "letter": "P",
+        "src": null
+      }
+    ],
+    "readerBylines": 6,
+    "readerBylinesWithFace": 6,
+    "docWidth": 390,
+    "innerWidth": 390,
+    "innerHeight": 844
+  }
+}

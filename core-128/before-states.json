@@ -1,0 +1,36 @@
+{
+  "desktop-1440-room": {
+    "hasReader": false,
+    "reader": false,
+    "readerState": null,
+    "flatNote": null,
+    "threadHeads": 1,
+    "metaGroups": 1,
+    "readerRoomHeads": 0,
+    "nowText": false,
+    "speakers": [],
+    "readerBylines": 0,
+    "readerBylinesWithFace": 0,
+    "docWidth": 1440,
+    "innerWidth": 1440,
+    "innerHeight": 900
+  },
+  "desktop-1440-circle": "no reader in this runtime: the flat transcript is what the page shows; nothing to open",
+  "phone-390-room": {
+    "hasReader": false,
+    "reader": false,
+    "readerState": null,
+    "flatNote": null,
+    "threadHeads": 1,
+    "metaGroups": 1,
+    "readerRoomHeads": 0,
+    "nowText": false,
+    "speakers": [],
+    "readerBylines": 0,
+    "readerBylinesWithFace": 0,
+    "docWidth": 390,
+    "innerWidth": 390,
+    "innerHeight": 844
+  },
+  "phone-390-circle": "no reader in this runtime: the flat transcript is what the page shows; nothing to open"
+}
