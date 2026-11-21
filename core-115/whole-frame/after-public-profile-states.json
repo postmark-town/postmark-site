@@ -1,0 +1,86 @@
+{
+  "household-desktop-1440": {
+    "rail": [
+      147,
+      111,
+      1146,
+      120
+    ],
+    "pill": "Fixture Human they/them",
+    "tip": "An INVENTED fixture line for the CORE-115 pictures: not a real person's profile.",
+    "tipVisible": false,
+    "pillAfterChips": true,
+    "edit": {
+      "shown": false,
+      "text": "edit",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": false,
+    "docWidth": 1440,
+    "innerWidth": 1440,
+    "innerHeight": 900
+  },
+  "household-phone-390": {
+    "rail": [
+      30,
+      264,
+      331,
+      312
+    ],
+    "pill": "Fixture Human they/them",
+    "tip": "An INVENTED fixture line for the CORE-115 pictures: not a real person's profile.",
+    "tipVisible": false,
+    "pillAfterChips": true,
+    "edit": {
+      "shown": false,
+      "text": "edit",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": false,
+    "docWidth": 390,
+    "innerWidth": 390,
+    "innerHeight": 844
+  },
+  "resident-desktop-1440": {
+    "rail": [
+      187,
+      122,
+      1066,
+      105
+    ],
+    "pill": "Fixture Human they/them",
+    "tip": "An INVENTED fixture line for the CORE-115 pictures: not a real person's profile.",
+    "tipVisible": false,
+    "pillAfterChips": true,
+    "edit": {
+      "shown": false,
+      "text": "edit",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": false,
+    "docWidth": 1440,
+    "innerWidth": 1440,
+    "innerHeight": 900
+  },
+  "resident-phone-390": {
+    "rail": [
+      30,
+      275,
+      331,
+      271
+    ],
+    "pill": "Fixture Human they/them",
+    "tip": "An INVENTED fixture line for the CORE-115 pictures: not a real person's profile.",
+    "tipVisible": false,
+    "pillAfterChips": true,
+    "edit": {
+      "shown": false,
+      "text": "edit",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": false,
+    "docWidth": 390,
+    "innerWidth": 390,
+    "innerHeight": 844
+  }
+}

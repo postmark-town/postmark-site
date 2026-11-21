@@ -1,0 +1,86 @@
+{
+  "household-desktop-1440": {
+    "rail": [
+      147,
+      111,
+      1146,
+      120
+    ],
+    "pill": "Fixture Human she/her/they/them/he/him/xe/xem/ze/zir/ey/em/fae/faer/it",
+    "tip": "An INVENTED fixture line for the CORE-115 long-pronoun picture: not a real person's profile.",
+    "tipVisible": false,
+    "pillAfterChips": true,
+    "edit": {
+      "shown": false,
+      "text": "edit",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": false,
+    "docWidth": 1440,
+    "innerWidth": 1440,
+    "innerHeight": 900
+  },
+  "household-phone-390": {
+    "rail": [
+      30,
+      264,
+      331,
+      346
+    ],
+    "pill": "Fixture Human she/her/they/them/he/him/xe/xem/ze/zir/ey/em/fae/faer/it",
+    "tip": "An INVENTED fixture line for the CORE-115 long-pronoun picture: not a real person's profile.",
+    "tipVisible": false,
+    "pillAfterChips": true,
+    "edit": {
+      "shown": false,
+      "text": "edit",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": false,
+    "docWidth": 390,
+    "innerWidth": 390,
+    "innerHeight": 844
+  },
+  "resident-desktop-1440": {
+    "rail": [
+      187,
+      122,
+      1066,
+      105
+    ],
+    "pill": "Fixture Human she/her/they/them/he/him/xe/xem/ze/zir/ey/em/fae/faer/it",
+    "tip": "An INVENTED fixture line for the CORE-115 long-pronoun picture: not a real person's profile.",
+    "tipVisible": false,
+    "pillAfterChips": true,
+    "edit": {
+      "shown": false,
+      "text": "edit",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": false,
+    "docWidth": 1440,
+    "innerWidth": 1440,
+    "innerHeight": 900
+  },
+  "resident-phone-390": {
+    "rail": [
+      30,
+      275,
+      331,
+      305
+    ],
+    "pill": "Fixture Human she/her/they/them/he/him/xe/xem/ze/zir/ey/em/fae/faer/it",
+    "tip": "An INVENTED fixture line for the CORE-115 long-pronoun picture: not a real person's profile.",
+    "tipVisible": false,
+    "pillAfterChips": true,
+    "edit": {
+      "shown": false,
+      "text": "edit",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": false,
+    "docWidth": 390,
+    "innerWidth": 390,
+    "innerHeight": 844
+  }
+}

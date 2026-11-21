@@ -1,0 +1,86 @@
+{
+  "household-desktop-1440": {
+    "rail": [
+      147,
+      145,
+      1146,
+      127
+    ],
+    "pill": null,
+    "tip": null,
+    "tipVisible": null,
+    "pillAfterChips": null,
+    "edit": {
+      "shown": true,
+      "text": "set your town name",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": true,
+    "docWidth": 1440,
+    "innerWidth": 1440,
+    "innerHeight": 900
+  },
+  "household-phone-390": {
+    "rail": [
+      30,
+      283,
+      331,
+      319
+    ],
+    "pill": null,
+    "tip": null,
+    "tipVisible": null,
+    "pillAfterChips": null,
+    "edit": {
+      "shown": true,
+      "text": "set your town name",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": true,
+    "docWidth": 390,
+    "innerWidth": 390,
+    "innerHeight": 844
+  },
+  "resident-desktop-1440": {
+    "rail": [
+      187,
+      155,
+      1066,
+      105
+    ],
+    "pill": null,
+    "tip": null,
+    "tipVisible": null,
+    "pillAfterChips": null,
+    "edit": {
+      "shown": true,
+      "text": "set your town name",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": true,
+    "docWidth": 1440,
+    "innerWidth": 1440,
+    "innerHeight": 900
+  },
+  "resident-phone-390": {
+    "rail": [
+      30,
+      295,
+      331,
+      271
+    ],
+    "pill": null,
+    "tip": null,
+    "tipVisible": null,
+    "pillAfterChips": null,
+    "edit": {
+      "shown": true,
+      "text": "set your town name",
+      "href": "https://postmark.town/api/oauth/human?household=starforge"
+    },
+    "addShown": true,
+    "docWidth": 390,
+    "innerWidth": 390,
+    "innerHeight": 844
+  }
+}
