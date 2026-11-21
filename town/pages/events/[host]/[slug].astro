@@ -292,7 +292,8 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
       const drawRoom = (box, id) => {
         const reader = box.querySelector("[data-ev-reader]");
         const floor = reader.querySelector("[data-ev-floor]");
-        mountRoom({ doc: document, host: reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o) }).then((m) => {
+        // a circle's own link is the Conversations page's one-conversation view (CORE-117: `/conversations/#circle-<id>`)
+        mountRoom({ doc: document, host: reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o), hrefForCircle: (c) => `/conversations/#circle-${encodeURIComponent(c)}` }).then((m) => {
           if (m.ok) { floor?.remove(); return; }
           if (floor) floor.textContent = EVENT_WORDS.circles.noReader;
         });

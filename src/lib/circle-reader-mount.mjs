@@ -81,7 +81,7 @@ export async function loadReader({ url = READER_MODULE, importImpl = (u) => impo
  * @returns {Promise<{ ok: true, reader: object, module: object } | { ok: false, why: string }>}
  *   ok:false means the reader is not here: the host keeps its floor (the caller says which, it is never an empty room).
  */
-export async function mountRoom({ doc, host, roomId, base = "/api", fetchImpl, importImpl, canReply = false, onReply = null, onNavigate = null, hrefForCircle = null } = {}) {
+export async function mountRoom({ doc, host, roomId, base = "/api", fetchImpl, importImpl, canReply = false, onReply = null, onNavigate = null, hrefForCircle = null, faceForSpeaker = null, hostOwnsHeader = false } = {}) {
   if (!host || !roomId) return { ok: false, why: "no room to draw" };
   const module = await loadReader({ importImpl });
   if (!module) return { ok: false, why: "the circle reader is not on this site's pinned World yet" };
@@ -92,7 +92,10 @@ export async function mountRoom({ doc, host, roomId, base = "/api", fetchImpl, i
     (doc.head ?? doc.documentElement).append(style);
   }
   const source = officeSource({ base, fetchImpl });
-  const reader = module.createCircleReader({ doc, host, source, roomId, canReply, onReply, onNavigate, hrefForCircle });
+  // CORE-128: the optional speaker-face provider (`faceForSpeaker(handle) -> a fresh decorative DOM node | null`) is handed on ONLY when the caller gave one,
+  // so every caller without it (the event page, the gallery) builds the reader with exactly the options it built it with before
+  // `hostOwnsHeader` (WLD-215, strictly `true`): the host already shows this room's title/live/counts/began/latest itself, so the reader leaves its own `.cr-head` out; same rule, only when given
+  const reader = module.createCircleReader({ doc, host, source, roomId, canReply, onReply, onNavigate, hrefForCircle, ...(typeof faceForSpeaker === "function" ? { faceForSpeaker } : {}), ...(hostOwnsHeader === true ? { hostOwnsHeader: true } : {}) });
   await reader.showRoom(roomId);
   return { ok: true, reader, module };
 }

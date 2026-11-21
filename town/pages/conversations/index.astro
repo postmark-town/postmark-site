@@ -142,8 +142,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       </form>
     </section>
 
-    <!-- A #circle-<id> link that cannot be opened says so here (the page stands) -->
-    <p class="c-fine c-circle-note" data-circle-note role="status" hidden></p>
+    <!-- CORE-117: a #circle-<id> link shows ONE conversation here and nothing else (the lists below step aside); the speaking area above
+         moves in under it, in the page's flow, and goes home when the link is left -->
+    <div class="c-selected-box" data-selected hidden></div>
 
     <section class="c-live" aria-live="polite">
       <div class="c-rule"><span>Happening now</span></div>
@@ -296,6 +297,18 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         return mono;
       }
 
+      // THE READER'S FACE PROVIDER (CORE-128, Darko 2026-11-19 15:36 EST: "profile pictures next to speakers"). The World's circle reader accepts an
+      // OPTIONAL `faceForSpeaker(handle) -> a fresh decorative DOM node | null` and puts the node inline in each statement's byline (a reader that does
+      // not know the option ignores it). It is faceNode above, unchanged: the guarded public picture, the colour and letter fallback, the dashed
+      // `human-of-` chip with no photo. A FRESH node per call, so a speaker who speaks again never takes an earlier statement's face. Never throws:
+      // a face is a garnish, so a failure is no face, never a blocked line.
+      function faceForSpeaker(handle) {
+        try {
+          var h = String(handle == null ? "" : handle).trim();
+          return h ? faceNode(h) : null;
+        } catch (e) { return null; }
+      }
+
       function threadNode(t) {
         var card = el("article", "c-thread" + (t.live ? " is-live" : ""));
         // the id is how a card's scroll position survives the next rebuild
@@ -339,7 +352,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         // "statements", not "voices": eleven voices read like eleven residents,
         // and the count is utterances (Keemin, 2026-08-08)
         meta.appendChild(el("span", null, statementsWords(t))).setAttribute("data-c-count", "");
-        meta.appendChild(el("span", null, "last " + ago(Date.parse(t.latest)))).setAttribute("data-c-last", "");
+        // CORE-128 (Darko, 2026-11-19 19:55 EST: "the fields or like metadata about the conversation should probably be at the top … the now field is kind of
+        // verbose … it does already say 'live' at the top too"): the card's ONE metadata group, above the talk and said once: the place (title) and the live
+        // chip in the head, here the counts, when it began and its latest, as dates (the reader's own form), and no relative "last 5d ago / now" narration.
+        meta.appendChild(el("span", null, speakersWords(t))).setAttribute("data-c-speakers", "");
+        if (dateTimeOf(t.started)) meta.appendChild(el("span", null, "began " + dateTimeOf(t.started))).setAttribute("data-c-began", "");
+        if (latestWords(t)) meta.appendChild(el("span", null, latestWords(t))).setAttribute("data-c-latest", "");
         // A conversation someone wants to show a friend needs an address of its
         // own. The page has always ANSWERED to #<thread-id> — that is how the map
         // arrives — but there was no way to get the link out of the page short of
@@ -368,15 +386,50 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       function statementsWords(t) {
         return t.voice_count + (t.voice_count === 1 ? " statement" : " statements");
       }
+      function speakersWords(t) {
+        var n = (t.participants || []).length;
+        return n + (n === 1 ? " speaker" : " speakers");
+      }
+      // "2026-11-14T20:01:00.000Z" -> "2026-11-14 20:01Z", the circle reader's own date form ("" when the office gave none)
+      function dateTimeOf(iso) {
+        var m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(String(iso == null ? "" : iso));
+        return m ? m[1] + " " + m[2] + "Z" : "";
+      }
+      function latestWords(t) {
+        var d = dateTimeOf(t.latest);
+        return d ? "latest " + d : "";
+      }
 
+      // THE SPEAKERS LIST (CORE-128): each speaker is their face and their name, the same small face the lines wear (faceNode: public picture, letter
+      // fallback, the dashed chip for a house's human). The names are built once per speaker set and keep their focus; when the public residents list
+      // lands (or changes) AFTER they were drawn, only the face nodes are swapped, in place, never the links.
+      function personNode(handle) {
+        var item = el("span", "c-person");
+        item.setAttribute("data-handle", handle);
+        var face = faceForSpeaker(handle);
+        if (face) item.appendChild(face);
+        item.appendChild(personLink(handle));
+        return item;
+      }
       function fillPeople(people, t) {
         var key = (t.participants || []).join("\u0001");
-        if (people.getAttribute("data-people") === key) return;       // unchanged: the links keep their focus
+        var faced = faces ? "1" : "0";
+        if (people.getAttribute("data-people") === key) {
+          if (people.getAttribute("data-faced") === faced) return;    // unchanged: the links keep their focus
+          people.setAttribute("data-faced", faced);                   // only the pictures arrived: swap the face nodes, leave every link where it is
+          Array.prototype.forEach.call(people.querySelectorAll(".c-person"), function (item) {
+            var old = item.querySelector(":scope > .c-face");
+            var next = faceForSpeaker(item.getAttribute("data-handle"));
+            if (old && next) old.replaceWith(next); else if (next) item.insertBefore(next, item.firstChild);
+          });
+          return;
+        }
         people.setAttribute("data-people", key);
+        people.setAttribute("data-faced", faced);
         people.textContent = "";
         (t.participants || []).forEach(function (h, i) {
           if (i) people.appendChild(document.createTextNode(" · "));
-          people.appendChild(personLink(h));
+          people.appendChild(personNode(h));
         });
       }
 
@@ -412,7 +465,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var set = function (attr, text) { var n = card.querySelector("[" + attr + "]"); if (n && n.textContent !== text) n.textContent = text; };
         set("data-c-coords", t.at ? t.at.x + "," + t.at.y : "");
         set("data-c-count", statementsWords(t));
-        set("data-c-last", "last " + ago(Date.parse(t.latest)));
+        set("data-c-speakers", speakersWords(t));
+        set("data-c-latest", latestWords(t));
         var people = card.querySelector(".c-people");
         if (people) fillPeople(people, t);
       }
@@ -644,7 +698,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // be had or cannot read. Live rooms mount at once; finished ones when they come near the screen (one read each, not forty).
       var io = ("IntersectionObserver" in window)
         ? new IntersectionObserver(function (entries) {
-          entries.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); ensureReader(e.target, false); } });
+          entries.forEach(function (e) {
+            if (!e.isIntersecting) return;
+            io.unobserve(e.target);
+            if (selected) { e.target.__observed = false; return; }      // one conversation is on show: the rest mount when the list is back
+            ensureReader(e.target, false);
+          });
         }, { rootMargin: "400px 0px" })
         : null;
       function hook() { return window.__pmCircleReaders || null; }
@@ -665,6 +724,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 
       function ensureReader(card, force) {
         if (card.__cr) return card.__cr.ready;
+        if (selected) return null;                  // the lists are hidden behind a selected conversation: no reads for rooms nobody can see
         var h = hook();
         var t = card.__t;
         if (!h || !t || !t.id) return null;         // not yet (pm:circles-ready asks again), or a room with no id to read
@@ -674,6 +734,14 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var rec = { host: host, reader: null, ready: null, seen: t.latest + ":" + t.voice_count, flatHidden: false };
         card.__cr = rec;
         rec.ready = h.mount(host, String(t.id), {
+          // "Open" on a statement goes to that conversation on its own (the #circle- link), and the card goes back to its room view
+          onNavigate: function (n) {
+            if (!n || n.view !== "circle" || n.circleId === undefined || n.circleId === null) return;
+            var id = String(n.circleId);
+            setTimeout(function () { if (card.__cr && card.__cr.reader) card.__cr.reader.showRoom(); location.hash = "circle-" + encodeURIComponent(id); }, 0);
+          },
+          faceForSpeaker: faceForSpeaker,
+          hostOwnsHeader: true,
           onState: function (st) {
             if (st === "room" || st === "circle") showFlat(card, false, "");
             else if (st === "unavailable") showFlat(card, true, "The circles couldn't be read just now, so these are the words this page already holds:");
@@ -695,7 +763,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       }
 
       function wireReaders(box) {
-        if (!hook()) return;
+        if (!hook() || selected) return;
         Array.prototype.forEach.call(box.querySelectorAll(".c-thread"), function (card) {
           if (card.__cr || card.__observed) return;
           if (!io || (card.__t && card.__t.live)) ensureReader(card, false);
@@ -722,12 +790,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         if (card.parentNode) card.parentNode.removeChild(card);
       }
 
-      // the module script says the hook is there (it may land after the first paint): mount what is waiting, and open a waiting #circle- link
+      // the module script says the hook is there (it may land after the first paint): mount what is waiting, and the selected conversation if one is
       document.addEventListener("pm:circles-ready", function () {
         wireReaders(liveBox); wireReaders(closedBox);
-        if (pendingCircle) { var c = pendingCircle; pendingCircle = null; openCircleFromHash(c); }
+        if (selected) mountSelected(selected);
       });
-      var pendingCircle = null;
 
       // Pinned notices: the office's durable word over an area. Every string
       // is a text node — a notice is authored upstream, but the law here is
@@ -768,51 +835,181 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // every poll would yank a reader who has moved on.
       var anchored = false;
 
-      // A #circle-<id> link (the World column's footer, a feed trace, a circle's own permalink): the office says which room the circle is
-      // in (`find.room.id`, the keyless ?circle= read), the page scrolls to that room's card and opens THAT circle in its reader. The page
-      // works out neither the room nor the circle: it asks. If the room's card is not on the pages held, or the reader is not here, or the
-      // office cannot say, the page says so plainly and stands.
-      function openCircleFromHash(cid) {
-        var note = document.querySelector("[data-circle-note]");
-        var say = function (words) { if (note) { note.textContent = words || ""; note.hidden = !words; } };
-        say("");
-        if (!hook()) { pendingCircle = cid; return; }
-        fetch(API + "?circle=" + encodeURIComponent(cid), { headers: { accept: "application/json" } })
-          .then(function (r) { return r.json().catch(function () { return null; }).then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
-          .then(function (res) {
-            var room = res.ok && res.d && res.d.find && res.d.find.room ? res.d.find.room.id : null;
-            if (!room) {
-              say("The office couldn't open circle " + cid + (res.d && res.d.defect ? ": " + res.d.defect : " just now") + ". That is not the same as the circle being empty.");
-              return;
-            }
-            var card = document.getElementById(String(room));
-            if (!card || !card.classList.contains("c-thread")) {
-              say("Circle " + cid + " is in a room this page isn't holding right now (" + room + "). It may be on an earlier page of conversations: try Show earlier.");
-              return;
-            }
-            card.scrollIntoView({ block: "start" });
-            card.classList.add("is-anchored");
-            var ready = ensureReader(card, true);
-            if (!ready) { say("The circle reader isn't available on this page, so circle " + cid + " can't be opened here."); return; }
-            return ready.then(function (reader) {
-              if (!reader) { say("The circle reader isn't available on this page, so circle " + cid + " can't be opened here."); return; }
-              return reader.showCircle(cid);
-            });
-          })
-          .catch(function () { say("Circle " + cid + " couldn't be read just now, so it can't be opened. That is not the same as it being empty."); });
+      // ── ONE CONVERSATION (CORE-117; Erin, via Darko: "a separate view of just one conversation window") ──
+      // A #circle-<id> link (a card's "Open", the circle's own permalink, the World column's footer, an event page's circle, a feed trace)
+      // shows THAT conversation and nothing else: the lists step aside, the one shared reader draws it, and the speaking area comes in
+      // under it, in the page's flow. The office says which room the circle is in (`find.room`, the keyless ?circle= read: the circle's
+      // own served identity, so it needs no list page to be held first). The page works out neither the room nor the circle: it asks.
+      // Other talk, and the poll, never replace it: it lives outside the lists the poll paints, and its reader refreshes in place and
+      // quietly (it offers "new - show", never pulls the visitor along). A refused or missing circle says so, and is not an empty one.
+      var selBox = document.querySelector("[data-selected]");
+      var sayEl = document.querySelector("[data-say]");
+      var h1El = document.querySelector(".c-head h1");
+      var h1Home = h1El ? h1El.textContent : "";
+      var sayHome = null;                      // where the speaking area lives on the ordinary page
+      var selected = null;                     // { cid, card, host, room, reader, mine }
+      var selSeq = 0;
+      function selectedHash() {
+        var h = "";
+        try { h = decodeURIComponent(location.hash || ""); } catch (e) { return null; }
+        var m = /^#circle-(\d{1,18})$/.exec(h);
+        return m ? m[1] : null;
       }
+      function selNote(sel, words, retry) {
+        if (selected !== sel) return;
+        var n = sel.card.querySelector("[data-selected-note]");
+        if (!n && !words) return;
+        if (!n) { n = el("p", "c-fine c-selected-note"); n.setAttribute("data-selected-note", ""); n.setAttribute("role", "status"); sel.card.insertBefore(n, sel.host); }
+        n.textContent = words || "";
+        n.hidden = !words;
+        var b = sel.card.querySelector("[data-selected-retry]");
+        if (b) b.remove();
+        if (words && retry) {
+          b = el("button", "c-more", "Try again");
+          b.type = "button";
+          b.setAttribute("data-selected-retry", "");
+          b.addEventListener("click", function () { loadSelected(sel); });
+          n.after(b);
+        }
+      }
+      function mountSelected(sel) {
+        if (selected !== sel || sel.reader || sel.mounting || sel.room == null) return;
+        var h = hook();
+        if (!h) return;                         // pm:circles-ready asks again
+        sel.mounting = true;
+        // CORE-117 on CORE-128's host contract: the one conversation wears the SAME face provider every card's reader does (faceForSpeaker above: the guarded public
+        // picture, the letter fallback, the dashed chip for a house's human), so there is one face renderer and the bylines of the one view match the lists'.
+        // The header-ownership option is NOT passed here: the reader keeps its own room header for the room one step back, and on that step the page's own partial
+        // place/live line stands down (onState below), so there is ONE effective metadata group on screen, never both.
+        // The reader navigates INSIDE this view (its "Back to the room", a room opener's "Open", a stub's link): onNavigate follows it, so the address, the selected
+        // conversation and the reply target never diverge from what is on screen (followSelected).
+        h.mount(sel.host, String(sel.room), {
+          circle: sel.cid, faceForSpeaker: faceForSpeaker,
+          onState: function (st) { if (selected === sel) sel.card.classList.toggle("is-room-step", st === "room"); },
+          onNavigate: function (n) { followSelected(sel, n); },
+        }).then(function (m) {
+          sel.mounting = false;
+          if (selected !== sel) { if (m && m.reader) { try { m.reader.destroy(); } catch (e) { /* gone */ } } return; }
+          if (!m || !m.ok) { selNote(sel, "The circle reader isn't available on this page, so this conversation can't be shown here.", false); return; }
+          sel.reader = m.reader;
+        }, function () {
+          sel.mounting = false;
+          selNote(sel, "This conversation couldn't be read just now, so it can't be shown. That is not the same as it being empty.", true);
+        });
+      }
+      function loadSelected(sel) {
+        if (selected !== sel) return;
+        selNote(sel, "", false);
+        fetch(API + "?circle=" + encodeURIComponent(sel.cid), { headers: { accept: "application/json" } })
+          .then(function (r) { return r.json().catch(function () { return null; }).then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+            if (selected !== sel) return;       // another conversation, or the list, was chosen since
+            var room = res.ok && res.d && res.d.find && res.d.find.room ? res.d.find.room : null;
+            if (!room || room.id === undefined || room.id === null) {
+              selNote(sel, "The office couldn't open this conversation" + (res.d && res.d.defect ? " (" + res.d.defect + ")" : " just now") + ". That is not the same as it being empty.", true);
+              return;
+            }
+            paintSelectedPlace(sel, room);
+            mountSelected(sel);
+          })
+          .catch(function () {
+            selNote(sel, "This conversation couldn't be read just now, so it can't be shown. That is not the same as it being empty.", true);
+          });
+      }
+      // the page's own line above the reader: the place the OFFICE says this circle is in, and the live chip (never worked out here)
+      function paintSelectedPlace(sel, room) {
+        sel.room = room.id;
+        var title = sel.card.querySelector("[data-selected-place]");
+        if (!title) { title = el("h2", "c-place"); title.setAttribute("data-selected-place", ""); sel.card.insertBefore(title, sel.host); }
+        title.textContent = room.place || "somewhere in the world";
+        var chip = sel.card.querySelector(".c-chip");
+        if (room.live && !chip) title.after(el("span", "c-chip live", "live"));
+        else if (!room.live && chip) chip.remove();
+      }
+      // THE READER MOVED INSIDE THE VIEW (its Back to the room, a room opener's Open, a stub's link). The page follows what is on screen: whatever moved, a reply
+      // target chosen before it is dropped (a target belongs to the conversation it was chosen in); a different circle becomes the selected one (the card, the
+      // address: pushState, so the browser's Back returns to the one before, with no remount), and the office is asked again who it says that circle is in, so the
+      // place line is never the first conversation's. The room step keeps the address: the selected conversation is still the one the visitor chose.
+      function followSelected(sel, n) {
+        if (selected !== sel || !n) return;
+        document.dispatchEvent(new CustomEvent("pm:selected-change"));
+        if (n.view !== "circle" || n.circleId === undefined || n.circleId === null) return;
+        var id = String(n.circleId);
+        if (!/^\d{1,18}$/.test(id) || id === sel.cid) return;
+        sel.cid = id;
+        sel.card.setAttribute("data-selected-card", id);
+        try { history.pushState(null, "", "#circle-" + encodeURIComponent(id)); } catch (e) { /* the address stays; the view on screen is right */ }
+        var asked = id;
+        fetch(API + "?circle=" + encodeURIComponent(id), { headers: { accept: "application/json" } })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (selected !== sel || sel.cid !== asked) return;
+            var room = d && d.find && d.find.room ? d.find.room : null;
+            if (room && room.id !== undefined && room.id !== null) paintSelectedPlace(sel, room);   // else the line stays as the office last said it: no guess
+          })
+          .catch(function () { /* quiet: the reader is showing the circle; the place line keeps what the office last said */ });
+      }
+      function enterSelected(cid) {
+        var card = el("article", "c-thread c-selected");
+        card.setAttribute("data-selected-card", cid);
+        var back = el("a", "c-selected-back", "← All conversations");
+        back.href = "/conversations/";
+        // an ordinary primary press leaves IN PLACE (the page, its one speaking area, an unsent draft and the chosen actor all stay); the link keeps its ordinary
+        // href, so a modified press (new tab, new window, download, middle button) and a browser with no script behave as any link does
+        back.addEventListener("click", function (ev) {
+          if (ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+          ev.preventDefault();
+          try { history.pushState(null, "", "/conversations/"); } catch (e) { location.href = "/conversations/"; return; }
+          syncSelected(); anchored = false; tick();
+        });
+        card.appendChild(back);
+        var host = el("div", "c-circles");
+        host.setAttribute("data-circles-host", "");
+        card.appendChild(host);
+        selBox.textContent = "";
+        selBox.appendChild(card);
+        selBox.hidden = false;
+        document.documentElement.classList.add("c-selecting");
+        if (h1El) h1El.textContent = "One conversation";
+        // the speaking area is the page's own (one form, one auth, one submit): it moves in under the reader and goes home afterwards
+        if (sayEl && !sayHome) { sayHome = document.createComment("c-say-home"); sayEl.parentNode.insertBefore(sayHome, sayEl); }
+        if (sayEl) card.appendChild(sayEl);
+        selected = { cid: cid, card: card, host: host, room: null, reader: null, mounting: false, mine: ++selSeq };
+        document.dispatchEvent(new CustomEvent("pm:selected-change"));      // a reply target belongs to the conversation it was chosen in
+        loadSelected(selected);
+      }
+      function leaveSelected() {
+        var sel = selected;
+        selected = null;                        // first: late answers for it are dropped
+        if (sel && sel.reader) { try { sel.reader.destroy(); } catch (e) { /* gone */ } }
+        if (sayEl && sayHome && sayHome.parentNode) sayHome.parentNode.insertBefore(sayEl, sayHome.nextSibling);
+        if (selBox) { selBox.textContent = ""; selBox.hidden = true; }
+        document.documentElement.classList.remove("c-selecting");
+        if (h1El) h1El.textContent = h1Home;
+        document.dispatchEvent(new CustomEvent("pm:selected-change"));
+        wireReaders(liveBox); wireReaders(closedBox);
+      }
+      function syncSelected() {
+        var cid = selectedHash();
+        if (!cid) { if (selected) leaveSelected(); return; }
+        if (selected && selected.cid === cid) return;
+        if (selected) leaveSelected();
+        enterSelected(cid);
+      }
+      // the poll's refresh is quiet (new talk is offered, never pulled in); the visitor's OWN say is shown at once
+      function refreshSelected(own) { if (selected && selected.reader) selected.reader.refresh({ quiet: !own }); }
 
       function anchorFromHash() {
         var id = decodeURIComponent((location.hash || "").slice(1));
         if (!id) return;
         var circle = /^circle-(\d{1,18})$/.exec(id);
-        if (circle) { openCircleFromHash(circle[1]); return; }
+        if (circle) return;       // a circle link is the selected view (syncSelected), not a card to scroll to
         var card = document.getElementById(id);
         if (!card) return; // a thread past the closed cap, or a stale link — the page stands
         card.scrollIntoView({ block: "start" });
         card.classList.add("is-anchored");
       }
-      window.addEventListener("hashchange", function () { anchored = false; tick(); });
+      window.addEventListener("hashchange", function () { syncSelected(); anchored = false; tick(); });
 
       function tick() {
         fetch(pageUrl(null), { headers: { accept: "application/json" } })
@@ -831,6 +1028,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             redraw();
             // each mounted reader whose room moved takes the new talk IN PLACE (it offers "new — show"; it never pulls a reader along)
             refreshReaders(liveBox, false); refreshReaders(closedBox, false);
+            refreshSelected();
             if (!anchored) { anchored = true; anchorFromHash(); }
             pinNext = false;
             if (dials && d.earshot_m) {
@@ -849,7 +1047,13 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // appear under the names already on screen.
       fetch("/world-engine/residents-meta.json", { headers: { accept: "application/json" } })
         .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) { if (d && d.residents) { faces = d.residents; tick(); } })
+        .then(function (d) {
+          if (d && d.residents) {
+            faces = d.residents; tick();
+            // the readers drew (or are drawing) their bylines before the pictures landed: ask them to redraw so the faces appear under the names
+            refreshReaders(liveBox, true); refreshReaders(closedBox, true);
+          }
+        })
         .catch(function () { /* names only — a face is a garnish, never the meal */ });
 
       tick();
@@ -862,7 +1066,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // the doorstep box (module script below) speaks, then asks for a repaint
       // right away — waiting out the poll to see your own voice land feels broken.
       // Their own voice also beats wherever they were reading: pin to newest.
-      document.addEventListener("pm:spoke", function () { pinNext = true; tick(); refreshReaders(liveBox, true); refreshReaders(closedBox, true); });
+      document.addEventListener("pm:spoke", function () { pinNext = true; tick(); refreshReaders(liveBox, true); refreshReaders(closedBox, true); refreshSelected(true); });
+      syncSelected();       // a #circle- link on arrival shows its conversation at once, before the first poll answers
     })();
   </script>
 
@@ -886,7 +1091,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     // and a Reply press is announced as a `pm:reply-target` event for the speak box below. Nothing here derives a link, a parent or a circle.
     const __getTok = () => { try { return JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch { return null; } };
     window.__pmCircleReaders = {
-      async mount(host, roomId, { onState = null } = {}) {
+      async mount(host, roomId, { onState = null, onNavigate = null, circle = null, faceForSpeaker = null, hostOwnsHeader = false } = {}) {
         const mod = await loadReader({});
         if (!mod) return { ok: false, why: "the circle reader is not on this site's pinned World yet" };
         if (typeof mod.READER_CSS === "string" && mod.READER_CSS && !document.querySelector("style[data-circle-reader-css]")) {
@@ -899,10 +1104,16 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           doc: document, host, source: officeSource({ base: OFFICE_BASE }), roomId,
           canReply: tokenIsFresh(__getTok()),
           onReply: (target) => document.dispatchEvent(new CustomEvent("pm:reply-target", { detail: target })),
-          onState,
+          onState, onNavigate,
           hrefForCircle: (c) => `#circle-${encodeURIComponent(c)}`,
+          // CORE-128: the optional face provider, handed on ONLY when the page gave one (a reader without the option, or a caller without a provider, is unchanged)
+          ...(typeof faceForSpeaker === "function" ? { faceForSpeaker } : {}),
+          // CORE-128 / WLD-215: this page draws each card's one header itself (title, live, counts, began, latest), so the reader leaves its own out (strictly `true`; absent = the reader's default)
+          ...(hostOwnsHeader === true ? { hostOwnsHeader: true } : {}),
         });
-        await reader.showRoom(roomId);
+        // a selected conversation (CORE-117) opens on its circle, with its room one named step back; a card opens on its room
+        if (circle !== null && circle !== undefined) await reader.showCircle(circle);
+        else await reader.showRoom(roomId);
         return { ok: true, reader };
       },
     };
@@ -948,6 +1159,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       form.scrollIntoView?.({ block: "nearest" });
       textEl?.focus();
     });
+    // CORE-117: a chosen reply target belongs to the conversation it was chosen in; choosing or leaving a selected conversation clears it
+    document.addEventListener("pm:selected-change", () => { replyTarget = null; renderReply(); });
     $("[data-say-reply-clear]")?.addEventListener("click", () => { replyTarget = null; renderReply(); textEl?.focus(); });
 
     function only(el) {
@@ -1264,7 +1477,10 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       font: 0.7rem/1.4 var(--pm-mono); letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.58);
     }
     .convo .c-meta > * + *::before { content: "· "; color: rgba(232, 196, 139, 0.35); }
-    .convo .c-people { margin: 0.6em 0 0; font-size: 0.82rem; }
+    .convo .c-people { margin: 0.6em 0 0; font-size: 0.82rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.35em 0.5em; }
+    /* CORE-128: a speaker is their small face and their name, side by side (the same face the lines wear: about 20px) */
+    .convo .c-person { display: inline-flex; align-items: center; gap: 0.35em; min-width: 0; }
+    .convo .c-person > .c-face { width: 20px; height: 20px; font-size: 0.62rem; box-sizing: border-box; }
     .convo .c-who {
       color: var(--pm-gold-bright); text-decoration: none;
       border-bottom: 1px solid rgba(232, 196, 139, 0.3); white-space: nowrap;
@@ -1312,6 +1528,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       border: 1px solid rgba(232, 196, 139, 0.25);
       background: rgba(232, 196, 139, 0.08);
     }
+    /* CORE-128: the same small face INLINE at the start of a reader byline (the World's circle reader puts the provider's node first in .cr-head-line):
+       about 20px, in the line's own flow, so no statement or subtree gains a gutter and the speech keeps its width */
+    .convo .cr-head-line > .c-face {
+      display: inline-grid; vertical-align: middle; width: 20px; height: 20px; margin: -2px 0.4em 0 0;
+      font-size: 0.62rem; box-sizing: border-box;
+    }
     /* the human of a house: never a portrait, never a colour of their own */
     .convo .c-face.is-human {
       border-style: dashed; border-color: rgba(232, 196, 139, 0.45);
@@ -1337,8 +1559,20 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
        The reader brings its own stylesheet (READER_CSS, added once by the module script). */
     .convo .c-circles { margin: 0.7em 0 0; color: #f0e6d0; font-size: 0.92rem; line-height: 1.55; overflow-wrap: anywhere; }
     .convo .c-circles-note { margin: 0.7em 0 0.3em; }
-    .convo .c-voices[hidden], .convo .c-circles-note[hidden], .convo .c-say-reply[hidden], .convo .c-say-linked[hidden], .convo .c-circle-note[hidden] { display: none; }
-    .convo .c-circle-note { margin: 0.4em 0 1em; }
+    .convo .c-voices[hidden], .convo .c-circles-note[hidden], .convo .c-say-reply[hidden], .convo .c-say-linked[hidden], .convo [data-selected][hidden], .convo .c-selected-note[hidden] { display: none; }
+    /* CORE-117: ONE conversation. The lists, the pins and the page's intro step aside; the card is the page's one thread, the speaking area sits under it */
+    html.c-selecting .convo > *:not(.c-head):not([data-selected]) { display: none; }
+    html.c-selecting .convo .c-head > *:not(h1):not(.c-crumb) { display: none; }
+    .convo .c-selected { margin: 0 0 1.2rem; }
+    .convo .c-selected-back {
+      display: block; width: fit-content; margin: 0 0 0.7rem; font: 0.78rem/1.4 var(--pm-mono); letter-spacing: 0.04em;
+      color: var(--pm-gold-bright); text-decoration: none; border-bottom: 1px solid rgba(232, 196, 139, 0.4);
+    }
+    .convo .c-selected-note { margin: 0.5em 0; }
+    .convo .c-selected [data-selected-place] { display: inline-block; margin-right: 0.6rem; }
+    /* the room one step back (the reader's own Back to the room) draws the room's whole header itself: the page's partial place + live line stands down there, so one metadata group is on screen */
+    .convo .c-selected.is-room-step [data-selected-place], .convo .c-selected.is-room-step > .c-chip { display: none; }
+    .convo .c-selected > .c-say { margin: 1.2rem 0 0; }
     .convo .c-say-reply {
       display: flex; align-items: center; gap: 0.7em; flex-wrap: wrap; margin: 0 0 0.5em;
       padding: 0.5em 0.8em; border-radius: 8px; border: 1px dashed rgba(232, 196, 139, 0.4);
