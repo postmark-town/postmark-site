@@ -48,10 +48,13 @@ const READER_FILE = [process.env.CORE82_WORLD_READER, join(ROOT, "node_modules/p
 const HAS_READER = READER_FILE !== null;
 const readerNote = HAS_READER ? `the real reader (${READER_FILE.includes("node_modules") ? "the pinned World" : "CORE82_WORLD_READER"})` : "NO reader (the pinned World predates it)";
 
+// CORE-128: the public residents list the page reads for its faces (/world-engine/residents-meta.json): null = not served (names only), set per test, optionally late
+let RESIDENTS_META = null, RESIDENTS_META_DELAY_MS = 0;
 function serve({ withReader }) {
   const server = http.createServer((req, res) => {
     const path = decodeURIComponent((req.url || "/").split("?")[0]);
     const send = (code, type, body) => { res.writeHead(code, { "content-type": type, "cache-control": "no-store" }); res.end(body); };
+    if (path === "/world-engine/residents-meta.json" && RESIDENTS_META) { setTimeout(() => send(200, "application/json", JSON.stringify(RESIDENTS_META)), RESIDENTS_META_DELAY_MS); return; }
     if (path === "/conversations/") return send(200, "text/html; charset=utf-8", HARNESS);
     if (path.startsWith("/src/lib/") && /^\/src\/lib\/[A-Za-z0-9._-]+\.mjs$/.test(path) && existsSync(join(ROOT, path))) return send(200, "text/javascript", readFileSync(join(ROOT, path)));
     if (path === "/world-engine/spectator/circle-reader.mjs" && withReader && HAS_READER) return send(200, "text/javascript", readFileSync(READER_FILE));
@@ -512,6 +515,83 @@ test(`#circle-<id> (${readerNote}): the office says which room the circle is in;
     await lost.until(`!document.querySelector("[data-circle-note]").hidden`, "the note");
     assert.match(await lost.evalJs(`document.querySelector("[data-circle-note]").textContent`), /no such circle.*not the same as the circle being empty/);
   } finally { await lost.close(); }
+});
+
+test("CORE-128: a card's metadata is ONE group above the talk (counts, began, latest; no relative 'last … ago' narration), and each speaker is a face and a name, the faces arriving in place", async () => {
+  const { b, base } = await boot(false);
+  RESIDENTS_META = { residents: {
+    pica: { name: "Pica", avatar: "/media/pica-avatar-card.jpg", color: "#2f5aa8" },
+    noe: { name: "Noe", avatar: "javascript:alert(1)", color: "#c0703c" },
+  } };
+  RESIDENTS_META_DELAY_MS = 1500;                                   // the names are drawn first; the public list lands after, through the page's own poll/cache path
+  const withHuman = thread({ participants: ["pica", "noe", "human-of-pica", "seth"] });
+  const state = { live: [withHuman] };
+  const p = await openPage(b, base, { office: makeOffice(state) });
+  try {
+    await p.until(`${CARD}?.querySelectorAll(".c-people .c-person").length === 4`, "the speakers list");
+    // ONE metadata group, above the talk: place + live in the head; counts, began, latest in .c-meta; nothing relative, no second group
+    const meta = await p.evalJs(`(() => { const c = ${CARD}; const m = c.querySelector(".c-meta"); return { text: m.textContent.replace(/\\s+/g, " ").trim(), order: [...c.children].map((e) => e.className.split(" ")[0]).slice(0, 4), live: c.querySelectorAll(".c-chip.live").length, groups: c.querySelectorAll(".c-meta").length, whole: c.textContent }; })()`);
+    assert.match(meta.text, /14 statements/);
+    assert.match(meta.text, /4 speakers/);
+    assert.match(meta.text, /began 2026-11-14 20:01Z/);
+    assert.match(meta.text, /latest 2026-11-14 20:14Z/);
+    assert.doesNotMatch(meta.whole.split("There is")[0], /\blast \d+[smhd] ago\b|\bjust now\b/, "no relative 'last … ago / now' narration in the card's metadata");
+    assert.deepEqual(meta.order.slice(0, 3), ["c-thread-head", "c-meta", "c-people"], "title/live, then the metadata, then the speakers, all above the talk");
+    assert.equal(meta.live, 1, "the live mark once");
+    assert.equal(meta.groups, 1, "one metadata group");
+    // the names first (names-only until the list lands), then the faces are swapped in IN PLACE: the same link node, the same focus
+    await p.evalJs(`window.__link = ${CARD}.querySelector(".c-person a.c-who"); window.__link.focus(); true`);
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-person > img.c-face").length`), 0, "no picture before the list lands (letters, not blocked words)");
+    await p.until(`${CARD}.querySelectorAll(".c-person > img.c-face").length === 1`, "the public picture arrived");
+    const after = await p.evalJs(`(() => { const c = ${CARD}; const ppl = [...c.querySelectorAll(".c-person")].map((i) => ({ handle: i.dataset.handle, face: i.firstElementChild.tagName + "." + i.firstElementChild.className.replace(/\\s+/g, "."), letter: i.firstElementChild.textContent, src: i.firstElementChild.getAttribute("src"), hasLink: !!i.querySelector("a.c-who, .c-who") })); return { ppl, sameLink: c.querySelector(".c-person a.c-who") === window.__link, focus: document.activeElement === window.__link }; })()`);
+    assert.equal(after.sameLink, true, "the names were not rebuilt");
+    assert.equal(after.focus, true, "the keyboard focus stayed on the link it was on");
+    const by = Object.fromEntries(after.ppl.map((x) => [x.handle, x]));
+    assert.equal(by.pica.face.startsWith("IMG."), true);
+    assert.equal(by.pica.src, "/media/pica-avatar-card.jpg");
+    assert.equal(by.noe.face.startsWith("SPAN."), true, "a refused picture address is a letter");
+    assert.equal(by.noe.letter, "N");
+    assert.match(by["human-of-pica"].face, /is-human/, "the house's human: the dashed chip");
+    assert.equal(by["human-of-pica"].src, null, "never a photo");
+    assert.equal(by.seth.letter, "S", "a speaker the list does not hold: a letter");
+    assert.ok(after.ppl.every((x) => x.hasLink || x.handle.startsWith("human-of-")), "every speaker keeps their name");
+    // a poll with new talk moves the numbers in place and does not rebuild the speakers
+    state.live = [{ ...withHuman, voice_count: 15, latest: "2026-11-14T20:16:00.000Z" }];
+    await p.tick();
+    await p.until(`${CARD}.querySelector("[data-c-count]").textContent === "15 statements" && ${CARD}.querySelector("[data-c-latest]").textContent === "latest 2026-11-14 20:16Z"`, "the numbers moved in place");
+    assert.equal(await p.evalJs(`${CARD}.querySelector(".c-person a.c-who") === window.__link`), true, "the speakers were not rebuilt by the poll");
+  } finally { RESIDENTS_META = null; RESIDENTS_META_DELAY_MS = 0; await p.close(); }
+});
+
+test(`CORE-128 (${readerNote}): the host owns the room's header (none repeated inside the reader, no 'now' row) and every byline the reader draws, a room's circle list and an opened circle alike, carries its face inline`, async () => {
+  const { b, base } = await boot(true);
+  RESIDENTS_META = { residents: { pica: { name: "Pica", avatar: "/media/pica-avatar-card.jpg", color: "#2f5aa8" }, noe: { name: "Noe", avatar: null, color: "#c0703c" } } };
+  const p = await openPage(b, base, { office: makeOffice({ live: [thread()], room: (id) => roomFind(id) }) });
+  try {
+    if (!HAS_READER) return;                      // a pinned World that predates the reader: the FLOOR tests above are what runs
+    await p.until(MOUNTED, "the reader mounted");
+    // the room's one header is the host's: the reader draws none of its own (WLD-215 hostOwnsHeader), so the metadata is said once, above the talk
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".cr-head").length`), 0, "no second header inside the reader");
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-thread-head").length`), 1, "the host's one title/live group");
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-meta").length`), 1, "the host's one counts/began/latest group");
+    assert.equal(await p.evalJs(`/\\bnow\\b/i.test(${CARD}.querySelector(".c-thread-head").textContent + " " + ${CARD}.querySelector(".c-meta").textContent)`), false, "no 'now' row");
+    // the room's circle list: each opener's byline wears a face, inline, first (a fresh node per line)
+    const bylines = `[...${CARD}.querySelectorAll("[data-circle-reader] .cr-head-line")]`;
+    assert.equal(await p.evalJs(`${bylines}.length > 0 && ${bylines}.every((l) => l.firstElementChild?.classList.contains("c-face"))`), true, "every listed opener has its face first in the byline");
+    // an opened circle: every statement, replies included
+    await p.evalJs(`document.querySelector('[data-circle-open="50101"]').click(); true`);
+    await p.until(`!!${CARD}.querySelector("[data-circle-reader][data-state=circle]")`, "the circle opened");
+    // the visitor opens every folded thread (the replies), as the FALSIFIER test does, until none is folded
+    for (let i = 0; i < 20; i++) {
+      const folded = await p.evalJs(`(() => { const t = [...${CARD}.querySelectorAll('[data-thread][data-open="false"] > [data-thread-dot]')]; t.forEach((d) => d.click()); return t.length; })()`);
+      if (!folded) break;
+    }
+    // (an opened circle keeps ITS OWN header, the circle's: hostOwnsHeader leaves out only the room's; the host's group is still the one room header)
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-thread-head").length`), 1, "the host's one room header, unchanged by opening a circle");
+    assert.equal(await p.evalJs(`${bylines}.length > 1 && ${bylines}.every((l) => l.firstElementChild?.classList.contains("c-face"))`), true, "every statement of the opened circle, replies included, has its face first in the byline");
+    assert.equal(await p.evalJs(`new Set(${bylines}.map((l) => l.firstElementChild)).size === ${bylines}.length`), true, "a fresh node per line: no repeated speaker took an earlier line's face");
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-who, .cr-head-line a, .cr-head-line button").length > 0`), true, "the names and controls stay");
+  } finally { RESIDENTS_META = null; await p.close(); }
 });
 
 test("the header no longer says a conversation closes after five quiet minutes, and the page's own wording keeps 'letter threads' and 'circles' apart", () => {

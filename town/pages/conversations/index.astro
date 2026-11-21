@@ -296,6 +296,18 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         return mono;
       }
 
+      // THE READER'S FACE PROVIDER (CORE-128, Darko 2026-11-19 15:36 EST: "profile pictures next to speakers"). The World's circle reader accepts an
+      // OPTIONAL `faceForSpeaker(handle) -> a fresh decorative DOM node | null` and puts the node inline in each statement's byline (a reader that does
+      // not know the option ignores it). It is faceNode above, unchanged: the guarded public picture, the colour and letter fallback, the dashed
+      // `human-of-` chip with no photo. A FRESH node per call, so a speaker who speaks again never takes an earlier statement's face. Never throws:
+      // a face is a garnish, so a failure is no face, never a blocked line.
+      function faceForSpeaker(handle) {
+        try {
+          var h = String(handle == null ? "" : handle).trim();
+          return h ? faceNode(h) : null;
+        } catch (e) { return null; }
+      }
+
       function threadNode(t) {
         var card = el("article", "c-thread" + (t.live ? " is-live" : ""));
         // the id is how a card's scroll position survives the next rebuild
@@ -339,7 +351,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         // "statements", not "voices": eleven voices read like eleven residents,
         // and the count is utterances (Keemin, 2026-08-08)
         meta.appendChild(el("span", null, statementsWords(t))).setAttribute("data-c-count", "");
-        meta.appendChild(el("span", null, "last " + ago(Date.parse(t.latest)))).setAttribute("data-c-last", "");
+        // CORE-128 (Darko, 2026-11-19 19:55 EST: "the fields or like metadata about the conversation should probably be at the top … the now field is kind of
+        // verbose … it does already say 'live' at the top too"): the card's ONE metadata group, above the talk and said once: the place (title) and the live
+        // chip in the head, here the counts, when it began and its latest, as dates (the reader's own form), and no relative "last 5d ago / now" narration.
+        meta.appendChild(el("span", null, speakersWords(t))).setAttribute("data-c-speakers", "");
+        if (dateTimeOf(t.started)) meta.appendChild(el("span", null, "began " + dateTimeOf(t.started))).setAttribute("data-c-began", "");
+        if (latestWords(t)) meta.appendChild(el("span", null, latestWords(t))).setAttribute("data-c-latest", "");
         // A conversation someone wants to show a friend needs an address of its
         // own. The page has always ANSWERED to #<thread-id> — that is how the map
         // arrives — but there was no way to get the link out of the page short of
@@ -368,15 +385,50 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       function statementsWords(t) {
         return t.voice_count + (t.voice_count === 1 ? " statement" : " statements");
       }
+      function speakersWords(t) {
+        var n = (t.participants || []).length;
+        return n + (n === 1 ? " speaker" : " speakers");
+      }
+      // "2026-11-14T20:01:00.000Z" -> "2026-11-14 20:01Z", the circle reader's own date form ("" when the office gave none)
+      function dateTimeOf(iso) {
+        var m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(String(iso == null ? "" : iso));
+        return m ? m[1] + " " + m[2] + "Z" : "";
+      }
+      function latestWords(t) {
+        var d = dateTimeOf(t.latest);
+        return d ? "latest " + d : "";
+      }
 
+      // THE SPEAKERS LIST (CORE-128): each speaker is their face and their name, the same small face the lines wear (faceNode: public picture, letter
+      // fallback, the dashed chip for a house's human). The names are built once per speaker set and keep their focus; when the public residents list
+      // lands (or changes) AFTER they were drawn, only the face nodes are swapped, in place, never the links.
+      function personNode(handle) {
+        var item = el("span", "c-person");
+        item.setAttribute("data-handle", handle);
+        var face = faceForSpeaker(handle);
+        if (face) item.appendChild(face);
+        item.appendChild(personLink(handle));
+        return item;
+      }
       function fillPeople(people, t) {
         var key = (t.participants || []).join("\u0001");
-        if (people.getAttribute("data-people") === key) return;       // unchanged: the links keep their focus
+        var faced = faces ? "1" : "0";
+        if (people.getAttribute("data-people") === key) {
+          if (people.getAttribute("data-faced") === faced) return;    // unchanged: the links keep their focus
+          people.setAttribute("data-faced", faced);                   // only the pictures arrived: swap the face nodes, leave every link where it is
+          Array.prototype.forEach.call(people.querySelectorAll(".c-person"), function (item) {
+            var old = item.querySelector(":scope > .c-face");
+            var next = faceForSpeaker(item.getAttribute("data-handle"));
+            if (old && next) old.replaceWith(next); else if (next) item.insertBefore(next, item.firstChild);
+          });
+          return;
+        }
         people.setAttribute("data-people", key);
+        people.setAttribute("data-faced", faced);
         people.textContent = "";
         (t.participants || []).forEach(function (h, i) {
           if (i) people.appendChild(document.createTextNode(" · "));
-          people.appendChild(personLink(h));
+          people.appendChild(personNode(h));
         });
       }
 
@@ -412,7 +464,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var set = function (attr, text) { var n = card.querySelector("[" + attr + "]"); if (n && n.textContent !== text) n.textContent = text; };
         set("data-c-coords", t.at ? t.at.x + "," + t.at.y : "");
         set("data-c-count", statementsWords(t));
-        set("data-c-last", "last " + ago(Date.parse(t.latest)));
+        set("data-c-speakers", speakersWords(t));
+        set("data-c-latest", latestWords(t));
         var people = card.querySelector(".c-people");
         if (people) fillPeople(people, t);
       }
@@ -674,6 +727,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var rec = { host: host, reader: null, ready: null, seen: t.latest + ":" + t.voice_count, flatHidden: false };
         card.__cr = rec;
         rec.ready = h.mount(host, String(t.id), {
+          faceForSpeaker: faceForSpeaker,
+          hostOwnsHeader: true,
           onState: function (st) {
             if (st === "room" || st === "circle") showFlat(card, false, "");
             else if (st === "unavailable") showFlat(card, true, "The circles couldn't be read just now, so these are the words this page already holds:");
@@ -849,7 +904,13 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // appear under the names already on screen.
       fetch("/world-engine/residents-meta.json", { headers: { accept: "application/json" } })
         .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) { if (d && d.residents) { faces = d.residents; tick(); } })
+        .then(function (d) {
+          if (d && d.residents) {
+            faces = d.residents; tick();
+            // the readers drew (or are drawing) their bylines before the pictures landed: ask them to redraw so the faces appear under the names
+            refreshReaders(liveBox, true); refreshReaders(closedBox, true);
+          }
+        })
         .catch(function () { /* names only — a face is a garnish, never the meal */ });
 
       tick();
@@ -886,7 +947,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     // and a Reply press is announced as a `pm:reply-target` event for the speak box below. Nothing here derives a link, a parent or a circle.
     const __getTok = () => { try { return JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch { return null; } };
     window.__pmCircleReaders = {
-      async mount(host, roomId, { onState = null } = {}) {
+      async mount(host, roomId, { onState = null, faceForSpeaker = null, hostOwnsHeader = false } = {}) {
         const mod = await loadReader({});
         if (!mod) return { ok: false, why: "the circle reader is not on this site's pinned World yet" };
         if (typeof mod.READER_CSS === "string" && mod.READER_CSS && !document.querySelector("style[data-circle-reader-css]")) {
@@ -901,6 +962,10 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           onReply: (target) => document.dispatchEvent(new CustomEvent("pm:reply-target", { detail: target })),
           onState,
           hrefForCircle: (c) => `#circle-${encodeURIComponent(c)}`,
+          // CORE-128: the optional face provider, handed on ONLY when the page gave one (a reader without the option, or a caller without a provider, is unchanged)
+          ...(typeof faceForSpeaker === "function" ? { faceForSpeaker } : {}),
+          // CORE-128 / WLD-215: this page draws each card's one header itself (title, live, counts, began, latest), so the reader leaves its own out (strictly `true`; absent = the reader's default)
+          ...(hostOwnsHeader === true ? { hostOwnsHeader: true } : {}),
         });
         await reader.showRoom(roomId);
         return { ok: true, reader };
@@ -1264,7 +1329,10 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       font: 0.7rem/1.4 var(--pm-mono); letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.58);
     }
     .convo .c-meta > * + *::before { content: "· "; color: rgba(232, 196, 139, 0.35); }
-    .convo .c-people { margin: 0.6em 0 0; font-size: 0.82rem; }
+    .convo .c-people { margin: 0.6em 0 0; font-size: 0.82rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.35em 0.5em; }
+    /* CORE-128: a speaker is their small face and their name, side by side (the same face the lines wear: about 20px) */
+    .convo .c-person { display: inline-flex; align-items: center; gap: 0.35em; min-width: 0; }
+    .convo .c-person > .c-face { width: 20px; height: 20px; font-size: 0.62rem; box-sizing: border-box; }
     .convo .c-who {
       color: var(--pm-gold-bright); text-decoration: none;
       border-bottom: 1px solid rgba(232, 196, 139, 0.3); white-space: nowrap;
@@ -1311,6 +1379,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       font: 600 0.7rem/1 var(--pm-mono); letter-spacing: 0;
       border: 1px solid rgba(232, 196, 139, 0.25);
       background: rgba(232, 196, 139, 0.08);
+    }
+    /* CORE-128: the same small face INLINE at the start of a reader byline (the World's circle reader puts the provider's node first in .cr-head-line):
+       about 20px, in the line's own flow, so no statement or subtree gains a gutter and the speech keeps its width */
+    .convo .cr-head-line > .c-face {
+      display: inline-grid; vertical-align: middle; width: 20px; height: 20px; margin: -2px 0.4em 0 0;
+      font-size: 0.62rem; box-sizing: border-box;
     }
     /* the human of a house: never a portrait, never a colour of their own */
     .convo .c-face.is-human {
