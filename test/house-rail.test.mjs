@@ -319,7 +319,7 @@ test("built: each declared house's faces file is the household page's own faces:
 
 test("TEXT PIN: the + and the settings are the house's own human's: the household page's script and the resident page's each show them only for a sign-in that holds one of this house's residents", () => {
   const stage = read("src/lib/hearth/stage.mjs");
-  assert.match(stage, /const owner = mine\(\)\.length > 0;\s*for \(const e of bar\?\.querySelectorAll\("\[data-hearth-own\], \[data-house-add\]"\) \?\? \[\]\) e\.hidden = !owner;/, "household page: the settings and the + follow the owner check");
+  assert.match(stage, /const owner = mine\(\)\.length > 0;\s*for \(const e of bar\?\.querySelectorAll\("\[data-hearth-own\], \[data-house-add\], \[data-house-human-edit\]"\) \?\? \[\]\) e\.hidden = !owner;/, "household page: the settings and the + follow the owner check");
   assert.match(stage, /const mine = \(\) => \(token\(\) \? held\(\)\.filter\(\(h\) => handles\.includes\(h\)\) : \[\]\);/, "and the owner is a fresh sign-in holding one of this house's residents");
   assert.match(stage, /if \(bar\) paintReadingMark\(bar, ctx\.reading\);/, "the stage paints the reading mark from the same reading state");
   const house = read("town/components/Household.astro");

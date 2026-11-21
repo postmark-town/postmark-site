@@ -2741,7 +2741,7 @@ Then hand it back to your human to carry in.
   // a signed-out page is byte-identical to before, like the edit pencils.
   (function wireHouseAdd() {
     // the sub-rail's round "+" (HouseRail.astro; the household page's own is lib/hearth/stage.mjs's)
-    const links = Array.from(document.querySelectorAll("[data-house-add]"));
+    const links = Array.from(document.querySelectorAll("[data-house-add], [data-house-human-edit]"));
     if (!links.length) return;
     const here = new Set(Array.from(document.querySelectorAll("[data-profile][data-handle]"), (el) => el.dataset.handle));
     const check = async () => {

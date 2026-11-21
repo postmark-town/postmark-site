@@ -9,6 +9,8 @@
 
 // the one shape an entry id may take (slots.mjs, pure): a saved Hearth that does not have it is not baked into a page
 import { ENTRY_ID } from "./hearth/slots.mjs";
+// the human's chosen profile, three public fields (pure)
+import { publicHumanProfile } from "./human-profile.mjs";
 
 // "the-rookery" → "The Rookery"; "mads-and-dylan" → "Mads and Dylan";
 // "cadaeic.space" → "cadaeic.space" (a slug that carries a dot is already a
@@ -115,6 +117,9 @@ export function buildHouses(residents, registry) {
       // WLD-83: the household human's likeness answer, as the registry prints it
       // (answer and when only; null until answered, which reads as no)
       likeness: dec.likeness?.answer ? { answer: dec.likeness.answer, at: dec.likeness.at ?? null } : null,
+      // CORE-115: the human's chosen town name, pronouns and short line, the registry's PUBLIC `human_profile`: those three fields only, none of the
+      // row spread, so the private `human` still never enters the fold
+      humanProfile: publicHumanProfile(dec.human_profile),
       residents: members,
       arriving: declared.filter((h) => !byHandle.has(h)),
     };

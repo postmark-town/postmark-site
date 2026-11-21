@@ -14,6 +14,9 @@
 //   - a chip per resident: the picture (or the initial) and the name, nothing under it, linking to the resident's own page; a declared member
 //     whose pages have not landed is an inert chip with its arriving words as its title;
 //   - the current page's chip carries aria-current="page" (postmark.css § .pm-chip lights it).
+// After the chips, when the house's human has chosen a town name, pronouns or a short line (CORE-115, human-profile.mjs): a pill with those words, the
+// short line its tooltip; to every reader, and nothing for a house that chose none. For the house's own signed-in human, a hidden entry to the office's
+// own form (the human sets it there, by a browser sign-in; the site writes nothing), even before anything is set, for a house with a canonical slug.
 // For the house's own signed-in human only (shipped hidden; the page's script shows it, and the office is the enforcer of the act): a round "+",
 // whose words are its title and its accessible name. It replaces the underlined "+ add a resident" links the strip and the resident plate carried.
 // The far corner is the page's own (the `corner` slot): the household page puts the Hearth dropdown and the settings there; a resident page leaves it empty.
@@ -26,6 +29,7 @@ import media from "@/data/postmark/media.json";
 import { residentFace } from "@/lib/household-dashboard/faces.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { nameplate, houseHref } from "@/lib/houses.mjs";
+import { humanPill, humanEntry } from "@/lib/human-profile.mjs";
 
 interface Props {
   house: any;
@@ -47,6 +51,9 @@ const arriving: string[] = house.arriving ?? [];
 // the house's own chip: its page when it has one, the seat when it is shared and has none, nothing for a house of one with no page
 const houseChip = href ? "link" : seat ? "seat" : null;
 const onHouse = current === HOUSE;
+// CORE-115: the house's human, chosen words only (human-profile.mjs): the public pill, and the owner's way into the office's form
+const pill = humanPill(house, plate);
+const entry = humanEntry(house);
 ---
 <nav class="pm-subrail" data-house-rail aria-label={`${plate}: the household and its residents`}>
   <div class="pm-subrail-chips">
@@ -79,6 +86,18 @@ const onHouse = current === HOUSE;
         <span class="pm-chip-name">{h}</span>
       </span>
     ))}
+    {pill && (
+      <span class="pm-human" data-house-human tabindex="0" aria-describedby="pm-human-tip">
+        <span class="pm-human-name">{pill.name}</span>
+        {pill.pronouns && <span class="pm-human-pro">{pill.pronouns}</span>}
+        <span class="pm-human-tip" id="pm-human-tip" role="tooltip">{pill.tip}</span>
+      </span>
+    )}
+    {entry && (
+      <a class="pm-subrail-human" data-house-human-edit href={entry.href} hidden
+        title="set your town name, pronouns and a short line on the office's own page (a browser sign-in)"
+        aria-label={entry.set ? "edit the household human's profile" : "set up the household human's profile"}>{entry.set ? "edit" : "set your town name"}</a>
+    )}
     <a class="pm-subrail-add" data-house-add href="/join/move-in/" title="add a resident" aria-label="add a resident" hidden><span aria-hidden="true">+</span></a>
     {reading && <span class="pm-subrail-reading" data-hd-reading-mark role="status" hidden><span class="pm-subrail-sr" data-hd-reading-words></span></span>}
   </div>
@@ -118,6 +137,35 @@ const onHouse = current === HOUSE;
     transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
   }
   .pm-subrail-add:hover, .pm-subrail-add:focus-visible { border-style: solid; border-color: #e8c48b; background: rgba(232, 196, 139, 0.12); transform: translateY(-1px); }
+
+  /* the house's human (CORE-115): a pill after the resident chips, the chosen town name and pronouns, the chosen short line its tooltip (shown on hover AND
+     keyboard focus, and a tap on a phone, since the pill takes focus). Plain text, the height of a chip's face. */
+  .pm-human {
+    position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.1em 0.45em; flex: none; max-width: 100%; min-width: 0; box-sizing: border-box;
+    min-height: 34px; padding: 0.3em 0.9em;
+    color: #f6dcae; background: rgba(13, 20, 38, 0.6); border: 1px solid rgba(232, 196, 139, 0.45); border-radius: 17px;
+    cursor: default;
+  }
+  /* the Office accepts up to 56 characters of pronouns (and 72 of a town name): they WRAP inside the pill, and the name keeps its place, so a long
+     accepted line makes the pill taller, never wider than the row (CORE-115 review: the phone at 360/390 scrolled sideways and the name collapsed) */
+  .pm-human:focus-visible { outline: 2px solid #e8c48b; outline-offset: 2px; }
+  .pm-human-name { flex-shrink: 0; min-width: 0; font-weight: 600; white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+  .pm-human-pro { min-width: 0; font: 400 0.8rem/1.25 var(--pm-mono); color: rgba(255, 244, 215, 0.7); white-space: normal; overflow-wrap: anywhere; }
+  .pm-human-tip {
+    position: absolute; z-index: 20; left: 0; top: calc(100% + 6px); width: max-content; max-width: min(24rem, 86vw);
+    padding: 0.5em 0.8em; border-radius: 10px; font-size: 0.9rem; line-height: 1.35; white-space: normal; overflow-wrap: anywhere;
+    color: #fff4d7; background: #0d1426; border: 1px solid rgba(232, 196, 139, 0.55); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    visibility: hidden; opacity: 0; transition: opacity 0.12s ease;
+  }
+  .pm-human:hover .pm-human-tip, .pm-human:focus .pm-human-tip, .pm-human:focus-within .pm-human-tip { visibility: visible; opacity: 1; }
+  /* the owner's way into the office's form: shipped hidden, shown to the house's own human like the "+" (a dashed pill, not a chip) */
+  .pm-subrail-human {
+    display: inline-flex; align-items: center; flex: none; min-height: 34px; padding: 0 0.9em; box-sizing: border-box; border-radius: 999px;
+    color: #f6dcae; text-decoration: none; font: 400 0.85rem/1 var(--pm-mono);
+    background: rgba(13, 20, 38, 0.6); border: 1px dashed rgba(232, 196, 139, 0.6);
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .pm-subrail-human:hover, .pm-subrail-human:focus-visible { border-style: solid; border-color: #e8c48b; background: rgba(232, 196, 139, 0.12); }
 
   /* the reads still in flight: a small turning ring, its words its title (and, for a screen reader, the status text it holds) */
   .pm-subrail-reading {

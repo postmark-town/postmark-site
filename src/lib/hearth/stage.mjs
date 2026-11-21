@@ -126,7 +126,7 @@ export function mountHearth(root, { loadScript } = {}) {
   // the enforcer of every act.
   function paintStrip() {
     const owner = mine().length > 0;
-    for (const e of bar?.querySelectorAll("[data-hearth-own], [data-house-add]") ?? []) e.hidden = !owner;
+    for (const e of bar?.querySelectorAll("[data-hearth-own], [data-house-add], [data-house-human-edit]") ?? []) e.hidden = !owner;
     if (!owner && settings) settings.open = false;
   }
   // the settings panel is a <details>: it opens and closes by itself; a click elsewhere or Escape closes it too
