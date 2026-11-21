@@ -58,6 +58,22 @@ test("the sheet view: what the office shows, and how many the town holds until t
   assert.equal("plate" in view, false, "the town's style plate left the sheet (10-25)");
 });
 
+test("only the anchored sheet is current, every sheet still shows, and nothing is current without an anchor (postmark#4437)", () => {
+  const first = "https://media.postmark.town/media/x/newer.webp", second = "https://media.postmark.town/media/x/older.webp";
+  const sheets = [{ url: first, own: true, made_by: "lantern-row" }, { url: second, own: true, made_by: "lantern-row" }];
+  const given = sheetView({ read: "sheet", likeness: "given", anchor: first, sheets, template: "" });
+  assert.equal(given.anchor, first);
+  assert.deepEqual(given.sheets.map((s) => s.url), [first, second], "every sheet is still present");
+  assert.deepEqual(given.sheets.map((s) => s.current), [true, false], "only the anchor is current");
+  const notGiven = sheetView({ read: "sheet", likeness: "not given", anchor: null, sheets, template: "" });
+  assert.equal(notGiven.anchor, null);
+  assert.deepEqual(notGiven.sheets.map((s) => s.current), [false, false], "no anchor, no current sheet");
+  assert.equal(sheetView({ read: "sheet", likeness: "given", sheets, template: "" }).anchor, null, "an answer without an anchor marks nothing");
+  const page = readFileSync(new URL("../town/pages/residents/[handle]/appearance.astro", import.meta.url), "utf8");
+  assert.match(page, /cap\.textContent = \(s\.own \? "the household's own" : "the town's"\) \+ \(s\.current \? " · current" : ""\)/,
+    "the anchored sheet's caption says current; the others keep theirs");
+});
+
 test("the town's own sheet is marked a starting default, and the template note names no style plate", () => {
   const view = sheetView({ read: "sheet", likeness: "given", sheets: [{ url: "https://media.postmark.town/media/the-town/s.webp", own: false, made_by: "the-town" },
     { url: "https://media.postmark.town/media/x/own.webp", own: true, made_by: "lantern-row" }], template: "Make ONE image", style_plate: null });
