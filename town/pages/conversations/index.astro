@@ -1011,14 +1011,66 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       }
       window.addEventListener("hashchange", function () { syncSelected(); anchored = false; tick(); });
 
-      function tick() {
-        fetch(pageUrl(null), { headers: { accept: "application/json" } })
+      // POLL-SCHEDULER:BEGIN
+      // ONE ASK AT A TIME, AND A WAIT THAT GROWS WHILE THE OFFICE DOES NOT ANSWER (CORE-158; Wright 2026-11-22: "one ask at a time per tab; back off after a
+      // failure and say so on the page"). The pace itself (POLL_MS) is not changed here. Every way into the main list's ask (the timer, a hash change, a say, the
+      // faces landing, the tab coming back) goes through `tick`, which does nothing while the last ask has not settled; the next ask is armed from the SETTLEMENT,
+      // after the pace on a success and after a longer, capped wait on a failure, and a success is back at the pace. A hidden tab arms nothing (a failure that
+      // settles while hidden does not start the poll again), and a tab that comes back waits out what is left of a back-off rather than asking at once.
+      var POLL_BACKOFF_MS = [15000, 30000, 60000];
+      function makePoller(o) {
+        var inFlight = false, fails = 0, timer = null, due = 0;
+        function wait() { return fails ? o.steps[Math.min(fails, o.steps.length) - 1] : o.pace; }
+        function clear() { if (timer !== null) { o.clearT(timer); timer = null; } }
+        function arm(ms) {
+          clear();
+          due = o.now() + ms;             // kept even when hidden, so a tab that comes back owes only what is left of the wait
+          if (o.hidden()) return;
+          timer = o.setT(function () { timer = null; tick(); }, ms);
+        }
+        function tick() {
+          if (inFlight) return false;
+          inFlight = true; clear();
+          var settled = false;
+          function settle(ok) {
+            if (settled) return;
+            settled = true; inFlight = false;
+            fails = ok ? 0 : fails + 1;
+            arm(wait());
+          }
+          var p;
+          try { p = o.run(); } catch (e) { settle(false); return true; }
+          Promise.resolve(p).then(function (ok) { settle(ok === true); }, function () { settle(false); });
+          return true;
+        }
+        return {
+          tick: tick,
+          pause: clear,
+          resume: function () {
+            if (timer !== null || inFlight) return;
+            var left = fails ? due - o.now() : 0;
+            if (left > 0) arm(left); else tick();
+          },
+          // the wait a failing ask now would be followed by, for the words the page says while it backs off
+          retryMs: function () { return o.steps[Math.min(fails + 1, o.steps.length) - 1]; },
+          state: function () { return { inFlight: inFlight, fails: fails, wait: wait(), armed: timer !== null }; },
+        };
+      }
+      // POLL-SCHEDULER:END
+
+      // POLL-ASK:BEGIN
+      // One ask of the main list. It answers true when the office answered and false when it did not (not OK, not JSON, or the request itself failed: a rejection,
+      // an abort, a timeout), which is what the scheduler above backs off on. A failure says so on the page, and says the page is waiting to retry.
+      function officeSilent() {
+        var s = Math.round(poller.retryMs() / 1000);
+        paint(liveBox, null, "The office isn't answering, so this page is waiting " + s + " seconds to retry. The live door is /api/world/conversations.");
+        return false;
+      }
+      function ask() {
+        return fetch(pageUrl(null), { headers: { accept: "application/json" } })
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (d) {
-            if (!d) {
-              paint(liveBox, null, "The office isn't answering — the live door is /api/world/conversations.");
-              return;
-            }
+            if (!d) return officeSilent();
             paintPinned(d.pinned);
             // live threads follow the newest voice; a finished one is a record,
             // so it opens at the first thing said rather than the last
@@ -1035,33 +1087,46 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
               dials.textContent = "Earshot is " + d.earshot_m + " metres; words stay hearable there until the next settlement."
                 + " This page refreshes every " + (POLL_MS / 1000) + " seconds.";
             }
+            return true;
           })
-          .catch(function () {
-            paint(liveBox, null, "The office isn't answering — the live door is /api/world/conversations.");
-          });
+          .catch(function () { return officeSilent(); });
       }
+      // POLL-ASK:END
+      var poller = makePoller({
+        run: ask, pace: POLL_MS, steps: POLL_BACKOFF_MS,
+        hidden: function () { return document.hidden; },
+        now: function () { return Date.now(); },
+        setT: function (fn, ms) { return window.setTimeout(fn, ms); },
+        clearT: function (t) { window.clearTimeout(t); },
+      });
+      function tick() { return poller.tick(); }
 
       // The faces arrive on their own schedule and are never waited for: the
       // first paint is names-only, and if this fetch never lands the page stays
       // names-only rather than empty. When it does land, repaint so the faces
       // appear under the names already on screen.
+      // POLL-FACES:BEGIN
+      // The faces landing is an AUTOMATIC ask, not a visitor's act (CORE-158): it repaints the cards with their pictures by asking the list again, but never while the
+      // page is waiting out a failed read: the owed retry stands, and the pictures arrive with it. The readers are still asked to redraw at once.
+      function facesReady(d) {
+        if (d && d.residents) {
+          faces = d.residents;
+          if (!poller.state().fails) tick();
+          // the readers drew (or are drawing) their bylines before the pictures landed: ask them to redraw so the faces appear under the names
+          refreshReaders(liveBox, true); refreshReaders(closedBox, true);
+        }
+      }
+      // POLL-FACES:END
       fetch("/world-engine/residents-meta.json", { headers: { accept: "application/json" } })
         .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) {
-          if (d && d.residents) {
-            faces = d.residents; tick();
-            // the readers drew (or are drawing) their bylines before the pictures landed: ask them to redraw so the faces appear under the names
-            refreshReaders(liveBox, true); refreshReaders(closedBox, true);
-          }
-        })
+        .then(facesReady)
         .catch(function () { /* names only — a face is a garnish, never the meal */ });
 
       tick();
-      var timer = setInterval(tick, POLL_MS);
-      // a backgrounded tab should not keep polling the office all night
+      // a backgrounded tab should not keep polling the office all night; it comes back with one ask (or the rest of a back-off), never a burst
       document.addEventListener("visibilitychange", function () {
-        if (document.hidden) { clearInterval(timer); timer = null; }
-        else if (!timer) { tick(); timer = setInterval(tick, POLL_MS); }
+        if (document.hidden) poller.pause();
+        else poller.resume();
       });
       // the doorstep box (module script below) speaks, then asks for a repaint
       // right away — waiting out the poll to see your own voice land feels broken.

@@ -116,7 +116,8 @@ test("the page's mount door forwards the provider the same way, and the inline p
   assert.match(page, /h\.mount\(sel\.host, String\(sel\.room\), \{\s*circle: sel\.cid, faceForSpeaker: faceForSpeaker,\s*onState: function \(st\) \{ if \(selected === sel\) sel\.card\.classList\.toggle\("is-room-step", st === "room"\); \},\s*onNavigate: function \(n\) \{ followSelected\(sel, n\); \},\s*\}\)/, "the selected view hands on the page's one face provider, and follows the reader's own navigation and room step");
   assert.doesNotMatch(page.slice(page.indexOf("function mountSelected"), page.indexOf("function loadSelected")), /hostOwnsHeader/, "and does not pass hostOwnsHeader");
   assert.match(MOUNT, /\.\.\.\(typeof faceForSpeaker === "function" \? \{ faceForSpeaker \} : \{\}\)/);
-  assert.match(page, /refreshReaders\(liveBox, true\); refreshReaders\(closedBox, true\);\s*\}\s*\}\)/, "the pictures landing after a reader drew ask it to redraw");
+  // CORE-158 moved that callback into `facesReady` (the POLL-FACES block) and then `.then(facesReady)`; it still asks both lists' readers to redraw
+  assert.match(page, /refreshReaders\(liveBox, true\); refreshReaders\(closedBox, true\);\s*\}\s*\}\s*\/\/ POLL-FACES:END[\s\S]*?\.then\(facesReady\)/, "the pictures landing after a reader drew ask it to redraw");
 });
 
 test("the face sits in the byline's own flow (about 20px, no gutter), and the human chip keeps the page's dashed style", () => {
