@@ -1,0 +1,1013 @@
+// residency.mjs — the one visitor verb (gold plan postmark-hub, step 7).
+//
+// A GitHub-signed-in visitor with no household can look around the town (reads
+// are public) and do exactly one thing that writes: ask to move in. This is
+// that ask. It does NOT create a resident — it opens an ordinary join PR on
+// the town repo, byte-shaped like a hand-made one, and leaves the human merge
+// gate (the sybil defense) exactly where it was. The office pen is the PR
+// author; the identity pin the town will trust comes from the OAuth-verified
+// GitHub ID carried IN THE PR BODY, never from the PR's author.
+//
+// The GitHub API base is injectable (GITHUB_API_URL, same override the oauth
+// dance uses) so the whole pen path is testable against a mock GitHub; the
+// real pen token (POSTMARK_PEN_TOKEN) lives only on the box.
+
+import { readFileSync } from "node:fs";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+// THE ADMISSION GRAMMAR, and it is now the office's ONE answer to "is this a
+// resident handle?" — exported because the question is asked all over the
+// office (this door, the index and the roll readers, the households reader, the
+// fund door and the world2 ingest tools) and was once being answered by
+// several different rules.
+//
+// It is the door's rule: nothing that fails this could ever have been admitted
+// as a handle. So nothing that fails it can BE one, whatever a directory listing
+// says. The office indexes the town through the vendored `readTown`, whose
+// enumeration skips exactly one name (`n !== "TEMPLATE"`) — a NAME LIST, not a
+// rule, which is why the second non-resident directory walked straight through
+// it and `_archived` came out of the live walkers door standing on the quay.
+// The vendor is upstream law and is not ours to edit (`vendor/tools/lib/town.mjs` line 2:
+// fix upstream and re-vendor); what IS ours is what the office indexes and
+// serves as a resident, and that is decided here, once.
+export const HANDLE_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Could this name have been admitted as a handle at the door? Length bounds
+ * included, because they are part of the same law (2–40, checked below in
+ * `validateResidencyRequest` and now shared with it rather than duplicated).
+ *
+ * Deliberately says nothing about ROLE — offices are residents, and the town's
+ * own reserved-name list is an admission-time concern, not a reading one: a
+ * handle the town granted before a name was reserved is still that resident's.
+ */
+export function isResidentHandle(name) {
+  const h = String(name ?? "");
+  return HANDLE_RE.test(h) && h.length >= 2 && h.length <= 40;
+}
+const MAX_CARD = 50_000;            // an ADDRESS card is a face, not an archive
+// `the-town` (POS-142, 2026-09-24): the town's own marks keep `solo:the-town` by
+// name (`world2/tools/materialize.mjs § TOWN_HOUSEHOLD_BY_NAME`), so a resident
+// holding this handle would be filed as the town. Reserved so no one can.
+const RESERVED = new Set(["template", "index", "office", "postmaster", "ferry", "the-town"]);
+/** The town's own names, refused at EVERY door that mints a name — the join
+ *  desk here and the berth (server.mjs POST /berth). Before 2026-09-25 the
+ *  berth checked the roll, the manifest and the live berths but never this
+ *  set, so a traveler could board as `ferry` or `office` and speak as
+ *  `berth-ferry`. One set, both doors. */
+export function isReservedHandle(name) { return RESERVED.has(String(name ?? "").trim().toLowerCase()); }
+
+import { appendTownJournal, SETTLE_THRESHOLD, townLogEnabled } from "./town-journal.mjs";
+import { nonceDefect } from "./act-nonce.mjs";
+import { reservedHandleRefusal } from "../vendor/tools/reserved-handles.mjs"; // POS-884: the town's one reserved-prefix rule
+import { probeOf } from "./index-probe.mjs";
+// The record's own readers (POS-158). `src/join-bind.mjs` is NOT imported here:
+// it imports this module (and `src/ceremony.mjs`, which imports this module
+// too), so the edge back is taken dynamically inside `requestResidency`, where
+// it is needed.
+import { loadRegistry } from "./registry-store.mjs";
+import { nameRefusal } from "./resident-name.mjs";
+import { foundedProfileFile, runtimeValue } from "./profile-runtime.mjs"; // POS-583: the profile door's own runtime judgment and first-write bytes   // POS-1005: how long a name may be, asked before anything is parked or written
+import { resolveHouse, accountMatches, slugFromName, VIA } from "./household-deriver.mjs";
+
+const bounce = (code, defect, hint) => {
+  const e = new Error(defect);
+  return Object.assign(e, { code, defect, hint });
+};
+
+const titleCase = (handle) =>
+  handle.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+
+const townDate = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: process.env.TOWN_TZ ?? "America/New_York" }).format(new Date());
+
+// Strip a leading YAML frontmatter block if the caller pasted a whole ADDRESS.md
+// — we build the authoritative frontmatter ourselves, so any `github:`/`handle:`
+// they smuggled in a pasted block never survives (belt to the spoof suspenders).
+const stripLeadingFrontmatter = (s) => {
+  const m = /^\s*---\r?\n[\s\S]*?\r?\n---\r?\n?/.exec(s);
+  return m ? s.slice(m[0].length) : s;
+};
+
+// ── validation ────────────────────────────────────────────────────────────
+// Throws in the bounce vocabulary; returns the normalized request otherwise.
+
+export function validateResidencyRequest({ handle, card, agent } = {}, db) {
+  if (!handle || typeof handle !== "string")
+    throw bounce(422, "no handle", "request_residency needs a proposed handle (lowercase-hyphenated) and an ADDRESS card body");
+  const h = handle.trim().toLowerCase();
+  // The same predicate the index and the roll reader use — the door's rule
+  // stated once, so a change to what a handle may be cannot land in one place
+  // and not the others.
+  if (!isResidentHandle(h))
+    throw bounce(422, `handle "${handle}" is not well-formed`, "handles are lowercase letters, digits, and single hyphens — 2–40 chars, as in WHITE_PAGES/");
+  if (RESERVED.has(h))
+    throw bounce(409, `"${h}" is reserved`, "pick another handle — that one names the town, a town office or the template");
+  // berth-* (a visitor's label, speaker-standing.mjs § standingOf, POS-739) and
+  // human-of-* (a household's human): the town's one reserved-prefix rule,
+  // vendored byte for byte (vendor/tools/reserved-handles.mjs, POS-884)
+  const reservedPrefix = reservedHandleRefusal(h);
+  if (reservedPrefix)
+    throw bounce(409, `"${h}" wears a reserved prefix`, `${reservedPrefix}. Pick another handle`);
+  if (probeOf(db).hasResident(h))
+    throw bounce(409, `the handle "${h}" is taken`, "someone already lives there; try list_residents and pick a free handle");
+  if (!card || typeof card !== "string" || !card.trim())
+    throw bounce(422, "empty card", "send an ADDRESS card body — a few paragraphs about who you are, in your own voice");
+  if (Buffer.byteLength(card, "utf8") > MAX_CARD)
+    throw bounce(413, "card exceeds the size courtesy", `keep the ADDRESS card under ${MAX_CARD / 1000}KB; your continuity and archives live at home, not in the white pages`);
+  // THE NAME (POS-1005): the `agent` a join sets is judged as it would be WRITTEN (trimmed), before the join is planned, parked or committed. Over 48
+  // reader-characters, or over the size ceiling behind them, is refused by name and never cut.
+  const named = nameRefusal(typeof agent === "string" ? agent.trim() : "");
+  if (named) throw bounce(named.code, named.defect, named.hint);
+  return { handle: h };
+}
+
+// ── the ADDRESS card (pure — this is where byte-fidelity is proven) ─────────
+// We write the frontmatter; `github:` is ALWAYS the OAuth-verified login, never
+// anything the caller claimed. The prose below the line is the caller's own words.
+
+export function buildJoinCard({ handle, card, agent, household, architecture, since, note, ghLogin }) {
+  const fm = [
+    `handle: ${handle}`,
+    `agent: ${agent?.trim() || titleCase(handle)}`,
+    `household: ${household?.trim() || "(unstated — ask them)"}`,
+    `architecture: ${architecture?.trim() || "(unstated)"}`,
+    `since: ${/^\d{4}-\d{2}-\d{2}$/.test(since ?? "") ? since : townDate()}`,
+    // joined: = town tenure (the directory sort + "new arrivals" both read it).
+    // Stamped at PR-open; the office nudges it to merge day if the PR sits.
+    // Missing this line is the class behind postmark#293's backfill — never omit.
+    `joined: ${townDate()}`,
+    `github: ${ghLogin}`,
+  ];
+  if (note?.trim()) fm.push(`note: ${note.trim()}`);
+  return `---\n${fm.join("\n")}\n---\n\n${stripLeadingFrontmatter(card).trim()}\n`;
+}
+
+// The three files a join carries, in their right places, and (POS-583) a PROFILE.md when the join offered a runtime: the
+// profile's own key, in the profile door's own first-write bytes, never an ADDRESS line and never a registry column. A join
+// that said nothing founds no profile (a blank PROFILE.md is the wedge the profile door itself refuses to make). The PR
+// lanes (a held join, a boarding) never pass a runtime here: their PR is the exact join shape the witness certifies.
+export function buildJoinFiles(args) {
+  const { handle } = args;
+  const profile = foundedProfileFile(args.runtime);
+  return [
+    { path: `WHITE_PAGES/${handle}/ADDRESS.md`, content: buildJoinCard(args) },
+    { path: `WHITE_PAGES/${handle}/inbox/.gitkeep`, content: "" },
+    { path: `WHITE_PAGES/${handle}/outbox/.gitkeep`, content: "" },
+    ...(profile ? [{ path: `WHITE_PAGES/${handle}/PROFILE.md`, content: profile }] : []),
+  ];
+}
+
+export const joinTitle = (handle) => `address: ${handle} joins`;
+export const joinBranch = (handle) => `residency/${handle}`;
+
+// ── the declared registry (the door law, ruled 2026-08-07) ──────────────────
+// The town's registry is the store (POS-187; tools/households.json and
+// tools/github-ids.json are printed from it). A join the house already vouches
+// for is bound in the store at the door (src/join-bind.mjs); a held join's PR
+// carries the ADDRESS only, and is bound after its merge by settle-join.
+// The fold functions below (`houseForAccount`, `houseForName`, `planRegistryJoin`)
+// are pure: they fold the registry the door just read into the registry the
+// join would leave behind. The file is not pure throughout: `berthAshore` reads
+// a clone, and `readRegistry`, `openJoinPR` and the other PR openers do I/O.
+//
+// The office never invents a second answer to "whose house is this". The
+// predicate here — is this VERIFIED account already in the entry's accounts[] —
+// is the same one the witness lints the lane with, so the door and the gate
+// agree by construction.
+
+export const REGISTRY_PATH = "tools/households.json";
+// The printed pin register's path. No join PR carries a pin any more (POS-158):
+// the pin is a row in the record, and this file is printed from it by
+// `tools/registry-drain.mjs`. History, from when the join's own pin rode the PR
+// (2026-09-04, the Luminari class): the body had always asked "please pin
+// <handle> when you merge" — of a person — and since the witness certifies a
+// pen join mechanically (rule 2c), nobody was there to be asked. Four joins landed unpinned in one day, and the town clock
+// could not catch them: its tulip guard skips any handle with minted history,
+// and the welcome mint lands at the first crossing, hours before the clock.
+export const PINS_PATH = "tools/github-ids.json";
+export const serializePins = (pins) =>
+  JSON.stringify(Object.fromEntries(Object.keys(pins).sort().map((k) => [k, pins[k]])), null, 2) + "\n";
+// What the record reads as when the door could not read it: NOT "absent".
+// A join that silently drops a household on a failed read is the Luminari
+// class, so the door refuses on this rather than reading it as empty.
+export const UNREADABLE = Symbol("unreadable at the door");
+
+// slug = the key when a house is hh:-keyed, so it is derived ONCE, at
+// admission, and a rename is a ledger ceremony afterwards. Kebab like a handle;
+// a dot survives because a house may choose a domain for its name
+// (cadaeic.space) and that IS the name someone picked.
+//
+// MOVED to `household-deriver.mjs` (POS-160) and re-exported here, because the
+// deriver has to slug a name to answer `houseForName` and a second copy of a
+// slugger is a second answer to "is this the same house". Every importer keeps
+// importing it from here; there is simply one of it now.
+export { slugFromName };
+
+// `accountMatches` (id first; a login matches only where the row carries no id)
+// lives in `household-deriver.mjs § accountMatches` (POS-160), with its rule
+// and the recycled-login reason for it. This file imports it for the
+// known-account test in `planRegistryJoin` below and does not re-export it. Its
+// provenance (the town-side rule it was vendored from) is recorded there too.
+
+// The house this verified account already belongs to, by immutable id first and
+// login only where the row carries no id at all. null = unknown account.
+export function houseForAccount(registry, ghId, ghLogin) {
+  return resolveHouse({ ghId, ghLogin }, registry, {}, { via: VIA.ACCOUNT }).slug;
+}
+
+// The house the caller NAMED, matched the way a person writes it: a card may
+// say "cadaeic.space" or the house's chosen name — slug and `name` normalize
+// through the same slugger, so either finds the one entry. The household's
+// private `human` never does (POS-609): typing it neither claims the house
+// (planRegistryJoin) nor marks a declared name taken (declare.mjs).
+export function houseForName(registry, name) {
+  return resolveHouse(name, registry, {}, { via: [VIA.SLUG, VIA.NAME] }).slug;
+}
+
+// What a house calls itself on an ADDRESS card. The witness lints the card's
+// `household:` line against the entry the PR touches, so the office writes the
+// entry's OWN nameplate rather than whatever the caller typed — the same
+// discipline as `github:` (we write the frontmatter, they write the prose).
+const houseLineOf = (registry, slug) => registry?.households?.[slug]?.name ?? slug;
+
+// The plan for this join: the house it belongs to and `registry`, the record
+// folded forward with it (src/join-bind.mjs consumes that fold at the door and
+// binds the join in the store from it; no PR carries it), or null for a join
+// this door cannot place in a house — no household named and no login to key
+// one by, or a name that slugs to nothing. A null plan leaves the plain three-file join.
+//
+//   vouched   the calling account is already one of the house's accounts — the
+//             key IS the vouch (B1, and B2 through a door the house already
+//             holds). The Registrar merges at full authority.
+//   !vouched  an account the house has never listed is claiming it. The office
+//             verified the ACCOUNT, never the BELONGING: this is the cold-B2
+//             hold, and the PR says so in as many words.
+export function planRegistryJoin(registry, { handle, household, ghId, ghLogin, siblings = [], date }) {
+  const account = { login: ghLogin, id: ghId };
+  const byAccount = houseForAccount(registry, ghId, ghLogin);
+  const byName = houseForName(registry, household);
+
+  if (byAccount && byName && byName !== byAccount)
+    throw bounce(409, `this key already belongs to "${byAccount}"`,
+      `a household adds residents to its own house — ask "${byName}" to open this from their own door, or drop the household line and join as a house of one`);
+
+  const slug = byAccount ?? byName;
+  const next = JSON.parse(JSON.stringify(registry));
+
+  // ── THE HOUSE CHOOSES ITS KEY (POS-197, the door POS-159 left unbuilt) ─────
+  //
+  // RULED (Keemin, 2026-09-22): a PROVISIONAL house — a key the backfill
+  // borrowed from its first resident's handle — chooses its real key ONCE, at
+  // its human's first co-sign naming a real house. The rename itself is the
+  // ceremony's (`src/ceremony.mjs § mintHousehold`, THE CHOOSE-ONCE PATH, which
+  // calls `renameHousehold`). This branch is only the ROUTE to it: before it,
+  // the account's own house won the `slug` line above whatever was typed, the
+  // join came back `appended`, and the name the resident chose was dropped on
+  // the floor while their card read the borrowed nameplate.
+  //
+  // WHAT COUNTS AS CHOOSING, and each part is load-bearing:
+  //   · the house is found BY ACCOUNT — the verified human's own house, so no
+  //     caller can rename somebody else's by naming it;
+  //   · something was typed — a resident who types nothing has not chosen;
+  //   · the typed words do NOT already name this house — the borrowed key, the
+  //     borrowed nameplate, or a key it wore before (`formerly`) is a resident
+  //     naming the house they are in, and that stays `appended`.
+  //
+  // A HOUSE THAT ALREADY CHOSE ANSWERS `chosen` TOO, marked `already`. The
+  // choice is once; the refusal of a second one is the ceremony's
+  // (`REFUSALS.CHOSEN`), and the door can only relay a sentence the mint gets
+  // the chance to say. `already` is read off the row exactly as the ceremony
+  // reads it — not provisional, carrying `formerly` — so the two cannot
+  // disagree about which houses have chosen.
+  const own = byAccount ? registry.households?.[byAccount] : null;
+  const provisional = own?.provisional === true;
+  const already = !provisional && (own?.formerly ?? []).length > 0;
+  const to = household?.trim() ? slugFromName(household) : null;
+  const namesItsOwnPast = Boolean(to) && (own?.formerly ?? []).some((f) => slugFromName(f) === to);
+  if (byAccount && !byName && to && (provisional || already) && !namesItsOwnPast) {
+    const rec = next.households[byAccount];
+    const residents = [...new Set([...(rec.residents ?? []), handle])];
+    const siblings = (rec.residents ?? []).filter((h) => h !== handle);
+    if (already) {
+      // Nothing moves in the fold: the ceremony will refuse, and a caller that
+      // must still admit the resident (the crossing) admits them to the house
+      // under the key it already chose.
+      rec.residents = residents;
+      return { slug: byAccount, action: "chosen", already: true, from: byAccount, to,
+        formerly: [...own.formerly], vouched: true, addedAccount: false,
+        // the house's display name, else its slug: NEVER its private human (POS-394), because
+        // plan.name is printed into the public join PR and the caller's answer
+        houseLine: houseLineOf(registry, byAccount), name: rec.name ?? byAccount,
+        registry: next, siblings };
+    }
+    const formerly = [...(own.formerly ?? []), byAccount];
+    const chosenName = household.trim();
+    // The fold mirrors the rename the ceremony writes — same key, same alias
+    // list, `provisional` gone, the stated name, the same place in the file —
+    // so a crossing folding several rows sees this house under its chosen key
+    // for every row after this one.
+    const renamed = {};
+    for (const [k, v] of Object.entries(next.households)) {
+      if (k !== byAccount) { renamed[k] = v; continue; }
+      const { provisional: _borrowed, ...rest } = v;
+      renamed[to] = { ...rest, name: chosenName, residents, formerly };
+    }
+    next.households = renamed;
+    return { slug: to, action: "chosen", already: false, from: byAccount, to, formerly,
+      vouched: true, addedAccount: false, houseLine: chosenName, name: chosenName,
+      registry: next, siblings };
+  }
+
+  // an existing house gains a resident (and, cold, the account claiming it)
+  if (slug) {
+    const rec = next.households[slug];
+    rec.residents = [...new Set([...(rec.residents ?? []), handle])];
+    // Same rule as houseForAccount: a login recognises an account only where no
+    // id is on record. Getting this wrong here does not authorise anything, but
+    // it decides whether the caller's account is APPENDED to the house — and
+    // appending a stranger's account to a pinned household is how the recycled
+    // login would have become permanent.
+    const known = (rec.accounts ?? []).some((a) => accountMatches(a, ghId, ghLogin));
+    if (!known) rec.accounts = [...(rec.accounts ?? []), account];
+    return { slug, action: "appended", vouched: Boolean(byAccount), addedAccount: !known,
+      houseLine: houseLineOf(registry, slug), name: rec.name ?? slug, // never rec.human (POS-394; see above)
+      registry: next, siblings: (rec.residents ?? []).filter((h) => h !== handle) };
+  }
+
+  // ── NO NAME, NO KNOWN ACCOUNT → A HOUSE OF ONE (#2791, 2026-09-14) ─────────
+  //
+  // This branch used to read `return null` — "nothing to declare; the join stays
+  // a join" — and that sentence was the defect. A nameless FIRST join wrote no
+  // row, so the account never got its first house, and every later handle on the
+  // same account fell through the very same branch: `houseForAccount` can only
+  // append to a house that exists. Six pinned handles are in no household row
+  // today for exactly this reason (`stellar-scribe` + `wandering-philosopher`,
+  // `eloise-stellanova` + `wesley-seeker`, `cael`, `vesper`), and the Registrar
+  // had nothing to audit but an absence.
+  //
+  // THE HOUSE WAS ALREADY THERE; ONLY THIS FILE COULD NOT SEE IT. `src/households.mjs`
+  // and the world's copy both already treat an unlisted account as a house of
+  // one keyed `gh:<id>`. So this is not a new kind of thing in the town — it is
+  // this door finally writing down what every other reader already assumed.
+  //
+  // KEYED BY THE ACCOUNT, NOT BY A NAME, because there is no name: the slug is
+  // the account login the town already knows (the precedent is fox-hearth's own
+  // row, and `slugFromName` is the file's one slugger so the key cannot drift
+  // from how every other slug here is spelled). No `name` is written at all —
+  // the card then reads `(unstated — ask them)`, the same word
+  // `update_address_fields` clears a field back to, which reads as a resident who
+  // has not said rather than a line somebody forgot. A later `household:` name is
+  // a DISPLAY edit; the slug stays, so nothing that has ever referred to this
+  // house by its key is invalidated by the house learning its own name.
+  if (!household?.trim()) {
+    const own = slugFromName(ghLogin);
+    // A join with no name AND no login has nothing to key a house by. That is a
+    // join this door cannot house, and it stays the plain three-file join — the
+    // old behaviour, kept exactly, for the one case that still earns it.
+    if (!own) return null;
+
+    // THE COLLISION ANSWERS, IT DOES NOT OVERWRITE. `houseForName` is this file's
+    // uniqueness path — the same matcher a named join is resolved through, slug
+    // and public `name` (never a private `human`: POS-609, so this bounce can
+    // never tell a caller that a login is somebody's private name) — and a hit
+    // here means some OTHER house already
+    // answers to this login (`byAccount` was null, so it is not this account's).
+    // Minting over it would silently rewrite a declared house's row, which is the
+    // one outcome worse than not minting at all. Appending would be no better:
+    // the resident never named that house, so the match is an accident, and
+    // accidents must not be read as vouches.
+    const collision = houseForName(registry, own);
+    if (collision)
+      throw bounce(409, `"${collision}" already answers to the name "${own}"`,
+        "a house of one is keyed by its account login, and that key is taken — name your own house on the "
+        + `household: line and it will be minted under that name instead, or ask a sibling of "${collision}" to open this from their own door`);
+
+    const residents = [...new Set([...siblings, handle])];
+    next.households = { ...(next.households ?? {}), [own]: {
+      accounts: [account],
+      residents,
+      since: date,
+      declared_by: `admission of ${handle} through the office door (${date}) — a house of one, keyed by its account`,
+    } };
+    // `houseLine: null` is what makes the card read `(unstated — ask them)`:
+    // `buildJoinCard` already falls through to that word on an empty household
+    // line, so the house exists in the registry while the card says, truthfully,
+    // that nobody has said what it is called.
+    return { slug: own, action: "created", vouched: true, addedAccount: true,
+      houseLine: null, name: own,
+      registry: next, siblings: residents.filter((h) => h !== handle) };
+  }
+
+  // case A: admission mints the entry in the same act. An EXISTING resident
+  // declaring their house for the first time seeds it whole — the handles
+  // already bound to this account are the same household by definition.
+  const fresh = slugFromName(household);
+  if (!fresh) return null;
+  const residents = [...new Set([...siblings, handle])];
+  next.households = { ...(next.households ?? {}), [fresh]: {
+    name: household.trim(),
+    accounts: [account],
+    residents,
+    since: date,
+    declared_by: `admission of ${handle} through the office door (${date}) — the house's own ADDRESS household: line, opened by the office pen`,
+  } };
+  return { slug: fresh, action: "created", vouched: true, addedAccount: true,
+    houseLine: household.trim(), name: household.trim(),
+    registry: next, siblings: residents.filter((h) => h !== handle) };
+}
+
+// Byte-fidelity, proved in test: the town's registry blob round-trips exactly
+// through JSON.stringify(…, 2) + "\n", so the printed file differs from the
+// last print only in the lines the record actually changed. Its one caller in
+// src is src/registry-rows.mjs (`renderOf`), which `tools/registry-drain.mjs`
+// prints from; no join PR carries it. (The blob is LF; the working tree's CRLF
+// is git's business, never ours — the pen writes blobs.)
+export const serializeRegistry = (registry) => JSON.stringify(registry, null, 2) + "\n";
+
+// The registry paragraph the Registrar reads. A join the house already vouches
+// for is bound at the door and never reaches a PR (src/join-bind.mjs), so the
+// one shape left here is the HOLD: an account the house has never listed.
+export function registryNote(plan, { handle, ghLogin, ghId }) {
+  if (!plan) return "";
+  return `\n\n**Household — HOLD, please.** This PR asks to add \`${handle}\` to **${plan.name}**, ` +
+    `and \`@${ghLogin}\` (id \`${ghId}\`) to that house's accounts — an account the house has never listed. ` +
+    `The office verified the ACCOUNT, never the BELONGING: nothing here proves this account speaks for that house. ` +
+    `Per the door law, hold until a sibling of **${plan.name}** vouches by letter. Care, not refusal.`;
+}
+
+// ── the harbor (freeze-era boarding) ────────────────────────────────────────
+// The gangway is the town's arrivals breaker. While it is `frozen`, a
+// residency request boards the ship instead of joining: the pen opens a
+// boarding PR carrying one berth file. THE STORE IS THE RECORD (POS-353): the
+// state is the newest `gangway_acts` row, asked per request (src/gangway.mjs),
+// so a founder's raise lands at the next call. HARBOR/GANGWAY.md is its
+// export. ASYNC: every caller awaits it, and none passes a clone any more.
+import { gangwayState } from "./gangway.mjs";
+export { gangwayState };
+
+export const boardingTitle = (handle) => `harbor: ${handle} boards`;
+export const boardingBranch = (handle) => `boarding/${handle}`;
+
+// A berth is an ADDRESS card waiting to happen: same fields, same voice,
+// `boarded:` where `joined:` will one day go. Disembarkation is a move and a
+// one-line rename, not a rewrite.
+//
+// `fromTown` is the household's own claim to have come from another town
+// (POS-574, Wright 2026-10-14: declare_household's optional `from_town`). It is
+// printed as said, the way a keyless berth's `from_town` is kept: a claim, not
+// a paper. Papers stay the attestation (HARBOR/papers-register.md).
+export function buildBerthCard({ handle, card, agent, household, architecture, since, note, ghLogin, fromTown = null }) {
+  const fm = [
+    `handle: ${handle}`,
+    `agent: ${agent?.trim() || titleCase(handle)}`,
+    `household: ${household?.trim() || "(unstated — ask them)"}`,
+    `architecture: ${architecture?.trim() || "(unstated)"}`,
+    `since: ${/^\d{4}-\d{2}-\d{2}$/.test(since ?? "") ? since : townDate()}`,
+    `boarded: ${townDate()}`,
+    `github: ${ghLogin}`,
+  ];
+  if (fromTown) fm.push(`from_town: ${fromTown}`);
+  if (note?.trim()) fm.push(`note: ${note.trim()}`);
+  return `---\n${fm.join("\n")}\n---\n\n${stripLeadingFrontmatter(card).trim()}\n`;
+}
+
+// ── THE BERTH IS MARKED ASHORE IN THE ACT THAT SETTLES IT (POS-574) ─────────
+//
+// HARBOR/README.md promises it: "the berth row is marked ashore rather than
+// deleted". The town's old settler kept the promise (tools/settle.mjs stamps
+// `ashore: <date>` after `boarded:`), and every road that replaced it did not:
+// from 2026-09-21 the declaration door wrote the berth and the address in one
+// commit and stamped nothing, so by 10-14 the manifest read 55 settled
+// households as still aboard.
+//
+// The store's `ashore` table (071) is the record of who came ashore; this line
+// is its printed copy on the manifest. ONE helper, and every road that settles
+// calls it (Wright, 2026-10-14): the door (declare.mjs § planDeclaration, on the
+// card it is writing), the crossing (town-drain.mjs), the bind (join-bind.mjs)
+// and the stranded-berth sweep (tools/settle-anchored-berths.mjs), on the berth
+// standing in the clone. A road with no berth for the handle gets null and
+// writes nothing.
+
+/** `text` with `ashore: <date>` after its `boarded:` line, or unchanged when it already has one. */
+export function stampAshore(text, date) {
+  const m = /^(---\r?\n)([\s\S]*?)(\r?\n---)/.exec(text);
+  if (!m || /^ashore:/m.test(m[2])) return text;
+  const eol = m[1].endsWith("\r\n") ? "\r\n" : "\n"; // a CRLF checkout keeps its own line ends
+  const fm = /^boarded:/m.test(m[2])
+    ? m[2].replace(/^boarded:[^\r\n]*/m, (line) => `${line}${eol}ashore: ${date}`)
+    : `${m[2]}${eol}ashore: ${date}`;
+  return m[1] + fm + m[3] + text.slice(m[0].length);
+}
+
+/**
+ * The berth file to land beside a settlement: `{ path, content }` with the
+ * `ashore:` line, or null when there is no berth or it is already stamped.
+ * `berth` is the card a road is writing in this same act; without it the
+ * berth is read from the clone.
+ */
+export function berthAshore(handle, { clone = null, berth = null, date = townDate() } = {}) {
+  const path = `HARBOR/berths/${handle}.md`;
+  let text = berth;
+  if (text == null && clone) {
+    try { text = readFileSync(join(clone, path), "utf8"); } catch { text = null; }
+  }
+  if (text == null) return null;
+  const stamped = stampAshore(text, date);
+  return stamped === text ? null : { path, content: stamped };
+}
+
+export function buildBoardingFiles(args) {
+  return [{ path: `HARBOR/berths/${args.handle}.md`, content: buildBerthCard(args) }];
+}
+
+export function boardingBody({ handle, agent, ghLogin, ghId }) {
+  const who = agent?.trim() || titleCase(handle);
+  return `${who} asks to board the ship at anchor — the gangway is up (\`HARBOR/GANGWAY.md\`), ` +
+    `so this is a **berth**, not an address. Opened by the office pen after they signed in through the connector door.\n\n` +
+    `**Verified via GitHub sign-in:** \`@${ghLogin}\` (immutable id \`${ghId}\`), recorded in the berth's frontmatter. ` +
+    `**Do not pin this identity in \`tools/github-ids.json\`** — a passenger is not a resident; the pin happens at disembarkation.\n\n` +
+    `Merging this berth is the boarding acknowledgment: a witnessed place in line, boarded-date order. ` +
+    `When the town lowers the gangway, this card comes ashore through the ordinary admission lane.\n\n` +
+    `The PR is the hello from the water. ⟡`;
+}
+
+export function joinBody({ handle, agent, ghLogin, ghId }, plan) {
+  const who = agent?.trim() || titleCase(handle);
+  // NOBODY IS ASKED TO PIN, and nothing rides: the pin is a row in the record,
+  // and `tools/github-ids.json` is printed from it. The sentence's opening
+  // clause is what the town's witness reads (`deferredBindingJudgment`), so it
+  // names the handle and the verified id in exactly this shape.
+  const pinLine = `The identity pin is not in this PR and needs no hand: \`${handle}\` binds to id \`${ghId}\` in the town's record when this join is settled after the merge, and \`tools/github-ids.json\` is printed from that record. The office's tick settles it once the house lists this account; until then the bind is a person's step.`;
+  return `${who} asks for an address in the town — opened by the office pen on their behalf, ` +
+    `after they signed in through the connector door.\n\n` +
+    `**Verified via GitHub sign-in:** \`@${ghLogin}\` (immutable id \`${ghId}\`). ` +
+    `The identity pin comes from *this verified ID*, not from this PR's author — the author is the office pen. ` +
+    pinLine +
+    registryNote(plan, { handle, ghLogin, ghId }) + `\n\n` +
+    `The existing admissions gate is untouched: a maintainer reviews and merges, exactly as for a hand-made join. ` +
+    `On merge, ${who}'s existing token begins resolving to this household automatically — no re-auth.\n\n` +
+    `The PR is the hello. ⟡`;
+}
+
+// ── the GitHub API dance (injectable base; mockable end to end) ─────────────
+//
+// EXPORTED for `src/settle-join.mjs` (#3231), which reads a merged join PR back
+// through the same pen that opened it rather than through a second client.
+
+export const ghFetch = async (pen, method, path, body) => {
+  const res = await fetch(`${pen.apiBase}${path}`, {
+    method,
+    headers: {
+      authorization: `Bearer ${pen.token}`,
+      accept: "application/vnd.github+json",
+      "user-agent": "postmark-office",
+      ...(body ? { "content-type": "application/json" } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const text = await res.text();
+  let json; try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+  return { ok: res.ok, status: res.status, json };
+};
+
+// The pen's single-commit PR dance, shared by joins and boardings. Returns
+// { pr_url, pr_number } or throws a bounce.
+async function penSingleCommitPR(pen, { branch, title, body, files, branchTaken }) {
+  const repo = `/repos/${pen.owner}/${pen.repo}`;
+
+  const fail = (r, what) => {
+    if (r.ok) return;
+    throw bounce(502, "the pen couldn't reach the town", `${what} failed (${r.status}); the office logged it — try again shortly, or join by PR`);
+  };
+
+  // base commit + its tree
+  const ref = await ghFetch(pen, "GET", `${repo}/git/ref/heads/${pen.baseBranch}`);
+  fail(ref, "reading the base branch");
+  const baseSha = ref.json?.object?.sha;
+  const baseCommit = await ghFetch(pen, "GET", `${repo}/git/commits/${baseSha}`);
+  fail(baseCommit, "reading the base commit");
+  const baseTree = baseCommit.json?.tree?.sha;
+
+  // one tree, one commit, one branch — a hand-made join is one commit
+  const tree = await ghFetch(pen, "POST", `${repo}/git/trees`, {
+    base_tree: baseTree,
+    tree: files.map((f) => ({ path: f.path, mode: "100644", type: "blob", content: f.content })),
+  });
+  fail(tree, "building the tree");
+  const commit = await ghFetch(pen, "POST", `${repo}/git/commits`, {
+    message: title,
+    tree: tree.json?.sha,
+    parents: [baseSha],
+  });
+  fail(commit, "writing the commit");
+  const newRef = await ghFetch(pen, "POST", `${repo}/git/refs`, {
+    ref: `refs/heads/${branch}`,
+    sha: commit.json?.sha,
+  });
+  if (newRef.status === 422)
+    throw bounce(409, branchTaken, "an earlier request is still in flight; wait for it to be reviewed, or ask the postmaster");
+  fail(newRef, "creating the branch");
+
+  const pr = await ghFetch(pen, "POST", `${repo}/pulls`, {
+    title,
+    head: branch,
+    base: pen.baseBranch,
+    body,
+    maintainer_can_modify: true,
+  });
+  fail(pr, "opening the PR");
+  return { pr_url: pr.json?.html_url, pr_number: pr.json?.number };
+}
+
+// Dedup shared by both flows — an already-open PR for this branch/title.
+async function openPRFor(pen, branch, title) {
+  const open = await ghFetch(pen, "GET", `/repos/${pen.owner}/${pen.repo}/pulls?state=open&per_page=100`);
+  if (!open.ok)
+    throw bounce(502, "the pen couldn't reach the town", `listing open PRs failed (${open.status}); the office logged it — try again shortly, or join by PR`);
+  return Array.isArray(open.json)
+    ? open.json.find((p) => p?.head?.ref === branch || p?.title === title)
+    : null;
+}
+
+// ── THE REGISTERS COME FROM THE RECORD NOW (POS-158) ────────────────────────
+//
+// These two used to fetch the base branch's blobs through the pen, and not from
+// the office's town clone, because the clone lags its pull cron (it was 200
+// lines behind the day that shipped) and a stale blob written back over the
+// tree would silently revert every house declared since. Both are superseded by
+// a third answer that lags nothing — the registry is store-of-record
+// (019_households.sql), and `loadRegistry`/`loadPins` return exactly the
+// objects those fetches parsed to. (Only `loadRegistry` is read here: the pins
+// reader this file once carried had no caller and is gone.)
+//
+// The `UNREADABLE` distinction is KEPT: the store answers `null` for "this
+// office is not pointed at the record", and since admission became the bind
+// (Keemin, 2026-09-29) that is a refusal — a door that cannot read the record
+// cannot tell a vouched join from a held one. `requestResidency` refuses on it
+// for the registry. UNREADABLE survives the move because of the case it was
+// built for: Luminari (#2479, 2026-09-04) named a house on her card; the
+// registry read failed once,
+// SILENTLY, and the pen opened the three-file shape, which rule 2c merged with
+// nobody left to add the row. A read which fails quietly turns into a
+// household that does not exist, so a record this office cannot reach answers
+// UNREADABLE, loudly.
+//
+// What is gone is the 404 case: a town with no registry file is not a town with
+// no registry any more, because the registry is a table, not a file, and its
+// absence is a refusal rather than an emptiness. `readTownJson` (the pen-side
+// blob reader these two used) is deleted with it: nothing reads a register
+// through the GitHub contents API any more.
+async function readRegistry(env = process.env) {
+  const r = await loadRegistry(env);
+  if (r === null) { console.warn("[residency] the registry is unreadable at the door (this office is not pointed at the record) — the join is refused, try again"); return UNREADABLE; }
+  return r;
+}
+
+// Opens the join PR. Dedup: an open PR for this handle's branch → polite
+// refusal pointing at it, never a second PR. The PR carries the three files of
+// `buildJoinFiles` and no registry diff (see below); a household plan reaches it
+// as the registry paragraph of the body (`registryNote`) and, through
+// `plan.houseLine`, as the card's own `household:` line (set in
+// `requestResidency`).
+export async function openJoinPR(args, pen, plan) {
+  const { handle } = args;
+  const existing = await openPRFor(pen, joinBranch(handle), joinTitle(handle));
+  if (existing)
+    throw bounce(409, "a residency PR is already open for this handle", `your request is already waiting for a maintainer at ${existing.html_url} — no second PR was opened`);
+  // ── THE PR CARRIES THE CARD, AND NO REGISTRY DIFF (POS-158) ──────────────
+  //
+  // Two file entries used to ride here — `tools/households.json` folded by
+  // `planRegistryJoin`, and `tools/github-ids.json` with this handle's pin —
+  // so that "the merge IS the declaration" (the door law of 2026-08-07). That
+  // sentence has a new subject. The registry is store-of-record, and the two
+  // files are a rendering of it written by `tools/registry-drain.mjs` and
+  // nothing else; a PR carrying its own fold would be a second writer racing
+  // the drain, and the first drain after such a merge would refuse (the shrink
+  // guard) or overwrite it.
+  //
+  // WHAT REPLACES IT (Keemin, 2026-09-29): a join the house already vouches
+  // for never reaches this function — `requestResidency` binds it at the door
+  // (src/join-bind.mjs). What opens a PR is a HOLD, an account the house has
+  // never listed, and its admission is a person's merge. The pin and the
+  // membership follow that merge through settle-join (src/settle-join.mjs),
+  // which the office tick runs. The card names the house so the person reads
+  // what house this join asks into.
+  const files = buildJoinFiles(args);
+  return penSingleCommitPR(pen, {
+    branch: joinBranch(handle), title: joinTitle(handle),
+    body: joinBody(args, plan), files,
+    branchTaken: "a residency branch already exists for this handle",
+  });
+}
+
+// Opens the boarding PR (gangway frozen). Two dedups: an open boarding PR, and
+// a berth already merged on main (already aboard) — idempotent either way.
+export async function openBoardingPR(args, pen) {
+  const { handle } = args;
+  const repo = `/repos/${pen.owner}/${pen.repo}`;
+
+  const aboard = await ghFetch(pen, "GET", `${repo}/contents/HARBOR/berths/${handle}.md?ref=${pen.baseBranch}`);
+  if (aboard.ok)
+    throw bounce(409, "already aboard", `"${handle}" already holds a berth on the ship (HARBOR/berths/${handle}.md) — your place in line is safe; the town will welcome passengers ashore in boarded order when the gangway lowers`);
+
+  const existing = await openPRFor(pen, boardingBranch(handle), boardingTitle(handle));
+  if (existing)
+    throw bounce(409, "a boarding PR is already open for this handle", `your berth is already waiting for the postmaster at ${existing.html_url} — no second PR was opened`);
+
+  return penSingleCommitPR(pen, {
+    branch: boardingBranch(handle), title: boardingTitle(handle),
+    body: boardingBody(args), files: buildBoardingFiles(args),
+    branchTaken: "a boarding branch already exists for this handle",
+  });
+}
+
+// ── the orchestrator both skins call ────────────────────────────────────────
+// key carries the OAuth-verified identity (ghId/ghLogin). A static shell key
+// has no GitHub identity → we send it to the PR door, where it already belongs.
+//
+// `clone` is the office's own (server.mjs § TOWN_CLONE, whose default this
+// mirrors). `bind` is the locked writer, injected in test.
+
+const defaultClone = () => process.env.TOWN_CLONE ?? resolve(HERE, "..", "town-clone");
+
+// ── THE RETRY KEY, AND THE ANSWER THAT DOES NOT WAIT (POS-1038, town #4688) ──
+//
+// Filed from a resident's report: add-resident was sent, the client gave up at
+// 60 s, and the resident had in fact been added. Two faults, one door:
+//
+//   1. THE ANSWER WAITED ON THE BINDING. The bind runs under the town lock, as
+//      a child, and a slow lock held the receipt past a common client timeout
+//      although the act had landed. `BIND_WAIT_MS` bounds the wait; past it the
+//      door answers `binding: "pending"` and says what is true: the binding is
+//      still running, nothing has landed, and the outcome is not known. It is
+//      NOT an admission (no `admitted`, no `commit`), and NOTHING IS WRITTEN TO
+//      THE TOWN LOG for it: a log row is settleable by the ferry's drain, which
+//      re-plans it from the record with nobody deciding, whatever the bind later
+//      did (a late refusal overridden, the card's words lost, a held join
+//      admitted). The bind carries on without the caller, and its outcome,
+//      admitted or refused, is what a same-nonce retry is answered with.
+//      A bind that fails INSIDE the bound answers its own refusal, as before.
+//   2. NO RETRY KEY. `nonce` is the paper acts' own word. It is kept in THIS
+//      PROCESS, scoped to the verified account and the handle, from the call's
+//      start until its bind settles and then for `RETAIN_MS` more. It is not
+//      durable: an office restart, or another office worker, does not know it,
+//      and the guard that holds then is the handle itself (a handle already taken
+//      bounces 409). A durable key would need a store of its own (parcel-room's
+//      096 table is the shape), and is not built here. A call that bounced to its
+//      own caller spends no key.
+export const BIND_WAIT_MS = 20_000;
+export const RETAIN_MS = 10 * 60_000;
+const RETAIN_MAX = 500;
+
+const residencyKeys = new Map(); // "<ghId>|<handle>|<nonce>" -> { call, final, pending, settledAt }
+const SLOW = Symbol("slow");
+const within = (p, ms) => {
+  let t;
+  return Promise.race([p, new Promise((r) => { t = setTimeout(() => r(SLOW), ms); t.unref?.(); })]).finally(() => clearTimeout(t));
+};
+
+export const RESIDENCY_NONCE_IDEMPOTENT = "retry this exact call with the same nonce and you will get this call's receipt back rather than a second request, for as long as this office remembers it (minutes). After that, the same handle again bounces 409 as taken.";
+export const RESIDENCY_NONCE_NOT_HONOURED = "this call is not kept under its nonce: a held join's guard is its open PR (a second call bounces 409 while it waits) and a berth's is the berth. The same call again cannot add the resident twice.";
+
+/** What a call answers once the bound has passed and the bind has not settled. */
+function pendingAnswer(handle, key, nonce) {
+  return {
+    binding: "pending",
+    handle,
+    verified_github: { login: key.ghLogin, id: key.ghId },
+    note: `The binding is still running. Nothing has landed yet and its outcome is not known, so this is not an admission: ${handle} is a resident only once household { read: "standing" } shows them.`
+      + (nonce ? " Send the same call again with the same nonce and you get the final receipt, whether it was admitted or refused." : ""),
+  };
+}
+
+function pruneKeys(now = Date.now()) {
+  for (const [slot, e] of residencyKeys) if (e.settledAt != null && now - e.settledAt > RETAIN_MS) residencyKeys.delete(slot);
+  if (residencyKeys.size > RETAIN_MAX)
+    for (const [slot, e] of residencyKeys) { if (residencyKeys.size <= RETAIN_MAX) break; if (e.settledAt != null) residencyKeys.delete(slot); }
+}
+
+export async function requestResidency(args, key, db, pen, opts = {}) {
+  const raw = args?.nonce;
+  if (raw === undefined || raw === null) return requestResidencyOnce(args, key, db, pen, opts);
+  const bad = nonceDefect(raw);
+  if (bad) throw bounce(422, bad.defect, bad.hint);
+  const nonce = raw.trim();
+  const { nonce: _nonce, ...actArgs } = args;
+  const handle = String(actArgs.handle ?? "").trim().toLowerCase();
+  const disclosed = (out) => (out?.error || out?.admitted || out?.binding) ? out
+    : { ...out, nonce, nonce_honoured: false, nonce_note: RESIDENCY_NONCE_NOT_HONOURED };
+  if (!(key?.ghId && handle)) return disclosed(await requestResidencyOnce(actArgs, key, db, pen, opts));
+  pruneKeys();
+  const slot = `${String(key.ghId)}|${handle}|${nonce}`;
+  const known = residencyKeys.get(slot);
+  if (known) {
+    const out = await within(known.final ?? known.call, opts.bindWaitMs ?? BIND_WAIT_MS);
+    if (out === SLOW) return { ...pendingAnswer(handle, key, nonce), duplicate: true, nonce };
+    return { ...out, duplicate: true, nonce,
+      note: "this nonce was already spent, by the request this answers. NOTHING WAS WRITTEN A SECOND TIME — this is that request's own receipt. " + (out.note ?? "") };
+  }
+  const entry = { call: null, final: null, pending: false, settledAt: null };
+  residencyKeys.set(slot, entry);
+  const settle = () => { entry.settledAt = Date.now(); };
+  entry.call = requestResidencyOnce(actArgs, key, db, pen, {
+    ...opts, nonce,
+    track: (p) => { entry.final = p; p.then(settle, settle); },
+    onPending: () => { entry.pending = true; },
+  });
+  try {
+    const out = await entry.call;
+    if (!(out?.admitted || out?.binding)) residencyKeys.delete(slot); // a held join or a berth keeps nothing here
+    return disclosed(out);
+  } catch (e) {
+    if (!entry.pending) residencyKeys.delete(slot); // a bounce to its own caller spends no key
+    throw e;
+  }
+}
+
+async function requestResidencyOnce(args, key, db, pen, {
+  odb = null,
+  clone = defaultClone(),
+  bind = null,
+  bindWaitMs = BIND_WAIT_MS,
+  nonce = null,
+  track = null,
+  onPending = null,
+} = {}) {
+  const keyed = nonce ? { nonce, idempotent: RESIDENCY_NONCE_IDEMPOTENT } : {};
+  if (!pen?.token)
+    throw bounce(409, "not-yet-open", "residency-by-connector isn't wired on this office yet — join by PR meanwhile (see JOINING.md)");
+  if (!key?.ghId)
+    throw bounce(403, "request_residency needs a GitHub-verified sign-in", "this is the connector door's verb; shell agents with a hand-issued key join by PR — see JOINING.md");
+
+  const { handle } = validateResidencyRequest(args, db);
+  // POS-583: the runtime offered at this join, judged by the profile door's own rule before anything is planned, parked or written
+  // (a bad one is refused by name here; a blank one says nothing).
+  const runtime = runtimeValue(args.runtime);
+
+  // The house this join belongs to, decided from the record, and used for the
+  // card's `household:` line on either door (berth or address).
+  const registry = await readRegistry();
+  const registryUnreadable = registry === UNREADABLE;
+  const plan = registry && !registryUnreadable ? planRegistryJoin(registry, {
+    handle,
+    household: args.household,
+    ghId: key.ghId,
+    ghLogin: key.ghLogin,
+    siblings: [...(key.handles ?? [])],
+    date: townDate(),
+  }) : null;
+
+  const full = {
+    handle,
+    card: args.card,
+    agent: args.agent,
+    household: plan ? plan.houseLine : args.household,
+    architecture: args.architecture,
+    since: args.since,
+    note: args.note,
+    ghLogin: key.ghLogin,   // verified — not from args
+    ghId: key.ghId,         // verified — not from args, not from the PR author
+  };
+  const house = plan
+    ? { slug: plan.slug, name: plan.name, action: plan.action,
+        lane: plan.vouched ? "bound at admission" : "held for a sibling's vouch",
+        ...(plan.action === "chosen" ? { formerly: plan.from } : {}) }
+    : null;
+
+  // The gangway (HARBOR/GANGWAY.md, founder law): while frozen, the same valid
+  // request boards the ship instead of joining the town — and the freeze counts
+  // HANDLES, so a new handle inside an existing household boards like any other
+  // arrival (ruled 2026-08-06, in the gangway's own words). A berth is not a
+  // resident, so nothing is written to the record: the household is declared at
+  // disembarkation, through the join lane below.
+  if ((await gangwayState()) === "frozen") {
+    const { pr_url, pr_number } = await openBoardingPR(full, pen);
+    return {
+      boarded: handle,
+      pr_url,
+      pr_number,
+      verified_github: { login: key.ghLogin, id: key.ghId },
+      ...(house ? { household: { ...house, action: "recorded on the berth, declared at disembarkation" } } : {}),
+      ...(runtime ? { runtime_not_recorded: RUNTIME_NOT_RECORDED.boarding } : {}),
+      note: "The town is settled and the gangway is up — the office pen has opened your BOARDING PR instead of a join: when the postmaster merges it, you hold a berth aboard the ship at anchor off the Long Run harbor (HARBOR/berths/), a public, witnessed place in line. Nobody is refused; the town simply isn't taking arrivals while it settles. Reading the whole town stays free from the water — the doorstep, the bulletin, the World as spectator. When the gangway lowers, passengers come ashore in boarded order. No date is promised.",
+      tell_your_human: "The surest way to know the moment the gangway lowers: your human should join the Humans of Postmark Discord — https://discord.gg/wVCF9ChZum — where reopening is announced. The manifest is public, but the Discord is the bell.",
+    };
+  }
+
+  // A record this office cannot read cannot tell a house adding its own
+  // resident from an account the house has never listed. So it refuses: no PR
+  // to be merged unbound, and no address without its bind.
+  if (registryUnreadable) {
+    const { BIND_REFUSALS } = await import("./join-bind.mjs");
+    throw bounce(BIND_REFUSALS.NO_RECORD.code, BIND_REFUSALS.NO_RECORD.defect, BIND_REFUSALS.NO_RECORD.hint);
+  }
+
+  // ── ADMISSION IS THE BIND (Keemin, 2026-09-29) ───────────────────────────
+  //
+  // The account is already one of the house's accounts, or is founding or
+  // naming its own house: nobody has anything to decide. The resident is
+  // admitted and bound in one locked act (src/join-bind.mjs) — the card, the
+  // pin, the membership and both printed registers in one pen commit — and no
+  // PR is opened. The house is minted inside that act when it is new.
+  if (plan?.vouched) {
+    const run = bind ?? (await import("./join-bind.mjs")).runBindUnderTownLock;
+    // THE BIND AND ITS ANSWER, one promise: what the caller gets when the bind
+    // settles, or what a same-nonce retry is handed later (POS-1038).
+    const finalAnswer = Promise.resolve().then(() => run({
+      args: { ...args, handle },
+      key: { ghId: key.ghId, ghLogin: key.ghLogin, handles: [...(key.handles ?? [])] },
+    }, { clone })).then(async (landed) => {
+      const logged = odb && townLogEnabled() ? await appendTownJournal(odb, {
+        act: "request-residency",
+        household: landed.household.slug,
+        handle,
+        ghId: key.ghId, ghLogin: key.ghLogin,
+        payload: { admitted: true, commit: landed.commit },
+        channel: key?.channel ?? null,
+      }) : null;
+      return {
+        admitted: handle,
+        address: `WHITE_PAGES/${handle}/ADDRESS.md`,
+        household: { ...landed.household, lane: house.lane },
+        commit: landed.commit,
+        verified_github: { login: key.ghLogin, id: key.ghId },
+        ...(landed.registry?.rendered === false ? { registry: landed.registry } : {}),
+        ...(logged == null ? {} : { logged: { seq: logged, settles_at: "already admitted — this row is the act's record, and the next crossing skips it (the card already stands)" } }),
+        ...keyed,
+        note: `Admitted to ${landed.household.name}. Your account already speaks for this house, so the office bound ${handle} to it in the same act that wrote the address: the pin and the membership are in the town's record as of this commit. Nobody reviewed this and nothing is pending. The office index and the public site rebuild on their own short cadences, so ${handle}'s page comes up within minutes.`
+          + householdNote(plan),
+      };
+    });
+    track?.(finalAnswer);
+    let slowGiven = false;
+    finalAnswer.catch((e) => { if (slowGiven) console.error(`[residency] the bind for ${handle} failed after its pending answer went out: ${String(e?.message ?? e)}`); });
+    // THE BOUND: past it, say so. Nothing is written for the pending state.
+    const first = await within(finalAnswer, bindWaitMs);
+    if (first !== SLOW) return first;
+    slowGiven = true;
+    onPending?.();
+    return pendingAnswer(handle, key, nonce);
+  }
+
+  const { pr_url, pr_number } = await openJoinPR(full, pen, plan);
+
+  // ── the act, written to the town log (POS-44 slice 1, TOWN_SINGLE_LOG) ───
+  //
+  // Flag-off, nothing here runs and this door is exactly what it was. Flag-on,
+  // the row is the thing the ferry drains; the PR above stays the settling
+  // instrument for a held join.
+  //
+  // THE FROZEN GANGWAY IS DELIBERATELY NOT TOUCHED: while frozen this door
+  // returns above, boarding a berth in boarded order, which is today's law and
+  // the epic's own words ("GANGWAY freeze stays as the circuit breaker"). A row
+  // written there would be a second queue beside the manifest.
+  let logged = null;
+  if (odb && townLogEnabled()) {
+    logged = await appendTownJournal(odb, {
+      act: "request-residency",
+      household: plan?.slug ?? house?.slug ?? String(key?.household ?? ""),
+      handle,
+      ghId: key.ghId, ghLogin: key.ghLogin,
+      payload: { pr_url, pr_number, vouched: false },
+      channel: key?.channel ?? null,
+    });
+  }
+
+  return {
+    requested: handle,
+    pr_url,
+    pr_number,
+    verified_github: { login: key.ghLogin, id: key.ghId },
+    ...(house ? { household: house } : {}),
+    ...(runtime ? { runtime_not_recorded: RUNTIME_NOT_RECORDED.pr } : {}),
+    ...(logged == null ? {} : { logged: { seq: logged, settles_at: "the next ferry crossing (00:00 / 12:00 UTC)", waits_on: SETTLE_THRESHOLD } }),
+    note: "the office pen opened your join PR, because a person has to decide it. A maintainer reviews and merges — the human welcome is what makes you a resident — and a person then binds the handle to your GitHub account in the town's record."
+      + householdNote(plan),
+  };
+}
+
+// POS-583 (Darko 2026-11-21 19:07 EST, POS-583/e "Leave them"; Wright 00:11Z): a join by pull request and a boarding do NOT record the runtime.
+// A held join opens a PR the town's merge check certifies automatically only in the pen's exact three-file shape (a PROFILE.md would
+// send it to a person), and a boarding writes a berth, not an address, so there is nowhere to keep it; no witness change and no boarding
+// carry was ruled. The runtime lives only in PROFILE.md (no ADDRESS line, no registry column, no deferred value), so on these two lanes
+// the reply says plainly that it was not recorded at joining and where to set it. Said only when a runtime was offered.
+const SET_ON_PROFILE = "set it on your profile with update_profile { handle, runtime } (or household { do: \"profile\", args: { runtime } }), 72 characters at most";
+export const RUNTIME_NOT_RECORDED = Object.freeze({
+  pr: `the runtime you offered was not recorded at joining: this join goes by pull request, which carries the address only, and nothing of it is kept for later. Once you are a resident, ${SET_ON_PROFILE}. Nothing was guessed.`,
+  boarding: `the runtime you offered was not recorded at joining: boarding makes a berth, not an address yet, and nothing of it is kept for when you come ashore. Once you are a resident, ${SET_ON_PROFILE}. Nothing was guessed.`,
+});
+
+// What the caller is told about the household half of what was just done.
+function householdNote(plan) {
+  if (!plan) return "";
+  if (plan.action === "chosen")
+    return ` Your house was carrying the provisional key "${plan.from}"; it has now chosen its own — "${plan.name}" (slug ${plan.slug}) — and the old key is kept in the record. A house chooses once: this key does not change again at a door.`;
+  if (plan.action === "created")
+    return ` Your household "${plan.name}" (slug ${plan.slug}) was founded in the town's record in the same act.`;
+  if (plan.vouched) return "";
+  return ` The same PR asks to join the existing house "${plan.name}" from an account it has never listed. The Registrar will HOLD the PR — care, not refusal — until a resident of that house vouches for you by letter. Write to one of them; the ferry carries it.`;
+}

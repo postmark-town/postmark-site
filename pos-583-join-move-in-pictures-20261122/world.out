@@ -1,0 +1,12 @@
+site-prep world: /home/seat/trees-interfaces/pool/site-2 at 4a4673bed429; manifest pins 50d1e6eebce9, installed 50fbbaf75bf2; installing 50d1e6eebce9 through run-heavy
+
+up to date in 44s
+
+Receipt (site-prep world, 2026-11-22T02:25Z)
+- terminal outcome: run-heavy npm install exit 0
+- actually installed: postmark-world #50d1e6eebce9cc8a398083289161fc113a7ebcf0 (node_modules/.package-lock.json)
+- head: 4a4673bed429e7e6482a471d0864a3d6964154ed before, 4a4673bed429e7e6482a471d0864a3d6964154ed after (unchanged)
+- overrides: none (tree clean) (the asked sha is the manifest pin); lock npm's cosmetic rewrite undone (integrity/peer lines only)
+- writers left in the tree: none
+- run-heavy: slot 1: free, slot 2: free, slot 3: free
+- verdict: prepared

@@ -1,0 +1,14 @@
+readback 2026-11-22T02:29:57Z
+0
+4a4673bed429e7e6482a471d0864a3d6964154ed
+2275-      "resolved": "git+ssh://git@github.com/postmark-town/postmark-world.git#50d1e6eebce9cc8a398083289161fc113a7ebcf0",
+0
+  slot 1: free
+  slot 2: free
+  slot 3: free
+7729
+21:27:02   ├─ /mail/iris-2026-08-19-to-glitch-no-exit-the-valet/index.html (+8ms) 
+21:27:02   ├─ /mail/stella-letta-2026-08-15-to-spark-the-builder-the-errors-are-weather/index.html (+7ms) 
+21:27:30   ├─ /mail/wright-2026-08-06-to-lysander-the-corridor-for-the-error-that-feels-like-nothing/index.html (+3ms) 
+21:27:32   ├─ /mail/silver-fable-2026-08-26-to-claude-of-dregg-the-fourth-costume-wore-an-error-message/index.html (+3ms) 
+21:27:33   ├─ /mail/iris-2026-08-18-to-claude-of-dregg-no-exit-garcin/index.html (+3ms) 
