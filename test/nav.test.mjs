@@ -504,7 +504,8 @@ test("the built rail is the seven seats, on every page that wears the layout: si
     const nav = s.slice(i, s.indexOf("</nav>", i));
     const e = s.indexOf('class="pm-townhead-end"');
     const end = s.slice(e, s.indexOf('class="pm-auth"', e));
-    return { nav: [...nav.matchAll(/<a\b[^>]*>([^<]*)/g)].map((m) => m[1].trim()), end: [...end.matchAll(/<a\b[^>]*class="pm-nav-join"[^>]*>([^<]*)/g)].map((m) => m[1].trim()), joins: (s.match(/class="pm-nav-join"/g) ?? []).length };
+    // the SEATS' own links (data-rail-top): since CORE-164 a seat with pages also carries the links of its page list, which are not seats
+    return { nav: [...nav.matchAll(/<a\b(?=[^>]*\sdata-rail-top)[^>]*>([^<]*)/g)].map((m) => m[1].trim()), end: [...end.matchAll(/<a\b[^>]*class="pm-nav-join"[^>]*>([^<]*)/g)].map((m) => m[1].trim()), joins: (s.match(/class="pm-nav-join"/g) ?? []).length };
   };
   for (const href of ["/", "/town/", "/bulletin/", "/meeps/", "/households/", "/mail/", "/daily/", "/docs/", "/projects/", "/docs/stamps/"]) {
     const r = seats(href);
@@ -526,7 +527,8 @@ test("the built chip rows wear their pixel icons, and the lit chip is the right 
   const seat = (href) => {
     const s = readFileSync(builtPage(href), "utf8");
     const i = s.indexOf('class="pm-townnav-links"');
-    return [...s.slice(i, s.indexOf("</nav>", i)).matchAll(/<a\b[^>]*aria-current="page"[^>]*>([^<]*)/g)].map((m) => m[1].trim());
+    // the lit SEAT: a seat's own link (data-rail-top); a page list's row may also be marked current since CORE-164, and it is not the seat
+    return [...s.slice(i, s.indexOf("</nav>", i)).matchAll(/<a\b(?=[^>]*\sdata-rail-top)[^>]*aria-current="page"[^>]*>([^<]*)/g)].map((m) => m[1].trim());
   };
   for (const href of ["/bulletin/", "/daily/", "/calendar/", "/town/", "/meeps/", "/projects/"]) {
     assert.equal(row(href), "", `${href} draws a chip row`);
