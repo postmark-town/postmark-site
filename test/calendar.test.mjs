@@ -19,7 +19,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
-  GROUPS, groupsOf, eventsOf, eventParams, eventHref, placeOf, residentHref, whenLine, durationWords, utcText,
+  GROUPS, groupsOf, eventsOf, eventParams, eventHref, legacyEventHref, placeOf, residentHref, whenLine, durationWords, utcText,
   dayKey, monthKey, monthsOf, monthGrid, monthHref, referenceInstant, shiftMonth, utcClock,
 } from "../src/lib/calendar.mjs";
 
@@ -92,8 +92,12 @@ test("the committed calendar never carries the sample's invented events: they wo
 
 test("every event has a page address, and an id that is not <host>/<slug> has none", () => {
   for (const e of eventsOf(SAMPLE)) assert.ok(eventHref(e.id), e.id);
+  // CORE-82 (Darko's CORE-70 call 13): until then "/calendar/<host>/<slug>/"; now the permanent address, the old one a forward
   assert.equal(eventHref("current-the-reader/the-snug-harbour-grand-opening"),
+    "/events/current-the-reader/the-snug-harbour-grand-opening/");
+  assert.equal(legacyEventHref("current-the-reader/the-snug-harbour-grand-opening"),
     "/calendar/current-the-reader/the-snug-harbour-grand-opening/");
+  assert.equal(eventHref("no-slash"), null);
   assert.equal(eventParams("no-slash"), null);
   assert.equal(eventParams("a/b/c"), null);
 });
@@ -124,6 +128,7 @@ test("resident words render as text: no calendar page or card writes set:html", 
   // as markup is set:html. This is the arm CI can run; the built-page arm below
   // reads what the build actually wrote.
   for (const f of ["town/pages/calendar/index.astro", "town/pages/calendar/[host]/[slug].astro", "town/pages/calendar/[month].astro",
+    "town/pages/events/index.astro", "town/pages/events/[host]/[slug].astro", "src/components/SparkCard.astro",
     "src/components/CalendarCard.astro", "src/components/CalendarMonth.astro", "src/components/CalendarPanel.astro"]) {
     // The attribute, not the word: a comment naming it is not a use of it.
     assert.equal(/\sset:html\s*=/.test(read(f)), false, `${f} writes set:html`);
@@ -170,8 +175,8 @@ test("BUILT: resident words arrive escaped on the calendar and on the event page
   const calendarHtml = readFileSync(CAL_PAGE, "utf8");
   for (const e of eventsOf(COMMITTED)) {
     const p = eventParams(e.id);
-    const eventFile = pageFile("calendar", p.host, p.slug);
-    const pages = [["/calendar/", calendarHtml], [eventHref(e.id), existsSync(eventFile) ? readFileSync(eventFile, "utf8") : ""]];
+    const eventFile = pageFile("events", p.host, p.slug);
+    const pages =[["/calendar/", calendarHtml], [eventHref(e.id), existsSync(eventFile) ? readFileSync(eventFile, "utf8") : ""]];
     for (const [where, html] of pages) {
       // Astro also escapes quotes; compare on the angle brackets, which are
       // the markup that matters.
@@ -193,8 +198,12 @@ test("BUILT: every event has its page, with the RSVP block quoting the door call
   assert.ok(built >= new Set(eventsOf(COMMITTED).map((e) => eventParams(e.id)?.host)).size);
   for (const e of eventsOf(COMMITTED)) {
     const p = eventParams(e.id);
-    const f = pageFile("calendar", p.host, p.slug);
+    const f = pageFile("events", p.host, p.slug);
     assert.ok(existsSync(f), `${e.id} has no page`);
+    // and its old address is a forward to it (CORE-82), never a dead link
+    const old = pageFile("calendar", p.host, p.slug);
+    assert.ok(existsSync(old), `${e.id}: the old /calendar/ address has no forward`);
+    assert.ok(readFileSync(old, "utf8").includes(`url=${eventHref(e.id)}`), `${e.id}: the old address does not forward to ${eventHref(e.id)}`);
     const html = readFileSync(f, "utf8");
     assert.match(html, /data-rsvp-how/);
     // Both quotes name the resident who is coming: the office refuses by name

@@ -1,0 +1,11 @@
+---
+// An UNCONVERTED page: it reads data directly, so every build renders it.
+import { allTitles } from "../routes.mjs";
+const titles = allTitles();
+---
+<html lang="en">
+  <head><meta charset="utf-8" /><title>All</title></head>
+  <body>
+    <ul>{titles.map((t) => <li>{t}</li>)}</ul>
+  </body>
+</html>

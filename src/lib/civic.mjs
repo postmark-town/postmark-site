@@ -320,6 +320,7 @@ export const LANES = [
     place: BOARD_PLACE,
     who: "residents' asks of other residents",
     live: true,
+    changeSoon: true,
   },
   {
     key: "listings",
@@ -335,7 +336,11 @@ export const LANES = [
     // COMING SOON, founder-ruled 2026-09-01: "they're not live yet and are
     // mostly thin redirects to the legacy places." The listing class has not
     // landed; a row is hand-set by the office on the bulletin's price board.
+    // "WORKS TODAY AND LIKELY TO CHANGE SOON" is what this lane READS today (Wright, 2026-11-16 05:21:47Z, POS-1065: "bounties and
+    // the Marketplace work today and are likely to change soon. Not paused, not retired, not coming soon"): `changeSoon` below
+    // replaces "coming soon" in the building's chip and the opened heading, and `live` is read exactly as before.
     live: false,
+    changeSoon: true,
   },
   {
     key: "votes",
@@ -350,6 +355,16 @@ export const LANES = [
     live: true,
   },
 ];
+
+// `changeSoon` is a LABEL and nothing more (POS-1065). Darko, 2026-11-15 18:52 EST: "it's okay if they are still working, more
+// important that the town knows that they are subject to change soon. these are kind of dead pathways anyway so it's not worth a big
+// build". Wright, 2026-11-16 05:21:47Z (correcting his 04:32 "paused" note): "bounties and the Marketplace work today and are likely
+// to change soon. Not paused, not retired, not coming soon. Same places, same no-build scope". The Bounty Board and the Marketplace
+// each wear this chip on their building and over their opened panel (the page and LaneHead read the flag and this wording), and
+// BOTH clauses are the wording: that they work, and that they are likely to change. It gates nothing, reclassifies nothing and
+// disables no door: `live`, `place` and the building's anchor read exactly as they did, and existing bounties, stakes, offers and
+// letters stand. The funding pots belong to the quest lane and are not this label's.
+export const CHANGE_SOON_LABEL = "works today · likely to change soon";
 
 // The lane the panel opens on when a reader arrives with no fragment.
 // Founder-ruled 2026-09-27: the Quest Guild ("make the Quest Guild the default
@@ -1048,7 +1063,11 @@ export function questKind(q, cadence) {
 // mirror, a card appears with its count already working and nobody edits a
 // page. A registry row the mirror has no column for still renders; it simply
 // has no count, which is the honest state rather than a zero.
-export function questCards(standings, registry = QUEST_REGISTRY) {
+//
+// A MONTHLY QUEST THE WHOLE TOWN COUNTS (POS-885; Wright's call for the Guild, 2026-11-16: the Guild page is town-wide, so the
+// card shows the town's total this month, never one household's "N of 10"). `tallies` is `{ <title>: <n or null> }` from
+// monthTallies below; a card whose title is in it carries `monthTotal`, and a card that is not carries no such key.
+export function questCards(standings, registry = QUEST_REGISTRY, tallies = null) {
   const done = standings?.completedBy ?? {};
   const rows = [
     ...(registry.daily ?? []).map((q) => ({ ...q, cadence: questKind(q, "daily") })),
@@ -1059,7 +1078,23 @@ export function questCards(standings, registry = QUEST_REGISTRY) {
     ...q,
     done: Object.prototype.hasOwnProperty.call(done, q.title) ? done[q.title] : null,
     of: standings?.total ?? null,
+    ...(tallies && Object.prototype.hasOwnProperty.call(tallies, q.title) ? { monthTotal: Number.isInteger(tallies[q.title]) ? tallies[q.title] : null } : {}),
   }));
+}
+
+// WHICH MONTHLY QUESTS THE TOWN'S MONTH FIGURE ANSWERS, by the registry's own id, and the field of the Hall's month record
+// that carries the figure. Bring a neighbour is the one: its count is the inviter-side payouts of the town month, the same
+// rows the town's fold counts for each household (quest-progress.mjs MONTHLY_FIELD), here taken across the town.
+export const TOWN_MONTH_FIELD = Object.freeze({ "bring-a-neighbour": "invitesPaid" });
+
+/** `{ <title>: <n or null> }` for each registry quest the town's month figure answers; `view` is hallView's, for the town's month. */
+export function monthTallies(registry, view) {
+  const out = {};
+  for (const q of Array.isArray(registry?.quests) ? registry.quests : []) {
+    const field = TOWN_MONTH_FIELD[q?.id];
+    if (field && q.cadence === "monthly" && typeof q.title === "string") out[q.title] = Number.isInteger(view?.[field]) ? view[field] : null;
+  }
+  return out;
 }
 
 // ── the bulletin mirrors ─────────────────────────────────────────────────────

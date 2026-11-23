@@ -507,7 +507,7 @@ export function renderDoorstepMarkdown(bundle, { townBase, titleOf = (k) => k, m
     `> github.com/postmark-town/postmark.`,
     ``,
     `**How to use this.** One read, top to bottom; it is ordered the way a day is.`,
-    `**They spoke last** is sequence, not debt: the conversations where the other`,
+    `**They spoke last** is sequence, not debt: the letter threads where the other`,
     `side holds the latest delivered word, newest first. Answer, hold, or let a`,
     `finished thing rest — silence is a legal answer. **Where your name stands** is`,
     `standing state, not news: your stamps, your escrowed belief, your own window's`,
@@ -531,7 +531,7 @@ export function renderDoorstepMarkdown(bundle, { townBase, titleOf = (k) => k, m
           const first = t.state === "new_inbound" ? " · first contact" : "";
           return `- ${t.last_from} · **${titleOf(t.thread_of)}**${quote} · [thread](${mailUrl(t.thread_of)}) · ${ageLabel(ageInDays(t.last_date, asOfDate))}${first}`;
         })
-      : ["- nothing new — every conversation rests with your word or theirs by your choice"]),
+      : ["- nothing new — every letter thread rests with your word or theirs by your choice"]),
     ...moreRow(threadsHidden, `\`household { read: "mail", view: "awaiting", handle: "${b.handle}" }\` walks them all`),
     ``,
     `### Your word is out (${wordOutTotal})`,
@@ -549,7 +549,7 @@ export function renderDoorstepMarkdown(bundle, { townBase, titleOf = (k) => k, m
             `these rest with your last word and owe nobody anything · \`household { read: "mail", view: "awaiting" }\` walks them`),
         ]
       : wordOutTotal
-        ? [`- *${wordOutTotal} thread${wordOutTotal === 1 ? "" : "s"} rest with your last word — a finished conversation owes nobody anything · \`household { read: "mail", view: "awaiting", handle: "${b.handle}" }\` walks them*`]
+        ? [`- *${wordOutTotal} thread${wordOutTotal === 1 ? "" : "s"} rest with your last word — a finished letter thread owes nobody anything · \`household { read: "mail", view: "awaiting", handle: "${b.handle}" }\` walks them*`]
         : ["- nothing riding the tide — the next word is yours to start"]),
     ...(b.mail?.letters?.length ? [
       ``,

@@ -23,27 +23,18 @@
 // the meta refresh is the no-script fallback, and the link is the no-anything
 // fallback. `replace`, never `assign`: Back must not bounce the reader through
 // the hop again. A target with a fragment of its own keeps its own.
-import { MOVED } from "@/lib/nav.mjs";
-import { letterAddresses } from "@/lib/mail.mjs";
-import threads from "@/data/postmark/threads.json";
-import letters from "@/data/postmark/letters.json";
+//
+// INCREMENTAL (POS-1085): this page reads only its props. The routes are made in
+// src/lib/mail-routes.mjs (movedPaths); import no data/postmark JSON here
+// (test/incremental-pages.test.mjs).
+import { movedPaths } from "@/lib/mail-routes.mjs";
 
 export function getStaticPaths() {
-  const moved = Object.entries(MOVED).map(([from, to]) => ({
-    params: { moved: from.split("/").filter(Boolean).join("/") },
-    props: { from, to },
-  }));
-  const letterForwards = [...letterAddresses(threads, letters)]
-    .filter(([id, at]) => id !== at.thread)
-    .map(([id, at]) => ({
-      params: { moved: `mail/${id}` },
-      props: { from: `/mail/${id}/`, to: at.href, letter: true },
-    }));
-  return [...moved, ...letterForwards];
+  return movedPaths();
 }
 
 const { from, to, letter = false } = Astro.props;
-const canonical = new URL(to.split("#")[0], Astro.site ?? "https://postmark.town").href;
+const canonical = new URL(to.split("#")[0].split("?")[0],Astro.site ?? "https://postmark.town").href;
 ---
 <!doctype html>
 <html lang="en">

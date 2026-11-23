@@ -29,7 +29,11 @@
 // ── THE HOST CONTRACT (the host is /votes/, town/pages/votes/index.astro; POS-984's household-page band that once hosted it is gone) ──
 //
 //   import { mountBallotStake } from "@/lib/ballot-stake.mjs";
-//   mountBallotStake(rootElement, { topic, choices, doc?, storage?, fetchImpl?, base? });
+//   mountBallotStake(rootElement, { topic, choices, doc?, storage?, fetchImpl?, base?, captions? });
+//
+// `captions` (CORE-126, optional) is `{ [choice id]: "<design title>, by <household>" }` (hearth/ballot-caption.mjs): what the choice control and the
+// site's own preview / receipt / headroom words SHOW for a choice. The option's value, the selected candidate and the request stay the id; with no
+// `captions` (a bare call) every word is the id, as before.
 //
 // `topic` is a staking ballot's topic; `choices` its choices as the office's
 // GET /votes answers them (`[{ candidate, credit?, … }]`, or bare names). The
@@ -58,6 +62,9 @@ export function stampsOf(raw) {
 /** The handles a signed-in /me answer lets this human act as (its residents). */
 export const residentsOf = (me) => (me && !me.visitor ? (me.handles ?? me.residents ?? []).map(String) : []);
 
+/** What a reader is shown for a choice id: its caption when the host gave one (own keys only), else the id itself (today's words). */
+export const nameFor = (names, id) => (names && typeof names === "object" && Object.hasOwn(names, id) && typeof names[id] === "string" && names[id] ? names[id] : id);
+
 /** The choices as names, from GET /votes' rows or plain names. */
 export const choiceNames = (choices) => (Array.isArray(choices) ? choices : [])
   .map((c) => (typeof c === "string" ? c : c?.candidate)).filter((c) => typeof c === "string" && c);
@@ -69,7 +76,7 @@ const s = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
  * kind: "preview" | "staked" | "zero" | "refused". Every word that is the
  * office's is the office's, shown as text.
  */
-export function answerOf({ ok, status, json }, { as, candidate, preview = false } = {}) {
+export function answerOf({ ok, status, json }, { as, candidate, preview = false, names = null } = {}) {
   const j = json && typeof json === "object" ? json : {};
   if (!ok || j.error || j.refused === true) {
     const code = Number(j.code ?? status);
@@ -89,7 +96,8 @@ export function answerOf({ ok, status, json }, { as, candidate, preview = false 
   const applied = Number(a.applied) || 0;
   const requested = Number(a.requested) || 0;
   const who = String(a.handle ?? as ?? "your resident");
-  const on = String(a.candidate ?? candidate ?? "this choice");
+  // CORE-126: the site's own words name a Hearth design by its caption ("<title>, by <household>") when the host knows one; the id is never changed
+  const on = nameFor(names, String(a.candidate ?? candidate ?? "this choice"));
   const lines = [];
   if (a.preview === true) {
     if (applied <= 0) return { kind: "zero", title: `nothing would apply: ${a.reason ?? "no stamps can move"}`, lines: ["Nothing has been staked."], preview: true };
@@ -139,7 +147,7 @@ export const holdsConfirm = (a) => a?.kind === "unreachable" || a?.kind === "amb
  * (never a lock; the office records the site and `via: web` from it). Answers
  * `answerOf(...)`, or `{ kind: "unreachable" }` when no answer came back.
  */
-export async function postStake({ base = officeBase(), token, body, fetchImpl = globalThis.fetch }) {
+export async function postStake({ base = officeBase(), token, body, fetchImpl = globalThis.fetch, names = null }) {
   let res;
   try {
     res = await fetchImpl(`${base}/household`, {
@@ -152,7 +160,7 @@ export async function postStake({ base = officeBase(), token, body, fetchImpl = 
   }
   let json = null;
   try { json = await res.json(); } catch { return { kind: "unreachable" }; }
-  return answerOf({ ok: res.ok, status: res.status, json }, { as: body?.args?.from, candidate: body?.args?.candidate, preview: body?.args?.preview === true });
+  return answerOf({ ok: res.ok, status: res.status, json }, { as: body?.args?.from, candidate: body?.args?.candidate, preview: body?.args?.preview === true, names });
 }
 
 /** Read what stands: the ballot's own read, with your household's headroom on each choice (GET /votes/{topic}). */
@@ -182,7 +190,7 @@ export const BALLOT_STAKE_CSS = `
 .bs .bs-gate { font-size: 0.82rem; opacity: 0.78; margin: 0 0 0.6em; }
 .bs .bs-form { display: flex; flex-wrap: wrap; gap: 0.5em 0.9em; align-items: flex-end; }
 .bs .bs-form[hidden] { display: none; }
-.bs .bs-row { display: flex; flex-direction: column; gap: 0.25em; margin: 0; font-size: 0.82rem; }
+.bs .bs-row { display: flex; flex-direction: column; gap: 0.25em; margin: 0; font-size: 0.82rem; max-width: 100%; min-width: 0; }
 .bs .bs-row select, .bs .bs-row input { font: inherit; font-size: 0.9rem; padding: 0.35em 0.5em; min-width: 7em; max-width: 100%; }
 .bs .bs-row input { width: 6em; min-width: 0; }
 .bs button { font: 0.78rem/1 var(--pm-mono, monospace); padding: 0.6em 1em; border-radius: 999px; cursor: pointer; }
@@ -207,7 +215,7 @@ function styleOnce(doc) {
  * CONTRACT. Returns `{ refresh }` (re-reads who is signed in; the host calls it
  * on its own sign-in event, and the mount listens for `pm:lens` itself).
  */
-export function mountBallotStake(root, { topic, choices, doc = globalThis.document, storage = globalThis.localStorage, fetchImpl = globalThis.fetch, base } = {}) {
+export function mountBallotStake(root, { topic, choices, doc = globalThis.document, storage = globalThis.localStorage, fetchImpl = globalThis.fetch, base, captions = null } = {}) {
   if (!root || !doc) return { refresh: () => {} };
   const office = () => base ?? officeBase(storage);
   const names = choiceNames(choices);
@@ -228,7 +236,8 @@ export function mountBallotStake(root, { topic, choices, doc = globalThis.docume
   const idFor = (k) => `bs-${topic}-${k}`;
   const fromSel = el("select", { id: idFor("from"), name: "from", required: "" });
   const choiceSel = el("select", { id: idFor("choice"), name: "candidate", required: "" });
-  for (const c of names) choiceSel.append(el("option", { value: c }, c));
+  // the option's VALUE is the choice id (the stake names it); only its caption is what the reader sees (CORE-126, `captions`: { id: "<title>, by <household>" })
+  for (const c of names) choiceSel.append(el("option", { value: c }, nameFor(captions, c)));
   const stampsIn = el("input", { id: idFor("stamps"), name: "stamps", type: "number", min: "1", step: "1", inputmode: "numeric", required: "" });
   const row = (label, input) => { const p = el("p", { class: "bs-row" }); p.append(el("label", { for: input.id }, label), input); return p; };
   const previewBtn = el("button", { type: "submit", class: "bs-preview" }, "Preview");
@@ -264,7 +273,7 @@ export function mountBallotStake(root, { topic, choices, doc = globalThis.docume
     if (!want.stamps) return say({ kind: "refused", title: "stamps is a whole number, at least 1", lines: [] });
     sending = true; previewBtn.disabled = true;
     say({ kind: "pending", title: "asking the office what this stake would do…", lines: ["Nothing is staked by a preview."] });
-    const a = await postStake({ base: office(), token, body: stakeBody({ ...want, preview: true }), fetchImpl });
+    const a = await postStake({ base: office(), token, body: stakeBody({ ...want, preview: true }), fetchImpl, names: captions });
     sending = false; previewBtn.disabled = false;
     if (a.kind === "unreachable") { forget(); return say({ kind: "refused", title: "the office could not be reached", lines: ["Nothing was staked. Preview again shortly."] }); }
     say(a);
@@ -281,7 +290,7 @@ export function mountBallotStake(root, { topic, choices, doc = globalThis.docume
     if (!token) return refresh();
     sending = true; confirmBtn.disabled = true; previewBtn.disabled = true;
     say({ kind: "pending", title: `asking the office to stake as ${want.from}…`, lines: [] });
-    const a = await postStake({ base: office(), token, body, fetchImpl });
+    const a = await postStake({ base: office(), token, body, fetchImpl, names: captions });
     sending = false; confirmBtn.disabled = false; previewBtn.disabled = false;
     forget();
     // unanswered, or answered with an error the office could not stand behind: held until checked and previewed again
@@ -299,8 +308,9 @@ export function mountBallotStake(root, { topic, choices, doc = globalThis.docume
     const st = await readStanding({ base: office(), token, topic, candidate: want.candidate, fetchImpl });
     if (!st) return say({ kind: "refused", title: "the ballot could not be read just now", lines: ["Nothing will be sent. Check again shortly."] });
     blocked = false; checkBtn.hidden = true;
-    say({ kind: "checked", title: `as it stands: ${want.candidate} holds ${st.staked} stamps`,
-      lines: [st.headroom == null ? "Your household's headroom could not be read." : `Your household's headroom left on ${want.candidate}: ${st.headroom}.`,
+    const shown = nameFor(captions, want.candidate);
+    say({ kind: "checked", title: `as it stands: ${shown} holds ${st.staked} stamps`,
+      lines: [st.headroom == null ? "Your household's headroom could not be read." : `Your household's headroom left on ${shown}: ${st.headroom}.`,
         "If that already counts your stake, it landed. Preview again before staking more."] });
   });
 

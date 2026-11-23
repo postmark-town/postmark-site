@@ -1,0 +1,143 @@
+---
+// SparkCard — one spark as the office serves it (CORE-82; the common Spark view of POS-1035 / WLD-173), and since CORE-121 THE WHOLE CARD OPENS ITS SPARK.
+//
+// Every word here is the producer's: the headline is the spark's `body`, the recounting, the credit (`by`, `household`) and the picture are fields it carries. The
+// card works nothing out. A spark with NO picture still has its headline, its recounting and its credit, and draws no picture tile at all (CORE-82: "no empty
+// picture tile"). Resident-authored words render as TEXT through Astro's escaping, never set:html; a picture is drawn only from a site path or an https address
+// (calendar.mjs pictureOf).
+//
+// THE WHOLE CARD IS THE LINK (Darko, 2026-11-18: "each card could be clicked to get the full info"; Wright: "go on the layout as drawn"). Real link semantics, ONE
+// anchor: the headline is the `<a href="/sparks/<canonical id>/">`, and its `::after` is stretched over the card, so the background, the picture and the text all
+// open the detail (new-tab / modifier clicks and the context menu are the browser's own, keyboard Enter works, and the card shows a focus ring while the anchor has
+// focus). The other links inside the card (the maker's page, a room) are SIBLING anchors lifted above the stretched one, so they keep working and no anchor
+// is nested in another. A card with no canonical id has no link and says nothing about it. `link={false}` is the detail page's own big card (it is already there).
+import { isRoomId, pictureOf, roomHref, roomIdOf, utcText } from "@/lib/calendar.mjs";
+import { CATALOGUE_WORDS, sparkHref } from "@/lib/sparks.mjs";
+
+interface Props {
+  spark: any;
+  /** handles that have a page under /residents/ */
+  roll?: Set<string>;
+  /** the event's own spark: drawn larger, the page's headline spark */
+  root?: boolean;
+  /** the whole card opens the Spark's detail (default); false on the detail page itself */
+  link?: boolean;
+  /** the approved empty "Flares from this spark" place (no flare data exists yet); false where the page draws a bigger one */
+  flares?: boolean;
+  /** the gallery's event / "no event named" line, drawn INSIDE an unpictured card (a pictured card is the picture and its one caption, and takes none) */
+  eventLine?: string | null;
+}
+const { spark: s, roll = new Set(), root = false, link = true, flares = true, eventLine = null } = Astro.props;
+const pic = pictureOf(s);
+const by = typeof s?.credit?.by === "string" ? s.credit.by : null;
+const household = typeof s?.credit?.household === "string" ? s.credit.household : null;
+const headline = typeof s?.body === "string" && s.body.trim() ? s.body.trim() : null;
+const recounting = typeof s?.recounting === "string" && s.recounting.trim() ? s.recounting.trim() : null;
+const rooms = Array.isArray(s?.rooms) ? s.rooms.map(roomIdOf).filter(isRoomId) : [];
+const href = link ? sparkHref(s?.id) : null;
+// IMAGE-FIRST (Darko 2026-11-18 13:14 EST: "MUCH more image-centric IF there is an image ... the image take up everything with a small caption line at the bottom,
+// and clicking should open it even bigger with all of the text elements"). A PICTURED card in a listing (link on) is the picture edge to edge plus ONE small caption
+// (the NAME only; the maker is in the detail): no recounting, date, room, household or Flares panel. The detail's own card (link off) shows the picture as large as the viewport permits, then every
+// served word below it. A card with no picture is exactly as before.
+const listed = !!pic && link;
+const big = !!pic && !link;
+---
+{listed ? (
+<article class:list={["spark-card", "pm-paper", "has-picture", "is-image-card", { "is-root": root, "is-link": !!href }]} data-spark={s?.id ?? ""} data-spark-root={root ? "" : undefined}>
+  <figure class="spark-pic" data-spark-picture>
+    <img src={pic.src} alt={pic.alt ?? (headline ?? "")} loading="lazy" decoding="async" />
+  </figure>
+  <div class="spark-cap" data-spark-caption>
+    {headline || href ? (
+      root
+        ? <h2 class="spark-head" data-spark-headline>{href ? <a class="spark-open" href={href} data-spark-open>{headline ?? "Open this Spark"}</a> : headline}</h2>
+        : <h3 class="spark-head" data-spark-headline>{href ? <a class="spark-open" href={href} data-spark-open>{headline ?? "Open this Spark"}</a> : headline}</h3>
+    ) : null}
+  </div>
+</article>
+) : (
+<article class:list={["spark-card", "pm-paper", { "is-root": root, "has-picture": !!pic, "is-link": !!href, "is-big": big }]} data-spark={s?.id ?? ""} data-spark-root={root ? "" : undefined}>
+  {pic && (
+    <figure class="spark-pic" data-spark-picture>
+      <img src={pic.src} alt={pic.alt ?? (headline ?? "")} loading={big ? "eager" : "lazy"} decoding="async" />
+    </figure>
+  )}
+  <div class="spark-body">
+    {headline || href ? (
+      root
+        ? <h2 class="spark-head" data-spark-headline>{href ? <a class="spark-open" href={href} data-spark-open>{headline ?? "Open this Spark"}</a> : headline}</h2>
+        : <h3 class="spark-head" data-spark-headline>{href ? <a class="spark-open" href={href} data-spark-open>{headline ?? "Open this Spark"}</a> : headline}</h3>
+    ) : null}
+    {recounting && <p class="spark-recounting" data-spark-recounting>{recounting}</p>}
+    <p class="spark-credit" data-spark-credit>
+      {by
+        ? <>by {roll.has(by) ? <a href={`/residents/${by}/`}>{by}</a> : by}{household && <span class="soft"> of {household}</span>}</>
+        : <span class="soft">credit not served</span>}
+    </p>
+    {s?.experienced_at && (
+      <p class="spark-when soft" data-spark-when>
+        <time datetime={s.experienced_at} title={`${s.experienced_at} (UTC)`}>{utcText(s.experienced_at)}</time>
+        {s.experienced_until && <> to <time datetime={s.experienced_until} title={`${s.experienced_until} (UTC)`}>{utcText(s.experienced_until)}</time></>}
+      </p>
+    )}
+    {rooms.length > 0 && (
+      <p class="spark-rooms soft" data-spark-rooms>
+        From the talk in{" "}
+        {rooms.map((r, i) => <>{i > 0 && ", "}<a href={roomHref(r)}>{r}</a></>)}
+      </p>
+    )}
+    {flares && (
+      <p class="spark-flares" data-spark-flares>
+        <b>{CATALOGUE_WORDS.flares}</b><br />
+        {CATALOGUE_WORDS.flaresNone}
+      </p>
+    )}
+    {eventLine && <p class="spark-eventline soft" data-spark-event>{eventLine}</p>}
+  </div>
+</article>
+)}
+
+<style>
+  .spark-card { position: relative; display: grid; gap: 0.8em; padding: 0.9em 1.1em; margin: 0 0 0.9em; }
+  .spark-card.has-picture { grid-template-columns: minmax(0, 9.5rem) minmax(0, 1fr); align-items: start; }
+  .spark-card.is-root.has-picture { grid-template-columns: minmax(0, 14rem) minmax(0, 1fr); }
+  .spark-pic { margin: 0; }
+  .spark-pic img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--pm-line); }
+  .spark-head { margin: 0 0 0.35em; font-size: 1.05em; line-height: 1.3; overflow-wrap: anywhere; color: var(--pm-ink); }
+  .spark-card.is-root .spark-head { font-size: 1.3em; }
+  .spark-recounting { margin: 0.3em 0; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-line; }
+  .spark-credit, .spark-when, .spark-rooms { margin: 0.25em 0; font-size: 0.9rem; overflow-wrap: anywhere; }
+  .spark-flares { margin: 0.55em 0 0; padding: 0.4em 0.6em; border: 1px dashed var(--pm-line); border-radius: 6px; font-size: 0.88rem; color: var(--pm-ink-soft); }
+  .spark-flares b { color: var(--pm-ink); }
+  .spark-eventline { margin: 0.55em 0 0; font-size: 0.85rem; overflow-wrap: anywhere; }
+  .spark-card .soft { color: var(--pm-ink-soft); }
+  .spark-card a { color: var(--pm-wax); text-decoration: underline; }
+  /* the whole-card link: the headline anchor's ::after covers the card (picture, background, text); the other links are lifted above it */
+  .spark-card.is-link { cursor: pointer; }
+  .spark-card.is-link:hover { box-shadow: 0 0 0 2px var(--pm-wax); }
+  .spark-card .spark-open { color: inherit; text-decoration: none; }
+  .spark-card .spark-open:hover { text-decoration: underline; }
+  .spark-card .spark-open::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+  .spark-card.is-link:has(.spark-open:focus-visible) { outline: 3px solid var(--pm-wax); outline-offset: 2px; }
+  .spark-card .spark-open:focus-visible { outline: none; text-decoration: underline; }
+  .spark-credit a, .spark-rooms a { position: relative; z-index: 2; }
+  /* the pictured listing card: the picture fills the card edge to edge, one small caption line at the bottom (the card is still one whole link) */
+  .spark-card.is-image-card { display: block; padding: 0; overflow: hidden; }
+  .spark-card.is-image-card .spark-pic { margin: 0; }
+  .spark-card.is-image-card .spark-pic img { width: 100%; height: auto; border: 0; border-radius: 0; }
+  /* ONE visual caption line, NAME ONLY: it ellipsises; the maker/credit is in the detail (and on unpictured cards), never a fragment here */
+  .spark-card.is-image-card .spark-cap { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 0.6em; padding: 0.45em 0.8em 0.55em; white-space: nowrap; }
+  .spark-card.is-image-card .spark-head { flex: 0 1 auto; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.92rem; font-weight: 700; line-height: 1.3; }
+  .spark-card.is-image-card.is-root .spark-head { font-size: 1.05rem; }
+  /* the detail's own big card: the picture first, as large as the viewport permits and whole (never the listing's thumbnail cap), all the text below at a readable measure */
+  .spark-card.is-big, .spark-card.is-big.is-root.has-picture { display: block; padding: 0; overflow: hidden; }
+  .spark-card.is-big .spark-pic { margin: 0; text-align: center; background: var(--pm-paper-deep, rgba(0,0,0,0.06)); }
+  /* width 100% (not auto): a small valid source is ENLARGED to the page's width like the listing's, bounded by the viewport height and kept whole (contain), never left at its natural size */
+  .spark-card.is-big .spark-pic img { display: block; width: 100%; height: auto; max-height: 85vh; object-fit: contain; border: 0; border-radius: 0; }
+  .spark-card.is-big .spark-body { max-width: 46rem; padding: 0.9em 1.1em 1em; }
+  .spark-card.is-big .spark-head { font-size: 1.4em; }
+  @media (max-width: 520px) {
+    .spark-card.has-picture:not(.is-image-card):not(.is-big), .spark-card.is-root.has-picture:not(.is-image-card):not(.is-big) { grid-template-columns: minmax(0, 1fr); }
+    .spark-card:not(.is-image-card):not(.is-big) .spark-pic { max-width: 16rem; }
+  }
+</style>

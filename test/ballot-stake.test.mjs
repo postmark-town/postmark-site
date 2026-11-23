@@ -138,7 +138,7 @@ test("the page: a staking ballot carries the stake form; a closed one does not; 
   // ballot's card and mounts the form into it with the office's choices as sent; a closed, submissions or unrecognised ballot gets none.
   // ...and, since the frontier review of 147f72d3, ONCE per topic: the slot holding a mounted form is kept in `mountedSlots` and moved into each
   // redrawn card, so a board refresh never remounts (it would reset the form's held state and leave another pm:lens listener).
-  assert.match(PAGE, /if \(kind === "staking"\) \{\s*var slot = mountedSlots\[t\.topic\];\s*if \(!slot\) \{\s*slot = el\("div", "v-stake"\);\s*slot\.setAttribute\("data-stake-slot", t\.topic\);\s*mountedSlots\[t\.topic\] = slot;[\s\S]*mountBallotStake\(slot, \{ topic: t\.topic, choices: t\.raw \}\)[\s\S]*card\.appendChild\(slot\);/);
+  assert.match(PAGE, /if \(kind === "staking"\) \{\s*var slot = mountedSlots\[t\.topic\];\s*if \(!slot\) \{\s*slot = el\("div", "v-stake"\);\s*slot\.setAttribute\("data-stake-slot", t\.topic\);\s*mountedSlots\[t\.topic\] = slot;[\s\S]*mountBallotStake\(slot, \{ topic: t\.topic, choices: t\.raw, captions: captionsOf\(titles, t\.topic, t\.raw\) \}\)[\s\S]*card\.appendChild\(slot\);/);
   assert.doesNotMatch(MODULE, /innerHTML/, "every word goes in as text");
   assert.match(BALLOT_STAKE_CSS, /\.bs \.bs-out\.ambiguous/);
 });

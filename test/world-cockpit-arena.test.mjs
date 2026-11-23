@@ -386,7 +386,8 @@ test("a target is taken into the panel, not sent at the door", () => {
   assert.doesNotMatch(MOUNT, /function sendAim\(/, "the dispatch-on-click path is gone");
   // and the confirm carries what the target contributed, with typed fields
   // winning where a reader edited the box in front of them
-  assert.match(MOUNT, /const whole = \{ \.\.\.\(aimed \?\? \{\}\), \.\.\.args \};/,
+  // (CORE-82: the same merge, now handed through withReplyTarget, which adds reply_to only for a chosen target on a card that declares it)
+  assert.match(MOUNT, /const whole = withReplyTarget\(\{ \.\.\.\(aimed \?\? \{\}\), \.\.\.args \}, slotFor\(action\)\?\.card, state\.replyTo\);/,
     "the target's fields ride along with whatever was typed");
 });
 
@@ -416,11 +417,12 @@ test("the panel does not ask again for what the flow already answered", () => {
   // three empty boxes asking the question the reader had just answered on the
   // map — the form language the founder has objected to twice.
   assert.match(MOUNT, /const answered = state\.act\?\.action === action \? Object\.keys\(state\.act\.args \?\? \{\}\) : \[\];/);
-  assert.match(MOUNT, /const asked = flowShaped\r?\n\s*\? c\.fields\.filter\(\(f\) => f\.required && !answered\.includes\(f\.name\) && filled\[f\.name\] == null\)\r?\n\s*: c\.fields;/,
+  // (CORE-82: the same two arms, read through formFieldsOf, which only drops the raw reply_to a person never types)
+  assert.match(MOUNT, /const asked = flowShaped\r?\n\s*\? formFieldsOf\(c\)\.filter\(\(f\) => f\.required && !answered\.includes\(f\.name\) && filled\[f\.name\] == null\)\r?\n\s*: formFieldsOf\(c\);/,
     "a flow-shaped act asks only for what the door requires and the flow did not fill");
   // AN ORDINARY FORM ACT IS UNTOUCHED — outside the fight there are acts whose
   // whole substance is typed, and for those the form IS the act.
-  assert.match(MOUNT, /: c\.fields;/, "a non-flow act still gets every field");
+  assert.match(MOUNT, /: formFieldsOf\(c\);/, "a non-flow act still gets every field (CORE-82: bar the raw reply_to, which the chosen target drives)");
 });
 
 // ══ (2b) WHAT THE WHEEL ACTUALLY GATES (addendum, 2026-08-29) ═══════════════
@@ -1505,7 +1507,7 @@ test("an exit tells the pane behind it, from the act's own answer", () => {
   // assertion used to claim and what the founder disproved live: a refused act
   // came back 200 and reached that branch. The real guard is the receipt, and it
   // is asserted in "a refusal wearing a 200" below.
-  assert.match(MOUNT, /if \(res\.ok && !defect\) \{[\s\S]{0,3200}?if \(leftRoom && !stillInside\) announceStoodOut\(leftRoom\);/,
+  assert.match(MOUNT, /if \(res\.ok && !defect\) \{[\s\S]{0,4400}?if \(leftRoom && !stillInside\) announceStoodOut\(leftRoom\);/,
     "inside the accepted branch, and past the receipt");
 });
 

@@ -248,6 +248,10 @@ export const RAIL = [
   // to `mail` and light the seat.
   { key: "mail", label: "The Mail", href: "/mail/" },
 
+  // SPARKS — the moments the town kept (CORE-121, Darko 2026-11-18: "shipping the full Sparks experience"; the mockup's drawn "Sparks" entry). One door,
+  // no row: /sparks/ is the accepted gallery (events and none), and /sparks/<id>/ the Spark's own page.
+  { key: "sparks", label: "Sparks", href: "/sparks/" },
+
   // THE HOUSEHOLDS — the unit, in Residents' place ("the best version retires
   // the Residents page"). No row: with /residents/ forwarding here, the one
   // read left is the seat's own, and a row of one chip is the site explaining
@@ -308,6 +312,11 @@ export const MOVED = {
   "/archive/": "/projects/",          // v1's Town Archive, folded into the Works
   "/board/": "/town/#board",          // the Bounty Board, folded into the quarter
   "/stamps/guide/": "/docs/stamps/",  // the Guide, the teaching's own page
+  // the two Shorts doors (POS-1124; CON-25, Darko: "Yes, all nine as recommended"): a Short's description link cannot be
+  // clicked, so its sting shows an address to TYPE. Each lands on the front page carrying its listed ?from= tag (src/lib/
+  // join-source.mjs keeps it). The targets are fixed and same-origin; nothing in the URL chooses where they go.
+  "/yt/": "/?from=youtube",
+  "/tt/": "/?from=tiktok",
 };
 
 /** Every entry in the rail, in every chip row, at every depth, flat. */

@@ -1,0 +1,111 @@
+---
+// SPARKS — /sparks/ (CORE-121; Darko's look, 2026-11-18: "sparks layout looks good ... each card could be clicked to get the full info").
+//
+// The accepted gallery of Sparks, events and none, with the drawn filters (All accepted / From events / Without an event / With a picture). Every card is a link
+// to its own page, /sparks/<canonical id>/, over the whole card (SparkCard). What is listed is what the site has been served and the PRODUCER accepted
+// (sparks.mjs collectSparks): this page decides no acceptance and works out no membership. The source is the office's public mark register (sparks.json), which
+// is PUBLIC-VISIBLE only, so the page says what it is (CATALOGUE_WORDS.register) rather than "every Spark", and says so when the register could not be read. "The sparks" and "The gallery" on an event's own
+// page stay separate; this is the wider gallery, one click from them.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import PageFreshness from "@/components/PageFreshness.astro";
+import SparkCard from "@/components/SparkCard.astro";
+import calendar from "@/data/postmark/calendar.json";
+import eventsData from "@/data/postmark/events.json";
+import sparksData from "@/data/postmark/sparks.json";
+import residents from "@/data/postmark/residents.json";
+import { CATALOGUE_WORDS, SPARK_FILTERS, collectSparks, eventOfSpark } from "@/lib/sparks.mjs";
+import { pictureOf } from "@/lib/calendar.mjs";
+
+// the register's own answer: "ok" (read as served; none is KNOWN none), else unavailable/absent (never an empty list)
+const registerOk = sparksData?.read === "ok" && Array.isArray(sparksData.sparks);
+// DETAIL COVERAGE is the union (every event card has its page), but the GRID is the register's own rows when the register was read: an event read is not
+// filtered by the register's anonymous visibility, so it never widens the catalogue. Only when the register is unavailable is the event-carried list shown (and says so).
+const covered = collectSparks(calendar, eventsData, registerOk ? sparksData.sparks : []);
+const entries = registerOk ? covered.filter((e) => e.origin === "catalogue") : covered;
+const roll = new Set(residents.map((r) => r.handle));
+const counts = Object.fromEntries(SPARK_FILTERS.map((f) => [f.key, entries.filter(f.test).length]));
+const eventTitle = (entry) => eventOfSpark(entry, calendar, eventsData)?.event?.title ?? null;
+---
+<PostmarkLayout
+  door={{ get: "/api/world2/marks?all=true&full=true" }}
+  title="Sparks — Postmark"
+  description={registerOk ? "The moments the town kept: accepted Sparks in the town's public register, from events and from no event named." : "The moments the town kept: the Sparks the event pages carry (the town's register could not be read just now)."}
+  active="sparks"
+>
+  <div class="cal-page spk" data-sparks-page>
+    <header class="spk-head">
+      <h1>{CATALOGUE_WORDS.title}</h1>
+      <p class="how">{CATALOGUE_WORDS.lead}</p>
+    </header>
+
+    <div class="spk-filters" role="group" aria-label="Filter the Sparks" data-spark-filters hidden>
+      {SPARK_FILTERS.map((f) => (
+        <button type="button" class:list={["spk-filter", { on: f.key === "all" }]} data-filter={f.key} aria-pressed={f.key === "all" ? "true" : "false"}>{f.label} <span class="soft">{counts[f.key]}</span></button>
+      ))}
+    </div>
+
+    {entries.length > 0
+      ? (
+        <div class="spk-grid" data-spark-grid>
+          {entries.map((entry) => (
+            <div class="spk-cell" data-spark-cell data-has-event={entry.eventId !== null ? "1" : "0"} data-has-picture={pictureOf(entry.spark) ? "1" : "0"}>
+              {/* a PICTURED card is the picture and one caption (Darko 13:14 EST): no second metadata row on it, its event is on its page. An UNPICTURED card
+                  carries its event / "no event named" line INSIDE the card (Darko 15:36 EST: "the line inside it"), never as a sibling under it. */}
+              <SparkCard spark={entry.spark} roll={roll}
+                eventLine={pictureOf(entry.spark) ? null : (entry.eventId !== null ? `event: ${eventTitle(entry) ?? entry.eventId}` : "no event named")} />
+            </div>
+          ))}
+        </div>
+      )
+      : registerOk && <p class="ev-note pm-paper" data-spark-none>{CATALOGUE_WORDS.none}</p>}
+    <p class="ev-note pm-paper" data-spark-nomatch hidden>{CATALOGUE_WORDS.noMatch}</p>
+
+    <p class="soft spk-partial" data-spark-register data-state={registerOk ? "ok" : "unavailable"}>{registerOk ? CATALOGUE_WORDS.register : CATALOGUE_WORDS.unavailable}</p>
+
+    <PageFreshness of="the town's Sparks" />
+  </div>
+
+  <script>
+    // THE FILTERS. They only hide cards the page already carries (the producer's accepted ones); without JavaScript every card shows and the buttons stay hidden.
+    const bar = document.querySelector("[data-spark-filters]");
+    const cells = [...document.querySelectorAll("[data-spark-cell]")];
+    const none = document.querySelector("[data-spark-nomatch]");
+    const tests = {
+      all: () => true,
+      events: (c) => c.dataset.hasEvent === "1",
+      none: (c) => c.dataset.hasEvent === "0",
+      picture: (c) => c.dataset.hasPicture === "1",
+    };
+    if (bar && cells.length) {
+      bar.hidden = false;
+      const apply = (key) => {
+        let shown = 0;
+        for (const c of cells) { const ok = (tests[key] ?? tests.all)(c); c.hidden = !ok; if (ok) shown += 1; }
+        if (none) none.hidden = shown > 0;
+        for (const b of bar.querySelectorAll("[data-filter]")) { const on = b.dataset.filter === key; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on ? "true" : "false"); }
+      };
+      bar.addEventListener("click", (ev) => { const b = ev.target.closest?.("[data-filter]"); if (b) apply(b.dataset.filter); });
+    }
+  </script>
+
+  <style>
+    .spk { max-width: 64rem; margin: 0 auto; padding: 0 1rem 2rem; }
+    .spk-head :global(.how) { max-width: 44rem; }
+    .spk-head h1 { margin: 0.2em 0; }
+    .spk-filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
+    .spk-filter { font: inherit; padding: 0.3em 0.9em; border: 1px solid var(--pm-wax, #b4561f); border-radius: 999px; background: transparent; color: inherit; cursor: pointer; }
+    .spk-filter.on { background: var(--pm-wax, #b4561f); color: #fff; font-weight: 700; }
+    .spk-filter:focus-visible { outline: 3px solid var(--pm-wax, #b4561f); outline-offset: 2px; }
+    /* A CARD SITS IN ITS ROW (Darko 15:36 EST: "a card with no picture is taller than its row"): the cells of a row share its height and each card fills its cell
+       exactly (no margin of its own, the grid's gap is the only space), so a card never stands taller than, or past, its row. A pictured card keeps its picture
+       whole and edge to edge in width; any extra height a taller neighbour gives the row is the picture's own dark well, the caption stays at the bottom. */
+    .spk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 1rem; }
+    .spk-cell { display: flex; min-width: 0; }
+    .spk-cell[hidden] { display: none; }
+    .spk-cell > :global(.spark-card) { flex: 1 1 auto; margin: 0; min-width: 0; }
+    .spk-cell > :global(.spark-card.is-image-card) { display: flex; flex-direction: column; align-items: stretch; }
+    .spk-cell > :global(.spark-card.is-image-card .spark-pic) { flex: 1 1 auto; display: flex; align-items: center; background: #11161d; }
+    .spk-cell > :global(.spark-card.is-image-card .spark-pic img) { flex: 0 0 auto; }
+    .spk-partial { margin: 1rem 0; max-width: 46rem; }
+  </style>
+</PostmarkLayout>

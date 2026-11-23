@@ -324,7 +324,9 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
 
       arm(tok);
       let bareEntry;
-      try { bareEntry = await P.callTool("household", {}); }
+      // read_shape "v1" is asked for by name: the tier, `next` and `acts` read below are v1's shape, and the connector's default
+      // moves to v2's glance (CORE-116), which has none of them.
+      try { bareEntry = await P.callTool("household", { read_shape: "v1" }); }
       catch (e) { return doorShut("The town office could not be reached from this page — " + String((e && e.message) || e) + ". Nothing was sent."); }
 
       if (bareEntry.status === 401 || bareEntry.status === 403) {

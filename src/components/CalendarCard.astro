@@ -29,10 +29,13 @@ interface Props {
   roll: Set<string>;
   /** the event page's card: the title is not a link, and the RSVP list shows */
   full?: boolean;
+  /** the approved PAST layout (CORE-121): an ended event does not draw the future-tense "Who is coming" list; the recorded RSVP count stays in the card's
+   *  own metadata row as history, and who was THERE is the page's public-acts section, never RSVP attendance */
+  past?: boolean;
   /** calendar.json's as_of: the instant the "starts in" count was read at */
   asOf?: string | null;
 }
-const { event: e, roll, full = false, asOf = null } = Astro.props;
+const { event: e, roll, full = false, past = false, asOf = null } = Astro.props;
 const place = placeOf(e.place);
 const hostHref = residentHref(e.host, roll);
 const href = eventHref(e.id);
@@ -94,7 +97,7 @@ const times = [
 
   {full && <p class="cal-zone" data-cal-zone-card>{ZONE_FLOOR}</p>}
 
-  {full && (
+  {full && !past && (
     <section class="cal-rsvp-list">
       <h2>Who is coming</h2>
       {rsvpNames.length

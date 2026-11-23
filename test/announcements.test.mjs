@@ -51,7 +51,7 @@ test("the island's read: the office's answer newest first, and null for anything
 });
 
 test("the event page shows the host's announcements, baked and then read live, as text", () => {
-  const page = read("town", "pages", "calendar", "[host]", "[slug].astro");
+  const page = read("town", "pages", "events", "[host]", "[slug].astro");     // CORE-82: the event page lives at /events/<host>/<slug>/
   assert.match(page, /const announcements = newestFirst\(event\.announcements\)/, "baked newest first from calendar.json");
   assert.match(page, /data-announcements data-event=\{event\.id\}/);
   assert.match(page, /fetchAnnouncements\(annBox\.dataset\.event, \{ base: officeBase\(\) \}\)/, "and repainted from the office's one-event read");

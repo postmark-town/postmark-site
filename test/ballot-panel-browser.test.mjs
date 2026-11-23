@@ -10,8 +10,8 @@
 //
 // WHAT IT PROVES that test/ballot-panel.test.mjs (the helper, in node) cannot: the panel is the page's visible panel when the Ballot House
 // is opened; its states (open / none / could not be read) are different sentences on the real page; a changed answer shows without a reload
-// when the panel is opened again; the Ballot House card opens its panel and is not "coming soon"; and the page fits a phone-width view.
-// (Carried to main by POS-1066 from the reviewed #435, the panel only: #435's two "changing soon" chips and their case stay on the train.)
+// when the panel is opened again; the Ballot House card opens its panel and is not "coming soon"; the Bounty Board and the Marketplace
+// wear exactly one "works today · likely to change soon" chip each (POS-1065) and both still open their own panels; and the page fits a phone-width view.
 //
 // BALLOT_PANEL_BASE_URL points it at a running dev server instead of dist-town. WITHOUT dist-town and without a base url the test SKIPS
 // and says so; WITH built pages and no browser it FAILS (so the built-pages job cannot turn a skip into a pass).
@@ -110,7 +110,26 @@ async function openPage(b, base, path, { width, height = 900, box }) {
       S("Fetch.fulfillRequest", { requestId, responseCode: r.status, responseHeaders: [{ name: "content-type", value: r.type ?? "application/json" }, { name: "cache-control", value: "no-store" }], body: Buffer.from(r.body ?? "").toString("base64") }).catch(() => {});
     } else S("Fetch.failRequest", { requestId, errorReason: "BlockedByClient" }).catch(() => {});
   });
-  await S("Page.navigate", { url: base + path });
+  // A DOCUMENT NAVIGATION DESTROYS THE PAGE'S EVALUATION CONTEXT, and a Runtime.evaluate in flight when that happens fails with "Inspected
+  // target navigated or closed" (a CDP answer about the TARGET, not an assertion about the page). So a step that starts a navigation, the
+  // first Page.navigate or a real click on a link, WAITS for the new document to be loaded before anything evaluates in it: `landing()` is
+  // registered BEFORE the step (so the event cannot be missed) and settles with the main frame's new URL when its load event fires.
+  const landing = (ms = 30_000) => new Promise((ok, no) => {
+    let url = null;
+    const done = (fn, v) => { clearTimeout(t); b.listeners.splice(b.listeners.indexOf(l), 1); fn(v); };
+    const l = (m) => {
+      if (m.sessionId !== sessionId) return;
+      if (m.method === "Page.frameNavigated" && !m.params.frame.parentId) url = m.params.frame.url;
+      else if (m.method === "Page.loadEventFired" && url) done(ok, url);
+    };
+    const t = setTimeout(() => done(no, new Error(`the page did not finish loading within ${ms / 1000} s`)), ms);
+    b.listeners.push(l);
+  });
+  const first = landing();
+  first.catch(() => {});                     // if the navigate itself fails, the assertion below is the failure, not this promise's late timeout
+  const nav = await S("Page.navigate", { url: base + path });
+  assert.equal(nav.errorText, undefined, `the page did not open: ${nav.errorText}`);
+  await first;
   const evalJs = async (expression) => {
     const r = await S("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
     if (r.exceptionDetails) throw new Error(`page threw: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
@@ -128,7 +147,14 @@ async function openPage(b, base, path, { width, height = 900, box }) {
     assert.ok(pt.hit, `${selector}'s centre is covered by ${pt.covered} (rect ${pt.rect}, point ${Math.round(pt.x)},${Math.round(pt.y)})`);
     for (const type of ["mousePressed", "mouseReleased"]) await S("Input.dispatchMouseEvent", { type, x: pt.x, y: pt.y, button: "left", clickCount: 1 });
   };
-  return { evalJs, until, click, S, close: () => S("Target.closeTarget", { targetId }).catch(() => {}) };
+  // the same REAL click, for a link that opens another document: resolves with that document's URL once it has loaded
+  const clickToNavigate = async (selector) => {
+    const landed = landing();
+    landed.catch(() => {});                  // a click that never navigates fails below, at `await landed`, not as an unhandled rejection
+    await click(selector);
+    return landed;
+  };
+  return { evalJs, until, click, clickToNavigate, S, close: () => S("Target.closeTarget", { targetId }).catch(() => {}) };
 }
 
 const VOTES = {
@@ -171,7 +197,8 @@ test("the panel draws the OPEN ballots from the office's answer, in the page's v
   assert.ok(!/harbor-lantern|Brass Fox|Pick the harbor lantern/.test(html), "the page's shell holds no tally");
   // the door to the full view is a real, clickable link
   assert.equal(await p.evalJs(`document.querySelector("#ballot-house a.c-door").getAttribute("href")`), "/votes/");
-  await p.click("#ballot-house a.c-door");   // lands on /votes/ (a navigation: the click reached the link)
+  const landedOn = await p.clickToNavigate("#ballot-house a.c-door");   // a real click that opens /votes/ (a document navigation): wait for it to load
+  assert.equal(new URL(landedOn).pathname, "/votes/", `the door opened ${landedOn}`);
   await p.until(`location.pathname === "/votes/"`, "the full view");
   assert.deepEqual(box.asked.filter((a) => !a.startsWith("GET ")), [], "no write was ever made from the page or the door");
   await p.close();
@@ -230,16 +257,28 @@ test("could not be read is a different sentence from none open, for every unread
   }
 });
 
-// POS-1066's carry to main: #435's "changing soon" chips stay on the train, so this case checks the Ballot House card alone
-test("the Ballot House card is not 'coming soon' and opens its panel", { skip: SKIP }, async () => {
+test("the three cards: the Ballot House is not 'coming soon' and opens its panel; the Bounty Board and the Marketplace wear one 'works today · likely to change soon' chip each (POS-1065) and still open theirs, under the same words", { skip: SKIP }, async () => {
   await setup();
   const box = { asked: [], reply: () => json(VOTES) };
   const p = await openPage(browser, base, "/town/", { width: 1280, box });
   await p.until(`document.querySelector(".cq-b[data-lane='votes']") !== null`, "the quarter");
-  const chips = await p.evalJs(`[...document.querySelectorAll(".cq-b")].map((a) => ({ lane: a.getAttribute("data-lane"), chips: [...a.querySelectorAll(".cq-coming")].map((c) => c.className + ":" + c.textContent.trim()) }))`);
+  const chips = await p.evalJs(`[...document.querySelectorAll(".cq-b")].map((a) => ({ lane: a.getAttribute("data-lane"), chips: [...a.querySelectorAll(".cq-coming, .cq-change")].map((c) => c.className + ":" + c.textContent.trim()) }))`);
   const by = Object.fromEntries(chips.map((c) => [c.lane, c.chips]));
   assert.deepEqual(by.votes, [], "the Ballot House card carries no coming-soon chip");
-  for (const [lane, id, panel] of [["votes", "ballot-house", "ballot-house"]]) {
+  const WORDS = "works today · likely to change soon";
+  assert.deepEqual(by.bounties, [`cq-change:${WORDS}`]);
+  assert.deepEqual(by.listings, [`cq-change:${WORDS}`], "the Marketplace card shows it IN PLACE OF 'coming soon' (one chip)");
+  assert.equal(await p.evalJs(`document.querySelectorAll(".cq-coming").length`), 0, "no coming-soon chip is left on any card");
+  assert.equal(await p.evalJs(`document.querySelectorAll(".cq-change").length`), 2, "exactly two chips on the page");
+  // BOTH CLAUSES LEGIBLE: the chip wraps, and neither clause is clipped or runs out of its building's cell
+  const fit = await p.evalJs(`[...document.querySelectorAll(".cq-change")].map((c) => { const cell = c.closest(".cq-b").getBoundingClientRect(), r = c.getBoundingClientRect();
+    return { clipped: c.scrollWidth > c.clientWidth + 1 || c.scrollHeight > c.clientHeight + 1, inside: r.left >= cell.left - 1 && r.right <= cell.right + 1, lines: Math.round(r.height / parseFloat(getComputedStyle(c).lineHeight)) }; })`);
+  for (const f of fit) assert.ok(!f.clipped && f.inside, `a chip is clipped or outside its building: ${JSON.stringify(fit)}`);
+  // the opened panels' headings: the two lanes say the same two clauses (never Coming soon), the others carry no such pill
+  assert.deepEqual(await p.evalJs(`["bounty-board", "marketplace", "ballot-house", "quests"].map((id) => [id, [...document.querySelectorAll("#" + id + " .c-coming-head")].map((e) => e.textContent.trim())])`),
+    [["bounty-board", [WORDS]], ["marketplace", [WORDS]], ["ballot-house", []], ["quests", []]]);
+  // the building's fragment, and the panel it opens (the Bounty Board's building points at #board, a block INSIDE the bounty-board panel, which :has() opens)
+  for (const [lane, id, panel] of [["bounties", "board", "bounty-board"], ["listings", "marketplace", "marketplace"], ["votes", "ballot-house", "ballot-house"]]) {
     await p.evalJs(`(location.hash = "", history.replaceState(null, "", "/town/"), true)`);
     assert.ok(await p.evalJs(`getComputedStyle(document.querySelector(".cq-b[data-lane='${lane}']")).pointerEvents !== "none" && !document.querySelector(".cq-b[data-lane='${lane}']").hasAttribute("aria-disabled")`), `${lane}: the card is not disabled`);
     await p.click(`.cq-b[data-lane='${lane}']`);
@@ -264,5 +303,10 @@ test("a phone-width page: the panel and the cards fit, and no horizontal scroll 
   await p.evalJs(`(location.hash = "", history.replaceState(null, "", "/town/"), true)`);
   const cards = await p.evalJs(`[...document.querySelectorAll(".cq-b")].map((a) => { const r = a.getBoundingClientRect(); return { lane: a.getAttribute("data-lane"), l: r.left, r: r.right }; })`);
   for (const c of cards) assert.ok(c.l >= 0 && c.r <= 390.5, `the ${c.lane} card is on screen: ${JSON.stringify(c)}`);
+  // POS-1065: both clauses of the two chips stay whole at 390 px (wrapped, not clipped, inside their building's cell and the screen)
+  const chips = await p.evalJs(`[...document.querySelectorAll(".cq-change")].map((c) => { const cell = c.closest(".cq-b").getBoundingClientRect(), r = c.getBoundingClientRect();
+    return { text: c.textContent.trim(), clipped: c.scrollWidth > c.clientWidth + 1 || c.scrollHeight > c.clientHeight + 1, inside: r.left >= Math.max(0, cell.left - 1) && r.right <= Math.min(390.5, cell.right + 1) }; })`);
+  assert.equal(chips.length, 2);
+  for (const c of chips) assert.ok(c.text === "works today · likely to change soon" && !c.clipped && c.inside, `a chip is clipped or off screen at 390 px: ${JSON.stringify(chips)}`);
   await p.close();
 });

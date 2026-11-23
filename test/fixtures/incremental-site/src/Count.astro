@@ -1,0 +1,8 @@
+---
+// A component with a HIDDEN READ, switched on by FIXTURE_HIDDEN=1 (the test turns it on to
+// prove a read outside the props is caught): it shows how many threads exist, a fact no
+// route's props carry. Off, it renders nothing, so the ordinary cases are untouched.
+import { allTitles } from "./routes.mjs";
+const show = process.env.FIXTURE_HIDDEN === "1";
+---
+{show && <p class="count">{allTitles().length} threads</p>}

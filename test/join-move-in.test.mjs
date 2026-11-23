@@ -841,6 +841,17 @@ test("required still rides a titled textarea: the door's three required boxes ca
   assert.deepEqual(plain(missing), ["household", "handle", "card"]);
 });
 
+// CORE-116: the bare household read the page's tier, `next` and `acts` come from is v1's shape. The connector's default becomes v2's
+// glance (no top-level tier, next or acts), so the page must ask for v1 by name; this fails if the call goes back to bare.
+test("the page's bare household read asks for read_shape v1 by name, so a v2 default cannot change what it reads", () => {
+  const bare = PAGE.match(/bareEntry = await P\.callTool\("household",\s*(\{[^}]*\})\)/);
+  assert.ok(bare, "the page no longer makes its bare household read through P.callTool(\"household\", {...})");
+  assert.match(bare[1], /read_shape:\s*"v1"/, `the bare read is unshaped, so it follows the connector's default: ${bare[1]}`);
+  assert.doesNotMatch(PAGE, /callTool\("household",\s*\{\s*\}\)/, "no other household call is left unshaped");
+  // the named card reads and the act submit stay as they were
+  assert.match(PAGE, /callTool\("household", \{ read: act \}\)/);
+});
+
 test("the page no longer tells a reader to go find a multiline button", () => {
   assert.doesNotMatch(PAGE, /grow-note|Writing more than a line/, "the sentence the fieldsets made unnecessary is gone");
   assert.match(PAGE, /THE BOXES KNOW THEIR OWN SHAPE NOW/, "and the page says why, where the sentence stood");

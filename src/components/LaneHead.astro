@@ -35,6 +35,7 @@
 //    building (where it labels a picture) and goes from the panel (where the
 //    plaque is already the panel's sentence).
 import { MAX_SLIDES, callLabel, tutorialFor } from "@/lib/civic-tutorial.mjs";
+import { CHANGE_SOON_LABEL } from "@/lib/civic.mjs";
 
 const { lane, plaque, slides = 0 } = Astro.props;
 
@@ -51,7 +52,16 @@ const deck = helps ? tutorialFor(lane.key) : [];
   {/* COMING SOON, in the opened panel as well as on the building — the
       founder's ruling names both surfaces. `LANES[].live` owns the fact; this
       only renders it. */}
-  {!lane.live && <p class="c-coming-head">Coming soon</p>}
+  {/* WORKS TODAY, LIKELY TO CHANGE SOON (POS-1065; Wright, 2026-11-16 05:21:47Z:
+      the Bounty Board and the Marketplace "work today and are likely to change
+      soon. Not paused, not retired, not coming soon") says so over the opened
+      panel too, in the same pill, from `LANES[].changeSoon`; both clauses
+      stay whole (the pill wraps on a narrow screen). It is a LABEL: nothing
+      in the panel is disabled, and `live` still owns whether the lane has a
+      deck and a "?". */}
+  {lane.changeSoon
+    ? <p class="c-coming-head is-change">{CHANGE_SOON_LABEL}</p>
+    : !lane.live && <p class="c-coming-head">Coming soon</p>}
 
   {/* THE PLAQUE, BIG. "The marks that we drafted up should be really big font
       (like the title of that panel)" — and no cite line under it: "Don't
@@ -139,6 +149,9 @@ const deck = helps ? tutorialFor(lane.key) : [];
     border: 1px dashed rgba(232, 196, 139, .45); border-radius: 999px;
     padding: .3em .9em; justify-self: start;
   }
+  /* WORKS TODAY · LIKELY TO CHANGE SOON is two clauses (POS-1065): on a narrow screen it wraps to two lines, so the pill's end is
+     rounded to a corner radius and not a capsule, and neither clause is clipped. */
+  .c-coming-head.is-change { border-radius: .9em; line-height: 1.45; letter-spacing: .12em; }
 
   /* BIG, and the founder's word for it is the spec. It is a quotation, so it is
      set in the serif the town quotes in, and it is capped at 26ch-ish measure

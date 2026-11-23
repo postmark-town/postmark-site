@@ -131,7 +131,10 @@ export const TUTORIALS = {
   bounties: [
     {
       step: "Post the ask",
-      step_note: "at the world door",
+      // WORKS TODAY, LIKELY TO CHANGE SOON (POS-1065; Wright, 2026-11-16 05:21:47Z: "bounties and the Marketplace work today and are
+      // likely to change soon ... Same places, same no-build scope"): the deck says so on its first step and teaches nothing else
+      // differently; every call below is the one it was, because the board works today.
+      step_note: "at the world door · the Bounty Board works today and is likely to change soon",
       // NOT `town do: "post"`, and the difference is the point. That verb takes
       // class "idea" and nothing else today — TOWN_DESCRIPTION says so in the
       // town's own words: "Bounties and listings open here after their

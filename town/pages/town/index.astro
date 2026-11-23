@@ -75,7 +75,7 @@ import { loadWorldState, notices, FIXTURE, BOARD_PLACE, ASK_MAX } from "@/lib/bo
 // import kept "just in case" is how a struck block finds its way back, which
 // this page has now been taught twice (HOLO_LINE was the first).
 import {
-  LANES, DEFAULT_LANE, standing, ideas, questStandings, questCards, questBoardFrom, townDay, marketplace, PAIR_RULE,
+  LANES, DEFAULT_LANE, CHANGE_SOON_LABEL, standing, ideas, questStandings, questCards, questBoardFrom, monthTallies, townDay, marketplace, PAIR_RULE,
   readPen, loadPlaceMarks, plaque, markStakes, stakeOf,
   ideaDashboard, boardDashboard, worldPin,
   BLUEPRINTS_REPO, THINK_TANK_PLACE,
@@ -89,6 +89,7 @@ import houseRegistry from "@/data/postmark/households.json";
 import meeps from "@/data/postmark/meeps.json";
 // POS-1066 A: the Hearth ballot's designs, each to its live preview on its author's own house (the map is the build's; hearth/ballot-links.mjs)
 import { hearthPreviews } from "@/lib/hearth/ballot-previews.mjs";
+import { hearthTitles } from "@/lib/hearth/ballot-titles.mjs";
 import bulletin from "@/data/postmark/bulletin.json";
 import questPosts from "@/data/postmark/quest-posts.json";
 import questRegistry from "@/data/postmark/quest-registry.json"; // POS-954: the town's quest registry, the office board's own source (monthly quests)
@@ -177,10 +178,12 @@ const quests = questStandings(bulletin);
 // /posts?class=quest, baked as quest-posts.json.
 // A quest with an `ends` is offered through that town day (POS-857), the day this build ran in.
 // A MONTHLY quest is drawn from the registry the office's board reads (POS-954): no post need name it (civic.mjs § questBoardFrom).
-const questRows = questCards(quests, questBoardFrom(questPosts, { today: townDay(), registry: questRegistry }));
 // FERRY'S HALL OF FAME (POS-967): this month's top five, from the same view the
 // full board draws, in the town's month (townDay), never the runner's.
 const hallPreview = hallView(loadHall(), { today: townDay(), limit: 5, letterBook: letterAddresses(threads, letters) });
+// BRING A NEIGHBOUR'S CARD SHOWS THE TOWN'S MONTH (POS-885): the Guild is town-wide, so the card says how many neighbours the whole
+// town brought this month (the Hall's month record, the same ledger the board's per-household count reads), not "N of 10".
+const questRows = questCards(quests, questBoardFrom(questPosts, { today: townDay(), registry: questRegistry }), monthTallies(questRegistry, hallPreview));
 const market = marketplace(bulletin);
 
 // THE FIVE PLAQUES, per lane, read from the record. No sentence below is typed
@@ -410,7 +413,23 @@ const switchCss = [
                     founder's ruling of 2026-09-01 and nothing the world can
                     settle. One owner for it, `LANES[].live`, so the badge here
                     and the heading in the panel cannot drift apart. */}
-                {!lane.live && <span class="cq-coming">coming soon</span>}
+                {!lane.live && !lane.changeSoon && <span class="cq-coming">coming soon</span>}
+                {/* WORKS TODAY, LIKELY TO CHANGE SOON (POS-1065; Darko, 2026-11-15
+                    18:52 EST: "it's okay if they are still working, more
+                    important that the town knows that they are subject to change
+                    soon"; Wright, 2026-11-16 05:21:47Z: "bounties and the
+                    Marketplace work today and are likely to change soon. Not
+                    paused, not retired, not coming soon"). A LABEL on the
+                    Bounty Board and the Marketplace, read from
+                    `LANES[].changeSoon` and worded in civic.mjs; BOTH clauses
+                    are the wording, so the chip wraps to two lines instead of
+                    clipping either. On the Marketplace it REPLACES the
+                    coming-soon chip on this card (one chip); `live: false` is
+                    read exactly as before. A different thing from "not standing
+                    yet" above: not the world's answer, only what the lane reads
+                    today. It disables nothing, and the building is still the
+                    same anchor to the same panel. */}
+                {lane.changeSoon && <span class="cq-change">{CHANGE_SOON_LABEL}</span>}
               </a>
             </li>
           );
@@ -566,7 +585,15 @@ const switchCss = [
                       position is invisible to that stripper — so quoting the
                       struck line there turned the removal's own falsifier red
                       about a page that was already correct. */}
-                  {q.done != null && q.of ? (
+                  {/* A MONTHLY QUEST THE WHOLE TOWN COUNTS (POS-885): one town figure in place of the daily board's snapshot. A null is the
+                      honest unavailable, never a zero. */}
+                  {"monthTotal" in q ? (
+                    q.monthTotal != null ? (
+                      <p class="m-barlab"><b>{q.monthTotal}</b> {q.monthTotal === 1 ? "neighbour" : "neighbours"} brought this month <span class="m-dim">· town total</span></p>
+                    ) : (
+                      <p class="m-barlab m-dim">Town count unavailable</p>
+                    )
+                  ) : q.done != null && q.of ? (
                     <div class="m-bar-wrap">
                       <div class="m-bar" role="img" aria-label={`${q.done} of ${q.of} on this board completed this (board snapshot)`}>
                         <i style={`width:${Math.max(2, pct(q.done / q.of))}%`}></i>
@@ -1200,7 +1227,7 @@ const switchCss = [
           opened, and <a href="/votes/">the Ballot Box</a> is the full view: each
           ballot whole, the past ones, and every way to back a design.
         </p>
-        <div class="bp" data-ballot-panel aria-live="polite" aria-busy="true" data-hearth-previews={JSON.stringify(hearthPreviews)}>
+        <div class="bp" data-ballot-panel aria-live="polite" aria-busy="true" data-hearth-previews={JSON.stringify(hearthPreviews)} data-hearth-titles={JSON.stringify(hearthTitles)}>
           <p class="bp-note">Reading the ballot box…</p>
           <noscript><p class="bp-note">The open ballots are read in your browser. With scripts off, <a href="/votes/">the Ballot Box</a> has them.</p></noscript>
         </div>
@@ -1399,10 +1426,12 @@ const switchCss = [
 <script>
   import { mountBallotPanel } from "@/lib/ballot-panel.mjs";
   import { readPreviews } from "@/lib/hearth/ballot-links.mjs";
+  import { readTitles } from "@/lib/hearth/ballot-caption.mjs";
 
   const host = document.querySelector("[data-ballot-panel]");
   // POS-1066 A: the build's Hearth preview map, read back (only its own links survive): a Hearth ballot design links to its live preview
-  mountBallotPanel(host, { previews: readPreviews(host?.getAttribute("data-hearth-previews")) });
+  // CORE-126: and the build's id -> authored title map: a Hearth design reads "<title>, by <household>" (unknown titles keep the raw id)
+  mountBallotPanel(host, { previews: readPreviews(host?.getAttribute("data-hearth-previews")), titles: readTitles(host?.getAttribute("data-hearth-titles")) });
 </script>
 
 <style>
@@ -1685,6 +1714,22 @@ const switchCss = [
   .m-card.is-quest .m-chip {
     border-color: rgba(var(--pm-stamp-rgb), 0.4);
     color: var(--pm-stamp-bright);
+  }
+
+  /* ── WORKS TODAY · LIKELY TO CHANGE SOON, on the building (POS-1065) ───
+     A LABEL, outlined where COMING SOON is filled and "not standing yet" is
+     dashed, so they never read as one badge. It stands in place of COMING SOON
+     on the Marketplace card (Wright, 2026-11-16 05:21:47Z). BOTH clauses must
+     stay readable, so unlike the one-word chips it WRAPS (to two lines, centred,
+     in the building's own width) rather than clip or shrink. It does not dim the
+     building, take the link away or change its hit area: the cell is still an
+     ordinary anchor to the lane's panel. Gold-bright text on the night
+     background, well over 4.5:1. */
+  .cq-change {
+    font-family: var(--pm-mono); font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1.45;
+    text-transform: uppercase; color: var(--pm-gold-bright); text-align: center;
+    border: 1px solid rgba(232, 196, 139, 0.6); border-radius: 0.8em;
+    padding: 0.25em 0.7em; margin-top: 0.3rem; max-width: 100%; white-space: normal;
   }
 
   /* ── COMING SOON, on the building ──────────────────────────────────────

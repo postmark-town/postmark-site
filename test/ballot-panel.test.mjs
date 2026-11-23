@@ -1,20 +1,18 @@
-// ballot-panel.test.mjs — the Ballot House panel on /town/ reads the office's open ballots live (POS-1060).
+// ballot-panel.test.mjs — the Ballot House panel on /town/ reads the office's open ballots live (POS-1060), and the two "works today · likely to change soon" chips (POS-1065's wording, after POS-1060's "changing soon" and the retracted "paused").
 //
 //   node --test test/ballot-panel.test.mjs
 //
 // Darko, 2026-11-15: the Ballot House "to be the main place where you see the ballots ... right now that portion is just kind of a redirect,
 // unlike the quest guild or think tank." Wright's go: the open ballots in the civic panel, read live; /votes/ stays the full view; a real
-// card (no "coming soon").
-//
-// CARRIED TO MAIN BY POS-1066's hotfix (the reviewed #435 at e0662ca9, the panel only): #435's two "changing soon" chips (POS-1065's site
-// half) stay on the train, so their test does too, and the badge law below is main's.
+// card (no "coming soon"); and, from POS-1065's site half, a "changing soon" chip on the Bounty Board and the Marketplace, "a label, not new
+// state".
 //
 // WHAT THIS HOLDS: (1) the answer is sorted the way the office's lifecycle says (open vs past vs unsortable), and an answer that cannot be
 // read is a different sentence from none; (2) every figure and word is the office's, escaped, with an unreadable figure never 0; (3) the
 // mount reads the office's /votes, draws, and a second answer changes it with no rebuild, a slow older answer never puts an old tally back,
 // and a failed refresh never leaves the last tally standing as current; (4) it only reads (no POST, no form); (5) the page's shell holds no
-// tally and keeps the door to /votes/; (6) the Ballot House is live (no "coming soon"). The rendered page is
-// test/ballot-panel-browser.test.mjs.
+// tally and keeps the door to /votes/; (6) the Ballot House is live (no "coming soon") and the two chips are exactly two labels that leave
+// both doors as they were. The rendered page is test/ballot-panel-browser.test.mjs.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -22,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readBallots, panelHtml, mountBallotPanel, stakedOf, OPEN_STATUSES, MAX_DESIGNS } from "../src/lib/ballot-panel.mjs";
-import { LANES } from "../src/lib/civic.mjs";
+import { LANES, CHANGE_SOON_LABEL } from "../src/lib/civic.mjs";
 import { tutorialFor } from "../src/lib/civic-tutorial.mjs";
 
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -249,20 +247,40 @@ test("the Town page's Ballot House shell holds no tally, keeps the door to /vote
   assert.doesNotMatch(panel, /fetch\(|innerHTML/, "the read is the helper's, not inline in the shell");
   const script = page.slice(page.indexOf('import { mountBallotPanel }'));
   // POS-1066 A: the mount is handed the build's Hearth preview map, read back from the panel's own attribute
-  assert.match(script.slice(0, 500), /const host = document\.querySelector\("\[data-ballot-panel\]"\);[\s\S]*mountBallotPanel\(host, \{ previews: readPreviews\(host\?\.getAttribute\("data-hearth-previews"\)\) \}\)/);
+  assert.match(script.slice(0, 900), /const host = document\.querySelector\("\[data-ballot-panel\]"\);[\s\S]*mountBallotPanel\(host, \{ previews: readPreviews\(host\?\.getAttribute\("data-hearth-previews"\)\), titles: readTitles\(host\?\.getAttribute\("data-hearth-titles"\)\) \}\)/);
   assert.ok(!page.includes('addEventListener("hashchange"'), "the page holds no hashchange listener (a founder law: a click's hashchange must not scroll): the helper re-reads on it");
   // the page ships no stake form or sign-in for this panel
   assert.doesNotMatch(read("src/lib/ballot-panel.mjs").replace(/^\s*\/\/.*$/gm, ""), /ballot-stake|mountBallotStake|\bPOST\b|method:|oauth|\btoken\b|\bbody:/i, "the panel's code only reads");
 });
 
-// ── (6) the card ─────────────────────────────────────────────────────────────
+// ── (6) the card and the chips ───────────────────────────────────────────────
 
 test("the Ballot House is live: no 'coming soon' on its building or its panel, and the world's standing stays a separate fact", () => {
   const votes = LANES.find((l) => l.key === "votes");
   assert.equal(votes.live, true);
   assert.deepEqual(tutorialFor("votes").map((s) => s.step), ["Read the ballots", "Back a design", "Or back it by mail"], "the live-lane law's deck, as POS-1054 wrote it");
   const page = read("town/pages/town/index.astro");
-  assert.match(page, /\{!lane\.live && <span class="cq-coming">coming soon<\/span>\}/, "the badge is still read from the flag");
+  assert.match(page, /\{!lane\.live && !lane\.changeSoon && <span class="cq-coming">coming soon<\/span>\}/, "the badge is still read from the flag, for the not-live lanes that do not carry the change-soon label");
   assert.ok(page.includes("not standing yet") && /quarter\.built\[lane\.key\]/.test(page), "'not standing yet' is still the world's answer");
-  assert.equal(LANES.filter((l) => !l.live).map((l) => l.key).join(), "listings", "only the Marketplace is still coming soon");
+  assert.equal(LANES.filter((l) => !l.live).map((l) => l.key).join(), "listings", "only the Marketplace is not live (and it reads works-today-likely-to-change-soon, not coming soon: test/paused-wording.test.mjs)");
+});
+
+test("exactly two chips, 'works today · likely to change soon' (POS-1065), on the Bounty Board and the Marketplace: a label that changes no door", () => {
+  assert.equal(CHANGE_SOON_LABEL, "works today · likely to change soon");
+  assert.deepEqual(LANES.filter((l) => l.changeSoon).map((l) => l.key), ["bounties", "listings"]);
+  // both lanes read exactly as they did: live flags and places untouched (the Marketplace is still not live, the Bounty Board live)
+  const by = Object.fromEntries(LANES.map((l) => [l.key, l]));
+  assert.equal(by.bounties.live, true);
+  assert.equal(by.listings.live, false);
+  assert.equal(by.bounties.id, "board");
+  assert.equal(by.listings.id, "marketplace");
+  const page = read("town/pages/town/index.astro");
+  assert.equal((page.match(/class="cq-change"/g) ?? []).length, 1, "one chip in the card loop, drawn from the flag");
+  assert.match(page, /\{lane\.changeSoon && <span class="cq-change">\{CHANGE_SOON_LABEL\}<\/span>\}/);
+  // the building is the same anchor to the same panel; nothing here disables it
+  assert.match(page, /<a class="cq-b" href=\{`#\$\{LANE_ANCHORS\[lane\.key\]\}`\} data-lane=\{lane\.key\}>/);
+  const css = page.slice(page.indexOf(".cq-change {"), page.indexOf(".cq-change {") + 500);
+  assert.doesNotMatch(css, /pointer-events|opacity|filter|display:\s*none/, "the chip dims and blocks nothing");
+  assert.doesNotMatch(page, /aria-disabled|tabindex="-1"[^>]*cq-b|cq-b[^>]*aria-disabled/, "no building is disabled");
+  assert.doesNotMatch(read("src/lib/civic.mjs"), /\bchangeSoon:[^\n]*(disabled|status|flag)/i, "no state rides the label");
 });

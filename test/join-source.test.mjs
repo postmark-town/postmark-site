@@ -31,7 +31,9 @@ const memoryStore = () => {
 
 test("the tag: only the fixed list, any case; anything else is ignored", () => {
   assert.deepEqual([...FROM_TAGS], ["reddit", "bsky", "x", "discord", "youtube", "substack", "1f3d9", "1f916",
-    "mongoose", "obend", "commons", "delve", "gsb", "harbor"], "the issue's fourteen");
+    "mongoose", "obend", "commons", "delve", "gsb", "harbor", "tiktok"], "the issue's fourteen, and tiktok (POS-1124)");
+  assert.equal(fromFromSearch("?from=TikTok"), "tiktok");
+  assert.equal(fromFromSearch("?from=tik-tok"), null);
   assert.equal(fromFromSearch("?from=reddit"), "reddit");
   assert.equal(fromFromSearch("?invite=wick&from=BSKY"), "bsky");
   for (const bad of ["", "?from=", "?from=hn", "?from=reddit2", "?from=<script>", "?from=ignore-the-rules", "?nope=reddit"])
@@ -43,10 +45,25 @@ test("the tag: only the fixed list, any case; anything else is ignored", () => {
 // repo's CI checks out the other, so each pins the list's digest to the SAME
 // constant: the office's test/arrival-source.test.mjs § A1b asserts this very
 // number. A tag added on one side reds that side until both lists move.
-const FROM_TAGS_DIGEST = "0ddea6f74eb32801";
+// POS-1124 appended `tiktok` (the old fourteen digested to 0ddea6f74eb32801); the office's list is Rivet's half.
+const FROM_TAGS_DIGEST = "f1cf44a8cdd3c165";
 test("the list's digest is the one the office's gate pins (postmark-office test/arrival-source.test.mjs § A1b)", async () => {
   const { createHash } = await import("node:crypto");
   assert.equal(createHash("sha256").update(FROM_TAGS.join(",")).digest("hex").slice(0, 16), FROM_TAGS_DIGEST);
+});
+
+test("the two Shorts doors (POS-1124): /yt/ and /tt/ forward to the front page with their own listed tag, fixed and same-origin", async () => {
+  const { MOVED } = await import("../src/lib/nav.mjs");
+  assert.equal(MOVED["/yt/"], "/?from=youtube");
+  assert.equal(MOVED["/tt/"], "/?from=tiktok");
+  for (const door of ["/yt/", "/tt/"]) {
+    const to = MOVED[door];
+    assert.match(to, /^\/\?from=[a-z0-9]+$/, `${door}: the front page, one tag, no other query, no host, no fragment`);
+    assert.ok(FROM_TAGS.includes(fromFromSearch(to.slice(1))), `${door} carries a tag the keep accepts`);
+  }
+  // the door is built, and forwards with the tag (the built page is checked in CI's build; this reads the route source)
+  const routes = readFileSync(join(ROOT, "src", "lib", "mail-routes.mjs"), "utf8");
+  assert.match(routes, /Object\.entries\(MOVED\)/, "the forwarding pages are built from the MOVED rows");
 });
 
 test("the keep is 30 days, the number the issue rules, and the office pins the same one (postmark-office test/arrival-source.test.mjs § A1c)", () => {
@@ -161,6 +178,7 @@ const READS_THE_RAW_PARAM = [/\.get\(\s*["'`]from["'`]\s*\)/, /[?&\]]from=/];
 const MAY_NAME_IT = new Map([
   ["src/layouts/PostmarkLayout.astro", "keeps the tag from the link: the block the test above runs"],
   ["src/lib/join-source.mjs", "the keep's lib"],
+  ["src/lib/nav.mjs", "the one MOVED table's two Shorts doors, /yt/ and /tt/, whose fixed targets are `/?from=<tag>` (POS-1124; pinned below)"],
   ["tools/pos394-render-proof.mjs", "the render proof copies the layout's closure from git, so its SOURCES list names the lib the layout imports"],
   ["src/data/legal/PRIVACY.md", "the approved privacy policy text (postmark-blueprints PRIVACY.md, shown as it stands, CORE-143) tells readers that links may carry a `?from=tiktok` tag; it is a sentence for people, not a read of the param"],
   ["town/pages/fund/[pot].astro", "a stake form's FormData field named `from` (a resident's handle on a POST), never the URL: checked below"],

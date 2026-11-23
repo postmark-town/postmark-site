@@ -55,6 +55,7 @@ export const SECTION_CARDS = Object.freeze({
   world: BANNER,
   harbor: BANNER,
   mail: BANNER,
+  sparks: BANNER,
   households: BANNER,
   docs: BANNER,
   join: BANNER,

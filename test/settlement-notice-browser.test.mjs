@@ -27,6 +27,9 @@ import http from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as season from "../src/lib/mists-season.mjs";
+
+const SKELETON = season.pinnedSkeleton();
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const DIST = join(ROOT, "dist-town");
@@ -483,9 +486,8 @@ test("the World page: the floating notice is fixed, takes no clicks, and sits un
 // CLEARANCE, measured and not assumed (click-through is not clearance): the notice's box against the boxes of the controls the viewer
 // ACTUALLY draws: the Telling's filter chips, the Time travel opener and body, the by-mail button and its open card, and (app frame)
 // the whole Telling column. Every layout the viewer has is walked: the app frame, the stacked page, and the phone painting.
-// The by-mail controls come from the viewer that carries POS-1006: set SETTLEMENT_NOTICE_WORLD_DIR (see above). Without it (CI, on the
-// package pin) the chips, Time travel and the Telling are still checked, and the by-mail ones are asserted absent so a silent
-// downgrade of this test is named rather than passed.
+// The by-mail controls and the phone bell menu are part of the pinned viewer (POS-1006), so they are REQUIRED: a missing one fails the run.
+// SETTLEMENT_NOTICE_WORLD_DIR (see above) is only a source override for the viewer served, never the switch for what is expected.
 // FOREGROUND, not rectangles: what is painted on top at the centre of each row of the open card. The notice takes no clicks, so it is made to take them for
 // the length of the probe (that is what lets elementFromPoint see it at all) and put back. A row whose topmost element is the notice is masked.
 const FOREGROUND = `(() => {
@@ -516,10 +518,6 @@ for (const [width, height] of [[375, 667], [360, 640], [1024, 600], [844, 390]])
     try {
       await p.until(`(${NOTICE})?.shown === true`, "the notice");
       await new Promise((ok) => setTimeout(ok, 2800));
-      if (!WORLD_DIR) {   // CI on the pinned viewer: there is no by-mail card to look through (a skip would fail built-pages), so say so by asserting its absence
-        assert.equal(await p.evalJs(`document.querySelector(".pm-bymail-btn") === null`), true, "no by-mail button on the pinned viewer: this run did not check the long card (set SETTLEMENT_NOTICE_WORLD_DIR)");
-        return;
-      }
       await p.evalJs(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); true`);
       await p.until(`(() => { const b = document.querySelector(".pm-bymail-btn"); return !!b && !b.hidden; })()`, "the by-mail button");
       await p.evalJs(`document.querySelector(".pm-bymail-btn").click(); true`);
@@ -539,7 +537,7 @@ for (const [width, height] of [[375, 667], [360, 640], [1024, 600], [844, 390]])
 }
 
 // R1 (Wright, 06:46Z): the WORLD notice steps aside while the by-mail card, the search-results list or the bell menu is open, and returns on close. The
-// bell's menu is the viewer's phone control, so it is opened at phone width; the by-mail card needs the S165 viewer (SETTLEMENT_NOTICE_WORLD_DIR).
+// bell's menu is the viewer's phone control, so it is opened at phone width; the by-mail card is the pinned viewer's too, and both are required.
 for (const [width, height, lists] of [[390, 844, ["search", "bell", "bymail"]], [1280, 800, ["search", "bymail"]]]) {
   test(`the World page at ${width}x${height}: DOWN shows, then each open list (${lists.join(", ")}) hides the notice and closing it brings it back`, { skip: SKIP, timeout: 120_000 }, async () => {
     await boot();
@@ -558,8 +556,19 @@ for (const [width, height, lists] of [[390, 844, ["search", "bell", "bymail"]], 
         bell: [`(() => { document.querySelector(".wv-bell").click(); return true; })()`, `(() => { const m = document.querySelector(".wv-bell-menu"); return !!m && !m.hidden; })()`, `(() => { document.querySelector(".wv-bell").click(); return true; })()`],
         bymail: [`(() => { document.querySelector(".pm-bymail-btn").click(); return true; })()`, `(() => { const c = document.querySelector(".wv-bymail"); return !!c && c.classList.contains("pm-bymail-open") && c.getClientRects().length > 0; })()`, `(() => { document.querySelector(".pm-bymail-btn").click(); return true; })()`],
       };
+      // The bell is the MISTS bell: the viewer draws it while the Mists stand at the crossing the page is told, and hides it once they are
+      // withdrawn (WLD-147, from crossing 289). Whether they stand is read from the same inputs the viewer uses: the crossing the rendered
+      // frame prints and the pinned skeleton. No crossing printed is a failure, never "withdrawn".
+      const told = await p.evalJs(`(document.body.textContent.match(/crossing (\\d+) · live/) || [])[1] ?? null`);
+      assert.notEqual(told, null, "the frame prints the crossing it is told");
+      assert.ok(SKELETON?.mists, "the pinned skeleton is readable, so withdrawal is known rather than assumed");
+      const mistsStand = season.siteMists({ crossing: Number(told), skeleton: SKELETON }) !== null;
       for (const list of lists) {
-        if ((list === "bymail" || list === "bell") && !WORLD_DIR) continue;   // the pinned viewer has neither the by-mail card nor the phone bell menu (CI): the search list is still checked
+        if (list === "bell" && !mistsStand) {   // withdrawn: no visible, interactive bell (a retained hidden node is the renderer's contract)
+          const live = await p.evalJs(`(() => { const b = document.querySelector(".wv-bell"); return !!b && !b.hidden && b.getClientRects().length > 0; })()`);
+          assert.equal(live, false, `no visible bell once the Mists are withdrawn (crossing ${told})`);
+          continue;
+        }
         const [open, isOpen, close] = steps[list];
         await p.evalJs(open);
         await p.until(isOpen, `the ${list} list to be open`);
@@ -604,16 +613,15 @@ for (const [width, height] of [[1280, 800], [1920, 1080], [1180, 800], [1024, 80
       await p.until(`document.querySelector(".pm-tt-open") !== null`, "the viewer's Time travel opener");
       await new Promise((ok) => setTimeout(ok, 2800));                 // the viewer's first-visit tour opens on its own; Escape is how a visitor puts it away
       await p.evalJs(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); true`);
-      if (WORLD_DIR) await p.until(`(() => { const b = document.querySelector(".pm-bymail-btn"); return !!b && !b.hidden; })()`, "the by-mail button (the S165 viewer, with invented residents)");
+      await p.until(`(() => { const b = document.querySelector(".pm-bymail-btn"); return !!b && !b.hidden; })()`, "the by-mail button (the pinned viewer carries it, with invented residents)");
       await new Promise((ok) => setTimeout(ok, 500));
       const closed = await p.evalJs(CLEARANCE);
       assert.ok(closed.present.timeTravelButton > 0, "Time travel is drawn, so it is checked");
       if (width > 720) assert.ok(closed.present.chips > 0, "the Telling's filter chips are drawn, so they are checked");
-      if (WORLD_DIR) assert.ok(closed.present.byMailButton > 0, "the by-mail button is drawn, so it is checked");
-      else assert.equal(closed.present.byMailButton, 0, "no by-mail button on the pinned viewer: this run did not check it (set SETTLEMENT_NOTICE_WORLD_DIR)");
+      assert.ok(closed.present.byMailButton > 0, "the by-mail button is drawn, so it is checked");
       assert.deepEqual(closed.hits, [], `the notice ${JSON.stringify(closed.notice)} covers no control`);
       if (width >= 1161) assert.ok(closed.notice.l >= (await p.evalJs(`document.querySelector(".wv-telling").getBoundingClientRect().right`)), "right of the Telling column");
-      if (WORLD_DIR) {
+      {
         await p.evalJs(`document.querySelector(".pm-bymail-btn").click(); true`);
         await p.until(`(() => { const c = document.querySelector(".wv-bymail"); return !!c && c.getClientRects().length > 0; })()`, "the by-mail card to open");
         const open = await p.evalJs(CLEARANCE);

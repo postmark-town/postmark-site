@@ -130,11 +130,28 @@ test("each page with a picture of its own passes it", () => {
     "mail/[thread]/older/[part].astro": "handlesPreview(",
     "mail/with/[pair].astro": "handlesPreview(",
     "mail/with/[pair]/older/[part].astro": "handlesPreview(",
-    "calendar/[host]/[slug].astro": "handlesPreview(",
+    "events/[host]/[slug].astro": "handlesPreview(",     // CORE-82: the event page moved from calendar/[host]/[slug].astro
   };
+  // until 2026-11-17 (POS-1085) the four mail pages picked in their own text; they build their
+  // share card in src/lib/mail-routes.mjs now and the page only hands it on (its prop)
+  const inRoutes = new Set(["mail/[thread].astro", "mail/[thread]/older/[part].astro", "mail/with/[pair].astro", "mail/with/[pair]/older/[part].astro"]);
+  // Each mail page's pick is pinned on its OWN route builder, not on "somewhere in the file": the builder
+  // must make the card from the right handles and put it in that page's props.
+  const routes = read("../src/lib/mail-routes.mjs");
+  const slice = (name) => routes.slice(routes.indexOf(`function ${name}(`)).split(/\n(?:export )?function /)[0];
+  const builderOf = {
+    "mail/[thread].astro": ["threadsBook", "handlesPreview(openerFirst(thread.participants, opener)", "threadPagePaths"],
+    "mail/[thread]/older/[part].astro": ["threadsBook", "handlesPreview(openerFirst(thread.participants, opener)", "threadOlderPagePaths"],
+    "mail/with/[pair].astro": ["pairsBook", "handlesPreview([a, b]", "pairPagePaths"],
+    "mail/with/[pair]/older/[part].astro": ["pairsBook", "handlesPreview([a, b]", "pairOlderPagePaths"],
+  };
+  for (const [page, [book, call, paths]] of Object.entries(builderOf)) {
+    assert.ok(slice(book).includes(call), `${page}: ${book}() does not pick with ${call}`);
+    assert.match(slice(paths), /\bpreview\b/, `${page}: ${paths}() does not put the pick in the page's props`);
+  }
   for (const [page, pick] of Object.entries(pages)) {
     const text = read(`../town/pages/${page}`);
-    assert.ok(text.includes(pick), `${page} picks with ${pick}`);
+    assert.ok((inRoutes.has(page) ? routes : text).includes(pick), `${page} picks with ${pick}`);
     assert.match(text, /image=\{preview\.image\}\s+card=\{preview\.card\}/, `${page} hands the pick to the layout`);
   }
   for (const page of ["fund/index.astro", "fund/[pot].astro"])

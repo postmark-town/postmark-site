@@ -19,14 +19,26 @@ const DURING = at("2026-10-31T12:00:00Z"), AFTER = at("2026-11-01T07:00:00Z"), L
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "").replace(/<!--[\s\S]*?-->/g, "");
 
-test("the pinned world has the Mists at crossing 300 (the control the rest stands on)", () => {
+// The standing control is crossing 288: the last crossing the Mists stand at full on the pinned skeleton (WLD-147 withdrew them from
+// 289, Wright verified S148). 300 is no control any more: the Mists are gone there, and the next test says so.
+const STANDING = 288;
+
+test("the pinned world has the Mists at crossing 288 (the standing control the rest stands on)", () => {
   assert.ok(SKELETON?.mists, "a skeleton with a Mists schedule");
-  assert.ok(season.siteMists({ crossing: 300, skeleton: SKELETON }), "the Mists stand at 300");
+  assert.ok(season.siteMists({ crossing: STANDING, skeleton: SKELETON }), "the Mists stand at 288");
+});
+
+test("the Mists are withdrawn at and from crossing 289 (WLD-147), and the decoration with them", () => {
+  assert.equal(SKELETON.mists.withdrawn_from, 289, "the skeleton names the crossing the Mists are withdrawn from");
+  for (const crossing of [289, 300]) {
+    assert.equal(season.siteMists({ crossing, skeleton: SKELETON }), null, `no Mists at ${crossing}`);
+    assert.equal(season.halloweenMists({ crossing, skeleton: SKELETON, now: DURING }), null, `no decoration at ${crossing}: no Mists, no decoration`);
+  }
 });
 
 test("the gate: decoration while the window is open, none from `until`; the Mists stand either way", () => {
   assert.equal(typeof season.halloweenMists, "function", "the gate exists");
-  const o = { crossing: 300, skeleton: SKELETON };
+  const o = { crossing: STANDING, skeleton: SKELETON };
   assert.ok(season.halloweenMists({ ...o, now: DURING }), "during Halloween the decoration is on");
   assert.equal(season.halloweenMists({ ...o, now: at("2026-11-01T06:59:59Z") }) !== null, true);
   for (const now of [AFTER, LATER]) {
@@ -37,7 +49,7 @@ test("the gate: decoration while the window is open, none from `until`; the Mist
 });
 
 test("after `until`, the creatures and motifs render nothing; during, they do", () => {
-  const o = { crossing: 300, skeleton: SKELETON };
+  const o = { crossing: STANDING, skeleton: SKELETON };
   const render = (now) => {
     const m = season.halloweenMists({ ...o, now });
     return { crows: homeCrowsHTML(m), bat: navBatHTML(m), ...Object.fromEntries(Object.keys(SPOTS).map((k) => [k, motifHTML(k, m)])) };
@@ -87,7 +99,7 @@ test("one clock: no second date in the components or the gate", () => {
 });
 
 test("one decoration, really rendered, through the guard: carries data-pm-hwf (the browser can remove it)", () => {
-  const m = season.halloweenMists({ crossing: 300, skeleton: SKELETON, now: DURING });
+  const m = season.halloweenMists({ crossing: STANDING, skeleton: SKELETON, now: DURING });
   const out = season.hwGuard(motifHTML("world", m));
   assert.ok(/<(style|div|span) data-pm-hwf/.test(out), "a real motif carries the mark on its own tag");
   assert.doesNotMatch(strip(read("src/components/HeroFog.astro")), /data-pm-hwf/, "the fog carries no mark: the guard can never reach it");

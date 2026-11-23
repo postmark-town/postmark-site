@@ -34,7 +34,8 @@ test("the roster rides inside the bar's own row, not as a floating plate", () =>
   // …and paint mounts no second, standalone copy of either plate. The
   // composition is now TWO calls, not three: the roster rides inside drawBar
   // and the standpoint plate rides inside the roster (2026-08-28, below).
-  assert.match(mount, /root\.innerHTML = drawWheel\(\) \+ drawBar\(\);/,
+  // (CORE-82 adds one more plate, the office's note on a say it took: drawSaidNotes, which is not the roster)
+  assert.match(mount, /root\.innerHTML = drawWheel\(\) \+ drawBar\(\) \+ drawSaidNotes\(\);/,
     "paint composes the roster only through drawBar");
   assert.doesNotMatch(mount, /drawWheel\(\) \+ drawRoster\(\) \+ drawBar\(\)/,
     "the old standalone composition is gone");

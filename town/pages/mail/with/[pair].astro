@@ -12,40 +12,34 @@
 // chunks at older/<k>.json from the same build (MailOlder). The calendar, the
 // rail and the facts still cover the whole correspondence; a link to a letter
 // not on the page names the part that holds it.
+//
+// INCREMENTAL (POS-1085): this page reads ONLY its props (src/lib/mail-routes.mjs
+// makes them). The ledger's delivery dates, the letters' markup, the share card,
+// the two residents' page links, the friendship entry and today's date are all
+// props, so the route's key is the hash of everything the page shows. Import no
+// data/postmark JSON, no resident-pages and no clock here:
+// test/incremental-pages.test.mjs fails if one comes back.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import letters from "@/data/postmark/letters.json";
-import threads from "@/data/postmark/threads.json";
-import media from "@/data/postmark/media.json";
-import ledger from "@/data/postmark/ledger.json";
-import friendships from "@/data/postmark/friendships.json";
 import MailLetters from "@/components/MailLetters.astro";
 import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
 import { fmtDate, threadTitle } from "@/lib/pm.mjs";
 import { letterPartHref } from "@/lib/mail.mjs";
-import { pairViews, deliveredOnOf, pairLettersHtml } from "@/lib/mail-letter.mjs";
-import { replyTarget } from "@/lib/mail-reply.mjs";
-import { residentHref } from "@/lib/resident-pages.mjs";
-import residents from "@/data/postmark/residents.json";
-import { handlesPreview, sectionCard } from "@/lib/og-image.mjs";
-
-// git-event legibility (support case, 2026-07-19): the happy path says so in
-// human words — a delivered letter wears its ledger receipt as "✓ delivered".
-const deliveredOn = deliveredOnOf(ledger);
+import { pairPagePaths } from "@/lib/mail-routes.mjs";
 
 // The ONE true letter→thread map lives in pairViews: a letter's own `thread:`
 // field may point mid-chain (the letter it answers), not at the root — 264 of
-// 401 raw refs do. threads.json already followed the chains; trust it.
+// 401 raw refs do. threads.json already followed the chains; trust it. Each row
+// below carries its letter's root thread (`tkey`) and that thread's hue.
 export function getStaticPaths() {
-  return [...pairViews(letters, threads, ledger).values()].map((view) => ({ params: { pair: view.key }, props: { view } }));
+  return pairPagePaths();
 }
 
-const { view } = Astro.props;
-const { a, b, pairLetters, threadOrder, tkeyOf, hueOf } = view;
+const { key, a, b, rows, threadOrder, olderIds, html, preview, links, friendship, friendStart, today } = Astro.props;
+const pairLetters = rows;
+const tkeyOf = (l) => l.tkey;
 
 // the newest part is this page; a letter in an older part is linked there
-const base = `/mail/with/${view.key}/`;
-const shown = view.parts[0];
-const olderIds = view.parts.slice(1).map((part) => part.map((l) => l.id));
+const base = `/mail/with/${key}/`;
 const partOf = new Map();
 olderIds.forEach((ids, i) => ids.forEach((id) => partOf.set(id, i + 2)));
 const hrefOf = (id) => (partOf.has(id) ? letterPartHref(partOf.get(id), base) : "") + `#${id}`;
@@ -53,7 +47,6 @@ const hrefOf = (id) => (partOf.has(id) ? letterPartHref(partOf.get(id), base) : 
 // the plain facts
 const first = pairLetters[0];
 const last = pairLetters[pairLetters.length - 1];
-const today = new Date().toISOString().slice(0, 10);
 const daysKnown = Math.max(1, Math.round((Date.parse(today) - Date.parse(first.date)) / 86400000) + 1);
 const fromA = pairLetters.filter((l) => l.from === a).length;
 const fromB = pairLetters.length - fromA;
@@ -81,11 +74,11 @@ for (let w = start.getTime(); w <= end; w += 7 * dayMs) {
     col.push({
       date,
       count: dl.length,
-      hue: dl.length ? hueOf(tkeyOf(dl[0])) : null,
+      hue: dl.length ? dl[0].hue : null,
       anchor: dl.length ? dl[0].id : null,
       day: dl.map((l) => ({
         from: l.from, title: threadTitle(l.id),
-        thread: threadTitle(tkeyOf(l)), hue: hueOf(tkeyOf(l)),
+        thread: threadTitle(tkeyOf(l)), hue: l.hue,
       })),
     });
   }
@@ -98,7 +91,7 @@ const monthMarks = weeks.map((col, i) => {
 });
 
 const railItems = pairLetters.map((l) => ({
-  id: l.id, date: l.date, from: l.from, title: threadTitle(l.id), hue: hueOf(tkeyOf(l)), tkey: tkeyOf(l),
+  id: l.id, date: l.date, from: l.from, title: threadTitle(l.id), hue: l.hue, tkey: tkeyOf(l),
 }));
 // A reply names the LETTER it answers, never the conversation root (#2876):
 // `thread` at the office is a direct edge, and a root id answers nothing. The
@@ -132,16 +125,12 @@ const composerData = { a, b, lastSender, threads: threadOptions };
 // law is live; a meep or same-roof pair never sees a bar toward an award it can't
 // earn. `fwd`/`rev` are POST-LAW counts (the heatmap above is the whole history),
 // so the note names the law date to keep the two legible.
-const friendActive = friendships && friendships.active;
-const friendPairs = new Map((friendships?.pairs ?? []).map((p) => [`${p.a}|${p.b}`, p]));
-const friendship = friendActive ? friendPairs.get(`${a}|${b}`) : null;
-const showMilestone = !!(friendship && friendship.qualifies);
+const showMilestone = !!friendship; // mail-routes.mjs hands it over only for a qualifying pair
 const achievedRungs = showMilestone ? friendship.rungs.filter((r) => r.achieved) : [];
 const nextRung = showMilestone ? friendship.rungs.find((r) => !r.achieved) : null;
 const pct = (n, t) => Math.max(0, Math.min(100, Math.round((n / t) * 100)));
-// A shared link previews with the first correspondent's face, then the
-// other's, then the Mail's card (POS-616, og-image.mjs).
-const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r])), sectionCard("mail"), { media });
+// The share card (POS-616, og-image.mjs) is a prop too: the first correspondent's
+// face, then the other's, then the Mail's card.
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "letters" }', get: "/api/letters" }}
@@ -157,7 +146,7 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
     </p>
 
     <header class="fr-head">
-      <h1>{residentHref(a) ? <a href={residentHref(a)}>{a}</a> : a} <span class="amp">&amp;</span> {residentHref(b) ? <a href={residentHref(b)}>{b}</a> : b}</h1>
+      <h1>{links.a ? <a href={links.a}>{a}</a> : a} <span class="amp">&amp;</span> {links.b ? <a href={links.b}>{b}</a> : b}</h1>
       <p class="tag">a correspondence, drawn from the town's own record</p>
     </header>
 
@@ -245,7 +234,7 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
               <span class="ms-count">{Math.min(friendship.rev, nextRung.threshold)}/{nextRung.threshold}</span>
             </div>
             <p class="ms-note">
-              Counted forward from {friendships.startDate} — both directions must reach it. Once
+              Counted forward from {friendStart} — both directions must reach it. Once
               per pair, and the pair must span two households.
             </p>
           </div>
@@ -319,11 +308,11 @@ const preview = handlesPreview([a, b], new Map(residents.map((r) => [r.handle, r
       </aside>
 
       <div class="fr-letters">
-        <MailLetters html={pairLettersHtml(view, shown, { media, deliveredOn, hrefOf: residentHref })} base={base} olderIds={olderIds} />
+        <MailLetters html={html} base={base} olderIds={olderIds} />
         <p class="fr-foot">
-          {residentHref(a) && <a class="pm-btn ghost" href={residentHref(a)}>← {a}</a>}
+          {links.a && <a class="pm-btn ghost" href={links.a}>← {a}</a>}
           <a class="pm-btn send wb-off" href={composeHref} data-open-composer>✍ Write back</a>
-          {residentHref(b) && <a class="pm-btn ghost" href={residentHref(b)}>{b} →</a>}
+          {links.b && <a class="pm-btn ghost" href={links.b}>{b} →</a>}
         </p>
       </div>
     </div>

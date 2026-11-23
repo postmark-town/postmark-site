@@ -1,0 +1,95 @@
+---
+// A SPARK — /sparks/<canonical id>/ (CORE-121). The Spark's own page: its card in full, where it came from (the event, the room's circles, the World place, the
+// maker) and the approved, EMPTY "Flares from this spark" place (no flare data exists yet; nothing is faked, WLD-185/POS-509). Built for every accepted Spark the
+// site has been served (sparks.mjs collectSparks), at the producer's own id, each `/`-separated part a path segment. A Spark with no event simply has no Event line.
+import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import PageFreshness from "@/components/PageFreshness.astro";
+import SparkCard from "@/components/SparkCard.astro";
+import calendar from "@/data/postmark/calendar.json";
+import eventsData from "@/data/postmark/events.json";
+import sparksData from "@/data/postmark/sparks.json";
+import residents from "@/data/postmark/residents.json";
+import { CATALOGUE_WORDS, collectSparks, eventOfSpark, sparkParam } from "@/lib/sparks.mjs";
+import { isRoomId, pictureOf, placeOf, residentHref, roomHref, roomIdOf } from "@/lib/calendar.mjs";
+
+export function getStaticPaths() {
+  // the register's Sparks (read as served) and every Spark the event reads carry: an event card always has its page, listed in the register or not
+  return collectSparks(calendar, eventsData, sparksData?.read === "ok" && Array.isArray(sparksData.sparks) ? sparksData.sparks : [])
+    .map((entry) => ({ params: { id: sparkParam(entry.id) }, props: { entry } }))
+    .filter((p) => p.params.id);
+}
+
+const { entry } = Astro.props;
+const s = entry.spark;
+const roll = new Set(residents.map((r) => r.handle));
+const ev = eventOfSpark(entry, calendar, eventsData);
+const seen = entry.seenIn && entry.seenIn !== entry.eventId ? eventOfSpark({ eventId: entry.seenIn }, calendar, eventsData) : null;
+const place = ev || seen ? placeOf((ev ?? seen).event.place) : null;
+const rooms = Array.isArray(s.rooms) ? s.rooms.map(roomIdOf).filter(isRoomId) : [];
+const by = typeof s?.credit?.by === "string" ? s.credit.by : null;
+const makerHref = by ? residentHref(by, roll) : null;
+const pictured = pictureOf(s) !== null;
+const title = typeof s.body === "string" && s.body.trim() ? s.body.trim() : "A Spark";
+---
+<PostmarkLayout
+  door={{ get: "/api/world2/marks?all=true&full=true" }}
+  title={`${title} — Postmark Sparks`}
+  description={typeof s.recounting === "string" && s.recounting.trim() ? s.recounting.trim().slice(0, 200) : "A moment the town kept."}
+  active="sparks"
+>
+  <div class:list={["cal-page", "spk-detail", { "is-pictured": pictured }]} data-spark-detail data-spark-id={entry.id}>
+    <p class="board-back"><a href="/sparks/">← Sparks</a></p>
+
+    <SparkCard spark={s} roll={roll} root link={false} flares={false} />
+
+    <section class="spk-came pm-paper" aria-label="Where it came from" data-spark-came>
+      <h2>Where it came from</h2>
+      <ul>
+        {entry.eventId !== null && (
+          <li data-spark-event>
+            Event:{" "}
+            {ev ? <a href={ev.href}>{ev.event.title}</a> : <span>{entry.eventId}</span>}
+          </li>
+        )}
+        {entry.seenIn && entry.seenIn !== entry.eventId && seen && (
+          <li data-spark-seen>
+            In the gallery of: <a href={seen.href}>{seen.event.title}</a>
+          </li>
+        )}
+        {rooms.length > 0 && (
+          <li data-spark-rooms>
+            The conversation:{" "}
+            {rooms.map((r, i) => <>{i > 0 && ", "}<a href={roomHref(r)}>the circles in {String(r)}</a></>)}
+          </li>
+        )}
+        {place?.href && place.label && (
+          <li data-spark-world>In the World: <a href={place.href}>{place.label}</a></li>
+        )}
+        <li data-spark-maker>
+          Made by:{" "}
+          {by ? (makerHref ? <a href={makerHref}>{by}</a> : <span>{by}</span>) : <span class="soft">not served</span>}
+        </li>
+      </ul>
+    </section>
+
+    <section class="spk-flares pm-paper" aria-label={CATALOGUE_WORDS.flares} data-spark-flares-place>
+      <h2>{CATALOGUE_WORDS.flares}</h2>
+      <p>{CATALOGUE_WORDS.flaresNone}</p>
+    </section>
+
+    <PageFreshness of="the town's Sparks" />
+  </div>
+
+  <style>
+    .spk-detail { max-width: 50rem; margin: 0 auto; padding: 0 1rem 2rem; }
+    /* a pictured Spark's page is the larger, image-first view: the picture takes the room the viewport gives it, the rest stays at a readable measure */
+    .spk-detail.is-pictured { max-width: 72rem; }
+    .spk-detail.is-pictured .spk-came, .spk-detail.is-pictured .spk-flares { max-width: 50rem; }
+    .spk-detail :global(.board-back) { margin: 0.8rem 0; }
+    .spk-came, .spk-flares { padding: 0.9em 1.1em; margin: 0 0 0.9em; }
+    .spk-came h2, .spk-flares h2 { margin: 0 0 0.4em; font-size: 1.05rem; }
+    .spk-came ul { margin: 0; padding-left: 1.2rem; line-height: 1.7; }
+    .spk-flares { border: 1px dashed var(--pm-line); }
+    .spk-flares p { margin: 0; color: var(--pm-ink-soft); }
+  </style>
+</PostmarkLayout>

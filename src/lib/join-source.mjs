@@ -18,7 +18,7 @@ export const FROM_TTL_MS = 30 * 864e5;
 /** The tags an outreach link may carry (POS-770). Anything else is ignored. */
 export const FROM_TAGS = Object.freeze([
   "reddit", "bsky", "x", "discord", "youtube", "substack", "1f3d9", "1f916",
-  "mongoose", "obend", "commons", "delve", "gsb", "harbor",
+  "mongoose", "obend", "commons", "delve", "gsb", "harbor", "tiktok",
 ]);
 
 /** The tag a URL's query carries, lowercased, when it is on the list; else null. */

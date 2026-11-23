@@ -176,6 +176,10 @@ export function hallFromLedger({ mint, entries, asOf }) {
     return people.get(handle);
   };
 
+  // month → how many neighbours were brought and paid (POS-885): the inviter-side Bring a neighbour credits, the same rows the
+  // town's own fold counts (quest-progress.mjs invitesPaidByHouse), taken across every household for the Guild's card.
+  const invitesByMonth = new Map(months.map((m) => [m, 0]));
+
   for (const e of entries) {
     const c = mint.classifyEntry(e.canonical);
     // the row's own day: the classifier's, or for a MINT row it does not name
@@ -206,6 +210,8 @@ export function hallFromLedger({ mint, entries, asOf }) {
     else if (c.kind === "transfer" && c.n > 0 && c.to !== "BURN" && c.to !== "MINT" && !c.to.startsWith("stake:")) { handle = c.to; n = c.n; }
     else continue;
     if (e.sig && burned.has(e.sig)) continue;
+
+    if (c.kind === "invite" && c.side === "inviter") invitesByMonth.set(month, invitesByMonth.get(month) + 1);
 
     const src = sourceOf(c);
     // an unclassified MINT row is labelled by its own `for:` tag, not "unknown"
@@ -250,7 +256,7 @@ export function hallFromLedger({ mint, entries, asOf }) {
     }));
     const holoBoard = all.filter((p) => p.holo > 0).sort((a, b) => b.holo - a.holo || a.handle.localeCompare(b.handle))
       .slice(0, HALL_HOLO_TOP).map((p) => ({ handle: p.handle, ...holoOf(p) }));
-    out.months[month] = { earners: ranked.length, holoRecipients: all.filter((p) => p.holo > 0).length, people, holoBoard };
+    out.months[month] = { earners: ranked.length, holoRecipients: all.filter((p) => p.holo > 0).length, invitesPaid: invitesByMonth.get(month), people, holoBoard };
   }
   return out;
 }
@@ -308,7 +314,7 @@ export function readHall(raw) {
 //   ok           rows
 export function hallView(hall, { today, limit = null, letterBook = null } = {}) {
   const month = monthOfDay(today);
-  const none = () => ({ state: "unavailable", month, monthLabel: monthLabel(month), asOf: hall?.as_of ?? null, rows: [], holoRows: [], earners: 0, holoRecipients: 0 });
+  const none = () => ({ state: "unavailable", month, monthLabel: monthLabel(month), asOf: hall?.as_of ?? null, rows: [], holoRows: [], earners: 0, holoRecipients: 0, invitesPaid: null });
   if (!month || !hall) return none();
   const body = hall.months?.[month];
   if (!body) return none();
@@ -347,6 +353,9 @@ export function hallView(hall, { today, limit = null, letterBook = null } = {}) 
       : [],
     earners: body.earners,
     holoRecipients: body.holoRecipients,
+    // the town's neighbours brought this month (POS-885). An emission from before the field, or a bent value, is no value:
+    // null reads as "unavailable" on the Guild's card, never as a zero it cannot know.
+    invitesPaid: isInt(body.invitesPaid) ? body.invitesPaid : null,
   };
 }
 

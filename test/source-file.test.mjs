@@ -11,10 +11,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { readEntryFile, dirInside, RefusedFile, MAX_ENTRY_FILE_BYTES } from "../tools/lib/source-file.mjs";
 import { syncHearths } from "../tools/sync-hearths.mjs";
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SENTINEL = "FAKE-PROTECTED-SENTINEL-not-a-real-token-4f9c1d";
 const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), "pos959-intake-"));
 const write = (p, c) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, c); };
@@ -60,8 +61,9 @@ test("readEntryFile: a directory, a pipe, an oversize file and a non-plain name 
   const d = scratch();
   fs.mkdirSync(path.join(d, "dir.html"));
   assert.throws(() => readEntryFile(d, "dir.html"), (e) => e instanceof RefusedFile && /not a regular file/.test(e.message));
+  // a pipe is tested only where one was really made: Git for Windows ships an mkfifo that writes a plain file instead
   let fifo = true;
-  try { execFileSync("mkfifo", [path.join(d, "pipe.html")]); } catch { fifo = false; }
+  try { execFileSync("mkfifo", [path.join(d, "pipe.html")]); fifo = fs.lstatSync(path.join(d, "pipe.html")).isFIFO(); } catch { fifo = false; }
   if (fifo) assert.throws(() => readEntryFile(d, "pipe.html"), (e) => e instanceof RefusedFile && /not a regular file/.test(e.message));
   write(path.join(d, "big.html"), "x".repeat(MAX_ENTRY_FILE_BYTES + 1));
   assert.throws(() => readEntryFile(d, "big.html"), (e) => e instanceof RefusedFile && /over the/.test(e.message));

@@ -145,7 +145,9 @@ test("the standings' last column is completions, not stamps: no ✦, a legend, a
 });
 
 test("a quest card with no board count says 'Board count unavailable', and the branch is the one it was", () => {
-  assert.match(card, /\{q\.done != null && q\.of \? \(/, "the card's count-or-nothing branch changed: null must stay distinct from a known zero");
+  // POS-885: this branch is now the second arm of the card's ternary (a monthly quest the town counts, Bring a neighbour,
+  // draws its town total first), so it no longer opens with a brace; the condition and its null-is-not-zero law are the same.
+  assert.match(card, /\) : q\.done != null && q\.of \? \(/, "the card's count-or-nothing branch changed: null must stay distinct from a known zero");
   assert.match(card, /<p class="m-barlab m-dim">Board count unavailable<\/p>/, "the unavailable card lost its words");
   assert.equal(/>\s*uncounted\s*</.test(card), false, "`uncounted` is back on the quest card");
 });

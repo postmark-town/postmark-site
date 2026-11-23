@@ -18,6 +18,7 @@ import {
   pxToWorld, recentVoices, faceImageFor,
   aimField, aimKind, aimTargets, aimable, barFold, combatantBars, consentSplit, dialSpeak, leavingName,
   pointFields, snapPoint, walkStep, weaponFor,
+  REPLY_FIELD, formFieldsOf, replyTargetOf, replyWords, saidNotes, speechHref, takesReply, withReplyTarget,
 } from "./world-cockpit.mjs";
 // The rail's feed — its sentences, its merge rule and its bottom test. All of
 // it pure, so the fight's whole grammar is falsifiable against fixtures without
@@ -405,6 +406,12 @@ export const COCKPIT_CSS = `
    button has to tell a reader how to send it */
 .pmc-chat .keys { flex: 0 0 auto; color: var(--pmc-dim); font: .58rem/1.5 ui-monospace, Consolas, monospace; }
 .pmc-chat .pmc-said { margin: 0; }
+/* the reply target (CORE-82): who is being answered, in words, with a Clear; and the office's note once a say is taken */
+.pmc-chat .pmc-reply { flex: 1 0 100%; display: flex; gap: .6em; align-items: center; margin: 0 0 .35em; font-size: .72rem; color: var(--pmc-dim); }
+.pmc-reply-words { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-style: italic; }
+.pmc-reply-clear { flex: 0 0 auto; font: .62rem/1 ui-monospace, Consolas, monospace; color: var(--pmc-ink); background: transparent; border: 1px solid var(--pmc-line); border-radius: 999px; padding: .35em .8em; cursor: pointer; }
+.pmc-said-note { margin: 0; padding: .5em .8em; font-size: .74rem; line-height: 1.5; color: var(--pmc-ink); }
+.pmc-fl-link, .pmc-fl-reply { margin-left: .5em; font: .62rem/1 ui-monospace, Consolas, monospace; color: var(--amber, #e8c56a); background: transparent; border: 0; padding: 0; cursor: pointer; text-decoration: none; }
 
 /* ── AIMING ──
    RULED 2026-08-29: the act is pressed first, and then what it is aimed at
@@ -866,6 +873,7 @@ export function mountCockpit(o) {
     acting: null,      // handle | HUMAN_ACTOR
     open: null,        // the action whose form is open
     said: null,        // the last thing the door said back
+    replyTo: null,     // { id, handle, said, circle } — the say being answered (CORE-82); the id is the office's, never worked out here
     voices: [],        // recent speech, from the conversations door
     aiming: null,      // { action, kind, field } — armed, waiting for a target
     act: null,         // { action, args, label } — a target taken, waiting for confirm
@@ -2027,8 +2035,8 @@ export function mountCockpit(o) {
     const answered = state.act?.action === action ? Object.keys(state.act.args ?? {}) : [];
     const flowShaped = SELF_DIRECTED.includes(action) || aimKind(c) !== "none" || answered.length > 0;
     const asked = flowShaped
-      ? c.fields.filter((f) => f.required && !answered.includes(f.name) && filled[f.name] == null)
-      : c.fields;
+      ? formFieldsOf(c).filter((f) => f.required && !answered.includes(f.name) && filled[f.name] == null)
+      : formFieldsOf(c);      // the raw reply_to is never a form field: a human never types an id, the chosen target drives it
 
     const inputs = asked.map((f) => {
       const id = `pmc-f-${esc(f.name)}`;
@@ -2309,10 +2317,16 @@ export function mountCockpit(o) {
     // sentence is not lost: the act's card still quotes it whole on hover.
     const prompt = String(f.description ?? f.name).split(/\s*[,—–]\s*/)[0];
     const said = state.said
-      ? `<p class="pmc-said${state.said.ok ? "" : " bad"}">${esc(state.said.text)}</p>`
+      ? `<p class="pmc-said${state.said.ok ? "" : " bad"}">${esc(state.said.text)}${(state.said.notes ?? []).map((n) => `<span class="hint" data-said-note>${esc(n)}</span>`).join("")}</p>`
+      : "";
+    // THE REPLY TARGET (CORE-82): only on an act whose card declares a reply_to, shown in words with a Clear, never as a field to type into.
+    const reply = state.replyTo && takesReply(slot?.card)
+      ? `<p class="pmc-reply" data-reply-target="${esc(state.replyTo.id)}"><span class="pmc-reply-words">${esc(replyWords(state.replyTo))}</span>
+        <button type="button" class="pmc-reply-clear" data-reply-clear aria-label="stop replying to this say">Clear</button></p>`
       : "";
     return `<form class="pmc-plate pmc-chat" data-form="${esc(action)}" data-chat="${esc(f.name)}">
       <span class="who">${esc(action.toUpperCase())} · ${esc(who)}</span>
+      ${reply}
       <input type="text" data-field="${esc(f.name)}" autocomplete="off"
         ${cap ? `maxlength="${cap}"` : ""}
         aria-label="${esc(f.name)}" placeholder="${esc(prompt)}">
@@ -3272,6 +3286,13 @@ export function mountCockpit(o) {
     feedList = doc.createElement("ol");
     feedList.className = "pmc-feed";
     feedList.setAttribute("data-pmc-feed-list", "");
+    // Reply on a spoken line: the office's own id for that say becomes the speaking form's target (setReplyTarget).
+    feedList.addEventListener("click", (ev) => {
+      const btn = ev.target?.closest?.("[data-feed-reply]");
+      if (!btn) return;
+      const e = state.feed.find((x) => x.id === btn.getAttribute("data-feed-reply"));
+      if (e?.say) setReplyTarget({ id: e.say.id, handle: e.who ?? "", said: e.text });
+    });
     host.appendChild(feedList);
     feedNew = doc.createElement("button");
     feedNew.type = "button";
@@ -3406,10 +3427,18 @@ export function mountCockpit(o) {
   function feedLineHtml(e) {
     const tone = ` is-${e.tone ?? "plain"}`;
     if (e.kind === "say") {
+      // A SHORT TRACE THAT LINKS TO ITS CIRCLE (CORE-82): the say's circle when the office served its id, else the room's anchor, else no
+      // link. A line the office numbered can also be answered: Reply hands the office's id to the speaking form (never worked out here).
+      const href = speechHref(e);
+      const canReply = replyTargetOf({ id: e.say?.id }) && Object.values(barSlots(state.answer, { acting: state.acting })).flat().some((s) => takesReply(s.card));
       return `<li class="pmc-fline is-say${e.who ? "" : " is-anon"}">`
         + (e.who ? `<span class="who">${esc(e.who)}</span>` : "")
-        + `<span class="said">${esc(e.text)}</span></li>`;
+        + `<span class="said">${esc(e.text)}</span>`
+        + (href ? `<a class="pmc-fl-link" href="${esc(href)}" target="_blank" rel="noopener" aria-label="open this talk on the conversations page">↗</a>` : "")
+        + (canReply ? `<button type="button" class="pmc-fl-reply" data-feed-reply="${esc(e.id)}" aria-label="reply to this say">reply</button>` : "")
+        + `</li>`;
     }
+    if (e.kind === "note") return `<li class="pmc-fline is-plain" data-said-note>${esc(e.text)}</li>`;
     return `<li class="pmc-fline${tone}">${esc(e.text)}</li>`;
   }
 
@@ -3589,6 +3618,17 @@ export function mountCockpit(o) {
   }
 
   // ── painting ──────────────────────────────────────────────────────────────
+  /**
+   * THE OFFICE'S NOTE ON A SAY IT TOOK ("linked by name", or why a reply has no act number), after the chat line has closed. A chat line closes
+   * on Enter, so the receipt has no form to sit in; the words stand on their own plate until the next thing the reader opens. They are the
+   * office's, as served (saidNotes), and written with esc().
+   */
+  function drawSaidNotes() {
+    const notes = state.said?.ok ? state.said.notes : null;
+    if (!notes?.length || state.open || state.aiming) return "";
+    return `<p class="pmc-plate pmc-said-note" data-said-note>${notes.map((n) => esc(n)).join(" ")}</p>`;
+  }
+
   function paint() {
     resolveActing();
     // the wheel can arrive or end between two paints, and the rail follows it —
@@ -3600,7 +3640,7 @@ export function mountCockpit(o) {
     root.setAttribute("data-space", spaceOf(state.answer));
     // the roster rides inside drawBar's row, and the standpoint plate inside the
     // roster — one row owns the bottom edge and everything hangs off it
-    root.innerHTML = drawWheel() + drawBar();
+    root.innerHTML = drawWheel() + drawBar() + drawSaidNotes();
     // THE BAR MOVES FIRST. Everything below is positioned against the bar's real
     // box, and the bar's own placement lifts it clear of the viewer's bottom-edge
     // furniture — so measuring before that lift put the gate pill straight across
@@ -3618,6 +3658,8 @@ export function mountCockpit(o) {
     // armed act — one question, asked on the map instead of in a box.
     const aim = root.querySelector(".pmc-aim");
     if (aim) placeAbove(aim, root.querySelector(".pmc-bar"));
+    const saidNote = root.querySelector(".pmc-said-note");
+    if (saidNote) placeAbove(saidNote, root.querySelector(".pmc-bar"));
     // The overflow tray opens above its own seat, clamped into the painting the
     // same way the card is — it belongs to that seat and the hand is already there.
     const ctx = root.querySelector(".pmc-tray");
@@ -3666,7 +3708,41 @@ export function mountCockpit(o) {
   }
 
   // ── the wiring ────────────────────────────────────────────────────────────
+  /**
+   * THE SPEAKING FORM TAKES A RESOLVED REPLY TARGET (CORE-82, CORE-70 call 3).
+   *
+   * Handed in by Reply on a feed line, or by the circle reader on the conversations / event pages over `pm:reply-target`
+   * ({ id, handle, said, circle? }). The id is validated as the whole number the office served and nothing else (replyTargetOf); it is
+   * never read out of words and no link is worked out. The chat line of the act whose card declares a `reply_to` opens, saying who is being
+   * answered with a Clear. An act whose card has no such field is left alone.
+   */
+  function setReplyTarget(raw) {
+    const target = replyTargetOf(raw);
+    if (!target || dead) return false;
+    const all = barSlots(state.answer, { acting: state.acting });
+    const slot = [...all.fixed, ...all.tray].find((s) => takesReply(s.card) && s.afforded !== false);
+    if (!slot) return false;
+    state.replyTo = target;
+    state.said = null;
+    if (state.open !== slot.action) { state.act = null; state.open = slot.action; formValues = null; }
+    paint();
+    root.querySelector(".pmc-chat [data-field]")?.focus?.();
+    return true;
+  }
+  function onReplyTargetEvent(ev) { setReplyTarget(ev?.detail); }
+  doc.defaultView?.addEventListener?.("pm:reply-target", onReplyTargetEvent);
+
   function onClick(ev) {
+    // CLEAR: the target goes, the words typed so far stay (the box is not repainted from formValues).
+    const clearBtn = ev.target.closest?.("[data-reply-clear]");
+    if (clearBtn && root.contains(clearBtn)) {
+      state.replyTo = null;
+      const typed = root.querySelector(".pmc-chat [data-field]")?.value ?? "";
+      paint();
+      const box = root.querySelector(".pmc-chat [data-field]");
+      if (box) { box.value = typed; box.focus?.(); }
+      return;
+    }
     // THE TRAY CLOSES THE MOMENT YOU LOOK ELSEWHERE. Handled first, and without
     // returning, so the click it was dismissed by still does whatever it was
     // going to do — a tray should never cost a reader a click.
@@ -3835,7 +3911,8 @@ export function mountCockpit(o) {
     // The typed fields win where both somehow name the same key: a reader who
     // edited the box in front of them meant the thing in the box.
     const aimed = state.act?.action === action ? state.act.args : null;
-    const whole = { ...(aimed ?? {}), ...args };
+    // `reply_to` rides ALONG only when a target was chosen and this act's card declares the field (withReplyTarget): additive, never typed.
+    const whole = withReplyTarget({ ...(aimed ?? {}), ...args }, slotFor(action)?.card, state.replyTo);
     // ── SPEAKING CLOSES ON ENTER (founder, live: there is "a small lag between
     // hitting Enter and the panel going away" that reads as "did that send?") ──
     //
@@ -3948,7 +4025,13 @@ export function mountCockpit(o) {
       // missing was arriving at it.
       const defect = typeof res.body?.defect === "string" && res.body.defect ? res.body.defect : null;
       if (res.ok && !defect) {
-        state.said = { ok: true, text: chat ? "sent." : "done — the door took it." };
+        // THE OFFICE'S OWN WORDS ABOUT THE REPLY LINK ("linked by name", or why there is no act number), exactly as served and never composed
+        // here. They sit under the receipt line, and in the feed too, because a chat line closes its form the moment it is sent.
+        const notes = saidNotes(res.body);
+        state.said = { ok: true, text: chat ? "sent." : "done — the door took it.", notes };
+        for (const n of notes) ingest([{ id: `n:${Date.now()}:${n}`, seq: null, at: Date.now(), kind: "note", tone: "plain", who: null, text: n }]);
+        // a reply is answered once: the target goes with the say that carried it (a refused say keeps it, below)
+        if (REPLY_FIELD in args) state.replyTo = null;
         formValues = null;
         // AN AIMED ACT PUTS ITSELF DOWN once the door has taken it. A swing does
         // not stay armed: the reader chose an act, chose a target, and the act
@@ -4794,6 +4877,7 @@ export function mountCockpit(o) {
     feedList?.remove();
     feedNew?.remove();
     feedList = feedNew = null;
+    doc.defaultView?.removeEventListener?.("pm:reply-target", onReplyTargetEvent);
     root.remove();
     throwLayer.remove();
     tokenLayer?.remove();

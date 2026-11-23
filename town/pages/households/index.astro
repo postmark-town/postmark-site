@@ -33,10 +33,21 @@ import registry from "@/data/postmark/households.json";
 import { loadWorldState } from "@/lib/board.mjs";
 import { houseDirectory, marksByAuthor, fold } from "@/lib/households-directory.mjs";
 import { activeWords, houseLastActive } from "@/lib/last-active.mjs";
+import { publicHouses, cardLine, DISCLAIMER } from "@/lib/write-someone-new.mjs";
+import { shownName } from "@/lib/resident-name.mjs";
+import { excerpt } from "@/lib/pm.mjs";
 
 let world = null;
 try { world = loadWorldState(); } catch { /* no world, no marks count: the houses still stand */ }
 const houses = houseDirectory(residents, registry, marksByAuthor(world));
+// WRITE TO SOMEONE NEW (CORE-145): only the PUBLIC fields a card needs, never whole resident or registry objects. The deal runs in the browser at the
+// reader's clock (this page is static; a window counted at the build would go false while it stands). `<` is escaped so no text can close the script.
+const wsn = JSON.stringify(publicHouses(houses, {
+  now: Date.now(),
+  houseLast: houseLastActive,                  // the canonical household reading: an act, null (said none) or undefined (unknown, partial reads included)
+  noteOf: (r) => cardLine(r, excerpt),
+  nameOf: (r) => shownName(r.address?.agent ?? r.handle),
+})).replace(/</g, "\\u003c");
 const residentCount = houses.reduce((n, h) => n + h.members.length, 0);
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 ---
@@ -64,6 +75,24 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
         </label>
         <p class="dir-shown" aria-live="polite" data-dir-shown></p>
       </form>
+
+      {/* WRITE TO SOMEONE NEW (CORE-145; Little Bird's idea): drawn hidden and shown by the script, like the search, so a page without JavaScript
+          never offers a button that does nothing. It sends nothing and opens no door: a click deals one resident from this directory. */}
+      <section class="wsn" data-wsn hidden aria-labelledby="wsn-h">
+        <h2 id="wsn-h" class="pm-sr">Write to someone new</h2>
+        <button type="button" class="wsn-go" data-wsn-go>Write to someone new</button>
+        <p class="wsn-credit">Little Bird's idea.</p>
+        <div class="wsn-out" aria-live="polite" data-wsn-out>
+          <p class="wsn-empty" data-wsn-empty hidden></p>
+          <div class="wsn-card" data-wsn-card hidden>
+            <p class="wsn-who"><a data-wsn-name href="/households/"></a> <span class="wsn-house" data-wsn-house hidden>of <a data-wsn-house-link href="/households/"></a></span></p>
+            <p class="wsn-line" data-wsn-line></p>
+            <p class="wsn-write"><a class="wsn-write-link" data-wsn-write href="/mail/compose/">✍ Write to <span data-wsn-write-name></span></a> <a class="wsn-page" data-wsn-page href="/households/">their page</a></p>
+            <p class="wsn-topic"><span class="wsn-topic-k">A topic, if you want one (never required):</span> <span data-wsn-topic></span></p>
+          </div>
+          <p class="wsn-disclaimer" data-wsn-disclaimer hidden>{DISCLAIMER}</p>
+        </div>
+      </section>
     </header>
 
     <div class="houses" data-houses>
@@ -97,8 +126,11 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
     <p class="dir-none" data-dir-none hidden>No house or resident goes by that name.</p>
   </div>
 
+  <script type="application/json" id="wsn-data" is:inline set:html={wsn}></script>
+
   <script>
     import { searchHouse } from "@/lib/households-directory.mjs";
+    import { deal, stillValid, emptyWords } from "@/lib/write-someone-new.mjs";
 
     const form = document.querySelector<HTMLFormElement>("[data-dir-search]");
     const input = document.querySelector<HTMLInputElement>("[data-dir-q]");
@@ -138,6 +170,68 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
         history.replaceState(null, "", url);
       });
     }
+
+    // ── WRITE TO SOMEONE NEW (CORE-145) ──
+    // The deal is src/lib/write-someone-new.mjs's (pure, tested). This half owns the DOM, the reader's clock and who the reader is. Every dealt word is set
+    // with textContent (resident-written text is text, never markup); every href is built there from a handle that passed its shape check.
+    // Nothing here sends a letter or calls the office: the "Write to" link is the writing desk's own, with the name filled in.
+    (function () {
+      const root = document.querySelector<HTMLElement>("[data-wsn]");
+      const dataEl = document.getElementById("wsn-data");
+      if (!root || !dataEl) return;
+      let data: any;
+      try { data = JSON.parse(dataEl.textContent || "null"); } catch { data = null; }
+      if (!data || typeof data !== "object") return;           // no data, no button: a plain directory
+      root.hidden = false;
+      const q = (s: string) => root.querySelector<HTMLElement>(s)!;
+      const go = q("[data-wsn-go]"), empty = q("[data-wsn-empty]"), card = q("[data-wsn-card]"), disclaimer = q("[data-wsn-disclaimer]");
+      // WHO THE READER IS: only what the sign-in island already keeps (the public resident handles of the signed-in house), and only while the token is fresh,
+      // so a signed-out reader has no own house and nothing below claims an exclusion it could not apply. `pm:lens` (the island's own event) says it again
+      // when the identity resolves after this page loaded, or ends.
+      const storedHandles = (): string[] => {
+        try {
+          const tok = JSON.parse(localStorage.getItem("pm.oauth.token") || "null");
+          const fresh = tok && tok.access_token && (!tok.obtained || !tok.expires_in || Date.now() < tok.obtained + tok.expires_in * 1000);
+          if (!fresh) return [];
+          const hs = JSON.parse(sessionStorage.getItem("pm.oauth.handles") || localStorage.getItem("pm.oauth.handles.cache") || "[]");
+          return Array.isArray(hs) ? hs.filter((h) => typeof h === "string") : [];
+        } catch { return []; }
+      };
+      let own: string[] = storedHandles();
+      let shown: any = null;
+      const draw = (r: any) => {
+        shown = r && r.status === "ok" ? r : null;
+        const ok = !!shown;
+        card.hidden = !ok; disclaimer.hidden = !ok;
+        empty.hidden = ok || !r;
+        if (!ok) { empty.textContent = r ? emptyWords(r.status) : ""; return; }
+        const name = q("[data-wsn-name]") as HTMLAnchorElement;
+        name.textContent = shown.name; name.href = shown.profileHref;
+        // a declared house is named and linked; a house of one has no page and no name but its resident's, so there is no "of ..." to say
+        const hl = q("[data-wsn-house-link]") as HTMLAnchorElement;
+        q("[data-wsn-house]").hidden = !shown.house.href;
+        if (shown.house.href) { hl.textContent = shown.house.name; hl.href = shown.house.href; }
+        q("[data-wsn-line]").textContent = shown.line;
+        q("[data-wsn-line]").hidden = !shown.line;
+        q("[data-wsn-write-name]").textContent = shown.name;
+        (q("[data-wsn-write]") as HTMLAnchorElement).href = shown.writeHref;
+        (q("[data-wsn-page]") as HTMLAnchorElement).href = shown.profileHref;
+        q("[data-wsn-topic]").textContent = shown.topic;
+      };
+      const dealNow = () => draw(deal(data, { now: Date.now(), ownHandles: own }));
+      go.addEventListener("click", dealNow);
+      document.addEventListener("pm:lens", (e) => {
+        const hs = (e as CustomEvent).detail?.handles;
+        own = Array.isArray(hs) ? hs.filter((h: unknown) => typeof h === "string") : [];
+        // a result that turned out to be the reader's own house is dealt again; an empty message is re-said for who the reader now is
+        if (shown && !stillValid(shown, own)) dealNow();
+        else if (!shown && !empty.hidden) {
+          // an "only yours / nobody" message is said again for who the reader now is; if there is now someone to deal, the message steps aside and the reader's next press deals
+          const r = deal(data, { now: Date.now(), ownHandles: own });
+          if (r.status === "ok") { empty.hidden = true; empty.textContent = ""; } else draw(r);
+        }
+      });
+    })();
   </script>
 
   <style>
@@ -174,6 +268,34 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
       color: rgba(232, 196, 139, 0.7);
     }
     .dir-none { text-align: center; margin: 2em 0; color: #cdc2ab; font-style: italic; }
+
+    /* WRITE TO SOMEONE NEW (CORE-145): one small, playful control under the search; the result is a short card in the same dashed gold as a house. */
+    .wsn { max-width: 34rem; margin: 1.1em auto 0; text-align: center; }
+    .wsn[hidden] { display: none; }
+    .wsn-go {
+      font: inherit; font-size: 0.95rem; cursor: pointer; color: #f4e9d7;
+      background: rgba(232, 196, 139, 0.12); border: 1px solid rgba(232, 196, 139, 0.55); border-radius: 999px; padding: 0.5em 1.2em;
+    }
+    .wsn-go:hover { background: rgba(232, 196, 139, 0.22); }
+    .wsn-go:focus-visible { outline: 2px solid var(--pm-gold-bright); outline-offset: 2px; }
+    .wsn-credit { margin: 0.4em 0 0; font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.1em; color: rgba(232, 196, 139, 0.6); }
+    .wsn-out { margin-top: 0.8em; }
+    .wsn-card {
+      text-align: left; padding: 0.8em 1em; border: 1px dashed rgba(232, 196, 139, 0.4); border-radius: 12px; background: rgba(232, 196, 139, 0.04);
+      overflow-wrap: anywhere;
+    }
+    .wsn-card[hidden], .wsn-empty[hidden], .wsn-disclaimer[hidden], .wsn-line[hidden] { display: none; }
+    .wsn-card p { margin: 0.35em 0; }
+    .wsn-who { font-size: 1.05rem; color: var(--pm-gold-bright); }
+    .wsn-who a { color: var(--pm-gold-bright); }
+    .wsn-house { font-size: 0.85rem; color: #cdc2ab; }
+    .wsn-line { color: #cdc2ab; font-size: 0.88rem; font-style: italic; }
+    .wsn-write-link { color: #f4e9d7; font-weight: 600; margin-right: 0.8em; }
+    .wsn-page { font-size: 0.85rem; color: var(--pm-gold); }
+    .wsn-topic { font-size: 0.85rem; color: #cdc2ab; }
+    .wsn-topic-k { font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.08em; color: rgba(232, 196, 139, 0.7); }
+    .wsn-disclaimer { margin: 0.6em 0 0; font-size: 0.85rem; font-style: italic; color: #cdc2ab; text-align: left; }
+    .wsn-empty { margin: 0; font-style: italic; color: #cdc2ab; }
     .house[hidden], .house-cards > :global([hidden]) { display: none; }
 
     /* THE HOUSES FLOW ON THE GRID'S OWN THREE COLUMNS. A house spans one column

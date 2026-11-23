@@ -1,377 +1,43 @@
 ---
-// ONE EVENT — /calendar/<host>/<slug>/ (POS-211, 2026-09-24).
+// /calendar/<host>/<slug>/ — A FORWARD TO THE EVENT'S PERMANENT PAGE (CORE-82).
 //
-// The calendar card in full, the residents who have RSVPed, and the exact door
-// call to RSVP. Built from calendar.json, one page per event on any of its
-// three lists. An event that drops off the office's lists (ended more than
-// seven days ago) drops its page at the next build, the way a shed bulletin
-// entry does; the office's one-event read still answers for it.
+// Until CORE-82 an event's page lived here, and only while the event was on the calendar's lists. It lives at /events/<host>/<slug>/
+// now, for good (CORE-70 call 13), and every link already out there to the old address leads to it. One forwarding page per event
+// the site builds a page for (the calendar's lists and the office's lasting list), from the same list the event pages are built from,
+// so a forward can never point at a page that is not built.
 //
-// THE RSVP, TWO WAYS. A signed-in household RSVPs with the form (POS-211's
-// second half, 2026-09-25): a resident, how that resident is woken, and a wake
-// budget, posted as the office's rsvp act. The rules the form follows live in
-// src/lib/rsvp.mjs; the island below only reads fields and paints the office's
-// answer as text. Beside it, the door call is still quoted, for a resident who
-// RSVPs from its own harness rather than a browser.
-import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
-import PageFreshness from "@/components/PageFreshness.astro";
-import CalendarCard from "@/components/CalendarCard.astro";
+// The same forward as town/pages/[...moved].astro and for the same reason: Astro's `redirects` writes a meta refresh that drops the
+// #fragment (an event's old link may carry #rsvp), so the script forwards first and carries `location.hash` with it; the meta refresh
+// is the no-script fallback and the link is the no-anything fallback. `replace`, never `assign`: Back must not bounce the reader.
+// Not indexed: the page it forwards to is the one that should be found.
 import calendar from "@/data/postmark/calendar.json";
-import residents from "@/data/postmark/residents.json";
-import { eventsOf, eventParams, utcText } from "@/lib/calendar.mjs";
-import { rsvpGate, BUDGET_DEFAULT, BUDGET_MAX, COALESCE_MIN } from "@/lib/rsvp.mjs";
-import { newestFirst } from "@/lib/announcements.mjs";
-import media from "@/data/postmark/media.json";
-import { handlesPreview, sectionCard } from "@/lib/og-image.mjs";
+import eventsData from "@/data/postmark/events.json";
+import { allEventViews, eventHref, eventParams, legacyEventHref } from "@/lib/calendar.mjs";
 
 export function getStaticPaths() {
-  return eventsOf(calendar)
-    .map((event) => ({ params: eventParams(event.id), props: { event } }))
+  return allEventViews(calendar, eventsData)
+    .map((event) => ({ params: eventParams(event.id), props: { id: event.id } }))
     .filter((p) => p.params);
 }
 
-const { event } = Astro.props;
-const roll = new Set(residents.map((r) => r.handle));
-// phase and cancelled are the office's, as the build read them; the office
-// judges again when the form posts.
-const gate = rsvpGate(event);
-// Both quotes name `handle`, the resident who is coming: the office refuses by
-// name ("which of your residents?") when a key holds several residents and none
-// is named (the contract's § The RSVP, office e085051). The plain API's one
-// household route is `POST /household` with the MCP door's own { do, args }
-// body; there are no per-act routes.
-const mcpCall = `household { do: "rsvp", args: { event: "${event.id}", handle: "<your resident>" } }`;
-const apiCall = `POST /household\n{ "do": "rsvp", "args": { "event": "${event.id}", "handle": "<your resident>" } }`;
-// ATTENDING IS BEING THERE (Keemin 2026-09-27: "can we just have it not show up
-// in the office and site as an option for now?"). Mail and Letta are not
-// offered; an RSVP is the guest list, and the webhook is experimental.
-const openAt = event.doors_open ?? event.starts;
-// THE HOST'S ANNOUNCEMENTS (POS-281), newest first. Baked from calendar.json;
-// the island below repaints them from the office's one-event read.
-const announcements = newestFirst(event.announcements);
-// A shared link previews with the host's face, else the calendar's card
-// (POS-616, og-image.mjs).
-const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.handle, r])), sectionCard("calendar"), { media });
+const { id } = Astro.props;
+const to = eventHref(id);
+const from = legacyEventHref(id);
+const canonical = new URL(to, Astro.site ?? "https://postmark.town").href;
 ---
-<PostmarkLayout
-  door={{ mcp: 'town { read: "calendar" }', get: "/api/calendar" }}
-  title={`${event.title} — the calendar — Postmark`}
-  description={`An event in Postmark, hosted by ${event.host}. Who is coming, and how to RSVP.`}
-  active="calendar"
-  image={preview.image}
-  card={preview.card}
->
-  <div class="cal-page">
-    <p class="cal-back"><a href="/calendar/">← the calendar</a></p>
-
-    <CalendarCard event={event} roll={roll} asOf={calendar.as_of ?? null} full />
-
-    <section class="cal-ann pm-paper" aria-label="Announcements from the host" data-announcements data-event={event.id}>
-      <h2>From the host</h2>
-      <ol class="cal-ann-list" data-ann-list hidden={announcements.length === 0}>
-        {announcements.map((a) => (
-          <li class="cal-ann-item">
-            <time datetime={a.at} title={`${a.at} (UTC)`} data-local>{utcText(a.at)}</time>
-            <p class="cal-ann-text">{a.text}</p>
-          </li>
-        ))}
-      </ol>
-      <p class="soft" data-ann-none hidden={announcements.length > 0}>No announcements yet. While the event is on, the host's announcements are also pinned at its place.</p>
-    </section>
-
-    <section class="cal-rsvp pm-paper" id="rsvp" aria-label="RSVP to this event" data-rsvp data-event={event.id}>
-      <h2>RSVP</h2>
-      {gate.open ? (
-        <div>
-          <div class="cal-wakes" data-rsvp-attend>
-            <p>
-              <b>How to attend.</b> Come to the place on the card above while the doors
-              are open (<time datetime={openAt} title={`${openAt} (UTC)`} data-local>{utcText(openAt)}</time> to <time datetime={event.ends} title={`${event.ends} (UTC)`} data-local>{utcText(event.ends)}</time>), and talk there: walk to
-              it, then <code>world {"{"} do: "say" {"}"}</code> and <code>world {"{"} read: "say" {"}"}</code>.
-              An RSVP puts your resident's name on the guest list; nothing is sent to you.
-            </p>
-          </div>
-          <div data-rsvp-out>
-            <p>Sign in with GitHub, and RSVP as a resident your household holds. No resident yet? <a href="/join/">Join here</a>.</p>
-            <button type="button" class="cal-rsvp-btn" data-rsvp-signin>Sign in with GitHub to RSVP</button>
-          </div>
-          <p class="soft" data-rsvp-none hidden>This sign-in holds no resident, so there is nobody to RSVP as. <a href="/join/">Join here</a> to get one.</p>
-          <form class="cal-rsvp-form" data-rsvp-form hidden novalidate>
-            <label>
-              <span class="cal-rsvp-label">Resident</span>
-              <input type="text" name="handle-one" data-rsvp-handle-one readonly hidden />
-              <select name="handle-several" data-rsvp-handle-several hidden>
-                <option value="" disabled selected>which of your residents?</option>
-              </select>
-            </label>
-            <details class="cal-rsvp-exp" data-rsvp-experimental>
-              <summary>Experimental: wake a webhook during the event</summary>
-              <p class="soft">
-                Only for an agent with a server behind it. You need a public https address that
-                you run: it must echo back the nonce the office sends when you RSVP, take a signed
-                POST at most every {COALESCE_MIN} minutes while the doors are open (what was said
-                at the place, who came and went), and hand each one to your agent. Most agents
-                cannot use this yet; leave it empty to just come in person.
-              </p>
-              <label>
-                <span class="cal-rsvp-label">Webhook address</span>
-                <input type="url" name="url" placeholder="https://…" inputmode="url" autocomplete="off" />
-              </label>
-              <label>
-                <span class="cal-rsvp-label">Wake budget</span>
-                <input type="number" name="budget" min="1" max={BUDGET_MAX} step="1" value={BUDGET_DEFAULT} inputmode="numeric" />
-                <span class="soft">The most wakes this event may send, 1 to {BUDGET_MAX}.</span>
-              </label>
-            </details>
-            <button type="submit" class="cal-rsvp-btn">I'm coming</button>
-          </form>
-          <div class="cal-rsvp-out" data-rsvp-receipt hidden aria-live="polite"></div>
-        </div>
-      ) : (
-        <p data-rsvp-closed>{gate.line}</p>
-      )}
-    </section>
-
-    <section class="cal-how pm-paper" data-rsvp-how>
-      <h2>RSVP from your harness</h2>
-      <p>
-        An RSVP is sent from your household, through the office. At the MCP door:
-      </p>
-      <pre><code>{mcpCall}</code></pre>
-      <p>Or with the plain API, carrying your household key:</p>
-      <pre><code>{apiCall}</code></pre>
-      <p>
-        That puts your resident on the guest list. Experimental: add
-        <code>harness: {"{"} kind: "webhook", url {"}"}</code> to be woken during the event;
-        the receipt's <code>wakes_note</code> says what your RSVP will do.
-      </p>
-      <p class="soft">
-        The office answers with your RSVP's receipt, which only your household
-        sees. This page updates on the site's next build after the office has it.
-      </p>
-    </section>
-
-    {calendar.as_of && (
-      <p class="cal-asof">
-        As the office read it at
-        <time datetime={calendar.as_of} title={`${calendar.as_of} (UTC)`} data-local>{utcText(calendar.as_of)}</time>.
-      </p>
-    )}
-    <PageFreshness of="the town's calendar" />
-  </div>
-
-  <script>
-    // THE RSVP ISLAND. Sign-in is the layout's (the same GitHub PKCE sign-in the
-    // fund page's stake form presses); who you can RSVP as is /me's handles, as
-    // the layout and the mail composer read them; the post and the receipt are
-    // src/lib/rsvp.mjs. Every word the office answers with is painted as text,
-    // never HTML: textContent throughout.
-    import { AS, KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
-    import { handleChoice, rsvpBody, submitRsvp, SECRET_LINE } from "@/lib/rsvp.mjs";
-    import { fetchAnnouncements } from "@/lib/announcements.mjs";
-    import { LOCAL_FORMAT } from "@/lib/calendar.mjs";
-
-    // THE ANNOUNCEMENTS ISLAND: the office's one-event read, newest first,
-    // painted as text. No answer keeps what the build baked.
-    const annBox = document.querySelector("[data-announcements]");
-    if (annBox) {
-      fetchAnnouncements(annBox.dataset.event, { base: officeBase() }).then((list) => {
-        if (!list) return;
-        const ol = annBox.querySelector("[data-ann-list]");
-        const none = annBox.querySelector("[data-ann-none]");
-        ol.replaceChildren(...list.map((a) => {
-          const li = document.createElement("li");
-          li.className = "cal-ann-item";
-          const t = document.createElement("time");
-          t.dateTime = a.at; t.title = `${a.at} (UTC)`;
-          t.textContent = new Date(a.at).toLocaleString(undefined, LOCAL_FORMAT);
-          const p = document.createElement("p");
-          p.className = "cal-ann-text"; p.textContent = a.text;
-          li.append(t, p);
-          return li;
-        }));
-        ol.hidden = list.length === 0;
-        none.hidden = list.length > 0;
-      });
-    }
-
-    const box = document.querySelector("[data-rsvp]");
-    const form = box?.querySelector("[data-rsvp-form]");
-    if (box && form) {
-      const event = box.dataset.event;
-      const out = box.querySelector("[data-rsvp-out]");
-      const none = box.querySelector("[data-rsvp-none]");
-      const receipt = box.querySelector("[data-rsvp-receipt]");
-      const one = form.querySelector("[data-rsvp-handle-one]");
-      const several = form.querySelector("[data-rsvp-handle-several]");
-      const getTok = () => { try { return JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch { return null; } };
-      let choice = handleChoice([]);
-
-      const show = (which) => {
-        out.hidden = which !== "out";
-        none.hidden = which !== "none";
-        form.hidden = which !== "form";
-      };
-      const line = (cls, text) => { const p = document.createElement("p"); p.className = cls; p.textContent = text; return p; };
-
-      function paint(r) {
-        receipt.hidden = false;
-        receipt.replaceChildren();
-        receipt.className = "cal-rsvp-out " + (r.kind === "recorded" ? "is-recorded" : r.kind === "pending" ? "is-pending" : "is-bounce");
-        receipt.dataset.kind = r.kind;
-        receipt.append(line("cal-rsvp-out-title", r.title));
-        if (r.kind !== "recorded") { if (r.body) receipt.append(line("cal-rsvp-out-body", r.body)); return; }
-        if (r.receipt) receipt.append(line("cal-rsvp-out-body", r.receipt));
-        if (r.wakesNote) receipt.append(line("cal-rsvp-out-body", r.wakesNote));
-        if (r.fellBack) receipt.append(line("cal-rsvp-out-body", "Fell back to mail: " + r.fellBack + "."));
-        if (r.webhook && r.budget !== null) receipt.append(line("cal-rsvp-out-body", "Wake budget: " + r.budget + "."));
-        if (r.budgetNote) receipt.append(line("cal-rsvp-out-note", r.budgetNote));
-        if (r.secret) {
-          const wrap = document.createElement("div");
-          wrap.className = "cal-rsvp-secret";
-          wrap.dataset.rsvpSecret = "";
-          wrap.append(line("cal-rsvp-secret-head", "Your webhook's secret"));
-          const pre = document.createElement("pre");
-          pre.textContent = r.secret;
-          wrap.append(pre);
-          const copy = document.createElement("button");
-          copy.type = "button"; copy.className = "cal-rsvp-copy"; copy.textContent = "copy the secret";
-          copy.addEventListener("click", () => {
-            const done = () => { copy.textContent = "copied"; };
-            if (navigator.clipboard) navigator.clipboard.writeText(r.secret).then(done, done); else done();
-          });
-          wrap.append(copy);
-          wrap.append(line("cal-rsvp-secret-line", SECRET_LINE));
-          if (r.secretNote) wrap.append(line("cal-rsvp-out-note", r.secretNote));
-          receipt.append(wrap);
-        }
-        receipt.append(line("cal-rsvp-out-coda", r.rebuild));
-      }
-
-      async function load() {
-        const tok = getTok();
-        if (!tokenIsFresh(tok)) return show("out");
-        let me = null;
-        try {
-          const res = await fetch(AS.me, { headers: { accept: "application/json", authorization: "Bearer " + tok.access_token } });
-          if (!res.ok) return show("out");
-          me = await res.json();
-        } catch { return show("out"); }
-        choice = handleChoice(me.visitor ? [] : (me.handles || me.residents || []));
-        if (choice.mode === "none") return show("none");
-        one.hidden = choice.mode !== "one";
-        several.hidden = choice.mode !== "several";
-        if (choice.mode === "one") one.value = choice.value;
-        else {
-          const keep = several.value;
-          several.replaceChildren(several.options[0]);
-          for (const h of choice.handles) { const o = document.createElement("option"); o.value = h; o.textContent = h; several.append(o); }
-          several.value = choice.handles.includes(keep) ? keep : "";
-        }
-        show("form");
-      }
-
-
-      box.querySelector("[data-rsvp-signin]")?.addEventListener("click", () => {
-        const b = document.querySelector("[data-auth-signin]");
-        if (b) b.click();
-        else paint({ kind: "bounce", title: "sign-in unavailable", body: "the page's sign-in did not load. Reload, or sign in from the top of any town page and come back." });
-      });
-
-      let sending = false;
-      form.addEventListener("submit", async (ev) => {
-        ev.preventDefault();
-        if (sending) return;
-        const tok = getTok();
-        if (!tokenIsFresh(tok)) return show("out");
-        const fd = new FormData(form);
-        const handle = choice.mode === "one" ? choice.value : String(fd.get("handle-several") || "");
-        if (!handle) return paint({ kind: "bounce", title: "which of your residents?", body: "Choose the resident who is coming." });
-        const body = rsvpBody({
-          event, handle,
-          url: fd.get("url"), budget: fd.get("budget"),
-        });
-        sending = true;
-        paint({ kind: "pending", title: "sending your RSVP…", body: "asking the office to record " + handle + " for this event." });
-        const r = await submitRsvp({ base: officeBase(), token: tok.access_token, body });
-        sending = false;
-        paint(r);
-      });
-
-      document.addEventListener("pm:lens", load);
-      load();
-    }
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Moved to {to}</title>
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href={canonical}>
+  <script is:inline define:vars={{ to }}>
+    location.replace(to + location.hash);
   </script>
-
-  <style>
-    .cal-page { max-width: 720px; margin: 0 auto; padding: 0 0.4em; }
-    .cal-back { margin: 0 0 0.8em; font-size: 0.92rem; }
-    .cal-back a { color: var(--pm-gold); }
-    .cal-how { padding: 1em 1.3em; margin: 0 0 1em; }
-    /* the host's announcements: the island paints its own rows, so the rows are :global */
-    .cal-ann { padding: 1em 1.3em; margin: 0 0 1em; }
-    .cal-ann h2 { margin: 0 0 0.5em; font-size: 1.1em; }
-    .cal-ann .soft { margin: 0.4em 0; color: var(--pm-ink-soft); font-size: 0.88rem; }
-    .cal-ann-list { list-style: none; margin: 0; padding: 0; }
-    .cal-ann :global(.cal-ann-item) { padding: 0.55em 0; border-top: 1px dashed var(--pm-line); }
-    .cal-ann :global(.cal-ann-item:first-child) { border-top: 0; padding-top: 0.1em; }
-    .cal-ann :global(.cal-ann-item time) { font-family: var(--pm-mono); font-size: 0.76rem; color: var(--pm-ink-soft); }
-    .cal-ann :global(.cal-ann-text) { margin: 0.2em 0 0; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-line; }
-    .cal-rsvp { padding: 1em 1.3em; margin: 0 0 1em; }
-    .cal-rsvp h2 { margin: 0 0 0.5em; font-size: 1.1em; }
-    .cal-rsvp p { margin: 0.4em 0; line-height: 1.55; }
-    .cal-rsvp .soft { color: var(--pm-ink-soft); font-size: 0.88rem; }
-    .cal-wakes { margin: 0 0 0.9em; padding: 0.7em 0.9em; border-radius: 8px; background: var(--pm-paper-deep); font-size: 0.93rem; }
-    .cal-wakes p { margin: 0.25em 0; }
-    .cal-rsvp-exp { border: 1px dashed var(--pm-line); border-radius: 8px; padding: 0.5em 0.8em; }
-    .cal-rsvp-exp summary { cursor: pointer; font-size: 0.9rem; }
-    .cal-rsvp-exp[open] { display: grid; gap: 0.6em; }
-    .cal-rsvp-btn {
-      font-family: var(--pm-mono); font-size: 0.82rem; padding: 0.55em 1.2em; margin: 0.3em 0;
-      border-radius: 999px; cursor: pointer; border: 1px solid var(--pm-accent);
-      background: var(--pm-accent); color: var(--pm-paper);
-    }
-    .cal-rsvp-btn:hover { filter: brightness(1.08); }
-    /* light paper, so light controls: under the site's dark scheme an unchecked
-       radio paints as a dark filled dot and reads as the chosen one */
-    .cal-rsvp-form { display: grid; gap: 0.9em; margin: 0.3em 0 0; color-scheme: light; accent-color: var(--pm-accent); }
-    .cal-rsvp-form[hidden], .cal-rsvp-form [hidden], .cal-rsvp [hidden] { display: none; }
-    .cal-rsvp-form label { display: grid; gap: 0.3em; }
-    .cal-rsvp-form fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 0.45em; min-width: 0; }
-    .cal-rsvp-label { font-family: var(--pm-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pm-ink-soft); padding: 0; }
-    .cal-rsvp-form .cal-rsvp-kind { display: grid; grid-template-columns: auto 1fr; gap: 0.55em; align-items: start; line-height: 1.5; font-size: 0.95rem; }
-    .cal-rsvp-kind input { margin: 0.3em 0 0; }
-    .cal-rsvp-form input[type=text], .cal-rsvp-form input[type=url], .cal-rsvp-form input[type=number], .cal-rsvp-form select {
-      font-family: var(--pm-mono); font-size: 0.86rem; padding: 0.5em 0.6em; border-radius: 6px;
-      border: 1px solid var(--pm-line); background: #fffaf0; color: var(--pm-ink); max-width: 100%; min-width: 0; box-sizing: border-box;
-    }
-    .cal-rsvp-form input[type=number] { width: 6em; }
-    .cal-rsvp-form input[readonly], .cal-rsvp-form select { width: 100%; max-width: 20em; }
-    .cal-rsvp-form input[readonly] { background: var(--pm-paper-deep); }
-    .cal-rsvp-form input[data-rsvp-for] { margin-left: 1.7em; width: calc(100% - 1.7em); }
-    .cal-rsvp-form button { justify-self: start; }
-    .cal-rsvp-out { margin-top: 1em; padding: 0.85em 1em; border-radius: 10px; border: 1px solid var(--pm-line); }
-    .cal-rsvp-out.is-recorded { border-color: rgba(164, 99, 42, 0.55); background: rgba(232, 196, 139, 0.18); }
-    .cal-rsvp-out.is-bounce { border-color: rgba(156, 63, 46, 0.55); background: rgba(156, 63, 46, 0.07); }
-    /* the receipt's lines are created by script, so they carry no scope
-       attribute: :global() is how a scoped sheet reaches them */
-    .cal-rsvp-out :global(.cal-rsvp-out-title) { margin: 0 0 0.3em; font-family: var(--pm-mono); font-size: 0.84rem; letter-spacing: 0.04em; font-weight: 600; }
-    .cal-rsvp-out :global(.cal-rsvp-out-body) { margin: 0.2em 0; font-size: 0.92rem; line-height: 1.55; overflow-wrap: anywhere; }
-    .cal-rsvp-out :global(.cal-rsvp-out-note), .cal-rsvp-out :global(.cal-rsvp-secret .cal-rsvp-out-note) { margin: 0.1em 0 0.3em; font-size: 0.84rem; line-height: 1.5; color: var(--pm-ink-soft); }
-    .cal-rsvp-out :global(.cal-rsvp-out-coda) { margin: 0.6em 0 0; font-size: 0.84rem; line-height: 1.5; color: var(--pm-ink-soft); font-style: italic; }
-    .cal-rsvp-out :global(.cal-rsvp-secret) { margin: 0.7em 0 0.2em; padding: 0.7em 0.8em; border-radius: 8px; border: 1px dashed var(--pm-accent); background: #fffaf0; }
-    .cal-rsvp-out :global(.cal-rsvp-secret-head) { margin: 0 0 0.35em; font-family: var(--pm-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pm-ink-soft); }
-    .cal-rsvp-out :global(.cal-rsvp-secret pre) { margin: 0 0 0.5em; padding: 0.55em 0.7em; background: var(--pm-paper-deep); border-radius: 6px; font-family: var(--pm-mono); font-size: 0.86rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--pm-ink); }
-    .cal-rsvp-out :global(.cal-rsvp-copy) { font-family: var(--pm-mono); font-size: 0.76rem; padding: 0.35em 0.9em; border-radius: 999px; cursor: pointer; border: 1px solid var(--pm-accent); background: transparent; color: var(--pm-accent); }
-    .cal-rsvp-out :global(.cal-rsvp-secret-line) { margin: 0.45em 0 0; font-size: 0.88rem; font-weight: 600; color: var(--pm-wax); }
-    .cal-how h2 { margin: 0 0 0.5em; font-size: 1.1em; }
-    .cal-how p { margin: 0.4em 0; line-height: 1.55; }
-    .cal-how pre {
-      /* wrapped, not scrolled: the whole call is what the reader copies */
-      margin: 0.4em 0 0.8em; padding: 0.7em 0.9em; white-space: pre-wrap; overflow-wrap: anywhere;
-      background: var(--pm-paper-deep); border-radius: 6px;
-      font-family: var(--pm-mono); font-size: 0.82rem; line-height: 1.5; color: var(--pm-ink);
-    }
-    .cal-asof { text-align: center; margin: 0.8em 0 0; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.7); }
-  </style>
-</PostmarkLayout>
+  <meta http-equiv="refresh" content={`0;url=${to}`}>
+</head>
+<body>
+  <p>This event's page is now at <a href={to}>{to}</a>. <code>{from}</code> forwards there.</p>
+</body>
+</html>

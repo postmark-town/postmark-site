@@ -380,6 +380,24 @@ const html = rawHtml.replace(/<head>/i,
         s.bottom = "auto"; s.left = "10px"; s.right = "10px";
         s.alignItems = "flex-end";
       }
+      publishChrome();
+    }
+
+    // CORE-54 (Darko 2026-11-20, "1. Buttons cover titles"): on a phone this page's floating buttons (the folded Postmark pill, this Time-travel bar) ride
+    // over the top of the viewer's full-height column, which began its title under them. The host says where its floating chrome ends, as --wv-chrome-bottom
+    // (px from the top of the screen), and the World's column keeps its sticky nav at least that tall, so the title starts below the buttons. Measured here,
+    // where the pill and the bar are placed, with a few px of air; removed again off a phone (a rail: nothing floats over the column, the World is unchanged).
+    function publishChrome() {
+      var root = document.documentElement;
+      var nav = document.querySelector(".wv-nav");
+      if (!panel || (nav && nav.getClientRects().length)) { root.style.removeProperty("--wv-chrome-bottom"); return; }
+      var low = 0;
+      ["#pm-world-auth [data-wa-menu]", ".pm-tt-bar"].forEach(function (sel) {
+        var el = document.querySelector(sel);
+        if (el && el.getClientRects().length) low = Math.max(low, el.getBoundingClientRect().bottom);
+      });
+      if (low) root.style.setProperty("--wv-chrome-bottom", Math.ceil(low + 8) + "px");
+      else root.style.removeProperty("--wv-chrome-bottom");
     }
 
     function build() {
@@ -665,6 +683,13 @@ const html = rawHtml.replace(/<head>/i,
   .pm-tt-back.is-go { background: transparent; color: #f0d5a8; font-weight: 400; }
   .pm-tt-fine { margin: 0.8em 0 0; font-size: 0.62rem; line-height: 1.5; color: rgba(185, 173, 147, 0.85); }
   .pm-tt-fine a { color: rgba(232, 196, 139, 0.9); }
+  /* CORE-54 (Darko 2026-11-20, "4. Small targets"): on a phone or a touch screen the earlier/later arrows are 44 px and the "replay page" link, 11 px
+     tall in its sentence, gets a 44 px press target without moving a word (a transparent extension, no layout). */
+  @media (max-width: 720px), (pointer: coarse) {
+    .pm-tt-arrow { width: 2.75rem; height: 2.75rem; }
+    .pm-tt-fine a { position: relative; }
+    .pm-tt-fine a::after { content: ""; position: absolute; inset: -17px -8px; }
+  }
   /* Position itself is set by place() against the rail and the site cluster as
      they actually measure — see the note there. What stays here is only what is
      true at every position: on a narrow screen the body spans the width it is

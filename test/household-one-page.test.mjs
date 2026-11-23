@@ -233,7 +233,7 @@ test("PIN the household page's one ballot host: the stake form comes only throug
   // /votes/ keeps its own form, as POS-1054 left it
   const votes = read("town/pages/votes/index.astro");
   assert.match(votes, /import \{ mountBallotStake \} from "@\/lib\/ballot-stake\.mjs";/, "the form is /votes/'s");
-  assert.match(votes, /mountBallotStake\(slot, \{ topic: t\.topic, choices: t\.raw \}\)/, "mounted under each STAKING ballot");
+  assert.match(votes, /mountBallotStake\(slot, \{ topic: t\.topic, choices: t\.raw, captions: captionsOf\(titles, t\.topic, t\.raw\) \}\)/, "mounted under each STAKING ballot");
   assert.match(votes, /if \(kind === "staking"\) \{\s*var slot = mountedSlots\[t\.topic\];\s*if \(!slot\) \{\s*slot = el\("div", "v-stake"\);/, "once per topic, kept across board refreshes (POS-1054 lifecycle fix)");
 });
 
