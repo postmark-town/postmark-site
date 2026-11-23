@@ -101,6 +101,58 @@ test("a broken record places nothing wrongly and never hangs: a reply to a later
   for (const none of [undefined, null, "not a list", 5, {}]) assert.deepEqual(roomShape(none).tops, [], "no lines: an empty room, no throw");
 });
 
+// ── WHO OF A HOUSEHOLD CAN HEAR A CONVERSATION (CORE-161): the page's own HEAR block, run over invented positions ──
+//
+// Darko, 2026-11-22 20:10–20:14 EST: "How do we know which resident is actually near enough to even be able to reply?" · "fake reply buttons that lead
+// nowhere". The office's rule (office src/circles.mjs resolveReplyTo): "`roomVoices` is the room the speaker is speaking into … a say outside it is
+// refused, never linked"; and the room is the OPEN conversation with a line within earshot of where the speaker stands, or aboard with them (office
+// src/voices.mjs openConversationAt). The house's human is stood beside a resident the office picks (office src/world.mjs humanStand).
+const hearSrc = between("// HEAR:BEGIN", "// HEAR:END");
+const { canHear, hearersOf } = new Function(`${hearSrc}\nreturn { canHear: canHear, hearersOf: hearersOf };`)();
+const at = (x, y, over = {}) => ({ handle: "someone", x, y, source: "walk", moving: false, standing: "resident", ...over });
+const room = (over = {}) => ({ id: "t1-room", live: true, aboard: false, voices: [{ handle: "pica", said: "a", x: 100, y: 100, id: 1 }, { handle: "seth", said: "b", x: 400, y: 100, id: 2, reply_to: 1 }], ...over });
+
+test("a resident can hear a LIVE conversation when they stand within earshot of ONE of its lines, as the office judges it; never a quiet one, and never when the world has not placed them", () => {
+  const EARSHOT = 60;
+  // LAW (office src/circles.mjs): "a say outside it is refused, never linked"
+  assert.equal(canHear(at(100, 160), room(), EARSHOT), true, "60 m from a line: within earshot");
+  assert.equal(canHear(at(100, 163), room(), EARSHOT), false, "63 m from every line: \"a say outside it is refused, never linked\", so no Reply is offered");
+  assert.equal(canHear(at(100, 161), room(), EARSHOT), true, "a line's point is served rounded to the metre, so one metre of slack is allowed (and it is NOT a wide margin: 63 m is out)");
+  assert.equal(canHear(at(430, 130), room(), EARSHOT), true, "near the SECOND line only (300 m from the first): any one line is enough, as the office chains a room");
+  assert.equal(canHear(at(250, 100), room(), EARSHOT), false, "between two lines and near neither (150 m from each): not within the room's box, within earshot of a line");
+  assert.equal(canHear(at(100, 130), room(), 20), false, "the earshot is the office's number, not a constant: at 20 m this resident, 30 m off, is out");
+  assert.equal(canHear(at(100, 100), room({ live: false }), EARSHOT), false, "a conversation that has gone quiet takes no reply, however near (the office's room is the OPEN one)");
+  assert.equal(canHear(at(100, 100, { source: "origin", placeholder: true }), room(), EARSHOT), false, "a resident the world has not placed stands nowhere");
+  for (const nowhere of [null, undefined, {}, { x: "a", y: 1 }]) assert.equal(canHear(nowhere, room(), EARSHOT), false);
+  // aboard: the deck is the place
+  assert.equal(canHear(at(9000, 9000, { aboard: true }), room({ aboard: true }), EARSHOT), true, "aboard, and the conversation is aboard: one deck, wherever the vessel is");
+  assert.equal(canHear(at(9000, 9000, { aboard: true }), room(), EARSHOT), false, "aboard, and the conversation is ashore and far");
+  // a room longer than its read: its earlier lines' points are not here, so inside its whole ground plus earshot it MAY be heard
+  const long = room({ voices_earlier: { remaining: 40 }, extent: { x0: 0, y0: 0, x1: 1000, y1: 200 } });
+  assert.equal(canHear(at(800, 150), long, EARSHOT), true, "a long room: inside its ground, near no line this read holds: offered, not wrongly denied");
+  assert.equal(canHear(at(1100, 150), long, EARSHOT), false, "a long room: outside its ground by more than earshot: no line of it can be near");
+  assert.equal(canHear(at(800, 150), room({ extent: { x0: 0, y0: 0, x1: 1000, y1: 200 } }), EARSHOT), false, "a room the read holds WHOLE is judged by its lines alone, never its box");
+});
+
+test("the household: each resident by where they stand; the house's human only where the office's own pick cannot miss", () => {
+  const house = { handles: ["ada", "ben", "cy"] };
+  const A = room();
+  const where = { ada: at(100, 100), ben: at(5000, 0), cy: at(110, 100) };
+  assert.deepEqual(hearersOf(A, house, where, 60), { residents: ["ada", "cy"], human: false }, "ada and cy stand in it; the human is NOT offered, since the office may stand them beside ben");
+  assert.deepEqual(hearersOf(A, house, { ...where, ben: at(120, 90) }, 60), { residents: ["ada", "ben", "cy"], human: true }, "every placed housemate hears it: whoever the office picks, the human's reply lands");
+  assert.deepEqual(hearersOf(A, house, { ada: at(100, 100), cy: at(110, 100) }, 60), { residents: ["ada", "cy"], human: true }, "a housemate the world has not placed is never the office's pick while another is placed");
+  assert.deepEqual(hearersOf(A, house, { ada: at(100, 100), ben: at(5000, 0, { placeholder: true }), cy: at(110, 100) }, 60), { residents: ["ada", "cy"], human: true });
+  // the office's first rung: a housemate ABOARD a vessel is chosen before any ashore (the first such, in the house's own order)
+  const deck = room({ aboard: true });
+  assert.deepEqual(hearersOf(deck, house, { ada: at(100, 100), ben: at(7000, 7000, { aboard: true }), cy: at(7000, 7000, { aboard: true }) }, 60), { residents: ["ada", "ben", "cy"], human: true }, "the human stands with ben, who is aboard and hears the deck");
+  assert.deepEqual(hearersOf(A, house, { ada: at(100, 100), ben: at(7000, 7000, { aboard: true }), cy: at(110, 100) }, 60), { residents: ["ada", "cy"], human: false }, "the human would be stood aboard with ben, who cannot hear this room ashore");
+  // nobody signed in, nowhere known, nobody placed, a quiet room: nothing is offered
+  assert.deepEqual(hearersOf(A, null, where, 60), { residents: [], human: false });
+  assert.deepEqual(hearersOf(A, house, null, 60), { residents: [], human: false });
+  assert.deepEqual(hearersOf(A, house, {}, 60), { residents: [], human: false }, "nobody placed: no resident, and no human");
+  assert.deepEqual(hearersOf(room({ live: false }), house, where, 60), { residents: [], human: false });
+});
+
 // ── labelled TEXT PINS (the weakest instrument: they read the page's source, not its behaviour; the behaviour is the browser file's "B ·" tests) ──
 
 test("text pins: a message's words are never clamped or cut; the room's drawing asks the office nothing; the per-card reader mount is gone", () => {
@@ -110,7 +162,9 @@ test("text pins: a message's words are never clamped or cut; the room's drawing 
   assert.match(drawSrc, /el\("span", "c-said", v\.said\)/, "the whole of what was said goes on the page");
   const code = (s) => s.split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
   assert.ok(code(drawSrc).length > 2000 && code(drawSrc).length < drawSrc.length, "control: the strip took comments and left code");
-  assert.equal(/\bfetch\s*\(|XMLHttpRequest/.test(code(drawSrc)), false, "drawing, opening and folding a room make no request of their own");
+  // (until CORE-161 this block held no request at all; it now holds exactly ONE, the read of where the household's residents stand, and never the conversations door)
+  assert.deepEqual(code(drawSrc).match(/\bfetch\s*\([^,)]*/g), ["fetch(WALKERS"], "the room's drawing holds one request: where the household's residents stand");
+  assert.equal(/XMLHttpRequest|fetch\s*\(\s*API|[?&](room|circle)=/.test(code(drawSrc)), false, "drawing, opening, folding and replying never ask the conversations door for a room or a circle");
   assert.equal((code(drawSrc).match(/ensureReader\(/g) ?? []).length, 1, "the World's reader is reached from ONE place in the room's drawing: the long room's 'earlier' press");
   for (const gone of [["wire", "Readers"], ["Intersection", "Observer"], ["fill", "Voices"], ["show", "Flat"]]) {
     assert.equal(page.includes(gone.join("")), false, `${gone.join("")} is gone (every card mounted the reader with it until CORE-156)`);
