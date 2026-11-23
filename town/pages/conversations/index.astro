@@ -2682,7 +2682,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     .convo .c-mine-here { margin: 0.55em 0 0; font-size: 0.82rem; line-height: 1.6; color: #e8dfc9; display: flex; flex-wrap: wrap; align-items: center; gap: 0.3em 0.5em; }
     .convo .c-mine-here.is-none { display: block; font-size: 0.78rem; color: rgba(185, 173, 147, 0.95); font-style: italic; }
     /* CORE-161: the reply box, directly under the message it answers */
-    .convo .c-reply-wrap { list-style: none; min-width: 0; }
+    /* brought into view with a little air under it: its bottom edge is never flush against the pane or the screen (showAnswer, openReply) */
+    .convo .c-reply-wrap { list-style: none; min-width: 0; scroll-margin-bottom: 1rem; }
     .convo .c-reply {
       margin: 0.2em 0 0.4em; padding: 0.75rem 0.85rem; background: rgba(13, 20, 38, 0.75);
       border: 1px solid rgba(232, 196, 139, 0.45); border-radius: 12px;
