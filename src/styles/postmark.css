@@ -174,6 +174,9 @@
 @media (hover: hover) and (pointer: fine) {
   .pm .pm-rail-seat:hover:not([data-shut]) > .pm-rail-pages { display: block; }
 }
+/* the same, wherever the script has seen a real mouse move over the rail (rail-pages-ui.mjs sets data-mouse; a touch clears it): a device
+   whose media report says no hover (a headless browser, a touch laptop) still shows the list to the mouse it is actually using */
+.pm .pm-townnav-links[data-mouse] .pm-rail-seat:hover:not([data-shut]) > .pm-rail-pages { display: block; }
 .pm .pm-townnav-links .pm-rail-pages a {
   display: flex; align-items: baseline; gap: 0.5em;
   padding: 0.5em 0.7em; border-radius: 6px; white-space: normal;

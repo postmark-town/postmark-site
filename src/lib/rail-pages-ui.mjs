@@ -1,8 +1,8 @@
 // rail-pages-ui.mjs — a main-rail seat's page list, opened and closed (CORE-164). The pages themselves are rail-pages.mjs's; the markup is
 // PostmarkLayout.astro's (`.pm-rail-seat`: the seat's link, `[data-rail-more]`, `[data-rail-pages]`).
 //
-// HOW IT OPENS. Pointing at a seat shows its list: that is the stylesheet's (`:hover`, only where the device can hover), so it needs no
-// script and closes the moment the pointer leaves the seat and its list (the list hangs from the seat with no gap between them, so the
+// HOW IT OPENS. Pointing at a seat shows its list: that is the stylesheet's (`:hover`, where the device reports it can hover, or once this
+// script has seen a real mouse move over the rail), so it needs no script on a desktop and closes the moment the pointer leaves the seat and its list (the list hangs from the seat with no gap between them, so the
 // pointer can travel into it). For a keyboard and a touch screen there is the seat's small button: Enter, Space or a tap opens the list
 // and says so (aria-expanded), and it stays open while the reader is using it.
 // HOW IT CLOSES. The button again; Escape anywhere in the seat (focus goes back to the button, and a list shown by pointing stays shut
@@ -67,7 +67,11 @@ export function mountRailPages(nav, { doc = globalThis.document } = {}) {
     seat.addEventListener("mouseleave", () => { delete seat.dataset.shut; });
   }
   doc.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "touch") delete nav.dataset.mouse;  // a touch's sticky hover must not hold a list open
     for (const s of seats) if ("open" in s.dataset && !s.contains(e.target)) close(s);
   });
+  // POINTING SHOWS THE LIST where the device reports hover (the stylesheet's media query), and also wherever a real mouse is seen moving
+  // over the rail: a device whose media report says otherwise (a headless browser, a touch laptop with a mouse) is still pointed at
+  nav.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") nav.dataset.mouse = ""; });
   return { open, close, seats };
 }

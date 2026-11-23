@@ -151,6 +151,19 @@ test("focus leaving the seat, or a press outside it, shuts the list; focus movin
   assert.ok(!("open" in w.s.dataset), "a press anywhere else shuts it");
 });
 
+test("a real mouse moving over the rail lets pointing show a list; a touch takes that away, so a tap's sticky hover holds nothing open", () => {
+  const { doc, nav } = fakeDom();
+  mountRailPages(nav, { doc });
+  nav.fire("pointermove", { pointerType: "touch" });
+  assert.ok(!("mouse" in nav.dataset), "a finger dragging is not a mouse");
+  nav.fire("pointermove", { pointerType: "mouse" });
+  assert.ok("mouse" in nav.dataset);
+  doc.fire("pointerdown", { pointerType: "mouse", target: nav });
+  assert.ok("mouse" in nav.dataset, "a click keeps it");
+  doc.fire("pointerdown", { pointerType: "touch", target: nav });
+  assert.ok(!("mouse" in nav.dataset), "a touch clears it");
+});
+
 test("an open list is placed inside the window: its shift is written where the stylesheet reads it", () => {
   const { doc, nav, seats: [w] } = fakeDom();
   mountRailPages(nav, { doc });
@@ -175,6 +188,8 @@ test("PIN the layout draws a list only where a seat has pages, its button hidden
   assert.match(layout, /import \{ mountRailPages \} from "@\/lib\/rail-pages-ui\.mjs";\s*mountRailPages\(document\.querySelector\("\.pm-townnav-links"\)\);/);
   const css = read("src/styles/postmark.css");
   assert.match(css, /\.pm \.pm-rail-pages \{\s*display: none; position: absolute; top: 100%;/, "shut and out of the tab order by default, hung from the seat with no gap");
-  assert.match(css, /@media \(hover: hover\) and \(pointer: fine\) \{\s*\.pm \.pm-rail-seat:hover:not\(\[data-shut\]\) > \.pm-rail-pages \{ display: block; \}\s*\}/, "pointing shows it only where the device can hover");
+  assert.match(css, /@media \(hover: hover\) and \(pointer: fine\) \{\s*\.pm \.pm-rail-seat:hover:not\(\[data-shut\]\) > \.pm-rail-pages \{ display: block; \}\s*\}/, "pointing shows it where the device reports hover");
+  assert.match(css, /\.pm \.pm-townnav-links\[data-mouse\] \.pm-rail-seat:hover:not\(\[data-shut\]\) > \.pm-rail-pages \{ display: block; \}/, "and where the script has seen a real mouse");
+  assert.equal((css.match(/\.pm-rail-seat:hover/g) ?? []).length, 2, "and nowhere else: no bare hover rule a tap could hold open");
   assert.match(css, /transform: translateX\(var\(--pm-rail-shift, 0px\)\);/, "the script's shift is what moves it");
 });

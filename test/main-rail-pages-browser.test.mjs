@@ -156,7 +156,7 @@ async function openPage(b, base, path, { width, height = 900, touch = false, noS
 
 const SEAT = (key) => `.pm-townnav-links a[data-rail-top][href="/${key === "town" ? "bulletin" : key}/"]`;
 const LIST = (key) => `#pm-rail-pages-${key}`;
-const BTN = (key) => `.pm-rail-seat:has(> a${SEAT(key).replace(".pm-townnav-links ", "")}) > [data-rail-more]`;
+const BTN = (key) => `.pm-rail-seat:has(> ${SEAT(key).replace(".pm-townnav-links ", "")}) > [data-rail-more]`;
 const SHOWN = (key) => `(() => { const l = document.querySelector(${JSON.stringify(LIST(key))}); return !!l && getComputedStyle(l).display !== "none" && l.getClientRects().length > 0; })()`;
 const ANY_SHOWN = `[...document.querySelectorAll(".pm-rail-pages")].filter((l) => getComputedStyle(l).display !== "none").map((l) => l.id)`;
 const FOCUS = `(() => { const a = document.activeElement; return a ? (a.matches("[data-rail-more]") ? "button:" + a.getAttribute("aria-controls") : (a.textContent || "").trim().replace(/\\s*beta$/, "")) : null; })()`;
@@ -257,13 +257,13 @@ test("on a phone (touch, no hover) a tap on the button opens the list inside the
   await p.close();
 });
 
-test("every list fits the window at 1440 and at 390; the rail still counts its six seats in at most two rows; nothing scrolls sideways", { skip: SKIP }, async () => {
+test("every list fits the window at 1440 and at 390; the rail still counts every seat, and only the seats, in at most two rows; nothing scrolls sideways", { skip: SKIP }, async () => {
   await setup();
   for (const [width, height, touch] of [[1440, 900, false], [390, 844, true]]) {
     const p = await openPage(browser, base, "/docs/", { width, height, touch });
     await p.until(`!document.querySelector(${JSON.stringify(BTN("world"))}).hidden`, "the script");
     const seats = await p.evalJs(`(() => { const tops = [...document.querySelectorAll(".pm-townnav-links [data-rail-top]")].map((a) => Math.round(a.getBoundingClientRect().top)); return { n: tops.length, rows: new Set(tops).size }; })()`);
-    assert.equal(seats.n, 6, `${width}: the nav's six seats`);
+    assert.equal(seats.n, RAIL.filter((s) => !s.lantern).length, `${width}: the nav's seats, every one, and no list's link among them`);
     if (width === 1440) assert.ok(seats.rows <= 2, `${width}: the seats sit in ${seats.rows} rows`);
     for (const key of ["town", "world", "docs"]) {
       await p.evalJs(`document.querySelector(${JSON.stringify(BTN(key))}).click(), true`);
@@ -276,13 +276,14 @@ test("every list fits the window at 1440 and at 390; the rail still counts its s
   }
 });
 
-test("with JavaScript off the seats are plain links, with no button, and pointing at a seat still shows its list", { skip: SKIP }, async () => {
+// (Without the script, pointing shows a list only where the device's media report says it can hover. This headless browser reports no
+// hover and no fine pointer, and CDP cannot emulate those two features, so that half is held by the stylesheet pin in the node test.)
+test("with JavaScript off the seats are plain links to their own pages, with no button, and every list is shut", { skip: SKIP }, async () => {
   await setup();
   const p = await openPage(browser, base, "/docs/", { width: 1440, noScript: true });
   assert.equal(await p.evalJs(`[...document.querySelectorAll("[data-rail-more]")].every((b) => b.hidden && getComputedStyle(b).display === "none")`), true, "no button without the script");
   assert.deepEqual(await p.evalJs(`[...document.querySelectorAll(".pm-townnav-links [data-rail-top]")].map((a) => a.getAttribute("href"))`),
     RAIL.filter((s) => !s.lantern).map((s) => s.href), "every seat is its own plain link");
-  await p.pointAt(SEAT("world"));
-  await p.until(SHOWN("world"), "the list, by pointing alone");
+  assert.deepEqual(await p.evalJs(ANY_SHOWN), [], "and no list covers the page");
   await p.close();
 });
