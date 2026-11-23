@@ -613,10 +613,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       var whereOwed = false;                 // an ask stood down while the list was failing: made once, by the next answered poll
       var whereStamp = 0;
       var earshotM = 60;                     // the office's own number, taken from each list answer (`earshot_m`); 60 until the first one
-      function askWhere() {
+      // `answered`: the caller is the list's own answered poll (the poller counts that answer as a success only after its paint, so its `fails` is
+      // still the old count there): the office IS answering, and an owed ask is made on that first good answer, not a poll later.
+      function askWhere(answered) {
         if (!house) return Promise.resolve(false);
         if (whereAsk) return whereAsk;                                   // one ask at a time
-        if (poller.state().fails) {                                      // the office is not answering: this page is not asking it for more
+        if (!answered && poller.state().fails) {                         // the office is not answering: this page is not asking it for more
           whereOwed = true;
           if (whereState === "none") { whereState = "waiting"; showMine(); }
           return Promise.resolve(false);
@@ -873,7 +875,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var signin = el("button", "c-say-btn ghost", "Sign in ↗");
         signin.type = "button"; signin.setAttribute("data-rb-signin", ""); signin.setAttribute("data-key", "rb-signin");
         signin.hidden = true;
-        signin.addEventListener("click", function () { var pill = document.querySelector("[data-auth-signin]"); if (pill) pill.click(); });
+        // signing in leaves the page (a full redirect), so the words are kept across it first (keepAcrossSignIn) and put back on return
+        signin.addEventListener("click", function () { keepAcrossSignIn(); var pill = document.querySelector("[data-auth-signin]"); if (pill) pill.click(); });
         [send, cancel, signin, count, status].forEach(function (n) { actions.appendChild(n); });
         var bounce = el("p", "c-say-bounce"); bounce.setAttribute("data-rb-bounce", ""); bounce.setAttribute("role", "status"); bounce.hidden = true;
         var heard = el("p", "c-say-heard"); heard.setAttribute("data-rb-heard", ""); heard.setAttribute("role", "status"); heard.hidden = true;
@@ -926,7 +929,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         // nobody of the house can hear it any more (someone walked on while the box was open): said kindly, the draft kept
         var gone = !options.length;
         if (gone) { rb.note.textContent = "None of your residents is within earshot of this conversation any more, so a reply from here would not be heard. Your words are kept in this box."; rb.note.hidden = false; }
-        else if (rb.note.getAttribute("data-why") !== "walked") { rb.note.hidden = true; rb.note.textContent = ""; }
+        else if (!rb.note.hasAttribute("data-why")) { rb.note.hidden = true; rb.note.textContent = ""; }      // a note with a reason of its own (walked, restored) stays
         if (gone) rb.note.removeAttribute("data-why");
       }
       // WHO THE HUMAN WILL STAND BESIDE: shown only while "yourself" is the chosen voice. One housemate can hear: said in words. More than one:
@@ -976,8 +979,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // it). The words go to the box at the top of the page, with one line saying so: they are not sent, and from there they would be a new line
       // of talk, not a reply. If the top box already holds words of its own, the draft stays in the reply box instead (it is one node, and it
       // comes back with the next Reply pressed), and the line says that.
-      function keepDraft() {
+      function keepDraft(why) {
         if (!rb || !rb.text.value.trim()) return;
+        var lead = why || "The message you were replying to is no longer on this page";
         var form = document.querySelector("[data-say-form]"), top = document.querySelector("[data-say-text]");
         if (!form || !top) return;
         var line = form.querySelector("[data-say-moved]");
@@ -995,9 +999,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           top.value = rb.text.value;
           rb.text.value = "";
           top.dispatchEvent(new Event("input", { bubbles: true }));       // the box's own count follows
-          line.textContent = "The message you were replying to is no longer on this page, so your reply was moved here. It has not been sent, and from this box it would be a new line of talk, not a reply.";
+          line.textContent = lead + ", so your reply was moved here. It has not been sent, and from this box it would be a new line of talk, not a reply.";
         } else {
-          line.textContent = "The message you were replying to is no longer on this page. Your reply is kept: it will be in the reply box the next time you press Reply.";
+          line.textContent = lead + ". Your reply is kept: it will be in the reply box the next time you press Reply.";
         }
         line.hidden = false;
         // THE READER IS BROUGHT TO IT: the box they were typing in has just gone from under them, and the top box is usually off screen (and, in a
@@ -1012,7 +1016,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         if (rb.el.parentNode) rb.el.parentNode.removeChild(rb.el);
         rb.card = null; rb.id = null; rb.key = null;
         rb.lapsed = false; rb.signin.hidden = true;
-        if (clear) rb.text.value = "";
+        if (clear) { rb.text.value = ""; dropKept(); }                    // Cancel: nothing is kept, on the page or across a sign-in
         // the keyboard goes back to the Reply button it came from
         var list = card ? card.querySelector(".c-voices") : null;
         if (clear && list && key) focusKeyed(list, "reply-" + key);
@@ -1021,7 +1025,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         if (!rb || !rb.card || rb.busy) return;
         var say = window.__pmSay || null, text = (rb.text.value || "").trim(), as = rb.as.value;
         rb.heard.hidden = true;
-        if (!text) { rb.bounce.textContent = "Nothing to say yet: write a line first."; rb.bounce.hidden = false; return; }
+        if (rb.note.getAttribute("data-why") === "restored") { rb.note.hidden = true; rb.note.textContent = ""; rb.note.removeAttribute("data-why"); }
+        if (!text) { rb.bounce.textContent = "Nothing to say yet: write a line first."; rb.bounce.hidden = false; showAnswer(); return; }
         if (!say || typeof say.speak !== "function" || !as) return;
         // reply_to is exactly the id the office served on that line
         // the human's say names the housemate they stand beside (`with:`), one who can hear this conversation: the office does not pick
@@ -1070,7 +1075,71 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           rb.bounce.textContent = "The office didn't answer, so nothing was said. Check your connection and try again.";
           rb.bounce.hidden = false;
         };
-        try { Promise.resolve(say.speak(payload)).then(done, function () { done(null); }); } catch (e) { done(null); }
+        // whatever the office answered (heard, refused, nothing), the answer is brought into view when it arrives
+        var answered = function (res) { done(res); showAnswer(); };
+        try { Promise.resolve(say.speak(payload)).then(answered, function () { answered(null); }); } catch (e) { answered(null); }
+      }
+      // THE OFFICE'S ANSWER IS BROUGHT INTO VIEW WHEN IT ARRIVES: the whole box, its bottom edge included. The answer is a new line at the box's
+      // foot, so a box that sat at the pane's foot (or the screen's) grew past it and the answer was cut by the edge. The nearest scroll that shows
+      // the whole box, in the pane and in the window; a box already whole in view does not move.
+      function showAnswer() {
+        if (!rb || !rb.el.parentNode || !rb.el.scrollIntoView) return;
+        rb.el.scrollIntoView({ block: "nearest" });
+      }
+      // THE WORDS ARE KEPT ACROSS A SIGN-IN. Signing in is a full redirect away from this page and back, so the lapsed box's "Sign in" first puts
+      // the draft, and which message it answers, in this tab's sessionStorage. When the page comes back with the SAME household signed in, the
+      // reply box is opened under that message again with the words in it, and the kept copy is cleared. If that message cannot be answered from
+      // the page any more, the words go to the top box with a line saying so. Nothing is kept by Cancel, nothing outlives 30 minutes, and a
+      // return that is not signed in (the sign-in was abandoned) clears it.
+      var DRAFT_KEY = "pm.convo.reply-draft", DRAFT_MAX_MS = 30 * 60 * 1000;
+      var lastHouseKey = null;                // the household last seen signed in on this page (the lapse has already forgotten `house`)
+      var keptTried = false;                  // the kept draft is looked for once per page load
+      function dropKept() { try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) { /* no storage: nothing was kept */ } }
+      function readKept() {
+        try {
+          var d = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null");
+          return d && typeof d.text === "string" && d.text.trim() && Date.now() - Number(d.at) < DRAFT_MAX_MS ? d : null;
+        } catch (e) { return null; }
+      }
+      function keepAcrossSignIn() {
+        if (!rb || !rb.card || !rb.text.value.trim()) return;
+        try {
+          sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ thread: rb.card.getAttribute("data-thread"), id: rb.id, as: rb.as.value, text: rb.text.value, house: lastHouseKey, at: Date.now() }));
+        } catch (e) { /* no storage: the words stay in the box for as long as this page does */ }
+      }
+      // is a sign-in held in this browser at all (the header's own token, fresh)? A return without one means the sign-in was abandoned
+      function signInHeld() {
+        try {
+          var t = JSON.parse(localStorage.getItem("pm.oauth.token") || "null");
+          return !!t && !!t.access_token && (!isFinite(t.obtained) || !isFinite(t.expires_in) || Number(t.obtained) + Number(t.expires_in) * 1000 > Date.now());
+        } catch (e) { return false; }
+      }
+      // called whenever the page has worked out anew who can hear what (showMine): it acts once, when a household is signed in, the list has
+      // answered and where the residents stand is settled either way
+      function restoreKept() {
+        if (keptTried || !house || !listAnswered || (whereState !== "known" && whereState !== "failed")) return;
+        keptTried = true;
+        var d = readKept();
+        dropKept();
+        if (!d || d.house !== house.handles.join(" ")) return;          // nothing kept, too old, or another household's: not shown to this one
+        var box = replyBox();
+        if (box.card || box.text.value) return;                          // they have already begun another reply here
+        var card = null;
+        Array.prototype.forEach.call(liveBox.querySelectorAll(".c-thread"), function (c) { if (c.getAttribute("data-thread") === d.thread) card = c; });
+        var node = card && card.__room && card.__room.shape ? card.__room.shape.byId[String(d.id)] : null;
+        if (node && replyAs(card).length) {
+          openReply(card, node);
+          box.text.value = d.text;
+          if (d.as && Array.prototype.some.call(box.as.options, function (o) { return o.value === d.as; })) { box.as.value = d.as; fillBeside(); }
+          replyCount();
+          box.note.textContent = "You are signed in again, and your reply is back where you left it. It has not been sent.";
+          box.note.setAttribute("data-why", "restored");
+          box.note.hidden = false;
+          showAnswer();
+          return;
+        }
+        box.text.value = d.text;
+        keepDraft("You are signed in again, but the message you were replying to can't be answered from this page now");
       }
       // THE SIGN-IN RAN OUT WHILE A REPLY WAS BEING WRITTEN. The box stays, with its words: it says the sign-in has lapsed and that nothing was said,
       // and offers Sign in (the header's own, never a second flow). Nothing can be sent from it until the page hears a household is signed in again.
@@ -1083,6 +1152,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         rb.bounce.textContent = "Your sign-in has lapsed, so nothing was said. Your words are still in this box.";
         rb.bounce.hidden = false;
         rb.signin.hidden = false;
+        showAnswer();
       }
       // REPLY-BOX:END
 
@@ -1124,8 +1194,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         line.appendChild(el("span", "c-mine-label", hear.residents.length === 1 ? "Your resident here:" : "Your residents here:"));
         hear.residents.forEach(function (h) { line.appendChild(document.createTextNode(" ")); line.appendChild(personNode(h)); });
       }
-      function showMine() {
-        var cards = Array.prototype.slice.call(liveBox.querySelectorAll(".c-thread")).concat(Array.prototype.slice.call(closedBox.querySelectorAll(".c-thread")));
+      // (a reply kept across a sign-in is put back, once, AFTER the lines are drawn: the top line's height is then already in the page, so the
+      // box the reader is brought to stays where they were brought)
+      function showMine() { drawMine(); restoreKept(); }
+      function drawMine() {
+        var cards =Array.prototype.slice.call(liveBox.querySelectorAll(".c-thread")).concat(Array.prototype.slice.call(closedBox.querySelectorAll(".c-thread")));
         cards.forEach(function (card) { mineOnCard(card); redrawRoom(card); });
         if (rb && rb.card) fillReplyAs();
         if (!mineBox) return;
@@ -1193,9 +1266,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           // Sign in (replyLapsed); an empty one is simply put away.
           where = null; whereState = "none"; whereOwed = false;
           if (rb && rb.card && (rb.lapsed || rb.text.value.trim())) replyLapsed(); else closeReply(false);
+          if (!signInHeld()) dropKept();         // a page that comes back NOT signed in: the sign-in was abandoned, and nothing is kept
           showMine();
           return;
         }
+        lastHouseKey = d.handles.join(" ");
         if (rb && rb.lapsed) { rb.lapsed = false; rb.signin.hidden = true; rb.bounce.hidden = true; rb.bounce.textContent = ""; }      // signed in again
         if (same && whereState !== "none") { showMine(); return; }          // the same household again (a sign-in check): nothing new to ask
         where = null; whereState = "none";
@@ -1837,7 +1912,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           // CORE-161: an answered poll's last call. Both read only what the page holds. The ONE exception is an ask that was owed: where the
           // residents stand, stood down while the list was not answering, is asked now, once (never otherwise by a poll).
           listAnswered = true;
-          if (house && whereOwed) askWhere();
+          if (house && whereOwed) askWhere(true);
           showMine(); markAlone();
         }
         if (!selected) return;

@@ -685,8 +685,31 @@ test("THE REPLY BOX OPENS WHERE REPLY IS PRESSED: directly under that message, t
     await p.evalJs(`(() => { const box = ${RB}; box.querySelector("[data-rb-as]").value = "__human__"; box.querySelector("[data-rb-text]").value = "and from me"; box.querySelector("[data-rb-send]").click(); return true; })()`);
     for (const t0 = Date.now(); Date.now() - t0 < 5000 && (state.said ?? []).length < 2;) await new Promise((ok) => setTimeout(ok, 60));
     assert.deepEqual(state.said[1], { human: true, with: "claran", text: "and from me", reply_to: 50101 }, "the human's say NAMES the housemate they stand beside (`with:`), one who can hear this conversation: the office is not left to pick one who cannot");
+    // THE ANSWER IS BROUGHT INTO VIEW WHEN IT ARRIVES, the whole box with its bottom edge (Truey at 228e92319: with the box at the pane's foot,
+    // 10 of the "Heard…" line's 21 px showed). For a mid-room message and for the room's last one. Each time the box is first put where it sits
+    // when a reader has it at the very foot of the pane: its bottom edge on the pane's (the last message's box is at the room's end already).
+    const answerAtTheFoot = async (id, words) => {
+      await press(p, `${CARD}.querySelector('[data-reply="${id}"]')`);
+      const n = state.said.length;
+      const set = await p.evalJs(`(() => { const pane = ${CARD}.querySelector(".c-voices"), box = ${RB};
+        box.querySelector("[data-rb-as]").value = "claran"; box.querySelector("[data-rb-text]").value = ${JSON.stringify(words)};
+        pane.scrollTop += box.getBoundingClientRect().bottom - pane.getBoundingClientRect().bottom;
+        window.scrollBy(0, pane.getBoundingClientRect().bottom - window.innerHeight);
+        return { heardHidden: box.querySelector("[data-rb-heard]").hidden, gap: Math.round(pane.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom), paneFoot: Math.round(pane.getBoundingClientRect().bottom - window.innerHeight) }; })()`);
+      assert.ok(set.heardHidden && set.gap >= 0 && set.gap <= 1 && set.paneFoot <= 0, `control (${id}): before the say there is no answer yet, and the box's foot is on the pane's foot, on screen (${JSON.stringify(set)})`);
+      await press(p, `${RB}.querySelector("[data-rb-send]")`);
+      for (const t0 = Date.now(); Date.now() - t0 < 5000 && state.said.length === n;) await new Promise((ok) => setTimeout(ok, 60));
+      await p.until(`!${RB}.querySelector("[data-rb-heard]").hidden`, "the town's answer");
+      await new Promise((ok) => setTimeout(ok, 700));      // and the repaint the say asked for has come and gone
+      return p.evalJs(`(() => { const pr = ${CARD}.querySelector(".c-voices").getBoundingClientRect(), box = ${RB}, x = box.getBoundingClientRect(), h = box.querySelector("[data-rb-heard]").getBoundingClientRect();
+        const lo = Math.max(0, pr.top) - 1, hi = Math.min(window.innerHeight, pr.bottom) + 1;
+        return { under: box.previousElementSibling.dataset.say, heardWhole: h.height > 0 && h.top >= lo && h.bottom <= hi, heardCutPx: Math.round(Math.max(0, h.bottom - hi)), boxFootInView: x.bottom <= hi }; })()`);
+    };
+    assert.deepEqual(await answerAtTheFoot(50107, "from the middle of the room"), { under: "50107", heardWhole: true, heardCutPx: 0, boxFootInView: true }, "a mid-room message: the whole \"Heard…\" line and the box's bottom edge are on screen");
+    assert.deepEqual(await answerAtTheFoot(50122, "from the foot of the room"), { under: "50122", heardWhole: true, heardCutPx: 0, boxFootInView: true }, "the room's last message: the same");
+    await press(p, `${CARD}.querySelector('[data-reply="50101"]')`);
     // the office says no (the speaker walked away since the page looked): its own words, and one kind line; the words are kept
-    state.sayAnswer = () => ({ status: 422, body: { spoke: false, error: "bounce", code: 422, defect: "say 50101 is not in the room you are speaking into", hint: "a reply must come from the same room as the say it answers (call 21): walk back within earshot of that conversation" } });
+    state.sayAnswer =() => ({ status: 422, body: { spoke: false, error: "bounce", code: 422, defect: "say 50101 is not in the room you are speaking into", hint: "a reply must come from the same room as the say it answers (call 21): walk back within earshot of that conversation" } });
     await p.evalJs(`(() => { const box = ${RB}; box.querySelector("[data-rb-as]").value = "claran"; box.querySelector("[data-rb-text]").value = "too late"; box.querySelector("[data-rb-send]").click(); return true; })()`);
     await p.until(`!${RB}.querySelector("[data-rb-bounce]").hidden`, "the refusal, in the box");
     assert.deepEqual(await box(`[box.querySelector("[data-rb-bounce] b").textContent, /walk back within earshot/.test(box.querySelector("[data-rb-bounce]").textContent), box.querySelector("[data-rb-note]").textContent, box.querySelector("[data-rb-text]").value, box.querySelector("[data-rb-heard]").hidden]`),
@@ -761,7 +784,52 @@ test("THE REPLY BOX OPENS WHERE REPLY IS PRESSED: directly under that message, t
       [1, "words that must not be lost", "Your sign-in has lapsed, so nothing was said. Your words are still in this box.", true, "Sign in ↗", "50140"], "the box stays under its message with the words, says the sign-in has lapsed, will not send, and offers Sign in");
     assert.equal(state.said.length, saidAtLapse, "nothing was said");
     assert.equal(await p.evalJs(`document.querySelectorAll("[data-reply]").length`), 0, "(Reply itself is no longer offered: nobody is signed in)");
+    // "SIGN IN" IS A FULL REDIRECT AWAY AND BACK (Truey at 228e92319: the words were lost on it). The draft, and which message it answers, are kept
+    // in this tab across it, put back when the page returns with the same household signed in, and then cleared. The header's own sign-in is
+    // stood in for here (it would leave the page): the press is counted and stopped.
+    const KEPT = `sessionStorage.getItem("pm.convo.reply-draft")`;
+    const standInPill = () => p.evalJs(`(() => { let pill = document.querySelector("[data-auth-signin]"); if (!pill) { pill = document.createElement("button"); pill.setAttribute("data-auth-signin", ""); document.body.appendChild(pill); }
+      window.__pill = 0; pill.addEventListener("click", (e) => { e.stopImmediatePropagation(); e.preventDefault(); window.__pill++; }, true); return true; })()`);
+    await standInPill();
+    assert.equal(await p.evalJs(KEPT), null, "control: nothing is kept until Sign in is pressed");
+    const threadId = await p.evalJs(`${CARD}.getAttribute("data-thread")`);
+    await press(p, `${RB}.querySelector("[data-rb-signin]")`);
+    const kept = JSON.parse(await p.evalJs(KEPT) ?? "null");
+    assert.deepEqual([await p.evalJs(`window.__pill`), kept?.thread, kept?.id, kept?.as, kept?.text, kept?.house], [1, threadId, 50140, "claran", "words that must not be lost", "claran"],
+      "the header's sign-in was pressed once, and the words, the message they answer, the voice and whose they are were kept first");
+    // the page comes back signed in (a reload: this harness signs a signed-in page in on every load)
+    // (the real return is a new navigation, which starts at the top of the page: the browser is told not to put this reload back where it was)
+    await p.evalJs(`history.scrollRestoration = "manual"; location.reload(); true`);
+    await p.until(`!!${RB} && ${RB}.querySelector("[data-rb-text]").value === "words that must not be lost"`, "the reply box is back with the words");
+    await new Promise((ok) => setTimeout(ok, 600));      // whatever the page draws late (its top line, a card's line) has been drawn
+    assert.deepEqual(await box(`(() => { const x = box.getBoundingClientRect(); return [document.querySelectorAll(".c-thread [data-rb]").length, box.previousElementSibling.dataset.say, box.querySelector("[data-rb-as]").value, box.querySelector("[data-rb-send]").disabled, box.querySelector("[data-rb-note]").textContent, ${KEPT}, x.top >= 0 && x.bottom <= window.innerHeight]; })()`),
+      [1, "50140", "claran", false, "You are signed in again, and your reply is back where you left it. It has not been sent.", null, true],
+      "under the same message, as the same voice, ready to send, with a line saying it has not been sent; the kept copy is cleared; and the reader is brought to it");
+    assert.equal(state.said.length, saidAtLapse, "and nothing was said by any of it");
+    // Cancel keeps nothing: the sign-in lapses again, Sign in is pressed (the words are kept), then Cancel
+    await standInPill();
+    await p.evalJs(`localStorage.removeItem("pm.oauth.token"); true`);
+    await press(p, `${RB}.querySelector("[data-rb-send]")`);
+    await p.until(`!!${RB} && !${RB}.querySelector("[data-rb-signin]").hidden`, "lapsed again");
+    await press(p, `${RB}.querySelector("[data-rb-signin]")`);
+    assert.equal(JSON.parse(await p.evalJs(KEPT) ?? "null")?.text, "words that must not be lost", "control: kept again");
+    await press(p, `${RB}.querySelector("[data-rb-cancel]")`);
+    assert.deepEqual(await p.evalJs(`[document.querySelectorAll("[data-rb]").length, ${KEPT}]`), [0, null], "Cancel: the box is put away and nothing is kept across a sign-in either");
     assert.deepEqual(findReads(p), [], "and none of it asked ?room= or ?circle=");
+    // a page that comes back NOT signed in (the sign-in was abandoned) keeps nothing; nor is another household shown a kept draft
+    const out = await openPage(b, base, { office: makeOffice(state), signedIn: false, width: 390, height: 844 });
+    try {
+      await out.until(`!document.querySelector("[data-say-signedout]").hidden`, "a signed-out page");
+      await out.evalJs(`sessionStorage.setItem("pm.convo.reply-draft", JSON.stringify({ ...${JSON.stringify(kept)}, at: Date.now() })); location.reload(); true`);
+      await out.until(`!document.querySelector("[data-say-signedout]").hidden && ${KEPT} === null`, "the signed-out return cleared the kept draft");
+    } finally { await out.close(); }
+    const other = await openPage(b, base, { office: makeOffice({ ...state, me: { ...HOUSE, handles: ["claran", "amia"] } }), signedIn: true, width: 390, height: 844 });
+    try {
+      await other.until(`!!${CARD}.querySelector('[data-reply="50140"]')`, "another household's page");
+      await other.evalJs(`sessionStorage.setItem("pm.convo.reply-draft", JSON.stringify({ ...${JSON.stringify(kept)}, at: Date.now() })); location.reload(); true`);
+      await other.until(`${KEPT} === null && !!${CARD}.querySelector('[data-reply="50140"]')`, "the other household's page looked for a kept draft");
+      assert.deepEqual(await other.evalJs(`[document.querySelectorAll("[data-rb]").length, document.querySelector("[data-say-text]").value]`), [0, ""], "a draft kept by one household is never shown to another: cleared, not restored");
+    } finally { await other.close(); }
   } finally { await p.close(); }
 });
 
@@ -852,6 +920,7 @@ test("WHERE THEY STAND IS NEVER ASKED WHILE THE LIST IS FAILING: the page says s
     await p.until(`${repliesIn(ROOM)} === 3`, "Reply appears once the list has answered and where they stand has been read");
     assert.ok(lists() > before, "control: the list did answer again");
     assert.equal(walkerAsks(p), 1, "asked ONCE");
+    assert.equal(lists(), before + 1, "and on the FIRST good answer of the list, not a poll later (Truey at 228e92319: the line said the office wasn't answering for about 7 s after it had)");
     assert.match(await p.evalJs(`${MINE}.textContent`), /^Your residents are in: Cave Interior \(claran\)/);
     await p.poll();
     await new Promise((ok) => setTimeout(ok, 900));
