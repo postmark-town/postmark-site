@@ -551,9 +551,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // while the speaker is aboard too. A reply into any other conversation, and into one that has gone quiet, is refused. So for each LIVE room this
       // works out which of the signed-in household's residents stand within earshot of one of its lines, from where the world's public walkers read
       // says they stand. It is the page's reading of positions that can be some seconds old: the office still judges every say.
-      //   · a resident with no ground on the map speaks from the Origin (the read lists them there, marked a placeholder), and so does one the read
-      //     does not list at all: the office stands such a voice at the Origin (office src/world.mjs, the say's `standpoint`: "Their voice lands
-      //     there honestly instead of being refused"), so the page judges them from the Origin's point too;
+      //   · a resident with no ground on the map speaks from the Origin, and the read LISTS them there (marked a placeholder): they are judged from
+      //     that point like anyone (office src/world.mjs, the say's `standpoint`: "Their voice lands there honestly instead of being refused");
+      //   · a resident the read does NOT list is offered nothing (Wright, 2026-11-22 21:45 EST: "not listed at all → no Reply as that housemate").
+      //     The public read leaves out anyone inside a dungeon, whom the office stands in their dungeon room, so the page cannot tell where an
+      //     unlisted resident's voice would land; the top line names them as not shown on the map just now;
       //   · a line's point is served rounded to the metre, so a metre of slack is allowed (a button at the very edge may still be refused);
       //   · a room longer than its read does not carry its earlier lines' points: a resident inside that room's whole ground (its `extent`) plus
       //     earshot MAY hear it, and is offered Reply rather than wrongly denied it.
@@ -578,40 +580,48 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           return w.x >= e.x0 - reach && w.x <= e.x1 + reach && w.y >= e.y0 - reach && w.y <= e.y1 + reach;
         return false;
       }
-      function hearersOf(t, house, where, earshot, origin) {
+      function hearersOf(t, house, where, earshot) {
         var out = { residents: [], human: false, beside: [] };
         if (!house || !Array.isArray(house.handles) || !house.handles.length || !where || !t || !t.live) return out;
-        var from = standsSomewhere(origin) ? { x: Number(origin.x), y: Number(origin.y) } : { x: 0, y: 0 };      // the Origin: where an unlisted resident's voice lands
-        var placed = [], hears = {};
         house.handles.forEach(function (h) {
-          var w = where[h], listed = standsSomewhere(w);
-          if (listed) placed.push(h);
-          if (canHear(listed ? w : from, t, earshot)) { hears[h] = true; out.residents.push(h); }
+          if (canHear(where[h], t, earshot)) out.residents.push(h);         // a resident the read does not list has no `where`: they hear nothing here
         });
-        // THE HUMAN STANDS BESIDE A HOUSEMATE THE PAGE NAMES (`with:`), one who can hear this conversation. The office takes `with:` for a
-        // housemate it has a standpoint for; with none placed at all, only for the house's first resident (whom it stands at the Origin).
-        out.beside = placed.length ? placed.filter(function (h) { return !!hears[h]; }) : (hears[house.handles[0]] ? [house.handles[0]] : []);
+        // THE HUMAN STANDS BESIDE A HOUSEMATE THE PAGE NAMES (`with:`): any of the residents who can hear this conversation (each is one the read
+        // lists, so one the office has a standpoint for and takes `with:` for)
+        out.beside = out.residents.slice();
         out.human = out.beside.length > 0;
         return out;
+      }
+      // the household's residents the walkers read does not list at all: not shown on the map just now, so offered nothing
+      function unlistedOf(house, where) {
+        if (!house || !Array.isArray(house.handles) || !where) return [];
+        return house.handles.filter(function (h) { return !standsSomewhere(where[h]); });
       }
       // HEAR:END
 
       // WHERE THE HOUSEHOLD'S RESIDENTS STAND: one cheap read, `GET /api/world/walkers` (keyless; every walker's derived position; the front door keeps
-      // its answer for 15 s and a read worker serves it). Asked ONCE per page load, when the page learns a household is signed in, and once more each
-      // time the reader opens a reply box. NEVER on the timer, and never while the page is waiting out a failed read of the list.
+      // its answer for 15 s and a read worker serves it). It is ONE SHARED PUBLIC ANSWER: the page sends it no query, no Authorization and nothing
+      // about the household, and picks its own residents out of the public list by the handles /me gave it. Asked when the page learns a household
+      // is signed in (once per page load), each time the reader opens a reply box, and once when the tab comes back to the front. NEVER on the
+      // timer, and never while the page is waiting out a failed read of the list: an ask owed then is made once, when the list next answers.
       var WALKERS = API.replace(/\/conversations$/, "/walkers");
       var HUMAN_AS = "__human__";            // a chooser value no handle can collide with (the top box's own)
       var house = null;                      // { handles, household } once the module script says who is signed in; null when nobody is
       var where = null;                      // handle -> the walker the office served for it
-      var whereState = "none";               // none | asking | known | failed
+      var whereState = "none";               // none | waiting (owed: the list is not answering) | asking | known | failed
       var whereAsk = null;
+      var whereOwed = false;                 // an ask stood down while the list was failing: made once, by the next answered poll
       var whereStamp = 0;
-      var originAt = null;                   // the Origin's point, as the walkers read lists a resident with no ground there (0,0 when it lists none)
       var earshotM = 60;                     // the office's own number, taken from each list answer (`earshot_m`); 60 until the first one
       function askWhere() {
         if (!house) return Promise.resolve(false);
         if (whereAsk) return whereAsk;                                   // one ask at a time
-        if (poller.state().fails) return Promise.resolve(false);         // the office is not answering: this page is not asking it for more
+        if (poller.state().fails) {                                      // the office is not answering: this page is not asking it for more
+          whereOwed = true;
+          if (whereState === "none") { whereState = "waiting"; showMine(); }
+          return Promise.resolve(false);
+        }
+        whereOwed = false;
         if (whereState !== "known") whereState = "asking";
         whereAsk = fetch(WALKERS, { headers: { accept: "application/json" } })
           .then(function (r) { return r.ok ? r.json() : null; })
@@ -619,12 +629,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             whereAsk = null;
             if (!d || !Array.isArray(d.walkers)) { if (whereState !== "known") whereState = "failed"; showMine(); return false; }
             var mine = {};
-            originAt = null;
-            d.walkers.forEach(function (w) {
-              if (!w) return;
-              if (originAt === null && w.source === "origin" && isFinite(w.x) && isFinite(w.y)) originAt = { x: Number(w.x), y: Number(w.y) };
-              if (house && house.handles.indexOf(w.handle) !== -1) mine[w.handle] = w;
-            });
+            d.walkers.forEach(function (w) { if (w && house && house.handles.indexOf(w.handle) !== -1) mine[w.handle] = w; });
             where = mine; whereState = "known"; whereStamp++;
             showMine();
             return true;
@@ -864,7 +869,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var count = el("span", "c-say-count");
         var status = el("span", "c-say-status");
         status.hidden = true;
-        [send, cancel, count, status].forEach(function (n) { actions.appendChild(n); });
+        // shown only when the sign-in has lapsed (replyLapsed): the header's own sign-in, pressed for the reader
+        var signin = el("button", "c-say-btn ghost", "Sign in ↗");
+        signin.type = "button"; signin.setAttribute("data-rb-signin", ""); signin.setAttribute("data-key", "rb-signin");
+        signin.hidden = true;
+        signin.addEventListener("click", function () { var pill = document.querySelector("[data-auth-signin]"); if (pill) pill.click(); });
+        [send, cancel, signin, count, status].forEach(function (n) { actions.appendChild(n); });
         var bounce = el("p", "c-say-bounce"); bounce.setAttribute("data-rb-bounce", ""); bounce.setAttribute("role", "status"); bounce.hidden = true;
         var heard = el("p", "c-say-heard"); heard.setAttribute("data-rb-heard", ""); heard.setAttribute("role", "status"); heard.hidden = true;
         var note = el("p", "c-fine c-reply-note"); note.setAttribute("data-rb-note", ""); note.hidden = true;
@@ -882,7 +892,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         beside.addEventListener("change", fillBeside);
         [to, asRow, besideRow, text, actions, bounce, heard, note].forEach(function (n) { box.appendChild(n); });
         wrap.appendChild(box);
-        rb = { el: wrap, card: null, id: null, key: null, to: to, as: as, besideRow: besideRow, besideWords: besideWords, beside: beside, text: text, send: send, cancel: cancel, count: count, status: status, bounce: bounce, heard: heard, note: note, busy: false };
+        rb = { el: wrap, card: null, id: null, key: null, to: to, as: as, besideRow: besideRow, besideWords: besideWords, beside: beside, text: text, send: send, cancel: cancel, signin: signin, count: count, status: status, bounce: bounce, heard: heard, note: note, busy: false, lapsed: false };
         text.addEventListener("input", replyCount);
         // ⌘/Ctrl-Enter replies (Enter stays a newline, as in the box at the top); Escape puts the box away
         text.addEventListener("keydown", function (e) {
@@ -901,6 +911,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // the chooser holds ONLY the voices that can hear this conversation; the one already chosen stays chosen while it still can
       function fillReplyAs() {
         if (!rb || !rb.card) return;
+        if (rb.lapsed) { rb.send.disabled = true; return; }       // the sign-in lapsed: the box keeps what it shows until a household is signed in again
         var options = replyAs(rb.card), was = rb.as.value, still = false;
         rb.as.textContent = "";
         options.forEach(function (o) {
@@ -955,6 +966,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         if (list && st && st.shape) placeReply(list, st.shape);
         try { box.text.focus({ preventScroll: true }); } catch (e) { /* the box is there */ }
         if (box.el.scrollIntoView) box.el.scrollIntoView({ block: "nearest" });
+        // and the message being answered stays in view above it (the box coming up from below would otherwise sit at the pane's top, over it)
+        var answeredRow = box.el.previousElementSibling;
+        if (answeredRow && answeredRow.scrollIntoView) answeredRow.scrollIntoView({ block: "nearest" });
         // where they stand is read again now (the one press that may ask); the chooser follows the answer
         askWhere();
       }
@@ -972,7 +986,10 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           line.setAttribute("data-say-moved", "");
           line.setAttribute("role", "status");
           top.after(line);
-          top.addEventListener("input", function (ev) { if (ev.isTrusted) { line.hidden = true; line.textContent = ""; } });      // said once: gone when they type
+          // said once: gone when they type, and gone once the words are sent ("it has not been sent" must not outlive the sending)
+          var spent = function () { line.hidden = true; line.textContent = ""; if (sayEl) sayEl.classList.remove("has-moved"); };
+          top.addEventListener("input", function (ev) { if (ev.isTrusted) spent(); });
+          document.addEventListener("pm:spoke", spent);
         }
         if (!form.hidden && !top.value) {
           top.value = rb.text.value;
@@ -983,12 +1000,18 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           line.textContent = "The message you were replying to is no longer on this page. Your reply is kept: it will be in the reply box the next time you press Reply.";
         }
         line.hidden = false;
+        // THE READER IS BROUGHT TO IT: the box they were typing in has just gone from under them, and the top box is usually off screen (and, in a
+        // room shown by itself, put away: `has-moved` shows it there until the line is spent). The keyboard goes with the words.
+        if (sayEl) sayEl.classList.add("has-moved");
+        if (line.scrollIntoView) line.scrollIntoView({ block: "center" });
+        if (!rb.text.value) { try { top.focus({ preventScroll: true }); } catch (e) { /* the words are there */ } }
       }
       function closeReply(clear) {
         if (!rb) return;
         var card = rb.card, key = rb.key;
         if (rb.el.parentNode) rb.el.parentNode.removeChild(rb.el);
         rb.card = null; rb.id = null; rb.key = null;
+        rb.lapsed = false; rb.signin.hidden = true;
         if (clear) rb.text.value = "";
         // the keyboard goes back to the Reply button it came from
         var list = card ? card.querySelector(".c-voices") : null;
@@ -1018,20 +1041,27 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             rb.text.value = ""; replyCount();
             rb.heard.textContent = [res.heard].concat(res.notes || []).filter(Boolean).join(" ");
             rb.heard.hidden = false;
-            // the room is painted by the poller: ask it now, so the speaker watches their own reply land where it sits
+            // their reply will be drawn inside the circle it answers: that circle is opened now, so the line is shown the moment the list carries it
+            // (often not on the very next read: the front door keeps the list for 30 s)
+            var room = rb.card ? rb.card.__room : null, answered = room && room.shape ? room.shape.byId[String(rb.id)] : null;
+            if (answered) room.open[topOf(answered).key] = true;
+            // the room is painted by the poller: ask it now. The reader's place holds meanwhile (restoreScroll: a reader answering in a room)
             document.dispatchEvent(new CustomEvent("pm:spoke"));
             return;
           }
-          if (res && res.signedOut) { rb.bounce.textContent = "Your sign-in has run out, so nothing was said. Sign in again (top right) and your words are still here."; rb.bounce.hidden = false; return; }
+          if (res && res.signedOut) { replyLapsed(); return; }
           if (res && res.refused) {
             // the office's own words, both halves as text
             rb.bounce.textContent = "";
             rb.bounce.appendChild(el("b", null, res.defect));
             if (res.hint) rb.bounce.appendChild(document.createTextNode(" — " + res.hint));
             rb.bounce.hidden = false;
-            // the one refusal this page tries to prevent: the speaker is no longer within earshot. Said kindly, with what to do
-            if (/is not in the room you are speaking into/.test(String(res.defect))) {
-              rb.note.textContent = "It looks like " + asWords + " moved out of earshot of this conversation after this page last looked. Nothing was said, and your words are still in the box.";
+            // the one refusal this page tries to prevent: the speaker cannot hear this conversation from where they stand. Said kindly, in words that
+            // are true whatever the reason (they walked on, or the page's reading of where they stand was off). Known by its shape, which both
+            // offices give ("say N is not in the room you are speaking into" at release/2026-w48.2; "say N is not in a conversation you can hear
+            // from where you stand" at e775caa): a 422 whose defect opens "say <id> is not in".
+            if (res.status === 422 && /^say \d+ is not in /.test(String(res.defect))) {
+              rb.note.textContent = "The office says " + asWords + " can't hear this conversation from where they stand now. Nothing was said, and your words are still in the box.";
               rb.note.setAttribute("data-why", "walked");
               rb.note.hidden = false;
             }
@@ -1041,6 +1071,18 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           rb.bounce.hidden = false;
         };
         try { Promise.resolve(say.speak(payload)).then(done, function () { done(null); }); } catch (e) { done(null); }
+      }
+      // THE SIGN-IN RAN OUT WHILE A REPLY WAS BEING WRITTEN. The box stays, with its words: it says the sign-in has lapsed and that nothing was said,
+      // and offers Sign in (the header's own, never a second flow). Nothing can be sent from it until the page hears a household is signed in again.
+      function replyLapsed() {
+        if (!rb || !rb.card) return;
+        rb.lapsed = true;
+        rb.send.disabled = true;
+        rb.heard.hidden = true;
+        rb.note.hidden = true; rb.note.textContent = ""; rb.note.removeAttribute("data-why");
+        rb.bounce.textContent = "Your sign-in has lapsed, so nothing was said. Your words are still in this box.";
+        rb.bounce.hidden = false;
+        rb.signin.hidden = false;
       }
       // REPLY-BOX:END
 
@@ -1053,7 +1095,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       var mineBox = document.querySelector("[data-mine]");
       function mineOnCard(card) {
         var t = card.__t, line = card.querySelector("[data-mine-here]");
-        var hear = house && whereState === "known" && t && t.live ? hearersOf(t, house, where, earshotM, originAt) : null;
+        var hear = house && whereState === "known" && t && t.live ? hearersOf(t, house, where, earshotM) : null;
         card.__hear = hear;
         // a conversation that has gone quiet takes no reply (the office refuses one): said once on its card, for a signed-in household
         var ended = !!house && !!t && !t.live;
@@ -1089,7 +1131,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         if (!mineBox) return;
         if (!house || whereState === "none" || whereState === "asking") { mineBox.hidden = true; mineBox.textContent = ""; return; }
         var key, build;
-        if (whereState === "failed") {
+        if (whereState === "waiting") {
+          // the list was not answering when the page learned who is signed in: said plainly, and asked once when the list next answers
+          key = "waiting";
+          build = function () { mineBox.textContent = "The office isn't answering just now, so this page can't yet tell where your residents are standing. Reply will appear once it can."; };
+        } else if (whereState === "failed") {
           key = "failed";
           build = function () { mineBox.textContent = "This page couldn't read where your residents are standing, so it is not offering Reply for now. Loading the page again tries once more."; };
         } else {
@@ -1100,8 +1146,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             hear.residents.forEach(function (h) { near[h] = true; });
             rooms.push({ id: card.getAttribute("data-thread"), place: (card.__t && card.__t.place) || "somewhere in the world", who: hear.residents });
           });
-          var away = house.handles.filter(function (h) { return !near[h]; });
-          key = rooms.map(function (r) { return r.id + ":" + r.place + ":" + r.who.join(","); }).join("|") + "||" + away.join(",");
+          // residents the public read does not list are named apart: the page cannot tell where their voice would land, so it offers them nothing
+          var unseen = unlistedOf(house, where);
+          var away = house.handles.filter(function (h) { return !near[h] && unseen.indexOf(h) === -1; });
+          var tail = (away.length ? " Not near a conversation: " + away.join(", ") + "." : "") + (unseen.length ? " Not shown on the map just now: " + unseen.join(", ") + "." : "");
+          key = rooms.map(function (r) { return r.id + ":" + r.place + ":" + r.who.join(","); }).join("|") + "||" + tail;
           build = function () {
             mineBox.textContent = "";
             if (rooms.length) {
@@ -1114,8 +1163,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
                 mineBox.appendChild(a);
                 mineBox.appendChild(document.createTextNode(" (" + r.who.join(", ") + ")"));
               });
-              if (away.length) mineBox.appendChild(document.createTextNode(". Not near a conversation: " + away.join(", ") + "."));
-            } else mineBox.appendChild(document.createTextNode("None of your residents is near a conversation right now, so there is nowhere to reply from here."));
+              mineBox.appendChild(document.createTextNode("." + tail));
+            } else mineBox.appendChild(document.createTextNode("None of your residents is near a conversation right now, so there is nowhere to reply from here." + (unseen.length ? " Not shown on the map just now: " + unseen.join(", ") + "." : "")));
           };
         }
         mineBox.hidden = false;
@@ -1139,12 +1188,23 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var d = ev.detail && Array.isArray(ev.detail.handles) && ev.detail.handles.length ? { handles: ev.detail.handles.map(String), household: ev.detail.household || null } : null;
         var same = !!d && !!house && d.handles.join("\u0001") === house.handles.join("\u0001");
         house = d;
-        if (!d) { where = null; whereState = "none"; closeReply(false); showMine(); return; }
+        if (!d) {
+          // nobody is signed in any more. A reply box that is open is NOT taken away with its words: it says the sign-in has lapsed and offers
+          // Sign in (replyLapsed); an empty one is simply put away.
+          where = null; whereState = "none"; whereOwed = false;
+          if (rb && rb.card && (rb.lapsed || rb.text.value.trim())) replyLapsed(); else closeReply(false);
+          showMine();
+          return;
+        }
+        if (rb && rb.lapsed) { rb.lapsed = false; rb.signin.hidden = true; rb.bounce.hidden = true; rb.bounce.textContent = ""; }      // signed in again
         if (same && whereState !== "none") { showMine(); return; }          // the same household again (a sign-in check): nothing new to ask
         where = null; whereState = "none";
         showMine();
         askWhere();
       });
+      // the tab comes back to the front: where they stand is read again, once (a resident may have walked while the reader was away). Not a
+      // timer: one ask per return, and none while the list is not answering (it is owed then, and made when the list next answers).
+      document.addEventListener("visibilitychange", function () { if (!document.hidden && house) askWhere(); });
       // MINE:END
 
       // THE READER PRESSED SOMETHING IN A ROOM (one listener per pane). Reply opens the reply box under that message; the replies button opens or folds
@@ -1309,7 +1369,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           if (!prior) { if (followsNew) list.scrollTop = list.scrollHeight; return; }
           var mine = land && land.own ? keyed(list, land.own) : null;
           if (mine) { list.scrollTop = prior.top; showInPane(list, mine); return; }
-          if (pinNext || prior.following) { list.scrollTop = list.scrollHeight; return; }
+          // A READER ANSWERING IN THIS ROOM KEEPS THEIR PLACE (CORE-161): the message they answered, the reply box and the town's "Heard…" stay on
+          // screen until THEY move. Their own say asks for a repaint, and the list usually comes back WITHOUT their line (the front door keeps the
+          // list for 30 s), so following the bottom here carried the box and its answer off the screen. When their line does arrive it is shown
+          // where it sits, by the rule above.
+          var answering = !!rb && rb.card === card && !!rb.el.parentNode;
+          if (!answering && (pinNext || prior.following)) { list.scrollTop = list.scrollHeight; return; }
           list.scrollTop = prior.top;
           var at = land && land.anchor ? keyed(list, land.anchor.key) : null;
           if (at) list.scrollTop += (at.getBoundingClientRect().top - list.getBoundingClientRect().top) - land.anchor.off;
@@ -1768,7 +1833,13 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       }
       // the poll's call (no argument) asks the office NOTHING; the visitor's own say (`own`) is their act, and is one ask
       function refreshSelected(own) {
-        if (!own) { listAnswered = true; showMine(); markAlone(); }      // CORE-161: an answered poll's last call; both read only what the page holds
+        if (!own) {
+          // CORE-161: an answered poll's last call. Both read only what the page holds. The ONE exception is an ask that was owed: where the
+          // residents stand, stood down while the list was not answering, is asked now, once (never otherwise by a poll).
+          listAnswered = true;
+          if (house && whereOwed) askWhere();
+          showMine(); markAlone();
+        }
         if (!selected) return;
         if (own) askSelected(selected);
         else { selected.waiting = false; offerSelected(selected); }
@@ -2276,7 +2347,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       }
       const mine = document.createElement("option");
       mine.value = HUMAN;
-      mine.textContent = "yourself (the human of the house)";
+      mine.textContent = "yourself (the human)";      // the same words as the reply box under a message (CORE-161)
       asEl.appendChild(mine);
       houseEl.textContent = household ? "· " + household : "";
     }
@@ -2551,7 +2622,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     }
     /* CORE-161: ONE ROOM BY ITSELF (#room-<thread id>). Everything but that room's card steps aside; its pane's height is lifted, so the whole
        conversation reads straight down the page */
-    html.c-rooming main.convo > *:not(.c-head):not(.c-live):not(.c-past):not([data-alone]) { display: none; }
+    html.c-rooming main.convo > *:not(.c-head):not(.c-live):not(.c-past):not([data-alone]):not(.has-moved) { display: none; }      /* .has-moved: the top box, while it holds a reply's words moved out of a room */
     html.c-rooming .convo .c-head > *:not(h1):not(.c-crumb) { display: none; }
     html.c-rooming .convo .c-rule, html.c-rooming .convo .c-thread:not(.is-alone), html.c-rooming .convo .c-pager, html.c-rooming .convo .c-empty:not([data-office-down]),
     html.c-rooming .convo .c-loading, html.c-rooming .convo .c-mine, html.c-rooming .convo .c-open-room { display: none; }

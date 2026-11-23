@@ -155,10 +155,14 @@ async function openPage(b, base, { hash = "", office, signedIn = false, width = 
     const { requestId, request } = m.params;
     const u = new URL(request.url);
     const key = u.pathname.replace(/^\/api/, "") + u.search;
-    calls.push({ method: request.method, path: key, body: request.postData ?? null });
-    const a = office(request.method, key, request.postData ?? null);
-    if (a === "fail") { S("Fetch.failRequest", { requestId, errorReason: "ConnectionRefused" }).catch(() => {}); return; }
-    S("Fetch.fulfillRequest", { requestId, responseCode: a.status, responseHeaders: [{ name: "content-type", value: "application/json" }, { name: "access-control-allow-origin", value: "*" }], body: Buffer.from(JSON.stringify(a.body)).toString("base64") }).catch(() => {});
+    // CORE-161: the request's own headers are kept (lower-cased names), so a test can hold what an ask does NOT carry; and the office may answer
+    // LATER (a promise), so a test can hold one answer back until the page is in the state it means to test
+    const headers = Object.fromEntries(Object.entries(request.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]));
+    calls.push({ method: request.method, path: key, body: request.postData ?? null, headers });
+    Promise.resolve(office(request.method, key, request.postData ?? null)).then((a) => {
+      if (a === "fail") { S("Fetch.failRequest", { requestId, errorReason: "ConnectionRefused" }).catch(() => {}); return; }
+      S("Fetch.fulfillRequest", { requestId, responseCode: a.status, responseHeaders: [{ name: "content-type", value: "application/json" }, { name: "access-control-allow-origin", value: "*" }], body: Buffer.from(JSON.stringify(a.body)).toString("base64") }).catch(() => {});
+    });
   };
   b.listeners.push(listener);
   await S("Page.navigate", { url: `${base}/conversations/${hash}` });
@@ -506,7 +510,9 @@ test("B · READS: a page of rooms asks the office for the LIST and nothing else:
 
 // a household of three, and four rooms: A where claran stands, B (5 km east) where amia stands, C (9 km east) where nobody of the house is, and a
 // GONE-QUIET room on the very spot claran stands; liv is placed, far from every conversation; pica is somebody else's resident, standing in A
-const HOUSE = { handles: ["claran", "amia", "liv"], household: "test-house", households: { claran: { slug: "test-house" } } };
+// (moth is a resident of the house the public walkers read does NOT list, as it leaves out anyone inside a dungeon: room A is at the Origin, and
+// moth must be offered nothing there. Wright, 2026-11-22 21:45 EST: "not listed at all → no Reply as that housemate".)
+const HOUSE = { handles: ["claran", "amia", "liv", "moth"], household: "test-house", households: { claran: { slug: "test-house" } } };
 const ROOM_C = "t1794700000000-far";
 const ROOM_OLD = "t1794600000000-old";
 const eastOf = (dx) => voicesOf().map((v) => ({ ...v, x: v.x + dx }));
@@ -547,7 +553,12 @@ test("REPLY ONLY WHERE IT CAN WORK: Reply is on the messages of a live room one 
     assert.equal(await p.evalJs(hereLine(ROOM_OLD)), "This conversation has ended, so it can't be answered.", "a gone-quiet room has no Reply and says why, in one plain line (claran stands on its very spot: it is still ended)");
     assert.equal(await p.evalJs(`${cardOf(ROOM)}.querySelector("[data-mine-here] .c-person .c-face") !== null`), true, "with the page's usual face beside the name");
     // one line at the top names their rooms, and who is near none
-    assert.equal(await p.evalJs(`${MINE}.textContent`), "Your residents are in: Cave Interior (claran) · The Quay (amia). Not near a conversation: liv.");
+    assert.equal(await p.evalJs(`${MINE}.textContent`), "Your residents are in: Cave Interior (claran) · The Quay (amia). Not near a conversation: liv. Not shown on the map just now: moth.",
+      "their rooms, who is near none, and (apart) the one the public read does not list: moth is not placed at the Origin, where Cave Interior is");
+    // the ask of where they stand is the one shared public answer: no query, no Authorization, nothing about the household
+    const asked = p.calls.filter((c) => c.path.startsWith("/world/walkers"));
+    assert.deepEqual(asked.map((c) => [c.method, c.path, "authorization" in c.headers, "cookie" in c.headers]), [["GET", "/world/walkers", false, false]], "GET /world/walkers, bare: no query string and no Authorization (the front door keeps one answer for everybody)");
+    assert.equal(p.calls.find((c) => c.path === "/me").headers.authorization, "Bearer invented-token", "control: this instrument does see an Authorization header when a request carries one");
     await p.evalJs(`window.__y = window.scrollY; ${MINE}.querySelector('[data-mine-room="${ROOM_B}"]').click(); true`);
     assert.equal(await p.evalJs(`${cardOf(ROOM_B)}.classList.contains("is-anchored")`), true, "a room's name there jumps to its card");
     // the reply box lists ONLY the voices that can hear that conversation
@@ -648,8 +659,24 @@ test("THE REPLY BOX OPENS WHERE REPLY IS PRESSED: directly under that message, t
     assert.deepEqual(await box(`[box === window.__box, box.previousElementSibling.dataset.say, box.querySelector("[data-rb-text]").value, document.activeElement === box.querySelector("[data-rb-text]"), box.querySelector("[data-rb-text]").selectionStart + "-" + box.querySelector("[data-rb-text]").selectionEnd]`),
       [true, "50101", "my draft", true, "2-5"], "the redraw kept the box where it was, with the draft, the focus and the selection");
     // the say: exactly the id the office served on that message, as the chosen voice; the town's answer shows IN the box
+    const place = () => p.evalJs(`(() => { const pane = ${CARD}.querySelector(".c-voices"), pr = pane.getBoundingClientRect(), box = ${RB};
+      const inView = (n) => { const r = n.getBoundingClientRect(); return r.height > 0 && r.top >= Math.max(0, pr.top) - 1 && r.bottom <= Math.min(window.innerHeight, pr.bottom) + 1; };
+      return { top: Math.round(pane.scrollTop), below: Math.round(pane.scrollHeight - pane.clientHeight - pane.scrollTop), message: inView(${CARD}.querySelector('.c-voice[data-say="50101"]')), reply: inView(box.querySelector("[data-rb-send]")), heard: inView(box.querySelector("[data-rb-heard]")) }; })()`);
+    const before = await place();
+    assert.deepEqual([before.message, before.reply], [true, true], "control: the message being answered and the box's Reply are both on screen before the say (at 390)");
+    assert.ok(before.below > 150, `control: the pane is NOT at its bottom (${before.below}px of the room lies below it), so there is somewhere for it to jump to`);
+    const listsBefore = p.calls.filter((c) => c.path.startsWith("/world/conversations?closed=")).length;
     await press(p, `${RB}.querySelector("[data-rb-send]")`);
     await p.until(`!${RB}.querySelector("[data-rb-heard]").hidden`, "the town's answer, in the box");
+    // AFTER THE TOWN ANSWERS, THE READER'S PLACE HOLDS (the review's 4a). The say asks for a repaint, and the list comes back WITHOUT the new line
+    // (the front door keeps the list for 30 s: this office's list is unchanged). The pane used to follow its bottom, taking the box, the message and
+    // "Heard…" off the screen.
+    for (const t0 = Date.now(); Date.now() - t0 < 9000 && p.calls.filter((c) => c.path.startsWith("/world/conversations?closed=")).length === listsBefore;) await new Promise((ok) => setTimeout(ok, 60));
+    assert.ok(p.calls.filter((c) => c.path.startsWith("/world/conversations?closed=")).length > listsBefore, "control: the say's repaint did ask the list again");
+    await new Promise((ok) => setTimeout(ok, 500));
+    const after = await place();
+    assert.ok(Math.abs(after.top - before.top) <= 1, `the pane stayed where the reader was (it sat at ${before.top}px and sits at ${after.top}px; its bottom is ${before.top + before.below}px)`);
+    assert.deepEqual([after.message, after.reply, after.heard], [true, true, true], "the message they answered, the reply box and the town's \"Heard…\" line are all still on screen");
     assert.deepEqual(state.said, [{ handle: "claran", text: "my draft", reply_to: 50101 }], "the say is claran's, with reply_to exactly the id on that message");
     assert.equal(await box(`box.querySelector("[data-rb-heard]").textContent`), "Heard at Cave Interior — one within earshot.");
     assert.deepEqual(await box(`[box.querySelector("[data-rb-text]").value, box.querySelector("[data-rb-bounce]").hidden]`), ["", true]);
@@ -663,8 +690,20 @@ test("THE REPLY BOX OPENS WHERE REPLY IS PRESSED: directly under that message, t
     await p.evalJs(`(() => { const box = ${RB}; box.querySelector("[data-rb-as]").value = "claran"; box.querySelector("[data-rb-text]").value = "too late"; box.querySelector("[data-rb-send]").click(); return true; })()`);
     await p.until(`!${RB}.querySelector("[data-rb-bounce]").hidden`, "the refusal, in the box");
     assert.deepEqual(await box(`[box.querySelector("[data-rb-bounce] b").textContent, /walk back within earshot/.test(box.querySelector("[data-rb-bounce]").textContent), box.querySelector("[data-rb-note]").textContent, box.querySelector("[data-rb-text]").value, box.querySelector("[data-rb-heard]").hidden]`),
-      ["say 50101 is not in the room you are speaking into", true, "It looks like claran moved out of earshot of this conversation after this page last looked. Nothing was said, and your words are still in the box.", "too late", true],
-      "the office's defect and hint verbatim, one kind line saying what happened, and the words kept");
+      ["say 50101 is not in the room you are speaking into", true, "The office says claran can't hear this conversation from where they stand now. Nothing was said, and your words are still in the box.", "too late", true],
+      "the office's defect and hint verbatim (the sentence of release/2026-w48.2), one kind line that is true whatever the reason, and the words kept");
+    // the SAME refusal in the words dev's office (e775caa, POS-1185) gives it: the kind line shows there too (the review's 4c: it keyed on the
+    // w48.2 sentence alone, so on dev it could never show)
+    state.sayAnswer = () => ({ status: 422, body: { spoke: false, error: "bounce", code: 422, defect: "say 50101 is not in a conversation you can hear from where you stand", hint: "walk within earshot of that conversation, or read it with say { circle: 50101 }" } });
+    await p.evalJs(`(() => { const box = ${RB}; box.querySelector("[data-rb-note]").textContent = ""; box.querySelector("[data-rb-send]").click(); return true; })()`);
+    await p.until(`/a conversation you can hear/.test(${RB}.querySelector("[data-rb-bounce] b")?.textContent ?? "")`, "the refusal in e775caa's words");
+    assert.deepEqual(await box(`[box.querySelector("[data-rb-note]").hidden, box.querySelector("[data-rb-note]").textContent, box.querySelector("[data-rb-text]").value]`),
+      [false, "The office says claran can't hear this conversation from where they stand now. Nothing was said, and your words are still in the box.", "too late"], "the kind line shows for e775caa's sentence too");
+    // any OTHER refusal gets the office's words alone (the kind line is for the one refusal the page tries to prevent)
+    state.sayAnswer = () => ({ status: 422, body: { spoke: false, error: "bounce", code: 422, defect: "you just spoke", hint: "a voice every 15 seconds" } });
+    await press(p, `${RB}.querySelector("[data-rb-send]")`);
+    await p.until(`${RB}.querySelector("[data-rb-bounce] b")?.textContent === "you just spoke"`, "another refusal");
+    assert.equal(await box(`box.querySelector("[data-rb-note]").hidden`), true, "no kind line for a refusal that is not about earshot");
     // Cancel puts the box away, and the keyboard goes back to the Reply it came from
     await press(p, `${RB}.querySelector("[data-rb-cancel]")`);
     assert.deepEqual(await p.evalJs(`[document.querySelectorAll("[data-rb]").length, document.activeElement?.getAttribute("data-reply")]`), [0, "50101"]);
@@ -683,6 +722,8 @@ test("THE REPLY BOX OPENS WHERE REPLY IS PRESSED: directly under that message, t
       [0, "half a thought about the harbour", false, "The message you were replying to is no longer on this page, so your reply was moved here. It has not been sent, and from this box it would be a new line of talk, not a reply.", "468 left"],
       "the box is gone, and its words are in the top box with a line saying so (and the top box's own count followed)");
     assert.equal(state.said.length, saidBefore, "nothing was sent by the move");
+    assert.deepEqual(await p.evalJs(`(() => { const r = ${MOVED}.getBoundingClientRect(); return [r.top >= 0 && r.bottom <= window.innerHeight, document.activeElement === ${TOP}]; })()`), [true, true],
+      "and the reader is brought to it: the line is on screen at 390 and the keyboard is in the box that now holds their words");
     // the top box already holds words: the reply's draft is NOT poured over them; it stays in the reply box and comes back with the next Reply
     await press(p, `${CARD}.querySelector('[data-reply="50101"]')`);
     await p.evalJs(`${RB}.querySelector("[data-rb-text]").value = "a second draft"; true`);
@@ -693,6 +734,33 @@ test("THE REPLY BOX OPENS WHERE REPLY IS PRESSED: directly under that message, t
       [0, "half a thought about the harbour", "The message you were replying to is no longer on this page. Your reply is kept: it will be in the reply box the next time you press Reply."], "the top box's own words are untouched, and the line says where the reply is");
     await press(p, `${CARD}.querySelector('[data-reply="50114"]')`);
     assert.equal(await p.evalJs(`${RB}.querySelector("[data-rb-text]").value`), "a second draft", "and there it is");
+    // once the moved words are SENT from the top box, the line that says "it has not been sent" is gone
+    state.sayAnswer = undefined;
+    await sendSay(p, "half a thought about the harbour");
+    await p.until(`${TOP}.value === ""`, "the moved words were sent from the top box");
+    assert.equal(state.said.at(-1).reply_to, undefined, "as a new line of talk, as the line said (no reply_to)");
+    assert.equal(await p.evalJs(`${MOVED}.hidden`), true, "the line does not outlive the sending");
+    // IN A ROOM SHOWN BY ITSELF the top box is put away; when a reply's words are moved there, it is shown, so the words and the line can be seen
+    await press(p, `${CARD}.querySelector("[data-open-room]")`);
+    assert.equal(await p.evalJs(`getComputedStyle(document.querySelector("section[data-say]")).display`), "none", "control: in a room by itself the top box is put away");
+    const lone = { handle: "noe", standing: "resident", said: "An invented opening message, the only one left.", at: "2026-11-14T20:30:00.000Z", at_ms: 1794688200000, x: 0, y: 0, id: 50140, circle: 50140 };
+    state.live = [thread({ voice_count: 1, latest: lone.at, voices: [lone] })];
+    await p.tick();
+    await p.until(`!${CARD}.querySelector('.c-voice[data-say="50114"]')`, "the message under the box left the room shown by itself");
+    assert.deepEqual(await p.evalJs(`(() => { const r = ${MOVED}.getBoundingClientRect(); return [getComputedStyle(document.querySelector("section[data-say]")).display !== "none", ${TOP}.value, ${MOVED}.hidden, r.top >= 0 && r.bottom <= window.innerHeight, document.documentElement.classList.contains("c-rooming")]; })()`),
+      [true, "a second draft", false, true, true], "still in the room by itself: the top box is shown with the words, and the line is on screen");
+    await press(p, `document.querySelector("[data-alone-back]")`);
+    // THE SIGN-IN RUNS OUT while a reply is being written (the review's 4b): the box and its words are NOT taken away; it says so and offers Sign in
+    await p.until(`!!${CARD}.querySelector('[data-reply="50140"]')`, "Reply on the room's one message");
+    await press(p, `${CARD}.querySelector('[data-reply="50140"]')`);
+    await p.evalJs(`${RB}.querySelector("[data-rb-text]").value = "words that must not be lost"; localStorage.removeItem("pm.oauth.token"); true`);
+    const saidAtLapse = state.said.length;
+    await press(p, `${RB}.querySelector("[data-rb-send]")`);
+    await p.until(`!!${RB} && !${RB}.querySelector("[data-rb-signin]").hidden && !document.querySelector("[data-say-signedout]").hidden`, "the page has learned nobody is signed in, and the box is still there");
+    assert.deepEqual(await box(`[document.querySelectorAll(".c-thread [data-rb]").length, box.querySelector("[data-rb-text]").value, box.querySelector("[data-rb-bounce]").textContent, box.querySelector("[data-rb-send]").disabled, box.querySelector("[data-rb-signin]").textContent, box.previousElementSibling.dataset.say]`),
+      [1, "words that must not be lost", "Your sign-in has lapsed, so nothing was said. Your words are still in this box.", true, "Sign in ↗", "50140"], "the box stays under its message with the words, says the sign-in has lapsed, will not send, and offers Sign in");
+    assert.equal(state.said.length, saidAtLapse, "nothing was said");
+    assert.equal(await p.evalJs(`document.querySelectorAll("[data-reply]").length`), 0, "(Reply itself is no longer offered: nobody is signed in)");
     assert.deepEqual(findReads(p), [], "and none of it asked ?room= or ?circle=");
   } finally { await p.close(); }
 });
@@ -751,6 +819,50 @@ test("ONE OPEN PER ROOM, NONE PER MESSAGE: no message has an Open; each room's c
     assert.deepEqual(await q.evalJs(shown), [], "and draws no room in its place");
     assert.deepEqual(findReads(q), [], "without asking the office for it");
   } finally { await q.close(); }
+});
+
+// The review of #478 (finding 1a, and its flips): "If the list is failing when the page learns who is signed in, Reply never appears and nothing says
+// why", and "the walkers ask no longer stands down during a back-off: green … Nothing guards it".
+test("WHERE THEY STAND IS NEVER ASKED WHILE THE LIST IS FAILING: the page says so in one plain line, asks ONCE when the list answers again, and Reply appears; the tab coming back is one more ask", async () => {
+  const { b, base } = await boot(false);
+  const state = { ...fourRooms(), me: HOUSE, walkers: STANDING() };
+  const inner = makeOffice(state);
+  let listDown = true, releaseMe = null;
+  const meHeld = new Promise((ok) => { releaseMe = ok; });
+  // the list fails; who is signed in is answered only when the test says so (so the page is KNOWN to be backing off when it learns it)
+  const office = (method, path, body) => {
+    if (path.startsWith("/world/conversations") && listDown) return "fail";
+    if (path === "/me") return meHeld.then(() => inner(method, path, body));
+    return inner(method, path, body);
+  };
+  const p = await openPage(b, base, { office, signedIn: true });
+  const MINE = `document.querySelector("[data-mine]")`;
+  const lists = () => p.calls.filter((c) => c.path.startsWith("/world/conversations?closed=")).length;
+  try {
+    await p.until(`/isn't answering/.test(document.querySelector("[data-live]").textContent)`, "the list has failed and the page is waiting to retry");
+    releaseMe();
+    await p.until(`!!${MINE} && !${MINE}.hidden`, "the page says why there is no Reply yet");
+    assert.equal(await p.evalJs(`${MINE}.textContent`), "The office isn't answering just now, so this page can't yet tell where your residents are standing. Reply will appear once it can.");
+    await new Promise((ok) => setTimeout(ok, 700));
+    assert.equal(walkerAsks(p), 0, "while the list is failing, where they stand is NOT asked (the page is not asking a silent office for more)");
+    // the list answers again: the owed ask is made, once, and Reply appears with no reload
+    listDown = false;
+    const before = lists();
+    await p.poll();
+    await p.until(`${repliesIn(ROOM)} === 3`, "Reply appears once the list has answered and where they stand has been read");
+    assert.ok(lists() > before, "control: the list did answer again");
+    assert.equal(walkerAsks(p), 1, "asked ONCE");
+    assert.match(await p.evalJs(`${MINE}.textContent`), /^Your residents are in: Cave Interior \(claran\)/);
+    await p.poll();
+    await new Promise((ok) => setTimeout(ok, 900));
+    assert.equal(walkerAsks(p), 1, "and not again by the polls that follow");
+    // the tab goes to the back and returns: where they stand is read again, once (a resident may have walked meanwhile)
+    state.walkers = [walker("claran", 9005, 0), walker("amia", 5010, 0), walker("liv", 20000, 0)];
+    await p.evalJs(`(() => { const set = (v) => Object.defineProperty(document, "hidden", { configurable: true, get: () => v }); set(true); document.dispatchEvent(new Event("visibilitychange")); set(false); document.dispatchEvent(new Event("visibilitychange")); return true; })()`);
+    await p.until(`${repliesIn(ROOM_C)} === 3 && ${repliesIn(ROOM)} === 0`, "the page follows claran to the far field when the tab comes back");
+    assert.equal(walkerAsks(p), 2, "one more ask for the tab's return");
+    assert.deepEqual(findReads(p), [], "and no ?room= or ?circle= read anywhere in it");
+  } finally { await p.close(); }
 });
 
 test("B · THE POLL DOES NOT DISTURB A READER: a poll that moved nothing redraws nothing; a reply that lands ABOVE the line they are on does not move it; their own reply lands in view", async () => {
