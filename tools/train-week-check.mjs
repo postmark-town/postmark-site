@@ -66,6 +66,12 @@ export function judge(ref, { on = todayLocal(), flexed = FLEXED } = {}) {
   if (kind === "train") {
     const open = cur.week + 1;
     if (week === open) return { ok: true, note: `${name} is the open train (ships Sunday, release week ${open})` };
+    // THE FREEZE WEEKEND (CORE-160; postmark-telemetry SHIPPING § 2). The open train freezes on Friday night
+    // and the next train opens from its tip the same night, so from Friday until release day the open train is
+    // TWO weeks ahead: w49 frozen on Friday of release week 48 means w50 is open. The check knows the day, not
+    // the hour, so Friday counts whole. On Sunday the week rolls and that train is `open` again.
+    if (week === open + 1 && (on.getUTCDay() === 5 || on.getUTCDay() === 6))
+      return { ok: true, note: `${name} is the open train during the freeze (Friday to Sunday: w${open} is frozen and ships next)` };
     if (week === cur.week && isReleaseDay) return { ok: true, note: `${name} ships today` };
     if (week === cur.week) return { ok: true, note: `${name} is this week's train, shipped or shipping — patch work rides release/${year}-w${week}.N` };
     if (flex) return { ok: true, warn: `${name}: ${flex}` };
@@ -133,6 +139,13 @@ function selfTest() {
     ["release/2026-w37", "2026-09-06", true],   // release day
     ["release/2026-w37", "2026-09-03", true],   // flexed by the founder's word (WARN)
     ["wright/some-feature", "2026-09-03", true],
+    // the freeze weekend (CORE-160): w49 frozen on Friday 2026-11-27 (release week 48), w50 open
+    ["train/2026-w50", "2026-11-27", true],     // Friday of the freeze: the open train is two weeks ahead
+    ["train/2026-w50", "2026-11-28", true],     // Saturday, still the freeze
+    ["train/2026-w50", "2026-11-29", true],     // Sunday: the week rolled, w50 is simply the open train
+    ["train/2026-w50", "2026-11-26", false],    // Thursday: no freeze yet, two weeks ahead is the 09-03 class
+    ["train/2026-w51", "2026-11-27", false],    // three weeks ahead, freeze or not
+    ["release/2026-w50", "2026-11-28", false],  // the freeze opens a train, never a tag
   ];
   let bad = 0;
   for (const [ref, day, want] of cases) {
@@ -149,6 +162,7 @@ function selfTest() {
     ["train/2026-w39", "2026-09-08", null],                 // two weeks ahead — no lawful tag
     ["train/2026-w36", "2026-09-08", null],                 // an old train does not reopen
     ["release/2026-w37", "2026-09-08", null],               // not a train name
+    ["train/2026-w50", "2026-11-27", null],                 // the open train during the freeze has no lawful tag: the frozen w49 ships first
   ];
   for (const [ref, day, want] of tagCases) {
     const r = tagBaseFor(ref, { on: on(day) });

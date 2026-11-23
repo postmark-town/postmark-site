@@ -16,6 +16,8 @@ name: Deploy (snapshot -> dev; release proves the tag, the box publishes prod)
 #
 # Four lanes, one build:
 #   - push to train/**        -> SNAPSHOT build -> dev.postmark.town webroot
+#                                (only the train the DEV_TRAIN variable names, when
+#                                it names one: DEV SHOWS ONE TRAIN, below)
 #   - push to main (train PR merged; founder-approved) -> cut release tag ->
 #                                RELEASE build at that tag -> prod
 #   - push a release/* tag    -> RELEASE build  -> postmark.town webroot (prod)
@@ -42,8 +44,21 @@ on:
         type: choice
         options: [snapshot, release]
 
+# DEV SHOWS ONE TRAIN (CORE-160; postmark-telemetry SHIPPING § 2.6). From the
+# w49 freeze two trains are open at once: the frozen release, which people test
+# on dev for a week, and the open train taking new work. A push to ANY train/**
+# used to rebuild dev, so dev showed whichever pushed last. When the repository
+# variable DEV_TRAIN names a train (Settings -> Variables -> Actions, e.g.
+# `train/2026-w49`, set at the freeze), a push to any OTHER train builds
+# nothing: town-seam and deploy skip. A push to DEV_TRAIN, main, a tag, the
+# schedule and every workflow_dispatch run as before. DEV_TRAIN unset = today's
+# behaviour, every train push rebuilds dev.
+#
+# The skipped push gets a concurrency group of its own: in the shared `dev`
+# group, with cancel-in-progress, the open train's push would cancel the frozen
+# train's dev deploy mid-run even though its own jobs then skip.
 concurrency:
-  group: deploy-${{ (startsWith(github.ref, 'refs/tags/release/') || github.ref == 'refs/heads/main' || github.event_name == 'schedule' || inputs.channel == 'release') && 'prod' || 'dev' }}
+  group: deploy-${{ (startsWith(github.ref, 'refs/tags/release/') || github.ref == 'refs/heads/main' || github.event_name == 'schedule' || inputs.channel == 'release') && 'prod' || ((github.event_name == 'push' && startsWith(github.ref, 'refs/heads/train/') && vars.DEV_TRAIN != '' && github.ref_name != vars.DEV_TRAIN) && format('dev-not-shown-{0}', github.ref_name) || 'dev') }}
   cancel-in-progress: true
 
 jobs:
@@ -108,7 +123,8 @@ jobs:
   # files cross over, as an artifact. Snapshot lane only, by the same test the
   # concurrency group uses: the release lane's data is the box's to refresh.
   town-seam:
-    if: ${{ !(startsWith(github.ref, 'refs/tags/release/') || github.ref == 'refs/heads/main' || github.event_name == 'schedule' || inputs.channel == 'release') }}
+    # and only for the train dev shows (DEV SHOWS ONE TRAIN, at the top)
+    if: ${{ !(startsWith(github.ref, 'refs/tags/release/') || github.ref == 'refs/heads/main' || github.event_name == 'schedule' || inputs.channel == 'release') && (github.event_name != 'push' || !startsWith(github.ref, 'refs/heads/train/') || vars.DEV_TRAIN == '' || github.ref_name == vars.DEV_TRAIN) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -172,7 +188,9 @@ jobs:
     # town-seam is skipped on the release lane and must succeed on the
     # snapshot lane: a failed fold stops the dev deploy rather than shipping
     # the committed seam.
-    if: ${{ !cancelled() && (needs.cut-release-tag.result == 'success' || needs.cut-release-tag.result == 'skipped') && (needs.town-seam.result == 'success' || needs.town-seam.result == 'skipped') }}
+    # A train DEV_TRAIN doesn't name skips here too (DEV SHOWS ONE TRAIN, at the top): town-seam skipped
+    # for it, and a snapshot without its fold must not ship.
+    if: ${{ !cancelled() && (needs.cut-release-tag.result == 'success' || needs.cut-release-tag.result == 'skipped') && (needs.town-seam.result == 'success' || needs.town-seam.result == 'skipped') && (github.event_name != 'push' || !startsWith(github.ref, 'refs/heads/train/') || vars.DEV_TRAIN == '' || github.ref_name == vars.DEV_TRAIN) }}
     runs-on: ubuntu-latest
     steps:
       - name: Decide the lane
