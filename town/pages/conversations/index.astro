@@ -643,7 +643,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var h = hearOf(card), out = [];
         if (!h) return out;
         h.residents.forEach(function (x) { out.push({ value: x, label: x }); });
-        if (h.human) out.push({ value: HUMAN_AS, label: "yourself (the human of the house)" });
+        // a short label: under a message on a phone the chooser is narrow, and the long one ("yourself (the human of the house)") was cut short there
+        if (h.human) out.push({ value: HUMAN_AS, label: "yourself (the human)" });
         return out;
       }
       // What the reader has done in this room, kept on its card so a poll never undoes it: the circles they opened, the lines they have been shown, the
@@ -2544,6 +2545,10 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     .convo .c-reply .c-say-as { margin: 0 0 0.5em; }
     .convo .c-reply-note { margin: 0.6em 0 0; }
     .convo .c-reply-beside-words { font-size: 0.86rem; color: #e8dfc9; }
+    @media (max-width: 34rem) {
+      /* on a phone the choosers take the box's whole width, on their own line under their label, so no name in them is cut short */
+      .convo .c-reply .c-say-select { flex: 1 1 100%; width: 100%; min-width: 0; }
+    }
     /* CORE-161: ONE ROOM BY ITSELF (#room-<thread id>). Everything but that room's card steps aside; its pane's height is lifted, so the whole
        conversation reads straight down the page */
     html.c-rooming main.convo > *:not(.c-head):not(.c-live):not(.c-past):not([data-alone]) { display: none; }
