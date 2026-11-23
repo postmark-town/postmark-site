@@ -164,7 +164,7 @@
 .pm .pm-rail-seat[data-open] > .pm-rail-more svg { transform: rotate(180deg); }
 .pm .pm-rail-pages {
   display: none; position: absolute; top: 100%; left: 0; z-index: 70;
-  min-width: 11rem; max-width: calc(100vw - 16px); box-sizing: border-box;
+  width: max-content; min-width: 11rem; max-width: calc(100vw - 16px); box-sizing: border-box;   /* as wide as its longest page, wrapping only past the window */
   margin: 0; padding: 0.4em; list-style: none; text-align: left;
   background: var(--pm-harbor); border: 1px solid rgba(232, 196, 139, 0.32); border-radius: 10px;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
