@@ -551,15 +551,18 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // while the speaker is aboard too. A reply into any other conversation, and into one that has gone quiet, is refused. So for each LIVE room this
       // works out which of the signed-in household's residents stand within earshot of one of its lines, from where the world's public walkers read
       // says they stand. It is the page's reading of positions that can be some seconds old: the office still judges every say.
-      //   · a resident the world has not placed (the read marks them a placeholder) can hear nothing;
+      //   · a resident with no ground on the map speaks from the Origin (the read lists them there, marked a placeholder), and so does one the read
+      //     does not list at all: the office stands such a voice at the Origin (office src/world.mjs, the say's `standpoint`: "Their voice lands
+      //     there honestly instead of being refused"), so the page judges them from the Origin's point too;
       //   · a line's point is served rounded to the metre, so a metre of slack is allowed (a button at the very edge may still be refused);
       //   · a room longer than its read does not carry its earlier lines' points: a resident inside that room's whole ground (its `extent`) plus
       //     earshot MAY hear it, and is offered Reply rather than wrongly denied it.
       // THE HOUSE'S HUMAN speaks from beside a resident the OFFICE picks (office src/world.mjs humanStand): a housemate aboard a vessel first (the
       // first such, in the house's own order); else the housemate most lately awake in the world, which only the office knows; else the first placed.
       // So the human is offered only where the office's pick cannot miss: beside the aboard housemate when there is one, else only when EVERY placed
-      // housemate can hear.
-      function standsSomewhere(w) { return !!w && typeof w === "object" && !w.placeholder && isFinite(w.x) && isFinite(w.y); }
+      // housemate can hear. (The office counts a housemate as placed when the world has a standpoint for them, the Origin's included; with none
+      // placed it stands the human beside the house's first resident, at the Origin.)
+      function standsSomewhere(w) { return !!w && typeof w === "object" && isFinite(w.x) && isFinite(w.y); }
       function canHear(w, t, earshot) {
         if (!standsSomewhere(w) || !t || !t.live) return false;
         if (w.aboard && t.aboard) return true;
@@ -574,18 +577,19 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           return w.x >= e.x0 - reach && w.x <= e.x1 + reach && w.y >= e.y0 - reach && w.y <= e.y1 + reach;
         return false;
       }
-      function hearersOf(t, house, where, earshot) {
+      function hearersOf(t, house, where, earshot, origin) {
         var out = { residents: [], human: false };
-        if (!house || !Array.isArray(house.handles) || !where || !t || !t.live) return out;
-        var placed = [], aboardFirst = null;
+        if (!house || !Array.isArray(house.handles) || !house.handles.length || !where || !t || !t.live) return out;
+        var from = standsSomewhere(origin) ? { x: Number(origin.x), y: Number(origin.y) } : { x: 0, y: 0 };      // the Origin: where an unlisted resident's voice lands
+        var placed = [], hears = {}, aboardFirst = null;
         house.handles.forEach(function (h) {
-          var w = where[h];
-          if (!standsSomewhere(w)) return;
-          placed.push(h);
-          if (w.aboard && aboardFirst === null) aboardFirst = h;
-          if (canHear(w, t, earshot)) out.residents.push(h);
+          var w = where[h], listed = standsSomewhere(w);
+          if (listed) { placed.push(h); if (w.aboard && aboardFirst === null) aboardFirst = h; }
+          if (canHear(listed ? w : from, t, earshot)) { hears[h] = true; out.residents.push(h); }
         });
-        if (placed.length) out.human = aboardFirst !== null ? out.residents.indexOf(aboardFirst) !== -1 : out.residents.length === placed.length;
+        if (aboardFirst !== null) out.human = !!hears[aboardFirst];
+        else if (placed.length) out.human = placed.every(function (h) { return !!hears[h]; });
+        else out.human = !!hears[house.handles[0]];
         return out;
       }
       // HEAR:END
@@ -600,6 +604,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       var whereState = "none";               // none | asking | known | failed
       var whereAsk = null;
       var whereStamp = 0;
+      var originAt = null;                   // the Origin's point, as the walkers read lists a resident with no ground there (0,0 when it lists none)
       var earshotM = 60;                     // the office's own number, taken from each list answer (`earshot_m`); 60 until the first one
       function askWhere() {
         if (!house) return Promise.resolve(false);
@@ -612,7 +617,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             whereAsk = null;
             if (!d || !Array.isArray(d.walkers)) { if (whereState !== "known") whereState = "failed"; showMine(); return false; }
             var mine = {};
-            d.walkers.forEach(function (w) { if (w && house && house.handles.indexOf(w.handle) !== -1) mine[w.handle] = w; });
+            originAt = null;
+            d.walkers.forEach(function (w) {
+              if (!w) return;
+              if (originAt === null && w.source === "origin" && isFinite(w.x) && isFinite(w.y)) originAt = { x: Number(w.x), y: Number(w.y) };
+              if (house && house.handles.indexOf(w.handle) !== -1) mine[w.handle] = w;
+            });
             where = mine; whereState = "known"; whereStamp++;
             showMine();
             return true;
@@ -985,7 +995,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       var mineBox = document.querySelector("[data-mine]");
       function mineOnCard(card) {
         var t = card.__t, line = card.querySelector("[data-mine-here]");
-        var hear = house && whereState === "known" && t && t.live ? hearersOf(t, house, where, earshotM) : null;
+        var hear = house && whereState === "known" && t && t.live ? hearersOf(t, house, where, earshotM, originAt) : null;
         card.__hear = hear;
         if (!hear) { if (line) line.remove(); return; }
         if (!line) {

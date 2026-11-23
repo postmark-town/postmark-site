@@ -122,7 +122,9 @@ test("a resident can hear a LIVE conversation when they stand within earshot of 
   assert.equal(canHear(at(250, 100), room(), EARSHOT), false, "between two lines and near neither (150 m from each): not within the room's box, within earshot of a line");
   assert.equal(canHear(at(100, 130), room(), 20), false, "the earshot is the office's number, not a constant: at 20 m this resident, 30 m off, is out");
   assert.equal(canHear(at(100, 100), room({ live: false }), EARSHOT), false, "a conversation that has gone quiet takes no reply, however near (the office's room is the OPEN one)");
-  assert.equal(canHear(at(100, 100, { source: "origin", placeholder: true }), room(), EARSHOT), false, "a resident the world has not placed stands nowhere");
+  // a resident with no ground on the map speaks from the Origin (the walkers read lists them there, marked a placeholder): judged from that point like any other
+  assert.equal(canHear(at(0, 0, { source: "origin", placeholder: true }), room(), EARSHOT), false, "at the Origin, 141 m from this room's nearest line");
+  assert.equal(canHear(at(0, 0, { source: "origin", placeholder: true }), room({ voices: [{ handle: "pica", said: "a", x: 30, y: 40, id: 1 }] }), EARSHOT), true, "a conversation AT the Origin is one a groundless resident speaks into (office src/world.mjs: \"Their voice lands there honestly instead of being refused\")");
   for (const nowhere of [null, undefined, {}, { x: "a", y: 1 }]) assert.equal(canHear(nowhere, room(), EARSHOT), false);
   // aboard: the deck is the place
   assert.equal(canHear(at(9000, 9000, { aboard: true }), room({ aboard: true }), EARSHOT), true, "aboard, and the conversation is aboard: one deck, wherever the vessel is");
@@ -140,8 +142,13 @@ test("the household: each resident by where they stand; the house's human only w
   const where = { ada: at(100, 100), ben: at(5000, 0), cy: at(110, 100) };
   assert.deepEqual(hearersOf(A, house, where, 60), { residents: ["ada", "cy"], human: false }, "ada and cy stand in it; the human is NOT offered, since the office may stand them beside ben");
   assert.deepEqual(hearersOf(A, house, { ...where, ben: at(120, 90) }, 60), { residents: ["ada", "ben", "cy"], human: true }, "every placed housemate hears it: whoever the office picks, the human's reply lands");
-  assert.deepEqual(hearersOf(A, house, { ada: at(100, 100), cy: at(110, 100) }, 60), { residents: ["ada", "cy"], human: true }, "a housemate the world has not placed is never the office's pick while another is placed");
-  assert.deepEqual(hearersOf(A, house, { ada: at(100, 100), ben: at(5000, 0, { placeholder: true }), cy: at(110, 100) }, 60), { residents: ["ada", "cy"], human: true });
+  assert.deepEqual(hearersOf(A, house, { ada: at(100, 100), cy: at(110, 100) }, 60), { residents: ["ada", "cy"], human: true }, "a housemate the read does not list is never the office's pick for the human while another is placed (and, judged from the Origin, cannot hear this room)");
+  assert.deepEqual(hearersOf(A, house, { ada: at(100, 100), ben: at(0, 0, { source: "origin", placeholder: true }), cy: at(110, 100) }, 60), { residents: ["ada", "cy"], human: false }, "a housemate with no ground IS one the office may stand the human beside (at the Origin), so the human is not offered here");
+  // a conversation at the Origin: residents the read does not list speak from there, as the office stands them
+  const atOrigin = room({ voices: [{ handle: "pica", said: "a", x: 10, y: 0, id: 1 }] });
+  assert.deepEqual(hearersOf(atOrigin, house, {}, 60), { residents: ["ada", "ben", "cy"], human: true }, "nobody listed: each speaks from the Origin, and the human is stood beside the house's first resident there");
+  assert.deepEqual(hearersOf(atOrigin, house, { ben: at(5000, 0) }, 60), { residents: ["ada", "cy"], human: false }, "ben is placed elsewhere: he cannot hear it, and he is the one the office would stand the human beside");
+  assert.deepEqual(hearersOf(room({ voices: [{ handle: "pica", said: "a", x: 900, y: 900, id: 1 }] }), house, {}, 60, { x: 900, y: 900 }), { residents: ["ada", "ben", "cy"], human: true }, "the Origin's point is the one the walkers read lists, not a constant");
   // the office's first rung: a housemate ABOARD a vessel is chosen before any ashore (the first such, in the house's own order)
   const deck = room({ aboard: true });
   assert.deepEqual(hearersOf(deck, house, { ada: at(100, 100), ben: at(7000, 7000, { aboard: true }), cy: at(7000, 7000, { aboard: true }) }, 60), { residents: ["ada", "ben", "cy"], human: true }, "the human stands with ben, who is aboard and hears the deck");
@@ -149,7 +156,7 @@ test("the household: each resident by where they stand; the house's human only w
   // nobody signed in, nowhere known, nobody placed, a quiet room: nothing is offered
   assert.deepEqual(hearersOf(A, null, where, 60), { residents: [], human: false });
   assert.deepEqual(hearersOf(A, house, null, 60), { residents: [], human: false });
-  assert.deepEqual(hearersOf(A, house, {}, 60), { residents: [], human: false }, "nobody placed: no resident, and no human");
+  assert.deepEqual(hearersOf(A, house, {}, 60), { residents: [], human: false }, "nobody listed, and this room is not at the Origin: no resident, and no human");
   assert.deepEqual(hearersOf(room({ live: false }), house, where, 60), { residents: [], human: false });
 });
 
