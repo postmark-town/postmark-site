@@ -351,12 +351,16 @@ export function sectionOf(active) {
   ) ?? null;
 }
 
+/** A section's members a reader may see: held ones never; a flagged one only while its flag is on. The chip row and the
+ *  rail's page list (rail-pages.mjs, CORE-164) both read this one rule. */
+export const shownMembers = (s, flags = {}) => (s?.members ?? []).filter((m) => !m.held && (!m.flag || flags[m.flag] === true));
+
 /** The section's chip row for this page, or null. Held chips never render;
  *  a flagged chip renders only when its flag is on. */
 export function chipsFor(active, { flags = {} } = {}) {
   const s = sectionOf(active);
   if (!s || !s.members) return null;
-  return { of: s, chips: s.members.filter((m) => !m.held && (!m.flag || flags[m.flag] === true)) };
+  return { of: s, chips: shownMembers(s, flags) };
 }
 
 /**

@@ -143,6 +143,46 @@
   background: linear-gradient(180deg, var(--pm-gold-bright), var(--pm-gold));
   font-weight: 700;
 }
+/* A SEAT'S PAGES (CORE-164; Darko, 2026-11-23 08:37 EST: "hover over any of the main rail headers to see their pages as a vertical list").
+   A seat that has pages stands in `.pm-rail-seat`: its link, a small button (keyboard and touch; the script reveals it) and the list. The list
+   hangs from the seat's bottom edge with no gap, so the pointer can travel into it without the list closing; it shows while the pointer is on
+   the seat or the list (only where the device can hover: a tap's sticky hover would hold it open on a phone), or while the button has it open.
+   Shut, it is display:none, so its links are out of the tab order. It never moves the rail: it floats over the page beneath, and the script
+   shifts it sideways (--pm-rail-shift) only as far as keeps it inside the window. The rail's own link styles are for the seats: the list's links
+   take their own, quieter shape, and the page the reader is on is marked in the list, not filled like the lit seat. */
+.pm .pm-rail-seat { position: relative; display: inline-flex; align-items: center; }
+.pm .pm-rail-more {
+  display: inline-grid; place-items: center; flex: none;
+  width: 1.5em; height: 1.9em; margin-left: -0.35em; padding: 0;
+  font: inherit; font-size: 0.74rem; line-height: 1; cursor: pointer;
+  color: rgba(232, 196, 139, 0.62); background: none; border: 0; border-radius: 999px;
+}
+.pm .pm-rail-more[hidden] { display: none; }
+.pm .pm-rail-more:hover, .pm .pm-rail-more:focus-visible, .pm .pm-rail-seat[data-open] > .pm-rail-more { color: var(--pm-gold-bright); background: rgba(232, 196, 139, 0.08); }
+.pm .pm-rail-more:focus-visible { outline: 2px solid var(--pm-gold); outline-offset: 1px; }
+.pm .pm-rail-more svg { transition: transform 0.12s ease; }
+.pm .pm-rail-seat[data-open] > .pm-rail-more svg { transform: rotate(180deg); }
+.pm .pm-rail-pages {
+  display: none; position: absolute; top: 100%; left: 0; z-index: 70;
+  min-width: 11rem; max-width: calc(100vw - 16px); box-sizing: border-box;
+  margin: 0; padding: 0.4em; list-style: none; text-align: left;
+  background: var(--pm-harbor); border: 1px solid rgba(232, 196, 139, 0.32); border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+  transform: translateX(var(--pm-rail-shift, 0px));
+}
+.pm .pm-rail-seat[data-open] > .pm-rail-pages { display: block; }
+@media (hover: hover) and (pointer: fine) {
+  .pm .pm-rail-seat:hover:not([data-shut]) > .pm-rail-pages { display: block; }
+}
+.pm .pm-townnav-links .pm-rail-pages a {
+  display: flex; align-items: baseline; gap: 0.5em;
+  padding: 0.5em 0.7em; border-radius: 6px; white-space: normal;
+  color: rgba(246, 220, 174, 0.88); background: none; font-weight: 400;
+}
+.pm .pm-townnav-links .pm-rail-pages a:hover, .pm .pm-townnav-links .pm-rail-pages a:focus-visible { color: var(--pm-gold-bright); background: rgba(232, 196, 139, 0.1); }
+.pm .pm-townnav-links .pm-rail-pages a:focus-visible { outline: 2px solid var(--pm-gold); outline-offset: -2px; }
+.pm .pm-townnav-links .pm-rail-pages a[aria-current="page"] { color: var(--pm-gold-bright); background: rgba(232, 196, 139, 0.14); font-weight: 700; }
+
 /* the rail's END: Join, then the reader's own corner (PostmarkLayout.astro) */
 .pm .pm-townhead-end { display: inline-flex; align-items: center; gap: 0.6em; margin-left: auto; flex: none; }
 @media (max-width: 860px) {

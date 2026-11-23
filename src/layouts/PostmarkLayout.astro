@@ -9,6 +9,7 @@ import "../styles/postmark.css";
 // law "a page per read, a read per page; this structure is the rail's single
 // source". `test/nav.test.mjs` holds it to that. See that file for why.
 import { RAIL, rowFor, sectionOf, navFlags } from "@/lib/nav.mjs";
+import { railPageLists } from "@/lib/rail-pages.mjs";
 import ChipRow from "@/components/ChipRow.astro";
 import DoorLine from "@/components/DoorLine.astro";
 import LikenessPrompt from "@/components/LikenessPrompt.astro";
@@ -70,6 +71,11 @@ const here = sectionOf(active);
 //
 // There is exactly one <ChipRow> in this file, and the suite counts it.
 const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
+
+// EACH SEAT'S PAGES, for the list its header shows (CORE-164; Darko, 2026-11-23 08:37 EST: "can we make it so you can hover over any of the
+// main rail headers to see their pages as a vertical list?"). Read from where the site already lists them (rail-pages.mjs: the chip rows'
+// members, and the Town's board pieces); a seat with none gets no list and no control. `here` is this page's own row.
+const pageLists = railPageLists({ path: Astro.url.pathname, flags: navFlags(import.meta.env) });
 ---
 <BaseLayout title={title} description={description} image={image ?? sectionCard(active)} card={card} chrome="none" bgm={false} noindex={noindex} canonical={canonical}><HalloweenSkin slot="head" /><slot name="head" slot="head" />
   <script is:inline>
@@ -166,9 +172,35 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
             as a link to their own window. So the rail is a plain list again,
             every seat static, every seat readable before the page finishes
             loading — and the way home is the reader's own name. */}
-        {RAIL.filter((n) => !n.lantern).map((n) => (
+        {/* A SEAT'S PAGES (CORE-164; Darko, 2026-11-23 08:37 EST: "hover over any of the main rail headers to see their pages as a vertical
+            list"). A seat that has pages (pageLists, from rail-pages.mjs) stands in a `.pm-rail-seat`: its own link (the seat's destination,
+            unchanged), a small disclosure button for keyboard and touch, and the list. Pointing at the seat shows the list (CSS, on a device
+            that can hover); the button opens and closes it by Enter, Space or a tap, and the script below closes it on Escape, a click
+            elsewhere or focus leaving. The list is display:none until shown, so its links are not in the tab order while it is shut. The
+            button ships hidden and the script reveals it, so without JavaScript the seat is the plain link it always was. A seat without
+            pages has no list and no button. Every seat's own link carries data-rail-top: the rail's row measure (§ THE TOP RAIL, below)
+            counts the seats, never the links inside a list. */}
+        {RAIL.filter((n) => !n.lantern).map((n) => pageLists[n.key] ? (
+          <span class="pm-rail-seat" data-rail-seat>
+            <a
+              href={railHref(n)}
+              data-rail-top
+              aria-current={here?.key === n.key ? "page" : undefined}
+            >{n.label}{n.beta && <span class="pm-nav-beta">beta</span>}</a>
+            <button type="button" class="pm-rail-more" data-rail-more aria-expanded="false" aria-controls={`pm-rail-pages-${n.key}`} hidden>
+              <span class="pm-sr">{n.label}: its pages</span>
+              <svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.6 5 6.6 8 3.6" /></svg>
+            </button>
+            <ul class="pm-rail-pages" id={`pm-rail-pages-${n.key}`} data-rail-pages aria-label={`${n.label}: its pages`}>
+              {pageLists[n.key].map((p) => (
+                <li><a href={p.external ? p.href : `${P}${p.href}`} aria-current={p.here ? "page" : undefined}>{p.label}{p.beta && <span class="pm-nav-beta">beta</span>}</a></li>
+              ))}
+            </ul>
+          </span>
+        ) : (
           <a
             href={railHref(n)}
+            data-rail-top
             aria-current={here?.key === n.key ? "page" : undefined}
           >{n.label}{n.beta && <span class="pm-nav-beta">beta</span>}</a>
         ))}
@@ -328,7 +360,8 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
           head.removeAttribute("data-stacked");
           if (window.matchMedia && window.matchMedia("(max-width: 860px)").matches) return;
           var end = head.querySelector("[data-townhead-end]");
-          var tops = Array.prototype.map.call(head.querySelectorAll(".pm-townnav-links a"), function (a) { return a.getBoundingClientRect().top; });
+          // the SEATS' rows: each seat's own link (data-rail-top), never a link inside a seat's page list (CORE-164)
+          var tops = Array.prototype.map.call(head.querySelectorAll(".pm-townnav-links [data-rail-top]"), function (a) { return a.getBoundingClientRect().top; });
           var edge = head.getBoundingClientRect().right - parseFloat(getComputedStyle(head).paddingRight);
           if (pmRailStacked(tops, end ? end.getBoundingClientRect().right : 0, edge, head.scrollWidth > head.clientWidth + 1)) head.setAttribute("data-stacked", "");
         };
@@ -429,6 +462,13 @@ const row = rowFor(active, { ownChips, flags: navFlags(import.meta.env) });
         window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
       });
     })();
+  </script>
+
+  <script>
+    // A SEAT'S PAGES (CORE-164): the rail's page lists, opened and closed by keyboard and touch, kept inside the window (rail-pages-ui.mjs).
+    // Pointing at a seat needs no script; this reveals each seat's button and binds it.
+    import { mountRailPages } from "@/lib/rail-pages-ui.mjs";
+    mountRailPages(document.querySelector(".pm-townnav-links"));
   </script>
 
   <script>
