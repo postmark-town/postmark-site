@@ -668,6 +668,31 @@ test("THE REPLY BOX OPENS WHERE REPLY IS PRESSED: directly under that message, t
     // Cancel puts the box away, and the keyboard goes back to the Reply it came from
     await press(p, `${RB}.querySelector("[data-rb-cancel]")`);
     assert.deepEqual(await p.evalJs(`[document.querySelectorAll("[data-rb]").length, document.activeElement?.getAttribute("data-reply")]`), [0, "50101"]);
+    // THE DRAFT IS NOT LOST when the message the box sits under leaves the page (Wright, 2026-11-22 21:10 EST: "keep the draft and move it to the top
+    // box with a line saying so"). Here the room's read moves on and no longer holds noe's conversation.
+    const TOP = `document.querySelector("[data-say-text]")`, MOVED = `document.querySelector("[data-say-moved]")`;
+    await press(p, `${CARD}.querySelector('[data-reply="50107"]')`);
+    await p.evalJs(`${RB}.querySelector("[data-rb-text]").value = "half a thought about the harbour"; true`);
+    assert.deepEqual(await p.evalJs(`[${TOP}.value, !!${MOVED}]`), ["", false], "control: the top box is empty and says nothing yet");
+    const without = (circle) => voicesOf().filter((v) => v.circle !== circle);
+    const saidBefore = state.said.length;
+    state.live = [thread({ voice_count: 11, voices: without(50107) })];
+    await p.poll();
+    await p.until(`!${CARD}.querySelector('.c-voice[data-say="50107"]')`, "the message being answered is gone from the page");
+    assert.deepEqual(await p.evalJs(`[document.querySelectorAll("[data-rb]").length, ${TOP}.value, ${MOVED}.hidden, ${MOVED}.textContent, document.querySelector("[data-say-count]").textContent]`),
+      [0, "half a thought about the harbour", false, "The message you were replying to is no longer on this page, so your reply was moved here. It has not been sent, and from this box it would be a new line of talk, not a reply.", "468 left"],
+      "the box is gone, and its words are in the top box with a line saying so (and the top box's own count followed)");
+    assert.equal(state.said.length, saidBefore, "nothing was sent by the move");
+    // the top box already holds words: the reply's draft is NOT poured over them; it stays in the reply box and comes back with the next Reply
+    await press(p, `${CARD}.querySelector('[data-reply="50101"]')`);
+    await p.evalJs(`${RB}.querySelector("[data-rb-text]").value = "a second draft"; true`);
+    state.live = [thread({ voice_count: 1, voices: without(50107).filter((v) => v.circle !== 50101) })];
+    await p.poll();
+    await p.until(`!${CARD}.querySelector('.c-voice[data-say="50101"]')`, "that message is gone too");
+    assert.deepEqual(await p.evalJs(`[document.querySelectorAll("[data-rb]").length, ${TOP}.value, ${MOVED}.textContent]`),
+      [0, "half a thought about the harbour", "The message you were replying to is no longer on this page. Your reply is kept: it will be in the reply box the next time you press Reply."], "the top box's own words are untouched, and the line says where the reply is");
+    await press(p, `${CARD}.querySelector('[data-reply="50114"]')`);
+    assert.equal(await p.evalJs(`${RB}.querySelector("[data-rb-text]").value`), "a second draft", "and there it is");
     assert.deepEqual(findReads(p), [], "and none of it asked ?room= or ?circle=");
   } finally { await p.close(); }
 });

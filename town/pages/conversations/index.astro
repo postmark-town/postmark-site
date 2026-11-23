@@ -933,9 +933,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // where the box sits: directly under the message it answers; when that message is folded away, under its circle's opening message
       function placeReply(list, shape) {
         var node = shape.byId[String(rb.id)];
-        if (!node) { closeReply(false); return; }       // the message has left this page's read of the room: the box has nothing to sit under
+        if (!node) { keepDraft(); closeReply(false); return; }       // the message has left this page's read of the room: the box has nothing to sit under
         var row = keyed(list, node.key) || keyed(list, topOf(node).key);
-        if (!row) { closeReply(false); return; }
+        if (!row) { keepDraft(); closeReply(false); return; }
         row.after(rb.el);
       }
       function openReply(card, node) {
@@ -956,6 +956,32 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         if (box.el.scrollIntoView) box.el.scrollIntoView({ block: "nearest" });
         // where they stand is read again now (the one press that may ask); the chooser follows the answer
         askWhere();
+      }
+      // THE DRAFT IS NOT LOST when the message a reply box sits under leaves the page (its room went from the list, or a long room's read moved past
+      // it). The words go to the box at the top of the page, with one line saying so: they are not sent, and from there they would be a new line
+      // of talk, not a reply. If the top box already holds words of its own, the draft stays in the reply box instead (it is one node, and it
+      // comes back with the next Reply pressed), and the line says that.
+      function keepDraft() {
+        if (!rb || !rb.text.value.trim()) return;
+        var form = document.querySelector("[data-say-form]"), top = document.querySelector("[data-say-text]");
+        if (!form || !top) return;
+        var line = form.querySelector("[data-say-moved]");
+        if (!line) {
+          line = el("p", "c-fine c-say-moved");
+          line.setAttribute("data-say-moved", "");
+          line.setAttribute("role", "status");
+          top.after(line);
+          top.addEventListener("input", function (ev) { if (ev.isTrusted) { line.hidden = true; line.textContent = ""; } });      // said once: gone when they type
+        }
+        if (!form.hidden && !top.value) {
+          top.value = rb.text.value;
+          rb.text.value = "";
+          top.dispatchEvent(new Event("input", { bubbles: true }));       // the box's own count follows
+          line.textContent = "The message you were replying to is no longer on this page, so your reply was moved here. It has not been sent, and from this box it would be a new line of talk, not a reply.";
+        } else {
+          line.textContent = "The message you were replying to is no longer on this page. Your reply is kept: it will be in the reply box the next time you press Reply.";
+        }
+        line.hidden = false;
       }
       function closeReply(clear) {
         if (!rb) return;
@@ -1515,7 +1541,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       }
 
       function dropCard(card) {
-        if (rb && rb.card === card) closeReply(false);
+        if (rb && rb.card === card) { keepDraft(); closeReply(false); }
         var rec = card.__cr;
         if (rec && rec.reader) { try { rec.reader.destroy(); } catch (e) { /* gone */ } }
         if (card.parentNode) card.parentNode.removeChild(card);
@@ -2524,7 +2550,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     html.c-rooming .convo .c-head > *:not(h1):not(.c-crumb) { display: none; }
     html.c-rooming .convo .c-rule, html.c-rooming .convo .c-thread:not(.is-alone), html.c-rooming .convo .c-pager, html.c-rooming .convo .c-empty:not([data-office-down]),
     html.c-rooming .convo .c-loading, html.c-rooming .convo .c-mine, html.c-rooming .convo .c-open-room { display: none; }
-    html.c-rooming .convo .c-thread.is-alone .c-voices { max-height: none; overflow: visible; padding-right: 0; }
+    html.c-rooming .convo .c-thread.is-alone .c-voices { max-height: none; overflow: visible; }      /* the pane keeps its own right inset, so a message's time sits where it does in the lists */
+    .convo .c-say-moved { margin: 0.5em 0 0; color: var(--pm-gold-bright); }
+    .convo .c-say-moved[hidden] { display: none; }
     .convo .c-alone-bar { max-width: 53.75rem; margin: 0 auto 0.2rem; }      /* the cards' own column, so the way back sits over the card it leaves */
     .convo .c-alone-bar > p { margin: 0 0 0.8rem; }
     .convo .c-who {
