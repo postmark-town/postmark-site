@@ -616,6 +616,7 @@ test("THE REPLY BOX OPENS WHERE REPLY IS PRESSED: directly under that message, t
     assert.equal(await p.evalJs(`!!${RB}`), false, "no box until Reply is pressed");
     await press(p, FOLD(50101));
     await press(p, `${CARD}.querySelector('[data-reply="50105"]')`);
+    assert.deepEqual(await p.evalJs(`[document.querySelectorAll(".c-thread [data-rb]").length, document.querySelector("[data-say-reply]").hidden]`), [1, true], "Reply pressed: a reply box is in the room, and the box at the top of the page was not turned into one");
     const at = await box(`(() => { const row = ${CARD}.querySelector('.c-voice[data-say="50105"]'), r = row.getBoundingClientRect(), x = box.getBoundingClientRect(), pane = ${CARD}.querySelector(".c-voices").getBoundingClientRect();
       return { under: box.previousElementSibling === row, boxes: document.querySelectorAll("[data-rb]").length, to: box.querySelector("[data-rb-to]").textContent, focus: document.activeElement === box.querySelector("[data-rb-text]"),
         messageInView: r.top >= pane.top - 1 && r.bottom <= pane.bottom + 1 && r.top >= 0, boxInView: x.bottom <= Math.min(pane.bottom, window.innerHeight) + 1 && x.top >= 0, fits: x.left >= 0 && x.right <= window.innerWidth && document.documentElement.scrollWidth <= window.innerWidth + 1,

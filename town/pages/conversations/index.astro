@@ -2476,7 +2476,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     html.c-rooming .convo .c-rule, html.c-rooming .convo .c-thread:not(.is-alone), html.c-rooming .convo .c-pager, html.c-rooming .convo .c-empty:not([data-office-down]),
     html.c-rooming .convo .c-loading, html.c-rooming .convo .c-mine, html.c-rooming .convo .c-open-room { display: none; }
     html.c-rooming .convo .c-thread.is-alone .c-voices { max-height: none; overflow: visible; padding-right: 0; }
-    .convo .c-alone-bar { margin: 0 0 0.2rem; }
+    .convo .c-alone-bar { max-width: 53.75rem; margin: 0 auto 0.2rem; }      /* the cards' own column, so the way back sits over the card it leaves */
     .convo .c-alone-bar > p { margin: 0 0 0.8rem; }
     .convo .c-who {
       color: var(--pm-gold-bright); text-decoration: none;
