@@ -7,7 +7,8 @@
 // throwaway profile, no sync, no extensions) with REAL input: a pointer that moves, Tab/Shift-Tab/Enter/Space/Escape key events, a touch tap.
 // Every request to /api/ is refused: the rail is static, nobody is signed in. WHAT IT PROVES that test/main-rail-pages.test.mjs cannot:
 //   · pointing at a seat with pages shows ITS list, the pointer can travel from the header into the list without it closing, and leaving
-//     shuts it; a one-door seat shows nothing;
+//     shuts it; a one-door seat shows nothing; its button says expanded exactly while the list is shown, pointing included;
+//   · mixed input: pointed at, Tabbed into, then the pointer moves away, the list and the focused page stay until focus leaves or Escape;
 //   · the keyboard reaches the seat, its button, and the list's pages by Tab, and Shift-Tab back; a shut list's pages are not in the tab
 //     order; Escape shuts it and leaves focus on the button; Tab past the last page shuts it;
 //   · on a phone (touch, no hover) a tap on the button opens the list inside the screen and a tap elsewhere shuts it, while a tap on the
@@ -178,6 +179,7 @@ test("pointing at The World shows its pages; the pointer travels from the header
   assert.deepEqual(await p.evalJs(ANY_SHOWN), [], "nothing is open at rest");
   const head = await p.pointAt(SEAT("world"));
   await p.until(SHOWN("world"), "The World's list, pointed at");
+  assert.equal(await p.evalJs(`document.querySelector(${JSON.stringify(BTN("world"))}).getAttribute("aria-expanded")`), "true", "shown by pointing, and its button says so");
   assert.deepEqual(await p.evalJs(`[...document.querySelectorAll(${JSON.stringify(LIST("world") + " a")})].map((a) => a.textContent.trim().replace(/\\s*beta$/, ""))`), EXPECT_WORLD, "its pages, in the rail source's order");
   // THE POINTER'S PATH: from the header's centre to the first page's centre, in small steps; the list stays shown at every one
   const firstRow = await p.centre(LIST("world") + " li:first-child a");
@@ -192,10 +194,53 @@ test("pointing at The World shows its pages; the pointer travels from the header
   for (const c of contrast) { assert.equal(c.bgA, 1, "the list's surface is opaque"); assert.ok(c.r >= 4.5, `"${c.t}" reads at ${c.r.toFixed(1)}:1`); }
   await p.move(720, 700);
   await p.until(`!${SHOWN("world")}`, "the list shut, the pointer gone");
+  assert.equal(await p.evalJs(`document.querySelector(${JSON.stringify(BTN("world"))}).getAttribute("aria-expanded")`), "false", "and its button says so");
   await p.pointAt(SEAT("mail"));
   await new Promise((r) => setTimeout(r, 200));
   assert.deepEqual(await p.evalJs(ANY_SHOWN), [], "The Mail has no pages to list: nothing opens");
   assert.equal(await p.evalJs(`document.querySelector(${JSON.stringify(SEAT("mail"))}).closest(".pm-rail-seat")`), null, "and it has no control");
+  await p.close();
+});
+
+test("pointed at, Tabbed into, then the pointer moves away: the list and the focused page stay until focus leaves or Escape", { skip: SKIP }, async () => {
+  await setup();
+  const p = await openPage(browser, base, "/docs/", { width: 1440 });
+  await p.until(`!document.querySelector(${JSON.stringify(BTN("world"))}).hidden`, "the script");
+  const expanded = () => p.evalJs(`document.querySelector(${JSON.stringify(BTN("world"))}).getAttribute("aria-expanded")`);
+  await p.pointAt(SEAT("world"));
+  await p.until(SHOWN("world"), "The World's list, pointed at");
+  let at = null;
+  for (let i = 0; i < 40 && at !== EXPECT_WORLD[0]; i++) { await p.press("Tab"); at = await p.evalJs(FOCUS); }
+  assert.equal(at, EXPECT_WORLD[0], "real Tab reaches the pointed-at list's first page");
+  await p.press("Tab");
+  assert.equal(await p.evalJs(FOCUS), EXPECT_WORLD[1]);
+  await p.move(720, 700);
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(await p.evalJs(SHOWN("world")), true, "the pointer left, but keyboard focus is still using the list");
+  assert.equal(await p.evalJs(FOCUS), EXPECT_WORLD[1], "and the focused page is still focused, on screen");
+  assert.equal(await p.evalJs(`document.activeElement.getClientRects().length > 0`), true, "not stranded in a hidden list");
+  assert.equal(await expanded(), "true", "the button says the list is shown");
+  await p.pointAt(SEAT("docs"));
+  await new Promise((r) => setTimeout(r, 200));
+  assert.deepEqual(await p.evalJs(ANY_SHOWN), ["pm-rail-pages-world"], "pointing at another seat leaves the list focus is using");
+  await p.move(720, 700);
+  for (let i = 2; i < EXPECT_WORLD.length; i++) await p.press("Tab");
+  await p.press("Tab");
+  assert.equal(await p.evalJs(FOCUS), "The Mail", "Tab past the last page");
+  await p.until(`!${SHOWN("world")}`, "focus leaving lets the list go");
+  assert.equal(await expanded(), "false");
+  // again, closed by Escape: point, Shift-Tab back into the list's last page, pointer away, Escape
+  await p.pointAt(SEAT("world"));
+  await p.until(SHOWN("world"), "pointed at again");
+  await p.press("Tab", { shift: true });
+  assert.equal(await p.evalJs(FOCUS), EXPECT_WORLD.at(-1), "Shift-Tab from the next seat enters the shown list at its last page");
+  await p.move(720, 700);
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(await p.evalJs(SHOWN("world")), true, "held by focus, the pointer gone");
+  await p.press("Escape");
+  await p.until(`!${SHOWN("world")}`, "Escape lets it go");
+  assert.equal(await p.evalJs(FOCUS), "button:pm-rail-pages-world", "focus returns to the button");
+  assert.equal(await expanded(), "false");
   await p.close();
 });
 

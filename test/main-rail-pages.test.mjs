@@ -10,7 +10,8 @@
 //   (1) membership: each seat's list is its chip row's members by the chip row's own rule (held never, a flagged one only while its flag is
 //       on), or The Town's board pieces; in order, beta and external kept; the five one-door seats get none; no instance pages;
 //   (2) the list sits inside the window's edges (shiftFor);
-//   (3) open and close, on a hand-rolled document: the button, Escape, focus leaving, a press elsewhere, one list at a time;
+//   (3) open and close, on a hand-rolled document: the button, Escape, focus leaving, a press elsewhere, one list at a time; a mouse
+//       pointing (never a finger); keyboard focus in a list holding it after the mouse leaves; aria-expanded always the shown state;
 //   (4) the wiring: the layout draws a list only for a seat that has pages, its button ships hidden, every seat link is the row measure's.
 
 import test from "node:test";
@@ -90,11 +91,11 @@ function fakeDom() {
     e.contains = (x) => { for (let n = x; n; n = n.parent) if (n === e) return true; return false; };
     e.querySelector = (sel) => e.querySelectorAll(sel)[0] ?? null;
     e.querySelectorAll = (sel) => { const a = /^\[([a-z-]+)\]$/.exec(sel)?.[1]; const out = []; const walk = (n) => { for (const c of n.children) { if (a in c.attrs) out.push(c); walk(c); } }; walk(e); return out; };
-    e.focus = () => { doc.focused = e; };
+    e.focus = () => { doc.focused = e; doc.activeElement = e; };
     e.getBoundingClientRect = () => e.rect ?? { left: 0, right: 0, width: 0 };
     return e;
   };
-  const doc = on({ documentElement: { clientWidth: 390 }, focused: null });
+  const doc = on({ documentElement: { clientWidth: 390 }, focused: null, activeElement: null });
   const nav = el();
   const seats = ["world", "docs"].map((k) => {
     const s = el({ "data-rail-seat": "" }), link = el({ "data-rail-top": "" }), btn = el({ "data-rail-more": "", "aria-expanded": "false" }), list = el({ "data-rail-pages": "" });
@@ -130,9 +131,66 @@ test("Escape shuts the list and puts focus on its button; a list shown by pointi
   w.s.fire("keydown", { key: "Escape" });
   assert.ok(!("open" in w.s.dataset));
   assert.equal(doc.focused, w.btn, "focus is back on the button, never stranded in a hidden list");
-  assert.ok("shut" in w.s.dataset, "and pointing no longer shows it");
-  w.s.fire("mouseleave");
-  assert.ok(!("shut" in w.s.dataset), "until the pointer has left");
+  assert.ok(!("shut" in w.s.dataset), "no mouse on the seat: nothing to keep shut, so the next pointing shows it");
+  w.s.fire("pointerenter", { pointerType: "mouse" });
+  assert.ok("open" in w.s.dataset);
+  w.s.fire("keydown", { key: "Escape" });
+  assert.ok(!("open" in w.s.dataset), "Escape shuts a list shown by pointing too");
+  assert.equal(w.btn.getAttribute("aria-expanded"), "false");
+  w.s.fire("pointermove", { pointerType: "mouse" });
+  assert.ok(!("open" in w.s.dataset), "and the mouse still on the seat doesn't show it again");
+  w.s.fire("pointerleave", { pointerType: "mouse" });
+  w.s.fire("pointerenter", { pointerType: "mouse" });
+  assert.ok("open" in w.s.dataset, "until the pointer has left and come back");
+});
+
+test("a mouse pointing shows the list and the button says so; leaving lets it go; a finger never points", () => {
+  const { doc, nav, seats: [w, d] } = fakeDom();
+  mountRailPages(nav, { doc });
+  assert.ok("railJs" in nav.dataset, "the stylesheet's own hover rule stands down for the script");
+  w.s.fire("pointerenter", { pointerType: "touch" });
+  assert.ok(!("open" in w.s.dataset), "a finger is not pointing: a tap's sticky hover holds nothing open");
+  w.s.fire("pointerenter", { pointerType: "mouse" });
+  assert.ok("open" in w.s.dataset);
+  assert.equal(w.btn.getAttribute("aria-expanded"), "true", "shown by pointing, and the button says it is shown");
+  w.s.fire("pointerleave", { pointerType: "mouse" });
+  assert.ok(!("open" in w.s.dataset));
+  assert.equal(w.btn.getAttribute("aria-expanded"), "false");
+  w.s.fire("pointerenter", { pointerType: "mouse" });
+  w.btn.fire("click");
+  assert.ok(!("open" in w.s.dataset), "the button shuts a list shown by pointing (it said expanded, so it collapses)");
+  assert.equal(w.btn.getAttribute("aria-expanded"), "false");
+  w.btn.fire("click");
+  assert.ok("open" in w.s.dataset, "and opens it again");
+  d.s.fire("pointerenter", { pointerType: "mouse" });
+  assert.deepEqual(["open" in w.s.dataset, "open" in d.s.dataset], [false, true], "pointing at Docs shows Docs and lets The World go");
+  assert.deepEqual([w.btn.getAttribute("aria-expanded"), d.btn.getAttribute("aria-expanded")], ["false", "true"]);
+});
+
+test("pointed at, Tabbed into, then the mouse leaves: the list stays with focus in it until focus leaves or Escape", () => {
+  const { doc, nav, seats: [w, d], el } = fakeDom();
+  mountRailPages(nav, { doc });
+  const row = el(); w.list.append(row);
+  w.s.fire("pointerenter", { pointerType: "mouse" });
+  row.focus();
+  w.s.fire("focusin", { target: row });
+  w.s.fire("pointerleave", { pointerType: "mouse" });
+  assert.ok("open" in w.s.dataset, "keyboard focus is still using the list");
+  assert.equal(w.btn.getAttribute("aria-expanded"), "true");
+  d.s.fire("pointerenter", { pointerType: "mouse" });
+  assert.deepEqual(["open" in w.s.dataset, "open" in d.s.dataset], [true, false], "pointing at another seat leaves the list focus is using");
+  d.s.fire("pointerleave", { pointerType: "mouse" });
+  w.s.fire("focusout", { relatedTarget: d.link });
+  assert.ok(!("open" in w.s.dataset), "focus leaving the seat lets it go");
+  assert.equal(w.btn.getAttribute("aria-expanded"), "false");
+  w.s.fire("pointerenter", { pointerType: "mouse" });
+  w.s.fire("focusin", { target: row });
+  w.s.fire("pointerleave", { pointerType: "mouse" });
+  w.s.fire("keydown", { key: "Escape" });
+  assert.ok(!("open" in w.s.dataset), "Escape lets it go");
+  assert.equal(doc.focused, w.btn, "with focus on the button, not left in the hidden list");
+  w.s.fire("focusin", { target: w.btn });
+  assert.ok(!("open" in w.s.dataset), "focus on the button itself holds nothing open");
 });
 
 test("focus leaving the seat, or a press outside it, shuts the list; focus moving inside it does not", () => {
@@ -151,19 +209,6 @@ test("focus leaving the seat, or a press outside it, shuts the list; focus movin
   assert.ok(!("open" in w.s.dataset), "a press anywhere else shuts it");
 });
 
-test("a real mouse moving over the rail lets pointing show a list; a touch takes that away, so a tap's sticky hover holds nothing open", () => {
-  const { doc, nav } = fakeDom();
-  mountRailPages(nav, { doc });
-  nav.fire("pointermove", { pointerType: "touch" });
-  assert.ok(!("mouse" in nav.dataset), "a finger dragging is not a mouse");
-  nav.fire("pointermove", { pointerType: "mouse" });
-  assert.ok("mouse" in nav.dataset);
-  doc.fire("pointerdown", { pointerType: "mouse", target: nav });
-  assert.ok("mouse" in nav.dataset, "a click keeps it");
-  doc.fire("pointerdown", { pointerType: "touch", target: nav });
-  assert.ok(!("mouse" in nav.dataset), "a touch clears it");
-});
-
 test("an open list is placed inside the window: its shift is written where the stylesheet reads it", () => {
   const { doc, nav, seats: [w] } = fakeDom();
   mountRailPages(nav, { doc });
@@ -171,7 +216,8 @@ test("an open list is placed inside the window: its shift is written where the s
   w.btn.fire("click");
   assert.equal(w.list.style.props["--pm-rail-shift"], `${shiftFor(300, 470, 390)}px`);
   w.list.rect = { left: 20, right: 190, width: 170 };
-  w.s.fire("mouseenter");
+  w.btn.fire("click");
+  w.s.fire("pointerenter", { pointerType: "mouse" });
   assert.equal(w.list.style.props["--pm-rail-shift"], "0px", "pointing places it too");
 });
 
@@ -188,8 +234,10 @@ test("PIN the layout draws a list only where a seat has pages, its button hidden
   assert.match(layout, /import \{ mountRailPages \} from "@\/lib\/rail-pages-ui\.mjs";\s*mountRailPages\(document\.querySelector\("\.pm-townnav-links"\)\);/);
   const css = read("src/styles/postmark.css");
   assert.match(css, /\.pm \.pm-rail-pages \{\s*display: none; position: absolute; top: 100%;/, "shut and out of the tab order by default, hung from the seat with no gap");
-  assert.match(css, /@media \(hover: hover\) and \(pointer: fine\) \{\s*\.pm \.pm-rail-seat:hover:not\(\[data-shut\]\) > \.pm-rail-pages \{ display: block; \}\s*\}/, "pointing shows it where the device reports hover");
-  assert.match(css, /\.pm \.pm-townnav-links\[data-mouse\] \.pm-rail-seat:hover:not\(\[data-shut\]\) > \.pm-rail-pages \{ display: block; \}/, "and where the script has seen a real mouse");
-  assert.equal((css.match(/\.pm-rail-seat:hover/g) ?? []).length, 2, "and nowhere else: no bare hover rule a tap could hold open");
+  assert.match(css, /\.pm \.pm-rail-seat\[data-open\] > \.pm-rail-pages \{ display: block; \}/, "with the script, its shown state alone shows it");
+  assert.match(css, /@media \(hover: hover\) and \(pointer: fine\) \{\s*\.pm \.pm-townnav-links:not\(\[data-rail-js\]\) \.pm-rail-seat:hover > \.pm-rail-pages,\s*\.pm \.pm-townnav-links:not\(\[data-rail-js\]\) \.pm-rail-pages:focus-within \{ display: block; \}\s*\}/,
+    "without it, pointing where the device reports hover, kept while focus is in the list");
+  assert.equal((css.match(/\.pm-rail-seat:hover/g) ?? []).length, 1, "and nowhere else: no hover rule the script's aria-expanded can't see, none a tap could hold open");
+  assert.doesNotMatch(css, /data-mouse/);
   assert.match(css, /transform: translateX\(var\(--pm-rail-shift, 0px\)\);/, "the script's shift is what moves it");
 });

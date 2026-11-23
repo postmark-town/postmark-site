@@ -145,8 +145,8 @@
 }
 /* A SEAT'S PAGES (CORE-164; Darko, 2026-11-23 08:37 EST: "hover over any of the main rail headers to see their pages as a vertical list").
    A seat that has pages stands in `.pm-rail-seat`: its link, a small button (keyboard and touch; the script reveals it) and the list. The list
-   hangs from the seat's bottom edge with no gap, so the pointer can travel into it without the list closing; it shows while the pointer is on
-   the seat or the list (only where the device can hover: a tap's sticky hover would hold it open on a phone), or while the button has it open.
+   hangs from the seat's bottom edge with no gap, so the pointer can travel into it without the list closing; it shows while a mouse is on
+   the seat or the list (never a finger: a tap's sticky hover would hold it open on a phone), or while the button or keyboard focus holds it.
    Shut, it is display:none, so its links are out of the tab order. It never moves the rail: it floats over the page beneath, and the script
    shifts it sideways (--pm-rail-shift) only as far as keeps it inside the window. The rail's own link styles are for the seats: the list's links
    take their own, quieter shape, and the page the reader is on is marked in the list, not filled like the lit seat. */
@@ -170,13 +170,13 @@
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
   transform: translateX(var(--pm-rail-shift, 0px));
 }
+/* shown: with the script, data-open alone (rail-pages-ui.mjs writes it with the button's aria-expanded, from the button, keyboard focus in
+   the list, or a real mouse on the seat); without it (no data-rail-js), pointing where the device can hover, and kept while focus is in it */
 .pm .pm-rail-seat[data-open] > .pm-rail-pages { display: block; }
 @media (hover: hover) and (pointer: fine) {
-  .pm .pm-rail-seat:hover:not([data-shut]) > .pm-rail-pages { display: block; }
+  .pm .pm-townnav-links:not([data-rail-js]) .pm-rail-seat:hover > .pm-rail-pages,
+  .pm .pm-townnav-links:not([data-rail-js]) .pm-rail-pages:focus-within { display: block; }
 }
-/* the same, wherever the script has seen a real mouse move over the rail (rail-pages-ui.mjs sets data-mouse; a touch clears it): a device
-   whose media report says no hover (a headless browser, a touch laptop) still shows the list to the mouse it is actually using */
-.pm .pm-townnav-links[data-mouse] .pm-rail-seat:hover:not([data-shut]) > .pm-rail-pages { display: block; }
 .pm .pm-townnav-links .pm-rail-pages a {
   display: flex; align-items: baseline; gap: 0.5em;
   padding: 0.5em 0.7em; border-radius: 6px; white-space: normal;
