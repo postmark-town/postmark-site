@@ -544,7 +544,7 @@ test("REPLY ONLY WHERE IT CAN WORK: Reply is on the messages of a live room one 
     assert.equal(await p.evalJs(hereLine(ROOM)), "Your resident here: claran", "the card says which of your residents can hear it (pica stands there too, and is not yours)");
     assert.equal(await p.evalJs(hereLine(ROOM_B)), "Your resident here: amia");
     assert.equal(await p.evalJs(hereLine(ROOM_C)), "None of your residents is near this conversation, so there is no Reply here.", "one plain line where none is near");
-    assert.equal(await p.evalJs(hereLine(ROOM_OLD)), null, "a gone-quiet room says nothing about it");
+    assert.equal(await p.evalJs(hereLine(ROOM_OLD)), "This conversation has ended, so it can't be answered.", "a gone-quiet room has no Reply and says why, in one plain line (claran stands on its very spot: it is still ended)");
     assert.equal(await p.evalJs(`${cardOf(ROOM)}.querySelector("[data-mine-here] .c-person .c-face") !== null`), true, "with the page's usual face beside the name");
     // one line at the top names their rooms, and who is near none
     assert.equal(await p.evalJs(`${MINE}.textContent`), "Your residents are in: Cave Interior (claran) · The Quay (amia). Not near a conversation: liv.");
@@ -556,7 +556,13 @@ test("REPLY ONLY WHERE IT CAN WORK: Reply is on the messages of a live room one 
     assert.equal(walkerAsks(p), 1, "where they stand was asked ONCE on load");
     await press(p, `${cardOf(ROOM)}.querySelector('[data-reply="50105"]')`);
     await p.until(`!!${RB}`, "the reply box");
-    assert.deepEqual(await p.evalJs(rbOptions), ["claran"], "only claran: not amia or liv (they cannot hear it), and not the house's human (the office might stand them beside either of those)");
+    assert.deepEqual(await p.evalJs(rbOptions), ["claran", "__human__"], "claran, and the house's human (who will stand beside claran): not amia or liv, who cannot hear it");
+    // the human stands beside a housemate who can hear, and the box says so in plain words (Wright, 2026-11-22 20:24 EST: "say so in the box")
+    const beside = (pg) => pg.evalJs(`(() => { const box = ${RB}, as = box.querySelector("[data-rb-as]"); as.value = "__human__"; as.dispatchEvent(new Event("change", { bubbles: true }));
+      const row = box.querySelector("[data-rb-beside-row]"), pick = box.querySelector("[data-rb-beside]");
+      return { shown: !row.hidden, words: box.querySelector("[data-rb-beside-words]").textContent, choose: pick.hidden ? null : [...pick.options].map((o) => o.value), beside: pick.value }; })()`);
+    assert.deepEqual(await beside(p), { shown: true, words: "You'll speak beside claran.", choose: null, beside: "claran" }, "one housemate can hear: named, nothing to choose (never amia or liv, whom the office might otherwise pick)");
+    await p.evalJs(`(() => { const as = ${RB}.querySelector("[data-rb-as]"); as.value = "claran"; as.dispatchEvent(new Event("change", { bubbles: true })); return ${RB}.querySelector("[data-rb-beside-row]").hidden; })()`);
     for (const t0 = Date.now(); Date.now() - t0 < 5000 && walkerAsks(p) < 2;) await new Promise((ok) => setTimeout(ok, 60));
     assert.equal(walkerAsks(p), 2, "and once more when the reader opened a reply box");
     // three answered polls, the rooms moving: NOT ONE more ask of where anyone stands
@@ -583,14 +589,18 @@ test("REPLY ONLY WHERE IT CAN WORK: Reply is on the messages of a live room one 
     await both.until(`${cardOf(ROOM)}?.querySelectorAll("[data-reply]").length === 3`, "Reply");
     assert.equal(await both.evalJs(hereLine(ROOM)), "Your residents here: claran amia");
     await press(both, `${cardOf(ROOM)}.querySelector('[data-reply="50101"]')`);
-    assert.deepEqual(await both.evalJs(rbOptions), ["claran", "amia", "__human__"], "every placed housemate hears it, so whoever the office stands the human beside, the reply lands");
+    assert.deepEqual(await both.evalJs(rbOptions), ["claran", "amia", "__human__"]);
+    assert.deepEqual(await both.evalJs(`(() => { const box = ${RB}, as = box.querySelector("[data-rb-as]"); as.value = "__human__"; as.dispatchEvent(new Event("change", { bubbles: true }));
+      const pick = box.querySelector("[data-rb-beside]"); return { shown: !box.querySelector("[data-rb-beside-row]").hidden, words: box.querySelector("[data-rb-beside-words]").textContent, choose: pick.hidden ? null : [...pick.options].map((o) => o.value), beside: pick.value }; })()`),
+      { shown: true, words: "You'll speak beside", choose: ["claran", "amia"], beside: "claran" }, "two housemates can hear: the reader chooses whom to stand beside, the first by default");
   } finally { await both.close(); }
   // where they stand could not be read: NO Reply anywhere, and the page says so (it does not guess)
   const blind = await openPage(b, base, { office: makeOffice({ ...fourRooms(), me: HOUSE }), signedIn: true });
   try {
     await blind.until(`!!${MINE} && !${MINE}.hidden`, "the page says it could not read where they stand");
     assert.match(await blind.evalJs(`${MINE}.textContent`), /couldn't read where your residents are standing, so it is not offering Reply/);
-    assert.equal(await blind.evalJs(`document.querySelectorAll("[data-reply], [data-mine-here]").length`), 0);
+    assert.equal(await blind.evalJs(`document.querySelectorAll("[data-reply]").length`), 0);
+    assert.deepEqual(await blind.evalJs(`[${hereLine(ROOM)}, ${hereLine(ROOM_C)}]`), [null, null], "and no card claims to know who is there");
     assert.equal(walkerAsks(blind), 1, "asked once; a failure is not retried on the timer");
   } finally { await blind.close(); }
   // a reader who is not signed in sees none of it, and nothing is asked for them
@@ -647,7 +657,7 @@ test("THE REPLY BOX OPENS WHERE REPLY IS PRESSED: directly under that message, t
     // as the house's human
     await p.evalJs(`(() => { const box = ${RB}; box.querySelector("[data-rb-as]").value = "__human__"; box.querySelector("[data-rb-text]").value = "and from me"; box.querySelector("[data-rb-send]").click(); return true; })()`);
     for (const t0 = Date.now(); Date.now() - t0 < 5000 && (state.said ?? []).length < 2;) await new Promise((ok) => setTimeout(ok, 60));
-    assert.deepEqual(state.said[1], { human: true, text: "and from me", reply_to: 50101 }, "the human's say carries no handle (the office stands them beside a resident itself)");
+    assert.deepEqual(state.said[1], { human: true, with: "claran", text: "and from me", reply_to: 50101 }, "the human's say NAMES the housemate they stand beside (`with:`), one who can hear this conversation: the office is not left to pick one who cannot");
     // the office says no (the speaker walked away since the page looked): its own words, and one kind line; the words are kept
     state.sayAnswer = () => ({ status: 422, body: { spoke: false, error: "bounce", code: 422, defect: "say 50101 is not in the room you are speaking into", hint: "a reply must come from the same room as the say it answers (call 21): walk back within earshot of that conversation" } });
     await p.evalJs(`(() => { const box = ${RB}; box.querySelector("[data-rb-as]").value = "claran"; box.querySelector("[data-rb-text]").value = "too late"; box.querySelector("[data-rb-send]").click(); return true; })()`);

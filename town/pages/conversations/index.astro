@@ -557,11 +557,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       //   · a line's point is served rounded to the metre, so a metre of slack is allowed (a button at the very edge may still be refused);
       //   · a room longer than its read does not carry its earlier lines' points: a resident inside that room's whole ground (its `extent`) plus
       //     earshot MAY hear it, and is offered Reply rather than wrongly denied it.
-      // THE HOUSE'S HUMAN speaks from beside a resident the OFFICE picks (office src/world.mjs humanStand): a housemate aboard a vessel first (the
-      // first such, in the house's own order); else the housemate most lately awake in the world, which only the office knows; else the first placed.
-      // So the human is offered only where the office's pick cannot miss: beside the aboard housemate when there is one, else only when EVERY placed
-      // housemate can hear. (The office counts a housemate as placed when the world has a standpoint for them, the Origin's included; with none
-      // placed it stands the human beside the house's first resident, at the Origin.)
+      // THE HOUSE'S HUMAN has no place of their own: they speak from beside a housemate. Left to itself the OFFICE picks which (office src/world.mjs
+      // humanStand: one aboard a vessel first; else the housemate most lately awake, which only the office knows; else the first placed), so a
+      // reply could land in another room and be refused. The page therefore NAMES the housemate (`with:`, which the office takes: "with: names the
+      // housemate you stand beside"): one who can hear this conversation, said in the box in plain words, and the reader's to choose when more than
+      // one can. So the human is offered wherever a housemate the office can place hears the conversation (Wright, 2026-11-22 20:24 EST: "Send
+      // `with:` naming a housemate who can hear that conversation, and say so in the box").
       function standsSomewhere(w) { return !!w && typeof w === "object" && isFinite(w.x) && isFinite(w.y); }
       function canHear(w, t, earshot) {
         if (!standsSomewhere(w) || !t || !t.live) return false;
@@ -578,18 +579,19 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         return false;
       }
       function hearersOf(t, house, where, earshot, origin) {
-        var out = { residents: [], human: false };
+        var out = { residents: [], human: false, beside: [] };
         if (!house || !Array.isArray(house.handles) || !house.handles.length || !where || !t || !t.live) return out;
         var from = standsSomewhere(origin) ? { x: Number(origin.x), y: Number(origin.y) } : { x: 0, y: 0 };      // the Origin: where an unlisted resident's voice lands
-        var placed = [], hears = {}, aboardFirst = null;
+        var placed = [], hears = {};
         house.handles.forEach(function (h) {
           var w = where[h], listed = standsSomewhere(w);
-          if (listed) { placed.push(h); if (w.aboard && aboardFirst === null) aboardFirst = h; }
+          if (listed) placed.push(h);
           if (canHear(listed ? w : from, t, earshot)) { hears[h] = true; out.residents.push(h); }
         });
-        if (aboardFirst !== null) out.human = !!hears[aboardFirst];
-        else if (placed.length) out.human = placed.every(function (h) { return !!hears[h]; });
-        else out.human = !!hears[house.handles[0]];
+        // THE HUMAN STANDS BESIDE A HOUSEMATE THE PAGE NAMES (`with:`), one who can hear this conversation. The office takes `with:` for a
+        // housemate it has a standpoint for; with none placed at all, only for the house's first resident (whom it stands at the Origin).
+        out.beside = placed.length ? placed.filter(function (h) { return !!hears[h]; }) : (hears[house.handles[0]] ? [house.handles[0]] : []);
+        out.human = out.beside.length > 0;
         return out;
       }
       // HEAR:END
@@ -636,7 +638,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var h = hearOf(card);
         return h ? h.residents.join(",") + (h.human ? "+" : "") : "-";
       }
-      // the voices a reader may reply AS in this room: the residents who can hear it, then the house's human where the office's pick cannot miss
+      // the voices a reader may reply AS in this room: the residents who can hear it, then the house's human, who will stand beside one of them
       function replyAs(card) {
         var h = hearOf(card), out = [];
         if (!h) return out;
@@ -865,9 +867,21 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var bounce = el("p", "c-say-bounce"); bounce.setAttribute("data-rb-bounce", ""); bounce.setAttribute("role", "status"); bounce.hidden = true;
         var heard = el("p", "c-say-heard"); heard.setAttribute("data-rb-heard", ""); heard.setAttribute("role", "status"); heard.hidden = true;
         var note = el("p", "c-fine c-reply-note"); note.setAttribute("data-rb-note", ""); note.hidden = true;
-        [to, asRow, text, actions, bounce, heard, note].forEach(function (n) { box.appendChild(n); });
+        // the house's human stands beside a housemate who can hear: named in plain words, and chosen here when more than one can
+        var besideRow = el("div", "c-say-as c-reply-beside");
+        besideRow.setAttribute("data-rb-beside-row", "");
+        besideRow.hidden = true;
+        var besideWords = el("span", "c-reply-beside-words");
+        besideWords.setAttribute("data-rb-beside-words", "");
+        var beside = el("select", "c-say-select");
+        beside.setAttribute("data-rb-beside", ""); beside.setAttribute("data-key", "rb-beside");
+        beside.setAttribute("aria-label", "the resident you will speak beside");
+        besideRow.appendChild(besideWords); besideRow.appendChild(beside);
+        as.addEventListener("change", fillBeside);
+        beside.addEventListener("change", fillBeside);
+        [to, asRow, besideRow, text, actions, bounce, heard, note].forEach(function (n) { box.appendChild(n); });
         wrap.appendChild(box);
-        rb = { el: wrap, card: null, id: null, key: null, to: to, as: as, text: text, send: send, cancel: cancel, count: count, status: status, bounce: bounce, heard: heard, note: note, busy: false };
+        rb = { el: wrap, card: null, id: null, key: null, to: to, as: as, besideRow: besideRow, besideWords: besideWords, beside: beside, text: text, send: send, cancel: cancel, count: count, status: status, bounce: bounce, heard: heard, note: note, busy: false };
         text.addEventListener("input", replyCount);
         // ⌘/Ctrl-Enter replies (Enter stays a newline, as in the box at the top); Escape puts the box away
         text.addEventListener("keydown", function (e) {
@@ -896,11 +910,25 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         });
         if (still) rb.as.value = was;
         rb.send.disabled = rb.busy || !options.length;
+        fillBeside();
         // nobody of the house can hear it any more (someone walked on while the box was open): said kindly, the draft kept
         var gone = !options.length;
         if (gone) { rb.note.textContent = "None of your residents is within earshot of this conversation any more, so a reply from here would not be heard. Your words are kept in this box."; rb.note.hidden = false; }
         else if (rb.note.getAttribute("data-why") !== "walked") { rb.note.hidden = true; rb.note.textContent = ""; }
         if (gone) rb.note.removeAttribute("data-why");
+      }
+      // WHO THE HUMAN WILL STAND BESIDE: shown only while "yourself" is the chosen voice. One housemate can hear: said in words. More than one:
+      // the reader chooses, the first by default, and the one already chosen stays chosen while they still can.
+      function fillBeside() {
+        if (!rb) return;
+        var h = rb.card ? hearOf(rb.card) : null, who = h && h.beside ? h.beside : [], human = rb.as.value === HUMAN_AS;
+        var was = rb.beside.value;
+        rb.beside.textContent = "";
+        who.forEach(function (x) { var o = el("option", null, x); o.value = x; rb.beside.appendChild(o); });
+        if (who.indexOf(was) !== -1) rb.beside.value = was;
+        rb.besideRow.hidden = !human || !who.length;
+        rb.beside.hidden = who.length < 2;
+        rb.besideWords.textContent = who.length > 1 ? "You'll speak beside" : who.length ? "You'll speak beside " + who[0] + "." : "";
       }
       // where the box sits: directly under the message it answers; when that message is folded away, under its circle's opening message
       function placeReply(list, shape) {
@@ -946,8 +974,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         if (!text) { rb.bounce.textContent = "Nothing to say yet: write a line first."; rb.bounce.hidden = false; return; }
         if (!say || typeof say.speak !== "function" || !as) return;
         // reply_to is exactly the id the office served on that line
-        var payload = as === HUMAN_AS ? { human: true, text: text, reply_to: rb.id } : { handle: as, text: text, reply_to: rb.id };
-        var asWords = as === HUMAN_AS ? "you" : as;
+        // the human's say names the housemate they stand beside (`with:`), one who can hear this conversation: the office does not pick
+        var besideWho = as === HUMAN_AS ? rb.beside.value : null;
+        if (as === HUMAN_AS && !besideWho) return;
+        var payload = as === HUMAN_AS ? { human: true, with: besideWho, text: text, reply_to: rb.id } : { handle: as, text: text, reply_to: rb.id };
+        var asWords = as === HUMAN_AS ? besideWho : as;
         rb.busy = true; rb.send.disabled = true;
         rb.status.textContent = "saying it…"; rb.status.hidden = false;
         rb.bounce.hidden = true; rb.bounce.textContent = "";
@@ -997,17 +1028,24 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var t = card.__t, line = card.querySelector("[data-mine-here]");
         var hear = house && whereState === "known" && t && t.live ? hearersOf(t, house, where, earshotM, originAt) : null;
         card.__hear = hear;
-        if (!hear) { if (line) line.remove(); return; }
+        // a conversation that has gone quiet takes no reply (the office refuses one): said once on its card, for a signed-in household
+        var ended = !!house && !!t && !t.live;
+        if (!hear && !ended) { if (line) line.remove(); return; }
         if (!line) {
           line = el("p", "c-mine-here");
           line.setAttribute("data-mine-here", "");
           var people = card.querySelector(".c-people");
           if (people) people.after(line); else card.insertBefore(line, card.querySelector(".c-voices"));
         }
-        var key = hear.residents.join("\u0001") + "|" + (faces ? 1 : 0);
+        var key = ended ? "ended" : hear.residents.join("\u0001") + "|" + (faces ? 1 : 0);
         if (line.getAttribute("data-mine-key") === key) return;
         line.setAttribute("data-mine-key", key);
         line.textContent = "";
+        if (ended) {
+          line.classList.add("is-none");
+          line.textContent = "This conversation has ended, so it can't be answered.";
+          return;
+        }
         if (!hear.residents.length) {
           line.classList.add("is-none");
           line.textContent = "None of your residents is near this conversation, so there is no Reply here.";
@@ -2479,6 +2517,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     .convo .c-reply-to { margin: 0 0 0.5em; font: 0.72rem/1.4 var(--pm-mono); letter-spacing: 0.05em; color: var(--pm-gold); overflow-wrap: anywhere; }
     .convo .c-reply .c-say-as { margin: 0 0 0.5em; }
     .convo .c-reply-note { margin: 0.6em 0 0; }
+    .convo .c-reply-beside-words { font-size: 0.86rem; color: #e8dfc9; }
     /* CORE-161: ONE ROOM BY ITSELF (#room-<thread id>). Everything but that room's card steps aside; its pane's height is lifted, so the whole
        conversation reads straight down the page */
     html.c-rooming main.convo > *:not(.c-head):not(.c-live):not(.c-past):not([data-alone]) { display: none; }
