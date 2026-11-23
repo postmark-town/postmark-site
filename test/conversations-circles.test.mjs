@@ -679,7 +679,7 @@ test("THE REPLY BOX OPENS WHERE REPLY IS PRESSED: directly under that message, t
     state.live = [thread({ voice_count: 11, voices: without(50107) })];
     await p.poll();
     await p.until(`!${CARD}.querySelector('.c-voice[data-say="50107"]')`, "the message being answered is gone from the page");
-    assert.deepEqual(await p.evalJs(`[document.querySelectorAll("[data-rb]").length, ${TOP}.value, ${MOVED}.hidden, ${MOVED}.textContent, document.querySelector("[data-say-count]").textContent]`),
+    assert.deepEqual(await p.evalJs(`[document.querySelectorAll("[data-rb]").length, ${TOP}.value, ${MOVED}?.hidden ?? null, ${MOVED}?.textContent ?? null, document.querySelector("[data-say-count]").textContent]`),
       [0, "half a thought about the harbour", false, "The message you were replying to is no longer on this page, so your reply was moved here. It has not been sent, and from this box it would be a new line of talk, not a reply.", "468 left"],
       "the box is gone, and its words are in the top box with a line saying so (and the top box's own count followed)");
     assert.equal(state.said.length, saidBefore, "nothing was sent by the move");
