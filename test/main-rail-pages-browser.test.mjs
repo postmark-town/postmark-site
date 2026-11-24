@@ -245,6 +245,32 @@ test("pointed at, Tabbed into, then the pointer moves away: the list and the foc
   await p.close();
 });
 
+// The race the test above lost on CI 1 run in 3 (runs 45410445933, 45423133313): Tab lands on The Town's button, its "pages" word shows over
+// The World's name, under the resting mouse; when the browser re-hit-tests (it does so on its own after a layout change, at its own time)
+// the mouse is "on" The Town, so The World's list goes and The Town's comes, and the next Tabs skip The World's pages. A zero-distance mouse
+// move forces that re-hit-test now, so this fails every time the button takes the pointer, not one time in three.
+test("a mouse resting on The World keeps The World while Tab passes The Town's button: the shown button never takes the pointer", { skip: SKIP }, async () => {
+  await setup();
+  const p = await openPage(browser, base, "/docs/", { width: 1440 });
+  await p.until(`!document.querySelector(${JSON.stringify(BTN("town"))}).hidden`, "the script");
+  const head = await p.pointAt(SEAT("world"));
+  await p.until(SHOWN("world"), "The World's list, pointed at");
+  let at = null;
+  for (let i = 0; i < 40 && at !== "button:pm-rail-pages-town"; i++) { await p.press("Tab"); at = await p.evalJs(FOCUS); }
+  assert.equal(at, "button:pm-rail-pages-town", "Tab reaches The Town's button");
+  const pill = await p.evalJs(`(() => { const b = document.querySelector(${JSON.stringify(BTN("town"))}).getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom }; })()`);
+  assert.ok(pill.l <= head.x && head.x <= pill.r && pill.t <= head.y && head.y <= pill.b,
+    `control: the shown button lies under the resting mouse (${JSON.stringify({ pill, head })}), so this test can see the race`);
+  await p.move(head.x, head.y);
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(await p.evalJs(`!!document.elementFromPoint(${head.x}, ${head.y})?.closest(${JSON.stringify(BTN("town"))})`), false, "the mouse is not on The Town's button");
+  assert.deepEqual(await p.evalJs(ANY_SHOWN), ["pm-rail-pages-world"], "The World's list stays, The Town's doesn't come");
+  const seen = [];
+  for (let i = 0; i < 2 + EXPECT_WORLD.length; i++) { await p.press("Tab"); seen.push(await p.evalJs(FOCUS)); }
+  assert.deepEqual(seen.slice(2), EXPECT_WORLD, "and Tab walks on through The World's link, its button, then its pages");
+  await p.close();
+});
+
 test("the keyboard reaches the seat, its button and its pages by Tab and Shift-Tab; a shut list is not in the tab order; Escape shuts it onto its button", { skip: SKIP }, async () => {
   await setup();
   const p = await openPage(browser, base, "/docs/", { width: 1440 });
