@@ -40,6 +40,9 @@ const PUBLIC_API = (process.env.POSTMARK_PUBLIC_API || DEFAULT_API).replace(/\/+
 // that moved (fetch-town-data.mjs § THE LETTERS SINCE LAST PASS). Unset, every
 // run reads the whole corpus, as it always has.
 const LETTER_CACHE = process.env.POSTMARK_LETTER_CACHE || null;
+// Where the event archive is kept between builds (CORE-174): a file OUTSIDE the tree, because the box's refresh force-checks-out and cleans the tree before this runs, so the
+// tracked events.json is the empty committed file on every pass (tools/lib/events-archive-state.mjs). Unset, the committed snapshot is all there is, as it always was.
+const EVENTS_ARCHIVE = process.env.POSTMARK_EVENTS_ARCHIVE || null;
 const TOWN_ARG = arg("--town", null);
 const TOWN = TOWN_ARG ? resolve(TOWN_ARG) : null;
 if (TOWN) refuseLinkedCheckout(TOWN);
@@ -142,7 +145,7 @@ try {
   if (TOWN && !existsSync(join(TOWN, "MEEPS"))) {
     console.warn(`WARN: supplied --town has no MEEPS directory; meeps.json will use the committed snapshot: ${TOWN}`);
   }
-  const result = await buildOfficeData({ apiBase: API, dataDir: DATA_DIR, townRoot: TOWN, letterCachePath: LETTER_CACHE });
+  const result = await buildOfficeData({ apiBase: API, dataDir: DATA_DIR, townRoot: TOWN, letterCachePath: LETTER_CACHE, eventsArchivePath: EVENTS_ARCHIVE });
   for (const [name, value] of Object.entries(result.files)) writeDataFile(name, value);
   // ── WHETHER THE INVITATION ROLL IS LIVE (POS-576) ─────────────────────────
   // A build input, not a public file: the join carries an invite only for a

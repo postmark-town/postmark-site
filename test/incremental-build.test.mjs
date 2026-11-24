@@ -19,7 +19,7 @@ import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = join(HERE, "fixtures", "incremental-site");
@@ -189,7 +189,7 @@ test("a change to the code moves the global key: the next build is full", () => 
 
 test("every variable the site's code reads while it builds moves the global key (PUBLIC_*, BUILD_*, TOWN_TZ, SEAM_FIXTURE, PREVIEW_BASE)", () => {
   setData(base());
-  for (const env of [{ PUBLIC_X: "1" }, { BUILD_CROSSING: "318" }, { TOWN_TZ: "UTC" }, { SEAM_FIXTURE: "1" }, { PREVIEW_BASE: "/preview/x/" }]) {
+  for (const env of [{ PUBLIC_X: "1" }, { BUILD_TOWN_SHA: "abc" }, { TOWN_TZ: "UTC" }, { SEAM_FIXTURE: "1" }, { PREVIEW_BASE: "/preview/x/" }]) {
     const name = Object.keys(env)[0];
     const r = build(`env-${name}`, { prev: full1, env });
     assert.equal(r.meta.kind, "full", `${name} did not move the global key`);
@@ -238,4 +238,46 @@ test("a read hidden in a converted page's component is caught: the byte-compare 
   assert.match(readFileSync(join(inc.dir, "t", "a", "index.html"), "utf8"), /6 threads/);
   assert.match(readFileSync(join(ref.dir, "t", "a", "index.html"), "utf8"), /7 threads/);
   // the page graph test (test/incremental-pages.test.mjs) is what stops this in the real site; this case proves the compare itself can see it
+});
+
+// ── THE SEASON, NOT THE NUMBER (POS-1191/a, Darko 2026-11-23 19:56 EST: "Yeah, I think I'm down to try
+//    Jetto's proposal") ─────────────────────────────────────────────────────────────────────────────────
+// The raw crossing no longer moves the key; what pages derive from it does (tools/incremental-build.mjs §
+// seasonState). The fixture has no Mists, so a new crossing alone keeps its build incremental. The real site's
+// season, read through its own mists-season.mjs and the pinned world, stays put inside a season and moves at
+// each boundary, so a boundary still builds in full.
+const SITE = join(HERE, "..");
+const { seasonState } = await import(pathToFileURL(join(SITE, "tools", "incremental-build.mjs")).href);
+
+test("a new crossing alone does not move the global key (BUILD_CROSSING is keyed by its season, not its number)", () => {
+  setData(base());
+  assert.equal(build("crossing-only", { prev: full1, env: { BUILD_CROSSING: "318" } }).meta.kind, "incremental");
+});
+
+test("the season moves at a boundary and holds inside one: the Mists' arrival, the ramp, a steady season", async () => {
+  const sk = JSON.parse(readFileSync(join(SITE, "node_modules", "postmark-world", "WORLD", "skeleton.json"), "utf8"));
+  const first = sk.mists?.schedule?.[0]?.crossing;
+  assert.ok(Number.isFinite(first), "the pinned world's skeleton names the Mists' first crossing");
+  const at = (c) => seasonState(SITE, { BUILD_CROSSING: String(c) });
+  // no crossing named, and the crossing before the Mists: nothing derived, one state
+  assert.equal(await seasonState(SITE, {}), "no-mists");
+  assert.equal(await at(first - 1), "no-mists");
+  // the Mists arrive: a boundary, so the key moves and the next build is full
+  assert.notEqual(await at(first), await at(first - 1));
+  // the ramp: each step of t is a page change, so it moves the key
+  assert.notEqual(await at(first), await at(first + 1));
+  // the Mists end: a boundary too (the schedule's last rung lifts the veil), so it moves the key
+  const last = sk.mists.schedule.at(-1).crossing;
+  assert.notEqual(await at(last - 1), await at(last));
+  // a steady season: after the Mists every crossing shares one state, so a pass between crossings and across
+  // them stays incremental (the point of the change). While the Mists stand, the home page's line is the
+  // world's line for that crossing, so each of those passes still builds in full, as it should.
+  for (let c = last; c < last + 60; c++) assert.equal(await at(c + 1), await at(c), `crossing ${c}->${c + 1} moved the key outside the Mists`);
+});
+
+test("no page reads BUILD_CROSSING except through mists-season.mjs (a direct read would escape the season key)", () => {
+  const hits = [];
+  const walk = (d) => { for (const n of readdirSync(d)) { const p = join(d, n); if (statSync(p).isDirectory()) walk(p); else if (/\.(astro|mjs|js|ts)$/.test(n)) for (const [i, l] of readFileSync(p, "utf8").split("\n").entries()) if (/BUILD_CROSSING/.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l)) hits.push(`${relative(SITE, p)}:${i + 1}`); } };
+  walk(join(SITE, "src"));
+  assert.deepEqual(hits.filter((h) => !h.startsWith(join("src", "lib", "mists-season.mjs"))), []);
 });
