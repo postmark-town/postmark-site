@@ -96,6 +96,8 @@ export const SOURCES = Object.freeze([
   "src/lib/hearth/listbox.mjs",
   // POS-1066 B: "Back this design" in the strip (stage.mjs imports it), with /votes/'s stake form and ballot read, and the Hearth ballot's topic
   "src/lib/hearth/backing.mjs", "src/lib/ballot-stake.mjs", "src/lib/ballot-box.mjs", "src/lib/hearth/ballot-links.mjs",
+  // CORE-164: the main rail's page lists (PostmarkLayout.astro imports rail-pages.mjs, which reads the Town's board pieces, and its script mounts rail-pages-ui.mjs)
+  "src/lib/rail-pages.mjs", "src/lib/rail-pages-ui.mjs", "src/lib/town-views.mjs",
   "src/layouts/BaseLayout.astro", "src/layouts/PostmarkLayout.astro",
   "src/lib/appearance.mjs", "src/lib/auth.mjs", "src/lib/civic-art.mjs", "src/lib/correspondents.mjs", "src/lib/docs.mjs", "src/lib/door-line.mjs",
   "src/lib/freshness.mjs", "src/lib/halloween-frame.mjs", "src/lib/halloween-motifs.mjs", "src/lib/halloween-navy.mjs",
