@@ -741,6 +741,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             setTimeout(function () { if (card.__cr && card.__cr.reader) card.__cr.reader.showRoom(); location.hash = "circle-" + encodeURIComponent(id); }, 0);
           },
           faceForSpeaker: faceForSpeaker,
+          speakerFaces: function () { return faces; },   // CORE-178: the door draws each speaker's identity from these
           hostOwnsHeader: true,
           onState: function (st) {
             if (st === "room" || st === "circle") showFlat(card, false, "");
@@ -885,6 +886,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         // conversation and the reply target never diverge from what is on screen (followSelected).
         h.mount(sel.host, String(sel.room), {
           circle: sel.cid, faceForSpeaker: faceForSpeaker,
+          speakerFaces: function () { return faces; },   // CORE-178: the same identity every card's reader wears
           onState: function (st) { if (selected === sel) sel.card.classList.toggle("is-room-step", st === "room"); },
           onNavigate: function (n) { followSelected(sel, n); },
         }).then(function (m) {
@@ -1142,6 +1144,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     // same sign-in: the header pill's OAuth dance, clicked, never a second flow.
     // This module only relays. The office decides who may speak, how often, and
     // what bounces; when it says no, its words go on the page verbatim.
+    // CORE-178 / WLD-248: the site's one resident mention, handed to the reader as each speaker's identity (resident-identity.mjs), and its look
+    import { identityProvider } from "@/lib/resident-identity.mjs";
+    import "@/styles/resident-mention.css";
     import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import { siteWriteHeaders } from "@/lib/office-write.mjs";
     import { loadReader, officeSource } from "@/lib/circle-reader-mount.mjs";
@@ -1156,7 +1161,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     // and a Reply press is announced as a `pm:reply-target` event for the speak box below. Nothing here derives a link, a parent or a circle.
     const __getTok = () => { try { return JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch { return null; } };
     window.__pmCircleReaders = {
-      async mount(host, roomId, { onState = null, onNavigate = null, circle = null, faceForSpeaker = null, hostOwnsHeader = false } = {}) {
+      async mount(host, roomId, { onState = null, onNavigate = null, circle = null, faceForSpeaker = null, hostOwnsHeader = false, speakerFaces = null } = {}) {
         const mod = await loadReader({});
         if (!mod) return { ok: false, why: "the circle reader is not on this site's pinned World yet" };
         if (typeof mod.READER_CSS === "string" && mod.READER_CSS && !document.querySelector("style[data-circle-reader-css]")) {
@@ -1173,6 +1178,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           hrefForCircle: (c) => `#circle-${encodeURIComponent(c)}`,
           // CORE-128: the optional face provider, handed on ONLY when the page gave one (a reader without the option, or a caller without a provider, is unchanged)
           ...(typeof faceForSpeaker === "function" ? { faceForSpeaker } : {}),
+          // CORE-178 / WLD-248: each speaker's identity is the site's one resident mention, from the faces the poller already read (`speakerFaces`,
+          // a getter: residents-meta's residents, or null until they land); a reader without the option, or a caller without the faces, is unchanged
+          ...(typeof speakerFaces === "function" ? { identityForSpeaker: identityProvider(document, speakerFaces) } : {}),
           // CORE-128 / WLD-215: this page draws each card's one header itself (title, live, counts, began, latest), so the reader leaves its own out (strictly `true`; absent = the reader's default)
           ...(hostOwnsHeader === true ? { hostOwnsHeader: true } : {}),
         });

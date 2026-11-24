@@ -201,6 +201,7 @@ const DECLARED = {
   "src/lib/household-dashboard/paint.mjs": [1, "other(): a resident outside the house, with no face on the page (sent up)"],
   "src/lib/mail-routes.mjs": [3, "residentHref: the links table and the letters' hrefOf, beside the mention models it supplies"],
   "src/lib/resident-link.mjs": [1, "the link rule itself"],
+  "src/lib/resident-identity.mjs": [1, "speakerHref: the href the reader's speaker identity (the mention) is drawn with, as the Conversations page links its residents"],
   "src/lib/projects-page.mjs": [1, "handLabel's href, carried beside the handle the page draws the mention from"],
   "src/lib/funding.mjs": [1, "patronLabel's href, carried beside `attached`, which the pages draw the mention from"],
   "src/lib/hall-of-fame.mjs": [3, "a ledger record's link (its label is the record's words), the row's \"…'s page →\" navigation link, and the holo row's href"],
