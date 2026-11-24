@@ -128,8 +128,8 @@ export function paintMap(root, reads, ctx) {
   const places = placesOf(ctx.handles, reads.walkers);
   if (places == null) { box.appendChild(el("p", "hd-empty", "The walkers’ roll could not be read just now.")); return; }
   for (const p of places) {
-    const tile = el("div", "hx-place" + (p.place ? "" : " is-unknown"));
-    tile.appendChild(el("p", "hx-place-name", p.place ? (p.moving ? "on the way to " : "") + p.place : "not on the roll"));
+    const tile = el("div", "hx-place" + (p.place || p.moving ? "" : " is-unknown"));
+    tile.appendChild(el("p", "hx-place-name", p.place ? (p.moving ? "on the way to " : "") + p.place : p.moving ? "on the way" : "not on the roll"));
     const row = el("p", "hx-place-who");
     p.who.forEach((h, i) => { if (i) row.append(" "); row.appendChild(resident(ctx.faces, h, ctx.seatHref)); });
     tile.appendChild(row);
