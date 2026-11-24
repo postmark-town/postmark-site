@@ -555,3 +555,96 @@ test("the cockpit accepts the page's own sign-in word", () => {
   assert.match(astro, /localStorage\.getItem\("pm_key"\)/,
     "bearer() falls back to the viewer's pm_key — the page's other sign-in");
 });
+
+// ── CORE-159: a hidden tab asks the conversations door nothing ──────────────
+//
+// LAW (CORE-159, Darko 2026-11-24 10:14 EST, ruling Wright's option 1): the page "stops asking the office for updates while its
+// browser tab is hidden, and resumes (with one immediate refresh) when it's visible again. The 7-second pace while visible
+// stays exactly as it is." The Conversations page has paused in a hidden tab since it shipped (site #18; CORE-158 kept it,
+// test/conversations-poll.test.mjs "HIDDEN TAB"). The world page's cockpit polls the SAME door (GET /world/conversations) for
+// its speech, and before CORE-159 it did so on a bare 7 s setInterval whatever the tab's visibility.
+//
+// This runs the REAL mount with a document whose visibility the test sets, a clock whose interval fires only when the test
+// advances it, and a readVoices that counts. Each count is the number of asks of the conversations door.
+
+/** tinyDom, plus the three things the hidden-tab pause reads: visibilityState, a visibilitychange listener, and a 7 s interval. */
+function visibilityDom(state = "visible") {
+  const doc = tinyDom();
+  const clock = { t: 0, next: 1, intervals: [] };
+  const listeners = new Map();
+  doc.visibilityState = state;
+  doc.addEventListener = (type, fn) => { if (!listeners.has(type)) listeners.set(type, new Set()); listeners.get(type).add(fn); };
+  doc.removeEventListener = (type, fn) => { listeners.get(type)?.delete(fn); };
+  doc.defaultView.setInterval = (fn, ms) => { const id = clock.next++; clock.intervals.push({ id, fn, ms, due: clock.t + ms }); return id; };
+  doc.defaultView.clearInterval = (id) => { clock.intervals = clock.intervals.filter((x) => x.id !== id); };
+  const advance = (ms) => {
+    const end = clock.t + ms;
+    for (;;) {
+      const due = clock.intervals.filter((x) => x.due <= end).sort((a, b) => a.due - b.due)[0];
+      if (!due) break;
+      clock.t = due.due; due.due += due.ms; due.fn();
+    }
+    clock.t = end;
+  };
+  const show = (s) => { doc.visibilityState = s; for (const fn of [...(listeners.get("visibilitychange") ?? [])]) fn(); };
+  return { doc, clock, advance, show, listeners };
+}
+
+function mountCounting(doc) {
+  const asks = { n: 0 };
+  const mounted = mountCockpit({
+    document: doc, host: doc.body, svg: null,
+    answer: { ...IN_PORTAL, encounter: { order: [{ id: "x", kind: "creature" }] } },
+    me: MULTI_RESIDENT_ME, grid: null,
+    dispatch: async () => ({ ok: true, status: 200, body: {} }),
+    readTerms: async () => null, refresh: null,
+    readVoices: async () => { asks.n++; return null; },
+  });
+  assert.ok(mounted, "the cockpit mounted (a live fight), so its voices poll is the one under test");
+  return { mounted, asks };
+}
+
+test("CORE-159: the cockpit's voices poll asks nothing while the tab is hidden, asks ONCE at once when it is shown, then every 7 s", () => {
+  const v = visibilityDom("visible");
+  const { mounted, asks } = mountCounting(v.doc);
+
+  // visible: one ask at mount, then the unchanged 7 s pace
+  assert.equal(asks.n, 1, "a visible tab asks at mount");
+  v.advance(6999); assert.equal(asks.n, 1, "6999 ms: no second ask");
+  v.advance(1); assert.equal(asks.n, 2, "7000 ms: the next ask; the pace is 7 s, unchanged");
+
+  // hidden: nothing, however long
+  v.show("hidden");
+  v.advance(10 * 60_000);
+  assert.equal(asks.n, 2, "ten minutes hidden: NO ask of the conversations door");
+  assert.equal(v.clock.intervals.length, 0, "and no interval is left running for a hidden tab");
+
+  // visible again: one ask at once, then the pace from there
+  v.show("visible");
+  assert.equal(asks.n, 3, "shown again: ONE ask at once");
+  v.advance(6999); assert.equal(asks.n, 3, "then nothing until the pace is up");
+  v.advance(1); assert.equal(asks.n, 4, "then every 7 s, as before");
+
+  // a second 'visible' event while already polling is not a second poll
+  v.show("visible");
+  assert.equal(asks.n, 4, "a repeated visible event asks nothing extra");
+  v.advance(7000); assert.equal(asks.n, 5, "and the pace is not doubled: one ask per 7 s");
+  assert.equal(v.clock.intervals.length, 1, "exactly one interval while visible");
+
+  // destroy stops the poll and lets go of the listener
+  mounted.destroy();
+  v.advance(60_000); v.show("hidden"); v.show("visible");
+  assert.equal(asks.n, 5, "after destroy: no ask, from the clock or from the tab coming back");
+  assert.equal(v.listeners.get("visibilitychange")?.size ?? 0, 0, "the visibility listener is removed");
+});
+
+test("CORE-159: a cockpit mounted in a hidden tab asks nothing until the tab is shown", () => {
+  const v = visibilityDom("hidden");
+  const { mounted, asks } = mountCounting(v.doc);
+  v.advance(60_000);
+  assert.equal(asks.n, 0, "mounted hidden: no ask at mount and none on the clock");
+  v.show("visible");
+  assert.equal(asks.n, 1, "shown: one ask at once");
+  v.advance(7000); assert.equal(asks.n, 2, "then the 7 s pace");
+  mounted.destroy();
+});

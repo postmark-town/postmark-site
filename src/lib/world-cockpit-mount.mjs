@@ -4641,9 +4641,24 @@ export function mountCockpit(o) {
     state.voices = next;
     speech();
   }
-  if (o.readVoices) {
+  // A HIDDEN TAB ASKS NOTHING (CORE-159; Darko, 2026-11-24 10:14 EST, ruling the hidden-tab pause). While the reader's tab is
+  // hidden (the Page Visibility API: `document.visibilityState`), the voices poll is stopped, so a backgrounded world page
+  // does not keep asking the conversations door. When the tab is visible again it pulls ONCE at once, then goes back to the
+  // same seven-second pace. A cockpit mounted in a hidden tab asks nothing until it is shown. The pace itself is unchanged.
+  const tabHidden = () => doc.visibilityState === "hidden";
+  function startVoices() {
+    if (!o.readVoices || voiceTimer != null || tabHidden()) return;
     pullVoices();
     voiceTimer = (doc.defaultView ?? globalThis).setInterval?.(pullVoices, 7000) ?? null;
+  }
+  function stopVoices() {
+    if (voiceTimer != null) (doc.defaultView ?? globalThis).clearInterval?.(voiceTimer);
+    voiceTimer = null;
+  }
+  const onVisibility = () => { if (tabHidden()) stopVoices(); else startVoices(); };
+  if (o.readVoices) {
+    doc.addEventListener("visibilitychange", onVisibility);
+    startVoices();
   }
 
   // ── the fight, on its own clock ───────────────────────────────────────────
@@ -4859,7 +4874,8 @@ export function mountCockpit(o) {
     dead = true;
     doc.removeEventListener("keydown", onKey);
     (doc.defaultView ?? globalThis).removeEventListener?.("resize", onResize);
-    if (voiceTimer != null) (doc.defaultView ?? globalThis).clearInterval?.(voiceTimer);
+    stopVoices();
+    doc.removeEventListener("visibilitychange", onVisibility);
     if (encTimer != null) (doc.defaultView ?? globalThis).clearInterval?.(encTimer);
     doc.removeEventListener("click", onMapClick, true);
     doc.removeEventListener("pointermove", onMapHover);
