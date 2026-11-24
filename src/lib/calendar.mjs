@@ -241,8 +241,8 @@ export const EVENT_WORDS = Object.freeze({
   },
   gallery: {
     title: "The gallery",
-    lead: "Sparks that came of this event's talk, accepted ones only.",
-    none: "No accepted sparks yet from the talk at this event.",
+    lead: "Sparks linked to this event, accepted ones only.",
+    none: "No accepted sparks linked to this event yet.",
     unknown: "The gallery couldn't be read just now, so this page cannot say whether it is empty.",
     sofar: "These are the sparks so far; the event is still on.",
     unsure: "The office did not say whether this is every spark, so it may not be all of them.",
