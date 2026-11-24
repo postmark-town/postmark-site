@@ -125,8 +125,9 @@
 .hearth-stage .hd-needs .hd-calm { color: #2d6a2d; }   /* the calm green, darkened to read on the paper (it was 4.3:1 there; the 1.4 lift in --hx-ok is for the dark glass) */
 .hearth-stage .hd-needs p { margin: 0.15em 0 0.25em; font-size: 0.93rem; }
 .hearth-stage .hd-needs a { color: var(--hx-paper-ink); font-size: 0.9rem; }
-/* the note is paper: a mention takes its paper ink (no colour: the paper's ink) */
-.hearth-stage .hd-needs .rm.rm { color: var(--rm-ink-p, var(--hx-paper-ink)); }
+/* the note is paper: until the stage has measured it (resident-mention-surface.mjs, `.on-ink`), a mention takes its paper ink; no colour: the paper's ink */
+.hearth-stage .hd-needs .rm.rm:not(.on-ink) { color: var(--rm-ink-p, var(--hx-paper-ink)); }
+.hearth-stage .hd-needs .rm.rm.is-neutral { color: var(--hx-paper-ink); }
 
 /* ── the residents' cards ── */
 .hearth-stage .hx-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(17em, 1fr)); gap: 1em; }

@@ -56,7 +56,7 @@ test("a resident is drawn as their picture, then their name, in their colour and
   assert.ok(out.indexOf("rm-face") < out.indexOf("rm-name"), "the picture comes before the name");
 });
 
-test("the name's ink IS the favourite colour when it reads on the surface, and the ring and underline wear it exactly", () => {
+test("the ink IS the favourite colour when it reads on the surface (and only then)", () => {
   // measured: #e8c48b is 8.34:1 on the night (1.30 on the paper); #2f6b3a is 5.02:1 on the paper (2.16 on the night)
   const gold = mentionModel({ handle: "g", face: { name: "G", accent: "#E8C48B" }, href: "/residents/g/" });
   assert.equal(gold.accent, "#e8c48b");
@@ -67,12 +67,41 @@ test("the name's ink IS the favourite colour when it reads on the surface, and t
   assert.match(mentionHtml(green), /--rm-c: #2f6b3a; --rm-ink-n: #[0-9a-f]{6}; --rm-ink-p: #2f6b3a"/);
 });
 
-test("TEXT PIN (the CSS is read by the browser, not here): the name takes the ink, and the underline takes the colour", () => {
+// LAW (Darko, 2026-11-24 12:25 EST, a: "get everything to readable darkness"; Wright, 17:29: "every coloured part — name, underline and ring — uses
+// the favourite hue at readable darkness on its actual surface … No exact-colour exception"). Until 2026-11-24 17:38Z this pin asserted the underline
+// and ring wore the raw colour (`var(--rm-c)`); the ruling retired that, and the pin is inverted.
+test("TEXT PIN (the CSS is read by the browser, not here): ONE ink paints the name, the underline and the ring; the raw colour paints nothing", () => {
   const css = readFileSync(new URL("../src/styles/resident-mention.css", import.meta.url), "utf8");
-  assert.match(css, /\.rm\.rm \{\s*color: var\(--rm-ink-n, inherit\);/, "a mention's ink is its night ink");
-  assert.match(css, /:where\(\.pm-paper\) \.rm\.rm, \.rm\.rm\.on-paper \{ color: var\(--rm-ink-p, inherit\); \}/, "and its paper ink on paper");
-  assert.match(css, /\.rm-name \{[^}]*text-decoration: underline;[^}]*text-decoration-color: var\(--rm-c,/, "the name is underlined in the colour");
-  assert.match(css, /\.rm-face \{[^}]*box-shadow: 0 0 0 1\.5px var\(--rm-c,/, "the face is ringed in the colour");
+  const rules = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.match(rules, /\.rm\.rm \{\s*color: var\(--rm-ink-n, inherit\);/, "a mention's ink is its night ink");
+  assert.match(rules, /:where\(\.pm-paper, \[data-rm-surface="paper"\]\) \.rm\.rm, \.rm\.rm\.on-paper \{ color: var\(--rm-ink-p, inherit\); \}/, "its paper ink on paper");
+  assert.match(rules, /\.rm\.rm\.on-ink \{ color: var\(--rm-ink, inherit\); \}/, "and the measured ink where the page measured the surface");
+  assert.match(rules, /\.rm-name \{[^}]*text-decoration: underline;[^}]*text-decoration-color: currentColor;/, "the underline is the ink");
+  assert.match(rules, /\.rm-face \{[^}]*box-shadow: 0 0 0 1\.5px currentColor;/, "the ring is the ink");
+  assert.doesNotMatch(rules, /var\(--rm-c\b/, "the raw favourite colour paints no part: no exact-colour exception");
+});
+
+test("inkOn reads any actual background: a light glass darkens the ink, a dark one lightens it, and every answer reads at 4.5:1", () => {
+  const glasses = ["#ffffff", "#f3f0e6", "#c9d6e8", "#8a8f99", "#555b66", "#20242c", "#000000", "#efe3c8", "#1c2c4f"];
+  let n = 0;
+  for (const c of GRID.slice(0, 120)) for (const g of glasses) {
+    const ink = inkOn(c, g);
+    assert.ok(contrast(ink, g) >= MIN_CONTRAST, `${c} on ${g}: ${ink} is ${contrast(ink, g).toFixed(2)}:1`);
+    n++;
+  }
+  assert.equal(n, 120 * glasses.length);
+  assert.equal(inkOn("#e8c48b", "#ffffff") !== "#e8c48b", true, "a gold that reads on the night is darkened on a white glass");
+  assert.equal(inkOn("#2f6b3a", "#000000") !== "#2f6b3a", true, "a green that reads on the paper is lightened on a black glass");
+  assert.equal(inkOn("#e8c48b", "paper"), inkOn("#e8c48b", SURFACES.paper), "a named surface is its hex");
+  assert.equal(inkOn("#e8c48b", "not a colour"), null, "an unreadable surface is no ink (the CSS keeps the site ink)");
+});
+
+test("face:false draws the name's styling only (Darko b: \"Card portrait counts as the picture\"): ONE face per resident", () => {
+  const m = mentionModel({ handle: "wren-alder", face: FACE, href });
+  const bare = mentionHtml(m, { link: false, face: false, cls: "pm-chip-name" });
+  assert.match(bare, /^<span class="rm pm-chip-name" data-rm="wren-alder" style="[^"]+"><span class="rm-name">Wren Alder<\/span><\/span>$/);
+  assert.doesNotMatch(bare, /rm-face|<img/, "no second picture");
+  assert.match(mentionHtml(m), /rm-face/, "control: the default still draws the face");
 });
 
 // ── the contrast rule ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────

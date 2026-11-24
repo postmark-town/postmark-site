@@ -14,11 +14,17 @@
 // for a build step that writes HTML strings (the mail pages). test/resident-mention.test.mjs holds mentionNode and mentionHtml to the same
 // bytes, so the server's mention and the browser's cannot drift into two formats.
 //
-// THE COLOUR AND ITS CONTRAST. The ring and the underline wear the favourite colour exactly. The name's INK is the same colour, kept legible: when
-// the colour already reads at WCAG AA (4.5:1) on the surface the mention sits on, it is the colour itself; when it does not, only its lightness
-// moves (same hue, same saturation) until it does. The site has two surfaces, the harbor night and the letter paper (postmark.css), and each
-// mention carries its ink for both (`--rm-ink-n`, `--rm-ink-p`); resident-mention.css picks the paper one inside `.pm-paper` or `.on-paper`.
-// The contrast is measured against each surface's LIGHTEST night and DARKEST paper, so it holds on every shade of either.
+// THE COLOUR: READABLE DARKNESS ON ITS ACTUAL SURFACE (Darko, 2026-11-24 12:25 EST, a: "get everything to readable darkness"; Wright's
+// authenticated 17:29 reading, relayed in Facet's ruling of 17:38Z: "every coloured part — name, underline and ring — uses the favourite hue at
+// readable darkness on its actual surface, including authored light-glass surfaces. No exact-colour exception."). So the mention has ONE ink, and
+// the name, its underline and the face's ring all wear it (resident-mention.css paints the underline and ring in currentColor). The ink is the
+// favourite colour itself when it already reads at WCAG AA (4.5:1) on the surface; when it does not, only its lightness moves (same hue, same
+// saturation) until it does. Until 2026-11-24 17:38Z the ring and underline wore the raw colour; the ruling retired that.
+// THE SURFACES. The site's own two, the harbor night and the letter paper (postmark.css), are known at build time: each mention carries its ink
+// for both (`--rm-ink-n`, `--rm-ink-p`), measured against each surface's LIGHTEST night and DARKEST paper, and resident-mention.css picks the paper
+// one inside `.pm-paper`, `[data-rm-surface="paper"]` or `.on-paper`. A surface the site does not know at build time (a Hearth design's own glass
+// and paper, set by its template) is measured where it is: resident-mention-surface.mjs reads the real background under each mention in the
+// browser and writes the ink for THAT colour (`--rm-ink`, `.on-ink`); `inkOn` takes any background hex for it.
 //
 // THE FALLBACKS (faces.mjs's rule, kept): a resident who set no colour gets a quiet mention in the neutral hairline, never an invented colour;
 // a resident with no picture wears their initial. A handle with no resident page prints as plain text (resident-link.mjs's rule). A house's
@@ -96,16 +102,19 @@ function hexOfHsl(h, s, l) {
  */
 export function inkOn(colour, surface = "night") {
   const c = hexOf(colour);
-  const bg = SURFACES[surface];
+  // a named site surface, or the hex of the actual background under the mention (an authored Hearth glass, measured in the browser)
+  const bg = Object.hasOwn(SURFACES, surface) ? SURFACES[surface] : hexOf(surface);
   if (!c || !bg) return null;
   if (contrast(c, bg) >= MIN_CONTRAST) return c;
+  // a light background darkens the ink, a dark one lightens it: whichever end of the lightness scale reads better on it
+  const darken = contrast("#000000", bg) >= contrast("#ffffff", bg);
   const [h, s, l] = hslOf(c);
-  const step = surface === "paper" ? -0.005 : 0.005;
+  const step = darken ? -0.005 : 0.005;
   for (let x = l + step; x >= 0 && x <= 1; x += step) {
     const ink = hexOfHsl(h, s, x);
     if (contrast(ink, bg) >= MIN_CONTRAST) return ink;
   }
-  return surface === "paper" ? "#000000" : "#ffffff";
+  return darken ? "#000000" : "#ffffff";
 }
 
 /** A house's human, by handle: never drawn as a resident. */
@@ -168,8 +177,9 @@ export function mentionModel({ handle, face = null, href = null, label } = {}) {
  * @param {boolean} [opts.link=true]   false draws the mention as a span (inside a card or chip that is already a link)
  * @param {string} [opts.cls]          extra classes on the root, kept as hooks (the Hearth's `hx-who`, the dashboard's `hd-who`)
  * @param {"night"|"paper"} [opts.surface] "paper" marks a mention on the letter paper outside a `.pm-paper` box
+ * @param {boolean} [opts.face=true]   false: the name's styling only, for a card or chip whose own portrait is the resident's picture
  */
-export function mentionTree(m, { link = true, cls = "", surface } = {}) {
+export function mentionTree(m, { link = true, cls = "", surface, face: withFace = true } = {}) {
   if (!m || m.kind !== "resident") return [String(m?.text ?? "")];
   const classes = ["rm", m.accent ? null : "is-neutral", surface === "paper" ? "on-paper" : null, ...String(cls).split(/\s+/)].filter(Boolean);
   const attrs = { class: classes.join(" ") };
@@ -181,7 +191,10 @@ export function mentionTree(m, { link = true, cls = "", surface } = {}) {
   const face = { tag: "span", attrs: { class: "rm-face", "aria-hidden": "true" }, children: m.avatar
     ? [{ tag: "img", attrs: { src: m.avatar, alt: "", loading: "lazy" }, children: [] }]
     : [m.monogram] };
-  return [{ tag: anchor ? "a" : "span", attrs, children: [face, { tag: "span", attrs: { class: "rm-name" }, children: [m.name] }] }];
+  const name = { tag: "span", attrs: { class: "rm-name" }, children: [m.name] };
+  // `face: false` (Darko, 12:25 EST, b: "Card portrait counts as the picture"): a card or chip that already shows the resident's picture takes the
+  // name's styling only, so each resident wears ONE face
+  return [{ tag: anchor ? "a" : "span", attrs, children: withFace ? [face, name] : [name] }];
 }
 
 const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };

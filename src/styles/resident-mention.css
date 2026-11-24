@@ -1,9 +1,13 @@
 /* resident-mention.css — the one look of a resident named on the site (CORE-178; the markup is resident-mention.mjs § mentionTree).
 
-   The picture (or the initial) in a small round face ringed in the favourite colour, then the name, written in the favourite colour and
-   underlined in it. The ink is resident-mention.mjs § inkOn: the colour itself, or the same hue at a lightness that keeps 4.5:1 on the
-   surface. A mention reads the night ink by default and the paper ink inside the letter paper (`.pm-paper`) or when it says it sits on paper
-   (`.on-paper`). A resident who chose no colour (`.is-neutral`) keeps the surface's own ink and a neutral hairline, never an invented colour.
+   The picture (or the initial) in a small round face, then the name, underlined. ONE INK paints all three coloured parts: the name, its underline
+   and the face's ring (Darko, 2026-11-24 12:25 EST: "get everything to readable darkness"; Wright: every coloured part uses the favourite hue at
+   readable darkness on its actual surface, no exact-colour exception). The ink is resident-mention.mjs § inkOn: the favourite colour, or the same hue
+   at the nearest lightness that keeps 4.5:1 on the surface. The underline and ring are currentColor, so they always follow the ink in force:
+     · the night ink by default (the harbor night, the site's own dark surface);
+     · the paper ink inside the letter paper (`.pm-paper`), a surface that says it is paper (`[data-rm-surface="paper"]`), or `.on-paper`;
+     · the measured ink (`.on-ink`, `--rm-ink`) where resident-mention-surface.mjs read the actual background in the browser (a Hearth design's glass).
+   A resident who chose no colour (`.is-neutral`) keeps the surface's own ink and a neutral hairline, never an invented colour.
 
    Global on purpose: one stylesheet for the build's mentions and the ones a page paints live. A surface sizes the face with --rm-face.
    The ink rules double the class (`.rm.rm`, 0-2-0) so a page's generic link colour (`.spark-card a`, `.pm-letter a`, 0-1-1) can't repaint
@@ -15,17 +19,19 @@
   text-decoration: none;
   white-space: nowrap;
 }
-:where(.pm-paper) .rm.rm, .rm.rm.on-paper { color: var(--rm-ink-p, inherit); }
+:where(.pm-paper, [data-rm-surface="paper"]) .rm.rm, .rm.rm.on-paper { color: var(--rm-ink-p, inherit); }
+.rm.rm.on-ink { color: var(--rm-ink, inherit); }
 .rm.rm.is-neutral { color: inherit; }
 
 .rm-name {
   white-space: normal;
   text-decoration: underline;
-  text-decoration-color: var(--rm-c, rgba(205, 194, 171, 0.45));
+  text-decoration-color: currentColor;
   text-decoration-thickness: 2px;
   text-underline-offset: 0.2em;
   text-decoration-skip-ink: none;
 }
+.rm.is-neutral .rm-name { text-decoration-color: rgba(205, 194, 171, 0.45); }
 a.rm:hover .rm-name, a.rm:focus-visible .rm-name { text-decoration-thickness: 3px; }
 
 .rm-face {
@@ -35,8 +41,9 @@ a.rm:hover .rm-name, a.rm:focus-visible .rm-name { text-decoration-thickness: 3p
   border-radius: 50%; overflow: hidden;
   vertical-align: -0.2em;
   background: rgba(205, 194, 171, 0.15);
-  box-shadow: 0 0 0 1.5px var(--rm-c, rgba(205, 194, 171, 0.35));
+  box-shadow: 0 0 0 1.5px currentColor;
   font-family: var(--pm-mono, ui-monospace, monospace); font-size: 0.7em; font-weight: 400;
   text-decoration: none;
 }
+.rm.is-neutral .rm-face { box-shadow: 0 0 0 1.5px rgba(205, 194, 171, 0.35); }
 .rm-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
