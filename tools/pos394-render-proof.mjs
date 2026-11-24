@@ -112,6 +112,9 @@ export const SOURCES = Object.freeze([
   "src/lib/world-feed.mjs", "src/styles/global.css", "src/styles/postmark.css",
   "tools/lib/ids.mjs",
   "town/components/Household.astro", "town/pages/households/[slug].astro", "town/pages/residents/[handle].astro",
+  // CORE-178: the site's one resident mention (HearthSlot, Household.astro and the painters draw it), its build lookup and its link rule
+  "src/components/ResidentMention.astro", "src/components/ResidentMentionModel.astro", "src/lib/resident-mention.mjs",
+  "src/lib/resident-mention-roll.mjs", "src/lib/resident-mentions.mjs", "src/lib/resident-link.mjs", "src/styles/resident-mention.css",
 ]);
 
 // ── the checks, by name ─────────────────────────────────────────────────────
@@ -201,6 +204,8 @@ const DATA = {
   "households.json": { schema_version: 1, households: { "brass-hollow": { human: SENTINEL, since: "2026-08-01", residents: HOUSE.residents } } },
   "residents.json": MEMBERS,
   "media.json": {},
+  // CORE-178: the mention's build lookup reads the rename record; an invented, empty one
+  "renames.json": {},
   // POS-984: the Hearth draws the household page from a registered design and the bulletin; one invented default entry, an empty bulletin
   "hearths.json": [{ id: "default", title: "Invented default", author: "pos394", line: "An invented entry for the POS-394 render proof.", html: "<hearth-house></hearth-house><hearth-residents></hearth-residents>", css: "" }],
   "hearth-setup.json": { source: "HEARTH-SETUP.md", bytes: 0, sha256: null, text: null },   // POS-1021: the setup prompt box draws nothing without the town's doc
