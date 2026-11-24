@@ -288,6 +288,11 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
             a = document.createElement("a");
             a.href = href;
             a.textContent = info.name;
+            // the bridge is not here yet: marked with the face this page already holds, so it makes this link the mention in place (upgradePending)
+            if (!window.__pmMention && info.face) {
+              a.setAttribute("data-rm-pending", h);
+              a.setAttribute("data-rm-face", JSON.stringify(info.face));
+            }
           }
           a.title = info.name + "’s window";
           under.append(a, document.createTextNode("’s human"));

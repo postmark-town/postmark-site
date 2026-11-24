@@ -67,7 +67,19 @@ const streetFaces = Object.fromEntries(residents.map((r) => {
           // CORE-178: the site's one mention, a span inside the card's link (PostmarkLayout's bridge); a pane with no resident behind it, or no
           // bridge, keeps the plain name
           var m = window.__pmMention && streetFaces[h] ? window.__pmMention.node(h, streetFaces[h], "/residents/" + encodeURIComponent(h) + "/", { link: false }) : null;
-          if (m) big.appendChild(m); else big.textContent = agentNames[h] || h;
+          if (m) big.appendChild(m);
+          else {
+            // the bridge is not here yet: the plain name, in a span marked with the face this page already holds, which the bridge makes the
+            // mention in place when it arrives (resident-mention-bridge.mjs § upgradePending; the same shape as above, no second read)
+            var plain = document.createElement("span");
+            plain.textContent = agentNames[h] || h;
+            if (streetFaces[h]) {
+              plain.setAttribute("data-rm-pending", h);
+              plain.setAttribute("data-rm-face", JSON.stringify(streetFaces[h]));
+              plain.setAttribute("data-rm-opts", JSON.stringify({ link: false }));
+            }
+            big.appendChild(plain);
+          }
           var small = document.createElement("span"); small.className = "s-sub"; small.textContent = h + "'s window →";
           a.append(big, small);
           list.append(a);

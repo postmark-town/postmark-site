@@ -35,7 +35,8 @@ export function mentionBridge(doc) {
       if (!el || m.kind !== "resident") return false;
       const [root] = mentionTree(m, { ...opts, link: el.tagName === "A" || el.tagName === "a" });
       const fresh = mentionNode(doc, m, { ...opts, link: el.tagName === "A" || el.tagName === "a" });
-      for (const k of ["class", "style", "title", "data-rm"]) el.removeAttribute?.(k);
+      // the element's own title (a hero line's "…'s window") stays unless the mention brings one (a long name's whole)
+      for (const k of ["class", "style", "data-rm"]) el.removeAttribute?.(k);
       for (const [k, v] of Object.entries(root.attrs)) if (k !== "href" || !el.getAttribute?.("href")) el.setAttribute(k, v);
       while (el.firstChild) el.removeChild(el.firstChild);
       while (fresh.firstChild) el.appendChild(fresh.firstChild);
@@ -44,4 +45,30 @@ export function mentionBridge(doc) {
   };
   const restyleFromMeta = (el, handle, meta, href, opts) => restyle(el, handle, speakerFace(meta), href, opts);
   return Object.freeze({ node, fromMeta, restyle, restyleFromMeta });
+}
+
+/**
+ * THE LOAD ORDER (Facet, CORE-178: a fast data answer and a late module left known residents plain for good). An inline script that drew a resident
+ * before the bridge was here draws its plain text and marks it: `data-rm-pending` (the handle), and what it already holds for them, `data-rm-face`
+ * (a face, JSON) or `data-rm-meta` (a residents-meta row, JSON), with `data-rm-opts` (the mention's options, JSON) and, for an element that is not a
+ * link, `data-rm-href`. When the bridge arrives, PostmarkLayout calls this once, before it says `pm:mention-ready`: every marked element becomes the
+ * mention IN PLACE (the same element, so its link and its focus stay), with no second read of anything. One it can't draw stays as it was, plain:
+ * the honest floor. Returns how many it drew.
+ */
+export const PENDING = ["data-rm-pending", "data-rm-face", "data-rm-meta", "data-rm-opts", "data-rm-href"];
+export function upgradePending(root, bridge) {
+  if (!root || typeof root.querySelectorAll !== "function" || !bridge) return 0;
+  const json = (el, k) => { try { return JSON.parse(el.getAttribute(k) || "null"); } catch { return null; } };
+  let n = 0;
+  for (const el of root.querySelectorAll("[data-rm-pending]")) {
+    const handle = el.getAttribute("data-rm-pending");
+    const opts = json(el, "data-rm-opts") ?? {};
+    const href = el.getAttribute("href") || el.getAttribute("data-rm-href") || null;
+    const meta = json(el, "data-rm-meta");
+    const ok = meta ? bridge.restyleFromMeta(el, handle, meta, href, opts) : bridge.restyle(el, handle, json(el, "data-rm-face"), href, opts);
+    if (!ok) continue;
+    for (const k of PENDING) el.removeAttribute(k);
+    n++;
+  }
+  return n;
 }

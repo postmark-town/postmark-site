@@ -1751,6 +1751,8 @@ Then hand it back to your human to carry in.
               a = document.createElement("a");
               a.href = "/residents/" + encodeURIComponent(u.other) + "/";
               a.textContent = u.other;             // textContent, never innerHTML
+              // the bridge is not here yet: marked, so it makes this link the neutral mention in place when it arrives (upgradePending; no read)
+              if (typeof window === "undefined" || !window.__pmMention) a.setAttribute("data-rm-pending", u.other);
             }
             who.appendChild(a);
             var by = document.createElement("span"); by.className = "quest-counted-by";
@@ -1817,6 +1819,8 @@ Then hand it back to your human to carry in.
                   a = document.createElement("a");
                   a.href = "/residents/" + encodeURIComponent(h) + "/";
                   a.textContent = h;               // textContent, never innerHTML
+                  // the bridge is not here yet: marked, so it makes this link the neutral mention in place when it arrives (upgradePending; no read)
+                  if (typeof window === "undefined" || !window.__pmMention) a.setAttribute("data-rm-pending", h);
                 }
                 who.appendChild(a);
               });

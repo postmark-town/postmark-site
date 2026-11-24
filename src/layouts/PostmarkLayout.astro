@@ -470,8 +470,11 @@ const pageLists = railPageLists({ path: Astro.url.pathname, flags: navFlags(impo
   <script>
     // THE SITE'S ONE RESIDENT MENTION, FOR THE INLINE SCRIPTS (CORE-178): a page's `is:inline` script can't import a module, so this hands it
     // resident-mention-bridge.mjs as window.__pmMention; a script that finds it absent (or gets null) keeps the plain text it always drew.
-    import { mentionBridge } from "@/lib/resident-mention-bridge.mjs";
+    // The order is not fixed: a script whose data came first drew plain text and marked it (data-rm-pending); upgradePending turns each mark into
+    // the mention in place now, so data-first and bridge-first both end in the one form, with no second read.
+    import { mentionBridge, upgradePending } from "@/lib/resident-mention-bridge.mjs";
     window.__pmMention = mentionBridge(document);
+    upgradePending(document, window.__pmMention);
     document.dispatchEvent(new CustomEvent("pm:mention-ready"));
   </script>
 

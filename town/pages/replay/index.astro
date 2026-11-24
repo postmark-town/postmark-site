@@ -636,6 +636,13 @@ const residentPages = { pages: residents.map((r) => r.handle), renames };
       const a = el("a", "r-who");
       a.href = href;
       a.textContent = nameOf(handle);
+      // the bridge is not here yet: marked with the row this page already holds, so the bridge makes this link the mention in place when it arrives
+      // (resident-mention-bridge.mjs § upgradePending; no second read)
+      if (!window.__pmMention) {
+        a.setAttribute("data-rm-pending", handle);
+        if (faces[handle]) a.setAttribute("data-rm-meta", JSON.stringify(faces[handle]));
+        a.setAttribute("data-rm-opts", JSON.stringify({ cls: "r-who" }));
+      }
       return a;
     };
 

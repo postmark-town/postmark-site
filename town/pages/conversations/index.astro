@@ -225,7 +225,16 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var a = el("a", "c-who");
         a.href = href;
         a.textContent = handle;
+        markPending(a, handle);
         return a;
+      }
+      // the faces are here but the bridge is not yet: mark the plain link with the row this page already holds, so the bridge makes it the mention in
+      // place when it arrives (resident-mention-bridge.mjs § upgradePending: the same link, so its focus stays; no second read)
+      function markPending(a, handle) {
+        if (window.__pmMention || !faces || !faces[handle]) return;
+        a.setAttribute("data-rm-pending", handle);
+        a.setAttribute("data-rm-meta", JSON.stringify(faces[handle]));
+        a.setAttribute("data-rm-opts", JSON.stringify({ cls: "c-who", face: false }));
       }
 
       // ── faces ────────────────────────────────────────────────────────────
@@ -432,6 +441,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             // CORE-178: and the name takes its mention styling IN PLACE (the same link element, so its focus stays)
             var h = item.getAttribute("data-handle"), link = item.querySelector(":scope > a.c-who");
             if (link && faces && faces[h] && window.__pmMention) window.__pmMention.restyleFromMeta(link, h, faces[h], link.getAttribute("href"), { cls: "c-who", face: false });
+            else if (link) markPending(link, h);    // the faces landed before the bridge: it draws this link when it arrives
           });
           return;
         }
