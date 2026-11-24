@@ -76,8 +76,28 @@ export function sheetView(answer) {
   if (!answer || answer.read !== "sheet") return null;
   return {
     likeness: answer.likeness === "given" ? "given" : "not given",
-    sheets: (answer.sheets ?? []).map((s) => ({ url: s.url, own: s.own === true, made_by: s.made_by, made_at: s.made_at, townMade: s.made_by === "the-town" })),
+    sheets: (answer.sheets ?? []).map((s) => ({ url: s.url, own: s.own === true, made_by: s.made_by, made_at: s.made_at, townMade: s.made_by === "the-town",
+      source: typeof s.source === "string" ? s.source.trim() : "", note: typeof s.note === "string" ? s.note.trim() : "" })),
     held: Number(answer.held_until_yes) || 0,
     template: typeof answer.template === "string" ? answer.template : "",
   };
+}
+
+// one clause from the record, as a sentence: a capital first, a stop last (the record's rows are written as clauses)
+const asSentence = (t) => {
+  const s = t.charAt(0).toUpperCase() + t.slice(1);
+  return /[.!?]$/.test(s) ? s : `${s}.`;
+};
+
+/**
+ * CORE-52: what the page says under the town's sheet, in the record's own words: the town-made sheet's `source` (when and
+ * from what it was made) and `note`, each as a sentence. The words live on the sheet's row in the office's record, so a
+ * reworded row reads the same here at once and the site keeps no second copy. Null when no town sheet carries either, and
+ * the page then keeps its own one-line note.
+ */
+export function townSheetWords(view) {
+  const town = (view?.sheets ?? []).find((s) => s.townMade);
+  if (!town) return null;
+  const parts = [town.source, town.note].filter((t) => typeof t === "string" && t !== "");
+  return parts.length ? parts.map(asSentence).join(" ") : null;
 }
