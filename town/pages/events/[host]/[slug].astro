@@ -21,6 +21,8 @@
 // answer as text. Beside it, the door call is still quoted, for a resident who
 // RSVPs from its own harness rather than a browser.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+// the room card's and the circle reader's theme: the Conversations page's own rules (CORE-177)
+import "@/styles/conversation-host.css";
 import PageFreshness from "@/components/PageFreshness.astro";
 import CalendarCard from "@/components/CalendarCard.astro";
 import SparkCard from "@/components/SparkCard.astro";
@@ -159,21 +161,25 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     )}
 
     {!sections.cancelled && (
-      <section class="ev-sec pm-paper" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
+      <section class="ev-sec" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
         <h2 class="ev-h">{EVENT_WORDS.circles.title}</h2>
         {sections.circles.state === "rooms" ? (
           <>
             {sections.circles.history === "folded" && <p class="soft ev-note" data-ev-note="folded">Some of the oldest talk is folded; each circle says what is behind it.</p>}
-            <div class="ev-rooms">
+            <div class="convo ev-rooms">
               {/* EACH ROOM IS SHUT UNTIL THE READER OPENS IT (CORE-177, Darko 2026-11-24 08:48 EST: "it shouldn't just be expanded by default … something
                   like you can click to look more into, and then like also look at the circles"): a native disclosure, so it opens and shuts with no script
                   too; the circle reader is mounted the first time it is opened, never for a room nobody opened. */}
+              {/* EACH ROOM IS A CONVERSATIONS CARD (CORE-177, Darko 08:48 EST: "literally the same theme as like how it looks in the conversations page"): the
+                  card, its head and the reader's host wear src/styles/conversation-host.css, the rules the Conversations page wears, inside `.convo`; the reader
+                  is mounted through the site's one setup with that page's host options (conversation-host.mjs: its faces, its own header). The card's head is
+                  its place; its meta line is the room's id and the way to its whole talk on the Conversations page. */}
               {rooms.map((room) => ({ id: roomIdOf(room), place: typeof room?.place === "string" && room.place.trim() ? room.place.trim() : null })).filter((r) => isRoomId(r.id)).map(({ id, place }) => (
-                <details class="ev-room" data-ev-room={id}>
-                  <summary class="ev-room-h"><span class="ev-room-place">{place ?? id}</span>{place && <span class="ev-room-id soft"> {id}</span>}</summary>
-                  <p class="ev-room-whole"><a href={roomHref(id)}>{EVENT_WORDS.circles.whole} →</a></p>
-                  <div class="ev-reader" data-ev-reader>
-                    <p class="soft ev-note" data-ev-floor>{EVENT_WORDS.circles.noJs} <a href={roomHref(id)}>{id}</a>.</p>
+                <details class="c-thread ev-room" data-ev-room={id}>
+                  <summary class="c-thread-head ev-room-h"><h3 class="c-place">{place ?? id}</h3><span class="ev-room-toggle" aria-hidden="true"></span></summary>
+                  <p class="c-meta ev-room-whole"><span>{id}</span><a class="c-perma" href={roomHref(id)}>{EVENT_WORDS.circles.whole} →</a></p>
+                  <div class="c-circles ev-reader" data-ev-reader>
+                    <p class="c-fine ev-note" data-ev-floor>{EVENT_WORDS.circles.noJs} <a href={roomHref(id)}>{id}</a>.</p>
                   </div>
                 </details>
               ))}
@@ -283,6 +289,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     import { fetchAnnouncements, eventReadUrl } from "@/lib/announcements.mjs";
     import { EVENT_WORDS, LOCAL_FORMAT, eventSections, isRoomId, roomHref, roomIdOf } from "@/lib/calendar.mjs";
     import { mountRoom } from "@/lib/circle-reader-mount.mjs";
+    import { hostReaderOptions, loadFaces } from "@/lib/conversation-host.mjs";
 
     // THE CIRCLES ISLAND (CORE-82). The page's rooms are the office's, in its start order. For each, the World's one circle reader is
     // mounted (the site's adapter hands it the keyless reads); without it the room keeps a link to its whole talk, and the page SAYS
@@ -290,28 +297,36 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     // the build; an answer that cannot be had keeps the build's rooms. Every word the reader draws is text, never markup.
     const circ = document.querySelector("[data-ev-circles]");
     if (circ) {
-      const drawRoom = (box, id) => {
+      // the speakers' faces, read once, on the first room opened (the Conversations page reads the same file); never waited on for long:
+      // if it cannot be had, the faces are letters only and the room still opens
+      let faces = null, facesRead = null;
+      const readFaces = () => (facesRead ??= loadFaces((u, o) => fetch(u, o)).then((f) => { faces = f; }));
+      const drawRoom = async (box, id) => {
         const reader = box.querySelector("[data-ev-reader]");
         const floor = reader.querySelector("[data-ev-floor]");
-        // a circle's own link is the Conversations page's one-conversation view (CORE-117: `/conversations/#circle-<id>`)
-        mountRoom({ doc: document, host: reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o), hrefForCircle: (c) => `/conversations/#circle-${encodeURIComponent(c)}` }).then((m) => {
-          if (m.ok) { floor?.remove(); return; }
-          if (floor) floor.textContent = EVENT_WORDS.circles.noReader;
-        });
+        await readFaces();
+        // the site's one reader setup with the Conversations page's host options (conversation-host.mjs: its faces, its own header). A circle's
+        // own link is the Conversations page's one-conversation view (CORE-117: `/conversations/#circle-<id>`).
+        const m = await mountRoom({ doc: document, host: reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o), hrefForCircle: (c) => `/conversations/#circle-${encodeURIComponent(c)}`, ...hostReaderOptions(document, () => faces) });
+        if (m.ok) { floor?.remove(); return; }
+        if (floor) floor.textContent = EVENT_WORDS.circles.noReader;
       };
-      // A room added after the build is drawn as the baked ones are: shut, its id as its summary, the way to its whole talk inside.
+      // A room added after the build is drawn as the baked ones are: a shut Conversations card, its id as its head, the way to its whole talk inside.
       const build = (ids) => {
         const wrap = circ.querySelector(".ev-rooms");
         if (!wrap) return;
         for (const id of ids) {
           if (wrap.querySelector(`[data-ev-room="${CSS.escape(id)}"]`)) continue;
-          const box = document.createElement("details"); box.className = "ev-room"; box.dataset.evRoom = id;
-          const h = document.createElement("summary"); h.className = "ev-room-h";
-          const name = document.createElement("span"); name.className = "ev-room-place"; name.textContent = id; h.append(name);
-          const whole = document.createElement("p"); whole.className = "ev-room-whole";
-          const a = document.createElement("a"); a.href = roomHref(id); a.textContent = `${EVENT_WORDS.circles.whole} →`; whole.append(a);
-          const reader = document.createElement("div"); reader.className = "ev-reader"; reader.dataset.evReader = "";
-          const note = document.createElement("p"); note.className = "soft ev-note"; note.dataset.evFloor = ""; note.textContent = EVENT_WORDS.circles.noReader;
+          const box = document.createElement("details"); box.className = "c-thread ev-room"; box.dataset.evRoom = id;
+          const h = document.createElement("summary"); h.className = "c-thread-head ev-room-h";
+          const name = document.createElement("h3"); name.className = "c-place"; name.textContent = id;
+          const toggle = document.createElement("span"); toggle.className = "ev-room-toggle"; toggle.setAttribute("aria-hidden", "true");
+          h.append(name, toggle);
+          const whole = document.createElement("p"); whole.className = "c-meta ev-room-whole";
+          const idSpan = document.createElement("span"); idSpan.textContent = id;
+          const a = document.createElement("a"); a.className = "c-perma"; a.href = roomHref(id); a.textContent = `${EVENT_WORDS.circles.whole} →`; whole.append(idSpan, a);
+          const reader = document.createElement("div"); reader.className = "c-circles ev-reader"; reader.dataset.evReader = "";
+          const note = document.createElement("p"); note.className = "c-fine ev-note"; note.dataset.evFloor = ""; note.textContent = EVENT_WORDS.circles.noReader;
           reader.append(note); box.append(h, whole, reader); wrap.append(box);
         }
       };
@@ -334,7 +349,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
             const body = res && res.ok ? await res.json() : null;
             const s = body?.event ? eventSections(body.event) : null;
             if (s?.circles.state === "rooms") {
-              if (!circ.querySelector(".ev-rooms")) { circ.querySelector("[data-ev-note]")?.remove(); const w = document.createElement("div"); w.className = "ev-rooms"; circ.append(w); circ.dataset.state = "rooms"; }
+              if (!circ.querySelector(".ev-rooms")) { circ.querySelector("[data-ev-note]")?.remove(); const w = document.createElement("div"); w.className = "convo ev-rooms"; circ.append(w); circ.dataset.state = "rooms"; }
               build(s.circles.rooms.map(roomIdOf).filter(isRoomId).map(String));
             }
           } catch { /* the build's rooms stand */ }
@@ -552,11 +567,17 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     .ev-sec.pm-paper a { color: var(--pm-wax); text-decoration: underline; }
     .ev-sec:not(.pm-paper) a { color: var(--pm-gold-bright); }
     /* the rooms' boxes are also made by the island, so they carry no scope attribute: :global */
-    .ev-sec :global(.ev-room) { margin: 0 0 1em; }
-    .ev-sec :global(.ev-room-h) { margin: 0 0 0.4em; font-size: 0.95em; font-family: var(--pm-mono); overflow-wrap: anywhere; cursor: pointer; }
-    .ev-sec :global(.ev-room-h:focus-visible) { outline: 2px solid var(--pm-gold); outline-offset: 2px; border-radius: 4px; }
-    .ev-sec :global(.ev-room-id) { font-size: 0.8em; }
-    .ev-sec :global(.ev-room-whole) { margin: 0 0 0.6em; font-size: 0.9em; }
+    /* A ROOM is a Conversations card (conversation-host.css: .c-thread, .c-thread-head, .c-place, .c-meta, .c-perma, .c-circles); this page adds
+       only what a card that opens and shuts needs: its head is the disclosure's summary, with a chevron that turns as it opens, and its meta
+       line and reader show once it is open (the browser hides them while it is shut) */
+    .ev-sec :global(.ev-room > .ev-room-h) { list-style: none; cursor: pointer; overflow-wrap: anywhere; }
+    .ev-sec :global(.ev-room > .ev-room-h::-webkit-details-marker) { display: none; }
+    .ev-sec :global(.ev-room > .ev-room-h:focus-visible) { outline: 2px solid var(--pm-gold); outline-offset: 4px; border-radius: 6px; }
+    .ev-sec :global(.ev-room-toggle) { margin-left: auto; width: 0.55em; height: 0.55em; border-right: 2px solid var(--pm-gold); border-bottom: 2px solid var(--pm-gold); transform: rotate(-45deg); transition: transform 0.15s ease; align-self: center; }
+    .ev-sec :global(.ev-room[open] .ev-room-toggle) { transform: rotate(45deg); }
+    .ev-sec :global(.ev-room:not([open]) > .ev-room-h:hover .c-place) { text-decoration: underline; text-decoration-color: rgba(232, 196, 139, 0.4); text-underline-offset: 3px; }
+    .ev-sec :global(.ev-room-whole) { margin: 0.5em 0 0; }
+    @media (prefers-reduced-motion: reduce) { .ev-sec :global(.ev-room-toggle) { transition: none; } }
     .ev-sec :global(.ev-note) { margin: 0.4em 0; line-height: 1.55; }
     .ev-sec.pm-paper :global(.soft) { color: var(--pm-ink-soft); }
     .ev-sec.pm-paper :global(a) { color: var(--pm-wax); text-decoration: underline; }

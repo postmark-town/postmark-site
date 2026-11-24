@@ -367,7 +367,10 @@ test("BUILT FALSIFIER: the ended event outside the seven-day list has its page a
   const rooms = [...circ.matchAll(/<details\b[^>]*data-ev-room="[^"]+"[^>]*>/g)].map((m) => m[0]);
   assert.equal(rooms.length, 2, "each room is a disclosure");
   for (const tag of rooms) assert.doesNotMatch(tag, /\sopen[\s>=]/, "and shut until the reader opens it");
-  assert.equal((circ.match(/<summary\b[^>]*class="ev-room-h"/g) ?? []).length, 2, "its place is the summary a reader opens it by");
+  assert.equal((circ.match(/<summary\b[^>]*class="c-thread-head ev-room-h"/g) ?? []).length, 2, "its place is the summary a reader opens it by, the Conversations card's head");
+  for (const tag of rooms) assert.match(tag, /class="c-thread ev-room"/, "each room is a Conversations card (conversation-host.css)");
+  assert.match(circ, /<div class="convo ev-rooms"/, "inside `.convo`, where that theme applies");
+  assert.match(html, /<section class="ev-sec" aria-label="The conversation"/, "the section is the page's dark ground, as on the Conversations page, not cream paper");
   assert.match(circ, /data-ev-floor/);
   assert.match(circ, /data-live=|data-event=/);
 });

@@ -1,0 +1,64 @@
+/* conversation-host.css — the Conversations page's room card and circle-reader theme, ONE stylesheet for every host that draws a room
+   (CORE-177). Darko, 2026-11-24 08:48 EST: the event page's conversations "would just need to take literally the same theme as like how it
+   looks in the conversations page, because we worked on that a lot". So the rules are not copied: they MOVED here, word for word, from
+   town/pages/conversations/index.astro (the card, its head, place, chip and meta line, the speakers' small faces and the reader's host),
+   and both that page and the event page import this one file. The selectors keep their `.convo` scope, so the Conversations page is
+   unchanged and a host takes the theme by standing inside `.convo`. The reader brings its own stylesheet (READER_CSS, added once by
+   circle-reader-mount.mjs); the card chrome only the Conversations page draws (people, the flat transcript, the pager) stays on that page. */
+
+.convo .c-thread {
+  margin: 0 0 1rem; padding: 1rem 1.15rem;
+  background: rgba(13, 20, 38, 0.6);
+  border: 1px solid rgba(232, 196, 139, 0.18); border-radius: 14px;
+}
+.convo .c-thread.is-live { border-color: rgba(232, 196, 139, 0.42); }
+/* the card a map link landed on — lit until the reader moves on */
+.convo .c-thread.is-anchored { border-color: var(--pm-gold-bright); }
+.convo .c-thread-head { display: flex; align-items: baseline; gap: 0.8em; flex-wrap: wrap; }
+.convo .c-place { margin: 0; font-size: 1.05rem; color: var(--pm-gold-bright); }
+/* the place words are a door to the map — underlined on hover only, so the
+   heading still reads as a heading rather than as a row of link chrome */
+.convo .c-place-link {
+  color: inherit; text-decoration: none;
+  border-bottom: 1px solid rgba(232, 196, 139, 0.28);
+}
+.convo .c-place-link:hover { border-bottom-color: var(--pm-gold-bright); }
+.convo .c-perma {
+  color: rgba(232, 196, 139, 0.55); text-decoration: none;
+  border-bottom: 1px dotted rgba(232, 196, 139, 0.35);
+}
+.convo .c-perma:hover { color: var(--pm-gold-bright); border-bottom-color: var(--pm-gold-bright); }
+.convo .c-chip {
+  font: 0.62rem/1 var(--pm-mono); letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 0.28em 0.6em; border-radius: 999px;
+  color: var(--pm-gold); border: 1px solid rgba(232, 196, 139, 0.45);
+}
+.convo .c-chip.live::before { content: "● "; }
+.convo .c-meta {
+  display: flex; flex-wrap: wrap; gap: 0.3em 0.8em; margin: 0.4em 0 0;
+  font: 0.7rem/1.4 var(--pm-mono); letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.58);
+}
+.convo .c-meta > * + *::before { content: "· "; color: rgba(232, 196, 139, 0.35); }
+.convo .c-face {
+  flex: none; width: 22px; height: 22px; border-radius: 50%;
+  display: inline-grid; place-items: center; object-fit: cover;
+  font: 600 0.7rem/1 var(--pm-mono); letter-spacing: 0;
+  border: 1px solid rgba(232, 196, 139, 0.25);
+  background: rgba(232, 196, 139, 0.08);
+}
+/* CORE-128: the same small face INLINE at the start of a reader byline (the World's circle reader puts the provider's node first in .cr-head-line):
+   about 20px, in the line's own flow, so no statement or subtree gains a gutter and the speech keeps its width */
+.convo .cr-head-line > .c-face {
+  display: inline-grid; vertical-align: middle; width: 20px; height: 20px; margin: -2px 0.4em 0 0;
+  font-size: 0.62rem; box-sizing: border-box;
+}
+/* the human of a house: never a portrait, never a colour of their own */
+.convo .c-face.is-human {
+  border-style: dashed; border-color: rgba(232, 196, 139, 0.45);
+  background: transparent; color: rgba(232, 196, 139, 0.7);
+}
+.convo .c-fine { font-size: 0.78rem; color: rgba(185, 173, 147, 0.85); }
+/* CORE-82: the circle reader's host inside a room card, the flat floor's note, the reply target and the #circle- note.
+   The reader brings its own stylesheet (READER_CSS, added once by the module script). */
+.convo .c-circles { margin: 0.7em 0 0; color: #f0e6d0; font-size: 0.92rem; line-height: 1.55; overflow-wrap: anywhere; }
+.convo .c-circles-note { margin: 0.7em 0 0.3em; }
