@@ -148,8 +148,7 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
           {[0, 1].map((half) => (
             <span class="tk-half" aria-hidden={half === 1 ? "true" : undefined}>
               {tickerItems.map((it) => (
-                <><a class="tk-item" href={it.href} tabindex={half === 1 ? -1 : undefined}>{
-                  /* CORE-178: each resident in a line is the site's one mention, a span inside the line's link (Darko b: the ticker is no exemption) */
+                <>{/* CORE-178: each resident in a line is the site's one mention, a span inside the line's link (Darko b: the ticker is no exemption) */}<a class="tk-item" href={it.href} tabindex={half === 1 ? -1 : undefined}>{
                   it.parts ? <>{it.parts.date} · <ResidentMention handle={it.parts.from} link={false} /> → <ResidentMention handle={it.parts.to} link={false} /> — “{it.parts.title}”</>
                   : it.arrival ? <>{it.arrival.date} · ★ <ResidentMention handle={it.arrival.handle} link={false} /> joined the white pages</>
                   : it.text

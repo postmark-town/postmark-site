@@ -147,6 +147,21 @@ test("the projects fold (projects-page.mjs) hands the page one resident's handle
   assert.equal(many.handle, undefined, "a household hand is a house, never a resident mention");
 });
 
+test("write-someone-new carries the dealt resident's PUBLIC face (colour, picture, initial), so the card names them as the mention", async () => {
+  const { publicHouses, deal } = await import("../src/lib/write-someone-new.mjs");
+  const NOW = Date.parse("2031-05-01T12:00:00Z");
+  const member = { handle: "wren-alder", address: { agent: "Wren Alder" }, counts: { sent: 3 } };
+  const houses = [{ key: "h", name: "H", href: null, members: [member] }];
+  const opts = { now: NOW, houseLast: () => ({ at: new Date(NOW - 86_400_000).toISOString() }), noteOf: () => "a line", nameOf: (r) => r.address.agent };
+  const withFace = publicHouses(houses, { ...opts, faceOf: () => ({ accent: "#2f6b3a", avatar: "/m/w.jpg", monogram: "W", bioLine: "private-ish", homeImages: ["x"] }) });
+  assert.deepEqual(withFace.houses[0].members[0].face, { name: "Wren Alder", accent: "#2f6b3a", avatar: "/m/w.jpg", monogram: "W" }, "only the public face fields");
+  const without = publicHouses(houses, opts);
+  assert.equal("face" in without.houses[0].members[0], false, "control: without faceOf the card's data is exactly what it was");
+  const dealt = deal(withFace, { now: NOW, rng: () => 0 });
+  assert.equal(dealt.status, "ok");
+  assert.deepEqual(dealt.face, withFace.houses[0].members[0].face, "the deal hands the page the face");
+});
+
 // ── (2) text pins: the moved build-time callsites ─────────────────────────────────────────────────────────────────────────────────────
 
 const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -187,7 +202,7 @@ test("TEXT PIN: the front page's resident cards, its makers and its ticker draw 
 
 // the inline scripts, which reach the one mention through PostmarkLayout's bridge (window.__pmMention), and the bundled one that imports it
 const BRIDGED = {
-  "town/pages/replay/index.astro": [/window\.__pmMention\?\.fromMeta\(handle, faces\[handle\], "\/residents\/" \+ encodeURIComponent\(page\) \+ "\/", \{ cls: "r-who" \}\)/],
+  "town/pages/replay/index.astro": [/const href = "\/residents\/" \+ encodeURIComponent\(page\) \+ "\/";\s*const mention = window\.__pmMention\?\.fromMeta\(handle, faces\[handle\], href, \{ cls: "r-who" \}\);/],
   "town/pages/conversations/index.astro": [/window\.__pmMention\.fromMeta\(handle, faces\[handle\], href, \{ cls: "c-who", face: false \}\)/, /window\.__pmMention\.restyleFromMeta\(link, h, faces\[h\], link\.getAttribute\("href"\), \{ cls: "c-who", face: false \}\)/],
   "town/components/Household.astro": [/window\.__pmMention\.node\(u\.other, null, /, /window\.__pmMention\.node\(h, null, /],
   "town/pages/index.astro": [/window\.__pmMention\.node\(h, info\.face, href\)/],
@@ -265,7 +280,7 @@ const DECLARED = {
   "town/pages/window/index.astro": [2, "a window card's own link, and the href handed to the bridge for the mention inside it"],
   // the hrefs the inline scripts hand the bridge (window.__pmMention), and the plain links they keep when it is absent
   "town/pages/conversations/index.astro": [1, "personLink's href: the mention's (through the bridge), or the plain link's before the faces land"],
-  "town/pages/replay/index.astro": [3, "the settlement column's residentHref gate, and the live feed's href for the bridge's mention and for its plain link"],
+  "town/pages/replay/index.astro": [2, "the settlement column's residentHref gate, and the live feed's one resolved href (resident-links.test.mjs 2 holds its form), for the bridge's mention and its plain link"],
   "town/components/Household.astro": [10, "the appearance button, the tab URLs, the rendition egg, two fetches, and the quest lines' hrefs (the bridge's neutral mention, or the plain link), twice each"],
   // a picture-only cluster Darko ruled, and a notice that names no one
   "src/layouts/PostmarkLayout.astro": [2, "the main rail's corner faces (Darko 2026-11-11: \"just for the profile pictures\"; no name on them to style) and the \"You're in\" notice's link to your own page"],
