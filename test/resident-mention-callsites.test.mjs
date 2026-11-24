@@ -166,7 +166,40 @@ const MOVED = {
   "town/pages/replay/index.astro": [/<ResidentMention handle=\{g\.who\} cls="r-who" \/>/],
   "town/pages/mail/[thread].astro": [/<ResidentMentionModel model=\{mentionAt\(i\)\} \/>/],
   "town/pages/mail/with/[pair].astro": [/<ResidentMentionModel model=\{mentions\.a\} \/>/, /<ResidentMentionModel model=\{mentions\.b\} \/>/],
+  // the ruling of 17:38Z: cards and chips take the name's styling beside their own portrait (b), the ticker and labels the whole mention
+  "src/components/HouseRail.astro": [/<ResidentMention handle=\{f\.handle\} face=\{f\} link=\{false\} noFace cls="pm-chip-name" \/>/, /--pm-chip-color: \$\{inkOn\(f\.accent, "night"\) \?\? NEUTRAL\}/],
+  "src/components/ResidentCard.astro": [/<b><ResidentMention handle=\{r\.handle\} link=\{false\} noFace \/><\/b>/],
+  "src/components/household-dashboard/ResidentCard.astro": [/<ResidentMention handle=\{f\.handle\} face=\{f\} href=\{href\} noFace cls="hd-card-name" \/>/],
+  "town/pages/meeps/index.astro": [/<span class="cq-name">\{m\.profile\.inRoll \? <ResidentMention handle=\{m\.handle\} link=\{false\} noFace \/> : m\.display\}<\/span>/, /<h2>\{m\.profile\.inRoll \? <ResidentMention/],
+  "town/pages/bulletin/index.astro": [/<span class="hand-name">\{m\.handle \? <ResidentMention handle=\{m\.handle\} link=\{false\} noFace \/> : m\.name\}<\/span>/],
 };
+// and the front page's newer ones (the same file as its credits, above)
+const FRONT_MORE = [
+  /<b class="rc-name"><ResidentMention handle=\{m\.handle\} link=\{false\} noFace \/><\/b>/,
+  /<ResidentMention handle=\{it\.parts\.from\} link=\{false\} \/> → <ResidentMention handle=\{it\.parts\.to\} link=\{false\} \/>/,
+  /★ <ResidentMention handle=\{it\.arrival\.handle\} link=\{false\} \/> joined the white pages/,
+  /h\.handle \? <ResidentMention handle=\{h\.handle\} link=\{false\} \/> : h\.label/,
+];
+test("TEXT PIN: the front page's resident cards, its makers and its ticker draw the mention", () => {
+  const src = code(read("town/pages/index.astro"));
+  for (const pin of FRONT_MORE) assert.match(src, pin, String(pin));
+});
+
+// the inline scripts, which reach the one mention through PostmarkLayout's bridge (window.__pmMention), and the bundled one that imports it
+const BRIDGED = {
+  "town/pages/replay/index.astro": [/window\.__pmMention\?\.fromMeta\(handle, faces\[handle\], "\/residents\/" \+ encodeURIComponent\(page\) \+ "\/", \{ cls: "r-who" \}\)/],
+  "town/pages/conversations/index.astro": [/window\.__pmMention\.fromMeta\(handle, faces\[handle\], href, \{ cls: "c-who", face: false \}\)/, /window\.__pmMention\.restyleFromMeta\(link, h, faces\[h\], link\.getAttribute\("href"\), \{ cls: "c-who", face: false \}\)/],
+  "town/components/Household.astro": [/window\.__pmMention\.node\(u\.other, null, /, /window\.__pmMention\.node\(h, null, /],
+  "town/pages/index.astro": [/window\.__pmMention\.node\(h, info\.face, href\)/],
+  "town/pages/window/index.astro": [/window\.__pmMention\.node\(h, streetFaces\[h\], "\/residents\/" \+ encodeURIComponent\(h\) \+ "\/", \{ link: false \}\)/],
+  "town/pages/households/index.astro": [/import \{ mentionModel, mentionNode \} from "@\/lib\/resident-mention\.mjs";/, /name\.replaceChildren\(mentionNode\(document, m, \{ link: false \}\)\)/],
+};
+test(`TEXT PIN: the ${Object.keys(BRIDGED).length} script-drawn callsites reach the one mention, and keep their plain text without it`, () => {
+  for (const [rel, pins] of Object.entries(BRIDGED)) {
+    const src = code(read(rel));
+    for (const pin of pins) assert.match(src, pin, `${rel}: ${pin}`);
+  }
+});
 
 test(`TEXT PIN: each of the ${Object.keys(MOVED).length} moved build-time callsites draws the one mention`, () => {
   for (const [rel, pins] of Object.entries(MOVED)) {
@@ -188,17 +221,19 @@ test("TEXT PIN: the build's adapters write no set:html, and the model drawer imp
 // ── (3) the census ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 //
 // Every resident-page link pattern (`/residents/${…}`, `"/residents/" + …`, `residentHref(`) still in the Site's own source, comments
-// stripped. Each stays for a reason, and the reason is one of: it is the link a mention is drawn WITH (a seat, an href handed in); it is
-// navigation, an API door, a fetch or a redirect, not a name; it belongs to an open PR (CORE-177, site #488) or is retired; it waits on a call
-// sent up with CORE-178's hand-in (cards and chips; inline scripts that cannot import the module; out-of-house names with no face on the page).
+// stripped. Each stays for a reason, and since Facet's ruling of 17:38Z the reason is one of: it is the link a mention is drawn WITH (a seat, an
+// href handed in, a card's or chip's own link whose name inside is the mention); it is navigation, an API door, a fetch or a redirect, not a name;
+// it is a household's key, kept distinct from residents; it belongs to an open PR (CORE-177, site #488) or is retired; or it is a picture-only
+// cluster Darko ruled (the main rail's corner faces: "just for the profile pictures", 2026-11-11), with no name on it to style.
 
 const DECLARED = {
   // the link a mention is drawn with
   "src/components/hearth/HearthSlot.astro": [1, "seat(): the href the closest-correspondents mention and the residents' cards are drawn with"],
   "src/components/household-dashboard/HouseDashboard.astro": [2, "seat() and seatHref(): the hrefs paint.mjs's who() mention is drawn with"],
   "src/lib/hearth/stage.mjs": [1, "seatHref: the href the Hearth's mentions are drawn with"],
-  "src/lib/hearth/paint-v2.mjs": [3, "who()'s href (2: the residentHref fallback) and other(): a resident outside the house, with no face on the page (sent up)"],
-  "src/lib/household-dashboard/paint.mjs": [1, "other(): a resident outside the house, with no face on the page (sent up)"],
+  "src/lib/hearth/paint-v2.mjs": [3, "who()'s href (2: the residentHref fallback) and other()'s: the neutral mention of a resident outside the house is drawn with it"],
+  "src/lib/hearth/paint.mjs": [1, "outsider()'s href: the neutral mention of a host outside the house is drawn with it"],
+  "src/lib/household-dashboard/paint.mjs": [1, "other()'s href: the neutral mention of a resident outside the house is drawn with it"],
   "src/lib/mail-routes.mjs": [3, "residentHref: the links table and the letters' hrefOf, beside the mention models it supplies"],
   "src/lib/resident-link.mjs": [1, "the link rule itself"],
   "src/lib/resident-identity.mjs": [1, "speakerHref: the href the reader's speaker identity (the mention) is drawn with, as the Conversations page links its residents"],
@@ -216,21 +251,24 @@ const DECLARED = {
   "town/pages/residents/[handle]/view/[rendition].astro": [3, "the back link and the picker's navigation (the byline is moved)"],
   "town/pages/window/[handle].astro": [1, "a permanent redirect to the resident's window"],
   "town/components/HouseholdPage.astro": [1, "the old ?resident= address, redirected to the resident's page"],
-  "town/pages/town/index.astro": [1, "a think-tank backer row naming a HOUSEHOLD key under /residents/ (not a resident handle; sent up)"],
+  // a household's key, kept distinct from residents (Facet, 17:38Z)
+  "town/pages/town/index.astro": [1, "a think-tank backer row: a HOUSEHOLD key under /residents/, not a resident handle, so never drawn as a resident mention"],
   // belongs to an open PR, or retired
   "src/lib/calendar.mjs": [2, "residentHref's definition (CORE-177's file, site #488)"],
-  "town/pages/conversations/index.astro": [1, "personLink (CORE-177 moves it into conversation-host.mjs, site #488)"],
-  "town/pages/events/[host]/[slug].astro": [1, "the event page (CORE-177's file, site #488)"],
+  "town/pages/events/[host]/[slug].astro": [1, "the event page (CORE-177's file, site #488); its rooms take the identity by a one-line follow-up in #488's hostReaderOptions once it lands"],
   "src/components/QuestStandings.astro": [1, "retired by POS-967: nothing renders it"],
-  // waits on a call sent up with the hand-in
-  "src/components/HouseRail.astro": [1, "the sub-rail's chips: a chip is a picture and a name already (Darko, 2026-11-11); card/chip shape sent up"],
-  "src/components/ResidentCard.astro": [1, "the directory card: card/chip shape sent up"],
-  "src/lib/write-someone-new.mjs": [1, "the dealt card's profile link: its build data carries no face (sent up)"],
-  "src/layouts/PostmarkLayout.astro": [2, "the main rail's household-faces menu and the \"You're in\" notice (inline script; sent up)"],
-  "town/pages/index.astro": [4, "the ticker, the hero's window line (inline script), its button, and the Meet-the-residents cards (sent up)"],
-  "town/pages/replay/index.astro": [2, "the settlement column's residentHref gate (moved) and the live feed's personLink (inline module; sent up)"],
-  "town/pages/window/index.astro": [1, "the street's window cards (inline script; sent up)"],
-  "town/components/Household.astro": [8, "the appearance button, the tab URLs, the rendition egg, two fetches, and the quest 'Sent to today' names (inline script; sent up)"],
+  // a card's or chip's own link: the name inside it is the mention (Darko b: one face per resident)
+  "src/components/HouseRail.astro": [1, "the chip's own link; its name is the mention's styling beside the chip's face"],
+  "src/components/ResidentCard.astro": [1, "the directory card's own link; its name is the mention's styling"],
+  "src/lib/write-someone-new.mjs": [1, "the dealt card's profile link; the page draws the mention inside it from the card's public face"],
+  "town/pages/index.astro": [4, "the arrival's ticker link, the hero line's href (handed to the bridge) and its button, and a resident card's own link"],
+  "town/pages/window/index.astro": [2, "a window card's own link, and the href handed to the bridge for the mention inside it"],
+  // the hrefs the inline scripts hand the bridge (window.__pmMention), and the plain links they keep when it is absent
+  "town/pages/conversations/index.astro": [1, "personLink's href: the mention's (through the bridge), or the plain link's before the faces land"],
+  "town/pages/replay/index.astro": [3, "the settlement column's residentHref gate, and the live feed's href for the bridge's mention and for its plain link"],
+  "town/components/Household.astro": [10, "the appearance button, the tab URLs, the rendition egg, two fetches, and the quest lines' hrefs (the bridge's neutral mention, or the plain link), twice each"],
+  // a picture-only cluster Darko ruled, and a notice that names no one
+  "src/layouts/PostmarkLayout.astro": [2, "the main rail's corner faces (Darko 2026-11-11: \"just for the profile pictures\"; no name on them to style) and the \"You're in\" notice's link to your own page"],
 };
 
 const DIRS = ["src/components", "src/lib", "src/layouts", "town/pages", "town/components"];

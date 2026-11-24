@@ -24,9 +24,12 @@ function el(tag, bg = null, parent = null) {
     get classList() { return { contains: (c) => (n.attrs.class ?? "").split(" ").includes(c), add: (c) => { if (!(n.attrs.class ?? "").split(" ").includes(c)) n.attrs.class = ((n.attrs.class ?? "") + " " + c).trim(); } }; },
     style: { setProperty(k, v) { n.attrs.style = ((n.attrs.style ?? "").replace(new RegExp(`;?\\s*${k}:[^;]*`), "") + `; ${k}: ${v}`).replace(/^;\s*/, ""); } },
     querySelectorAll(sel) {
-      if (sel !== ".rm") throw new Error("the fake knows only .rm");
+      const hit = sel === ".rm" ? (c) => (c.attrs?.class ?? "").split(" ").includes("rm")
+        : sel === "[data-rm-accent]" ? (c) => c.attrs && "data-rm-accent" in c.attrs
+        : null;
+      if (!hit) throw new Error("the fake knows only .rm and [data-rm-accent], not " + sel);
       const out = [];
-      const walk = (x) => { for (const c of x.children) { if ((c.attrs?.class ?? "").split(" ").includes("rm")) out.push(c); if (c.children) walk(c); } };
+      const walk = (x) => { for (const c of x.children) { if (hit(c)) out.push(c); if (c.children) walk(c); } };
       walk(n);
       return out;
     },
@@ -98,6 +101,20 @@ test("a neutral mention (no colour chosen) is left alone, a repeat pass overwrit
   assert.equal((gold.attrs.style.match(/--rm-ink:/g) ?? []).length, 1, "one --rm-ink, however many passes");
   assert.equal(inkOnActualSurface(stage, {}), 0, "no getStyle: nothing touched");
   assert.equal(inkOnActualSurface(null, { getStyle }), 0);
+});
+
+test("the household card's other coloured parts (data-rm-accent → --hd-c) are re-inked for the background under them", () => {
+  const stage = el("div", "rgb(250, 248, 240)");                          // a light design
+  const card = stage.appendChild(el("article"));
+  card.setAttribute("data-rm-accent", "#e8c48b");
+  card.style.setProperty("--hd-c", inkOn("#e8c48b", "night"));           // what the build wrote: the night's ink
+  const bare = stage.appendChild(el("article"));                           // no colour chosen: no attribute, nothing written
+  assert.equal(inkOnActualSurface(stage, { getStyle }), 1);
+  const hd = /--hd-c:\s*(#[0-9a-f]{6})/.exec(card.attrs.style)?.[1];
+  assert.equal(hd, inkOn("#e8c48b", "#faf8f0"));
+  assert.ok(contrast(hd, "#faf8f0") >= MIN_CONTRAST, "the ring and wash read on the light glass");
+  assert.equal((card.attrs.style.match(/--hd-c:/g) ?? []).length, 1, "rewritten, not stacked");
+  assert.equal(bare.attrs.style, undefined);
 });
 
 test("a getStyle that throws on one layer skips it, and the pass still inks", () => {

@@ -104,7 +104,7 @@ test("ties: no bundle, or a bundle without the part, draws nothing; an answered 
   assert.equal(rows.length, 2);
   assert.match(heard(rows[0]), /^Fox and hare · 3 out, 2 back/);
   assert.match(rows[0].textContent, /Come by\.I will\./, "both quotes, by rule");
-  assert.match(rows[1].textContent, /^robin · 2 letters with the house/, "a correspondent with no pair on the page: the house's total, no direction made up");
+  assert.match(heard(rows[1]), /^robin · 2 letters with the house/, "a correspondent with no pair on the page: the house's total, no direction made up");
   paintTies(s, env({ closer: part({ rows: [] }) }), CTX);
   assert.equal(ties.hidden, false);
   assert.match(ties.textContent, /No letters have crossed between these residents and others yet\./);

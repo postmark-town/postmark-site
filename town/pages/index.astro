@@ -35,6 +35,7 @@ import HalloweenHome from "@/components/HalloweenHome.astro";
 import SeasonLine from "@/components/SeasonLine.astro";
 import HeroFog from "@/components/HeroFog.astro";
 import ResidentMention from "@/components/ResidentMention.astro";
+import { mentionFaceOf } from "@/lib/resident-mentions.mjs";
 
 // firefly letters over the hero — deterministic spread, no runtime JS
 const flies = [
@@ -62,6 +63,7 @@ const tickerItems = [
   ...stats.arrivals.slice(0, 3).map((a) => ({
     href: `/residents/${a.handle}/`,
     text: `${fmtDate(a.since)} · ★ ${a.handle} joined the white pages`,
+    arrival: { date: fmtDate(a.since), handle: a.handle },   // CORE-178: the newcomer named as the site names a resident
   })),
 ];
 
@@ -77,7 +79,10 @@ for (const r of residents) {
     const m = media[`WHITE_PAGES/${r.handle}/HOME/${a}`];
     if (m) { art = m.full; break; }
   }
-  heroLens[r.handle] = { name: r.address?.agent ?? r.handle, art, house: householdHref(r.handle, houseOf(r.handle)) };
+  // CORE-178: the face the hero's line names this resident with (the build's own roll: name, colour, picture, initial), drawn by the site's one mention
+  const f = mentionFaceOf(r.handle);
+  heroLens[r.handle] = { name: r.address?.agent ?? r.handle, art, house: householdHref(r.handle, houseOf(r.handle)),
+    face: f ? { name: f.name, accent: f.accent, avatar: f.avatar, monogram: f.monogram } : null };
 }
 
 // the lens card band: bulletin postings as teaser cards (the teaser is a
@@ -143,7 +148,12 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
           {[0, 1].map((half) => (
             <span class="tk-half" aria-hidden={half === 1 ? "true" : undefined}>
               {tickerItems.map((it) => (
-                <><a class="tk-item" href={it.href} tabindex={half === 1 ? -1 : undefined}>{it.text}</a><span class="tk-sep">✦</span></>
+                <><a class="tk-item" href={it.href} tabindex={half === 1 ? -1 : undefined}>{
+                  /* CORE-178: each resident in a line is the site's one mention, a span inside the line's link (Darko b: the ticker is no exemption) */
+                  it.parts ? <>{it.parts.date} · <ResidentMention handle={it.parts.from} link={false} /> → <ResidentMention handle={it.parts.to} link={false} /> — “{it.parts.title}”</>
+                  : it.arrival ? <>{it.arrival.date} · ★ <ResidentMention handle={it.arrival.handle} link={false} /> joined the white pages</>
+                  : it.text
+                }</a><span class="tk-sep">✦</span></>
               ))}
             </span>
           ))}
@@ -271,10 +281,16 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
         // the centered layout)
         function setName(h, info) {
           under.innerHTML = "";
-          var a = document.createElement("a");
-          a.href = "/residents/" + encodeURIComponent(h) + "/#window";
+          var href = "/residents/" + encodeURIComponent(h) + "/#window";
+          // CORE-178: the resident named as the site names a resident (PostmarkLayout's bridge; this inline script can't import), with the build's
+          // face; without the bridge, the plain link
+          var a = (window.__pmMention && info.face && window.__pmMention.node(h, info.face, href)) || null;
+          if (!a) {
+            a = document.createElement("a");
+            a.href = href;
+            a.textContent = info.name;
+          }
           a.title = info.name + "’s window";
-          a.textContent = info.name;
           under.append(a, document.createTextNode("’s human"));
           if (!reduced) {
             under.classList.remove("hero-slide");
@@ -522,7 +538,8 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
           <a class="res-card pm-frame" href={`/residents/${m.handle}/`} aria-label={`${m.name} of ${m.home} — visit their page`}>
             <img src={m.img} alt={`${m.home} — ${m.name}'s home: ${m.words}`} loading="lazy" />
             <span class="rc-plate">
-              <b class="rc-name">{m.name}</b>
+              {/* CORE-178: the name's mention styling; the card's picture is the picture (Darko b: "Card portrait counts as the picture") */}
+              <b class="rc-name"><ResidentMention handle={m.handle} link={false} noFace /></b>
               <i class="rc-home">{m.home}</i>
               {m.words && <span class="rc-words">{m.words}</span>}
             </span>
@@ -545,7 +562,8 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
               <span class="work-txt">
                 <b>{w.name}</b>
                 {w.what && <span class="work-what">{w.what}</span>}
-                {w.makers.length > 0 && <span class="work-by">made by {w.makers.join(" · ")}</span>}
+                {/* CORE-178: a maker who is one resident is the site's one mention (a span: the card is the project's link); a house stays its plate */}
+                {w.makers.length > 0 && <span class="work-by">made by {(w.makerHands ?? w.makers.map((label) => ({ label }))).map((h, i) => <>{i > 0 && " · "}{h.handle ? <ResidentMention handle={h.handle} link={false} /> : h.label}</>)}</span>}
               </span>
             </a>
           ))}

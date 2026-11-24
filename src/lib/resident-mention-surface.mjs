@@ -81,5 +81,15 @@ export function inkOnActualSurface(root, { getStyle, floor = FLOOR } = {}) {
     m.classList.add("on-ink");
     n++;
   }
+  // the household card's other coloured parts (its portrait's ring, its wash, a feed line's accent: `--hd-c`), which carry their colour as
+  // `data-rm-accent`: the same ink, for the background under THEM
+  for (const e of root.querySelectorAll("[data-rm-accent]")) {
+    const accent = hexOf(e.getAttribute("data-rm-accent"));
+    if (!accent) continue;
+    const ink = inkOn(accent, surfaceUnder(e, getStyle, floor));
+    if (!ink) continue;
+    e.style.setProperty("--hd-c", ink);
+    n++;
+  }
   return n;
 }

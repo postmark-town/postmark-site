@@ -51,7 +51,11 @@ test("DISPLAY ONLY: the name is never changed: the search string and the own pag
   assert.ok(residentKey(r).includes(LEGACY.toLowerCase().split(" ").at(-1)), "the search string still holds the end of the name");
   assert.ok(residentKey(r).includes("far lantern houses"), "a search for the tail of a long name still finds the resident");
   const card = src("src/components/ResidentCard.astro");
-  assert.match(card, /<b>\{shownName\(r\.address\?\.agent \?\? r\.handle\)\}<\/b>/, "the directory card shows the shortened name");
+  // CORE-178: the card's name is the site's one mention (name styling only), which shows the name through shownName (until 2026-11-24 this pinned
+  // the card's own `<b>{shownName(r.address?.agent ?? r.handle)}</b>`)
+  assert.match(card, /<b><ResidentMention handle=\{r\.handle\} link=\{false\} noFace \/><\/b>/, "the directory card shows the mention's name");
+  assert.match(src("src/lib/resident-mention.mjs"), /import \{ shownName \} from "\.\/resident-name\.mjs";/, "and the mention shortens it with this file's rule");
+  assert.match(src("src/lib/resident-mention.mjs"), /name: shownName\(whole\)/, "on the name it shows");
   assert.match(card, /data-search=\{residentKey\(r\)\}/, "and searches on the whole one");
   assert.match(card, /href=\{`\/residents\/\$\{r\.handle\}\/`\}/, "and links by the handle");
   assert.doesNotMatch(src("town/pages/residents/[handle].astro"), /shownName|resident-name/, "the resident's own page prints the name whole");

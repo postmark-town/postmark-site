@@ -40,6 +40,7 @@
 // as #board, one card per posting, the panels over the cork) are in this
 // file's git history.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import ResidentMention from "@/components/ResidentMention.astro";
 import CalendarPanel from "@/components/CalendarPanel.astro";
 import bulletin from "@/data/postmark/bulletin.json";
 import calendar from "@/data/postmark/calendar.json";
@@ -98,8 +99,11 @@ const REPO_BULLETIN = "https://github.com/postmark-town/postmark/blob/main/TOWN_
 // always worn; the top one names the pinned notices and the count
 const notes = [0, 1, 2, 3, 4].map((i) => postitLook(i));
 const firstPinned = sticks.filter(isPinned).slice(0, 2).map((p) => postingTitle(p));
+const rollHandles = new Set(residents.map((r) => r.handle));
 const meeps = MEEPS.map((m) => ({
   key: m.key,
+  // CORE-178: a meep in the build's roll is a resident, named by the site's one mention styling (its sprite is the picture)
+  handle: m.handle && rollHandles.has(m.handle) ? m.handle : null,
   name: m.name ?? displayName(m).replace(/^the /i, ""),
   sprite: SPRITES[m.key] ? paint(m.key) : null,
   monogram: displayName(m).replace(/^The /, "").charAt(0).toUpperCase(),
@@ -252,7 +256,7 @@ const views = JSON.stringify({
                     {m.sprite
                       ? <svg class="px" viewBox={`0 0 ${SPRITE_W} ${SPRITE_H}`} shape-rendering="crispEdges">{m.sprite.map((r) => <rect x={r.x} y={r.y} width={r.w} height="1" fill={r.fill} />)}</svg>
                       : <span class="mono">{m.monogram}</span>}
-                    <span class="hand-name">{m.name}</span>
+                    <span class="hand-name">{m.handle ? <ResidentMention handle={m.handle} link={false} noFace /> : m.name}</span>
                   </span>
                 ))}
               </span>

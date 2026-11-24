@@ -213,11 +213,17 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         return m ? "the human of " + m[1] : null;
       }
 
+      // CORE-178: a resident's name is the site's one mention styling (PostmarkLayout's bridge, window.__pmMention: this inline script can't import),
+      // from the faces this page already reads, with no second picture: the speaker's face beside it is the picture (Darko, 12:25 EST, b). Until the
+      // faces land, or without the bridge, the plain link; fillPeople restyles it in place when they land, so a focused link keeps its focus.
       function personLink(handle) {
         var human = humanOf(handle);
         if (human) return el("span", "c-who is-human", human);
+        var href = "/residents/" + encodeURIComponent(handle) + "/";
+        var mention = window.__pmMention && faces && faces[handle] ? window.__pmMention.fromMeta(handle, faces[handle], href, { cls: "c-who", face: false }) : null;
+        if (mention) return mention;
         var a = el("a", "c-who");
-        a.href = "/residents/" + encodeURIComponent(handle) + "/";
+        a.href = href;
         a.textContent = handle;
         return a;
       }
@@ -423,6 +429,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             var old = item.querySelector(":scope > .c-face");
             var next = faceForSpeaker(item.getAttribute("data-handle"));
             if (old && next) old.replaceWith(next); else if (next) item.insertBefore(next, item.firstChild);
+            // CORE-178: and the name takes its mention styling IN PLACE (the same link element, so its focus stays)
+            var h = item.getAttribute("data-handle"), link = item.querySelector(":scope > a.c-who");
+            if (link && faces && faces[h] && window.__pmMention) window.__pmMention.restyleFromMeta(link, h, faces[h], link.getAttribute("href"), { cls: "c-who", face: false });
           });
           return;
         }

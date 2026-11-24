@@ -25,7 +25,7 @@ import { excerpt, fmtDate } from "@/lib/pm.mjs";
 import { cardImageOf } from "@/lib/home-face.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { residentKey } from "@/lib/households-directory.mjs";
-import { shownName } from "@/lib/resident-name.mjs";
+import ResidentMention from "@/components/ResidentMention.astro";
 import { residentActiveWords } from "@/lib/last-active.mjs";
 
 interface Props {
@@ -60,7 +60,9 @@ const active = residentActiveWords(r);
     ? <img class="res-img" src={img} alt={`${r.handle}'s home`} loading="lazy" />
     : <div class="res-img res-img-empty"><span>✉</span></div>}
   <span class="res-txt">
-    <b>{shownName(r.address?.agent ?? r.handle)}</b>
+    {/* CORE-178: the site's one mention styling for the name, with no second picture (Darko b: "Card portrait counts as the picture"); it shows the name
+        through resident-name.mjs § shownName, as this card always has */}
+    <b><ResidentMention handle={r.handle} link={false} noFace /></b>
     {/* explicit label — a bare "since" can't tell join from birth;
         pre-field residents (no joined:) show no date rather than a
         mislabeled one, until the office backfills joined:. */}

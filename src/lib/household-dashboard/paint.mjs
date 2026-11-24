@@ -13,7 +13,7 @@ import {
 } from "./fold.mjs";
 import { hungLine } from "./hung-line.mjs";
 import { editLinkShown } from "../profile-edit.mjs";
-import { mentionModel, mentionNode } from "../resident-mention.mjs";
+import { inkOn, mentionModel, mentionNode } from "../resident-mention.mjs";
 
 const TOWN_REPO = "https://github.com/postmark-town/postmark/blob/main/";
 const FEED_MAX = 14;       // fresh lines shown before "N more"
@@ -35,11 +35,13 @@ function who(faces, handle, seatHref) {
   return mentionNode(document, mentionModel({ handle, face: faces[handle] ?? null, href: seatHref(handle) }), { cls: "hd-who" });
 }
 
-// someone outside the house, by handle, to their own page
+// someone outside the house, by handle, to their own page: the site's one mention (CORE-178), the honest neutral one, since this page holds no face
+// for a resident of another house (their initial, no invented colour; no new read). A house's human stays plain text (mentionModel's rule).
 function other(handle) {
-  const a = el("a", "hd-other", handle);
-  a.href = "/residents/" + encodeURIComponent(handle) + "/";
-  return a;
+  const href = "/residents/" + encodeURIComponent(handle) + "/";
+  const m = mentionModel({ handle, face: null, href });
+  if (m.kind === "resident") return mentionNode(document, m, { cls: "hd-other" });
+  return el("span", "hd-other", handle);
 }
 
 function feedLine(it, ctx) {
@@ -47,7 +49,8 @@ function feedLine(it, ctx) {
   li.dataset.kind = it.kind;
   li.dataset.who = it.who;
   const f = ctx.faces[it.who];
-  if (f?.accent) li.style.setProperty("--hd-c", f.accent);
+  // the line's accent is the resident's colour at readable darkness (CORE-178, Darko a), re-inked on a design's own glass by the Hearth stage
+  if (f?.accent && inkOn(f.accent, "night")) { li.style.setProperty("--hd-c", inkOn(f.accent, "night")); li.setAttribute("data-rm-accent", f.accent); }
   li.appendChild(el("span", "hd-t", whenOf(it.at, ctx.now)));
   const glyph = { letter: "✉", said: "❝", mark: it.verdict === "refused" ? "✕" : "◆", stamps: "✦" }[it.kind];
   li.appendChild(el("span", "hd-g g-" + (it.kind === "mark" ? it.verdict : it.kind), glyph));
@@ -377,9 +380,9 @@ function paintComing(root, events, ctx) {
       e.place,
     ].filter(Boolean);
     const facts = el("p", null, (lead.length ? lead.join(" · ") + " · " : "") + "hosted by ");
-    // a host of this house is named as every line names a resident (CORE-178); a host from outside it is the handle the calendar wrote,
-    // since this page holds no face for them (other() below, the same)
-    facts.appendChild(ctx.faces[e.host] ? who(ctx.faces, e.host, ctx.seatHref) : document.createTextNode(e.host));
+    // a host of this house is named as every line names a resident (CORE-178); a host from outside it is the neutral mention, since this page
+    // holds no face for them (other(), the same)
+    facts.appendChild(ctx.faces[e.host] ? who(ctx.faces, e.host, ctx.seatHref) : other(e.host));
     body.appendChild(facts);
     row.appendChild(body);
     const going = el("div", "hd-going");

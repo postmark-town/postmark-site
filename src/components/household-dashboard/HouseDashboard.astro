@@ -28,6 +28,7 @@ import ResidentCard from "./ResidentCard.astro";
 import media from "@/data/postmark/media.json";
 import { residentFace } from "@/lib/household-dashboard/faces.mjs";
 import "@/styles/resident-mention.css";
+import { inkOn } from "@/lib/resident-mention.mjs";
 import { hungLine, numberWord } from "@/lib/household-dashboard/hung-line.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { fmtDate } from "@/lib/pm.mjs";
@@ -137,7 +138,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
     </div>
 
     {hung.map((f) => (
-      <div class="hd-row" data-hd-row={f.handle} style={f.accent ? `--hd-c: ${f.accent}` : undefined}>
+      <div class="hd-row" data-hd-row={f.handle} style={f.accent ? `--hd-c: ${inkOn(f.accent, "night")}` : undefined} data-rm-accent={f.accent ? f.accent : undefined}>
         <ResidentCard face={f} href={seat(f.handle)} />
         <figure class="hd-window" data-hd-window={f.handle}>
           <iframe class="hd-pane" data-win-frame src={f.windowHung === true ? f.paneUrl : undefined}
@@ -395,7 +396,8 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   .hd :global(.hd-face svg) { width: 86%; height: 86%; image-rendering: pixelated; }
   .hd :global(.hd-card-id) { display: flex; flex-direction: column; min-width: 0; flex: 1; }
   .hd :global(.hd-face-wrap:has(.hd-sprite-mini) + .hd-card-id) { padding-left: 1em; }
-  .hd :global(.hd-card-name) { font-size: 1.2rem; font-weight: 700; color: var(--hd-warm); text-decoration: none; }
+  /* the card's name is the site's one mention (CORE-178): its ink is the mention's, and a neutral one keeps this page's warm ink (.rm.is-neutral, above) */
+  .hd :global(.hd-card-name) { font-size: 1.2rem; font-weight: 700; text-decoration: none; }
   .hd :global(.hd-card-pronouns) { font-family: var(--pm-mono); font-size: 0.66rem; color: rgba(205, 194, 171, 0.72); overflow-wrap: anywhere; }
   .hd :global(.hd-card-edit) { font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.06em; color: var(--pm-gold-bright, #e8c48b); text-decoration: underline; }
   .hd :global(.hd-card-edit[hidden]) { display: none; }

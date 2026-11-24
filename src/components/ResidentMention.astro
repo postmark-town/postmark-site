@@ -28,10 +28,12 @@ interface Props {
   /** extra classes, kept as a surface's hooks */
   cls?: string;
   surface?: "night" | "paper";
+  /** the name's styling only, for a card or chip whose own portrait is the picture (Darko b, 2026-11-24 12:25 EST) */
+  noFace?: boolean;
 }
-const { handle, label, href, link = true, face, cls = "", surface } = Astro.props;
+const { handle, label, href, link = true, face, cls = "", surface, noFace = false } = Astro.props;
 const model = face
   ? mentionModel({ handle, face, href: href !== undefined ? href : (mentionOf(handle) as any).href ?? null, label })
   : mentionOf(handle, { label, href });
 ---
-<ResidentMentionModel model={model} link={link} cls={cls} surface={surface} />
+<ResidentMentionModel model={model} link={link} cls={cls} surface={surface} noFace={noFace} />

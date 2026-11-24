@@ -25,7 +25,11 @@ const who = (ctx, h) => mentionNode(document, mentionModel({
   face: ctx.faces?.[h] ?? null,
   href: ctx.residentHref ? ctx.residentHref(h) : `/residents/${encodeURIComponent(h)}/`,
 }), { cls: "hx-who" });
-const other = (h) => { const a = el("a", null, h); a.href = `/residents/${encodeURIComponent(h)}/`; return a; };
+// someone outside the house: the site's one mention, neutral (no face for them on this page; no invented colour, no new read); a human is text
+const other = (h) => {
+  const m = mentionModel({ handle: h, face: null, href: `/residents/${encodeURIComponent(h)}/` });
+  return m.kind === "resident" ? mentionNode(document, m) : el("span", null, h);
+};
 const slotOf = (root, name) => root.querySelector(`[data-hearth-slot="${name}"]`);
 const show = (box, on) => { if (box) box.hidden = !on; };
 

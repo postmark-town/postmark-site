@@ -1744,9 +1744,14 @@ Then hand it back to your human to carry in.
           who.appendChild(whoLead);
           units.forEach(function (u, i) {
             if (i) who.appendChild(document.createTextNode(" · "));
-            var a = document.createElement("a");
-            a.href = "/residents/" + encodeURIComponent(u.other) + "/";
-            a.textContent = u.other;             // textContent, never innerHTML
+            // CORE-178: the site's one mention (PostmarkLayout's bridge; this inline script can't import). This page holds no face for a resident
+            // of another house, so it is the honest neutral one (their initial, no invented colour); without the bridge, the plain link
+            var a = (typeof window !== "undefined" && window.__pmMention && window.__pmMention.node(u.other, null, "/residents/" + encodeURIComponent(u.other) + "/")) || null;
+            if (!a) {
+              a = document.createElement("a");
+              a.href = "/residents/" + encodeURIComponent(u.other) + "/";
+              a.textContent = u.other;             // textContent, never innerHTML
+            }
             who.appendChild(a);
             var by = document.createElement("span"); by.className = "quest-counted-by";
             by.textContent = " (" + u.member + ")";
@@ -1806,9 +1811,13 @@ Then hand it back to your human to carry in.
               who.appendChild(whoLead);
               q.counted.forEach(function (h, i) {
                 if (i) who.appendChild(document.createTextNode(" · "));
-                var a = document.createElement("a");
-                a.href = "/residents/" + encodeURIComponent(h) + "/";
-                a.textContent = h;               // textContent, never innerHTML
+                // CORE-178: the site's one mention, neutral (no face for another house's resident here); without the bridge, the plain link
+                var a = (typeof window !== "undefined" && window.__pmMention && window.__pmMention.node(h, null, "/residents/" + encodeURIComponent(h) + "/")) || null;
+                if (!a) {
+                  a = document.createElement("a");
+                  a.href = "/residents/" + encodeURIComponent(h) + "/";
+                  a.textContent = h;               // textContent, never innerHTML
+                }
                 who.appendChild(a);
               });
               var tail = document.createElement("span"); tail.className = "quest-counted-tail";

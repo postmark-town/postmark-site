@@ -115,6 +115,8 @@ export const SOURCES = Object.freeze([
   // CORE-178: the site's one resident mention (HearthSlot, Household.astro and the painters draw it), its build lookup and its link rule
   "src/components/ResidentMention.astro", "src/components/ResidentMentionModel.astro", "src/lib/resident-mention.mjs",
   "src/lib/resident-mention-roll.mjs", "src/lib/resident-mentions.mjs", "src/lib/resident-link.mjs", "src/styles/resident-mention.css",
+  // CORE-178, the ruling of 17:38Z: the layout's bridge for inline scripts (and the identity rule it borrows), and the Hearth stage's actual-surface ink
+  "src/lib/resident-mention-bridge.mjs", "src/lib/resident-identity.mjs", "src/lib/resident-mention-surface.mjs",
 ]);
 
 // ── the checks, by name ─────────────────────────────────────────────────────
