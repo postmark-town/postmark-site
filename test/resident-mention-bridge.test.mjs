@@ -172,9 +172,10 @@ test("TEXT PIN (the inline scripts can't be imported; their fallbacks are read a
   const src = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
   const marks = {
     "town/pages/window/index.astro": [/plain\.setAttribute\("data-rm-pending", h\);/, /plain\.setAttribute\("data-rm-face", JSON\.stringify\(streetFaces\[h\]\)\);/],
-    "town/pages/replay/index.astro": [/if \(!window\.__pmMention\) \{\s*a\.setAttribute\("data-rm-pending", handle\);/, /a\.setAttribute\("data-rm-meta", JSON\.stringify\(faces\[handle\]\)\)/],
-    "town/pages/conversations/index.astro": [/markPending\(a, handle\);/, /else if \(link\) markPending\(link, h\);/, /a\.setAttribute\("data-rm-meta", JSON\.stringify\(faces\[handle\]\)\);/],
-    "town/components/Household.astro": [/!window\.__pmMention\) a\.setAttribute\("data-rm-pending", u\.other\);/, /!window\.__pmMention\) a\.setAttribute\("data-rm-pending", h\);/],
+    // the resolved row (F2: a speaker recorded under an old handle carries the resident's current face)
+    "town/pages/replay/index.astro": [/if \(!window\.__pmMention\) \{\s*a\.setAttribute\("data-rm-pending", handle\);/, /if \(row\) a\.setAttribute\("data-rm-meta", JSON\.stringify\(row\)\)/],
+    "town/pages/conversations/index.astro": [/markPending\(a, handle\);/, /else if \(link\) markPending\(link, h\);/, /a\.setAttribute\("data-rm-meta", JSON\.stringify\(faces\[key\]\)\);/],
+    "town/components/Household.astro": [/!window\.__pmMention\) a\.setAttribute\("data-rm-pending", other\);/, /!window\.__pmMention\) a\.setAttribute\("data-rm-pending", cur\);/],
     "town/pages/index.astro": [/if \(!window\.__pmMention && info\.face\) \{\s*a\.setAttribute\("data-rm-pending", h\);/],
   };
   for (const [rel, pins] of Object.entries(marks)) for (const pin of pins) assert.match(src(rel), pin, `${rel}: ${pin}`);

@@ -631,16 +631,18 @@ const residentPages = { pages: residents.map((r) => r.handle), renames };
       // CORE-178: a resident whose page stands is the site's one mention (window.__pmMention, PostmarkLayout's bridge: this inline module can't
       // import), from the faces this page already reads; without the bridge, the plain link below
       const href = "/residents/" + encodeURIComponent(page) + "/";
-      const mention = window.__pmMention?.fromMeta(handle, faces[handle], href, { cls: "r-who" });
+      // the face and name are the resident's the walk reached: a speaker recorded under an old handle is named and pictured as they are now (CORE-178)
+      const row = faces[page] ?? faces[handle];
+      const mention = window.__pmMention?.fromMeta(handle, row, href, { cls: "r-who" });
       if (mention) return mention;
       const a = el("a", "r-who");
       a.href = href;
-      a.textContent = nameOf(handle);
+      a.textContent = nameOf(page);
       // the bridge is not here yet: marked with the row this page already holds, so the bridge makes this link the mention in place when it arrives
       // (resident-mention-bridge.mjs § upgradePending; no second read)
       if (!window.__pmMention) {
         a.setAttribute("data-rm-pending", handle);
-        if (faces[handle]) a.setAttribute("data-rm-meta", JSON.stringify(faces[handle]));
+        if (row) a.setAttribute("data-rm-meta", JSON.stringify(row));
         a.setAttribute("data-rm-opts", JSON.stringify({ cls: "r-who" }));
       }
       return a;

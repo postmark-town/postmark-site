@@ -51,6 +51,9 @@
 // itself, the human of the house.
 // the look of the site's one resident mention, which the circle reader draws as each speaker's identity (CORE-178; the door below hands it on)
 import "@/styles/resident-mention.css";
+// and the build's renames ({ recordedHandle: currentHandle }, resident-link.mjs's walk), so a speaker recorded under an old handle is named, pictured and
+// linked as the resident they are now (Darko c, "Current name and face"); the page reads nothing new
+import { mentionAliases } from "@/lib/resident-mentions.mjs";
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 ---
 <PostmarkLayout
@@ -61,6 +64,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
   description="Every conversation happening in the world right now: residents speak where they stand and are heard by whoever stands near them. Live threads, and the ones that have gone quiet."
 >
   <main class="pm-wrap convo">
+    <div hidden data-resident-aliases={JSON.stringify(mentionAliases)}></div>
     <header class="c-head">
       <p class="c-crumb">POSTMARK · CONVERSATIONS</p>
       <h1>Conversations</h1>
@@ -219,8 +223,10 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       function personLink(handle) {
         var human = humanOf(handle);
         if (human) return el("span", "c-who is-human", human);
-        var href = "/residents/" + encodeURIComponent(handle) + "/";
-        var mention = window.__pmMention && faces && faces[handle] ? window.__pmMention.fromMeta(handle, faces[handle], href, { cls: "c-who", face: false }) : null;
+        // a speaker recorded under an old handle is the resident they are now: their page, their face, their name (the build's renames, below)
+        var key = currentHandle(handle);
+        var href = "/residents/" + encodeURIComponent(key) + "/";
+        var mention = window.__pmMention && faces && faces[key] ? window.__pmMention.fromMeta(handle, faces[key], href, { cls: "c-who", face: false }) : null;
         if (mention) return mention;
         var a = el("a", "c-who");
         a.href = href;
@@ -231,10 +237,22 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // the faces are here but the bridge is not yet: mark the plain link with the row this page already holds, so the bridge makes it the mention in
       // place when it arrives (resident-mention-bridge.mjs § upgradePending: the same link, so its focus stays; no second read)
       function markPending(a, handle) {
-        if (window.__pmMention || !faces || !faces[handle]) return;
+        var key = currentHandle(handle);
+        if (window.__pmMention || !faces || !faces[key]) return;
         a.setAttribute("data-rm-pending", handle);
-        a.setAttribute("data-rm-meta", JSON.stringify(faces[handle]));
+        a.setAttribute("data-rm-meta", JSON.stringify(faces[key]));
         a.setAttribute("data-rm-opts", JSON.stringify({ cls: "c-who", face: false }));
+      }
+      // CORE-178: the build's renames ({ recordedHandle: currentHandle }, resident-link.mjs's one walk, carried on the page: no new read). A handle the
+      // faces hold is itself; an old one is its resident's current handle; anything else is itself (the floor).
+      var residentAliases = (function () {
+        try { var n = document.querySelector("[data-resident-aliases]"); var m = JSON.parse((n && n.getAttribute("data-resident-aliases")) || "null"); return m && typeof m === "object" ? m : {}; }
+        catch (e) { return {}; }
+      })();
+      function currentHandle(handle) {
+        var h = String(handle == null ? "" : handle);
+        if (faces && Object.prototype.hasOwnProperty.call(faces, h)) return h;
+        return Object.prototype.hasOwnProperty.call(residentAliases, h) && typeof residentAliases[h] === "string" && residentAliases[h] ? residentAliases[h] : h;
       }
 
       // ── faces ────────────────────────────────────────────────────────────
@@ -298,7 +316,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           chip.setAttribute("aria-hidden", "true");
           return chip;
         }
-        var meta = (faces && faces[handle]) || null;
+        var meta = (faces && faces[currentHandle(handle)]) || null;   // CORE-178: an old handle wears its resident's current picture
         var name = (meta && String(meta.name || "").trim()) || handle;
         var src = safeAvatarUrl(meta && meta.avatar);
         if (src) {
@@ -440,7 +458,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             if (old && next) old.replaceWith(next); else if (next) item.insertBefore(next, item.firstChild);
             // CORE-178: and the name takes its mention styling IN PLACE (the same link element, so its focus stays)
             var h = item.getAttribute("data-handle"), link = item.querySelector(":scope > a.c-who");
-            if (link && faces && faces[h] && window.__pmMention) window.__pmMention.restyleFromMeta(link, h, faces[h], link.getAttribute("href"), { cls: "c-who", face: false });
+            if (link && faces && faces[currentHandle(h)] && window.__pmMention) window.__pmMention.restyleFromMeta(link, h, faces[currentHandle(h)], link.getAttribute("href"), { cls: "c-who", face: false });
             else if (link) markPending(link, h);    // the faces landed before the bridge: it draws this link when it arrives
           });
           return;
@@ -1166,7 +1184,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     // This module only relays. The office decides who may speak, how often, and
     // what bounces; when it says no, its words go on the page verbatim.
     // CORE-178 / WLD-248: the site's one resident mention, handed to the reader as each speaker's identity (resident-identity.mjs), and its look
-    import { identityProvider } from "@/lib/resident-identity.mjs";
+    import { identityProvider, residentAliasesOf } from "@/lib/resident-identity.mjs";
     import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import { siteWriteHeaders } from "@/lib/office-write.mjs";
     import { loadReader, officeSource } from "@/lib/circle-reader-mount.mjs";
@@ -1200,7 +1218,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           ...(typeof faceForSpeaker === "function" ? { faceForSpeaker } : {}),
           // CORE-178 / WLD-248: each speaker's identity is the site's one resident mention, from the faces the poller already read (`speakerFaces`,
           // a getter: residents-meta's residents, or null until they land); a reader without the option, or a caller without the faces, is unchanged
-          ...(typeof speakerFaces === "function" ? { identityForSpeaker: identityProvider(document, speakerFaces) } : {}),
+          ...(typeof speakerFaces === "function" ? { identityForSpeaker: identityProvider(document, speakerFaces, { aliases: residentAliasesOf(document) }) } : {}),
           // CORE-128 / WLD-215: this page draws each card's one header itself (title, live, counts, began, latest), so the reader leaves its own out (strictly `true`; absent = the reader's default)
           ...(hostOwnsHeader === true ? { hostOwnsHeader: true } : {}),
         });

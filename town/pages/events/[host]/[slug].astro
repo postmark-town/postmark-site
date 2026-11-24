@@ -38,7 +38,8 @@ import { rsvpGate, BUDGET_DEFAULT, BUDGET_MAX, COALESCE_MIN } from "@/lib/rsvp.m
 import { newestFirst } from "@/lib/announcements.mjs";
 import media from "@/data/postmark/media.json";
 import { handlesPreview, sectionCard } from "@/lib/og-image.mjs";
-import { mentionFaceOf } from "@/lib/resident-mentions.mjs";
+import { mentionAliases, publicFaces } from "@/lib/resident-mentions.mjs";
+import { carriesSpeakerFaces } from "@/lib/event-speakers.mjs";
 
 export function getStaticPaths() {
   return allEventViews(calendar, eventsData)
@@ -68,12 +69,11 @@ const householdLine = (id) => {
 const rooms = sections.circles.state === "rooms" ? sections.circles.rooms : [];
 const roomIds = rooms.map(roomIdOf).filter(isRoomId);
 // CORE-178 / WLD-248: each speaker in a room is the site's one resident mention, handed to the reader as its identity. The faces are the build's own
-// (resident-mentions.mjs § mentionFaceOf, the face every build-time mention wears), carried on the circles section, so the browser reads nothing new;
-// only a page that has rooms, or an event still on (a room can begin after the build), carries them.
-const speakerFaces = roomIds.length || !sections.after
-  ? Object.fromEntries(residents.map((r) => [r.handle, mentionFaceOf(r.handle)]).filter(([, f]) => f)
-      .map(([h, f]) => [h, { name: f.name, accent: f.accent, avatar: f.avatar, monogram: f.monogram }]))
-  : {};
+// (resident-mentions.mjs § publicFaces, the face every build-time mention wears), carried on the circles section, so the browser reads nothing new.
+// They ride WHENEVER the section can mount a reader (event-speakers.mjs: an ended page with no baked rooms still adds rooms through CORE-174's
+// refresh), with the build's renames (mentionAliases), so a speaker recorded under an old handle wears the resident's current face, name and page.
+const speakerFaces = carriesSpeakerFaces(sections) ? publicFaces(residents.map((r) => r.handle)) : {};
+const speakerAliases = carriesSpeakerFaces(sections) ? mentionAliases : {};
 const roll = new Set(residents.map((r) => r.handle));
 // phase and cancelled are the office's, as the build read them; the office
 // judges again when the form posts.
@@ -159,7 +159,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     )}
 
     {!sections.cancelled && (
-      <section class="ev-sec pm-paper" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-faces={JSON.stringify(speakerFaces)} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
+      <section class="ev-sec pm-paper" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-faces={JSON.stringify(speakerFaces)} data-aliases={JSON.stringify(speakerAliases)} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
         <h2 class="ev-h">{EVENT_WORDS.circles.title}</h2>
         {sections.circles.state === "rooms" ? (
           <>
@@ -306,7 +306,8 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     const circ = document.querySelector("[data-ev-circles]");
     // the build's faces for this page's speakers (an unreadable attribute is no faces: the reader keeps its own face and name path)
     const evFaces = (() => { try { return JSON.parse(circ?.getAttribute("data-faces") || "null"); } catch { return null; } })();
-    const speakerIdentity = identityProvider(document, () => evFaces, { toFace: (f) => f });
+    const evAliases = (() => { try { return JSON.parse(circ?.getAttribute("data-aliases") || "null"); } catch { return null; } })();
+    const speakerIdentity = identityProvider(document, () => evFaces, { toFace: (f) => f, aliases: evAliases });
     if (circ) {
       const drawRoom = (box, id) => {
         const reader = box.querySelector("[data-ev-reader]");

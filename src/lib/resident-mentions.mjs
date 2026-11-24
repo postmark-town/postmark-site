@@ -11,3 +11,8 @@ const roll = mentionRoll(residents, renames, media);
 
 export const mentionOf = roll.mentionOf;
 export const mentionFaceOf = roll.faceOf;
+// { recordedHandle: currentHandle } for every rename the build resolves (resident-mention-roll.mjs § aliases): for a page's live half
+export const mentionAliases = roll.aliases();
+// the public face map a page's live half draws from: every current resident's build face (name, colour, picture, initial), the one projection
+export const publicFaces = (handles) => Object.fromEntries((handles ?? []).map((h) => [h, roll.faceOf(h)]).filter(([, f]) => f)
+  .map(([h, f]) => [h, { name: f.name, accent: f.accent, avatar: f.avatar, monogram: f.monogram }]));

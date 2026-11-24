@@ -36,5 +36,20 @@ export function mentionRoll(residents = [], renames = {}, media = {}) {
       label,
     });
   };
-  return { mentionOf, faceOf, hrefOf: links.hrefOf };
+  /**
+   * Every recorded handle that is not a current one but resolves to a resident page (a rename, walked by resident-link.mjs's pageOf, the one rename
+   * rule): { recordedHandle: currentHandle }. Plain data, so a page's live half can resolve a speaker recorded under an old handle to the resident's
+   * current face, name and page without a second rename algorithm or a new read (Darko, 2026-11-24 12:25 EST, c: "Current name and face"). A loop, a
+   * chain past the hop limit or a rename to no page is not in it: those stay the floor.
+   */
+  const aliases = () => {
+    const out = {};
+    for (const recorded of Object.keys(renames ?? {})) {
+      if (byHandle.has(recorded)) continue;
+      const page = links.pageOf(recorded);
+      if (page && page !== recorded) out[recorded] = page;
+    }
+    return out;
+  };
+  return { mentionOf, faceOf, hrefOf: links.hrefOf, aliases };
 }

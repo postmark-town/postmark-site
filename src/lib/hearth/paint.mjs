@@ -15,6 +15,7 @@
 import { marksOf, mailOf, postsOf, townEventsOf, placesOf, chartOf, countdownOf, leftWords } from "./fold.mjs";
 import { feedOf, whenOf, dayWordOf, NOT_READING } from "../household-dashboard/fold.mjs";
 import { inkOn, mentionModel, mentionNode } from "../resident-mention.mjs";
+import { resolveHandle } from "../resident-identity.mjs";
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -31,8 +32,9 @@ function resident(faces, handle, seatHref) {
   return mentionNode(document, mentionModel({ handle, face: faces[handle] ?? null, href: seatHref(handle) }), { cls: "hx-who" });
 }
 /** Someone outside the house: the neutral mention to their page (no face for them here); a house's human is text. */
-function outsider(handle) {
-  const m = mentionModel({ handle, face: null, href: `/residents/${encodeURIComponent(handle)}/` });
+function outsider(handle, aliases = null) {
+  const cur = resolveHandle(handle, aliases);   // an old handle is its resident's current one (the page's build renames)
+  const m = mentionModel({ handle: cur, face: null, href: `/residents/${encodeURIComponent(cur)}/` });
   return m.kind === "resident" ? mentionNode(document, m) : document.createTextNode(handle);
 }
 
@@ -122,7 +124,7 @@ export function paintTown(root, reads, ctx) {
     const meta = el("span", "hx-when", " · " + [when, e.place, e.host && "hosted by "].filter(Boolean).join(" · "));
     // CORE-178: the host named as the site names a resident: the house's face for a host of this house, else the honest neutral one (no face on
     // this page for another house's resident; no new read)
-    if (e.host) meta.appendChild(ctx.faces[e.host] ? resident(ctx.faces, e.host, ctx.seatHref) : outsider(e.host));
+    if (e.host) meta.appendChild(ctx.faces[e.host] ? resident(ctx.faces, e.host, ctx.seatHref) : outsider(e.host, ctx.aliases));
     li.appendChild(meta);
     ul.appendChild(li);
   }

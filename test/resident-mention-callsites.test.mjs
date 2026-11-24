@@ -202,9 +202,10 @@ test("TEXT PIN: the front page's resident cards, its makers and its ticker draw 
 
 // the inline scripts, which reach the one mention through PostmarkLayout's bridge (window.__pmMention), and the bundled one that imports it
 const BRIDGED = {
-  "town/pages/replay/index.astro": [/const href = "\/residents\/" \+ encodeURIComponent\(page\) \+ "\/";\s*const mention = window\.__pmMention\?\.fromMeta\(handle, faces\[handle\], href, \{ cls: "r-who" \}\);/],
-  "town/pages/conversations/index.astro": [/window\.__pmMention\.fromMeta\(handle, faces\[handle\], href, \{ cls: "c-who", face: false \}\)/, /window\.__pmMention\.restyleFromMeta\(link, h, faces\[h\], link\.getAttribute\("href"\), \{ cls: "c-who", face: false \}\)/],
-  "town/components/Household.astro": [/window\.__pmMention\.node\(u\.other, null, /, /window\.__pmMention\.node\(h, null, /],
+  // F2: each resolves a recorded handle to the resident it is now (the replay's own pageOf walk; the build's renames elsewhere) before it looks up a face or a page
+  "town/pages/replay/index.astro": [/const href = "\/residents\/" \+ encodeURIComponent\(page\) \+ "\/";[\s\S]*?const row = faces\[page\] \?\? faces\[handle\];\s*const mention = window\.__pmMention\?\.fromMeta\(handle, row, href, \{ cls: "r-who" \}\);/],
+  "town/pages/conversations/index.astro": [/var key = currentHandle\(handle\);\s*var href = "\/residents\/" \+ encodeURIComponent\(key\) \+ "\/";/, /window\.__pmMention\.fromMeta\(handle, faces\[key\], href, \{ cls: "c-who", face: false \}\)/, /window\.__pmMention\.restyleFromMeta\(link, h, faces\[currentHandle\(h\)\], link\.getAttribute\("href"\), \{ cls: "c-who", face: false \}\)/, /var meta = \(faces && faces\[currentHandle\(handle\)\]\) \|\| null;/],
+  "town/components/Household.astro": [/var other = \(typeof residentAliases === "object" && residentAliases && Object\.prototype\.hasOwnProperty\.call\(residentAliases, u\.other\)\) \? residentAliases\[u\.other\] : u\.other;/, /window\.__pmMention\.node\(other, null, /, /window\.__pmMention\.node\(cur, null, /, /residentAliases: mentionAliases/],
   "town/pages/index.astro": [/window\.__pmMention\.node\(h, info\.face, href\)/],
   "town/pages/window/index.astro": [/window\.__pmMention\.node\(h, streetFaces\[h\], "\/residents\/" \+ encodeURIComponent\(h\) \+ "\/", \{ link: false \}\)/],
   "town/pages/households/index.astro": [/import \{ mentionModel, mentionNode \} from "@\/lib\/resident-mention\.mjs";/, /name\.replaceChildren\(mentionNode\(document, m, \{ link: false \}\)\)/],

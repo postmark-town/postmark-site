@@ -45,23 +45,45 @@ export function speakerFace(meta) {
 /** Where a speaker's identity links: their resident page, as the Conversations page's personLink links every resident. */
 export const speakerHref = (handle) => `/residents/${encodeURIComponent(handle)}/`;
 
+/** The build's renames a page carries on `[data-resident-aliases]` (resident-mentions.mjs § mentionAliases), or {} (no element, unreadable: the floor). */
+export function residentAliasesOf(doc) {
+  try {
+    const m = JSON.parse(doc?.querySelector?.("[data-resident-aliases]")?.getAttribute("data-resident-aliases") || "null");
+    return m && typeof m === "object" && !Array.isArray(m) ? m : {};
+  } catch { return {}; }
+}
+
+/**
+ * The handle a face and a page are found under: the recorded one when the faces hold it, else its current one by the build's alias map (one hop: the
+ * map already holds each chain's end), else the recorded one. A non-object map, an inherited key or a non-string target is no alias.
+ */
+export function resolveHandle(handle, aliases, faces = null) {
+  const h = String(handle ?? "");
+  if (faces && typeof faces === "object" && Object.hasOwn(faces, h)) return h;
+  if (aliases && typeof aliases === "object" && Object.hasOwn(aliases, h) && typeof aliases[h] === "string" && aliases[h]) return aliases[h];
+  return h;
+}
+
 /**
  * The reader's identity provider.
  * @param {Document} doc
  * @param {() => (Record<string, {name?: string, avatar?: string, color?: string}> | null)} getFaces  residents-meta's residents, or null until read
  * @param {{ hrefOf?: (handle: string) => string | null, toFace?: (row: object) => object | null }} [opts] `toFace` reads a row as the face the mention
  *   draws: residents-meta's rows by default (speakerFace, the World's picture rule); a page that holds the site's own build faces (resident-mentions.mjs
- *   § mentionFaceOf, already through the site's picture rule) passes `(f) => f`.
+ *   § mentionFaceOf, already through the site's picture rule) passes `(f) => f`. `aliases` ({ recordedHandle: currentHandle }, resident-mentions.mjs §
+ *   mentionAliases, the build's own rename walk) resolves a speaker recorded under an old handle to the resident's current face, name and page (Darko c,
+ *   "Current name and face"); the mention keeps the recorded handle as `data-rm`.
  */
-export function identityProvider(doc, getFaces = () => null, { hrefOf = speakerHref, toFace = speakerFace } = {}) {
+export function identityProvider(doc, getFaces = () => null, { hrefOf = speakerHref, toFace = speakerFace, aliases = null } = {}) {
   return function identityForSpeaker(handle) {
     try {
       const h = String(handle ?? "").trim();
       if (!h || isHuman(h)) return null;
       const faces = typeof getFaces === "function" ? getFaces() : null;
-      const meta = faces && typeof faces === "object" && Object.hasOwn(faces, h) ? faces[h] : null;
+      const key = resolveHandle(h, aliases, faces);
+      const meta = faces && typeof faces === "object" && Object.hasOwn(faces, key) ? faces[key] : null;
       if (!meta) return null;
-      const model = mentionModel({ handle: h, face: toFace(meta), href: hrefOf(h) });
+      const model = mentionModel({ handle: h, face: toFace(meta), href: hrefOf(key) });
       if (model.kind !== "resident") return null;
       return mentionNode(doc, model, { cls: "rm-speaker" });
     } catch {

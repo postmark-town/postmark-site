@@ -41,6 +41,7 @@ import HouseQuests from "./HouseQuests.astro";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
 import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
 import ResidentMention from "@/components/ResidentMention.astro"; // the site's one resident mention (CORE-178)
+import { mentionAliases } from "@/lib/resident-mentions.mjs";    // the build's renames, for the quest lines' names and links (CORE-178)
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
 const { house, members, active, route } = Astro.props;
@@ -878,7 +879,7 @@ Then hand it back to your human to carry in.
   )}
 </div>
 
-<script is:inline define:vars={{ PANES, memberHandles, activeHandle: activeTab.handle, houseSlug: house.path ?? "", HOUSE_TAB, hasHouseSeat: seated, housePlate: plate, openSeat: onHouseTab ? HOUSE_TAB : activeTab.handle, stampsFixture: seamFixture ? STAMPS_FIXTURE : null }}>
+<script is:inline define:vars={{ PANES, memberHandles, residentAliases: mentionAliases, activeHandle: activeTab.handle, houseSlug: house.path ?? "", HOUSE_TAB, hasHouseSeat: seated, housePlate: plate, openSeat: onHouseTab ? HOUSE_TAB : activeTab.handle, stampsFixture: seamFixture ? STAMPS_FIXTURE : null }}>
   (function () {
     var house = document.querySelector("[data-house]");
     if (!house) return;
@@ -1746,13 +1747,15 @@ Then hand it back to your human to carry in.
             if (i) who.appendChild(document.createTextNode(" · "));
             // CORE-178: the site's one mention (PostmarkLayout's bridge; this inline script can't import). This page holds no face for a resident
             // of another house, so it is the honest neutral one (their initial, no invented colour); without the bridge, the plain link
-            var a = (typeof window !== "undefined" && window.__pmMention && window.__pmMention.node(u.other, null, "/residents/" + encodeURIComponent(u.other) + "/")) || null;
+            // an old handle is its resident's current one (the build's renames, residentAliases), named and linked as they are now
+            var other = (typeof residentAliases === "object" && residentAliases && Object.prototype.hasOwnProperty.call(residentAliases, u.other)) ? residentAliases[u.other] : u.other;
+            var a = (typeof window !== "undefined" && window.__pmMention && window.__pmMention.node(other, null, "/residents/" + encodeURIComponent(other) + "/")) || null;
             if (!a) {
               a = document.createElement("a");
-              a.href = "/residents/" + encodeURIComponent(u.other) + "/";
-              a.textContent = u.other;             // textContent, never innerHTML
+              a.href = "/residents/" + encodeURIComponent(other) + "/";
+              a.textContent = other;               // textContent, never innerHTML
               // the bridge is not here yet: marked, so it makes this link the neutral mention in place when it arrives (upgradePending; no read)
-              if (typeof window === "undefined" || !window.__pmMention) a.setAttribute("data-rm-pending", u.other);
+              if (typeof window === "undefined" || !window.__pmMention) a.setAttribute("data-rm-pending", other);
             }
             who.appendChild(a);
             var by = document.createElement("span"); by.className = "quest-counted-by";
@@ -1814,13 +1817,15 @@ Then hand it back to your human to carry in.
               q.counted.forEach(function (h, i) {
                 if (i) who.appendChild(document.createTextNode(" · "));
                 // CORE-178: the site's one mention, neutral (no face for another house's resident here); without the bridge, the plain link
-                var a = (typeof window !== "undefined" && window.__pmMention && window.__pmMention.node(h, null, "/residents/" + encodeURIComponent(h) + "/")) || null;
+                // an old handle is its resident's current one (the build's renames, residentAliases)
+                var cur = (typeof residentAliases === "object" && residentAliases && Object.prototype.hasOwnProperty.call(residentAliases, h)) ? residentAliases[h] : h;
+                var a = (typeof window !== "undefined" && window.__pmMention && window.__pmMention.node(cur, null, "/residents/" + encodeURIComponent(cur) + "/")) || null;
                 if (!a) {
                   a = document.createElement("a");
-                  a.href = "/residents/" + encodeURIComponent(h) + "/";
-                  a.textContent = h;               // textContent, never innerHTML
+                  a.href = "/residents/" + encodeURIComponent(cur) + "/";
+                  a.textContent = cur;             // textContent, never innerHTML
                   // the bridge is not here yet: marked, so it makes this link the neutral mention in place when it arrives (upgradePending; no read)
-                  if (typeof window === "undefined" || !window.__pmMention) a.setAttribute("data-rm-pending", h);
+                  if (typeof window === "undefined" || !window.__pmMention) a.setAttribute("data-rm-pending", cur);
                 }
                 who.appendChild(a);
               });

@@ -87,7 +87,7 @@ export function mountHearth(root, { loadScript } = {}) {
   const inkStage = () => { try { inkOnActualSurface(stage, { getStyle: (el) => window.getComputedStyle(el) }); } catch { /* a mention keeps its night or paper ink */ } };
   inkStage();
   const phone = window.matchMedia("(max-width: 760px)");
-  const ctx = { handles, faces, slug, seatHref, residentHref: seatHref, storage, filter: { kind: "all", who: "all" }, expanded: false, feedSort: "newest" };
+  const ctx = { handles, faces, aliases: data.aliases ?? {}, slug, seatHref, residentHref: seatHref, storage, filter: { kind: "all", who: "all" }, expanded: false, feedSort: "newest" };
 
   // v2: THE PUBLIC BUNDLE, THE HUNG WINDOWS AND THE HOUSE'S OWN SCRIPT. The bundle is read once, signed out (reads.mjs § readHearthBundle), and the
   // same answer paints the site's v2 slots and is handed to the entry's script. `scriptState` is what the script's getters read (hearthApi).

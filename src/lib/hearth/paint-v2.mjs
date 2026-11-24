@@ -10,6 +10,7 @@
 import { tiesOf, wentOf, feedOf, feedShown, dayOf } from "./bundle.mjs";
 import { whenOf } from "../household-dashboard/fold.mjs";
 import { mentionModel, mentionNode } from "../resident-mention.mjs";
+import { resolveHandle } from "../resident-identity.mjs";
 
 const PANES = "https://panes.postmark.town";
 const el = (tag, cls, text) => {
@@ -26,8 +27,10 @@ const who = (ctx, h) => mentionNode(document, mentionModel({
   href: ctx.residentHref ? ctx.residentHref(h) : `/residents/${encodeURIComponent(h)}/`,
 }), { cls: "hx-who" });
 // someone outside the house: the site's one mention, neutral (no face for them on this page; no invented colour, no new read); a human is text
-const other = (h) => {
-  const m = mentionModel({ handle: h, face: null, href: `/residents/${encodeURIComponent(h)}/` });
+// an old handle is its resident's current one (the page's build renames: resident-identity.mjs § resolveHandle)
+const other = (h, aliases = null) => {
+  const cur = resolveHandle(h, aliases);
+  const m = mentionModel({ handle: cur, face: null, href: `/residents/${encodeURIComponent(cur)}/` });
   return m.kind === "resident" ? mentionNode(document, m) : el("span", null, h);
 };
 const slotOf = (root, name) => root.querySelector(`[data-hearth-slot="${name}"]`);
@@ -86,7 +89,7 @@ export function paintTies(root, bundle, ctx) {
     const li = el("li", "hx-tie");
     // the resident who writes them most, when the pairs page names one; else the house's correspondent, with the house's total
     if (r.handle) { li.appendChild(who(ctx, r.handle)); li.appendChild(document.createTextNode(" and ")); }
-    li.appendChild(other(r.with));
+    li.appendChild(other(r.with, ctx.aliases));
     const count = r.out != null && r.in != null ? `${r.out} out, ${r.in} back` : `${r.letters} letter${r.letters === 1 ? "" : "s"} with the house`;
     li.appendChild(el("span", "hx-with", ` · ${count}` + (r.stamps ? ` · ✦${r.stamps} between` : "") + (r.latest ? ` · ${whenOf(r.latest, ctx.now)}` : "")));
     if (r.milestones.length) li.appendChild(el("span", "hx-milestones", " · " + r.milestones.join(", ")));

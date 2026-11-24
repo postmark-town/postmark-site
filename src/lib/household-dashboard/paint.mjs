@@ -14,6 +14,7 @@ import {
 import { hungLine } from "./hung-line.mjs";
 import { editLinkShown } from "../profile-edit.mjs";
 import { inkOn, mentionModel, mentionNode } from "../resident-mention.mjs";
+import { resolveHandle } from "../resident-identity.mjs";
 
 const TOWN_REPO = "https://github.com/postmark-town/postmark/blob/main/";
 const FEED_MAX = 14;       // fresh lines shown before "N more"
@@ -37,9 +38,11 @@ function who(faces, handle, seatHref) {
 
 // someone outside the house, by handle, to their own page: the site's one mention (CORE-178), the honest neutral one, since this page holds no face
 // for a resident of another house (their initial, no invented colour; no new read). A house's human stays plain text (mentionModel's rule).
-function other(handle) {
-  const href = "/residents/" + encodeURIComponent(handle) + "/";
-  const m = mentionModel({ handle, face: null, href });
+// An old handle is its resident's current one (the page's build renames, `aliases`: resident-identity.mjs § resolveHandle, no second rename rule).
+function other(handle, aliases = null) {
+  const cur = resolveHandle(handle, aliases);
+  const href = "/residents/" + encodeURIComponent(cur) + "/";
+  const m = mentionModel({ handle: cur, face: null, href });
   if (m.kind === "resident") return mentionNode(document, m, { cls: "hd-other" });
   return el("span", "hd-other", handle);
 }
@@ -57,9 +60,9 @@ function feedLine(it, ctx) {
   const line = el("span", "hd-l");
   const me = who(ctx.faces, it.who, ctx.seatHref);
   if (it.kind === "letter" && it.dir === "out") {
-    line.append(me, " wrote to ", other(it.other ?? "someone"));
+    line.append(me, " wrote to ", other(it.other ?? "someone", ctx.aliases));
   } else if (it.kind === "letter") {
-    line.append(other(it.other ?? "someone"), " wrote to ", me);
+    line.append(other(it.other ?? "someone", ctx.aliases), " wrote to ", me);
   } else if (it.kind === "said") {
     line.append(me, " said" + (it.place ? ", in " + it.place : ""));
   } else if (it.kind === "mark") {
@@ -382,7 +385,7 @@ function paintComing(root, events, ctx) {
     const facts = el("p", null, (lead.length ? lead.join(" · ") + " · " : "") + "hosted by ");
     // a host of this house is named as every line names a resident (CORE-178); a host from outside it is the neutral mention, since this page
     // holds no face for them (other(), the same)
-    facts.appendChild(ctx.faces[e.host] ? who(ctx.faces, e.host, ctx.seatHref) : other(e.host));
+    facts.appendChild(ctx.faces[e.host] ? who(ctx.faces, e.host, ctx.seatHref) : other(e.host, ctx.aliases));
     body.appendChild(facts);
     row.appendChild(body);
     const going = el("div", "hd-going");

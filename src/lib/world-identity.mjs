@@ -17,16 +17,18 @@ import { identityProvider } from "./resident-identity.mjs";
 export const VIEWER_URL = "/world-engine/spectator/viewer.mjs";
 
 /**
- * @param {{ doc: Document, app: Element | null, faces: object | null, importViewer: () => Promise<object>, toFace?: (row: object) => object | null }} o
+ * @param {{ doc: Document, app: Element | null, faces: object | null, importViewer: () => Promise<object>, toFace?: (row: object) => object | null,
+ *   aliases?: Record<string, string> | null }} o  `aliases`: the build's renames (resident-mentions.mjs § mentionAliases), so an old handle wears its
+ *   resident's current face and page
  * @returns {Promise<{ ok: true } | { ok: false, why: string }>}
  */
-export async function attachViewerIdentity({ doc, app, faces, importViewer, toFace } = {}) {
+export async function attachViewerIdentity({ doc, app, faces, importViewer, toFace, aliases = null } = {}) {
   if (!app) return { ok: false, why: "no viewer root on this page" };
   let mod = null;
   try { mod = await importViewer(); } catch { return { ok: false, why: "the viewer module could not be loaded" }; }
   if (typeof mod?.setViewerIdentityForSpeaker !== "function") return { ok: false, why: "the installed viewer has no setViewerIdentityForSpeaker yet (WLD-249)" };
   try {
-    mod.setViewerIdentityForSpeaker(app, identityProvider(doc, () => faces, toFace ? { toFace } : undefined));
+    mod.setViewerIdentityForSpeaker(app, identityProvider(doc, () => faces, { ...(toFace ? { toFace } : {}), aliases }));
     return { ok: true };
   } catch {
     return { ok: false, why: "the viewer refused the identity" };
