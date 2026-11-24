@@ -53,10 +53,13 @@ export function postitLook(i) {
  * the note names: the first that is on now, else the first coming. Which group
  * an event is in is the office's word, never worked out here from the times
  * (calendar.mjs's rule). `ref` is the office's as_of, else the build's clock.
+ * `events` is the office's lasting list (events.json), as /calendar/ reads it
+ * (CORE-177): an event that ended this month and has left the calendar's
+ * seven-day list stays on its day here too. Without it, the calendar's lists.
  */
-export function pinnedMonth(calendar, now = new Date()) {
+export function pinnedMonth(calendar, now = new Date(), { events } = {}) {
   const ref = referenceInstant(calendar, now);
-  const month = monthGrid(calendar, monthKey(ref), ref);
+  const month = monthGrid(calendar, monthKey(ref), ref, undefined, events);
   const groups = groupsOf(calendar);
   const pick = (key) => groups.find((g) => g.key === key).events.find((e) => !e.cancelled) ?? null;
   const onNow = pick("now");

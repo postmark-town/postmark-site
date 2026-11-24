@@ -102,6 +102,27 @@ export async function loadFaces(fetchImpl = globalThis.fetch) {
   } catch { return null; }
 }
 
+/** How long a room's first mount may wait for residents-meta: past it the reader mounts with letters (a face is a garnish, never the meal). */
+export const FACES_WAIT_MS = 1200;
+
+/**
+ * The host's faces: ONE residents-meta read for the page, started on the first ask, and a BOUNDED wait on it. `ready()` settles when the read
+ * settles (headers and body alike) or when `waitMs` has passed, whichever is first, and the timer is cleared on an early result; every later ask
+ * shares the same read and the same deadline. `get()` is the provider's getter: faces that land after the deadline still reach every byline the
+ * reader draws from then on. Never throws, never rejects.
+ */
+export function hostFaces({ fetchImpl = globalThis.fetch, waitMs = FACES_WAIT_MS, timers = globalThis } = {}) {
+  let faces = null, ready = null;
+  const read = () => loadFaces(fetchImpl).then((f) => { faces = f; });
+  return {
+    get: () => faces,
+    ready: () => (ready ??= new Promise((done) => {
+      const t = timers.setTimeout(done, waitMs);
+      read().then(() => { timers.clearTimeout(t); done(); });
+    })),
+  };
+}
+
 /** What a Conversations-style host hands mountRoom beyond the bare defaults: its face provider and its own header. */
 export function hostReaderOptions(doc, getFaces) {
   return { faceForSpeaker: faceProvider(doc, getFaces), hostOwnsHeader: true };

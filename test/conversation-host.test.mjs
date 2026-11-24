@@ -15,7 +15,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { mountRoom } from "../src/lib/circle-reader-mount.mjs";
-import { faceNode, faceProvider, hostReaderOptions, inkOn, loadFaces, monogramOf, RESIDENTS_META, safeAvatarUrl, safeHexColor } from "../src/lib/conversation-host.mjs";
+import { FACES_WAIT_MS, faceNode, faceProvider, hostFaces, hostReaderOptions, inkOn, loadFaces, monogramOf, RESIDENTS_META, safeAvatarUrl, safeHexColor } from "../src/lib/conversation-host.mjs";
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 const CONVO = read("town/pages/conversations/index.astro");
@@ -37,6 +37,24 @@ test("the card, its head, the faces and the reader's host are ONE stylesheet, im
   for (const [name, page] of [["conversations", CONVO], ["event", EVENT]]) assert.match(page, /^import "@\/styles\/conversation-host\.css";$/m, `the ${name} page imports the shared theme`);
   // the card chrome only the Conversations page draws stays there
   for (const own of [".convo .c-people {", ".convo .c-voices {", ".convo .c-more {"]) assert.equal(CONVO.includes(own), true, `${own} stays on the Conversations page`);
+});
+
+test("PIN the event page's own fallbacks stop at the room card's chrome, so the shared .c-perma and .c-fine win on a baked card as on an island-built one", () => {
+  const css = EVENT.slice(EVENT.lastIndexOf("<style>"), EVENT.lastIndexOf("</style>"));
+  // the page's scoped rules out-rank `.convo .c-perma` / `.convo .c-fine` on a baked card (its scope attribute) but not on an island-built one: so they must not reach them
+  assert.match(css, /^\s*\.ev-sec:not\(\.pm-paper\) a:not\(\.c-perma\) \{ color: var\(--pm-gold-bright\); \}$/m);
+  assert.match(css, /^\s*\.ev-sec:not\(\.pm-paper\) \.ev-note:not\(\.c-fine\), \.ev-sec:not\(\.pm-paper\) \.soft \{ color: var\(--pm-paper\); \}$/m);
+  for (const rule of css.match(/^[^{}\n]*\{[^}]*\bcolor\s*:/gm) ?? []) {
+    const sel = rule.slice(0, rule.indexOf("{"));
+    if (!/\.ev-sec:not\(\.pm-paper\)/.test(sel)) continue;
+    for (const part of sel.split(",")) {
+      if (/\ba\b\s*$/.test(part.trim()) || /\ba:(?!not\(\.c-perma\))/.test(part)) assert.fail(`a dark-ground link rule that reaches the room's whole-talk link: ${part.trim()}`);
+      if (/\.ev-note(?!:not\(\.c-fine\))\s*$/.test(part.trim())) assert.fail(`a dark-ground note rule that reaches the room's fine print: ${part.trim()}`);
+    }
+  }
+  // both paths draw the chrome with the shared classes: the baked card and the island's build()
+  assert.match(EVENT, /<a class="c-perma" href=\{roomHref\(id\)\}>/); assert.match(EVENT, /a\.className = "c-perma";/);
+  assert.match(EVENT, /<p class="c-fine ev-note" data-ev-floor>/); assert.match(EVENT, /note\.className = "c-fine ev-note";/);
 });
 
 // ── (2) one reader setup ──────────────────────────────────────────────────
@@ -75,8 +93,8 @@ test("PIN both hosts mount the World's reader through mountRoom: the Conversatio
   assert.match(CONVO, /import \{ mountRoom \} from "@\/lib\/circle-reader-mount\.mjs";/);
   assert.match(CONVO, /const m = await mountRoom\(\{[\s\S]*?onState, onNavigate, circle,[\s\S]*?faceForSpeaker, hostOwnsHeader,\s*\}\);/, "the door delegates, passing what it was given");
   assert.equal(/createCircleReader\(/.test(CONVO), false, "the door no longer builds the reader itself");
-  assert.match(EVENT, /import \{ hostReaderOptions, loadFaces \} from "@\/lib\/conversation-host\.mjs";/);
-  assert.match(EVENT, /await mountRoom\(\{ doc: document, host: reader, roomId: id,[^\n]*?\.\.\.hostReaderOptions\(document, \(\) => faces\) \}\);/, "the event page mounts with the Conversations host's options");
+  assert.match(EVENT, /import \{ hostFaces, hostReaderOptions \} from "@\/lib\/conversation-host\.mjs";/);
+  assert.match(EVENT, /await mountRoom\(\{ doc: document, host: reader, roomId: id,[^\n]*?\.\.\.hostReaderOptions\(document, faces\.get\) \}\);/, "the event page mounts with the Conversations host's options");
   assert.equal(/createCircleReader\(/.test(EVENT), false, "and never builds a reader of its own");
 });
 
@@ -118,4 +136,61 @@ test("the host's options are its faces and its own header; residents-meta that c
   assert.equal(await loadFaces(async () => ({ ok: false, json: async () => ({}) })), null);
   assert.equal(await loadFaces(async () => { throw new Error("offline"); }), null);
   assert.equal(await loadFaces(async () => ({ ok: true, json: async () => ({}) })), null);
+});
+
+// ── a face never holds a room (CORE-177 FIX F1) ───────────────────────────
+
+// timers the test fires by hand: `armed` is what is still pending, `fire()` runs it
+function fakeTimers() {
+  const armed = new Map(); let n = 0;
+  return { armed, setTimeout(fn, ms) { armed.set(++n, { fn, ms }); return n; }, clearTimeout(id) { armed.delete(id); }, fire() { for (const [id, t] of [...armed]) { armed.delete(id); t.fn(); } } };
+}
+const never = () => new Promise(() => {});
+const tick = () => new Promise((r) => setImmediate(r));
+
+test("FALSIFIER: a residents-meta read that NEVER settles (headers, or a pending body) still lets the actual reader mount once the bounded wait has passed", async () => {
+  for (const [name, fetchImpl] of [["headers never come", () => never()], ["the body never comes", async () => ({ ok: true, json: never })]]) {
+    const timers = fakeTimers(); const log = [];
+    const faces = hostFaces({ fetchImpl, timers });
+    // the event page's drawRoom, in its order: the bounded wait, then the site's one setup with the host's options
+    const opened = faces.ready().then(() => mountRoom({ doc: fakeDoc(), host: {}, roomId: "r1", importImpl: async () => fakeReader(log), ...hostReaderOptions(fakeDoc(), faces.get) }));
+    await tick();
+    assert.equal(log.length, 0, `${name}: control, the room is waiting on the bounded faces`);
+    assert.deepEqual([...timers.armed.values()].map((t) => t.ms), [FACES_WAIT_MS], "one deadline, the host's");
+    timers.fire();
+    const m = await opened;
+    assert.equal(m.ok, true, `${name}: the reader mounted`);
+    assert.deepEqual(log.filter((l) => l[0] !== "create"), [["showRoom", "r1"]], `${name}: and opened its room`);
+    assert.equal(faces.get(), null, "with letters: no faces were had");
+  }
+});
+
+test("an early result clears its deadline, faces that land LATE reach the provider, and every room shares ONE read and ONE deadline", async () => {
+  const timers = fakeTimers(); let reads = 0;
+  const fast = hostFaces({ fetchImpl: async () => { reads++; return { ok: true, json: async () => ({ residents: { "pic-test": { name: "Pic", avatar: "/media/pic.png" } } }) }; }, timers });
+  await fast.ready();
+  assert.equal(timers.armed.size, 0, "no timer left alive after an early result");
+  assert.equal(fast.get()["pic-test"].name, "Pic");
+  await Promise.all([fast.ready(), fast.ready()]);
+  assert.equal(reads, 1, "one residents-meta read for the page, however many rooms open");
+  // refused / thrown: letters, at once, and no timer left
+  for (const fetchImpl of [async () => ({ ok: false }), async () => { throw new Error("offline"); }]) {
+    const t = fakeTimers(); const f = hostFaces({ fetchImpl, timers: t });
+    await f.ready(); assert.equal(f.get(), null); assert.equal(t.armed.size, 0);
+  }
+  // late: the deadline passes first, the room mounts with letters, and the faces then land for every byline drawn after
+  let land; const t2 = fakeTimers();
+  const late = hostFaces({ fetchImpl: () => new Promise((r) => { land = r; }), timers: t2 });
+  const waited = late.ready(); await tick(); t2.fire(); await waited;
+  const provide = hostReaderOptions(fakeDoc(), late.get).faceForSpeaker;
+  assert.equal(provide("pic-test").tag, "span", "letters while the read is out");
+  land({ ok: true, json: async () => ({ residents: { "pic-test": { name: "Pic", avatar: "/media/pic.png" } } }) }); await tick(); await tick();
+  assert.equal(provide("pic-test").tag, "img", "the picture once it lands, through the same getter: no remount, no second read");
+});
+
+test("PIN the event page's room waits only on the bounded faces, never on the read itself, and mounts through the one setup with the same getter", () => {
+  const draw = EVENT.slice(EVENT.indexOf("const drawRoom = async"), EVENT.indexOf("const build = (ids)"));
+  assert.match(EVENT, /const faces = hostFaces\(\{ fetchImpl: \(u, o\) => fetch\(u, o\) \}\);/, "one host faces for the page");
+  assert.deepEqual([...draw.matchAll(/await ([\w.]+)\(/g)].map((m) => m[1]), ["faces.ready", "mountRoom"], "the bounded wait, then the mount: nothing else is awaited");
+  assert.equal(/loadFaces|readFaces/.test(EVENT), false, "no unbounded read left on the page");
 });

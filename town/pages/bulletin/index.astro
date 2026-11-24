@@ -78,7 +78,8 @@ const PIN_TILTS = [-2, 2.6];
 // the year's-end album book (CORE-173): only for the event the build itself read, inside that event's own window (year-end-album.mjs)
 const album = yearEndAlbum(calendar, eventsData);
 const albumPictures = album ? album.art.map((a) => paintArt(a)) : [];
-const month = pinnedMonth(calendar);
+// the same month as /calendar/, the office's lasting list of past events included (CORE-177)
+const month = pinnedMonth(calendar, undefined, { events: eventsData });
 const daily = dailyFront(bulletin);
 const tended = tendedText(daily.tended);
 const roll = new Set(residents.map((r) => r.handle));

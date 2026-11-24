@@ -286,7 +286,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     import { fetchAnnouncements, eventReadUrl } from "@/lib/announcements.mjs";
     import { EVENT_WORDS, LOCAL_FORMAT, eventSections, isRoomId, roomHref, roomIdOf } from "@/lib/calendar.mjs";
     import { mountRoom } from "@/lib/circle-reader-mount.mjs";
-    import { hostReaderOptions, loadFaces } from "@/lib/conversation-host.mjs";
+    import { hostFaces, hostReaderOptions } from "@/lib/conversation-host.mjs";
     import { paintAttendance } from "@/lib/event-attendance.mjs";
 
     // THE CIRCLES ISLAND (CORE-82). The page's rooms are the office's, in its start order. For each, the World's one circle reader is
@@ -295,17 +295,17 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     // the build; an answer that cannot be had keeps the build's rooms. Every word the reader draws is text, never markup.
     const circ = document.querySelector("[data-ev-circles]");
     if (circ) {
-      // the speakers' faces, read once, on the first room opened (the Conversations page reads the same file); never waited on for long:
-      // if it cannot be had, the faces are letters only and the room still opens
-      let faces = null, facesRead = null;
-      const readFaces = () => (facesRead ??= loadFaces((u, o) => fetch(u, o)).then((f) => { faces = f; }));
+      // the speakers' faces (the Conversations page reads the same file): ONE read for the page, started on the first room opened, and a BOUNDED
+      // wait on it (conversation-host.mjs § hostFaces). A slow or stuck read never holds a room on its floor: past the deadline the reader mounts
+      // with letters, and faces that land later reach every byline it draws from then on. No second read, no remount.
+      const faces = hostFaces({ fetchImpl: (u, o) => fetch(u, o) });
       const drawRoom = async (box, id) => {
         const reader = box.querySelector("[data-ev-reader]");
         const floor = reader.querySelector("[data-ev-floor]");
-        await readFaces();
+        await faces.ready();
         // the site's one reader setup with the Conversations page's host options (conversation-host.mjs: its faces, its own header). A circle's
         // own link is the Conversations page's one-conversation view (CORE-117: `/conversations/#circle-<id>`).
-        const m = await mountRoom({ doc: document, host: reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o), hrefForCircle: (c) => `/conversations/#circle-${encodeURIComponent(c)}`, ...hostReaderOptions(document, () => faces) });
+        const m = await mountRoom({ doc: document, host: reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o), hrefForCircle: (c) => `/conversations/#circle-${encodeURIComponent(c)}`, ...hostReaderOptions(document, faces.get) });
         if (m.ok) { floor?.remove(); return; }
         if (floor) floor.textContent = EVENT_WORDS.circles.noReader;
       };
@@ -564,7 +564,9 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     .ev-sec:not(.pm-paper) .ev-h { color: var(--pm-gold-bright); }
     .ev-lead { margin: 0 0 0.6em; font-size: 0.9rem; line-height: 1.5; }
     .ev-note { margin: 0.4em 0; line-height: 1.55; }
-    .ev-sec:not(.pm-paper) .ev-note, .ev-sec:not(.pm-paper) .soft { color: var(--pm-paper); }
+    /* the page's fallbacks stop at the room card's chrome: a room's fine print (.c-fine) and its whole-talk link (.c-perma) wear the shared theme
+       (conversation-host.css) on a baked card exactly as on one the island builds, which carries no scope attribute (CORE-177) */
+    .ev-sec:not(.pm-paper) .ev-note:not(.c-fine), .ev-sec:not(.pm-paper) .soft { color: var(--pm-paper); }
     .ev-sec.pm-paper .soft { color: var(--pm-ink-soft); }
     .ev-basis { margin: 0.5em 0 0; font-size: 0.84rem; }
     /* who was there, in the card under its RSVPs (CORE-177): a compact run of the site's one mention, which brings its own look (resident-mention.css);
@@ -576,7 +578,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     .cal-attend-list[hidden], .cal-attend[hidden] { display: none; }
     .cal-attend-note { margin: 0.3em 0 0; font-size: 0.86rem; line-height: 1.5; }
     .ev-sec.pm-paper a { color: var(--pm-wax); text-decoration: underline; }
-    .ev-sec:not(.pm-paper) a { color: var(--pm-gold-bright); }
+    .ev-sec:not(.pm-paper) a:not(.c-perma) { color: var(--pm-gold-bright); }
     /* the rooms' boxes are also made by the island, so they carry no scope attribute: :global */
     /* A ROOM is a Conversations card (conversation-host.css: .c-thread, .c-thread-head, .c-place, .c-meta, .c-perma, .c-circles); this page adds
        only what a card that opens and shuts needs: its head is the disclosure's summary, with a chevron that turns as it opens, and its meta

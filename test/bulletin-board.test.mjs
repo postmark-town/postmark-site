@@ -21,6 +21,7 @@ import {
   BOARD_PIECES, BOARD_PINS, boardPins, FRAMED, NOSCRIPT_NOTICES, POSTIT_PAPERS, TILTS, boardIds, dailyFront, pinLink, pinnedMonth, postitLook, tendedText, viewOf,
 } from "../src/lib/bulletin-board.mjs";
 import { bulletinCards, bulletinPostings } from "../src/lib/bulletin-cards.mjs";
+import { monthGrid } from "../src/lib/calendar.mjs";
 import { LANES } from "../src/lib/civic.mjs";
 import { MEEPS } from "../src/lib/meeps-quarter.mjs";
 import { SOCIALS } from "../src/lib/door-line.mjs";
@@ -151,6 +152,29 @@ test("with no as_of the month is the build's own", () => {
   const m = pinnedMonth({}, new Date("2026-09-26T15:00:00Z"));
   assert.equal(m.key, "2026-09");
   assert.equal(m.next, null);
+});
+
+test("FALSIFIER (CORE-177): an event that ended this month and left the calendar's seven-day list stays on its day, as on /calendar/; never on the note", () => {
+  const as_of = "2026-10-28T12:00:00Z";
+  const cal = { as_of, now: [], coming: [ev("h/soon", "2026-10-30T19:00:00Z")], ended: [] };
+  const retained = ev("h/early-supper", "2026-10-04T18:00:00Z", { phase: "ended" });
+  const events = { past: { events: [retained] } };
+  const day = (m) => m.weeks.flat().find((d) => d.date === "2026-10-04");
+  assert.equal(day(pinnedMonth(cal)).events.length, 0, "control: the calendar's lists alone do not hold it");
+  const m = pinnedMonth(cal, undefined, { events });
+  assert.deepEqual(day(m).events.map((e) => [e.id, e.past]), [["h/early-supper", true]], "the retained past event, on its day, marked past");
+  // the same day as the calendar page's own grid, from the same function and inputs
+  assert.deepEqual(day(m).events.map((e) => e.id), day(monthGrid(cal, "2026-10", new Date(as_of), undefined, events)).events.map((e) => e.id));
+  assert.deepEqual(m.next, { event: cal.coming[0], now: false }, "the note still names only the office's now or coming");
+  // the date argument keeps its place and meaning
+  assert.equal(pinnedMonth({}, new Date("2026-09-26T15:00:00Z"), { events }).key, "2026-09");
+});
+
+test("PIN the board's production caller hands pinnedMonth the lasting list it already imports, keeping the default clock", () => {
+  const page = readFileSync(join(ROOT, "town/pages/bulletin/index.astro"), "utf8");
+  assert.match(page, /^import eventsData from "@\/data\/postmark\/events\.json";$/m);
+  assert.match(page, /^const month = pinnedMonth\(calendar, undefined, \{ events: eventsData \}\);$/m);
+  assert.match(readFileSync(join(ROOT, "town/pages/calendar/[month].astro"), "utf8"), /monthGrid\(calendar, key, ref, undefined, eventsData\)/, "control: the calendar's month pages read the same list");
 });
 
 // ── the pieces and their panels ────────────────────────────────────────────
