@@ -32,7 +32,8 @@ function node(tag, attrs = {}) {
     _text: "",
     appendChild(child) { el.children.push(child); return child; },
     append(...xs) { for (const x of xs) el.children.push(typeof x === "string" ? text(x) : x); },
-    setAttribute(k, v) { el.attrs[k] = String(v); if (k === "hidden") el.hidden = true; },
+    // as a DOM does: `class` and `href` are reflected to their properties (the mention, CORE-178, sets them as attributes)
+    setAttribute(k, v) { el.attrs[k] = String(v); if (k === "hidden") el.hidden = true; if (k === "class") el.className = String(v); if (k === "href") el.href = String(v); },
     removeAttribute(k) { delete el.attrs[k]; if (k === "hidden") el.hidden = false; },
     remove() {},
     get textContent() { return el._text + el.children.map((c) => c.textContent).join(""); },

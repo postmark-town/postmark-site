@@ -13,6 +13,7 @@ import {
 } from "./fold.mjs";
 import { hungLine } from "./hung-line.mjs";
 import { editLinkShown } from "../profile-edit.mjs";
+import { mentionModel, mentionNode } from "../resident-mention.mjs";
 
 const TOWN_REPO = "https://github.com/postmark-town/postmark/blob/main/";
 const FEED_MAX = 14;       // fresh lines shown before "N more"
@@ -28,20 +29,10 @@ const el = (tag, cls, text) => {
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const clip = (s, max) => (s.length > max ? s.slice(0, max - 1).trimEnd() + "…" : s);
 
-/** A resident's name as every line wears it: their face, their colour. */
+/** A resident's name as every line wears it: the site's one mention (CORE-178), their face and their colour, to their seat. `hd-who` stays
+ *  on it as the page's hook (the Hearth's designs style it inside the stage). */
 function who(faces, handle, seatHref) {
-  const f = faces[handle];
-  const a = el("a", "hd-who");
-  a.href = seatHref(handle);
-  if (f?.accent) a.style.setProperty("--hd-c", f.accent);
-  else a.classList.add("is-neutral");
-  const dot = el("span", "hd-who-face");
-  dot.setAttribute("aria-hidden", "true");
-  if (f?.avatar) { const img = el("img"); img.src = f.avatar; img.alt = ""; img.loading = "lazy"; dot.appendChild(img); }
-  else dot.textContent = f?.monogram ?? "·";
-  a.appendChild(dot);
-  a.appendChild(document.createTextNode(f?.name ?? handle));
-  return a;
+  return mentionNode(document, mentionModel({ handle, face: faces[handle] ?? null, href: seatHref(handle) }), { cls: "hd-who" });
 }
 
 // someone outside the house, by handle, to their own page
@@ -381,11 +372,15 @@ function paintComing(root, events, ctx) {
     h3.appendChild(link);
     body.appendChild(h3);
     const time = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-    body.appendChild(el("p", null, [
+    const lead = [
       e.doorsOpen != null ? "doors at " + time(e.doorsOpen) : e.starts != null ? time(e.starts) : null,
       e.place,
-      "hosted by " + (ctx.faces[e.host]?.name ?? e.host),
-    ].filter(Boolean).join(" · ")));
+    ].filter(Boolean);
+    const facts = el("p", null, (lead.length ? lead.join(" · ") + " · " : "") + "hosted by ");
+    // a host of this house is named as every line names a resident (CORE-178); a host from outside it is the handle the calendar wrote,
+    // since this page holds no face for them (other() below, the same)
+    facts.appendChild(ctx.faces[e.host] ? who(ctx.faces, e.host, ctx.seatHref) : document.createTextNode(e.host));
+    body.appendChild(facts);
     row.appendChild(body);
     const going = el("div", "hd-going");
     e.going.forEach((h) => going.appendChild(who(ctx.faces, h, ctx.seatHref)));

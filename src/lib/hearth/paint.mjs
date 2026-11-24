@@ -14,6 +14,7 @@
 
 import { marksOf, mailOf, postsOf, townEventsOf, placesOf, chartOf, countdownOf, leftWords } from "./fold.mjs";
 import { feedOf, whenOf, dayWordOf, NOT_READING } from "../household-dashboard/fold.mjs";
+import { mentionModel, mentionNode } from "../resident-mention.mjs";
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -25,11 +26,9 @@ const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const clip = (s, max) => (s.length > max ? s.slice(0, max - 1).trimEnd() + "…" : s);
 const nameOf = (faces, h) => faces[h]?.name ?? h;
 
+/** A resident of the house, named: the site's one mention (CORE-178), keeping `hx-who` as the stage's hook. */
 function resident(faces, handle, seatHref) {
-  const a = el("a", "hx-who", nameOf(faces, handle));
-  a.href = seatHref(handle);
-  if (faces[handle]?.accent) a.style.setProperty("--hd-c", faces[handle].accent);
-  return a;
+  return mentionNode(document, mentionModel({ handle, face: faces[handle] ?? null, href: seatHref(handle) }), { cls: "hx-who" });
 }
 
 /** One list slot: its `<ul>`, emptied, with a line for "could not read" or "nothing". */

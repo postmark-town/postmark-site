@@ -69,8 +69,8 @@ test("the name's ink IS the favourite colour when it reads on the surface, and t
 
 test("TEXT PIN (the CSS is read by the browser, not here): the name takes the ink, and the underline takes the colour", () => {
   const css = readFileSync(new URL("../src/styles/resident-mention.css", import.meta.url), "utf8");
-  assert.match(css, /\.rm \{\s*color: var\(--rm-ink-n, inherit\);/, "a mention's ink is its night ink");
-  assert.match(css, /:where\(\.pm-paper\) \.rm, \.rm\.on-paper \{ color: var\(--rm-ink-p, inherit\); \}/, "and its paper ink on paper");
+  assert.match(css, /\.rm\.rm \{\s*color: var\(--rm-ink-n, inherit\);/, "a mention's ink is its night ink");
+  assert.match(css, /:where\(\.pm-paper\) \.rm\.rm, \.rm\.rm\.on-paper \{ color: var\(--rm-ink-p, inherit\); \}/, "and its paper ink on paper");
   assert.match(css, /\.rm-name \{[^}]*text-decoration: underline;[^}]*text-decoration-color: var\(--rm-c,/, "the name is underlined in the colour");
   assert.match(css, /\.rm-face \{[^}]*box-shadow: 0 0 0 1\.5px var\(--rm-c,/, "the face is ringed in the colour");
 });

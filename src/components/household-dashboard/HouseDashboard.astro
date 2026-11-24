@@ -27,6 +27,7 @@
 import ResidentCard from "./ResidentCard.astro";
 import media from "@/data/postmark/media.json";
 import { residentFace } from "@/lib/household-dashboard/faces.mjs";
+import "@/styles/resident-mention.css";
 import { hungLine, numberWord } from "@/lib/household-dashboard/hung-line.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { fmtDate } from "@/lib/pm.mjs";
@@ -359,11 +360,9 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   .hd-boat { margin: 0.7em 0 0; padding-top: 0.6em; border-top: 1px dashed var(--hd-hair); font-size: 0.85rem; color: var(--hd-moon); }
   .hd-more { display: block; margin: 0.3em auto 0; font-family: var(--pm-mono); font-size: 0.68rem; background: none; border: 0; color: var(--pm-gold); cursor: pointer; }
 
-  /* a resident, named: their face and their colour, wherever a line names them */
-  .hd :global(.hd-who) { color: var(--hd-warm); font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--hd-c, rgba(232, 196, 139, 0.25)); white-space: nowrap; }
-  .hd :global(.hd-who.is-neutral) { border-bottom-color: rgba(205, 194, 171, 0.3); }
-  .hd :global(.hd-who-face) { display: inline-grid; place-items: center; width: 1.25em; height: 1.25em; margin-right: 0.3em; border-radius: 50%; overflow: hidden; vertical-align: -0.2em; background: rgba(205, 194, 171, 0.15); box-shadow: 0 0 0 1.5px var(--hd-c, rgba(205, 194, 171, 0.35)); font-family: var(--pm-mono); font-size: 0.7em; font-weight: 400; }
-  .hd :global(.hd-who-face img) { width: 100%; height: 100%; object-fit: cover; }
+  /* a resident, named: the site's one mention (CORE-178, resident-mention.css); `.hd-who` stays on it as this page's hook. A neutral one
+     (no colour chosen) keeps this page's warm ink. */
+  .hd :global(.rm.rm.is-neutral) { color: var(--hd-warm); }
 
   .hd-needs { background: var(--pm-paper); color: var(--pm-ink); border-radius: 12px; padding: 1em 1.1em 0.9em; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
   .hd-needs h2 { margin: 0; font-size: 1.35rem; color: var(--pm-ink); }
@@ -375,7 +374,8 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   .hd-needs :global(.hd-calm) { color: #3a7d3a; }
   .hd-needs :global(p) { margin: 0.15em 0 0.25em; font-size: 0.93rem; }
   .hd-needs :global(a) { color: var(--pm-accent); font-size: 0.85rem; }
-  .hd-needs :global(.hd-who) { color: var(--pm-ink); }
+  /* the Needs box is the letter paper: a mention takes its paper ink (no colour: the paper's ink) */
+  .hd-needs :global(a.rm.rm) { color: var(--rm-ink-p, var(--pm-ink)); }
 
   /* ── the residents ── */
   .hd-block { margin-top: 2.2em; }

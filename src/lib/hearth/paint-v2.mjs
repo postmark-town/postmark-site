@@ -9,6 +9,7 @@
 
 import { tiesOf, wentOf, feedOf, feedShown, dayOf } from "./bundle.mjs";
 import { whenOf } from "../household-dashboard/fold.mjs";
+import { mentionModel, mentionNode } from "../resident-mention.mjs";
 
 const PANES = "https://panes.postmark.town";
 const el = (tag, cls, text) => {
@@ -18,12 +19,12 @@ const el = (tag, cls, text) => {
   return e;
 };
 const nameOf = (faces, h) => faces?.[h]?.name ?? h;
-const who = (ctx, h) => {
-  const a = el("a", "hx-who", nameOf(ctx.faces, h));
-  a.href = ctx.residentHref ? ctx.residentHref(h) : `/residents/${encodeURIComponent(h)}/`;
-  if (ctx.faces?.[h]?.accent) a.style.setProperty("--hd-c", ctx.faces[h].accent);
-  return a;
-};
+// a resident of the house, named: the site's one mention (CORE-178), keeping `hx-who` as the stage's hook
+const who = (ctx, h) => mentionNode(document, mentionModel({
+  handle: h,
+  face: ctx.faces?.[h] ?? null,
+  href: ctx.residentHref ? ctx.residentHref(h) : `/residents/${encodeURIComponent(h)}/`,
+}), { cls: "hx-who" });
 const other = (h) => { const a = el("a", null, h); a.href = `/residents/${encodeURIComponent(h)}/`; return a; };
 const slotOf = (root, name) => root.querySelector(`[data-hearth-slot="${name}"]`);
 const show = (box, on) => { if (box) box.hidden = !on; };

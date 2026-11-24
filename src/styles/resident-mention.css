@@ -5,16 +5,18 @@
    surface. A mention reads the night ink by default and the paper ink inside the letter paper (`.pm-paper`) or when it says it sits on paper
    (`.on-paper`). A resident who chose no colour (`.is-neutral`) keeps the surface's own ink and a neutral hairline, never an invented colour.
 
-   Global on purpose: one stylesheet for the build's mentions and the ones a page paints live. A surface sizes the face with --rm-face. */
+   Global on purpose: one stylesheet for the build's mentions and the ones a page paints live. A surface sizes the face with --rm-face.
+   The ink rules double the class (`.rm.rm`, 0-2-0) so a page's generic link colour (`.spark-card a`, `.pm-letter a`, 0-1-1) can't repaint
+   a resident's name; a surface that must place the ink itself (the Hearth's stage, a paper box without .pm-paper) does so by name. */
 
-.rm {
+.rm.rm {
   color: var(--rm-ink-n, inherit);
   font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
 }
-:where(.pm-paper) .rm, .rm.on-paper { color: var(--rm-ink-p, inherit); }
-.rm.is-neutral { color: inherit; }
+:where(.pm-paper) .rm.rm, .rm.rm.on-paper { color: var(--rm-ink-p, inherit); }
+.rm.rm.is-neutral { color: inherit; }
 
 .rm-name {
   white-space: normal;

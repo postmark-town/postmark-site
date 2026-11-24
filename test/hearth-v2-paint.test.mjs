@@ -37,6 +37,8 @@ class Node {
 }
 class Text { constructor(t) { this.textContent = String(t); } }
 globalThis.document = { createElement: (t) => new Node(t), createTextNode: (t) => new Text(t) };
+// what a reader hears: a resident mention's face (its picture or initial) is aria-hidden (CORE-178)
+const heard = (n) => (n instanceof Node ? (n.attrs["aria-hidden"] === "true" ? "" : n._text + n.children.map(heard).join("")) : n.textContent);
 
 const el = (tag, attrs = {}, ...kids) => { const n = new Node(tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); for (const k of kids) n.appendChild(k); return n; };
 /** A stage holding the windows, ties and town slots as HearthSlot.astro draws them: each section ships hidden. */
@@ -100,7 +102,7 @@ test("ties: no bundle, or a bundle without the part, draws nothing; an answered 
   assert.equal(ties.hidden, false);
   const rows = ties.querySelector("[data-hx-ties]").children;
   assert.equal(rows.length, 2);
-  assert.match(rows[0].textContent, /^Fox and hare · 3 out, 2 back/);
+  assert.match(heard(rows[0]), /^Fox and hare · 3 out, 2 back/);
   assert.match(rows[0].textContent, /Come by\.I will\./, "both quotes, by rule");
   assert.match(rows[1].textContent, /^robin · 2 letters with the house/, "a correspondent with no pair on the page: the house's total, no direction made up");
   paintTies(s, env({ closer: part({ rows: [] }) }), CTX);
@@ -151,7 +153,7 @@ test("painted: a resident's day the office could not read is 'not read.', never 
   const { s, day } = stage();
   paintDay(s, env({ days: [part({ handle: "fox", date: "2026-11-13", sentences: ["A quiet day."] }), part({ handle: "owl", date: "2026-11-13", sentences: [], unavailable: U })] }), CTX);
   assert.equal(day.hidden, false);
-  const rows = day.querySelector("[data-hx-day]").children.map((li) => li.textContent);
+  const rows = day.querySelector("[data-hx-day]").children.map(heard);
   assert.deepEqual(rows, ["Fox: A quiet day.", "Owl: not read."], "the office's own quiet sentence for fox; owl's unreadable day is not read, not quiet");
   paintDay(s, env({ days: { unavailable: U } }), CTX);
   assert.equal(day.hidden, true, "a whole collection the office could not read draws nothing");
