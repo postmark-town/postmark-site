@@ -127,6 +127,44 @@ if (UNION) test("the union with CORE-177's mountRoom keeps its `onState` and `ci
     assert.equal("identityForSpeaker" in g.seen[0] || "onState" in g.seen[0], false);
   });
 
+// ── against the World's own gate (the pinned consumer contract: World #439 at afd4bb61, Bevel 18:36, relayed by Facet ~18:4xZ) ─────────────
+// "createCircleReader / mountCircleReader take optional identityForSpeaker(handle) → fresh Element | null … Absent/null/parented/reused/
+// aria-hidden=true/empty/invalid/throw keep the old face/name path. Site must supply a visible, exposed name." The World reader validates every
+// answer with its exported `speakerIdentity`. WLD-248 is In Review, not a published package the site has installed, so this arm is registered only
+// when CORE178_WORLD_READER names a circle-reader.mjs that carries it (the lane ran it on the pinned file; its hand-in carries the receipt), and the
+// CI gate counts no skip.
+const WORLD_READER = process.env.CORE178_WORLD_READER || null;
+if (WORLD_READER) test("the World's own speakerIdentity accepts every identity the site gives, and turns away what the site turns away", async () => {
+  const world = await import(pathToFileURL(WORLD_READER).href);
+  assert.equal(typeof world.speakerIdentity, "function", "the reader carries WLD-248's gate");
+  // a document whose elements carry what the gate reads: nodeType, parentNode, getAttribute, textContent
+  const live = {
+    createElement(tag) {
+      const e = { nodeType: 1, tagName: tag.toUpperCase(), parentNode: null, attrs: {}, children: [],
+        setAttribute(k, v) { e.attrs[k] = String(v); }, getAttribute(k) { return k in e.attrs ? e.attrs[k] : null; },
+        appendChild(c) { c.parentNode = e; e.children.push(c); return c; },
+        get textContent() { return e.children.map((c) => c.textContent ?? "").join(""); } };
+      return e;
+    },
+    createTextNode: (t) => ({ nodeType: 3, textContent: String(t), parentNode: null }),
+  };
+  const siteIdentity = identityProvider(live, () => FACES);
+  const a = world.speakerIdentity(siteIdentity, "wren-alder");
+  assert.ok(a, "the World accepts the site's whole identity");
+  assert.equal(a.attrs.class, "rm rm-speaker");
+  assert.equal(a.textContent, "Wren Alder", "with its visible, exposed name (the face inside is the only aria-hidden part)");
+  const b = world.speakerIdentity(siteIdentity, "wren-alder");
+  assert.ok(b && b !== a, "a second statement of the same speaker gets its own fresh node, which the World accepts too");
+  assert.equal(world.speakerIdentity(siteIdentity, "human-of-fox"), null, "a house's human: null, the World keeps its own path");
+  assert.equal(world.speakerIdentity(siteIdentity, "nobody-the-faces-name"), null, "an unknown speaker: the same");
+  // control: the gate is live, so its acceptance above means something
+  const once = siteIdentity("pale");
+  assert.ok(world.speakerIdentity(() => once, "pale"), "control: a fresh node is accepted once");
+  assert.equal(world.speakerIdentity(() => once, "pale"), null, "control: the same node handed back is refused (reuse), as the site never does");
+  const hidden = siteIdentity("door"); hidden.setAttribute("aria-hidden", "true");
+  assert.equal(world.speakerIdentity(() => hidden, "door"), null, "control: an aria-hidden identity is refused, as the site never makes one");
+});
+
 // ── the Conversations page wires it (TEXT PINS: no browser here; the byline proof waits on the installed World carrying WLD-248) ──────
 
 test("TEXT PIN: the Conversations door builds the identity from the poller's faces and hands it to the reader; both of the poller's mounts pass the faces", () => {
