@@ -128,9 +128,17 @@ test("the union with CORE-177's mountRoom keeps its `onState` and `circle` besid
 // ── the Conversations page wires it (TEXT PINS: no browser here; the byline proof waits on the installed World carrying WLD-248) ──────
 
 test("TEXT PIN: the Conversations door builds the identity from the poller's faces and hands it to the reader; both of the poller's mounts pass the faces", () => {
-  const src = readFileSync(new URL("../town/pages/conversations/index.astro", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../town/pages/conversations/index.astro", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(src, /import \{ identityProvider \} from "@\/lib\/resident-identity\.mjs";/);
-  assert.match(src, /import "@\/styles\/resident-mention\.css";/, "the mention's look reaches the page");
+  // in the frontmatter, not the door's module: conversations-circles serves that module raw and rewrites only `from "@/lib/…"` specifiers
+  const front = src.slice(0, src.indexOf("\n---", 4));
+  assert.match(front, /import "@\/styles\/resident-mention\.css";/, "the mention's look reaches the page, from the frontmatter");
+  const at = src.indexOf("\n  <script>\n", src.indexOf("<script is:inline>"));
+  assert.ok(at > 0, "the door's module is found (control: the slices below read it, not nothing)");
+  const door = src.slice(at);
+  assert.match(door, /import \{ identityProvider \} from "@\/lib\/resident-identity\.mjs";/, "control: the door slice holds the door");
+  assert.doesNotMatch(door, /import "@\/styles\//, "the door's module imports no stylesheet (the browser harness serves it raw)");
+  for (const m of door.matchAll(/^\s*import [^;]*?from "(@\/[^"]+)"/gm)) assert.match(m[1], /^@\/lib\//, `the door imports only @/lib modules: ${m[1]}`);
   assert.match(src, /hostOwnsHeader = false, speakerFaces = null \} = \{\}\) \{/, "the door takes the faces getter");
   assert.match(src, /\.\.\.\(typeof speakerFaces === "function" \? \{ identityForSpeaker: identityProvider\(document, speakerFaces\) \} : \{\}\),/);
   assert.equal((src.match(/speakerFaces: function \(\) \{ return faces; \},/g) ?? []).length, 2, "every card's reader and the one conversation's");

@@ -49,6 +49,8 @@
 // verb calls, reached over `POST /api/world/say` with the token the writing
 // desk already holds; a household speaks as any of its residents, or as
 // itself, the human of the house.
+// the look of the site's one resident mention, which the circle reader draws as each speaker's identity (CORE-178; the door below hands it on)
+import "@/styles/resident-mention.css";
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 ---
 <PostmarkLayout
@@ -1146,7 +1148,6 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     // what bounces; when it says no, its words go on the page verbatim.
     // CORE-178 / WLD-248: the site's one resident mention, handed to the reader as each speaker's identity (resident-identity.mjs), and its look
     import { identityProvider } from "@/lib/resident-identity.mjs";
-    import "@/styles/resident-mention.css";
     import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import { siteWriteHeaders } from "@/lib/office-write.mjs";
     import { loadReader, officeSource } from "@/lib/circle-reader-mount.mjs";
