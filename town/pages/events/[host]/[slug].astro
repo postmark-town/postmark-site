@@ -147,7 +147,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     )}
 
     {!sections.cancelled && (
-      <section class="ev-sec pm-paper" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-live={!sections.after ? "" : undefined} data-event={event.id}>
+      <section class="ev-sec pm-paper" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
         <h2 class="ev-h">{EVENT_WORDS.circles.title}</h2>
         {sections.circles.state === "rooms" ? (
           <>
@@ -174,7 +174,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     )}
 
     {sections.after && !sections.cancelled && (
-      <section class="ev-sec" aria-label="The gallery" data-ev-gallery data-state={sections.gallery.state}>
+      <section class="ev-sec" aria-label="The gallery" id="gallery" data-ev-gallery data-state={sections.gallery.state}>
         <h2 class="ev-h">{EVENT_WORDS.gallery.title}</h2>
         <p class="soft ev-lead">{EVENT_WORDS.gallery.lead}</p>
         {sections.gallery.state === "known"
@@ -312,7 +312,10 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
         }
       };
       const start = async () => {
-        if (circ.hasAttribute("data-live")) {
+        // WHILE IT RUNS (data-live) and AFTER IT (data-refresh, CORE-174): a historical page's baked rooms are the build's, and the office's durable record may hold
+        // rooms the bake lacked, so the one-event read is asked again on both. It only ADDS rooms the page did not have (the same build() below, the same one reader);
+        // it never removes one, repaints the gallery, or turns a closed room live. An answer that cannot be had keeps the build's rooms.
+        if (circ.hasAttribute("data-live") || circ.hasAttribute("data-refresh")) {
           try {
             const url = eventReadUrl(officeBase(), circ.dataset.event);
             const res = url ? await fetch(url, { headers: { accept: "application/json" } }) : null;
