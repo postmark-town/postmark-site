@@ -146,7 +146,8 @@
 /* A SEAT'S PAGES (CORE-164; Darko, 2026-11-23 08:37 EST: "hover over any of the main rail headers to see their pages as a vertical list").
    A seat that has pages stands in `.pm-rail-seat`: its link, a button for the keyboard (the script reveals it) and the list. The rail shows
    no caret (Darko, 2026-11-24 08:24 EST: "remove carets from rail, they look bad"): the button has no glyph, takes no room in the rail, and
-   is out of sight until keyboard focus lands on it, when it shows the word "pages" beside the seat. On a touch screen the seat's first tap
+   is out of sight until keyboard focus lands on it, when it shows the word "pages" beside the seat; a pointer passes through it (it is the
+   keyboard's, and it lies over the next seat). On a touch screen the seat's first tap
    opens the list (rail-pages-ui.mjs). The list
    hangs from the seat's bottom edge with no gap, so the pointer can travel into it without the list closing; it shows while a mouse is on
    the seat or the list (never a finger: a tap's sticky hover would hold it open on a phone), or while the button or keyboard focus holds it.
@@ -157,8 +158,11 @@
 .pm .pm-rail-more {
   position: absolute; left: 100%; top: 50%; z-index: 71;
   width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
-  font-family: var(--pm-mono); font-size: 0.66rem; letter-spacing: 0.08em; line-height: 1; cursor: pointer;
+  font-family: var(--pm-mono); font-size: 0.66rem; letter-spacing: 0.08em; line-height: 1;
   color: var(--pm-gold-bright); background: var(--pm-harbor); border: 0; border-radius: 999px;
+  /* the keyboard's alone: shown, it lies over the next seat's name, and a mouse resting there must stay on that seat, not on this button
+     (else Tabbing past The Town while the mouse rests on The World swaps The World's list for The Town's, and Tab skips The World's pages) */
+  pointer-events: none;
 }
 .pm .pm-rail-more[hidden] { display: none; }
 .pm .pm-rail-more:focus {

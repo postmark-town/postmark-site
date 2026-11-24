@@ -287,6 +287,8 @@ test("PIN no caret on the rail: the button has no glyph and is out of sight unti
   assert.match(rest, /position: absolute;/, "it takes no room in the rail");
   assert.match(rest, /width: 1px; height: 1px;/);
   assert.match(rest, /clip-path: inset\(50%\);/, "out of sight at rest");
+  assert.match(rest, /pointer-events: none;/, "a pointer passes through it: shown, it lies over the next seat, and must not take that seat's mouse");
+  assert.doesNotMatch(focused, /pointer-events/, "and focus doesn't give the pointer back");
   assert.match(focused, /clip-path: none;/, "in sight while focused");
   assert.match(focused, /outline: 2px solid/, "with a focus ring");
   assert.doesNotMatch(css, /pm-rail-more[^{]*svg|rotate\(180deg\)/, "no chevron rule left behind");
