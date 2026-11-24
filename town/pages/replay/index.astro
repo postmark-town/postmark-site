@@ -630,10 +630,11 @@ const residentPages = { pages: residents.map((r) => r.handle), renames };
       if (!page) return el("span", "r-who", nameOf(handle));
       // CORE-178: a resident whose page stands is the site's one mention (window.__pmMention, PostmarkLayout's bridge: this inline module can't
       // import), from the faces this page already reads; without the bridge, the plain link below
-      const mention = window.__pmMention?.fromMeta(handle, faces[handle], "/residents/" + encodeURIComponent(page) + "/", { cls: "r-who" });
+      const href = "/residents/" + encodeURIComponent(page) + "/";
+      const mention = window.__pmMention?.fromMeta(handle, faces[handle], href, { cls: "r-who" });
       if (mention) return mention;
       const a = el("a", "r-who");
-      a.href = "/residents/" + encodeURIComponent(page) + "/";
+      a.href = href;
       a.textContent = nameOf(handle);
       return a;
     };
