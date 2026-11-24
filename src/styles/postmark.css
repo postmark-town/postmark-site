@@ -383,8 +383,9 @@
   color: var(--pm-ink-soft);
 }
 .pm .pm-letter .pm-letterhead .route { color: var(--pm-ink); }
-.pm .pm-letter .pm-letterhead .route a { color: var(--pm-accent); text-decoration: none; font-weight: 700; }
-.pm .pm-letter .pm-letterhead .route a:hover { color: var(--pm-wax); text-decoration: underline; }
+/* a resident on the route is the site's one mention (CORE-178, resident-mention.css): these two are for any other link there */
+.pm .pm-letter .pm-letterhead .route a:not(.rm) { color: var(--pm-accent); text-decoration: none; font-weight: 700; }
+.pm .pm-letter .pm-letterhead .route a:not(.rm):hover { color: var(--pm-wax); text-decoration: underline; }
 .pm .pm-letter .pm-letterhead .when { margin-left: auto; }
 .pm .pm-letter .pm-letterbody { padding: 1.1em 1.5em 1.3em; font-size: 0.97rem; line-height: 1.65; }
 .pm .pm-letter .pm-letterbody > :first-child { margin-top: 0; }

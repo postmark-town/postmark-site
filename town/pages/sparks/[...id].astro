@@ -10,7 +10,8 @@ import eventsData from "@/data/postmark/events.json";
 import sparksData from "@/data/postmark/sparks.json";
 import residents from "@/data/postmark/residents.json";
 import { CATALOGUE_WORDS, collectSparks, eventOfSpark, sparkParam } from "@/lib/sparks.mjs";
-import { isRoomId, pictureOf, placeOf, residentHref, roomHref, roomIdOf } from "@/lib/calendar.mjs";
+import { isRoomId, pictureOf, placeOf, roomHref, roomIdOf } from "@/lib/calendar.mjs";
+import ResidentMention from "@/components/ResidentMention.astro";
 
 export function getStaticPaths() {
   // the register's Sparks (read as served) and every Spark the event reads carry: an event card always has its page, listed in the register or not
@@ -27,7 +28,6 @@ const seen = entry.seenIn && entry.seenIn !== entry.eventId ? eventOfSpark({ eve
 const place = ev || seen ? placeOf((ev ?? seen).event.place) : null;
 const rooms = Array.isArray(s.rooms) ? s.rooms.map(roomIdOf).filter(isRoomId) : [];
 const by = typeof s?.credit?.by === "string" ? s.credit.by : null;
-const makerHref = by ? residentHref(by, roll) : null;
 const pictured = pictureOf(s) !== null;
 const title = typeof s.body === "string" && s.body.trim() ? s.body.trim() : "A Spark";
 ---
@@ -67,7 +67,7 @@ const title = typeof s.body === "string" && s.body.trim() ? s.body.trim() : "A S
         )}
         <li data-spark-maker>
           Made by:{" "}
-          {by ? (makerHref ? <a href={makerHref}>{by}</a> : <span>{by}</span>) : <span class="soft">not served</span>}
+          {by ? <ResidentMention handle={by} /> : <span class="soft">not served</span>}
         </li>
       </ul>
     </section>

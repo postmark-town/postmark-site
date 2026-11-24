@@ -8,10 +8,11 @@
 // their NAME in their favourite colour, underlined in it. It grew out of the household page's `who` (household-dashboard/paint.mjs, POS-260),
 // which already drew the picture, the ring and the underline, but left the name's ink the page's own.
 //
-// ONE IMPLEMENTATION, TWO ADAPTERS. `mentionModel` decides everything (the name, the link, the colour, the picture, the fallbacks); `mentionTree`
-// turns a model into the one markup tree; `mentionHtml` serialises that tree for the build (ResidentMention.astro), and `mentionNode` builds the
-// same tree as DOM for a page's live half (paint.mjs and the Hearth's painters). test/resident-mention.test.mjs holds the two adapters' output
-// byte-identical, so the server's mention and the browser's cannot drift into two formats.
+// ONE IMPLEMENTATION, ITS ADAPTERS. `mentionModel` decides everything (the name, the link, the colour, the picture, the fallbacks); `mentionTree`
+// turns a model into the one markup tree. Every adapter only draws that tree: ResidentMention.astro walks it at build time through Astro's own
+// escaping; `mentionNode` builds it as DOM for a page's live half (paint.mjs and the Hearth's painters); `mentionHtml` serialises it, escaped,
+// for a build step that writes HTML strings (the mail pages). test/resident-mention.test.mjs holds mentionNode and mentionHtml to the same
+// bytes, so the server's mention and the browser's cannot drift into two formats.
 //
 // THE COLOUR AND ITS CONTRAST. The ring and the underline wear the favourite colour exactly. The name's INK is the same colour, kept legible: when
 // the colour already reads at WCAG AA (4.5:1) on the surface the mention sits on, it is the colour itself; when it does not, only its lightness

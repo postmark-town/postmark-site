@@ -5,13 +5,14 @@
 // <ResidentMention handle={h} link={false} />          the same, as a span (inside a card or a chip that is already a link)
 // <ResidentMention handle={h} href={seat} />           linking somewhere else (the house's seat); href={null} for no link
 // <ResidentMention handle={h} face={f} />              with a face the page already holds (faces.mjs residentFace), instead of the build's
-// <ResidentMention handle={h} cls="hx-who" />          keeping a surface's own hook class (the Hearth's designs style it)
+// <ResidentMention handle={h} cls="hx-who" />          keeping a surface's own hook class (the Hearth's styles name it)
 // <ResidentMention handle={h} surface="paper" />       on the letter paper outside a `.pm-paper` box
 //
-// The markup is resident-mention.mjs § mentionHtml, the same tree the live half builds with mentionNode: every resident-written string in it
-// is escaped there (test/resident-mention.test.mjs holds the escaping and the two adapters' sameness), so set:html here carries no raw text.
-import "@/styles/resident-mention.css";
-import { mentionHtml, mentionModel } from "@/lib/resident-mention.mjs";
+// It decides the model (the build's roll, resident-mentions.mjs, which follows renames and wears faces.mjs's face) and draws it with
+// ResidentMentionModel.astro. A page that builds incrementally can't import this file (the roll reads the residents file): it gets its
+// models as props and draws them with ResidentMentionModel directly.
+import ResidentMentionModel from "./ResidentMentionModel.astro";
+import { mentionModel } from "@/lib/resident-mention.mjs";
 import { mentionOf } from "@/lib/resident-mentions.mjs";
 
 interface Props {
@@ -30,7 +31,7 @@ interface Props {
 }
 const { handle, label, href, link = true, face, cls = "", surface } = Astro.props;
 const model = face
-  ? mentionModel({ handle, face, href: href !== undefined ? href : mentionOf(handle).href ?? null, label })
+  ? mentionModel({ handle, face, href: href !== undefined ? href : (mentionOf(handle) as any).href ?? null, label })
   : mentionOf(handle, { label, href });
 ---
-<Fragment set:html={mentionHtml(model, { link, cls, surface })} />
+<ResidentMentionModel model={model} link={link} cls={cls} surface={surface} />
