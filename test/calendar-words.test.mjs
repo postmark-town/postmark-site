@@ -83,7 +83,8 @@ test("the 'starts in' line is followed by the instant the office read it, since 
   assert.match(CARD, /<time datetime=\{asOf\}[^>]*data-local>/, "the as-of instant is localised like every other time");
   assert.match(CARD, /"the last build"/, "no as_of still says what the count is relative to");
   assert.match(PANEL, /<CalendarCard event=\{e\} roll=\{roll\} asOf=\{calendar\?\.as_of \?\? null\} \/>/);
-  assert.match(EVENT, /<CalendarCard event=\{event\} roll=\{roll\} asOf=\{calendar\.as_of \?\? null\} full past=\{sections\.after\} \/>/);
+  // CORE-177: the event page's card also holds its who-was-there in the card's one slot, so it is no longer self-closing
+  assert.match(EVENT, /<CalendarCard event=\{event\} roll=\{roll\} asOf=\{calendar\.as_of \?\? null\} full past=\{sections\.after\}>/);
   // The count itself is still the office's seconds: not worked out from the clock.
   assert.equal(whenLine(SAMPLE.coming[0]), "starts in 1 d 2 h");
   assert.equal(/Date\.now|new Date\(\)\.getTime/.test(CARD), false, "a client-side countdown crept in without its edge cases");

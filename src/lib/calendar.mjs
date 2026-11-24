@@ -117,11 +117,39 @@ export function evidenceRead(event, events) {
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
+// what a human's own hand may carry beside its handle (the public presentation a conversation's line carries); a resident carries none of it
+const HUMAN_FIELDS = ["speaker", "house", "house_slug", "town_name", "pronouns"];
+
+/**
+ * WHO WAS THERE, BY NAME (CORE-177; office POS-1217): the evidence's `participants`, the actors of the public acts at the event, each
+ * `{ handle, household, human? }`. A DISTINCT state, never read from `present` (households) or the RSVPs: an array is KNOWN (maybe empty),
+ * anything else is UNKNOWN. Each person once, in the office's order (it sorts by handle); a resident keeps its handle and household only (how
+ * a resident is drawn is the site's one mention), a human (`human: true`, a human's own hand) also its public presentation. Pure.
+ */
+export function participantsOf(ev) {
+  const basis = typeof ev?.participants_basis === "string" && ev.participants_basis.trim() ? ev.participants_basis.trim() : null;
+  if (!Array.isArray(ev?.participants)) return { state: "unknown", basis };
+  const seen = new Set();
+  const people = [];
+  for (const p of ev.participants) {
+    if (!isObj(p) || typeof p.handle !== "string" || p.handle === "" || seen.has(p.handle)) continue;
+    seen.add(p.handle);
+    const person = { handle: p.handle, household: typeof p.household === "string" ? p.household : null };
+    if (p.human === true) {
+      person.human = true;
+      for (const k of HUMAN_FIELDS) if (typeof p[k] === "string" && p[k].trim()) person[k] = p[k].trim();
+    }
+    people.push(person);
+  }
+  return { state: "known", people, basis, unplaced: Number(ev.unplaced_says) > 0 ? Number(ev.unplaced_says) : 0 };
+}
+
 /**
  * The states of one event page, from the office's own fields and nothing else. Pure.
  *
  *   circles   before | rooms | none | unavailable | cancelled
  *   present   unknown | known (list, maybe empty)
+ *   participants  unknown | known (people, maybe empty): participantsOf
  *   sparks    none | known (items: spark | reference, in the producer's order) | unavailable | unknown
  *   gallery   unknown | known (sparks, maybe empty)
  *
@@ -136,12 +164,12 @@ export function eventSections(event) {
   const out = { after, cancelled, phase };
   if (cancelled) {
     // "never on a cancelled event": the office serves no evidence, so there is nothing to say and nothing is claimed.
-    return { ...out, circles: { state: "cancelled" }, present: { state: "unknown" }, sparks: { state: "unknown", items: [] }, gallery: { state: "unknown" } };
+    return { ...out, circles: { state: "cancelled" }, present: { state: "unknown" }, participants: { state: "unknown", basis: null }, sparks: { state: "unknown", items: [] }, gallery: { state: "unknown" } };
   }
   if (!ev) {
     const before = phase === "announced";
     const gone = { state: before ? "before" : "unavailable" };
-    return { ...out, circles: gone, present: { state: "unknown", before }, sparks: { state: before ? "none" : "unknown", before, items: [] }, gallery: { state: "unknown", before } };
+    return { ...out, circles: gone, present: { state: "unknown", before }, participants: { state: "unknown", basis: null, before }, sparks: { state: before ? "none" : "unknown", before, items: [] }, gallery: { state: "unknown", before } };
   }
   // circles: every qualifying room, in the office's start order, never ranked or chosen
   const rooms = Array.isArray(ev.rooms) ? ev.rooms : null;
@@ -175,7 +203,7 @@ export function eventSections(event) {
     // `complete` is the producer's own flag: true is complete, false is "so far", and an ABSENT or non-boolean flag is UNKNOWN (null), never complete
     gallery = { state: "known", rooms: Array.isArray(ev.gallery.rooms) ? ev.gallery.rooms : [], sparks: ev.gallery.sparks, complete: typeof ev.complete === "boolean" ? ev.complete : null, note: typeof ev.gallery_note === "string" ? ev.gallery_note : null };
   } else gallery = { state: "unknown", note: typeof ev.gallery_note === "string" ? ev.gallery_note : null };
-  return { ...out, circles, present, sparks, gallery, window: isObj(ev.window) ? ev.window : null, complete: ev.complete === true };
+  return { ...out, circles, present, participants: participantsOf(ev), sparks, gallery, window: isObj(ev.window) ? ev.window : null, complete: ev.complete === true };
 }
 
 /**
@@ -230,6 +258,13 @@ export const EVENT_WORDS = Object.freeze({
     none: "No public act at the place during the event is on record.",
     unknown: "Who was there couldn't be read, so this page cannot say. That is not the same as no one.",
     before: "Who was there is shown once the event has run.",
+  },
+  // CORE-177: the card's compact who-was-there, by name (participantsOf). Its own words: the household wording above is not valid for an actor list
+  attendance: {
+    title: "Who was there",
+    lead: "Recorded attendees, from public acts at the event. An RSVP alone does not count.",
+    none: "No individual attendees are recorded.",
+    unknown: "Individual attendance isn't available here.",
   },
   sparks: {
     title: "The sparks",

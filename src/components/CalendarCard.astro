@@ -30,7 +30,7 @@ interface Props {
   /** the event page's card: the title is not a link, and the RSVP list shows */
   full?: boolean;
   /** the approved PAST layout (CORE-121): an ended event does not draw the future-tense "Who is coming" list; the recorded RSVP count stays in the card's
-   *  own metadata row as history, and who was THERE is the page's public-acts section, never RSVP attendance */
+   *  own metadata row as history, and who was THERE is the page's public-acts roster (its `attendance` slot), never RSVP attendance */
   past?: boolean;
   /** calendar.json's as_of: the instant the "starts in" count was read at */
   asOf?: string | null;
@@ -112,6 +112,8 @@ const times = [
         : <p class="soft">No one has RSVPed yet.</p>}
     </section>
   )}
+  {/* the event page's compact who-was-there, under the RSVPs (CORE-177): the page fills it from the office's participants */}
+  <slot name="attendance" />
 </article>
 
 <script>

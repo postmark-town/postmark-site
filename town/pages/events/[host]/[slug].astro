@@ -26,12 +26,15 @@ import "@/styles/conversation-host.css";
 import PageFreshness from "@/components/PageFreshness.astro";
 import CalendarCard from "@/components/CalendarCard.astro";
 import SparkCard from "@/components/SparkCard.astro";
+import ResidentMention from "@/components/ResidentMention.astro";
+// the mention's own sheet, also for a roster the island paints when the bake drew no mention (CORE-178's one form)
+import "@/styles/resident-mention.css";
 import { CATALOGUE_WORDS } from "@/lib/sparks.mjs";
 import calendar from "@/data/postmark/calendar.json";
 import eventsData from "@/data/postmark/events.json";
 import residents from "@/data/postmark/residents.json";
-import households from "@/data/postmark/households.json";
-import { buildHouses, nameplate } from "@/lib/houses.mjs";
+import { mentionAliases, publicFaces } from "@/lib/resident-mentions.mjs";
+import { attendanceNote, attendeeLabel, unplacedLine } from "@/lib/event-attendance.mjs";
 import {
   EVENT_WORDS, allEventViews, eventForPage, eventParams, eventSections, eventsOf, evidenceRead, isRoomId, legacyEventHref, roomHref, roomIdOf, utcText,
 } from "@/lib/calendar.mjs";
@@ -53,19 +56,19 @@ const readAt = eventReadAt(event, calendar.as_of ?? null, eventsData, eventsOf(c
 const sections = eventSections(event);
 const showGallery = !sections.cancelled && GALLERY_PHASES.has(sections.phase);
 const read = evidenceRead(event, eventsData);
-// Households the page can name: a "present" entry is a household id as the office writes it (a registry slug, or solo:<handle>); one the
-// site does not know is shown as the id it is, never guessed at.
-const { houseOf } = buildHouses(residents, households);
-const houseBySlug = new Map([...new Set(houseOf.values())].filter((h) => h.slug).map((h) => [h.slug, h]));
-const householdLine = (id) => {
-  const key = String(id ?? "");
-  const slug = key.replace(/^hh:/, "");
-  const h = houseBySlug.get(slug);
-  if (h) return { text: nameplate(h) || slug, href: `/households/${h.path}/` };
-  const solo = /^solo:(.+)$/.exec(key);
-  if (solo && residents.some((r) => r.handle === solo[1])) return { text: solo[1], href: `/residents/${solo[1]}/` };
-  return { text: key, href: null };
-};
+// WHO WAS THERE, BY NAME, under the RSVPs in the card (CORE-177 ruling 2; office POS-1217): the office's `participants`, the actors of the public acts
+// at the event (calendar.mjs § participantsOf), each drawn with the site's one mention (ResidentMention, CORE-178). Never the households, their
+// members, the RSVPs or a companion: an unknown roster says so, an empty one says none. Not before the event and never on a cancelled one, as before.
+// The office's one-event read the island already asks (for the rooms) repaints it when the bake's roster could still change (the event is on, or the
+// bake had none); for that it carries the build's public faces and renames on the circles section, the data CORE-178's live mentions read.
+const attendance = sections.participants;
+const attendShown = sections.after || attendance.state === "known";
+const attendRefresh = !sections.cancelled && (!sections.after || attendance.state !== "known");
+const attendNote = attendanceNote(attendance);
+const attendPeople = attendance.state === "known" ? attendance.people : [];
+const attendUnplaced = attendance.state === "known" ? attendance.unplaced : 0;
+const liveFaces = attendRefresh ? publicFaces(residents.map((r) => r.handle)) : null;
+const liveAliases = attendRefresh ? mentionAliases : null;
 const rooms = sections.circles.state === "rooms" ? sections.circles.rooms : [];
 const roomIds = rooms.map(roomIdOf).filter(isRoomId);
 const roll = new Set(residents.map((r) => r.handle));
@@ -101,7 +104,21 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
   <div class="cal-page" data-event-page data-event-id={event.id} data-after={sections.after ? "" : undefined}>
     <p class="cal-back"><a href="/calendar/">← the calendar</a> · <a href="/events/">past events</a></p>
 
-    <CalendarCard event={event} roll={roll} asOf={calendar.as_of ?? null} full past={sections.after} />
+    <CalendarCard event={event} roll={roll} asOf={calendar.as_of ?? null} full past={sections.after}>
+      <Fragment slot="attendance">
+        {!sections.cancelled && (
+          <section class="cal-attend" aria-label={EVENT_WORDS.attendance.title} data-ev-attend data-state={attendance.state} data-ev-attend-refresh={attendRefresh ? "" : undefined} hidden={!attendShown}>
+            <h2>{EVENT_WORDS.attendance.title}</h2>
+            <p class="soft cal-attend-lead">{EVENT_WORDS.attendance.lead}</p>
+            <ul class="cal-attend-list" data-ev-attend-list hidden={attendPeople.length === 0}>
+              {attendPeople.map((p) => <li><ResidentMention handle={p.handle} label={attendeeLabel(p)} /></li>)}
+            </ul>
+            <p class="soft cal-attend-note" data-ev-attend-note={attendNote ?? ""} hidden={!attendNote}>{attendNote ? EVENT_WORDS.attendance[attendNote] : ""}</p>
+            <p class="soft cal-attend-note" data-ev-attend-unplaced hidden={!(attendUnplaced > 0)}>{attendUnplaced > 0 ? unplacedLine(attendUnplaced) : ""}</p>
+          </section>
+        )}
+      </Fragment>
+    </CalendarCard>
 
     <section class="cal-ann pm-paper" aria-label="Announcements from the host" data-announcements data-event={event.id}>
       <h2>From the host</h2>
@@ -118,28 +135,8 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
 
     {/* THE AFTER-PAGE (and, while it runs, its conversation). Each section is the office's own field and says which state it is in.
         ONE GALLERY (CORE-177 ruling 5, Darko 2026-11-24 08:43 EST: "the gallery is the collection of all Sparks … We should probably just keep
-        the gallery"): the page draws no separate completion-Sparks group; the gallery below is the one place an event's sparks show. */}
-
-    {!sections.cancelled && (sections.after || sections.present.state === "known") && (
-      <section class="ev-sec pm-paper" aria-label="Who was there" data-ev-present data-state={sections.present.state}>
-        <h2 class="ev-h">{EVENT_WORDS.present.title}</h2>
-        <p class="soft ev-lead">{EVENT_WORDS.present.lead}</p>
-        {sections.present.state === "known"
-          ? (sections.present.households.length > 0
-            ? (
-              <ul class="ev-present" data-ev-present-list>
-                {sections.present.households.map((id) => {
-                  const h = householdLine(id);
-                  return <li>{h.href ? <a href={h.href}>{h.text}</a> : h.text}</li>;
-                })}
-              </ul>
-            )
-            : <p class="ev-note" data-ev-note="none">{EVENT_WORDS.present.none}</p>)
-          : <p class="ev-note" data-ev-note="unknown">{EVENT_WORDS.present.unknown}</p>}
-        {sections.present.basis && <p class="soft ev-basis" data-ev-basis>{sections.present.basis}</p>}
-        {sections.present.unplaced > 0 && <p class="soft ev-basis">{sections.present.unplaced} public {sections.present.unplaced === 1 ? "say" : "says"} could not be placed at the event, so they are not counted here.</p>}
-      </section>
-    )}
+        the gallery"): the page draws no separate completion-Sparks group; the gallery below is the one place an event's sparks show.
+        WHO WAS THERE is the card's, under its RSVPs (above): the households' list that stood here is retired for the office's names. */}
 
     {/* THE GALLERY, once the doors have opened (CORE-174 FIX): the same section, markup and #gallery anchor for the office's `doors-open`, `underway` and `ended` events, never for
         `announced` (nothing yet) or a cancelled one. The office already serves an open event's gallery (rooms so far), and eventSections says so-far / none / unknown exactly as it
@@ -161,7 +158,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     )}
 
     {!sections.cancelled && (
-      <section class="ev-sec" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
+      <section class="ev-sec" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-faces={liveFaces ? JSON.stringify(liveFaces) : undefined} data-aliases={liveAliases ? JSON.stringify(liveAliases) : undefined} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
         <h2 class="ev-h">{EVENT_WORDS.circles.title}</h2>
         {sections.circles.state === "rooms" ? (
           <>
@@ -290,6 +287,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     import { EVENT_WORDS, LOCAL_FORMAT, eventSections, isRoomId, roomHref, roomIdOf } from "@/lib/calendar.mjs";
     import { mountRoom } from "@/lib/circle-reader-mount.mjs";
     import { hostReaderOptions, loadFaces } from "@/lib/conversation-host.mjs";
+    import { paintAttendance } from "@/lib/event-attendance.mjs";
 
     // THE CIRCLES ISLAND (CORE-82). The page's rooms are the office's, in its start order. For each, the World's one circle reader is
     // mounted (the site's adapter hands it the keyless reads); without it the room keeps a link to its whole talk, and the page SAYS
@@ -348,6 +346,13 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
             const res = url ? await fetch(url, { headers: { accept: "application/json" } }) : null;
             const body = res && res.ok ? await res.json() : null;
             const s = body?.event ? eventSections(body.event) : null;
+            // WHO WAS THERE (CORE-177): the same answer repaints the card's roster when the bake's could still change, with the faces and renames
+            // the build carried (event-attendance.mjs, the one mention). Only a KNOWN roster is painted: an unknown answer keeps what the bake said.
+            const attend = document.querySelector("[data-ev-attend][data-ev-attend-refresh]");
+            if (attend && s?.participants.state === "known") {
+              const json = (k) => { try { return JSON.parse(circ.getAttribute(k) || "null"); } catch { return null; } };
+              if (paintAttendance(attend, s.participants, { doc: document, faces: json("data-faces"), aliases: json("data-aliases") })) attend.hidden = false;
+            }
             if (s?.circles.state === "rooms") {
               if (!circ.querySelector(".ev-rooms")) { circ.querySelector("[data-ev-note]")?.remove(); const w = document.createElement("div"); w.className = "convo ev-rooms"; circ.append(w); circ.dataset.state = "rooms"; }
               build(s.circles.rooms.map(roomIdOf).filter(isRoomId).map(String));
@@ -562,8 +567,14 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     .ev-sec:not(.pm-paper) .ev-note, .ev-sec:not(.pm-paper) .soft { color: var(--pm-paper); }
     .ev-sec.pm-paper .soft { color: var(--pm-ink-soft); }
     .ev-basis { margin: 0.5em 0 0; font-size: 0.84rem; }
-    .ev-present { margin: 0.3em 0; padding-left: 1.2em; columns: 2 12rem; }
-    .ev-present li { margin: 0 0 0.3em; break-inside: avoid; overflow-wrap: anywhere; }
+    /* who was there, in the card under its RSVPs (CORE-177): a compact run of the site's one mention, which brings its own look (resident-mention.css);
+       the island may repaint the list, so its items carry no scope attribute: :global */
+    .cal-attend h2 { font-size: 1.05em; margin: 1.2em 0 0.4em; }
+    .cal-attend-lead { margin: 0 0 0.4em; font-size: 0.86rem; line-height: 1.5; }
+    .cal-attend-list { display: flex; flex-wrap: wrap; gap: 0.35em 1em; margin: 0.3em 0; padding: 0; list-style: none; }
+    .cal-attend-list :global(li) { overflow-wrap: anywhere; }
+    .cal-attend-list[hidden], .cal-attend[hidden] { display: none; }
+    .cal-attend-note { margin: 0.3em 0 0; font-size: 0.86rem; line-height: 1.5; }
     .ev-sec.pm-paper a { color: var(--pm-wax); text-decoration: underline; }
     .ev-sec:not(.pm-paper) a { color: var(--pm-gold-bright); }
     /* the rooms' boxes are also made by the island, so they carry no scope attribute: :global */
