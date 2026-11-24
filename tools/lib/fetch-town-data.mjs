@@ -1319,8 +1319,10 @@ export async function fetchEventsArchived({ eventsArchivePath = null, trackedSna
     throw new Error(`events archive ${eventsArchivePath} exists but could not be read (${archive.reason}): refusing to publish a batch-only events.json over history it could not read; fix or replace the file (it was left untouched)`);
   }
   // held reads keep the time of the snapshot they came from; a snapshot with no time stamps nothing (never this pass's time). Only when the archive is in use.
+  // Only a BARE seed (or the committed snapshot) is inferred from: a versioned archive is already-held state, its `as_of` is the time of the pass that saved it, not of a read it
+  // holds without a stamp, so re-stamping it would turn an unknown time into a later document's.
   const held = (events) => (eventsArchivePath ? stampHeld(events) : events);
-  const snapshot = archive.state === "ok" ? joinSnapshots(held(archive.events), held(trackedSnapshot)) : held(trackedSnapshot);
+  const snapshot = archive.state === "ok" ? joinSnapshots(archive.versioned ? archive.events : held(archive.events), held(trackedSnapshot)) : held(trackedSnapshot);
   const result = await fetchEvents({ ...rest, snapshot });
   if (archive.state !== "unset") {
     const wrote = writeEventsArchive(eventsArchivePath, result.events);

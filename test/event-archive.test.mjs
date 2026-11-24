@@ -272,6 +272,14 @@ test("FAILURE FAILS THE PASS, NEVER A FALSE EMPTY: an unreadable archive and a f
   const n = await run(noTime);
   assert.equal(n.events.evidence["h/e8"].read_at, undefined, "no seed time: no stamp invented");
   assert.equal(eventReadAt({ id: "h/e8" }, null, n.events, false), null, "so the page says nothing about when");
+  // THE SAVED SECOND PASS: the file now on disk is a versioned archive whose as_of is the first pass's; reading it again must not stamp the unknown read with that later time
+  assert.equal(readEventsArchive(noTime).versioned, true);
+  const n2 = await run(noTime);
+  assert.equal(n2.events.evidence["h/e8"].read_at, undefined, "still unknown after the archive was saved and read again");
+  const n3 = await run(noTime);
+  assert.equal(n3.events.evidence["h/e8"].read_at, undefined, "and after a third pass");
+  assert.equal(eventReadAt({ id: "h/e8" }, "2026-11-30T00:00:00.000Z", n3.events, true), null, "listed in a fresh calendar: still no date for the held unknown read");
+  assert.equal(readEventsArchive(seeded).versioned, true);
 
   assert.equal(readEventsArchive(join(home, "missing.json")).state, "none");
   assert.equal(readEventsArchive(null).state, "unset");
@@ -315,7 +323,8 @@ test("PROVENANCE (review low 2): the footer's time is this event's OWN read when
   const CAL = "2026-11-24T00:00:00.000Z";
   assert.equal(eventReadAt({ id: "a/own" }, CAL, events, true), "2026-11-10T00:00:00.000Z", "retained older evidence says when IT was read, even for an event the calendar lists");
   assert.equal(eventReadAt({ id: "a/own" }, CAL, events, false), "2026-11-10T00:00:00.000Z");
-  assert.equal(eventReadAt({ id: "a/unstamped" }, CAL, events, true), CAL, "no stamp, but the calendar lists it now: the calendar's read");
+  assert.equal(eventReadAt({ id: "a/unstamped" }, CAL, events, true), null, "no stamp, even though a fresh calendar lists it: calendar metadata is not a fresh read of the held gallery");
+  assert.equal(eventReadAt({ id: "a/lost" }, CAL, events, true), CAL, "no good read held and listed: the calendar's read");
   assert.equal(eventReadAt({ id: "a/unstamped" }, CAL, events, false), null, "no stamp and not on the calendar: the time is UNKNOWN, never this pass's snapshot time");
   assert.equal(eventReadAt({ id: "a/lost" }, CAL, events, false), events.as_of, "no good read held: the snapshot's own time");
   assert.equal(eventReadAt({ id: "a/none" }, CAL, { evidence: {} }, false), CAL, "no snapshot time at all: the calendar's");

@@ -28,7 +28,8 @@ const isEventsShape = (v) => isObj(v) && isObj(v.past) && Array.isArray(v.past.e
  * @returns {{ state: "unset"|"none"|"ok"|"unreadable", events?: object, reason?: string }}
  *   unset      no path given: the caller does nothing
  *   none       a path with no file yet: a first run
- *   ok         the archived events (events.json shape)
+ *   ok         the archived events (events.json shape); `versioned` is false for a bare published events.json (the bootstrap seed), whose unstamped reads may be stamped
+ *              with its own as_of once; a versioned archive is already-held state and is never re-stamped (an unknown time stays unknown across saves)
  *   unreadable the file exists but could not be read, parsed, or is not an archive: never overwritten
  */
 export function readEventsArchive(path) {
@@ -36,8 +37,9 @@ export function readEventsArchive(path) {
   if (!existsSync(path)) return { state: "none" };
   try {
     const body = JSON.parse(readFileSync(path, "utf8"));
-    const events = isObj(body) && body.version === ARCHIVE_VERSION && isEventsShape(body.events) ? body.events : isEventsShape(body) ? body : null;
-    return events ? { state: "ok", events } : { state: "unreadable", reason: "it is not an events archive (version 1) or an events.json" };
+    const versioned = isObj(body) && body.version === ARCHIVE_VERSION && isEventsShape(body.events);
+    const events = versioned ? body.events : isEventsShape(body) ? body : null;
+    return events ? { state: "ok", events, versioned } : { state: "unreadable", reason: "it is not an events archive (version 1) or an events.json" };
   } catch (error) {
     return { state: "unreadable", reason: String(error?.message ?? error).slice(0, 160) };
   }

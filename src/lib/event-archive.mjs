@@ -72,15 +72,14 @@ export function joinSnapshots(primary, secondary) {
 
 /**
  * WHEN THE OFFICE READ WHAT THIS EVENT'S PAGE SAYS, for the footer's "As the office read it at" (CORE-174 FIX). Not always the calendar's read: an archived event's evidence may be
- * older. This event's OWN good read stamp (`read_at`) when the build holds one; else, for an event the calendar lists now, the calendar's read; else the events file's own `as_of`
- * (the snapshot that carries it); else the calendar's; else null (then nothing is said).
+ * older. This event's OWN good read stamp (`read_at`) when the build holds one; a held good read with NO stamp is of unknown time and gets null (nothing is said), listed or not.
+ * With no good read held: for an event the calendar lists now, the calendar's read; else the events file's own `as_of`; else the calendar's; else null.
  */
 export function eventReadAt(event, calendarAsOf, events, inCalendar = false) {
   const held = events?.evidence?.[event?.id];
   if (held?.read === "ok") {
-    // held evidence with no stamp (a legacy or bare seed read before stamping) has an UNKNOWN time: never this pass's. A listed event still has the calendar's own read to give.
-    if (typeof held.read_at === "string" && held.read_at) return held.read_at;
-    return inCalendar && calendarAsOf ? calendarAsOf : null;
+    // held evidence with no stamp (a legacy or bare seed with no time) has an UNKNOWN time: no date, even for an event a fresh calendar lists (calendar metadata is not a fresh read of the held gallery).
+    return typeof held.read_at === "string" && held.read_at ? held.read_at : null;
   }
   if (inCalendar && calendarAsOf) return calendarAsOf;
   return (typeof events?.as_of === "string" && events.as_of) || calendarAsOf || null;
