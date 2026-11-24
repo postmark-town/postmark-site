@@ -189,7 +189,7 @@ import { mkdtempSync, writeFileSync, readFileSync as readFile, existsSync } from
 import { tmpdir } from "node:os";
 import { fetchEventsArchived } from "../tools/lib/fetch-town-data.mjs";
 import { readEventsArchive, writeEventsArchive } from "../tools/lib/events-archive-state.mjs";
-import { eventReadAt, joinSnapshots } from "../src/lib/event-archive.mjs";
+import { eventReadAt, joinSnapshots, stampHeld, GALLERY_PHASES } from "../src/lib/event-archive.mjs";
 
 const SPARKY = (n) => ({ id: `h/e${n}`, evidence: evidenceOf({ rooms: [{ id: `r${n}` }], gallery: gallery({ id: `spark-${n}` }) }) });
 const DEGRADED = (n) => ({ id: `h/e${n}`, evidence: { rooms: null, room_history: "unavailable", gallery: null, present: null } });
@@ -228,44 +228,66 @@ test("RESET BOUNDARY, through the production caller: the archive file is carried
   assert.equal(bare2.events.evidence["h/e0"].event.evidence.gallery, null, "and the degraded answer is baked as the page's evidence");
 });
 
-test("FAILURE IS SAID, NEVER A FALSE EMPTY: a file that exists but cannot be read is left untouched and the run uses the committed snapshot; a failed write is said and the merged history is still published; a bare events.json seeds the archive", async () => {
+test("FAILURE FAILS THE PASS, NEVER A FALSE EMPTY: an unreadable archive and a failed save both REJECT (the short-fetch path), the unreadable file is left untouched; an absent file is a first run; a bare events.json seeds the archive with its own time", async () => {
   const home = mkdtempSync(join(tmpdir(), "core174-archive-"));
   const run = (path, tracked = EMPTY_EVENTS) => fetchEventsArchived({ apiBase: OFFICE, retries: 1, calendar: EMPTY_CALENDAR, trackedSnapshot: tracked, eventsArchivePath: path, maxPages: 1,
     fetchImpl: stubOffice({ pages: listPages(1), events: { "h/e0": SPARKY(0), "h/e1": SPARKY(1) } }) });
-  const tracked = { ...EMPTY_EVENTS, past: { ...EMPTY_EVENTS.past, events: [E(7)], read: "office" }, evidence: {} };
 
-  // corrupt: not JSON, then JSON that is not an archive
+  // corrupt: not JSON, then JSON that is not an archive; the tracked snapshot is the EMPTY committed one (the box's state after the reset)
   for (const [name, bytes] of [["corrupt.json", "{ this is not json"], ["wrong.json", JSON.stringify({ hello: "world" })]]) {
     const path = join(home, name);
     writeFileSync(path, bytes);
-    const r = await run(path, tracked);
-    assert.equal(readFile(path, "utf8"), bytes, `${name}: the file was left exactly as it was (history it could not read is not replaced)`);
-    assert.ok(r.gaps.some((g) => /exists but could not be read/.test(g) && g.includes(path)), `${name}: said: ${JSON.stringify(r.gaps)}`);
-    assert.ok(r.events.past.events.some((e) => e.id === "h/e7"), `${name}: the committed snapshot's events were used, not dropped`);
+    await assert.rejects(run(path), (e) => /events archive .* exists but could not be read/.test(e.message) && e.message.includes(path) && /refusing to publish/.test(e.message), `${name}: the pass fails, it does not publish a batch-only file`);
+    assert.equal(readFile(path, "utf8"), bytes, `${name}: the file was left exactly as it was`);
   }
 
-  // a failed write: the archive's directory cannot be made (a path under a regular file)
+  // a failed write: the archive's directory cannot be made (a path under a regular file); nothing is published that the next reset could forget
   const blocker = join(home, "afile"); writeFileSync(blocker, "x");
   const bad = join(blocker, "sub", "archive.json");
-  const w = await run(bad, tracked);
-  assert.ok(w.gaps.some((g) => /could not be written/.test(g)), `a failed write is said: ${JSON.stringify(w.gaps)}`);
-  assert.deepEqual(w.events.past.events.map((e) => e.id).slice(0, 3), ["h/e0", "h/e1", "h/e7"], "the merged history is still published in this run's events.json");
-  assert.equal(writeEventsArchive(bad, w.events).ok, false);
+  await assert.rejects(run(bad), (e) => /events archive .* could not be written/.test(e.message) && /refusing to publish/.test(e.message), "a failed save fails the pass");
+  assert.equal(writeEventsArchive(bad, EMPTY_EVENTS).ok, false);
   assert.equal(writeEventsArchive(join(home, "no.json"), { nope: 1 }).ok, false, "something that is not the events shape is never written");
+
+  // the FOLLOWING RUN: a run that can read and write loses no page even when its list is refused
+  const good = join(home, "good.json");
+  const r1 = await run(good);
+  assert.deepEqual(r1.events.past.events.map((e) => e.id), ["h/e0", "h/e1"]);
+  const r2 = await fetchEventsArchived({ apiBase: OFFICE, retries: 1, calendar: EMPTY_CALENDAR, trackedSnapshot: EMPTY_EVENTS, eventsArchivePath: good, maxPages: 1, fetchImpl: stubOffice({ pages: [{ body: { as_of: AS_OF, past: [E(5)], next: null, note: null } }], events: {} }) });
+  assert.deepEqual(r2.events.past.events.map((e) => e.id), ["h/e5", "h/e0", "h/e1"], "the archive carried the earlier pages across a run whose batch no longer reaches them");
 
   // a BARE events.json (the published file) at the path is the bootstrap seed: read as the archive, rewritten as a versioned one
   const seeded = join(home, "seed.json");
-  writeFileSync(seeded, JSON.stringify({ as_of: "2026-11-20T00:00:00.000Z", past: { events: [E(8), E(9)], next: null, note: null, read: "office" }, evidence: { "h/e9": { read: "ok", read_at: "2026-11-20T00:00:00.000Z", event: SPARKY(9) } } }));
+  const SEED_AT = "2026-11-20T00:00:00.000Z";
+  writeFileSync(seeded, JSON.stringify({ as_of: SEED_AT, past: { events: [E(8), E(9)], next: null, note: null, read: "office" }, evidence: { "h/e9": { read: "ok", event: SPARKY(9) } } }));
   assert.equal(readEventsArchive(seeded).state, "ok");
   const s = await run(seeded);
   assert.deepEqual(s.events.past.events.map((e) => e.id), ["h/e0", "h/e1", "h/e8", "h/e9"], "the seed's events join the batch");
   assert.equal(s.events.evidence["h/e9"].event.evidence.gallery.sparks[0].id, "spark-9", "and its evidence is held");
+  assert.equal(s.events.evidence["h/e9"].read_at, SEED_AT, "a seed read with no stamp carries the SEED'S OWN time, not this pass's");
   assert.equal(JSON.parse(readFile(seeded, "utf8")).version, 1, "rewritten as a versioned archive");
+
+  // a seed with NO as_of: the time stays unknown, never this pass's
+  const noTime = join(home, "notime.json");
+  writeFileSync(noTime, JSON.stringify({ past: { events: [E(8)], next: null, note: null, read: "office" }, evidence: { "h/e8": { read: "ok", event: SPARKY(8) } } }));
+  const n = await run(noTime);
+  assert.equal(n.events.evidence["h/e8"].read_at, undefined, "no seed time: no stamp invented");
+  assert.equal(eventReadAt({ id: "h/e8" }, null, n.events, false), null, "so the page says nothing about when");
+
   assert.equal(readEventsArchive(join(home, "missing.json")).state, "none");
   assert.equal(readEventsArchive(null).state, "unset");
-  // unset: no file is made anywhere
+  // unset: nothing is thrown and no archive gap is said
   const u = await run(null);
   assert.deepEqual(u.gaps.filter((g) => /archive/.test(g)), []);
+});
+
+test("stampHeld: a good read with no stamp gets the snapshot's own as_of; no as_of stamps nothing; a stamped or unavailable entry is untouched; the input is not mutated", () => {
+  const snap = { as_of: "T", evidence: { a: { read: "ok", event: {} }, b: { read: "ok", read_at: "S", event: {} }, c: { read: "unavailable" } } };
+  const out = stampHeld(snap);
+  assert.equal(out.evidence.a.read_at, "T");
+  assert.equal(out.evidence.b.read_at, "S");
+  assert.deepEqual(out.evidence.c, { read: "unavailable" });
+  assert.equal(snap.evidence.a.read_at, undefined, "pure");
+  assert.equal(stampHeld({ evidence: snap.evidence }).evidence.a.read_at, undefined, "no as_of: unknown stays unknown");
 });
 
 test("the production entry passes the archive home through: tools/fetch-town.mjs reads POSTMARK_EVENTS_ARCHIVE, buildOfficeData hands it to fetchEventsArchived over the committed snapshot", () => {
@@ -294,8 +316,8 @@ test("PROVENANCE (review low 2): the footer's time is this event's OWN read when
   assert.equal(eventReadAt({ id: "a/own" }, CAL, events, true), "2026-11-10T00:00:00.000Z", "retained older evidence says when IT was read, even for an event the calendar lists");
   assert.equal(eventReadAt({ id: "a/own" }, CAL, events, false), "2026-11-10T00:00:00.000Z");
   assert.equal(eventReadAt({ id: "a/unstamped" }, CAL, events, true), CAL, "no stamp, but the calendar lists it now: the calendar's read");
-  assert.equal(eventReadAt({ id: "a/unstamped" }, CAL, events, false), events.as_of, "no stamp and not on the calendar: the snapshot's own time, not the newer calendar read");
-  assert.equal(eventReadAt({ id: "a/lost" }, CAL, events, false), events.as_of);
+  assert.equal(eventReadAt({ id: "a/unstamped" }, CAL, events, false), null, "no stamp and not on the calendar: the time is UNKNOWN, never this pass's snapshot time");
+  assert.equal(eventReadAt({ id: "a/lost" }, CAL, events, false), events.as_of, "no good read held: the snapshot's own time");
   assert.equal(eventReadAt({ id: "a/none" }, CAL, { evidence: {} }, false), CAL, "no snapshot time at all: the calendar's");
   assert.equal(eventReadAt({ id: "a/none" }, null, { evidence: {} }, false), null, "nothing known: nothing is said");
   const src = readFileSync(join(ROOT, "town/pages/events/[host]/[slug].astro"), "utf8");
@@ -309,6 +331,9 @@ test("PAGE: the historical page keeps its presentation and gains the stable #gal
   assert.match(src, /<section class="ev-sec" aria-label="The gallery" id="gallery" data-ev-gallery/, "CORE-173's album can link to #gallery");
   assert.match(src, /data-live=\{!sections\.after \? "" : undefined\} data-refresh=\{sections\.after \? "" : undefined\}/, "running pages keep data-live; ended pages say they refresh");
   assert.match(src, /circ\.hasAttribute\("data-live"\) \|\| circ\.hasAttribute\("data-refresh"\)/);
+  assert.deepEqual([...GALLERY_PHASES].sort(), ["doors-open", "ended", "underway"], "the gallery is drawn once the doors are open, not while announced");
+  assert.match(src, /const showGallery = !sections\.cancelled && GALLERY_PHASES\.has\(sections\.phase\);/);
+  assert.match(src, /\{showGallery && \(\s*<section class="ev-sec" aria-label="The gallery" id="gallery"/, "the same section, only its visibility changed");
   assert.match(src, /import \{ mountRoom \} from "@\/lib\/circle-reader-mount\.mjs";/, "the World's one reader through the unchanged adapter");
   assert.equal((src.match(/mountRoom\(/g) ?? []).length, 1, "no second reader");
   assert.equal(/new SparkCard|sparkCardHtml|innerHTML\s*=/.test(src), false, "no second card renderer: the baked gallery is still SparkCard's");

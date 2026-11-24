@@ -13,6 +13,9 @@
 //
 // The office decides what an event's evidence is, scoped to its own window (POS-1203); this file only decides what the site KEEPS and what it ASKS FIRST.
 
+/** The office's phases at which an event page draws its gallery (the same section as after the event): doors open, under way, ended. Not `announced`; a cancelled event is excluded by the page. */
+export const GALLERY_PHASES = new Set(["doors-open", "underway", "ended"]);
+
 const ID = /^[^/]+\/[^/]+$/;
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
@@ -74,9 +77,29 @@ export function joinSnapshots(primary, secondary) {
  */
 export function eventReadAt(event, calendarAsOf, events, inCalendar = false) {
   const held = events?.evidence?.[event?.id];
-  if (held?.read === "ok" && typeof held.read_at === "string" && held.read_at) return held.read_at;
+  if (held?.read === "ok") {
+    // held evidence with no stamp (a legacy or bare seed read before stamping) has an UNKNOWN time: never this pass's. A listed event still has the calendar's own read to give.
+    if (typeof held.read_at === "string" && held.read_at) return held.read_at;
+    return inCalendar && calendarAsOf ? calendarAsOf : null;
+  }
   if (inCalendar && calendarAsOf) return calendarAsOf;
   return (typeof events?.as_of === "string" && events.as_of) || calendarAsOf || null;
+}
+
+/**
+ * A snapshot's held reads, each carrying the time of the snapshot it came from where that is known: every good read with no `read_at` gets the snapshot's OWN `as_of` (a bare
+ * published events.json predates stamping, so its evidence would otherwise read as fresh as the next pass). A snapshot with no `as_of` stamps nothing: the time stays unknown, it
+ * is never invented from the pass that happens to carry it. Pure; returns a new object.
+ */
+export function stampHeld(events) {
+  if (!isObj(events) || !isObj(events.evidence)) return events;
+  const at = typeof events.as_of === "string" && events.as_of ? events.as_of : null;
+  if (!at) return events;
+  const evidence = {};
+  for (const [id, entry] of Object.entries(events.evidence)) {
+    evidence[id] = entry?.read === "ok" && !(typeof entry.read_at === "string" && entry.read_at) ? { ...entry, read_at: at } : entry;
+  }
+  return { ...events, evidence };
 }
 
 // What a one-event read KNOWS (the office's own states: a rooms array whose history is not "unavailable"; a gallery that is an object with a sparks array, empty included).

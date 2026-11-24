@@ -33,7 +33,7 @@ import { buildHouses, nameplate } from "@/lib/houses.mjs";
 import {
   EVENT_WORDS, allEventViews, eventForPage, eventParams, eventSections, eventsOf, evidenceRead, isRoomId, legacyEventHref, roomHref, roomIdOf, utcText,
 } from "@/lib/calendar.mjs";
-import { eventReadAt } from "@/lib/event-archive.mjs";
+import { eventReadAt, GALLERY_PHASES } from "@/lib/event-archive.mjs";
 import { rsvpGate, BUDGET_DEFAULT, BUDGET_MAX, COALESCE_MIN } from "@/lib/rsvp.mjs";
 import { newestFirst } from "@/lib/announcements.mjs";
 import media from "@/data/postmark/media.json";
@@ -49,6 +49,7 @@ const { event } = Astro.props;
 // WHEN THE OFFICE READ THIS PAGE (CORE-174 FIX): this event's own evidence read when the build holds one, not always the calendar's (an archived event's evidence may be older)
 const readAt = eventReadAt(event, calendar.as_of ?? null, eventsData, eventsOf(calendar).some((e) => e.id === event.id));
 const sections = eventSections(event);
+const showGallery = !sections.cancelled && GALLERY_PHASES.has(sections.phase);
 const read = evidenceRead(event, eventsData);
 // Households the page can name: a "present" entry is a household id as the office writes it (a registry slug, or solo:<handle>); one the
 // site does not know is shown as the id it is, never guessed at.
@@ -176,7 +177,10 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
       </section>
     )}
 
-    {sections.after && !sections.cancelled && (
+    {/* THE GALLERY, once the doors have opened (CORE-174 FIX): the same section, markup and #gallery anchor for the office's `doors-open`, `underway` and `ended` events, never for
+        `announced` (nothing yet) or a cancelled one. The office already serves an open event's gallery (rooms so far), and eventSections says so-far / none / unknown exactly as it
+        does after the event, so this is visibility of an existing surface, not a new design. */}
+    {showGallery && (
       <section class="ev-sec" aria-label="The gallery" id="gallery" data-ev-gallery data-state={sections.gallery.state}>
         <h2 class="ev-h">{EVENT_WORDS.gallery.title}</h2>
         <p class="soft ev-lead">{EVENT_WORDS.gallery.lead}</p>

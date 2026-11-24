@@ -10,9 +10,10 @@
 // first run after the hook lands can be seeded by saving the currently published `https://postmark.town/data/events.json` to that path; without a seed, a first run starts
 // from the committed snapshot plus the capped batch, and cannot recover a page the batch no longer reaches and the published file is the only place still holding.
 //
-// FAILURE IS SAID, NEVER A FALSE EMPTY: a file that is absent is a first run (seed from the committed snapshot); a file that EXISTS but cannot be read or is not an archive is
-// "unreadable": the run uses the committed snapshot, says so, and does NOT write (it would replace history it could not read). A failed write is said and the merged result is
-// still published in events.json; nothing held is dropped on either path. The write is a temp file in the same directory renamed over the old one, so a reader never sees half a file.
+// FAILURE FAILS THE PASS, NEVER A FALSE EMPTY: a file that is absent is a first run (seed from the committed snapshot); a file that EXISTS but cannot be read or is not an archive is
+// "unreadable": fetchEventsArchived THROWS (the file is left untouched, it would otherwise be replaced by a batch-only archive), and so does a failed write; the throw takes the
+// existing short-fetch path, so on the release channel the publisher keeps the last good release. The write is a temp file in the same directory renamed over the old one, so a
+// reader never sees half a file.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";

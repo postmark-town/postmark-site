@@ -5,7 +5,7 @@ import { readFileSync, readdirSync, existsSync, writeFileSync, renameSync, mkdir
 import { join, dirname } from "node:path";
 import { buildThreads, normalizeProfile, parseFrontmatter, readResidentProfiles } from "./town.mjs";
 import { publicRegistry } from "./public-registry.mjs";
-import { joinSnapshots, mergeArchive, mergeEvidence, pickEvidenceWork, wantsEvidence } from "../../src/lib/event-archive.mjs";
+import { joinSnapshots, mergeArchive, mergeEvidence, pickEvidenceWork, stampHeld, wantsEvidence } from "../../src/lib/event-archive.mjs";
 import { readEventsArchive, writeEventsArchive } from "./events-archive-state.mjs";
 
 export const RESIDENT_CARD_LANES = 6;
@@ -1306,22 +1306,29 @@ const GROUP_KEYS = ["now", "coming", "ended"];
 /**
  * THE PRODUCTION CALLER OF fetchEvents (CORE-174 FIX). The held state lives where the caller names it (`eventsArchivePath`, from POSTMARK_EVENTS_ARCHIVE in tools/fetch-town.mjs;
  * events-archive-state.mjs says why it cannot be the tracked events.json): the prior archive is READ from it, joined over the committed snapshot, handed to fetchEvents as the held
- * state, and the merged result is WRITTEN BACK atomically after the run. Unset, this is exactly fetchEvents over the committed snapshot, as before. An archive that exists but
- * cannot be read is said and left untouched (the run uses the committed snapshot and does not write over history it could not read); a failed write is said and the merged
- * result is still published. Neither path drops what is held or publishes a false empty archive.
+ * state, and the merged result is WRITTEN BACK atomically after the run. Unset, this is exactly fetchEvents over the committed snapshot, as before. A genuinely ABSENT archive is a
+ * first run. An archive that exists but cannot be read, and a failed save, THROW: into the existing short-fetch path (fetch-town.mjs's catch + shortFetchPlan), so on the release
+ * channel the pass exits non-zero and the publisher keeps the last good release, rather than publishing a batch-only events.json or pages the next reset could forget. The
+ * unreadable file is left untouched. Held reads keep the time of the snapshot they came from (stampHeld); an unknown time stays unknown.
  */
 export async function fetchEventsArchived({ eventsArchivePath = null, trackedSnapshot = EMPTY_EVENTS, ...rest } = {}) {
   const archive = readEventsArchive(eventsArchivePath);
-  const notes = [];
-  let snapshot = trackedSnapshot;
-  if (archive.state === "ok") snapshot = joinSnapshots(archive.events, trackedSnapshot);
-  else if (archive.state === "unreadable") notes.push(`events.json: the event archive at ${eventsArchivePath} exists but could not be read (${archive.reason}); this run used the committed snapshot and left the file alone, so older event pages are not held until it is fixed`);
-  const result = await fetchEvents({ ...rest, snapshot });
-  if (archive.state !== "unset" && archive.state !== "unreadable") {
-    const wrote = writeEventsArchive(eventsArchivePath, result.events);
-    if (!wrote.ok) notes.push(`events.json: the event archive at ${eventsArchivePath} could not be written (${wrote.reason}); this run's events.json holds the merged history, but the next run will not find it saved`);
+  // A FAILURE OF THE ARCHIVE IS A FAILED PASS, NOT A WARNING (CORE-174 FIX, the delta review): these throw into the existing short-fetch path (tools/fetch-town.mjs's catch and
+  // shortFetchPlan), which on the release channel exits non-zero so the publisher keeps the last good release. A genuinely ABSENT archive ("none") is a first run and is not an error.
+  if (archive.state === "unreadable") {
+    throw new Error(`events archive ${eventsArchivePath} exists but could not be read (${archive.reason}): refusing to publish a batch-only events.json over history it could not read; fix or replace the file (it was left untouched)`);
   }
-  return { ...result, gaps: [...result.gaps, ...notes] };
+  // held reads keep the time of the snapshot they came from; a snapshot with no time stamps nothing (never this pass's time). Only when the archive is in use.
+  const held = (events) => (eventsArchivePath ? stampHeld(events) : events);
+  const snapshot = archive.state === "ok" ? joinSnapshots(held(archive.events), held(trackedSnapshot)) : held(trackedSnapshot);
+  const result = await fetchEvents({ ...rest, snapshot });
+  if (archive.state !== "unset") {
+    const wrote = writeEventsArchive(eventsArchivePath, result.events);
+    if (!wrote.ok) {
+      throw new Error(`events archive ${eventsArchivePath} could not be written (${wrote.reason}): refusing to publish event pages the next reset could forget`);
+    }
+  }
+  return result;
 }
 
 // ── THE SPARK REGISTER (CORE-121) ───────────────────────────────────────────
