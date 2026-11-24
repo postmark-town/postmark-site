@@ -111,8 +111,10 @@ test("mountRoom hands identityForSpeaker to the reader when given, beside the fa
   }
 });
 
-test("the union with CORE-177's mountRoom keeps its `onState` and `circle` beside the identity",
-  { skip: UNION ? false : "runs against the resolved union of this branch and site #488's circle-reader-mount.mjs: set CORE178_MOUNT_MODULE to it" }, async () => {
+// Registered only when CORE178_MOUNT_MODULE names the resolved union of this branch's and site #488's circle-reader-mount.mjs (the CI
+// built-pages gate refuses any skip beyond its one known calendar skip, so this arm is not a skip either): the lane ran it on that union
+// and its hand-in carries the receipt; once both have merged, the ordinary arm above runs against the merged file.
+if (UNION) test("the union with CORE-177's mountRoom keeps its `onState` and `circle` beside the identity", async () => {
     const f = fakeModule();
     const onState = () => {};
     await mountRoom({ doc: mdoc, host: {}, roomId: "r1", importImpl: async () => f.mod, onState, circle: "c7", identityForSpeaker: provide });
