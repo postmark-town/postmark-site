@@ -184,6 +184,126 @@ test("FALSIFIER: a read the office answers 200 but with LESS than the page holds
   assert.deepEqual(mergeEvidence({ previous: { a: poor }, fresh: { a: degraded }, asOf: "t1" }).evidence.a, { ...degraded, read_at: "t1" });
 });
 
+// ── THE PRODUCTION SEAM (CORE-174 FIX): the box resets the tracked events.json before every fetch, so the archive lives in a file OUTSIDE the tree ─────────────────
+import { mkdtempSync, writeFileSync, readFileSync as readFile, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { fetchEventsArchived } from "../tools/lib/fetch-town-data.mjs";
+import { readEventsArchive, writeEventsArchive } from "../tools/lib/events-archive-state.mjs";
+import { eventReadAt, joinSnapshots } from "../src/lib/event-archive.mjs";
+
+const SPARKY = (n) => ({ id: `h/e${n}`, evidence: evidenceOf({ rooms: [{ id: `r${n}` }], gallery: gallery({ id: `spark-${n}` }) }) });
+const DEGRADED = (n) => ({ id: `h/e${n}`, evidence: { rooms: null, room_history: "unavailable", gallery: null, present: null } });
+
+test("RESET BOUNDARY, through the production caller: the archive file is carried between two fetches while the TRACKED snapshot is reset to the empty committed one, across a small injected budget boundary", async () => {
+  const home = mkdtempSync(join(tmpdir(), "core174-archive-"));
+  const file = join(home, "events-archive.json");                 // OUTSIDE any tree: what POSTMARK_EVENTS_ARCHIVE names
+  const everyRead = Object.fromEntries([0, 1, 2, 3].map((n) => [`h/e${n}`, SPARKY(n)]));
+  // run 1 (a first run: no file yet, the committed snapshot is the empty one): the list budget reaches all four events
+  const first = await fetchEventsArchived({ apiBase: OFFICE, retries: 1, calendar: EMPTY_CALENDAR, trackedSnapshot: EMPTY_EVENTS, eventsArchivePath: file, maxPages: 2, evidenceMax: 400,
+    fetchImpl: stubOffice({ pages: listPages(2), events: everyRead }) });
+  assert.deepEqual(first.events.past.events.map((e) => e.id), ["h/e0", "h/e1", "h/e2", "h/e3"]);
+  assert.ok(existsSync(file), "the first run wrote the archive");
+  assert.equal(readEventsArchive(file).state, "ok");
+  assert.deepEqual(first.gaps, [], "nothing to say on a clean first run");
+
+  // run 2: the refresh has reset the tree, so the tracked file is the EMPTY committed one again; the budget now reaches only the two newest events and reads ONE page of
+  // evidence, and the office answers that read with a degraded 200 (rooms unavailable, gallery null: the 60-settlement edge)
+  const second = await fetchEventsArchived({ apiBase: OFFICE, retries: 1, calendar: EMPTY_CALENDAR, trackedSnapshot: EMPTY_EVENTS, eventsArchivePath: file, maxPages: 1, evidenceMax: 1,
+    fetchImpl: stubOffice({ pages: listPages(1), events: { "h/e0": DEGRADED(0), "h/e1": SPARKY(1), "h/e2": SPARKY(2), "h/e3": SPARKY(3) } }) });
+  const ids = second.events.past.events.map((e) => e.id);
+  assert.deepEqual(ids, ["h/e0", "h/e1", "h/e2", "h/e3"], "the older pages the capped batch no longer reaches are still there");
+  const routes = allEventViews(EMPTY_CALENDAR, second.events).map((e) => e.id);
+  for (let n = 0; n < 4; n++) assert.ok(routes.includes(`h/e${n}`), `h/e${n}: page and forward still built`);
+  for (let n = 0; n < 4; n++) assert.equal(second.events.evidence[`h/e${n}`].event.evidence.gallery.sparks[0].id, `spark-${n}`, `h/e${n}: the held gallery stands (the degraded 200 for e0 did not erase it; e1-e3 were not asked)`);
+  assert.equal(second.events.evidence["h/e0"].read_at, first.events.evidence["h/e0"].read_at, "e0 keeps the stamp of the read that actually held its gallery");
+  // and the file now on disk is the merged result, ready for a third run
+  assert.deepEqual(readEventsArchive(file).events, second.events);
+
+  // CONTROL: the same two runs with no archive path (the old bare call, the tracked snapshot reset each time) lose the older pages and the held gallery
+  const bare1 = await fetchEventsArchived({ apiBase: OFFICE, retries: 1, calendar: EMPTY_CALENDAR, trackedSnapshot: EMPTY_EVENTS, maxPages: 2, fetchImpl: stubOffice({ pages: listPages(2), events: everyRead }) });
+  const bare2 = await fetchEventsArchived({ apiBase: OFFICE, retries: 1, calendar: EMPTY_CALENDAR, trackedSnapshot: EMPTY_EVENTS, maxPages: 1, evidenceMax: 1,
+    fetchImpl: stubOffice({ pages: listPages(1), events: { "h/e0": DEGRADED(0) } }) });
+  assert.equal(bare1.events.past.events.length, 4);
+  assert.deepEqual(bare2.events.past.events.map((e) => e.id), ["h/e0", "h/e1"], "control: without the file the capped batch is the inventory again");
+  assert.equal(bare2.events.evidence["h/e0"].event.evidence.gallery, null, "and the degraded answer is baked as the page's evidence");
+});
+
+test("FAILURE IS SAID, NEVER A FALSE EMPTY: a file that exists but cannot be read is left untouched and the run uses the committed snapshot; a failed write is said and the merged history is still published; a bare events.json seeds the archive", async () => {
+  const home = mkdtempSync(join(tmpdir(), "core174-archive-"));
+  const run = (path, tracked = EMPTY_EVENTS) => fetchEventsArchived({ apiBase: OFFICE, retries: 1, calendar: EMPTY_CALENDAR, trackedSnapshot: tracked, eventsArchivePath: path, maxPages: 1,
+    fetchImpl: stubOffice({ pages: listPages(1), events: { "h/e0": SPARKY(0), "h/e1": SPARKY(1) } }) });
+  const tracked = { ...EMPTY_EVENTS, past: { ...EMPTY_EVENTS.past, events: [E(7)], read: "office" }, evidence: {} };
+
+  // corrupt: not JSON, then JSON that is not an archive
+  for (const [name, bytes] of [["corrupt.json", "{ this is not json"], ["wrong.json", JSON.stringify({ hello: "world" })]]) {
+    const path = join(home, name);
+    writeFileSync(path, bytes);
+    const r = await run(path, tracked);
+    assert.equal(readFile(path, "utf8"), bytes, `${name}: the file was left exactly as it was (history it could not read is not replaced)`);
+    assert.ok(r.gaps.some((g) => /exists but could not be read/.test(g) && g.includes(path)), `${name}: said: ${JSON.stringify(r.gaps)}`);
+    assert.ok(r.events.past.events.some((e) => e.id === "h/e7"), `${name}: the committed snapshot's events were used, not dropped`);
+  }
+
+  // a failed write: the archive's directory cannot be made (a path under a regular file)
+  const blocker = join(home, "afile"); writeFileSync(blocker, "x");
+  const bad = join(blocker, "sub", "archive.json");
+  const w = await run(bad, tracked);
+  assert.ok(w.gaps.some((g) => /could not be written/.test(g)), `a failed write is said: ${JSON.stringify(w.gaps)}`);
+  assert.deepEqual(w.events.past.events.map((e) => e.id).slice(0, 3), ["h/e0", "h/e1", "h/e7"], "the merged history is still published in this run's events.json");
+  assert.equal(writeEventsArchive(bad, w.events).ok, false);
+  assert.equal(writeEventsArchive(join(home, "no.json"), { nope: 1 }).ok, false, "something that is not the events shape is never written");
+
+  // a BARE events.json (the published file) at the path is the bootstrap seed: read as the archive, rewritten as a versioned one
+  const seeded = join(home, "seed.json");
+  writeFileSync(seeded, JSON.stringify({ as_of: "2026-11-20T00:00:00.000Z", past: { events: [E(8), E(9)], next: null, note: null, read: "office" }, evidence: { "h/e9": { read: "ok", read_at: "2026-11-20T00:00:00.000Z", event: SPARKY(9) } } }));
+  assert.equal(readEventsArchive(seeded).state, "ok");
+  const s = await run(seeded);
+  assert.deepEqual(s.events.past.events.map((e) => e.id), ["h/e0", "h/e1", "h/e8", "h/e9"], "the seed's events join the batch");
+  assert.equal(s.events.evidence["h/e9"].event.evidence.gallery.sparks[0].id, "spark-9", "and its evidence is held");
+  assert.equal(JSON.parse(readFile(seeded, "utf8")).version, 1, "rewritten as a versioned archive");
+  assert.equal(readEventsArchive(join(home, "missing.json")).state, "none");
+  assert.equal(readEventsArchive(null).state, "unset");
+  // unset: no file is made anywhere
+  const u = await run(null);
+  assert.deepEqual(u.gaps.filter((g) => /archive/.test(g)), []);
+});
+
+test("the production entry passes the archive home through: tools/fetch-town.mjs reads POSTMARK_EVENTS_ARCHIVE, buildOfficeData hands it to fetchEventsArchived over the committed snapshot", () => {
+  const entry = readFileSync(join(ROOT, "tools/fetch-town.mjs"), "utf8");
+  assert.match(entry, /const EVENTS_ARCHIVE = process\.env\.POSTMARK_EVENTS_ARCHIVE \|\| null;/);
+  assert.match(entry, /buildOfficeData\(\{[^}]*letterCachePath: LETTER_CACHE, eventsArchivePath: EVENTS_ARCHIVE \}\)/);
+  const data = readFileSync(join(ROOT, "tools/lib/fetch-town-data.mjs"), "utf8");
+  assert.match(data, /eventsArchivePath = null,\n\} = \{\}\) \{/, "an option with a null default: unset, the bare call is unchanged");
+  assert.match(data, /await fetchEventsArchived\(\{ apiBase, fetchImpl, retries, gate, calendar, trackedSnapshot: readSnapshot\("events\.json", EMPTY_EVENTS\), eventsArchivePath \}\)/);
+});
+
+test("joinSnapshots: the archive file's events and evidence win, the committed snapshot's fill what it lacks", () => {
+  const j = joinSnapshots(
+    { as_of: "A", past: { events: [E(1), E(2)], read: "office" }, evidence: { "h/e1": { read: "ok", event: { id: "from-archive" } } } },
+    { as_of: "B", past: { events: [E(2), E(3)], read: "office" }, evidence: { "h/e1": { read: "ok", event: { id: "from-tracked" } }, "h/e3": { read: "unavailable" } } },
+  );
+  assert.deepEqual(j.past.events.map((e) => e.id), ["h/e1", "h/e2", "h/e3"]);
+  assert.equal(j.as_of, "A");
+  assert.equal(j.evidence["h/e1"].event.id, "from-archive");
+  assert.deepEqual(j.evidence["h/e3"], { read: "unavailable" });
+});
+
+test("PROVENANCE (review low 2): the footer's time is this event's OWN read when the build holds one, else the calendar's for an event the calendar lists, else the events file's snapshot time", () => {
+  const events = { as_of: "2026-11-22T00:00:00.000Z", evidence: { "a/own": { read: "ok", read_at: "2026-11-10T00:00:00.000Z", event: {} }, "a/unstamped": { read: "ok", event: {} }, "a/lost": { read: "unavailable" } } };
+  const CAL = "2026-11-24T00:00:00.000Z";
+  assert.equal(eventReadAt({ id: "a/own" }, CAL, events, true), "2026-11-10T00:00:00.000Z", "retained older evidence says when IT was read, even for an event the calendar lists");
+  assert.equal(eventReadAt({ id: "a/own" }, CAL, events, false), "2026-11-10T00:00:00.000Z");
+  assert.equal(eventReadAt({ id: "a/unstamped" }, CAL, events, true), CAL, "no stamp, but the calendar lists it now: the calendar's read");
+  assert.equal(eventReadAt({ id: "a/unstamped" }, CAL, events, false), events.as_of, "no stamp and not on the calendar: the snapshot's own time, not the newer calendar read");
+  assert.equal(eventReadAt({ id: "a/lost" }, CAL, events, false), events.as_of);
+  assert.equal(eventReadAt({ id: "a/none" }, CAL, { evidence: {} }, false), CAL, "no snapshot time at all: the calendar's");
+  assert.equal(eventReadAt({ id: "a/none" }, null, { evidence: {} }, false), null, "nothing known: nothing is said");
+  const src = readFileSync(join(ROOT, "town/pages/events/[host]/[slug].astro"), "utf8");
+  assert.match(src, /const readAt = eventReadAt\(event, calendar\.as_of \?\? null, eventsData, eventsOf\(calendar\)\.some\(\(e\) => e\.id === event\.id\)\);/);
+  assert.match(src, /\{readAt && \(\s*<p class="cal-asof" data-read-at=\{readAt\}>\s*As the office read it at\s*<time datetime=\{readAt\}/, "the same footer line, now truthful");
+  assert.equal(/<time datetime=\{calendar\.as_of\}[^>]*>\{utcText\(calendar\.as_of\)\}<\/time>\.\s*<\/p>/.test(src), false, "the footer no longer claims the calendar's read for retained evidence");
+});
+
 test("PAGE: the historical page keeps its presentation and gains the stable #gallery target; the one-event read is asked on running AND ended pages, only to ADD rooms through the same reader", () => {
   const src = readFileSync(join(ROOT, "town/pages/events/[host]/[slug].astro"), "utf8");
   assert.match(src, /<section class="ev-sec" aria-label="The gallery" id="gallery" data-ev-gallery/, "CORE-173's album can link to #gallery");

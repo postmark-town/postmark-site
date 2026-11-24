@@ -5,7 +5,8 @@ import { readFileSync, readdirSync, existsSync, writeFileSync, renameSync, mkdir
 import { join, dirname } from "node:path";
 import { buildThreads, normalizeProfile, parseFrontmatter, readResidentProfiles } from "./town.mjs";
 import { publicRegistry } from "./public-registry.mjs";
-import { mergeArchive, mergeEvidence, pickEvidenceWork, wantsEvidence } from "../../src/lib/event-archive.mjs";
+import { joinSnapshots, mergeArchive, mergeEvidence, pickEvidenceWork, wantsEvidence } from "../../src/lib/event-archive.mjs";
+import { readEventsArchive, writeEventsArchive } from "./events-archive-state.mjs";
 
 export const RESIDENT_CARD_LANES = 6;
 
@@ -786,6 +787,8 @@ export async function buildOfficeData({
   // Where the last pass's letters are kept (fetchLettersSince); null reads the
   // whole corpus every time, as every run without a home for it always has.
   letterCachePath = null,
+  // Where the event archive is kept between builds, outside the tree the refresh resets (events-archive-state.mjs); null keeps only the committed snapshot, as always.
+  eventsArchivePath = null,
 } = {}) {
   const readSnapshot = snapshotReader(dataDir);
   const endpointGaps = [];
@@ -1069,7 +1072,7 @@ export async function buildOfficeData({
   // THE LASTING EVENTS (CORE-82): the past-events list and each event's evidence, kept beside the calendar. A door that
   // is not live (400/404/405/422: it does not know `past`) says "unavailable" in the file and a gap here, and the committed snapshot's events
   // stand. Any other failure of the LIST (a 5xx, a timeout, a body that is not the list) fails the build, exactly as the calendar's own read does; one event's own read that fails is "unavailable" for that event.
-  const eventsRead = await fetchEvents({ apiBase, fetchImpl, retries, gate, calendar, snapshot: readSnapshot("events.json", EMPTY_EVENTS) });
+  const eventsRead = await fetchEventsArchived({ apiBase, fetchImpl, retries, gate, calendar, trackedSnapshot: readSnapshot("events.json", EMPTY_EVENTS), eventsArchivePath });
   endpointGaps.push(...eventsRead.gaps);
 
   // THE SPARK REGISTER (CORE-121): the public standing-mark register's Sparks; any failure is "unavailable" in the file and a gap, never an empty catalogue.
@@ -1299,6 +1302,27 @@ export async function fetchEvents({ apiBase, fetchImpl = fetch, retries = 3, gat
   };
 }
 const GROUP_KEYS = ["now", "coming", "ended"];
+
+/**
+ * THE PRODUCTION CALLER OF fetchEvents (CORE-174 FIX). The held state lives where the caller names it (`eventsArchivePath`, from POSTMARK_EVENTS_ARCHIVE in tools/fetch-town.mjs;
+ * events-archive-state.mjs says why it cannot be the tracked events.json): the prior archive is READ from it, joined over the committed snapshot, handed to fetchEvents as the held
+ * state, and the merged result is WRITTEN BACK atomically after the run. Unset, this is exactly fetchEvents over the committed snapshot, as before. An archive that exists but
+ * cannot be read is said and left untouched (the run uses the committed snapshot and does not write over history it could not read); a failed write is said and the merged
+ * result is still published. Neither path drops what is held or publishes a false empty archive.
+ */
+export async function fetchEventsArchived({ eventsArchivePath = null, trackedSnapshot = EMPTY_EVENTS, ...rest } = {}) {
+  const archive = readEventsArchive(eventsArchivePath);
+  const notes = [];
+  let snapshot = trackedSnapshot;
+  if (archive.state === "ok") snapshot = joinSnapshots(archive.events, trackedSnapshot);
+  else if (archive.state === "unreadable") notes.push(`events.json: the event archive at ${eventsArchivePath} exists but could not be read (${archive.reason}); this run used the committed snapshot and left the file alone, so older event pages are not held until it is fixed`);
+  const result = await fetchEvents({ ...rest, snapshot });
+  if (archive.state !== "unset" && archive.state !== "unreadable") {
+    const wrote = writeEventsArchive(eventsArchivePath, result.events);
+    if (!wrote.ok) notes.push(`events.json: the event archive at ${eventsArchivePath} could not be written (${wrote.reason}); this run's events.json holds the merged history, but the next run will not find it saved`);
+  }
+  return { ...result, gaps: [...result.gaps, ...notes] };
+}
 
 // ── THE SPARK REGISTER (CORE-121) ───────────────────────────────────────────
 // The Sparks catalogue (/sparks/) is the office's existing ANONYMOUS public register: `GET /world2/marks?all=true&full=true` -> `{ what, count, marks: [...] }`,

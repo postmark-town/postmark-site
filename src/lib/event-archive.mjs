@@ -54,12 +54,41 @@ export function pickEvidenceWork({ events = [], previous = {}, max = Infinity } 
     .map((e) => e.id);
 }
 
+/**
+ * Two snapshots of events.json as one held state: the archive file's (`primary`, what the last build kept outside the tree) over the committed file's (`secondary`, which is
+ * empty on the box but may hold events elsewhere). Events: the primary's in its order, then any only the secondary holds. Evidence: the primary's entry wins an id both hold.
+ */
+export function joinSnapshots(primary, secondary) {
+  const p = isObj(primary) ? primary : {}, s = isObj(secondary) ? secondary : {};
+  return {
+    ...p,
+    past: { ...(isObj(p.past) ? p.past : {}), events: mergeArchive({ batch: p.past?.events, retained: s.past?.events }) },
+    evidence: { ...(isObj(s.evidence) ? s.evidence : {}), ...(isObj(p.evidence) ? p.evidence : {}) },
+  };
+}
+
+/**
+ * WHEN THE OFFICE READ WHAT THIS EVENT'S PAGE SAYS, for the footer's "As the office read it at" (CORE-174 FIX). Not always the calendar's read: an archived event's evidence may be
+ * older. This event's OWN good read stamp (`read_at`) when the build holds one; else, for an event the calendar lists now, the calendar's read; else the events file's own `as_of`
+ * (the snapshot that carries it); else the calendar's; else null (then nothing is said).
+ */
+export function eventReadAt(event, calendarAsOf, events, inCalendar = false) {
+  const held = events?.evidence?.[event?.id];
+  if (held?.read === "ok" && typeof held.read_at === "string" && held.read_at) return held.read_at;
+  if (inCalendar && calendarAsOf) return calendarAsOf;
+  return (typeof events?.as_of === "string" && events.as_of) || calendarAsOf || null;
+}
+
 // What a one-event read KNOWS (the office's own states: a rooms array whose history is not "unavailable"; a gallery that is an object with a sparks array, empty included).
 // Until the office keeps rooms durably (POS-1203) it answers an old event 200 with rooms "unavailable" and a null gallery once the event's window has passed its memory;
 // that is a degraded answer, not news, and it must not erase a gallery the build already holds.
 const roomsKnown = (e) => Array.isArray(e?.evidence?.rooms) && e.evidence.room_history !== "unavailable";
 const galleryKnown = (e) => isObj(e?.evidence?.gallery) && Array.isArray(e.evidence.gallery.sparks);
-/** True when the fresh read knows LESS than the held one on either axis (rooms or gallery): then the held read stands. */
+/**
+ * True when the fresh read knows LESS than the held one on either axis (rooms or gallery): then the held read stands, WHOLE. That is the deliberate trade (review low 3): a fresh read
+ * that knows more on one axis (newly known rooms) but less on the other (the gallery gone unknown) does not win, because a field-by-field merge would mix two reads' windows;
+ * the held read is refreshed by the next read that knows at least as much on both. `read_at` is the list's or calendar's `as_of` the read was stamped with, not the one-event read's own clock.
+ */
 export const knowsLess = (fresh, held) => (galleryKnown(held) && !galleryKnown(fresh)) || (roomsKnown(held) && !roomsKnown(fresh));
 
 /**

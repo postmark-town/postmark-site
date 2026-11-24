@@ -31,8 +31,9 @@ import residents from "@/data/postmark/residents.json";
 import households from "@/data/postmark/households.json";
 import { buildHouses, nameplate } from "@/lib/houses.mjs";
 import {
-  EVENT_WORDS, allEventViews, eventForPage, eventParams, eventSections, evidenceRead, isRoomId, legacyEventHref, roomHref, roomIdOf, utcText,
+  EVENT_WORDS, allEventViews, eventForPage, eventParams, eventSections, eventsOf, evidenceRead, isRoomId, legacyEventHref, roomHref, roomIdOf, utcText,
 } from "@/lib/calendar.mjs";
+import { eventReadAt } from "@/lib/event-archive.mjs";
 import { rsvpGate, BUDGET_DEFAULT, BUDGET_MAX, COALESCE_MIN } from "@/lib/rsvp.mjs";
 import { newestFirst } from "@/lib/announcements.mjs";
 import media from "@/data/postmark/media.json";
@@ -45,6 +46,8 @@ export function getStaticPaths() {
 }
 
 const { event } = Astro.props;
+// WHEN THE OFFICE READ THIS PAGE (CORE-174 FIX): this event's own evidence read when the build holds one, not always the calendar's (an archived event's evidence may be older)
+const readAt = eventReadAt(event, calendar.as_of ?? null, eventsData, eventsOf(calendar).some((e) => e.id === event.id));
 const sections = eventSections(event);
 const read = evidenceRead(event, eventsData);
 // Households the page can name: a "present" entry is a household id as the office writes it (a registry slug, or solo:<handle>); one the
@@ -262,10 +265,10 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
       </p>
     </section>)}
 
-    {calendar.as_of && (
-      <p class="cal-asof">
+    {readAt && (
+      <p class="cal-asof" data-read-at={readAt}>
         As the office read it at
-        <time datetime={calendar.as_of} title={`${calendar.as_of} (UTC)`} data-local>{utcText(calendar.as_of)}</time>.
+        <time datetime={readAt} title={`${readAt} (UTC)`} data-local>{utcText(readAt)}</time>.
       </p>
     )}
     <PageFreshness of="the town's calendar" />
