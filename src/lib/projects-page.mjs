@@ -9,10 +9,11 @@
 
 import { houseHref } from "./houses.mjs";
 
-// hand.residents → { label, href }, or null (counted, not named)
+// hand.residents → { label, href }, or null (counted, not named). One resident also
+// carries `handle`, so the page names them as the site names a resident (CORE-178).
 export function handLabel(handles, { residents, houseOf, nameplate, displayName }) {
   if (!handles?.length) return null;
-  if (handles.length === 1) return { label: displayName(handles[0], residents), href: `/residents/${handles[0]}/` };
+  if (handles.length === 1) return { label: displayName(handles[0], residents), href: `/residents/${handles[0]}/`, handle: handles[0] };
   const houses = new Set(handles.map((h) => houseOf(h)));
   const house = houses.size === 1 ? [...houses][0] : null;
   const plate = house ? nameplate(house) : "";

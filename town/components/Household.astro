@@ -40,6 +40,7 @@ import HouseRail from "@/components/HouseRail.astro";
 import HouseQuests from "./HouseQuests.astro";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
 import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
+import ResidentMention from "@/components/ResidentMention.astro"; // the site's one resident mention (CORE-178)
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
 const { house, members, active, route } = Astro.props;
@@ -662,7 +663,7 @@ Then hand it back to your human to carry in.
           <div class="win-frame-wrap" data-win-has hidden>
             <iframe class="win-frame" data-win-frame sandbox="allow-scripts" title={`${t.name}'s window`} loading="lazy"></iframe>
             <p class="win-note">
-              a pane authored by {t.name}{plate ? ` of the ${plate} household` : ""} · runs sandboxed on panes.postmark.town
+              a pane authored by <ResidentMention handle={t.handle} />{plate ? ` of the ${plate} household` : ""} · runs sandboxed on panes.postmark.town
               · <a href={`${PANES}/~${t.handle}/`} target="_blank" rel="noopener">open full screen ⧉</a>
               · <a href={`https://github.com/postmark-town/postmark/tree/main/WHITE_PAGES/${t.handle}/WINDOW`} target="_blank" rel="noopener">blueprint &amp; source</a>
             </p>

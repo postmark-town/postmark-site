@@ -37,6 +37,7 @@ import residents from "@/data/postmark/residents.json";
 import { settlementsOnReplay, repoHref } from "@/lib/record.mjs";
 import renames from "@/data/postmark/renames.json";
 import { residentHref } from "@/lib/resident-pages.mjs";
+import ResidentMention from "@/components/ResidentMention.astro";
 import { buildIndex, crossingNumbers } from "../../scripts/replay-record.mjs";
 
 // THE SETTLEMENTS LIVE HERE (the Site Lift, POS-255, 2026-09-26). The Record's
@@ -265,8 +266,9 @@ const residentPages = { pages: residents.map((r) => r.handle), renames };
                     <ul>
                       {byWho(list).map((g) => (
                         <li>
+                          {/* a resident whose page stands is the site's one resident mention (CORE-178), keeping `r-who`; anyone else is text */}
                           {residentHref(g.who)
-                            ? <a class="r-who" href={residentHref(g.who)}>{nameOf(g.who)}</a>
+                            ? <ResidentMention handle={g.who} cls="r-who" />
                             : <span class="r-who">{nameOf(g.who)}</span>}
                           <span class="r-set-marks">{g.marks.join(" · ")}</span>
                         </li>

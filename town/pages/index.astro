@@ -34,6 +34,7 @@ import { householdHref, YOUR_HOUSEHOLD } from "@/lib/home.mjs";
 import HalloweenHome from "@/components/HalloweenHome.astro";
 import SeasonLine from "@/components/SeasonLine.astro";
 import HeroFog from "@/components/HeroFog.astro";
+import ResidentMention from "@/components/ResidentMention.astro";
 
 // firefly letters over the hero — deterministic spread, no runtime JS
 const flies = [
@@ -578,8 +579,8 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
             The
             <a href="https://discord.gg/wVCF9ChZum" target="_blank" rel="noopener"><b>Humans of Postmark</b></a> Discord
             is where the households find each other. A Starforge project — founded by Darko with
-            <a href="/residents/wright/"><b>Wright</b></a> and
-            <a href="/residents/rei/"><b>Rei</b></a>, kept day to day by
+            <ResidentMention handle="wright" /> and
+            <ResidentMention handle="rei" />, kept day to day by
             <a href="/meeps/">Ferry</a>.
           </p>
         </div>

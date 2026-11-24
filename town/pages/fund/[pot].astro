@@ -68,6 +68,7 @@ import { qrSvg } from "@/lib/qr.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
 import PotSprite from "@/components/PotSprite.astro";
 import OneTimeSticker from "@/components/OneTimeSticker.astro";
+import ResidentMention from "@/components/ResidentMention.astro";
 import { sectionCard } from "@/lib/og-image.mjs";
 
 // THE ADDRESS IS NO LONGER ONE STRING. Since 2026-08-25 a pot may have an
@@ -600,8 +601,11 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
                 {roll.map((r) => (
                   <li class="f-roll-row">
                     <span class="f-roll-who">
-                      {r.href
+                      {/* a household's gift names its house; a resident's own is the site's one resident mention (CORE-178) */}
+                      {r.household
                         ? <a href={r.href}>{r.label}</a>
+                        : r.attached
+                        ? <ResidentMention handle={r.patron} />
                         : <>{r.label}{" "}<code class="f-roll-raw">{r.patron}</code></>}
                     </span>
                     <span class="f-roll-usd">{usd(r.usd)}</span>
@@ -662,7 +666,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
                   {stakers.map((s) => (
                     <li class="f-roll-row">
                       <span class="f-roll-who">
-                        {s.href ? <a href={s.href}>{s.label}</a> : s.label}
+                        {s.attached ? <ResidentMention handle={s.patron} /> : s.label}
                       </span>
                       <span class="f-roll-usd">{s.staked}<span class="f-u">✦</span></span>
                     </li>
@@ -706,7 +710,7 @@ const floorBar = pot.close === "elastic" && pot.minCloseUsd != null;
                     </p>
                     {mroll.length > 0 && (
                       <p class="f-past-roll f-dim">
-                        {mroll.map((r, i) => <>{i > 0 && ", "}{r.href ? <a href={r.href}>{r.label}</a> : r.label}{" "}{usd(r.usd)}</>)}
+                        {mroll.map((r, i) => <>{i > 0 && ", "}{r.household ? <a href={r.href}>{r.label}</a> : r.attached ? <ResidentMention handle={r.patron} /> : r.label}{" "}{usd(r.usd)}</>)}
                       </p>
                     )}
                   </li>

@@ -21,6 +21,7 @@
 //
 // The styles ride with the markup, scoped to this file (PotCards.astro's
 // reason: a page's scoped rules never reach a component's elements).
+import ResidentMention from "@/components/ResidentMention.astro";
 const { view } = Astro.props;
 const plural = (n, one, many) => (n === 1 ? one : many);
 // Strings are composed here, whole: Astro drops a space that sits between two
@@ -49,7 +50,8 @@ const legend = `Stamps earned in ${view.monthLabel}, highest first${view.earners
           <details class="hof-det">
             <summary class="hof-sum">
               <span class="hof-rank">{r.rank}</span>
-              <span class="hof-who">{r.handle}</span>
+              {/* the site's one resident mention (CORE-178), a span: the summary is the row's own toggle, and the page link is in the panel */}
+              <span class="hof-who"><ResidentMention handle={r.handle} link={false} /></span>
               <span class="hof-all"><span class="hof-sr">stamps earned this month </span>{r.earned}<span class="hof-u">✦</span></span>
               {r.holo > 0 && <span class="hof-holo pm-holo-ink"><span class="hof-sr">holo this month </span>✧ {r.holo}</span>}
             </summary>
@@ -91,7 +93,7 @@ const legend = `Stamps earned in ${view.monthLabel}, highest first${view.earners
         <ul class="hof-rec">
           {view.holoRows.map((h) => (
             <li>
-              <a href={h.href}>{h.handle}</a>{" "}
+              <ResidentMention handle={h.handle} />{" "}
               <span class="hof-holo pm-holo-ink">{`✧ ${h.holo}`}</span>
               <span class="hof-rec-d">{` · ${h.holoPots.map((p) => p.pot).join(", ")}`}</span>
             </li>
