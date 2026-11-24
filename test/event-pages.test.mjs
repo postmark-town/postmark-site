@@ -443,7 +443,10 @@ test("BUILT: each state is its own sentence: known none, unknown, a claim not ac
   const circ = section(live, "data-ev-circles");
   assert.deepEqual([...circ.matchAll(/data-ev-room="([^"]+)"/g)].map((m) => m[1]), ["t1794686460000-walker-test", "0"], "both rooms, the numeric one included, in the office's order");
   assert.ok(circ.includes('href="/conversations/#0"'), "the numeric room links to its own anchor");
-  assert.equal(live.includes("data-ev-gallery"), false, "no gallery while it is on");
+  // the SAME gallery section as the ended page, once the doors are open (CORE-174 FIX): the so-far note and the known none; never before the event
+  assert.match(live, /<section[^>]*id="gallery"[^>]*data-ev-gallery|<section[^>]*data-ev-gallery[^>]*id="gallery"/, "a running event has the gallery at its #gallery anchor");
+  assert.ok(say(live, "data-ev-gallery").includes(EVENT_WORDS.gallery.none), "an empty gallery of a running event is said as none");
+  assert.equal(c.includes("data-ev-gallery"), false, "no gallery before the event (announced)");
   assert.match(textOf(live), /RSVP/); assert.match(live, /data-rsvp-how/, "its RSVP doors are as they were");
   assert.equal(eventHtml(SUPPER).includes("data-rsvp-how"), false, "an ended event does not teach how to RSVP");
 });

@@ -23,8 +23,10 @@
 //   the GLOBAL KEY moved: the code (src/ minus the data, town/, tools/, the Astro
 //     config, package.json, the lockfile, tsconfig.json and the installed packages,
 //     which carry the world pin), the build's PUBLIC_*/BUILD_*/PREVIEW_BASE/
-//     TOWN_TZ/SEAM_FIXTURE environment, the Node major version, or the calendar
-//     switch the Halloween frame wears;
+//     TOWN_TZ/SEAM_FIXTURE environment, the Node major version, the calendar
+//     switch the Halloween frame wears, or the SEASON the crossing derives (the
+//     Mists' veil, density, ramp and the home page's line: seasonState). The raw
+//     BUILD_CROSSING is not in the key; what pages make of it is;
 //   the incremental build failed, or its output failed the checks below. It then
 //     runs the full build once more. A wrong carry-over is worse than a slow pass.
 //
@@ -104,10 +106,32 @@ async function calendarSwitch(root) {
   return String(m.frameOn(Date.now()));
 }
 
+// THE SEASON, NOT THE NUMBER (POS-1191/a, Darko 2026-11-23 19:56 EST: "Yeah, I think I'm down to try Jetto's
+// proposal"). BUILD_CROSSING moves at every crossing, so keyed raw it made every pass a full build. A page reads it
+// only through mists-season.mjs: the Mists' veil, density and ramp (siteMists, less its crossing), whether they
+// stand at all, and the home page's season line (homeSeasonLine). Those are what the key holds. A pass inside a
+// steady season stays incremental; a season boundary (the Mists arriving, a rung of their schedule, a step of the
+// ramp, a new line) moves the key and builds in full. A page that read BUILD_CROSSING any other way would be
+// missed, so test/incremental-build.test.mjs refuses one.
+export async function seasonState(root, env = process.env) {
+  const f = join(root, "src", "lib", "mists-season.mjs");
+  if (!existsSync(f)) return "no-season";
+  const ms = await import(pathToFileURL(f).href);
+  const crossing = ms.buildCrossing(env);
+  const skeleton = ms.pinnedSkeleton(root);
+  const m = ms.siteMists({ crossing, skeleton });
+  if (!m) return "no-mists";
+  const { mistsAt } = await import("postmark-world/world-engine");
+  const verbs = await import("postmark-world/world-verbs");
+  const line = ms.homeSeasonLine(mistsAt(crossing, skeleton.mists), crossing, verbs);
+  return JSON.stringify({ veil: m.veil, density: m.density, t: m.t, line });
+}
+
 export async function globalKey({ root, code }) {
   const env = Object.keys(process.env)
     // every variable the site's own code reads while it builds (grep process.env / import.meta.env over src/, town/ and the config)
     .filter((k) => /^(PUBLIC_|BUILD_)/.test(k) || ["PREVIEW_BASE", "TOWN_TZ", "SEAM_FIXTURE"].includes(k))
+    .filter((k) => k !== "BUILD_CROSSING") // keyed by what it derives instead: seasonState above
     .sort()
     .map((k) => `${k}=${process.env[k]}`);
   const installed = join(root, "node_modules", ".package-lock.json");
@@ -117,6 +141,7 @@ export async function globalKey({ root, code }) {
     node: process.versions.node.split(".")[0],
     env,
     calendar: await calendarSwitch(root),
+    season: await seasonState(root),
   };
   return { key: sha(JSON.stringify(parts)), parts };
 }
