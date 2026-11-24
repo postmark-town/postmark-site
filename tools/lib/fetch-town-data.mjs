@@ -5,6 +5,8 @@ import { readFileSync, readdirSync, existsSync, writeFileSync, renameSync, mkdir
 import { join, dirname } from "node:path";
 import { buildThreads, normalizeProfile, parseFrontmatter, readResidentProfiles } from "./town.mjs";
 import { publicRegistry } from "./public-registry.mjs";
+import { joinSnapshots, mergeArchive, mergeEvidence, pickEvidenceWork, stampHeld, wantsEvidence } from "../../src/lib/event-archive.mjs";
+import { readEventsArchive, writeEventsArchive } from "./events-archive-state.mjs";
 
 export const RESIDENT_CARD_LANES = 6;
 
@@ -785,6 +787,8 @@ export async function buildOfficeData({
   // Where the last pass's letters are kept (fetchLettersSince); null reads the
   // whole corpus every time, as every run without a home for it always has.
   letterCachePath = null,
+  // Where the event archive is kept between builds, outside the tree the refresh resets (events-archive-state.mjs); null keeps only the committed snapshot, as always.
+  eventsArchivePath = null,
 } = {}) {
   const readSnapshot = snapshotReader(dataDir);
   const endpointGaps = [];
@@ -1068,7 +1072,7 @@ export async function buildOfficeData({
   // THE LASTING EVENTS (CORE-82): the past-events list and each event's evidence, kept beside the calendar. A door that
   // is not live (400/404/405/422: it does not know `past`) says "unavailable" in the file and a gap here, and the committed snapshot's events
   // stand. Any other failure of the LIST (a 5xx, a timeout, a body that is not the list) fails the build, exactly as the calendar's own read does; one event's own read that fails is "unavailable" for that event.
-  const eventsRead = await fetchEvents({ apiBase, fetchImpl, retries, gate, calendar, snapshot: readSnapshot("events.json", EMPTY_EVENTS) });
+  const eventsRead = await fetchEventsArchived({ apiBase, fetchImpl, retries, gate, calendar, trackedSnapshot: readSnapshot("events.json", EMPTY_EVENTS), eventsArchivePath });
   endpointGaps.push(...eventsRead.gaps);
 
   // THE SPARK REGISTER (CORE-121): the public standing-mark register's Sparks; any failure is "unavailable" in the file and a gap, never an empty catalogue.
@@ -1212,8 +1216,11 @@ export async function fetchCalendar({ apiBase, fetchImpl = fetch, retries = 3, g
 // events.json = { as_of, past: { events, next, note, read: "office"|"unavailable"|"absent" }, evidence: { <id>: { read: "ok"|"unavailable", event? } } }
 export const EMPTY_EVENTS = Object.freeze({ as_of: null, past: { events: [], next: null, note: null, read: "absent" }, evidence: {} });
 export const EVENTS_GAP = "events.json: the office's lasting list of past events is not served yet (GET /town/apex?read=calendar&args={past:true} was refused), so /events/ lists only what the calendar still carries and says so";
-export const PAST_PAGES_MAX = 25;      // 40 a page: up to 1,000 past events a build
-export const EVIDENCE_MAX = 400;       // one-event reads per build, newest ends first
+// THE BUILD'S WORK BUDGETS, NOT THE ARCHIVE (CORE-174). These say how much one build ASKS the office; they are not how many event pages the site keeps. An event the
+// site has built a page for keeps it (and its forward) after a capped batch stops reaching it, and the one-event evidence already held stands until a read answers
+// (src/lib/event-archive.mjs: mergeArchive, pickEvidenceWork, mergeEvidence).
+export const PAST_PAGES_MAX = 25;      // 40 a page: up to 1,000 past events asked for a build
+export const EVIDENCE_MAX = 400;       // one-event reads asked per build: pages never read first, then the oldest-read (rotation)
 const REFUSED = new Set([400, 404, 405, 422]);
 
 export async function fetchPastEvents({ apiBase, fetchImpl = fetch, retries = 3, gate = null, maxPages = PAST_PAGES_MAX } = {}) {
@@ -1242,12 +1249,14 @@ export async function fetchPastEvents({ apiBase, fetchImpl = fetch, retries = 3,
   return { read: "office", events, next, note, asOf };
 }
 
-/** The one-event read for each event that has had its doors open and is not cancelled; a failure is `unavailable`, never an empty answer. */
-export async function fetchEventEvidence({ apiBase, fetchImpl = fetch, retries = 3, gate = null, events = [], max = EVIDENCE_MAX } = {}) {
-  const wanted = events
-    .filter((e) => e && typeof e.id === "string" && /^[^/]+\/[^/]+$/.test(e.id) && e.phase !== "announced" && !e.cancelled)
-    .sort((a, b) => String(b.ends).localeCompare(String(a.ends)))
-    .slice(0, max);
+/**
+ * The one-event read for each event that has had its doors open and is not cancelled, at most `max` this run; a failure is `unavailable`, never an empty answer.
+ * `previous` is the evidence the committed file holds: it only orders the work (never-read pages first, then oldest-read), it is not read as an answer.
+ * The result is THIS RUN'S reads for the events asked; src/lib/event-archive.mjs mergeEvidence lays them over what is held.
+ */
+export async function fetchEventEvidence({ apiBase, fetchImpl = fetch, retries = 3, gate = null, events = [], max = EVIDENCE_MAX, previous = {} } = {}) {
+  const byId = new Map(events.filter(wantsEvidence).map((e) => [e.id, e]));
+  const wanted = pickEvidenceWork({ events: [...byId.values()], previous, max }).map((id) => byId.get(id));
   const evidence = {};
   const BATCH = 4;
   for (let i = 0; i < wanted.length; i += BATCH) {
@@ -1265,27 +1274,64 @@ export async function fetchEventEvidence({ apiBase, fetchImpl = fetch, retries =
 }
 
 /** Both reads, as events.json. `snapshot` is the committed file: its events stand while the lasting list is not served. */
-export async function fetchEvents({ apiBase, fetchImpl = fetch, retries = 3, gate = null, calendar = EMPTY_CALENDAR, snapshot = EMPTY_EVENTS } = {}) {
-  const past = await fetchPastEvents({ apiBase, fetchImpl, retries, gate });
-  const kept = past.read === "unavailable" && Array.isArray(snapshot?.past?.events) ? snapshot.past.events : [];
-  const pastEvents = past.read === "unavailable" ? kept : past.events;
+export async function fetchEvents({ apiBase, fetchImpl = fetch, retries = 3, gate = null, calendar = EMPTY_CALENDAR, snapshot = EMPTY_EVENTS, maxPages = PAST_PAGES_MAX, evidenceMax = EVIDENCE_MAX } = {}) {
+  const past = await fetchPastEvents({ apiBase, fetchImpl, retries, gate, maxPages });
+  // THE ARCHIVE IS NOT THE BATCH (CORE-174): the lasting list is read within the page budget, but an event the committed file already holds keeps its page whether or not this
+  // batch reaches it (the batch's own view of an event is the newer word). While the list is not served the snapshot's events stand, as they always did.
+  const retained = Array.isArray(snapshot?.past?.events) ? snapshot.past.events : [];
+  const pastEvents = mergeArchive({ batch: past.read === "unavailable" ? [] : past.events, retained });
   const seen = new Set();
   const all = [...GROUP_KEYS.flatMap((k) => (Array.isArray(calendar?.[k]) ? calendar[k] : [])), ...pastEvents].filter((e) => e && !seen.has(e.id) && seen.add(e.id));
-  const evidence = await fetchEventEvidence({ apiBase, fetchImpl, retries, gate, events: all });
-  const failed = Object.values(evidence).filter((v) => v.read !== "ok").length;
+  // the evidence held stands until a read answers; this run asks at most `evidenceMax` (pages never read first, then the oldest-read) and lays the answers over it
+  const previous = snapshot?.evidence && typeof snapshot.evidence === "object" ? snapshot.evidence : {};
+  const asOf = past.asOf ?? calendar?.as_of ?? null;
+  const fresh = await fetchEventEvidence({ apiBase, fetchImpl, retries, gate, events: all, max: evidenceMax, previous });
+  const merged = mergeEvidence({ previous, fresh, asOf });
+  const asked = Object.keys(fresh).length;
+  const failed = merged.kept + merged.failed;
   return {
     events: {
-      as_of: past.asOf ?? calendar?.as_of ?? null,
+      as_of: asOf,
       past: { events: pastEvents, next: past.read === "unavailable" ? null : past.next, note: past.note, read: past.read },
-      evidence,
+      evidence: merged.evidence,
     },
     gaps: [
       ...(past.read === "unavailable" ? [EVENTS_GAP] : []),
-      ...(failed ? [`events.json: ${failed} of ${Object.keys(evidence).length} one-event reads were not served, so those events' pages say their evidence couldn't be read`] : []),
+      ...(failed ? [`events.json: ${failed} of ${asked} one-event reads were not served, so ${merged.failed} of those events' pages say their evidence couldn't be read and ${merged.kept} kept the evidence they already held (refused, or answered with less than the page already holds)`] : []),
     ],
   };
 }
 const GROUP_KEYS = ["now", "coming", "ended"];
+
+/**
+ * THE PRODUCTION CALLER OF fetchEvents (CORE-174 FIX). The held state lives where the caller names it (`eventsArchivePath`, from POSTMARK_EVENTS_ARCHIVE in tools/fetch-town.mjs;
+ * events-archive-state.mjs says why it cannot be the tracked events.json): the prior archive is READ from it, joined over the committed snapshot, handed to fetchEvents as the held
+ * state, and the merged result is WRITTEN BACK atomically after the run. Unset, this is exactly fetchEvents over the committed snapshot, as before. A genuinely ABSENT archive is a
+ * first run. An archive that exists but cannot be read, and a failed save, THROW: into the existing short-fetch path (fetch-town.mjs's catch + shortFetchPlan), so on the release
+ * channel the pass exits non-zero and the publisher keeps the last good release, rather than publishing a batch-only events.json or pages the next reset could forget. The
+ * unreadable file is left untouched. Held reads keep the time of the snapshot they came from (stampHeld); an unknown time stays unknown.
+ */
+export async function fetchEventsArchived({ eventsArchivePath = null, trackedSnapshot = EMPTY_EVENTS, ...rest } = {}) {
+  const archive = readEventsArchive(eventsArchivePath);
+  // A FAILURE OF THE ARCHIVE IS A FAILED PASS, NOT A WARNING (CORE-174 FIX, the delta review): these throw into the existing short-fetch path (tools/fetch-town.mjs's catch and
+  // shortFetchPlan), which on the release channel exits non-zero so the publisher keeps the last good release. A genuinely ABSENT archive ("none") is a first run and is not an error.
+  if (archive.state === "unreadable") {
+    throw new Error(`events archive ${eventsArchivePath} exists but could not be read (${archive.reason}): refusing to publish a batch-only events.json over history it could not read; fix or replace the file (it was left untouched)`);
+  }
+  // held reads keep the time of the snapshot they came from; a snapshot with no time stamps nothing (never this pass's time). Only when the archive is in use.
+  // Only a BARE seed (or the committed snapshot) is inferred from: a versioned archive is already-held state, its `as_of` is the time of the pass that saved it, not of a read it
+  // holds without a stamp, so re-stamping it would turn an unknown time into a later document's.
+  const held = (events) => (eventsArchivePath ? stampHeld(events) : events);
+  const snapshot = archive.state === "ok" ? joinSnapshots(archive.versioned ? archive.events : held(archive.events), held(trackedSnapshot)) : held(trackedSnapshot);
+  const result = await fetchEvents({ ...rest, snapshot });
+  if (archive.state !== "unset") {
+    const wrote = writeEventsArchive(eventsArchivePath, result.events);
+    if (!wrote.ok) {
+      throw new Error(`events archive ${eventsArchivePath} could not be written (${wrote.reason}): refusing to publish event pages the next reset could forget`);
+    }
+  }
+  return result;
+}
 
 // ── THE SPARK REGISTER (CORE-121) ───────────────────────────────────────────
 // The Sparks catalogue (/sparks/) is the office's existing ANONYMOUS public register: `GET /world2/marks?all=true&full=true` -> `{ what, count, marks: [...] }`,
