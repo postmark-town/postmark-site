@@ -318,9 +318,35 @@ test("F2: the residents-meta path (Conversations): the alias resolves the row an
   assert.deepEqual(residentAliasesOf(page), ALIASES);
   assert.deepEqual(residentAliasesOf({ querySelector: () => null }), {}, "no map on the page: no aliases");
   assert.deepEqual(residentAliasesOf({ querySelector: () => ({ getAttribute: () => "{broken" }) }), {});
-  assert.equal(resolveHandle("lupi", { lupi: "lupi-new" }, { lupi: {} }), "lupi", "a handle the faces hold is itself");
+  assert.equal(resolveHandle("lupi", { lupi: "lupi-new" }, { lupi: {} }), "lupi-new", "a known alias wins over a raw faces row under the old handle");
+  assert.equal(resolveHandle("lupi", {}, { lupi: {} }), "lupi", "bare: no alias, the handle is itself");
   assert.equal(resolveHandle("x", { x: 5 }), "x", "a non-string alias is no alias");
   assert.equal(resolveHandle("__proto__", {}), "__proto__", "an inherited key is no alias");
+});
+
+test("ALIAS ORDER: a recorded old handle that still has a raw faces row resolves to the current resident (provider and the page's inline resolver)", async () => {
+  // residents-meta still carrying a row under the old handle beside the current one: the alias must win, or the old name and a dead page come back
+  const BOTH = {
+    "wren-old": { name: "Wren (old)", avatar: "/media/old.jpg", color: "#2f6b3a" },
+    "wren-alder": { name: "Wren Alder", avatar: "/media/w.jpg", color: "#2f6b3a" },
+  };
+  const id = identityProvider(doc, () => BOTH, { aliases: ALIASES })("wren-old");
+  assert.equal(id.attrs.href, "/residents/wren-alder/", "the provider: the real page, not the old handle's");
+  assert.equal(id.children.at(-1).textContent, "Wren Alder", "the provider: the current name, not the old row's");
+  assert.equal(id.attrs["data-rm"], "wren-old", "the recorded handle is kept on the mention");
+  assert.equal(identityProvider(doc, () => BOTH, { aliases: ALIASES })("wren-alder").attrs.href, "/residents/wren-alder/", "bare: the current handle is unchanged");
+  // the Conversations page's own inline resolver, sliced from the page and run against the same rows
+  const vm = await import("node:vm");
+  const src = readFileSync(new URL("../town/pages/conversations/index.astro", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const from = src.indexOf("      var residentAliases = (function () {");
+  const to = src.indexOf("\n      }\n", src.indexOf("      function currentHandle(handle) {", from)) + 9;
+  assert.ok(from > 0 && to > from, "control: the inline resolver is found");
+  const ctx = { faces: BOTH, document: { querySelector: () => ({ getAttribute: () => JSON.stringify(ALIASES) }) } };
+  vm.runInNewContext(src.slice(from, to) + "\nthis.currentHandle = currentHandle;", ctx);
+  assert.equal(ctx.currentHandle("wren-old"), "wren-alder", "the page: a known alias wins over the old handle's raw row");
+  assert.equal(ctx.faces[ctx.currentHandle("wren-old")].name, "Wren Alder", "the page: the row it then reads is the current resident's");
+  assert.equal(ctx.currentHandle("wren-alder"), "wren-alder", "the page: bare, a current handle is itself");
+  assert.equal(ctx.currentHandle("never-was"), "never-was", "the page: unknown stays the floor");
 });
 
 // ── the Conversations page wires it (TEXT PINS: no browser here; the byline proof waits on the installed World carrying WLD-248) ──────

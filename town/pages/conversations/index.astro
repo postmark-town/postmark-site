@@ -244,14 +244,14 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         a.setAttribute("data-rm-opts", JSON.stringify({ cls: "c-who", face: false }));
       }
       // CORE-178: the build's renames ({ recordedHandle: currentHandle }, resident-link.mjs's one walk, carried on the page: no new read). A handle the
-      // faces hold is itself; an old one is its resident's current handle; anything else is itself (the floor).
+      // map knows is its resident's current handle, consulted before any faces row (a row kept under an old handle would bring back the old name and a
+      // dead page); anything else is itself (the floor).
       var residentAliases = (function () {
         try { var n = document.querySelector("[data-resident-aliases]"); var m = JSON.parse((n && n.getAttribute("data-resident-aliases")) || "null"); return m && typeof m === "object" ? m : {}; }
         catch (e) { return {}; }
       })();
       function currentHandle(handle) {
         var h = String(handle == null ? "" : handle);
-        if (faces && Object.prototype.hasOwnProperty.call(faces, h)) return h;
         return Object.prototype.hasOwnProperty.call(residentAliases, h) && typeof residentAliases[h] === "string" && residentAliases[h] ? residentAliases[h] : h;
       }
 

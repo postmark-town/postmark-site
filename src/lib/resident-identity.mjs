@@ -54,12 +54,13 @@ export function residentAliasesOf(doc) {
 }
 
 /**
- * The handle a face and a page are found under: the recorded one when the faces hold it, else its current one by the build's alias map (one hop: the
- * map already holds each chain's end), else the recorded one. A non-object map, an inherited key or a non-string target is no alias.
+ * The handle a face and a page are found under: its current one by the build's alias map when the map knows it (one hop: the map already holds each
+ * chain's end, and never a current built handle), else the recorded one. The alias is consulted BEFORE any faces row: a row still kept under an old
+ * handle would otherwise bring back the old name and a dead page. `faces` is not consulted; it stays in the signature for the callers that pass it.
+ * A non-object map, an inherited key or a non-string target is no alias.
  */
 export function resolveHandle(handle, aliases, faces = null) {
   const h = String(handle ?? "");
-  if (faces && typeof faces === "object" && Object.hasOwn(faces, h)) return h;
   if (aliases && typeof aliases === "object" && Object.hasOwn(aliases, h) && typeof aliases[h] === "string" && aliases[h]) return aliases[h];
   return h;
 }
