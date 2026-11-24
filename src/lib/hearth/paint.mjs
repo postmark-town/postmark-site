@@ -14,7 +14,7 @@
 
 import { marksOf, mailOf, postsOf, townEventsOf, placesOf, chartOf, countdownOf, leftWords } from "./fold.mjs";
 import { feedOf, whenOf, dayWordOf, NOT_READING } from "../household-dashboard/fold.mjs";
-import { mentionModel, mentionNode } from "../resident-mention.mjs";
+import { inkOn, mentionModel, mentionNode } from "../resident-mention.mjs";
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -163,7 +163,13 @@ export function paintChart(root, reads, ctx) {
     track.setAttribute("aria-label", `${nameOf(ctx.faces, r.handle)}: ${label}`);
     const fill = el("i");
     fill.style.width = r.held == null ? "0%" : Math.max(r.held > 0 ? 2 : 0, Math.round(r.share * 100)) + "%";
-    if (ctx.faces[r.handle]?.accent) fill.style.background = ctx.faces[r.handle].accent;
+    // the bar wears the resident's colour at readable darkness (CORE-178, Darko a), re-inked for a design's own glass by the stage (data-rm-accent)
+    const accent = ctx.faces[r.handle]?.accent;
+    if (accent && inkOn(accent, "night")) {
+      fill.style.setProperty("--hd-c", inkOn(accent, "night"));
+      fill.style.background = "var(--hd-c)";
+      fill.setAttribute("data-rm-accent", accent);
+    }
     track.appendChild(fill);
     row.appendChild(track);
     row.appendChild(el("span", "hx-bar-n", r.held == null ? "—" : String(r.held)));
