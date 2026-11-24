@@ -1,0 +1,39 @@
+{
+  "size": "1440",
+  "steps": [
+    {
+      "book on the board": 1
+    },
+    {
+      "title click lands on": "/events/fixture-host/invented-album/"
+    },
+    {
+      "Tab presses to the gallery link": {
+        "tabs": 20,
+        "focused": {
+          "cls": "album-foot",
+          "text": "open the album, the event's gallery →",
+          "href": "/events/fixture-host/invented-album/#gallery"
+        }
+      }
+    },
+    {
+      "Enter lands on": {
+        "hash": "#gallery",
+        "path": "/events/fixture-host/invented-album/",
+        "inFrame": true,
+        "top": 56,
+        "height": 168,
+        "frame": 900,
+        "text": "The gallery Sparks linked to this event, accepted ones only. No accepted sparks linked to this event yet. These are the sparks so far; the event is still on. The Sparks gallery, from events and from no event named →"
+      }
+    },
+    {
+      "one more Tab goes to": {
+        "tag": "A",
+        "text": "The Sparks gallery, from events and from no event named →",
+        "afterGallery": true
+      }
+    }
+  ]
+}
