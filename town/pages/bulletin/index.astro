@@ -10,7 +10,8 @@
 // and the civic quarter's postcard. And the town's social links are stickers
 // slapped on the cork, read from src/lib/door-line.mjs's SOCIALS. Under the
 // pieces, two pinned items (Darko, POS-566): Dom Pidgey's chapbook and the
-// Halloween notice (bulletin-board.mjs, BOARD_PINS).
+// Halloween notice (bulletin-board.mjs, BOARD_PINS). And, while its event is
+// on, the year's-end album book (year-end-album.mjs).
 //
 // THE BOARD SLIDES, NOTHING POPS (Keemin, 2026-09-27): "I'm also generally
 // not a fan of the whole pop-up window. could we try containing everything in
@@ -59,6 +60,8 @@ import { HARBOR } from "@/lib/nav.mjs";
 import households from "@/data/postmark/households.json";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
 import { hwGuardScript } from "@/lib/mists-season.mjs";
+import eventsData from "@/data/postmark/events.json";
+import { albumGuardScript, yearEndAlbum } from "@/lib/year-end-album.mjs";
 
 const cards = bulletinCards(bulletin);
 // Every posting an address can open: the pinned notices AND the unpinned
@@ -72,6 +75,9 @@ const doors = postingsWithoutCard(bulletin);
 // the pinned items on the board itself, each with where its click goes
 const pins = boardPins().map((p) => ({ ...p, link: pinLink(p, postings.map((x) => x.slug)), pictures: p.art.map((a) => paintArt(a)) }));
 const PIN_TILTS = [-2, 2.6];
+// the year's-end album book (CORE-173): only for the event the build itself read, inside that event's own window (year-end-album.mjs)
+const album = yearEndAlbum(calendar, eventsData);
+const albumPictures = album ? album.art.map((a) => paintArt(a)) : [];
 const month = pinnedMonth(calendar);
 const daily = dailyFront(bulletin);
 const tended = tendedText(daily.tended);
@@ -360,8 +366,33 @@ const views = JSON.stringify({
                   </li>
                 );
               })}
+              {/* THE YEAR'S-END ALBUM (CORE-173; Darko: "a nice like end of year album book on our corkboard … that takes you
+                  straight to the event and the gallery"): a photo album in wine cloth, a snapshot of the album table mounted on its
+                  cover in photo corners, clipped to the cork. Two ways in, both plain links: its title to the event's page, its
+                  foot to that page's gallery. Drawn only for the event the build read, inside its own window; otherwise
+                  nothing, not even its place in the row (year-end-album.mjs). */}
+              {album && (
+                <li class="pin-album" data-year-end-album>
+                  <div class="piece album" style={`--tilt: ${PIN_TILTS[pins.length % PIN_TILTS.length]}deg`}>
+                    <span class="album-clip" aria-hidden="true"></span>
+                    <span class="album-snap" aria-hidden="true">
+                      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+                      {albumPictures.map((rects) => (
+                        <svg class="px" viewBox={`0 0 ${SPRITE_W} 22`} shape-rendering="crispEdges">
+                          {rects.map((r) => <rect x={r.x} y={r.y} width={r.w} height="1" fill={r.fill} />)}
+                        </svg>
+                      ))}
+                    </span>
+                    <span class="album-kick">the town's year-end album</span>
+                    <a class="album-title" href={album.href}>{album.title}</a>
+                    <a class="album-foot" href={album.gallery}>open the album, the event's gallery →</a>
+                    <span class="album-pages" aria-hidden="true"></span>
+                  </div>
+                </li>
+              )}
             </ul>
             {pins.some((p) => HALLOWEEN_PIN_KEYS.includes(p.key)) && <Fragment set:html={hwGuardScript()} />}
+            {album && <Fragment set:html={albumGuardScript(album.until)} />}
 
             {/* THE STICKERS: the town's socials, slapped on the cork. Plain external
                 links; a platform not open yet (`soon` in door-line.mjs) would be a
@@ -1161,6 +1192,68 @@ const views = JSON.stringify({
       text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
     }
 
+    /* THE YEAR'S-END ALBUM (CORE-173): a photo album, wider than tall, in the wax red's wine cloth with a gold rule, its thick
+       block of pages showing at the fore-edge and the foot; a snapshot of the album table mounted on the cover in black photo
+       corners, on a cream border; clipped to the cork by a brass bulldog clip at its head, never a tack, tape or nail. */
+    .pin-album { width: min(100%, 21em); margin-top: 0.6em; }
+    .album {
+      padding: 1.5em 1.3em 1.3em; border-radius: 6px 9px 9px 6px;
+      background:
+        repeating-linear-gradient(-35deg, rgba(0, 0, 0, 0.07) 0 2px, transparent 2px 6px),
+        linear-gradient(165deg, var(--pm-wax), #6a2a1f);
+      color: var(--pm-paper);
+      box-shadow:
+        inset 0 0 0 6px #6a2a1f, inset 0 0 0 7px var(--pm-gold), inset 0 0 0 9px #6a2a1f,
+        6px 3px 0 -1px var(--pm-paper), 8px 5px 0 -1px var(--pm-paper-deep), 10px 7px 0 -1px #cdbda4,
+        0 14px 26px rgba(0, 0, 0, 0.55);
+      isolation: isolate;
+    }
+    .album-clip {
+      position: absolute; top: -0.9em; left: 50%; z-index: 3; width: 3.6em; height: 1.6em; margin-left: -1.8em;
+      border-radius: 4px 4px 2px 2px;
+      background: linear-gradient(180deg, #f6dcae, #b08d4d 45%, #6d5c44);
+      box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6), inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+    }
+    .album-clip::before {
+      content: ""; position: absolute; left: 50%; top: -0.75em; width: 2.2em; height: 1em; margin-left: -1.1em;
+      border: 2px solid #b08d4d; border-bottom: 0; border-radius: 1em 1em 0 0;
+    }
+    .album-snap {
+      position: relative; align-self: center; display: flex; justify-content: center; align-items: flex-end;
+      width: min(100%, 13em); padding: 0.55em 0.55em 0.8em; transform: rotate(-1.2deg);
+      background: var(--pm-paper); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+    }
+    .album-snap .px {
+      width: 100%; height: auto; display: block; image-rendering: pixelated;
+      background: linear-gradient(180deg, var(--pm-night) 0%, var(--pm-harbor-2) 70%, #2f3a56 100%);
+    }
+    .corner { position: absolute; width: 0.9em; height: 0.9em; background: #161c2b; }
+    .corner.tl { top: 0.2em; left: 0.2em; clip-path: polygon(0 0, 100% 0, 0 100%); }
+    .corner.tr { top: 0.2em; right: 0.2em; clip-path: polygon(0 0, 100% 0, 100% 100%); }
+    .corner.bl { bottom: 0.2em; left: 0.2em; clip-path: polygon(0 0, 100% 100%, 0 100%); }
+    .corner.br { bottom: 0.2em; right: 0.2em; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+    .album-kick {
+      margin-top: 0.8em; text-align: center;
+      font-family: var(--pm-mono); font-size: 0.58rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--pm-gold);
+    }
+    .album-title {
+      text-align: center; font-weight: 700; font-size: 1.2rem; line-height: 1.2;
+      color: var(--pm-gold-bright); text-decoration: none; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+    }
+    .album-foot {
+      align-self: center; margin-top: 0.35em; text-align: center;
+      font-style: italic; font-size: 0.88rem; color: var(--pm-gold-bright);
+      text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
+    }
+    .album-title:hover, .album-foot:hover { color: var(--pm-paper); }
+    .album-title:focus-visible, .album-foot:focus-visible { outline: 2px solid var(--pm-gold-bright); outline-offset: 3px; border-radius: 2px; }
+    .album-pages {
+      position: absolute; left: 0.6em; right: -0.2em; bottom: -0.55em; z-index: -1; height: 0.7em;
+      background: repeating-linear-gradient(180deg, var(--pm-paper) 0 1px, #cdbda4 1px 2px);
+      border-radius: 0 0 4px 4px;
+    }
+
     /* the stickers: die-cut, slapped on at a lean; a stamp's perforated edge
        or a blob of wax, in the style guide's inks, never a platform's tile */
     .stickers {
@@ -1207,7 +1300,7 @@ const views = JSON.stringify({
         gap: 2.4em; padding: 2.2em 0.9em 2.4em; border-width: 8px; border-bottom-width: 0;
       }
       .pins { flex-direction: column; align-items: center; gap: 2.6em; }
-      .pin-hanger { margin-top: 0; }
+      .pin-hanger, .pin-album { margin-top: 0; }
       .piece, .piece:hover, .piece:focus-visible { transform: none; }
       .notes { height: 15em; }
       .hand-name { font-size: 0.5rem; }
