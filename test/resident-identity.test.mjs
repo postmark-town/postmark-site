@@ -165,6 +165,66 @@ if (WORLD_READER) test("the World's own speakerIdentity accepts every identity t
   assert.equal(world.speakerIdentity(() => hidden, "door"), null, "control: an aria-hidden identity is refused, as the site never makes one");
 });
 
+// ── the event page's rooms, and the World page's viewer ───────────────────────────────────────────────────────────────────────────────────
+
+test("toFace: a page that holds the site's own build faces hands them through as they are (the event page, the World page)", () => {
+  const siteFaces = { "wren-alder": { name: "Wren Alder", accent: "#2f6b3a", avatar: "https://raw.githubusercontent.com/x/w.png", monogram: "W" } };
+  const id = identityProvider(doc, () => siteFaces, { toFace: (f) => f })("wren-alder");
+  assert.equal(id.attrs.class, "rm rm-speaker");
+  assert.equal(id.children[0].children[0].attrs.src, "https://raw.githubusercontent.com/x/w.png", "the site's own picture rule (resident-mention.mjs § pictureOf), already applied by the build");
+  assert.match(id.attrs.style, /--rm-c: #2f6b3a;/);
+  assert.equal(identityProvider(doc, () => siteFaces, { toFace: (f) => f })("human-of-x"), null, "a human is still null");
+  // control: the default reads residents-meta rows, where `accent` is not a field: the same row is neutral
+  assert.equal(identityProvider(doc, () => siteFaces)("wren-alder").attrs.class, "rm is-neutral rm-speaker");
+});
+
+// FACET (CORE-178, ~19:1xZ): "At CURRENT b18af539, town/pages/events/[host]/[slug].astro:303 calls mountRoom without identityForSpeaker … Wire the
+// EXISTING event-room caller in 178 now, using existing public inputs/safe fallbacks, no new data read". TEXT PIN (the page's script can't run here).
+test("TEXT PIN: the event page's room caller hands the reader the identity, from the build's faces on its circles section (no new read)", () => {
+  const src = readFileSync(new URL("../town/pages/events/[host]/[slug].astro", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.match(src, /import \{ mentionFaceOf \} from "@\/lib\/resident-mentions\.mjs";/, "the build's own faces");
+  assert.match(src, /data-rooms=\{JSON\.stringify\(roomIds\)\} data-faces=\{JSON\.stringify\(speakerFaces\)\}/, "carried on the circles section");
+  assert.match(src, /import \{ identityProvider \} from "@\/lib\/resident-identity\.mjs";/);
+  assert.match(src, /const speakerIdentity = identityProvider\(document, \(\) => evFaces, \{ toFace: \(f\) => f \}\);/);
+  assert.match(src, /mountRoom\(\{ doc: document, host: reader, roomId: id, [^\n]*, identityForSpeaker: speakerIdentity \}\)/, "the one mountRoom call hands it on");
+  assert.equal((src.match(/mountRoom\(/g) ?? []).length, 1, "still one reader");
+  assert.doesNotMatch(src.slice(src.indexOf("THE CIRCLES ISLAND")), /fetch\([^)]*residents-meta/, "no new read of the residents");
+});
+
+// WLD-249 (Facet accepted the consumer contract, ~19:1xZ): `setViewerIdentityForSpeaker(appEl, provider|null)` from the SAME served viewer module
+// instance as the shell. Behaviour: world-identity.mjs against stand-in viewer modules.
+test("the World page's viewer: the site's identity goes in through setViewerIdentityForSpeaker on the shell's own module, and the floor holds without it", async () => {
+  const { attachViewerIdentity, VIEWER_URL } = await import("../src/lib/world-identity.mjs");
+  assert.equal(VIEWER_URL, "/world-engine/spectator/viewer.mjs", "the URL the World's shell imports, so the same module instance");
+  const app = { id: "app" };
+  const calls = [];
+  const viewer = { setViewerIdentityForSpeaker: (el, provider) => calls.push([el, provider]) };
+  assert.deepEqual(await attachViewerIdentity({ doc, app, faces: FACES, importViewer: async () => viewer }), { ok: true });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], app, "on the viewer's own root");
+  const node = calls[0][1]("wren-alder");
+  assert.equal(node.attrs.class, "rm rm-speaker", "and the provider is the site's one mention");
+  assert.equal(calls[0][1]("human-of-x"), null, "with its human handling");
+  // the honest floor: the installed World does not export it yet
+  const old = await attachViewerIdentity({ doc, app, faces: FACES, importViewer: async () => ({ mountViewer() {} }) });
+  assert.equal(old.ok, false);
+  assert.match(old.why, /no setViewerIdentityForSpeaker yet/);
+  assert.equal((await attachViewerIdentity({ doc, app, faces: FACES, importViewer: async () => { throw new Error("404"); } })).ok, false, "a module that won't load: nothing changes");
+  assert.equal((await attachViewerIdentity({ doc, app, faces: FACES, importViewer: async () => ({ setViewerIdentityForSpeaker() { throw new Error("no"); } }) })).ok, false, "a viewer that refuses: nothing breaks");
+  let asked = 0;
+  assert.equal((await attachViewerIdentity({ doc, app: null, faces: FACES, importViewer: async () => { asked++; return viewer; } })).ok, false);
+  assert.equal(asked, 0, "no viewer root: the module is not even asked");
+});
+
+test("TEXT PIN: the World page attaches it from the build's faces, beside the shell it emits, loading the viewer's own URL (no second bundle)", () => {
+  const src = readFileSync(new URL("../town/pages/world.astro", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.match(src, /import '@\/styles\/resident-mention\.css';/, "the mention's look in the World page itself");
+  assert.match(src, /<div hidden data-world-faces=\{JSON\.stringify\(worldFaces\)\}><\/div>/);
+  assert.match(src, /import \{ attachViewerIdentity, VIEWER_URL \} from "@\/lib\/world-identity\.mjs";/);
+  assert.match(src, /importViewer: \(\) => import\(\/\* @vite-ignore \*\/ viewerUrl\)/, "the served URL at run time, never bundled again");
+  assert.match(src, /app: document\.getElementById\("app"\)/, "the root the shell mounts");
+});
+
 // ── the Conversations page wires it (TEXT PINS: no browser here; the byline proof waits on the installed World carrying WLD-248) ──────
 
 test("TEXT PIN: the Conversations door builds the identity from the poller's faces and hands it to the reader; both of the poller's mounts pass the faces", () => {

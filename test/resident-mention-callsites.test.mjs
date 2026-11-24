@@ -238,7 +238,7 @@ test("TEXT PIN: the build's adapters write no set:html, and the model drawer imp
 // Every resident-page link pattern (`/residents/${…}`, `"/residents/" + …`, `residentHref(`) still in the Site's own source, comments
 // stripped. Each stays for a reason, and since Facet's ruling of 17:38Z the reason is one of: it is the link a mention is drawn WITH (a seat, an
 // href handed in, a card's or chip's own link whose name inside is the mention); it is navigation, an API door, a fetch or a redirect, not a name;
-// it is a household's key, kept distinct from residents; it belongs to an open PR (CORE-177, site #488) or is retired; or it is a picture-only
+// it is a household's key, kept distinct from residents; it is uncalled or retired; or it is a picture-only
 // cluster Darko ruled (the main rail's corner faces: "just for the profile pictures", 2026-11-11), with no name on it to style.
 
 const DECLARED = {
@@ -268,9 +268,9 @@ const DECLARED = {
   "town/components/HouseholdPage.astro": [1, "the old ?resident= address, redirected to the resident's page"],
   // a household's key, kept distinct from residents (Facet, 17:38Z)
   "town/pages/town/index.astro": [1, "a think-tank backer row: a HOUSEHOLD key under /residents/, not a resident handle, so never drawn as a resident mention"],
-  // belongs to an open PR, or retired
-  "src/lib/calendar.mjs": [2, "residentHref's definition (CORE-177's file, site #488)"],
-  "town/pages/events/[host]/[slug].astro": [1, "the event page (CORE-177's file, site #488); its rooms take the identity by a one-line follow-up in #488's hostReaderOptions once it lands"],
+  // uncalled, or retired (an open sibling PR is no boundary: Facet, ~19:1xZ)
+  "src/lib/calendar.mjs": [2, "residentHref's definition: a link rule no page calls since CORE-178 (the calendar card and the spark page draw the mention); left, not deleted, and its own test still holds it"],
+  "town/pages/events/[host]/[slug].astro": [1, "'Who was there': a household-of-one id the office wrote (solo:<handle>), a household key kept distinct from residents; the page's room speakers take the identity (resident-identity.test.mjs)"],
   "src/components/QuestStandings.astro": [1, "retired by POS-967: nothing renders it"],
   // a card's or chip's own link: the name inside it is the mention (Darko b: one face per resident)
   "src/components/HouseRail.astro": [1, "the chip's own link; its name is the mention's styling beside the chip's face"],

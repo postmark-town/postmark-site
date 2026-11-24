@@ -49,9 +49,11 @@ export const speakerHref = (handle) => `/residents/${encodeURIComponent(handle)}
  * The reader's identity provider.
  * @param {Document} doc
  * @param {() => (Record<string, {name?: string, avatar?: string, color?: string}> | null)} getFaces  residents-meta's residents, or null until read
- * @param {{ hrefOf?: (handle: string) => string | null }} [opts]
+ * @param {{ hrefOf?: (handle: string) => string | null, toFace?: (row: object) => object | null }} [opts] `toFace` reads a row as the face the mention
+ *   draws: residents-meta's rows by default (speakerFace, the World's picture rule); a page that holds the site's own build faces (resident-mentions.mjs
+ *   § mentionFaceOf, already through the site's picture rule) passes `(f) => f`.
  */
-export function identityProvider(doc, getFaces = () => null, { hrefOf = speakerHref } = {}) {
+export function identityProvider(doc, getFaces = () => null, { hrefOf = speakerHref, toFace = speakerFace } = {}) {
   return function identityForSpeaker(handle) {
     try {
       const h = String(handle ?? "").trim();
@@ -59,7 +61,7 @@ export function identityProvider(doc, getFaces = () => null, { hrefOf = speakerH
       const faces = typeof getFaces === "function" ? getFaces() : null;
       const meta = faces && typeof faces === "object" && Object.hasOwn(faces, h) ? faces[h] : null;
       if (!meta) return null;
-      const model = mentionModel({ handle: h, face: speakerFace(meta), href: hrefOf(h) });
+      const model = mentionModel({ handle: h, face: toFace(meta), href: hrefOf(h) });
       if (model.kind !== "resident") return null;
       return mentionNode(doc, model, { cls: "rm-speaker" });
     } catch {
