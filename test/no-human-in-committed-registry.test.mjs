@@ -185,10 +185,16 @@ export function householdHumanLiterals(text) {
   return found;
 }
 
+// GENERATED OUTPUT IS NOT COMMITTED (CORE-167). test/incremental-build.test.mjs runs a real `astro build` over test/fixtures/incremental-site, and Astro keeps its working files under the
+// fixture root (`.astro/`, its `.prerender` chunks) while it builds; they are git-ignored and exist only mid-run, so walking them is both outside this audit's claim (a COMMITTED file) and a race
+// with that build (ENOENT on a chunk the build has just replaced). The walk skips those folders by name BEFORE it descends, so nothing in them is listed or read. A SOURCE file of a fixture
+// (its pages, data and config) is still walked and scanned: only the folders a build generates are skipped, and a test below pins that both halves hold.
+const GENERATED_DIRS = new Set(["node_modules", ".astro", ".prerender", "dist", "dist-town"]);
+
 function testFilesUnder(dir) {
   const out = [];
   for (const name of readdirSync(dir)) {
-    if (name === "node_modules") continue;
+    if (GENERATED_DIRS.has(name)) continue;
     const p = join(dir, name);
     if (statSync(p).isDirectory()) out.push(...testFilesUnder(p));
     else if (/\.(mjs|js|json)$/.test(name)) out.push(p);
@@ -204,6 +210,25 @@ test("householdHumanLiterals flags a household row's real-looking human and noth
   assert.deepEqual(householdHumanLiterals(`seat: { ground: "g", seat: "rei", human: "Someone Real" },`), [], "CONTROL: not household-shaped (a seat)");
   assert.deepEqual(householdHumanLiterals(`// a household's human: "the person"`), [], "prose in a comment with no household shape near it");
   assert.deepEqual(householdHumanLiterals(`{ human: someVariable, residents: ["x"] }`), [], "a value built in code is not a literal (named limit)");
+});
+
+test("the fixture walk skips a build's generated folders and still scans a fixture's source (CORE-167)", () => {
+  // INVENTED tree in a temp folder: a half-built fixture beside its source. The forbidden-shaped literal is the same invented shape householdHumanLiterals is tested with above.
+  const leak = `export const rows = { "a-house": { human: "Someone Real", residents: ["x"] } };\n`;
+  const root = mkdtempSync(join(tmpdir(), "core167-"));
+  const put = (rel, text) => { const p = join(root, rel); mkdirSync(join(p, ".."), { recursive: true }); writeFileSync(p, text); };
+  put("fixtures/site/src/data.mjs", leak);                    // SOURCE: must be walked, and its literal found
+  put("fixtures/site/src/pages/page.json", `{"households":{"a-house":{"human":"Someone Real"}}}`);
+  put("fixtures/site/.astro/.prerender/chunk.mjs", leak);       // GENERATED mid-build: never walked, never read
+  put("fixtures/site/dist/out.mjs", leak);
+  put("fixtures/site/node_modules/pkg/index.mjs", leak);
+  const seen = testFilesUnder(root).map((f) => relative(root, f).replaceAll("\\", "/")).sort();
+  assert.deepEqual(seen, ["fixtures/site/src/data.mjs", "fixtures/site/src/pages/page.json"], "the source files are scanned; the generated folders are not even listed");
+  const flagged = seen.filter((f) => householdHumanLiterals(readFileSync(join(root, f), "utf8")).length > 0 || rowsWithHuman(f.endsWith(".json") ? JSON.parse(readFileSync(join(root, f), "utf8")) : {}).length > 0);
+  assert.deepEqual(flagged, ["fixtures/site/src/data.mjs", "fixtures/site/src/pages/page.json"], "CONTROL: a forbidden-shaped literal in a fixture's SOURCE is still detected, in code and in JSON");
+  // the skip is by exact folder name: a SOURCE folder that merely looks similar is still walked
+  put("fixtures/site/src/distance/near.mjs", leak);
+  assert.ok(testFilesUnder(root).some((f) => f.endsWith("distance/near.mjs") || f.endsWith("distance\\near.mjs")), "a source folder whose name only begins like a generated one (distance/) is still walked");
 });
 
 test("no tracked test file or fixture holds a household row with a real-looking `human` value", () => {
