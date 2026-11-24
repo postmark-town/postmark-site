@@ -144,7 +144,10 @@
   font-weight: 700;
 }
 /* A SEAT'S PAGES (CORE-164; Darko, 2026-11-23 08:37 EST: "hover over any of the main rail headers to see their pages as a vertical list").
-   A seat that has pages stands in `.pm-rail-seat`: its link, a small button (keyboard and touch; the script reveals it) and the list. The list
+   A seat that has pages stands in `.pm-rail-seat`: its link, a button for the keyboard (the script reveals it) and the list. The rail shows
+   no caret (Darko, 2026-11-24 08:24 EST: "remove carets from rail, they look bad"): the button has no glyph, takes no room in the rail, and
+   is out of sight until keyboard focus lands on it, when it shows the word "pages" beside the seat. On a touch screen the seat's first tap
+   opens the list (rail-pages-ui.mjs). The list
    hangs from the seat's bottom edge with no gap, so the pointer can travel into it without the list closing; it shows while a mouse is on
    the seat or the list (never a finger: a tap's sticky hover would hold it open on a phone), or while the button or keyboard focus holds it.
    Shut, it is display:none, so its links are out of the tab order. It never moves the rail: it floats over the page beneath, and the script
@@ -152,16 +155,16 @@
    take their own, quieter shape, and the page the reader is on is marked in the list, not filled like the lit seat. */
 .pm .pm-rail-seat { position: relative; display: inline-flex; align-items: center; }
 .pm .pm-rail-more {
-  display: inline-grid; place-items: center; flex: none;
-  width: 1.5em; height: 1.9em; margin-left: -0.35em; padding: 0;
-  font: inherit; font-size: 0.74rem; line-height: 1; cursor: pointer;
-  color: rgba(232, 196, 139, 0.62); background: none; border: 0; border-radius: 999px;
+  position: absolute; left: 100%; top: 50%; z-index: 71;
+  width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  font: inherit; font-size: 0.7rem; line-height: 1; cursor: pointer;
+  color: var(--pm-gold-bright); background: var(--pm-harbor); border: 0; border-radius: 999px;
 }
 .pm .pm-rail-more[hidden] { display: none; }
-.pm .pm-rail-more:hover, .pm .pm-rail-more:focus-visible, .pm .pm-rail-seat[data-open] > .pm-rail-more { color: var(--pm-gold-bright); background: rgba(232, 196, 139, 0.08); }
-.pm .pm-rail-more:focus-visible { outline: 2px solid var(--pm-gold); outline-offset: 1px; }
-.pm .pm-rail-more svg { transition: transform 0.12s ease; }
-.pm .pm-rail-seat[data-open] > .pm-rail-more svg { transform: rotate(180deg); }
+.pm .pm-rail-more:focus {
+  width: auto; height: auto; margin: 0; padding: 0.35em 0.6em; overflow: visible; clip-path: none; transform: translateY(-50%);
+  outline: 2px solid var(--pm-gold); outline-offset: 1px;
+}
 .pm .pm-rail-pages {
   display: none; position: absolute; top: 100%; left: 0; z-index: 70;
   width: max-content; min-width: 11rem; max-width: calc(100vw - 16px); box-sizing: border-box;   /* as wide as its longest page, wrapping only past the window */

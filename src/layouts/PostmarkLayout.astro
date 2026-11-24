@@ -174,9 +174,11 @@ const pageLists = railPageLists({ path: Astro.url.pathname, flags: navFlags(impo
             loading — and the way home is the reader's own name. */}
         {/* A SEAT'S PAGES (CORE-164; Darko, 2026-11-23 08:37 EST: "hover over any of the main rail headers to see their pages as a vertical
             list"). A seat that has pages (pageLists, from rail-pages.mjs) stands in a `.pm-rail-seat`: its own link (the seat's destination,
-            unchanged), a small disclosure button for keyboard and touch, and the list. Pointing at the seat shows the list (CSS, on a device
-            that can hover); the button opens and closes it by Enter, Space or a tap, and the script below closes it on Escape, a click
-            elsewhere or focus leaving. The list is display:none until shown, so its links are not in the tab order while it is shut. The
+            unchanged), a disclosure button for the keyboard, and the list. The rail shows no caret (Darko, 2026-11-24 08:24 EST: "remove
+            carets from rail, they look bad"): the button has no glyph and is out of sight until keyboard focus lands on it, when it shows
+            the word "pages" beside the seat. Pointing at the seat shows the list; on a touch screen the first tap on the seat's link opens
+            its list and a second tap goes to the seat (rail-pages-ui.mjs); the button opens and closes it by Enter or Space, and the
+            script below closes it on Escape, a press elsewhere or focus leaving. The list is display:none until shown, so its links are not in the tab order while it is shut. The
             button ships hidden and the script reveals it, so without JavaScript the seat is the plain link it always was. A seat without
             pages has no list and no button. Every seat's own link carries data-rail-top: the rail's row measure (§ THE TOP RAIL, below)
             counts the seats, never the links inside a list. */}
@@ -189,7 +191,7 @@ const pageLists = railPageLists({ path: Astro.url.pathname, flags: navFlags(impo
             >{n.label}{n.beta && <span class="pm-nav-beta">beta</span>}</a>
             <button type="button" class="pm-rail-more" data-rail-more aria-expanded="false" aria-controls={`pm-rail-pages-${n.key}`} hidden>
               <span class="pm-sr">{n.label}: its pages</span>
-              <svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.6 5 6.6 8 3.6" /></svg>
+              <span class="pm-rail-more-word" aria-hidden="true">pages</span>
             </button>
             <ul class="pm-rail-pages" id={`pm-rail-pages-${n.key}`} data-rail-pages aria-label={`${n.label}: its pages`}>
               {pageLists[n.key].map((p) => (

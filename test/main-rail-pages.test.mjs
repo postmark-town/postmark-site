@@ -11,8 +11,11 @@
 //       on), or The Town's board pieces; in order, beta and external kept; the five one-door seats get none; no instance pages;
 //   (2) the list sits inside the window's edges (shiftFor);
 //   (3) open and close, on a hand-rolled document: the button, Escape, focus leaving, a press elsewhere, one list at a time; a mouse
-//       pointing (never a finger); keyboard focus in a list holding it after the mouse leaves; aria-expanded always the shown state;
-//   (4) the wiring: the layout draws a list only for a seat that has pages, its button ships hidden, every seat link is the row measure's.
+//       pointing (never a finger); keyboard focus in a list holding it after the mouse leaves; aria-expanded always the shown state; on a
+//       touch screen the seat's first tap opens its list and the second follows the link, while a mouse click or Enter always follows it;
+//   (4) the wiring: the layout draws a list only for a seat that has pages, its button ships hidden, every seat link is the row measure's;
+//       no caret anywhere on the rail (Darko, 2026-11-24 08:24 EST: "remove carets from rail, they look bad"), the button out of sight
+//       until keyboard focus lands on it.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -209,6 +212,35 @@ test("focus leaving the seat, or a press outside it, shuts the list; focus movin
   assert.ok(!("open" in w.s.dataset), "a press anywhere else shuts it");
 });
 
+test("on a touch screen the seat's first tap opens its list and the second goes to the seat; a mouse click and Enter always go", () => {
+  const { doc, nav, seats: [w, d] } = fakeDom();
+  mountRailPages(nav, { doc });
+  const click = (link) => { const ev = { defaultPrevented: false }; link.fire("click", { preventDefault() { ev.defaultPrevented = true; } }); return ev; };
+  const tap = (link, pointerType = "touch") => { link.fire("pointerdown", { pointerType }); doc.fire("pointerdown", { target: link }); return click(link); };
+  let ev = tap(w.link);
+  assert.equal(ev.defaultPrevented, true, "the first tap does not follow the link");
+  assert.ok("open" in w.s.dataset, "it opens The World's list");
+  assert.equal(w.btn.getAttribute("aria-expanded"), "true", "and the button says so");
+  ev = tap(w.link);
+  assert.equal(ev.defaultPrevented, false, "a tap with the list shown goes to the seat");
+  ev = tap(d.link, "pen");
+  assert.equal(ev.defaultPrevented, true, "a pen taps like a finger");
+  assert.deepEqual(["open" in w.s.dataset, "open" in d.s.dataset], [false, true], "one list at a time: Docs opens, The World shuts");
+  doc.fire("pointerdown", { target: {} });
+  assert.ok(!("open" in d.s.dataset), "a press elsewhere shuts it");
+  d.link.fire("pointerdown", { pointerType: "mouse" });
+  ev = click(d.link);
+  assert.equal(ev.defaultPrevented, false, "a mouse click goes to the seat");
+  assert.ok(!("open" in d.s.dataset), "and opens nothing");
+  ev = click(d.link);
+  assert.equal(ev.defaultPrevented, false, "Enter on the link (a click with no press before it) goes to the seat");
+  d.link.fire("pointerdown", { pointerType: "touch" });
+  doc.fire("pointerdown", { target: {} });                 // the finger lifted elsewhere: no click came
+  d.link.fire("pointerdown", { pointerType: "mouse" });
+  ev = click(d.link);
+  assert.equal(ev.defaultPrevented, false, "a touch press that never became a click doesn't make the next mouse click a tap");
+});
+
 test("an open list is placed inside the window: its shift is written where the stylesheet reads it", () => {
   const { doc, nav, seats: [w] } = fakeDom();
   mountRailPages(nav, { doc });
@@ -240,4 +272,22 @@ test("PIN the layout draws a list only where a seat has pages, its button hidden
   assert.equal((css.match(/\.pm-rail-seat:hover/g) ?? []).length, 1, "and nowhere else: no hover rule the script's aria-expanded can't see, none a tap could hold open");
   assert.doesNotMatch(css, /data-mouse/);
   assert.match(css, /transform: translateX\(var\(--pm-rail-shift, 0px\)\);/, "the script's shift is what moves it");
+});
+
+test("PIN no caret on the rail: the button has no glyph and is out of sight until keyboard focus lands on it", () => {
+  // Darko, 2026-11-24 08:24 EST: "remove carets from rail, they look bad"
+  const layout = read("src/layouts/PostmarkLayout.astro");
+  const seatMarkup = /<span class="pm-rail-seat" data-rail-seat>[\s\S]*?<\/span>\s*\) : \(/.exec(layout)?.[0] ?? "";
+  assert.ok(seatMarkup.includes("data-rail-more"), "the slice is the seat's markup (control: it holds the button)");
+  assert.doesNotMatch(seatMarkup, /<svg|[▾▼⌄⌃›❯▸▿]|&#9662;|chevron/i, "no glyph in the seat: no svg, no caret character");
+  assert.match(seatMarkup, /<span class="pm-rail-more-word" aria-hidden="true">pages<\/span>/, "what keyboard focus shows is a word");
+  const css = read("src/styles/postmark.css");
+  const rule = (sel) => new RegExp(`${sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\{([^}]*)\\}`).exec(css)?.[1] ?? "";
+  const rest = rule(".pm .pm-rail-more"), focused = rule(".pm .pm-rail-more:focus");
+  assert.match(rest, /position: absolute;/, "it takes no room in the rail");
+  assert.match(rest, /width: 1px; height: 1px;/);
+  assert.match(rest, /clip-path: inset\(50%\);/, "out of sight at rest");
+  assert.match(focused, /clip-path: none;/, "in sight while focused");
+  assert.match(focused, /outline: 2px solid/, "with a focus ring");
+  assert.doesNotMatch(css, /pm-rail-more[^{]*svg|rotate\(180deg\)/, "no chevron rule left behind");
 });

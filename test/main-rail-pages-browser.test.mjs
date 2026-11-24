@@ -10,9 +10,10 @@
 //     shuts it; a one-door seat shows nothing; its button says expanded exactly while the list is shown, pointing included;
 //   · mixed input: pointed at, Tabbed into, then the pointer moves away, the list and the focused page stay until focus leaves or Escape;
 //   · the keyboard reaches the seat, its button, and the list's pages by Tab, and Shift-Tab back; a shut list's pages are not in the tab
-//     order; Escape shuts it and leaves focus on the button; Tab past the last page shuts it;
-//   · on a phone (touch, no hover) a tap on the button opens the list inside the screen and a tap elsewhere shuts it, while a tap on the
-//     seat's own link still goes to the seat;
+//     order; Escape shuts it and leaves focus on the button; Tab past the last page shuts it; the button is out of sight until keyboard
+//     focus lands on it, and there is no caret on the rail (Darko, 2026-11-24 08:24 EST: "remove carets from rail, they look bad");
+//   · on a phone (touch, no hover) the first tap on a seat opens its list inside the screen (the page stays), a tap elsewhere shuts it,
+//     and a second tap on the seat while its list is shown goes to the seat;
 //   · every list fits the window at 1440 and 390, the rail still counts six seats in two rows at most, and nothing scrolls sideways;
 //   · with JavaScript off the seats are plain links (no button) and pointing still shows a list.
 // WITHOUT dist-town the test SKIPS and says so; WITH built pages and no browser it FAILS (built-pages cannot turn a skip into a pass).
@@ -248,12 +249,21 @@ test("the keyboard reaches the seat, its button and its pages by Tab and Shift-T
   await setup();
   const p = await openPage(browser, base, "/docs/", { width: 1440 });
   await p.until(`!document.querySelector(${JSON.stringify(BTN("world"))}).hidden`, "the script");
+  // NO CARET: nothing drawn in a seat but its own link's words, and the button out of sight (it covers no pixel) until it is focused
+  const looks = () => p.evalJs(`[...document.querySelectorAll("[data-rail-more]")].map((b) => { const r = b.getBoundingClientRect(), w = b.querySelector(".pm-rail-more-word");
+    return { w: Math.round(r.width), h: Math.round(r.height), clipped: getComputedStyle(b).clipPath !== "none", svg: b.querySelectorAll("svg").length,
+      word: w ? Math.round(w.getBoundingClientRect().width) : -1, wordText: w?.textContent.trim(), focused: b === document.activeElement }; })`);
+  for (const b of await looks()) assert.deepEqual([b.w <= 1, b.h <= 1, b.clipped, b.svg], [true, true, true, 0], `a button is in sight at rest: ${JSON.stringify(b)}`);
+  assert.equal(await p.evalJs(`[...document.querySelectorAll(".pm-rail-seat")].map((s) => s.innerText).join("|")`).then((t) => /[▾▼⌄⌃›❯▸▿]/.test(t)), false, "no caret character in a seat");
   let at = null;
   for (let i = 0; i < 40 && at !== "The World"; i++) { await p.press("Tab"); at = await p.evalJs(FOCUS); }
   assert.equal(at, "The World", "Tab reaches The World's own link");
   await p.press("Tab");
   assert.equal(await p.evalJs(FOCUS), "button:pm-rail-pages-world", "then its button");
   assert.equal(await p.evalJs(`document.activeElement.getAttribute("aria-expanded")`), "false");
+  const shown = (await looks()).find((b) => b.focused);
+  assert.deepEqual([shown.w > 10, shown.h > 10, shown.clipped, shown.word > 10, shown.wordText], [true, true, false, true, "pages"],
+    `focused, the button is in sight and says what it opens: ${JSON.stringify(shown)}`);
   await p.press("Tab");
   assert.equal(await p.evalJs(FOCUS), "The Mail", "a SHUT list's pages are skipped: Tab goes on to the next seat");
   await p.press("Tab", { shift: true });
@@ -280,25 +290,34 @@ test("the keyboard reaches the seat, its button and its pages by Tab and Shift-T
   await p.close();
 });
 
-test("on a phone (touch, no hover) a tap on the button opens the list inside the screen, a tap elsewhere shuts it, and a tap on the seat still goes to the seat", { skip: SKIP }, async () => {
+test("on a phone (touch, no hover) the first tap on a seat opens its list inside the screen, a tap elsewhere shuts it, and a second tap on the seat goes to the seat", { skip: SKIP }, async () => {
   await setup();
   const p = await openPage(browser, base, "/docs/stamps/", { width: 390, height: 844, touch: true });
   await p.until(`!document.querySelector(${JSON.stringify(BTN("world"))}).hidden`, "the script");
   assert.equal(await p.evalJs(`matchMedia("(hover: hover) and (pointer: fine)").matches`), false, "this is a device that cannot hover");
-  await p.tap(BTN("world"));
-  await p.until(SHOWN("world"), "a tap opens The World's list");
+  const c = await p.centre(BTN("world"));
+  assert.equal(c.hit, false, "there is no button to tap: it is out of sight");
+  const path = () => p.evalJs("location.pathname");
+  await p.tap(SEAT("world"));
+  await p.until(SHOWN("world"), "the first tap on The World opens its list");
+  assert.equal(await path(), "/docs/stamps/", "and the page stays where it was");
+  assert.equal(await p.evalJs(`document.querySelector(${JSON.stringify(BTN("world"))}).getAttribute("aria-expanded")`), "true", "the button says the list is shown");
   const r = await p.evalJs(`(() => { const b = document.querySelector(${JSON.stringify(LIST("world"))}).getBoundingClientRect(); return { l: b.left, r: b.right, w: innerWidth, sw: document.documentElement.scrollWidth }; })()`);
   assert.ok(r.l >= 0 && r.r <= r.w, `the list runs off a 390 screen: ${JSON.stringify(r)}`);
   assert.ok(r.sw <= r.w, `the page scrolls sideways: ${JSON.stringify(r)}`);
   await p.tap("main h1");
   await p.until(`!${SHOWN("world")}`, "a tap elsewhere shuts it");
-  await p.tap(BTN("world"));
-  await p.until(SHOWN("world"), "and it opens again");
-  await p.tap(BTN("world"));
-  await p.until(`!${SHOWN("world")}`, "a second tap on the button shuts it");
+  await p.tap(SEAT("world"));
+  await p.until(SHOWN("world"), "and the next first tap opens it again");
+  await p.tap("main h1");                                    // (at 390 The World's open list lies over Docs, as a reader would see)
+  await p.until(`!${SHOWN("world")}`, "shut again");
+  await p.tap(SEAT("docs"));
+  await p.until(SHOWN("docs"), "a first tap on Docs opens Docs' list");
+  assert.deepEqual(await p.evalJs(ANY_SHOWN), ["pm-rail-pages-docs"], "and only Docs'");
+  assert.equal(await path(), "/docs/stamps/", "still on the page");
   const landed = p.landing(); landed.catch(() => {});
   await p.tap(SEAT("docs"));
-  assert.equal(new URL(await landed).pathname, "/docs/", "the seat's own link still goes to the seat");
+  assert.equal(new URL(await landed).pathname, "/docs/", "the second tap on the seat, its list shown, goes to the seat");
   await p.close();
 });
 

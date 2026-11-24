@@ -3,11 +3,15 @@
 //
 // WHAT SHOWS IT. Once this script runs it alone decides whether a list is shown, and the seat's button always says so (aria-expanded, and
 // the seat's data-open, which the stylesheet reads). A list is shown while it is HELD, or while a real mouse POINTS at its seat:
-//   held: the button (Enter, Space, a click or a tap) or keyboard focus moving into the list holds it, and it stays held until the reader
-//         lets it go, however the pointer moves. A reader who points at a seat, Tabs into its pages and moves the mouse away keeps the list
+//   held: the button (Enter or Space; it has no glyph and is out of sight until keyboard focus lands on it), a touch screen's first tap on
+//         the seat's own link, or keyboard focus moving into the list holds it, and it stays held until the reader lets it go, however the
+//         pointer moves. A reader who points at a seat, Tabs into its pages and moves the mouse away keeps the list
 //         and their place in it.
 //   pointing: a mouse on the seat or its list (the list hangs from the seat with no gap, so the pointer can travel into it). A finger is
 //         never pointing (pointerType), so a tap's sticky hover holds nothing open on a phone. Leaving lets go of the pointing.
+// A TAP ON THE SEAT (Darko, 2026-11-24 08:24 EST: "remove carets from rail, they look bad"; with no caret to tap, the seat's link is the
+// phone's opener): a touch or pen press on the seat's link whose list isn't shown opens the list instead of following the link; a tap while
+// it is shown goes to the seat, as a link does. A mouse click and the keyboard's Enter on the link always go to the seat.
 // Without the script the stylesheet's own hover rule shows a list where the device can hover, and the seat is its plain link.
 // WHAT CLOSES IT. The button while the list is shown; Escape anywhere in the seat (focus goes back to the button, and a mouse still on the
 // seat doesn't show it again until it has left); focus leaving the seat (Tab past its last page, Shift-Tab before its link); a press
@@ -32,7 +36,7 @@ export function shiftFor(left, right, width, edge = EDGE) {
 export function mountRailPages(nav, { doc = globalThis.document } = {}) {
   if (!nav || !doc) return { open() {}, close() {}, seats: [] };
   const seats = [...nav.querySelectorAll("[data-rail-seat]")];
-  const parts = (seat) => ({ btn: seat.querySelector("[data-rail-more]"), list: seat.querySelector("[data-rail-pages]") });
+  const parts = (seat) => ({ btn: seat.querySelector("[data-rail-more]"), list: seat.querySelector("[data-rail-pages]"), link: seat.querySelector("[data-rail-top]") });
 
   function place(seat) {
     const { list } = parts(seat);
@@ -68,10 +72,20 @@ export function mountRailPages(nav, { doc = globalThis.document } = {}) {
   }
 
   for (const seat of seats) {
-    const { btn, list } = parts(seat);
+    const { btn, list, link } = parts(seat);
     if (!btn) continue;
     btn.hidden = false;
     btn.addEventListener("click", () => ("open" in seat.dataset ? close(seat) : open(seat)));
+    // a touch screen's first tap on the seat opens its list; the next tap (the list shown) follows the link
+    let touched = false;
+    link?.addEventListener("pointerdown", (e) => { touched = e.pointerType === "touch" || e.pointerType === "pen"; });
+    link?.addEventListener("click", (e) => {
+      const tap = touched;
+      touched = false;
+      if (!tap || "open" in seat.dataset) return;
+      e.preventDefault();
+      open(seat);
+    });
     seat.addEventListener("keydown", (e) => { if (e.key === "Escape") close(seat, { focusButton: true }); });
     seat.addEventListener("focusin", (e) => { if (list?.contains(e.target) && !("held" in seat.dataset)) open(seat); });
     seat.addEventListener("focusout", (e) => { if (!seat.contains(e.relatedTarget)) { delete seat.dataset.held; sync(seat); } });
