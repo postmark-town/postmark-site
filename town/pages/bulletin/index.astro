@@ -10,8 +10,8 @@
 // and the civic quarter's postcard. And the town's social links are stickers
 // slapped on the cork, read from src/lib/door-line.mjs's SOCIALS. Under the
 // pieces, two pinned items (Darko, POS-566): Dom Pidgey's chapbook and the
-// Halloween notice (bulletin-board.mjs, BOARD_PINS). And from December 1 to
-// January 6 the year's-end album book, for its event (year-end-album.mjs).
+// Halloween notice (bulletin-board.mjs, BOARD_PINS). And, while its event is
+// on, the year's-end album book (year-end-album.mjs).
 //
 // THE BOARD SLIDES, NOTHING POPS (Keemin, 2026-09-27): "I'm also generally
 // not a fan of the whole pop-up window. could we try containing everything in
@@ -75,7 +75,7 @@ const doors = postingsWithoutCard(bulletin);
 // the pinned items on the board itself, each with where its click goes
 const pins = boardPins().map((p) => ({ ...p, link: pinLink(p, postings.map((x) => x.slug)), pictures: p.art.map((a) => paintArt(a)) }));
 const PIN_TILTS = [-2, 2.6];
-// the year's-end album book (CORE-173): only inside its season, and only for the event the build itself read (year-end-album.mjs)
+// the year's-end album book (CORE-173): only for the event the build itself read, inside that event's own window (year-end-album.mjs)
 const album = yearEndAlbum(calendar, eventsData);
 const albumPictures = album ? album.art.map((a) => paintArt(a)) : [];
 const month = pinnedMonth(calendar);
@@ -369,8 +369,8 @@ const views = JSON.stringify({
               {/* THE YEAR'S-END ALBUM (CORE-173; Darko: "a nice like end of year album book on our corkboard … that takes you
                   straight to the event and the gallery"): a photo album in wine cloth, a snapshot of the album table mounted on its
                   cover in photo corners, clipped to the cork. Two ways in, both plain links: its title to the event's page, its
-                  foot to that page's gallery. Drawn only in its season and only for the event the build read; otherwise nothing,
-                  not even its place in the row (year-end-album.mjs). */}
+                  foot to that page's gallery. Drawn only for the event the build read, inside its own window; otherwise
+                  nothing, not even its place in the row (year-end-album.mjs). */}
               {album && (
                 <li class="pin-album" data-year-end-album>
                   <div class="piece album" style={`--tilt: ${PIN_TILTS[pins.length % PIN_TILTS.length]}deg`}>
@@ -385,7 +385,6 @@ const views = JSON.stringify({
                     </span>
                     <span class="album-kick">the town's year-end album</span>
                     <a class="album-title" href={album.href}>{album.title}</a>
-                    <span class="album-dates">1 December to 6 January</span>
                     <a class="album-foot" href={album.gallery}>open the album, the event's gallery →</a>
                     <span class="album-pages" aria-hidden="true"></span>
                   </div>
@@ -393,7 +392,7 @@ const views = JSON.stringify({
               )}
             </ul>
             {pins.some((p) => HALLOWEEN_PIN_KEYS.includes(p.key)) && <Fragment set:html={hwGuardScript()} />}
-            {album && <Fragment set:html={albumGuardScript()} />}
+            {album && <Fragment set:html={albumGuardScript(album.until)} />}
 
             {/* THE STICKERS: the town's socials, slapped on the cork. Plain external
                 links; a platform not open yet (`soon` in door-line.mjs) would be a
@@ -1242,7 +1241,6 @@ const views = JSON.stringify({
       text-align: center; font-weight: 700; font-size: 1.2rem; line-height: 1.2;
       color: var(--pm-gold-bright); text-decoration: none; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
     }
-    .album-dates { text-align: center; font-style: italic; font-size: 0.84rem; color: #e7dcc4; }
     .album-foot {
       align-self: center; margin-top: 0.35em; text-align: center;
       font-style: italic; font-size: 0.88rem; color: var(--pm-gold-bright);

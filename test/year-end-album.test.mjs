@@ -4,18 +4,19 @@
 //
 // Darko, 2026-11-23 19:21 EST (CORE-163/b): "during the duration of the event, we can just have a nice like end of year album book on
 // our corkboard on the site that takes you straight to the event and the gallery." The season (CORE-163/c): December 1 to January 6.
-// THE FIT: a book, only in its season, only for the event the build read (never a guessed one), with its two ways in (the event's page
-// and its gallery); outside its season, or with no event, nothing on the board and no gap.
+// THE FIT: a book, only for the event the build read (never a guessed one) and only inside that event's own posted window, with its
+// two ways in (the event's page and its gallery); outside the window, or with no readable event, nothing on the board and no gap.
 //
-// Every event here is INVENTED (`fixture-host/invented-album`): it exercises the rule, and it is never the production target, which
-// stays unnamed (YEAR_END_ALBUM.id is null) until Rei's posted id is confirmed. The built-page check reads dist-town when it is there.
+// Every event here is INVENTED (`fixture-host/invented-album`): it exercises the rule, and it is never the production target, Rei's
+// confirmed `rei/a-little-light-at-years-end`, which only the production-config test names. The built-page check reads dist-town
+// when it is there.
 
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { YEAR_END_ALBUM, albumGuardScript, albumWindowOn, yearEndAlbum } from "../src/lib/year-end-album.mjs";
+import { YEAR_END_ALBUM, albumGuardScript, eventWindow, yearEndAlbum } from "../src/lib/year-end-album.mjs";
 import { BOARD_ART, BOARD_INK, INK, SPRITES, checkSprite, paintArt } from "../src/lib/civic-art.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -29,28 +30,51 @@ const NONE = { past: { events: [] }, evidence: {} };
 const IN = Date.parse("2026-12-15T12:00:00Z");
 const ms = (s) => Date.parse(s);
 
-// ── the season ────────────────────────────────────────────────────────────
+// ── the event's own window ────────────────────────────────────────────────
 
-test("the season is December 1 to the end of January 6, on the town's Eastern clock, and the book keeps to it exactly", () => {
-  assert.equal(YEAR_END_ALBUM.from, "2026-12-01T05:00:00Z", "December 1, 00:00 EST");
-  assert.equal(YEAR_END_ALBUM.until, "2027-01-07T05:00:00Z", "the end of January 6, EST");
-  const at = (t) => yearEndAlbum(cal(EVENT), NONE, t, CFG);
-  assert.equal(at(ms(CFG.from) - 1), null, "a moment before December 1: no book");
-  assert.ok(at(ms(CFG.from)), "December 1, 00:00 EST: the book");
-  assert.ok(at(ms(CFG.until) - 1), "the last moment of January 6: still the book");
-  assert.equal(at(ms(CFG.until)), null, "January 7: gone");
-  assert.equal(albumWindowOn(new Date("2026-12-24T00:00:00Z"), CFG), true, "a Date reads as its instant");
-  assert.equal(albumWindowOn(Number.NaN, CFG), false);
+test("the book keeps to its event's own posted start and end, exactly", () => {
+  const at = (t, e = EVENT) => yearEndAlbum(cal(e), NONE, t, CFG);
+  assert.equal(at(ms(EVENT.starts) - 1), null, "a moment before the event starts: no book");
+  assert.ok(at(ms(EVENT.starts)), "as it starts: the book");
+  assert.ok(at(ms(EVENT.ends) - 1), "its last moment: still the book");
+  assert.equal(at(ms(EVENT.ends)), null, "as it ends: gone");
+  assert.ok(at(new Date("2026-12-24T00:00:00Z")), "a Date reads as its instant");
+  assert.equal(at(Number.NaN), null);
+});
+
+test("a posted window that differs from the ruled season wins: no book outside it, whatever the season says", () => {
+  const short = { ...EVENT, starts: "2026-12-03T17:00:00.000Z", ends: "2026-12-20T17:00:00.000Z" };
+  const at = (t) => yearEndAlbum(cal(short), NONE, ms(t), CFG);
+  assert.equal(at("2026-12-02T12:00:00Z"), null, "December 2, in the season but before the event: no book");
+  assert.ok(at("2026-12-10T12:00:00Z"));
+  assert.equal(at("2026-12-21T12:00:00Z"), null, "December 21, in the season but after the event: no book");
+  const late = { ...EVENT, starts: "2027-01-02T17:00:00.000Z", ends: "2027-01-20T17:00:00.000Z" };
+  assert.ok(yearEndAlbum(cal(late), NONE, ms("2027-01-15T12:00:00Z"), CFG), "past January 6 while the event runs: the event decides");
+  assert.equal(yearEndAlbum(cal(late), NONE, ms("2027-01-20T17:00:00Z"), CFG), null, "and gone as it ends");
+  assert.equal(yearEndAlbum(cal(short), NONE, ms("2026-12-10T12:00:00Z"), CFG).until, ms(short.ends), "the guard expires at the event's end");
+});
+
+test("a missing or invalid start or end authorizes no book", () => {
+  const bad = [
+    { starts: undefined }, { ends: undefined }, { starts: null }, { ends: "" }, { starts: "soon" }, { ends: "not a time" },
+    { starts: 1765000000000 }, { ends: "2026-12-01T17:00:00.000Z" }, { starts: EVENT.ends, ends: EVENT.starts },
+  ];
+  for (const over of bad) {
+    const e = { ...EVENT, ...over };
+    assert.equal(eventWindow(e), null, `window from ${JSON.stringify(over)}`);
+    assert.equal(yearEndAlbum(cal(e), NONE, IN, CFG), null, `book with ${JSON.stringify(over)}`);
+  }
+  assert.deepEqual(eventWindow(EVENT), { from: ms(EVENT.starts), until: ms(EVENT.ends) });
 });
 
 // ── the target ────────────────────────────────────────────────────────────
 
-test("in its season the book goes straight to its event's page and that page's gallery, under the event's own title", () => {
+test("inside its event's window the book goes straight to its event's page and that page's gallery, under the event's own title", () => {
   const book = yearEndAlbum(cal(EVENT), NONE, IN, CFG);
   assert.deepEqual(book, {
     id: ID, title: "An Invented Album",
     href: "/events/fixture-host/invented-album/", gallery: "/events/fixture-host/invented-album/#gallery",
-    until: CFG.until, art: CFG.art,
+    until: ms(EVENT.ends), art: CFG.art,
   });
   const lasting = yearEndAlbum(cal(), { past: { events: [EVENT] }, evidence: {} }, IN, CFG);
   assert.equal(lasting?.href, book.href, "an event the calendar has let go of is still read from the lasting list");
@@ -66,17 +90,21 @@ test("the book never guesses: no id, a malformed id, an event the build didn't r
   for (const title of [undefined, null, "", "   ", 7]) assert.equal(yearEndAlbum(cal({ ...EVENT, title }), NONE, IN, CFG), null, `title ${JSON.stringify(title)}`);
 });
 
-test("THE PRODUCTION BOOK names no event until Rei's is confirmed, so today's board has none, in season or out", () => {
-  assert.equal(YEAR_END_ALBUM.id, null, "a production id is set: it must be the one Rei posted under, confirmed on CORE-173");
-  assert.equal(yearEndAlbum(cal(EVENT), NONE, IN), null);
+test("THE PRODUCTION BOOK names Rei's confirmed event, and only that event the build reads opens it", () => {
+  assert.equal(YEAR_END_ALBUM.id, "rei/a-little-light-at-years-end", "the id Rei confirmed (CORE-173, Wright 2026-11-24 01:36Z), never another");
   assert.ok(Object.isFrozen(YEAR_END_ALBUM));
+  assert.equal(yearEndAlbum(cal(EVENT), NONE, IN), null, "an invented event is not the production one");
+  assert.equal(yearEndAlbum(cal(), NONE, IN), null, "until the Office carries Rei's event, no book");
+  const reis = { ...EVENT, id: YEAR_END_ALBUM.id };
+  assert.equal(yearEndAlbum(cal(reis), NONE, IN)?.href, "/events/rei/a-little-light-at-years-end/", "read, inside its window: its page");
 });
 
-test("a page built in season and read after it drops the book itself", () => {
-  const s = albumGuardScript(CFG);
-  assert.match(s, new RegExp(`Date\\.now\\(\\)>=${ms(CFG.until)}\\)`));
+test("a page built inside the window and read after the event's end drops the book itself", () => {
+  const s = albumGuardScript(ms(EVENT.ends));
+  assert.match(s, new RegExp(`Date\\.now\\(\\)>=${ms(EVENT.ends)}\\)`));
   assert.match(s, /querySelectorAll\("\[data-year-end-album\]"\)/);
   assert.match(s, /\.remove\(\)/);
+  for (const v of [undefined, null, Number.NaN, "2026-12-01"]) assert.throws(() => albumGuardScript(v), /needs the event's end/, `guard from ${v}`);
 });
 
 // ── the picture ───────────────────────────────────────────────────────────
@@ -107,7 +135,8 @@ test("PIN the board draws the book from yearEndAlbum alone, as a photo album wit
   assert.doesNotMatch(li, /set:html|data-pin=|data-open=|data-note-open=|target=/, "no markup from a resident's words; not a BOARD_PINS pin, a view, or a new tab");
   assert.doesNotMatch(li, /class="(washi|book-[a-z]+|hanger-[a-z]+|tack|quay|beyond)\b/, "it wears no other card's parts");
   assert.match(li, /class="album-snap"[\s\S]*corner tl[\s\S]*<svg class="px"/, "the album table, mounted in photo corners");
-  assert.match(page, /\{album && <Fragment set:html=\{albumGuardScript\(\)\} \/>\}/, "the guard goes with the book");
+  assert.match(page, /\{album && <Fragment set:html=\{albumGuardScript\(album\.until\)\} \/>\}/, "the guard goes with the book, expiring at its event's end");
+  assert.doesNotMatch(li, /December|January/, "no season dates typed on the book: the event's window is the Office's");
   assert.match(page, /\.pin-album \{ width: min\(100%, 21em\);/, "it fits a phone's column");
 });
 
