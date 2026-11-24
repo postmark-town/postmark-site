@@ -114,20 +114,9 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
       <p class="soft" data-ann-none hidden={announcements.length > 0}>No announcements yet. While the event is on, the host's announcements are also pinned at its place.</p>
     </section>
 
-    {/* THE AFTER-PAGE (and, while it runs, its conversation). Each section is the office's own field and says which state it is in. */}
-    {sections.after && !sections.cancelled && (
-      <section class="ev-sec" aria-label="The event's sparks" data-ev-sparks data-state={sections.sparks.state}>
-        <h2 class="ev-h">{EVENT_WORDS.sparks.title}</h2>
-        {/* every public completion spark, in the producer's order: none is chosen as the first, the default or the whole event */}
-        {sections.sparks.items.map((it) => it.kind === "spark"
-          ? <SparkCard spark={it.spark} roll={roll} root />
-          : <p class="ev-note" data-ev-note="reference" data-spark-ref={it.id ?? ""}>{EVENT_WORDS.sparks.reference} <span class="soft">{it.id}</span>{it.status && <> <span class="soft">({EVENT_WORDS.sparks.status} {it.status})</span></>}</p>)}
-        {sections.sparks.state !== "known" && (
-          <p class="ev-note" data-ev-note={sections.sparks.state}>{EVENT_WORDS.sparks[sections.sparks.state]}</p>
-        )}
-        {sections.sparks.note && <p class="soft ev-basis" data-ev-spark-note>{sections.sparks.note}</p>}
-      </section>
-    )}
+    {/* THE AFTER-PAGE (and, while it runs, its conversation). Each section is the office's own field and says which state it is in.
+        ONE GALLERY (CORE-177 ruling 5, Darko 2026-11-24 08:43 EST: "the gallery is the collection of all Sparks … We should probably just keep
+        the gallery"): the page draws no separate completion-Sparks group; the gallery below is the one place an event's sparks show. */}
 
     {!sections.cancelled && (sections.after || sections.present.state === "known") && (
       <section class="ev-sec pm-paper" aria-label="Who was there" data-ev-present data-state={sections.present.state}>
@@ -150,36 +139,10 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
       </section>
     )}
 
-    {!sections.cancelled && (
-      <section class="ev-sec pm-paper" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
-        <h2 class="ev-h">{EVENT_WORDS.circles.title}</h2>
-        {sections.circles.state === "rooms" ? (
-          <>
-            {sections.circles.history === "folded" && <p class="soft ev-note" data-ev-note="folded">Some of the oldest talk is folded; each circle says what is behind it.</p>}
-            <div class="ev-rooms">
-              {rooms.map((room) => ({ id: roomIdOf(room), place: typeof room?.place === "string" && room.place.trim() ? room.place.trim() : null })).filter((r) => isRoomId(r.id)).map(({ id, place }) => (
-                <div class="ev-room" data-ev-room={id}>
-                  <h3 class="ev-room-h"><a href={roomHref(id)}>{place ?? id}</a>{place && <span class="ev-room-id soft"> {id}</span>}</h3>
-                  <div class="ev-reader" data-ev-reader>
-                    <p class="soft ev-note" data-ev-floor>{EVENT_WORDS.circles.noJs} <a href={roomHref(id)}>{id}</a>.</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : sections.circles.state === "before" ? (
-          <p class="ev-note" data-ev-note="before">{EVENT_WORDS.circles.before}</p>
-        ) : sections.circles.state === "none" ? (
-          <p class="ev-note" data-ev-note="none">{EVENT_WORDS.circles.none}</p>
-        ) : (
-          <p class="ev-note" data-ev-note="unavailable">{EVENT_WORDS.circles.unavailable}{sections.circles.note && <> <span class="soft">({sections.circles.note})</span></>}</p>
-        )}
-      </section>
-    )}
-
     {/* THE GALLERY, once the doors have opened (CORE-174 FIX): the same section, markup and #gallery anchor for the office's `doors-open`, `underway` and `ended` events, never for
         `announced` (nothing yet) or a cancelled one. The office already serves an open event's gallery (rooms so far), and eventSections says so-far / none / unknown exactly as it
-        does after the event, so this is visibility of an existing surface, not a new design. */}
+        does after the event, so this is visibility of an existing surface, not a new design. ABOVE THE CONVERSATION (CORE-177, Darko 2026-11-24 08:48 EST: "we should probably
+        move the gallery above the conversations"). */}
     {showGallery && (
       <section class="ev-sec" aria-label="The gallery" id="gallery" data-ev-gallery data-state={sections.gallery.state}>
         <h2 class="ev-h">{EVENT_WORDS.gallery.title}</h2>
@@ -192,6 +155,37 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
         {sections.gallery.state === "known" && sections.gallery.complete === false && <p class="soft ev-basis" data-ev-complete="so-far">{EVENT_WORDS.gallery.sofar}</p>}
         {sections.gallery.state === "known" && sections.gallery.complete === null && <p class="soft ev-basis" data-ev-complete="unknown">{EVENT_WORDS.gallery.unsure}</p>}
         <p class="ev-onward" data-ev-onward><a href="/sparks/">{CATALOGUE_WORDS.onward} →</a></p>
+      </section>
+    )}
+
+    {!sections.cancelled && (
+      <section class="ev-sec pm-paper" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
+        <h2 class="ev-h">{EVENT_WORDS.circles.title}</h2>
+        {sections.circles.state === "rooms" ? (
+          <>
+            {sections.circles.history === "folded" && <p class="soft ev-note" data-ev-note="folded">Some of the oldest talk is folded; each circle says what is behind it.</p>}
+            <div class="ev-rooms">
+              {/* EACH ROOM IS SHUT UNTIL THE READER OPENS IT (CORE-177, Darko 2026-11-24 08:48 EST: "it shouldn't just be expanded by default … something
+                  like you can click to look more into, and then like also look at the circles"): a native disclosure, so it opens and shuts with no script
+                  too; the circle reader is mounted the first time it is opened, never for a room nobody opened. */}
+              {rooms.map((room) => ({ id: roomIdOf(room), place: typeof room?.place === "string" && room.place.trim() ? room.place.trim() : null })).filter((r) => isRoomId(r.id)).map(({ id, place }) => (
+                <details class="ev-room" data-ev-room={id}>
+                  <summary class="ev-room-h"><span class="ev-room-place">{place ?? id}</span>{place && <span class="ev-room-id soft"> {id}</span>}</summary>
+                  <p class="ev-room-whole"><a href={roomHref(id)}>{EVENT_WORDS.circles.whole} →</a></p>
+                  <div class="ev-reader" data-ev-reader>
+                    <p class="soft ev-note" data-ev-floor>{EVENT_WORDS.circles.noJs} <a href={roomHref(id)}>{id}</a>.</p>
+                  </div>
+                </details>
+              ))}
+            </div>
+          </>
+        ) : sections.circles.state === "before" ? (
+          <p class="ev-note" data-ev-note="before">{EVENT_WORDS.circles.before}</p>
+        ) : sections.circles.state === "none" ? (
+          <p class="ev-note" data-ev-note="none">{EVENT_WORDS.circles.none}</p>
+        ) : (
+          <p class="ev-note" data-ev-note="unavailable">{EVENT_WORDS.circles.unavailable}{sections.circles.note && <> <span class="soft">({sections.circles.note})</span></>}</p>
+        )}
       </section>
     )}
 
@@ -305,18 +299,29 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
           if (floor) floor.textContent = EVENT_WORDS.circles.noReader;
         });
       };
+      // A room added after the build is drawn as the baked ones are: shut, its id as its summary, the way to its whole talk inside.
       const build = (ids) => {
         const wrap = circ.querySelector(".ev-rooms");
         if (!wrap) return;
         for (const id of ids) {
           if (wrap.querySelector(`[data-ev-room="${CSS.escape(id)}"]`)) continue;
-          const box = document.createElement("div"); box.className = "ev-room"; box.dataset.evRoom = id;
-          const h = document.createElement("h3"); h.className = "ev-room-h";
-          const a = document.createElement("a"); a.href = roomHref(id); a.textContent = id; h.append(a);
+          const box = document.createElement("details"); box.className = "ev-room"; box.dataset.evRoom = id;
+          const h = document.createElement("summary"); h.className = "ev-room-h";
+          const name = document.createElement("span"); name.className = "ev-room-place"; name.textContent = id; h.append(name);
+          const whole = document.createElement("p"); whole.className = "ev-room-whole";
+          const a = document.createElement("a"); a.href = roomHref(id); a.textContent = `${EVENT_WORDS.circles.whole} →`; whole.append(a);
           const reader = document.createElement("div"); reader.className = "ev-reader"; reader.dataset.evReader = "";
           const note = document.createElement("p"); note.className = "soft ev-note"; note.dataset.evFloor = ""; note.textContent = EVENT_WORDS.circles.noReader;
-          reader.append(note); box.append(h, reader); wrap.append(box);
+          reader.append(note); box.append(h, whole, reader); wrap.append(box);
         }
+      };
+      // CORE-177: a room's reader is mounted the first time the room is opened (one read for a room someone looks into, none for the rest)
+      const arm = (box) => {
+        if (box.dataset.evArmed !== undefined) return;
+        box.dataset.evArmed = "";
+        const mount = () => { if (box.open && box.dataset.evMounted === undefined) { box.dataset.evMounted = ""; drawRoom(box, box.dataset.evRoom); } };
+        box.addEventListener("toggle", mount);
+        mount();
       };
       const start = async () => {
         // WHILE IT RUNS (data-live) and AFTER IT (data-refresh, CORE-174): a historical page's baked rooms are the build's, and the office's durable record may hold
@@ -334,7 +339,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
             }
           } catch { /* the build's rooms stand */ }
         }
-        for (const box of circ.querySelectorAll("[data-ev-room]")) drawRoom(box, box.dataset.evRoom);
+        for (const box of circ.querySelectorAll("[data-ev-room]")) arm(box);
       };
       start();
     }
@@ -548,8 +553,10 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     .ev-sec:not(.pm-paper) a { color: var(--pm-gold-bright); }
     /* the rooms' boxes are also made by the island, so they carry no scope attribute: :global */
     .ev-sec :global(.ev-room) { margin: 0 0 1em; }
-    .ev-sec :global(.ev-room-h) { margin: 0 0 0.4em; font-size: 0.95em; font-family: var(--pm-mono); overflow-wrap: anywhere; }
+    .ev-sec :global(.ev-room-h) { margin: 0 0 0.4em; font-size: 0.95em; font-family: var(--pm-mono); overflow-wrap: anywhere; cursor: pointer; }
+    .ev-sec :global(.ev-room-h:focus-visible) { outline: 2px solid var(--pm-gold); outline-offset: 2px; border-radius: 4px; }
     .ev-sec :global(.ev-room-id) { font-size: 0.8em; }
+    .ev-sec :global(.ev-room-whole) { margin: 0 0 0.6em; font-size: 0.9em; }
     .ev-sec :global(.ev-note) { margin: 0.4em 0; line-height: 1.55; }
     .ev-sec.pm-paper :global(.soft) { color: var(--pm-ink-soft); }
     .ev-sec.pm-paper :global(a) { color: var(--pm-wax); text-decoration: underline; }

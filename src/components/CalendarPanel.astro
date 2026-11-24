@@ -12,6 +12,7 @@
 // Resident words render as TEXT through Astro's escaping, never set:html.
 import CalendarCard from "@/components/CalendarCard.astro";
 import CalendarMonth from "@/components/CalendarMonth.astro";
+import eventsData from "@/data/postmark/events.json";
 import { groupsOf, monthGrid, monthKey, referenceInstant } from "@/lib/calendar.mjs";
 
 interface Props {
@@ -23,7 +24,8 @@ interface Props {
 const { calendar, roll } = Astro.props;
 const groups = groupsOf(calendar);
 const ref = referenceInstant(calendar);
-const month = monthGrid(calendar, monthKey(ref), ref);
+// the month reads the lasting list too, in both places this panel stands, so a past event is on its day wherever the calendar is (CORE-177)
+const month = monthGrid(calendar, monthKey(ref), ref, undefined, eventsData);
 ---
 <div class="cal-panel">
   <CalendarMonth month={month} />

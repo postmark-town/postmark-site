@@ -347,27 +347,27 @@ test("BUILT FALSIFIER: the ended event outside the seven-day list has its page a
   assert.match(html, /data-event-page[^>]*data-after/);
   const t = textOf(html);
   assert.ok(t.includes("Harvest Supper (invented; ended outside the seven-day list)"));
-  // the sparks: EVERY public completion spark, in the producer's order, each with headline, recounting and credit; then the public reference and the note
-  const spark = section(html, "data-ev-sparks");
-  // the PICTURED one is the picture and one caption (CORE-121, Darko 13:14 EST): its recounting is on its own page, not on the card
-  assert.equal(/A long table, too many dishes, and one very serious argument about pie\./.test(textOf(spark)), false, "an image card carries no recounting");
-  assert.match(textOf(built("sparks", "supperkeeper-test", "harvest-supper-test")), /A long table, too many dishes, and one very serious argument about pie\./, "the bigger view has every served word");
-  assert.match(textOf(spark), /The second room kept talking about pie until the lamps went out\./);
-  assert.deepEqual([...spark.matchAll(/data-spark="([^"]*)"/g)].map((m) => m[1]), ["supperkeeper-test/harvest-supper-test", "supperkeeper-test/harvest-supper-guests-test"], "both completion sparks, none chosen as the default");
-  assert.equal((spark.match(/data-spark-picture/g) ?? []).length, 1, "only the spark that has a picture draws a picture tile");
-  assert.match(spark, /data-spark-credit/);
-  assert.match(spark, /data-spark-ref="supperkeeper-test\/harvest-supper-pending-test"/); assert.match(textOf(spark), /the office says: pending/);
-  assert.match(spark, /data-ev-spark-note/); assert.match(textOf(spark), /a cap may leave some rooms without one/);
-  // the gallery: both accepted child sparks, no completion spark among them
+  // ONE GALLERY (CORE-177 ruling 5): the page draws no separate completion-Sparks group. The completion sparks keep their own pages (the bigger view has every
+  // served word); on the event page the gallery is the one place sparks show
+  assert.equal(html.includes("data-ev-sparks"), false, "no separate completion-Sparks section");
+  for (const id of ["supperkeeper-test/harvest-supper-test", "supperkeeper-test/harvest-supper-guests-test"]) assert.equal(html.includes(`data-spark="${id}"`), false, `${id}: a completion spark is not redrawn on the event page`);
+  assert.equal(html.includes("data-spark-ref="), false, "nor its public references");
+  assert.match(textOf(built("sparks", "supperkeeper-test", "harvest-supper-test")), /A long table, too many dishes, and one very serious argument about pie\./, "a completion spark's own page still has every served word");
+  // the gallery: both accepted child sparks
   const gal = section(html, "data-ev-gallery");
   assert.equal((gal.match(/data-spark="/g) ?? []).length, 2);
   assert.ok(gal.includes("The pie argument") && gal.includes("The last slice"));
-  assert.equal(gal.includes('data-spark="supperkeeper-test/harvest-supper-test"') || gal.includes("harvest-supper-guests-test"), false, "no completion spark is repeated in the gallery");
-  // both rooms, in the office's order, each with the no-JS floor and a link to its whole talk
+  // THE GALLERY ABOVE THE CONVERSATION (CORE-177, Darko 08:48 EST)
+  assert.ok(html.indexOf("data-ev-gallery") > 0 && html.indexOf("data-ev-gallery") < html.indexOf("data-ev-circles"), "the gallery sits above the conversation");
+  // both rooms, in the office's order, each SHUT (a disclosure with no `open`), with the no-JS floor and a link to its whole talk
   const circ = section(html, "data-ev-circles");
   const roomsAt = [...circ.matchAll(/data-ev-room="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(roomsAt, ["t1792519260000-supperkeeper-test", "t1792520400000-guest-test"]);
   for (const r of roomsAt) assert.ok(circ.includes(`href="/conversations/#${r}"`), `${r}: no link to its whole talk`);
+  const rooms = [...circ.matchAll(/<details\b[^>]*data-ev-room="[^"]+"[^>]*>/g)].map((m) => m[0]);
+  assert.equal(rooms.length, 2, "each room is a disclosure");
+  for (const tag of rooms) assert.doesNotMatch(tag, /\sopen[\s>=]/, "and shut until the reader opens it");
+  assert.equal((circ.match(/<summary\b[^>]*class="ev-room-h"/g) ?? []).length, 2, "its place is the summary a reader opens it by");
   assert.match(circ, /data-ev-floor/);
   assert.match(circ, /data-live=|data-event=/);
 });
@@ -405,16 +405,17 @@ test("BUILT: an empty completion collection beside a populated gallery: the gall
   assert.equal(s.circles.state, "rooms"); assert.deepEqual(s.circles.rooms.map(roomIdOf), ["t1790856000000-lawn-test"]);
   assert.deepEqual(s.gallery.rooms, ["t1790856000000-lawn-test"]); assert.deepEqual(s.gallery.sparks[0].rooms, ["t1790856000000-lawn-test"]);
   assert.deepEqual(s.present.households, ["hh:legacy-test-house"]);
-  assert.ok(section(html, "data-ev-circles").includes('data-ev-room="t1790856000000-lawn-test"'), "the room's circles are on the page, above the gallery");
+  assert.ok(section(html, "data-ev-circles").includes('data-ev-room="t1790856000000-lawn-test"'), "the room's circles are on the page, below the gallery");
   assert.equal(textOf(section(html, "data-ev-circles")).includes("No conversation formed"), false, "so the page does not say no conversation formed");
   const t = (marker) => textOf(section(html, marker));
-  assert.ok(t("data-ev-sparks").includes("No public completion sparks are listed here."), "the empty collection says exactly that");
-  assert.equal(EVENT_WORDS.sparks.none, "No public completion sparks are listed here.");
+  // CORE-177 ruling 5 (Darko: "Yeah, the no public completion sparks is a bit confusing because there are literal sparks … that link to this event"): the empty
+  // completion collection is no longer said at all beside the gallery; the gallery is the one place this event's sparks show
+  assert.equal(html.includes("data-ev-sparks"), false, "no completion-Sparks section, empty or not");
+  assert.equal(textOf(html).includes(EVENT_WORDS.sparks.none), false, "so no 'no public completion sparks' beside a populated gallery");
   assert.ok(section(html, "data-ev-gallery").includes('data-spark="legacy-gallery-spark-test"'), "the ordinary accepted Spark still stands in the gallery");
   assert.ok(t("data-ev-gallery").includes("A lawn spark (invented; an ordinary accepted Spark in the gallery)"));
   // the old sentence is the falsifier: it claimed no spark had been made from the event, which the gallery card contradicts
   assert.equal(html.includes("No public spark has been made from this event yet"), false, "the denying sentence is gone");
-  assert.doesNotMatch(t("data-ev-sparks"), /No (public )?spark has been made/);
   assert.equal(t("data-ev-gallery").includes(EVENT_WORDS.gallery.none), false, "and the gallery is not drawn as none");
 });
 
@@ -423,16 +424,15 @@ test("BUILT: each state is its own sentence: known none, unknown, a claim not ac
   const say = (html, marker) => textOf(section(html, marker));     // text, so an escaped apostrophe is the apostrophe a reader sees
   assert.equal(say(q, "data-ev-circles").includes(EVENT_WORDS.circles.none), true);
   assert.ok(say(q, "data-ev-present").includes(EVENT_WORDS.present.none));
-  assert.ok(say(q, "data-ev-sparks").includes(EVENT_WORDS.sparks.none));
   assert.ok(say(q, "data-ev-gallery").includes(EVENT_WORDS.gallery.none));
   const l = eventHtml(LOST);
-  for (const [marker, words] of [["data-ev-circles", EVENT_WORDS.circles.unavailable], ["data-ev-present", EVENT_WORDS.present.unknown], ["data-ev-sparks", EVENT_WORDS.sparks.unknown], ["data-ev-gallery", EVENT_WORDS.gallery.unknown]]) {
+  for (const [marker, words] of [["data-ev-circles", EVENT_WORDS.circles.unavailable], ["data-ev-present", EVENT_WORDS.present.unknown], ["data-ev-gallery", EVENT_WORDS.gallery.unknown]]) {
     assert.ok(say(l, marker).includes(words), `${marker}: unavailable is said as unavailable`);
     assert.equal(say(l, marker).includes(EVENT_WORDS.circles.none) || say(l, marker).includes(EVENT_WORDS.gallery.none), false, `${marker}: and never as none`);
   }
+  // CORE-177 ruling 5: no event page draws the separate completion-Sparks group, in any state (none, unknown, a claim not accepted)
+  for (const [name, h] of [["quiet", q], ["lost", l], ["old", eventHtml(OLD)]]) assert.equal(h.includes("data-ev-sparks"), false, `${name}: no completion-Sparks section`);
   const o = eventHtml(OLD);
-  assert.match(textOf(section(o, "data-ev-sparks")), /claim awaiting acceptance/); assert.match(textOf(section(o, "data-ev-sparks")), /withdrawn/);
-  assert.equal((section(o, "data-ev-sparks").match(/data-spark-ref=/g) ?? []).length, 2, "every public reference, none chosen");
   assert.match(textOf(section(o, "data-ev-circles")), /oldest settlement/);
   const c = eventHtml(COMING);
   assert.ok(say(c, "data-ev-circles").includes(EVENT_WORDS.circles.before));
@@ -546,10 +546,10 @@ test("the drawn filters are predicates over what the producer served: events, wi
 // the cards of a page's HTML
 const cardsOf = (html) => html.split("<article").slice(1).map((c) => "<article" + c.split("</article>")[0] + "</article>").filter((c) => /class="[^"]*spark-card/.test(c));
 
-test("BUILT: every Spark card, in both event sections, is ONE real link to its canonical page: the headline anchor is stretched over the whole card, nothing nests, the other links stay", () => {
+test("BUILT: every Spark card on the event page (the one gallery) is ONE real link to its canonical page: the headline anchor is stretched over the whole card, nothing nests, the other links stay", () => {
   const html = eventHtml(SUPPER);
   const cards = cardsOf(html);
-  assert.equal(cards.length, 4, "two completion Sparks + two gallery Sparks (the pending reference is not a card)");
+  assert.equal(cards.length, 2, "the two gallery Sparks: the page draws no separate completion-Sparks group (CORE-177 ruling 5)");
   for (const card of cards) {
     const id = /data-spark="([^"]*)"/.exec(card)[1];
     const opens = [...card.matchAll(/<a\b[^>]*data-spark-open[^>]*>/g)];
@@ -581,8 +581,9 @@ test("image-first CSS contract (pinned from the card's source): the pictured car
 test("BUILT: a Spark's headline is dark on its cream card (an own colour, never the page's pale heading) and a no-picture Spark still has no empty tile", () => {
   const css = readFileSync(join(ROOT, "src/components/SparkCard.astro"), "utf8");
   assert.match(css, /\.spark-head \{[^}]*color: var\(--pm-ink\)/);
-  const guests = cardsOf(eventHtml(SUPPER)).find((c) => c.includes("harvest-supper-guests-test"));
-  assert.ok(guests && !guests.includes("data-spark-picture"), "no picture, no tile");
+  // the gallery's no-picture Spark (the completion spark that used to stand here is no longer on the event page, CORE-177 ruling 5)
+  const slice = cardsOf(eventHtml(SUPPER)).find((c) => c.includes('data-spark="supperkeeper-test/the-last-slice"'));
+  assert.ok(slice && !slice.includes("data-spark-picture"), "no picture, no tile");
 });
 
 test("BUILT: /sparks/ (register read OK) lists ONLY the register's Sparks, once each, with a whole-card link, the filters and the empty Flares place; event-carried Sparks are not relisted as global discovery; unaccepted references are absent", () => {

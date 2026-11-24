@@ -13,6 +13,11 @@
 // the reader's zone, moves each event to its day in that zone, and marks the
 // reader's own today. The rules are in src/lib/calendar.mjs.
 //
+// PAST EVENTS STAY ON THE MONTH (CORE-177): an event the office says has ended
+// (`past`, calendar.mjs calendarEvents) is drawn greyed, as calendars do, and
+// is still the link to its page; the word "ended" is said in the agenda and
+// to a screen reader in the grid, so the grey is never the only sign.
+//
 // Resident words (an event's title) render as TEXT through Astro's escaping.
 import {
   WEEKDAYS, ZONE_FLOOR, eventHref, monthHref, monthLabel, placeOf, utcClock, utcText, zoneLine,
@@ -58,10 +63,10 @@ const agendaPlace = (p: any) => {
               <span class="cal-daynum">{day.day}</span>
               <ul class="cal-day-events">
                 {day.events.map((e: any) => (
-                  <li class:list={["cal-item", { "is-cancelled": e.cancelled }]} data-cal-item={e.id} data-starts={e.starts}>
+                  <li class:list={["cal-item", { "is-cancelled": e.cancelled, "is-past": e.past }]} data-cal-item={e.id} data-starts={e.starts} data-past={e.past ? "" : undefined}>
                     {eventHref(e.id)
-                      ? <a href={eventHref(e.id)}><time datetime={e.starts} title={`${e.starts} (UTC)`} data-local-clock>{utcClock(e.starts)}</time> <span class="cal-item-title">{e.title}</span></a>
-                      : <span><time datetime={e.starts} title={`${e.starts} (UTC)`} data-local-clock>{utcClock(e.starts)}</time> <span class="cal-item-title">{e.title}</span></span>}
+                      ? <a href={eventHref(e.id)}><time datetime={e.starts} title={`${e.starts} (UTC)`} data-local-clock>{utcClock(e.starts)}</time> <span class="cal-item-title">{e.title}</span>{e.past && <span class="cal-sr">, ended</span>}</a>
+                      : <span><time datetime={e.starts} title={`${e.starts} (UTC)`} data-local-clock>{utcClock(e.starts)}</time> <span class="cal-item-title">{e.title}</span>{e.past && <span class="cal-sr">, ended</span>}</span>}
                     {e.cancelled && <span class="cal-item-cancelled" data-cancelled> cancelled</span>}
                   </li>
                 ))}
@@ -75,8 +80,8 @@ const agendaPlace = (p: any) => {
 
   <ol class="cal-agenda" data-cal-agenda>
     {month.events.map((e: any) => (
-      <li class:list={["cal-agenda-item", { "is-cancelled": e.cancelled }]} data-cal-item={e.id}>
-        <time class="cal-agenda-when" datetime={e.starts} title={`${e.starts} (UTC)`} data-local-when>{utcText(e.starts)}</time>
+      <li class:list={["cal-agenda-item", { "is-cancelled": e.cancelled, "is-past": e.past }]} data-cal-item={e.id} data-past={e.past ? "" : undefined}>
+        <time class="cal-agenda-when" datetime={e.starts} title={`${e.starts} (UTC)`} data-local-when>{utcText(e.starts)}</time>{e.past && <span class="cal-item-past" data-past-word> · ended</span>}
         {eventHref(e.id)
           ? <a class="cal-agenda-title" href={eventHref(e.id)}>{e.title}</a>
           : <span class="cal-agenda-title">{e.title}</span>}
@@ -206,6 +211,13 @@ const agendaPlace = (p: any) => {
   .cal-item-cancelled {
     font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: #e0846b;
   }
+  /* a past event: greyed, still a link; the grey lifts while it is pointed at or focused, so the reader sees what they will open */
+  .cal-item.is-past a, .cal-item.is-past > span { opacity: 0.55; border-left-color: rgba(232, 196, 139, 0.45); filter: grayscale(0.6); }
+  .cal-item.is-past a:hover, .cal-item.is-past a:focus-visible { opacity: 1; filter: none; }
+  .cal-agenda-item.is-past { opacity: 0.6; border-left-color: rgba(232, 196, 139, 0.45); }
+  .cal-agenda-item.is-past:hover, .cal-agenda-item.is-past:focus-within { opacity: 1; }
+  .cal-item-past { font-family: var(--pm-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: #b9ae98; }
+  .cal-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
   .cal-agenda { display: none; list-style: none; margin: 0; padding: 0; }
   .cal-agenda-item {

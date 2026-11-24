@@ -221,6 +221,8 @@ export const EVENT_WORDS = Object.freeze({
     noReader: "The circles show here once the page can load the town's reader; the whole talk is on the conversations page.",
     noJs: "The circles load with JavaScript. Without it, each room's whole talk is on the conversations page:",
     loadFailed: "This room's circles couldn't be loaded.",
+    // CORE-177: inside a shut room, the way to the room's whole talk on the Conversations page
+    whole: "The whole conversation, on the conversations page",
   },
   present: {
     title: "Who was there",
@@ -430,10 +432,29 @@ export function referenceInstant(calendar, now = new Date()) {
   return now.toISOString();
 }
 
-/** Every month that gets a page, oldest first. */
-export function monthsOf(calendar, ref) {
+// PAST EVENTS LIVE ON THE CALENDAR (CORE-177, Darko 2026-11-24 08:43 EST: "Calendar should be where the past events live. That should be
+// where you can click them … We just need to make sure that the past events are findable on the calendar."). The months and their grids
+// read the same events the event pages are built from, allEventViews: the calendar's three lists and the office's lasting list
+// (events.json), so an event that ended past the calendar's seven days is still on its day, linking to its page. That is the inventory
+// the build actually holds, nothing fetched or dated here, and no claim that it is every event there ever was.
+//
+// AN EVENT IS PAST BY THE OFFICE'S WORD, never by the clock (which group an event is in is the office's, above): its phase is "ended", or
+// the office lists it as ended (the calendar's `ended` group, or the lasting list, which holds only ended events). A grid entry carries it
+// as `past`, and the month draws it greyed, as calendars do.
+
+/** The events a month is drawn from: allEventViews over the calendar and the lasting list, each marked `past` by the office's word. */
+export function calendarEvents(calendar, events) {
+  const ended = new Set([
+    ...(Array.isArray(calendar?.ended) ? calendar.ended : []),
+    ...(Array.isArray(events?.past?.events) ? events.past.events : []),
+  ].map((e) => e?.id));
+  return allEventViews(calendar, events).map((e) => ({ ...e, past: e.phase === "ended" || ended.has(e.id) }));
+}
+
+/** Every month that gets a page, oldest first. `events` is the lasting list (events.json): its months get pages too. */
+export function monthsOf(calendar, ref, events) {
   const refMonth = monthKey(ref);
-  const starts = eventsOf(calendar).map((e) => monthKey(e.starts)).filter(Boolean).sort();
+  const starts = calendarEvents(calendar, events).map((e) => monthKey(e.starts)).filter(Boolean).sort();
   let first = refMonth;
   let last = shiftMonth(refMonth, 1);
   if (starts.length && starts[0] < first) first = starts[0];
@@ -447,13 +468,16 @@ export function monthsOf(calendar, ref) {
  * One month as the page draws it: whole weeks, Sunday first, with the days of
  * the months on either side filling the first and last rows (marked out of the
  * month, and carrying their events too, so a reader at a month's edge sees the
- * week whole). Each day holds the events that start on it, earliest first.
- * `prev` and `next` are null past the first and last month that has a page.
+ * week whole). Each day holds the events that start on it, earliest first,
+ * each marked `past` by the office's word (calendarEvents). `events` is the
+ * lasting list (events.json). `prev` and `next` are null past the first and
+ * last month that has a page.
  */
-export function monthGrid(calendar, key, ref, months = monthsOf(calendar, ref)) {
+export function monthGrid(calendar, key, ref, months, events) {
   if (!isMonthKey(key)) throw new Error(`monthGrid: "${key}" is not a YYYY-MM month`);
+  months = months ?? monthsOf(calendar, ref, events);
   const byDay = new Map();
-  for (const e of eventsOf(calendar)) {
+  for (const e of calendarEvents(calendar, events)) {
     const k = dayKey(e.starts);
     if (!k) continue;
     if (!byDay.has(k)) byDay.set(k, []);
