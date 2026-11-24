@@ -577,6 +577,12 @@ function runs(label, rows, ink) {
 //                        and on the step a jack-o'-lantern smiling (not
 //                        leering) beside a bowl of candy. An event notice, warm,
 //                        not the season's skin, which the site drips in apart.
+//   albumtable           the year's-end album (CORE-173): Rei's event as she put
+//                        it, "an album table rather than a stage" in the Town
+//                        Centre, so a table on the quay with the album open on
+//                        it, its pictures showing, a candle lit at one end and a
+//                        party hat at the other, under a string of little lights.
+//                        Its pin is year-end-album.mjs's, not BOARD_PINS'.
 //
 // THEIR OWN TABLE, NOT SPRITES. SPRITES answers for the quarter and for faces
 // (household-dashboard's spriteOf hands a meep its sprite by handle), and a
@@ -672,6 +678,32 @@ export const BOARD_ART = {
     "................kccrcrck",
     ".................kcccck.",
     "..................kkkk..",
+    "..sSssssSsssssSssssSss..",
+    "........................",
+    "........................",
+  ],
+  albumtable: [
+    "........................",
+    "........................",
+    ".e....................q.",
+    "....z..............f....",
+    ".......f........z.......",
+    "..........q..e..........",
+    "........................",
+    "........................",
+    "...................e....",
+    "...h...............o....",
+    "..hGh.kkkkk.kkkkk.oqo...",
+    "...g..kfzpkkkpqek.ozqo..",
+    "...p..kzfpkkkpeqk.oqzoo.",
+    "...p..kppppkppppk.xxxxx.",
+    "..kttttttttttttttttttk..",
+    "..kxxxxxxxxxxxxxxxxxxk..",
+    "...kt..............tk...",
+    "...kt..............tk...",
+    "...kt..............tk...",
+    "...kt..............tk...",
+    "...kt..............tk...",
     "..sSssssSsssssSssssSss..",
     "........................",
     "........................",
