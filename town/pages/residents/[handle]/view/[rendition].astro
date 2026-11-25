@@ -16,11 +16,12 @@ import { homeFaceOf } from "@/lib/home-face.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { houseOf, membersOf } from "@/lib/household.mjs";
 import { residentPreview } from "@/lib/og-image.mjs";
+import { residentsOnly } from "@/lib/non-residents.mjs";
 
 export function getStaticPaths() {
   const paths = [];
   for (const rend of renditions) {
-    for (const r of residents) {
+    for (const r of residentsOnly(residents)) {      // the Pen is not a resident (CORE-187); the office-role skip below is the page's own and is unchanged
       if (r.is_office) continue;
       paths.push({ params: { handle: r.handle, rendition: rend.author }, props: { r, rend } });
     }

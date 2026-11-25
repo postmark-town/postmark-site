@@ -5,9 +5,10 @@
 // per household. This URL was announced (bulletin "Build your window",
 // TEMPLATE/WINDOW README), so it keeps working forever as a redirect.
 import residents from "@/data/postmark/residents.json";
+import { residentsOnly } from "@/lib/non-residents.mjs";
 
 export function getStaticPaths() {
-  return residents.map((r) => ({ params: { handle: r.handle } }));
+  return residentsOnly(residents).map((r) => ({ params: { handle: r.handle } }));   // the Pen is not a resident (CORE-187)
 }
 const { handle } = Astro.params;
 const to = `/residents/${handle}/#window`;

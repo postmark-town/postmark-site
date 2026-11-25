@@ -36,6 +36,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { readTown } from "./lib/town.mjs";
 import { refuseLinkedCheckout } from "./lib/plain-checkout.mjs";
 import { publicRegistry } from "./lib/public-registry.mjs";
+import { residentsOnly } from "../src/lib/non-residents.mjs";
 import { decorateFrozenNotice } from "./lib/atlas-frozen-notice.mjs";
 import { emitSeam } from "./extract-seam.mjs";
 import { threadTitle } from "./lib/ids.mjs";
@@ -177,7 +178,8 @@ if (!LEGACY_DATA) {
   const residentsPath = join(DATA_DIR, "residents.json");
   if (existsSync(residentsPath)) {
     try {
-      const snapshot = JSON.parse(readFileSync(residentsPath, "utf8"));
+      // the Pen is not a resident (CORE-187): a snapshot that still carries its row does not carry it forward
+      const snapshot = residentsOnly(JSON.parse(readFileSync(residentsPath, "utf8")));
       if (!Array.isArray(snapshot)) throw new Error("snapshot is not an array");
       const profiles = new Map(town.residents.map((r) => [r.handle, r.profile]));
       emit("residents.json", snapshot.map((r) => {
@@ -245,7 +247,7 @@ const deliveries = town.ledger.filter((e) => e.kind === "delivery");
 // own answer, fetched from POSTMARK_API. The law has one reader again, and it
 // is the one that owns it.
 if (LEGACY_DATA) {
-const residentsOut = town.residents.map((r) => ({
+const residentsOut = residentsOnly(town.residents).map((r) => ({     // the Pen is not a resident (CORE-187)
   handle: r.handle,
   profile: r.profile,
   address: r.address ? { ...r.address.data, body: r.address.body } : null,

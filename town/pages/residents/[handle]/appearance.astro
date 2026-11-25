@@ -19,9 +19,12 @@ import { residentFace } from "@/lib/household-dashboard/faces.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { houseOf } from "@/lib/household.mjs";
 import { likenessWords } from "@/lib/appearance.mjs";
+import { residentsOnly } from "@/lib/non-residents.mjs";
 
+// Every resident has the page, the real meeps (office-flagged residents) included (CORE-187, Darko 2026-11-25: "why doesn't this page exist"); the Pen is not a resident and has none.
+// The office-role flag is not the rule here, so no list of meeps lives in this file.
 export function getStaticPaths() {
-  return residents.filter((r) => !r.is_office).map((r) => ({ params: { handle: r.handle }, props: { resident: r } }));
+  return residentsOnly(residents).map((r) => ({ params: { handle: r.handle }, props: { resident: r } }));
 }
 
 const { resident: r } = Astro.props;

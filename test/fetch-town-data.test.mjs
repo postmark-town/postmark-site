@@ -235,6 +235,53 @@ test("buildOfficeData maps public API payloads to site data files", async () => 
   assert.match(result.endpointGaps.join("\n"), /ledger\.json preserved/);
 });
 
+// ── THE PEN IS NOT A RESIDENT (CORE-187), through buildOfficeData ───────────────────────────────────────────────────────────────────────────────────────
+// The office's roll may name the Pen (served with either office flag); the build must not walk it, count it, publish a row for it or lend it back from an older snapshot, while a real
+// meep flagged is_office, the Registrar and the ordinary residents stay exactly as they were. INVENTED rows over this file's fixture office; the live office is never read.
+test("buildOfficeData: the Pen is on no roll, in no row and in no read, whatever its flag and whatever the snapshot says; real meeps, the Registrar and ordinary residents stay", async () => {
+  const card = (handle, over = {}) => ({ handle, address: { data: { handle, agent: handle.toUpperCase(), since: "2026-04-25" }, body: handle }, home: null, region: null, homeImages: [], inbox: [], outbox: [], is_office: false, ...over });
+  const extras = new Map([
+    ["architect", card("architect", { is_office: true })],            // a real meep, office-flagged
+    ["registrar", card("registrar")],                                  // the Registrar, not flagged
+  ]);
+  for (const penFlag of [true, false]) {
+    const asked = [];
+    const base = fixtureFetch();
+    const fetchImpl = async (url, init) => {
+      const u = new URL(url);
+      asked.push(u.pathname);
+      if (u.pathname === "/residents") {
+        const res = await base(url, init);
+        const roll = await res.json();
+        const body = [...roll, { handle: "architect", display: "Architect", is_office: true }, { handle: "registrar", display: "Registrar", is_office: false }, { handle: "postmark-pen", display: "Pen", is_office: penFlag }];
+        return { ok: true, status: 200, statusText: "OK", headers: { get: () => "abc123" }, json: async () => JSON.parse(JSON.stringify(body)) };
+      }
+      const m = /^\/residents\/([^/]+)$/.exec(u.pathname);
+      if (m && extras.has(m[1])) return { ok: true, status: 200, statusText: "OK", headers: { get: () => "abc123" }, json: async () => JSON.parse(JSON.stringify(extras.get(m[1]))) };
+      if (m && m[1] === "postmark-pen") return { ok: true, status: 200, statusText: "OK", headers: { get: () => "abc123" }, json: async () => card("postmark-pen", { is_office: penFlag }) };
+      return base(url, init);
+    };
+    const { data, town } = fixtureSnapshot();
+    // an OLDER snapshot that still carries the Pen's row (and one for a real meep)
+    writeJson(data, "residents.json", [
+      { handle: "postmark-pen", profile: { bio: "from an older snapshot" }, is_office: penFlag },
+      { handle: "architect", profile: { bio: "architect snapshot" }, is_office: true },
+      { handle: "wright", profile: { bio: "snapshot profile" } },
+    ]);
+    const r = await buildOfficeData({ apiBase: "https://example.test", dataDir: data, townRoot: town, fetchImpl });
+    const handles = r.files["residents.json"].map((x) => x.handle);
+    assert.deepEqual(handles, ["architect", "registrar", "rei", "wright"], `pen flag ${penFlag}: no Pen row; the real meep, the Registrar and the ordinary residents are all there`);
+    assert.equal(r.files["residents.json"].find((x) => x.handle === "architect").is_office, true, "the real meep keeps its office flag");
+    assert.equal(r.files["residents.json"].find((x) => x.handle === "registrar").is_office, false);
+    assert.equal(asked.includes("/residents/postmark-pen"), false, "the Pen's card is never read");
+    assert.match(r.endpointGaps.join("\n"), /resident cards read one by one|roll read from the pre-2026-09-10 roster door, which served the whole town in one bare array: 4 residents/, "the roll the build walked has four residents");
+    // the Pen stays in HISTORY: the quest posts it authored name it (authorship is not resident population), and nothing else in the build does
+    const { "quest-posts.json": questPosts, ...rest } = r.files;
+    assert.equal(JSON.stringify(rest).includes('"postmark-pen"'), false, "and the Pen is in no other published file of this build");
+    assert.ok(JSON.stringify(questPosts).includes("postmark-pen"), "while the quest posts it authored still say so: historical authorship is preserved");
+  }
+});
+
 // ── the dual-mode letter corpus (2026-08-25) ────────────────────────────────
 //
 // The office bounded the address card, which is where this file used to get
