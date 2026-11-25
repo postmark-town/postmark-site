@@ -287,20 +287,23 @@ test("each step wears its little picture, and every picture is a clean 16x16 map
   // CAN FAIL: a short row, an ink with no colour, or a step left bare.
   for (const n of Object.keys(ART)) assert.ok(artRects(n).length > 0, n);
   for (const n of ["chat", "tools", "paste", "signin", "letter", "julian"]) assert.ok(FUNNEL.includes(`artSvg("${n}"`), `the funnel lost the ${n} picture`);
-  for (const n of ["signin", "field", "review", "sent"]) assert.ok(MOVEIN.includes(`artSvg("${n}")`), `move-in lost the ${n} picture`);
+  // move-in's steps wear the resident page itself and the Registrar's own token (CORE-188); its sign-in and sent screens keep their pictures
+  for (const n of ["signin", "sent"]) assert.ok(MOVEIN.includes(`artSvg("${n}")`), `move-in lost the ${n} picture`);
+  assert.match(MOVEIN, /const registrarArt = paint\("registrar"\);/, "the steps lost the Registrar's own token");
   assert.throws(() => { ART.__bad = Array(16).fill("q".repeat(16)); try { artRects("__bad"); } finally { delete ART.__bad; } }, /has no colour/);
   assert.match(artSvg("chat"), /width="48" height="48"[^>]*shape-rendering="crispEdges" aria-hidden="true"/);
 });
 
 // ── 5. /join/move-in/ is still a form it does not own ────────────────────────
 
-test("move-in's road is fieldSteps(form), and it walks the generator's nodes rather than drawing its own", () => {
-  // CAN FAIL: build screens from a list, or clone a field into a screen.
-  assert.match(MOVEIN, /steps = fieldSteps\(form\)/);
-  assert.match(MOVEIN, /for \(const n of form\.names\)/);
-  assert.match(MOVEIN, /<div class="jf-fields" data-form-host><\/div>/);
-  assert.ok(!/cloneNode/.test(MOVEIN), "a cloned field is a second copy of a box, and its value would never be sent");
-  assert.match(MOVEIN, /const missing = missingHere\(form, declared, name\);\s*if \(missing\.length\) return showMissing\(missing\);/);
+test("move-in's road is the approved steps, planned from the act's own card, and a step with a problem does not let the reader on", () => {
+  // CORE-188 (CORE-152's approved flow): the steps are join-draft.mjs's, and which of them a reader walks, and which pieces each asks, is the
+  // plan made from the card the door served (planFor). CAN FAIL: draw the steps from a list of the page's own, or let Continue past a step
+  // whose required piece is blank or over its limit.
+  assert.match(MOVEIN, /plan = planFor\(asked, \{ act, keepsHouse: keepsHouse\(act\) \}\);/);
+  assert.match(MOVEIN, /const walked = \[\.\.\.plan\.steps, "review"\];/);
+  assert.match(MOVEIN, /const probs = stepProblems\(plan, at, values\(\)\);\s*if \(probs\.length\) return refuse\(probs\[0\]\);/);
+  assert.ok(!/buildForm\(/.test(MOVEIN), "the prototype's generator draws boxes again, beside the design's");
 });
 
 test("the column is centred, 720 wide, with a 16px gutter of its own (Wright's review note 1)", () => {
@@ -376,36 +379,27 @@ test("the keeper's house is named from /me's households[handle], in the site's n
   assert.equal(houseOfMe(null), null);
 });
 
-test("move-in feeds the generator the reader's fields and names the keeper's house on the review", () => {
-  // CAN FAIL: build from picked.fields, check requiredness against the whole
-  // block, or leave the review silent about whose house this is.
-  assert.match(MOVEIN, /const house = keepsHouse\(act\) \? await readHouse\(tok\) : null;\s*const asked = fieldsForReader\(picked\.fields, act, house\);\s*const schema = window\.MCPProto\._internals\.fieldsSchema\(asked\);/);
-  assert.match(MOVEIN, /declared = asked;/);
-  assert.match(MOVEIN, /if \(keepsHouse\(act\)\) showHouse\(house, asked\);/);
-  assert.match(MOVEIN, /<p class="jf-house" data-jf-house hidden>Adding to <b data-jf-house-name><\/b>/);
+test("move-in plans from the reader's fields and names the keeper's house", () => {
+  // CAN FAIL: plan from picked.fields, check requiredness against the whole block, or leave the page silent about whose house this is.
+  assert.match(MOVEIN, /house = keepsHouse\(act\) \? await readHouse\(tok\) : null;\s*const asked = fieldsForReader\(picked\.fields, act, house\);\s*plan = planFor\(asked, /);
+  assert.match(MOVEIN, /if \(keepsHouse\(act\)\) showHouse\(house\);/);
+  assert.match(MOVEIN, /<p class="jf-house jd-house" data-jf-house hidden>Adding to <b data-jf-house-name><\/b>/);
   assert.match(MOVEIN, /fetch\(officeBase\(\) \+ "\/me"/);
-  assert.match(MOVEIN, /houseOfMe\(await r\.json\(\), houses\)/);
+  assert.match(MOVEIN, /houseOfMe\(await r\.json\(\), known\)/);
 });
 
-test("look it over edits IN PLACE: the row's edit moves the generator's own node in, and never walks back to its screen", () => {
-  // CAN FAIL: route the edit through go()/stepOfField (the old "sending you
-  // back"), or draw a second box in the row that the send would never read.
-  // \r?\n: the site's sources check out CRLF on Windows and LF in CI
-  // (home-pick.test.mjs's convention); an LF-only \n matched nothing here.
-  const review = MOVEIN.match(/function paintReview\(\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
-  assert.match(review, /edit\.addEventListener\("click", \(\) => openEdit\(row\.name, wrap\)\);/);
-  assert.ok(!/go\(|stepOfField/.test(review), "the review's edit still sends the reader back to a screen");
-  const open = MOVEIN.match(/function openEdit\(name, wrap\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
-  assert.match(open, /const node = form\.fields\[name\]\.node;/);
-  assert.match(open, /slot\.appendChild\(node\);/, "the row must hold the generator's own node");
-  assert.ok(!/go\(|history\.|createElement\("(input|textarea|select)"\)/.test(open), "an in-place edit navigated, or drew its own box");
-  assert.match(open, /textContent = "Save"/);
-  assert.match(open, /textContent = "cancel"/);
-  const close = MOVEIN.match(/function closeEdit\(saving\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
-  assert.match(close, /home\.insertBefore\(node, next\);/, "the node must go home to its screen");
-  assert.match(close, /missingHere\(form, declared, name\)/, "a save must keep the office's required rule");
-  assert.match(close, /c\.value = before;/, "cancel must restore what the box held");
-  assert.match(MOVEIN, /if \(!steps \|\| editing \|\| !enterContinues\(e\)\) return;/, "Enter while editing would send the whole request");
+test("look it over: each piece's edit takes the reader to its step, and Continue there comes straight back to the look-over", () => {
+  // CORE-152's approved Registrar: "Anything you'd change, press its edit and I'll take you back to that step." Keemin, 2026-09-27: "the look
+  // it over should just let you edit in-pane instead of sending you back". Both hold: the step's own boxes are the ones edited (the same box is
+  // the one sent, so no second copy), and its Continue returns to Look it over rather than walking every later step again.
+  // CAN FAIL: drop the return (the reader walks the whole flow to get back), or let Skip leave an edit.
+  assert.match(MOVEIN, /for \(const b of \$\$\("\[data-edit-step\]"\)\) b\.addEventListener\("click", \(\) => \{ returnTo = "review"; go\(b\.dataset\.editStep\); \}\);/);
+  assert.match(MOVEIN, /go\(returnTo \?\? walked\[walked\.indexOf\(at\) \+ 1\]\);/);
+  assert.match(MOVEIN, /if \(id === "review"\) returnTo = null;/);
+  assert.match(MOVEIN, /nextBtn\.textContent = returnTo \? "Back to Look it over" : "Continue";/);
+  assert.match(MOVEIN, /skipBtn\.hidden = last \|\| returnTo != null \|\| !SKIPPABLE\.has\(id\);/);
+  // Enter never sends from the look-over; it continues from a one-line box elsewhere
+  assert.match(MOVEIN, /if \(e\.key !== "Enter" \|\| e\.isComposing \|\| at === "review"\) return;/);
 });
 
 test("in the row being edited, Enter saves a one-line box, Escape cancels, and a paragraph box keeps its Enter", () => {
@@ -436,10 +430,10 @@ test("a PROVISIONAL house is the one keeper still asked its name, and the box sa
   const me = { handles: ["dearest-ai"], households: { "dearest-ai": { slug: "dearest-ai" } } };
   assert.equal(houseOfMe(me, { "dearest-ai": { name: "dearest-ai", provisional: true } }).provisional, true);
   assert.equal(houseOfMe(me, {}).provisional, false, "a house the site has not synced is not guessed provisional");
-  const show = MOVEIN.match(/function showHouse\(house, asked\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
-  assert.match(show, /if \(!house \|\| !house\.provisional\) return;/);
-  assert.match(show, /for \(const n of houseGroupNames\(asked\)\)/);
-  assert.match(show, /names it, once\./);
+  // the page: the provisional house's box stays (fieldsForReader keeps it, so the plan asks it), and the page says the answer names it once
+  const show = MOVEIN.match(/function showHouse\(h\) \{[\s\S]*?\r?\n    \}\r?\n/)[0];
+  assert.match(show, /if \(h && h\.provisional\) \$\("\[data-jf-house-once\]"\)\.hidden = false;/);
+  assert.match(MOVEIN, /Its name is still borrowed; the one below chooses it, once\./);
   assert.match(MOVEIN, /provisional: row\?\.provisional === true/, "the page must read provisional off the synced registry row");
 });
 

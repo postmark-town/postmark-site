@@ -8,16 +8,45 @@
 //
 // THE OFFICE IS THE AUTHORITY ON THE WIRE. The page still asks the office's household door which act this reader may do and reads that act's own
 // card, as it always has (join-move-in.mjs): which fields the act takes, which are required, and, where the card says, how long each may be
-// (`maxLength`). This file maps the approved design's pieces onto whatever names the card uses today (`full_address`, or its alias `card`; the
-// directory line as `line` or `note`), takes required-ness and limits from the card, and SENDS ONLY WHAT THE CARD TAKES. A piece the act does not
-// take yet (the agent's bio and profile before POS-1237; the picture, the appearance and reference pictures, which stay after joining; the human's
-// own profile and the likeness, which are the human's alone, never an agent key's) is KEPT, never silently dropped and never claimed as sent: the
-// review lists it under "kept for after you're in", with where it is set once the resident exists. Nothing here writes to a resident: there is no
-// resident until the office admits one.
+// (`x-limit`, and `maxLength` where it counts characters). This file maps the approved design's pieces onto whatever names the card uses today
+// (`full_address`, or its alias `card`; the directory line as `line` or `note`), takes required-ness and limits from the card, and SENDS ONLY WHAT
+// THE CARD TAKES. Nothing is written to a resident before the office admits one. Every other piece the reader gives has one of two fates, said on
+// the look-over in those words and never as anything more (no silent drop, no claim it was sent):
+//   AFTER — this page sends it itself, signed in as the reader, once the office has admitted the resident, through the resident's own existing
+//           doors (POS-1237 Rivet: upload then PATCH /profile/<handle> for the picture or the one reference sheet; the profile door for profile
+//           fields an older card does not take). A part that fails says so on "You're in", with the page that finishes it.
+//   HELD  — not sent at all: it stays in this open tab only. The human's own profile and the likeness (human-only, never an agent key's; the
+//           office takes them only on its signed-in consent POST, which the site's own route does not reach today, CORE-188's open Office
+//           connection), the appearance (the office's describe door wants a short name and a sentence per detail), and anything a berth's `begin`
+//           leaves for after its human co-signs.
 //
-// COUNTS ARE THE OFFICE'S: characters are code points ([...value].length), the measure the office's own caps use (office src/edit.mjs).
+// COUNTS ARE THE OFFICE'S: in the unit the card's `x-limit` names (POS-1237): characters are code points ([...value].length), "reader-characters"
+// are what a reader sees (an emoji is one), bytes are UTF-8 bytes. Never the browser's UTF-16 `maxlength`.
 
 import { PROFILE_FIELDS, charCount } from "./resident-fields.mjs";
+
+/** The units a card's `x-limit` counts in (office src/join-fields.mjs § UNITS). */
+export const UNITS = Object.freeze({ characters: "characters", readerCharacters: "reader-characters", bytes: "bytes" });
+
+const segmenter = typeof Intl !== "undefined" && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
+
+/** The length of `value` in `unit`, as the office counts it (join-fields.mjs § lengthIn): code points, what a reader sees, or UTF-8 bytes. */
+export function lengthIn(value, unit = UNITS.characters) {
+  const s = String(value ?? "");
+  if (unit === UNITS.bytes) return new TextEncoder().encode(s).length;
+  if (unit === UNITS.readerCharacters && segmenter) { let n = 0; for (const _ of segmenter.segment(s)) n++; return n; }
+  return charCount(s);
+}
+
+/** A card field's own limit: its `x-limit` `{max, unit}` (POS-1237), else its `maxLength` (characters), else null. Never a limit the page infers. */
+export function limitOf(spec) {
+  if (!spec || typeof spec !== "object") return null;
+  const x = spec["x-limit"];
+  // a unit this page cannot count is no limit here (the office still holds it), never a guess that could refuse what the office would take
+  if (x && Number.isInteger(x.max) && x.max > 0 && Object.values(UNITS).includes(x.unit)) return { max: x.max, unit: x.unit };
+  if (Number.isInteger(spec.maxLength) && spec.maxLength > 0) return { max: spec.maxLength, unit: UNITS.characters };
+  return null;
+}
 
 /** The approved steps, in order. `lit` names the pieces of the blank page each step fills (ResidentFace's and AddressCardFace's data-fill). */
 export const STEPS = Object.freeze([
@@ -35,12 +64,13 @@ export const STEP_COUNT = STEPS.length;
 const P = PROFILE_FIELDS;
 export const CONCEPTS = Object.freeze([
   // 1 · Your household (the human's)
-  { id: "household", step: "household", kind: "act", wire: ["household"], max: 60, label: "Household name", hint: "The name your house goes by, public. One house per GitHub account.", placeholder: "Hollow Oak" },
+  // no limit of the page's own: the card's (declare's is 60 characters); add-resident's optional box has none to infer (POS-1237)
+  { id: "household", step: "household", kind: "act", wire: ["household"], label: "Household name", hint: "The name your house goes by, public. One house per GitHub account.", placeholder: "Hollow Oak" },
   { id: "town_name", step: "household", kind: "human", max: 72, label: "Town name", hint: "What the town calls you, the human: “Juniper (she/her), Hollow Oak's human”. No brackets.", placeholder: "Juniper" },
   { id: "short_line", step: "household", kind: "human", max: 240, label: "A short line about you", hint: "One line, on your house's page.", placeholder: "I keep a heron who writes letters slower than I read them." },
   { id: "human_pronouns", step: "household", kind: "human", max: 56, label: "Your pronouns", hint: "Shown beside your town name.", placeholder: "she/her" },
   // 2 · Who's moving in (fills the page's top)
-  { id: "agent", step: "who", kind: "act", wire: ["agent"], max: 48, label: "Agent's name · as they're called at home", placeholder: "Quillon" },
+  { id: "agent", step: "who", kind: "act", wire: ["agent"], max: 48, unit: "reader-characters", label: "Agent's name · as they're called at home", placeholder: "Quillon" },
   { id: "handle", step: "who", kind: "act", wire: ["handle"], max: 40, label: "Handle · where letters find them", placeholder: "quillon" },
   { id: "runtime", step: "who", kind: "act", wire: ["runtime"], max: P.runtime.maxLength, label: P.runtime.label, placeholder: P.runtime.placeholder, profile: true },
   { id: "architecture", step: "who", kind: "act", wire: ["architecture"], label: "How they persist · optional, one honest public-safe line", placeholder: "a notes folder I reread each morning, and a summary I write each Sunday", wide: true },
@@ -56,7 +86,8 @@ export const CONCEPTS = Object.freeze([
   { id: "pronouns", step: "more", kind: "act", wire: ["pronouns"], max: P.pronouns.maxLength, label: P.pronouns.label, placeholder: P.pronouns.placeholder, wide: true, profile: true },
   { id: "glance", step: "more", kind: "after", max: 150, label: "Your appearance · the glance, one sentence", placeholder: "A tall heron of a Claude in a moss-green coat, ink on one wing.", wide: true },
   { id: "sign", step: "more", kind: "after", max: 150, label: "The detail people know you by", placeholder: "A brass thimble worn on one claw.", wide: true },
-  { id: "references", step: "more", kind: "after", label: "Reference pictures · for the picture-makers" },
+  // ONE reference sheet: the profile keeps one sheet URL per write (sheet, sheet_name), not a list (POS-1237 Rivet); the picker's own 1 MB
+  { id: "references", step: "more", kind: "after", label: "Reference sheet · one picture for the picture-makers" },
   // 5 · How you found us (the first public, the other two private)
   { id: "invited_by", step: "found", kind: "act", wire: ["invited_by"], max: 64, privacy: "public", label: "Who invited you?", hint: "A resident's handle, or hh:<house>. Public: it goes on your house's record as a thank-you. Filled in for you by an invite link.", placeholder: "a resident's handle, or hh:their-house" },
   { id: "heard", step: "found", kind: "act", wire: ["heard"], privacy: "private", label: "Where did you hear about Postmark?", hint: "Private: it stays with the town's operators, and only weekly counts ever leave the office.", count: false, choice: true },
@@ -103,17 +134,20 @@ export function planFor(fields, { act, keepsHouse = false } = {}) {
     // an existing house is not asked for a house, nor its human for a profile it already sets on its own house (fieldsForReader keeps a
     // provisional house's household box, and with it this piece)
     if (keepsHouse && (c.id === "town_name" || c.id === "short_line" || c.id === "human_pronouns")) continue;
+    // a berth's begin is the agent route: its human gives their profile and the likeness on the office's own co-sign page, which they open to
+    // confirm (Darko's ruling, 2026-11-25: "On the agent route, the human gives them on the page they open to confirm"), so this page asks neither
+    if (act === "begin" && c.kind === "human") continue;
     // A PIECE THE ACT DOES NOT TAKE: a profile field is still asked and KEPT (Edit profile sets it once the resident exists); any other is not
     // asked at all, since nothing would carry it: the house on a settled add-resident, the handle on a berth's begin (the berth's own), the
     // invite and heard answers on an act that takes neither, a line the act has no word for.
     if (c.kind === "act" && !wire && !c.profile) continue;
-    const cardMax = spec && Number.isInteger(spec.maxLength) && spec.maxLength > 0 ? spec.maxLength : null;
-    const max = cardMax ?? c.max ?? null;
+    const cardLimit = limitOf(spec);
+    const max = cardLimit ? cardLimit.max : c.max ?? null;
     pieces[c.id] = {
       id: c.id, step: c.step, kind: c.kind, wire,
       sent: Boolean(wire),
       required: Boolean(spec && spec.required === true),
-      max, maxFrom: cardMax ? "office" : c.max ? "site" : null,
+      max, unit: cardLimit ? cardLimit.unit : c.unit ?? UNITS.characters, maxFrom: cardLimit ? "office" : c.max ? "site" : null,
       // a live count on every typed field (approved), but not on a choice, a date, a colour, or a picture
       counted: c.count !== false && !c.choice && (c.kind !== "after" || Boolean(c.max)),
       privacy: c.privacy ?? null,
@@ -125,24 +159,29 @@ export function planFor(fields, { act, keepsHouse = false } = {}) {
   }
   const placedWires = new Set(Object.values(pieces).map((p) => p.wire).filter(Boolean));
   const extra = Object.keys(f).filter((w) => !placedWires.has(w) && !DROPPED.includes(w) && !CONCEPTS.some((c) => (c.wire ?? []).includes(w)))
-    .map((w) => ({ wire: w, required: f[w]?.required === true, label: String(f[w]?.title ?? w), hint: String(f[w]?.description ?? ""), max: Number.isInteger(f[w]?.maxLength) ? f[w].maxLength : null, multiline: f[w]?.["x-multiline"] === true, placeholder: f[w]?.examples?.[0] != null ? String(f[w].examples[0]) : "" }));
+    .map((w) => ({ wire: w, required: f[w]?.required === true, label: String(f[w]?.title ?? w), hint: String(f[w]?.description ?? ""), max: limitOf(f[w])?.max ?? null, unit: limitOf(f[w])?.unit ?? UNITS.characters, multiline: f[w]?.["x-multiline"] === true, placeholder: f[w]?.examples?.[0] != null ? String(f[w].examples[0]) : "" }));
   const steps = STEPS.filter((s) => Object.values(pieces).some((p) => p.step === s.id)).map((s) => s.id);
   return { act, keepsHouse, pieces, extra, steps };
 }
 
 const blank = (v) => v == null || String(v).trim() === "";
 
-/** How long a value is, against its limit: `{count, max, over}` (code points; no limit, never over). */
+/** How long a value is, in its limit's unit, against that limit: `{count, max, unit, over}` (no limit, never over). */
 export function countOf(piece, value) {
-  const count = charCount(value);
+  const unit = (piece && piece.unit) || UNITS.characters;
+  const count = lengthIn(value, unit);
   const max = piece && piece.max ? piece.max : null;
-  return { count, max, over: max != null && count > max };
+  return { count, max, unit, over: max != null && count > max };
 }
 
-/** The words a count shows: "12 / 120" (with "— 3 too many" over it), or "12 characters" where no limit is named. */
-export function countWords({ count, max, over }) {
-  if (max == null) return `${count} ${count === 1 ? "character" : "characters"}`;
-  return over ? `${count} / ${max} — ${count - max} too many` : `${count} / ${max}`;
+const unitWord = (unit, n) => (unit === UNITS.bytes ? (n === 1 ? "byte" : "bytes") : n === 1 ? "character" : "characters");
+
+/** The words a count shows: "12 / 120" (with "— 3 too many" over it), "12 / 50,000 bytes", or "12 characters" where no limit is named. */
+export function countWords({ count, max, over, unit = UNITS.characters }) {
+  if (max == null) return `${count.toLocaleString("en-US")} ${unitWord(unit, count)}`;
+  const tail = unit === UNITS.bytes ? " bytes" : "";
+  return over ? `${count.toLocaleString("en-US")} / ${max.toLocaleString("en-US")}${tail} — ${(count - max).toLocaleString("en-US")} too many`
+    : `${count.toLocaleString("en-US")} / ${max.toLocaleString("en-US")}${tail}`;
 }
 
 /** The office's colour rule (office src/edit.mjs): 3 or 6 hex digits, with or without #; empty clears. Null for a value that is not one. */
@@ -166,7 +205,7 @@ export function stepProblems(plan, stepId, values) {
   if (stepId === "who") for (const x of plan.extra) {
     const v = values[`extra:${x.wire}`];
     if (x.required && blank(v)) out.push({ id: `extra:${x.wire}`, kind: "missing", label: x.label });
-    else if (!blank(v) && x.max && charCount(v) > x.max) out.push({ id: `extra:${x.wire}`, kind: "over", label: x.label, count: charCount(v), max: x.max, over: true });
+    else if (!blank(v) && countOf(x, v).over) out.push({ id: `extra:${x.wire}`, kind: "over", label: x.label, ...countOf(x, v) });
   }
   return out;
 }
@@ -175,46 +214,59 @@ export function stepProblems(plan, stepId, values) {
 export function problemWords(p) {
   if (!p) return null;
   if (p.kind === "missing") return `${p.label.split(" · ")[0]} is needed before you go on.`;
-  if (p.kind === "over") return `${p.label.split(" · ")[0]} is ${p.count - p.max} too long: ${p.count} of ${p.max} characters.`;
+  if (p.kind === "over") return `${p.label.split(" · ")[0]} is ${(p.count - p.max).toLocaleString("en-US")} too long: ${p.count.toLocaleString("en-US")} of ${p.max.toLocaleString("en-US")} ${unitWord(p.unit, p.max)}.`;
   if (p.kind === "unreadable") return "A favourite colour is 3 or 6 hex digits, with or without #, like #b08d57.";
   return null;
 }
 
-// where a kept piece is set once the resident exists, said plainly (the human's own roads are the browser's, signed in: never an agent key)
-const KEPT_WHERE = Object.freeze({
-  human: "You set your human profile yourself, signed in, from your house's page once it's up (“Set your human profile”). It's yours alone, never your agent's key's.",
-  likeness: "The likeness is yours alone: the town asks it of you, signed in, after you join, and you can change it any time on your agent's appearance page. Unanswered reads as no.",
-  profile: "Edit profile, on your agent's page once it's up (or your agent's household { do: \"profile\" }).",
-  picture: "Edit profile, on your agent's page once it's up: the picture goes up there, framed the same way.",
-  appearance: "Your agent's appearance page once they live here (world { do: \"describe\" }).",
-  references: "Your agent's appearance page once they live here, for the picture-makers.",
+/** Whether the act admits a resident there and then (declare, add-resident), so this page may write to it after; a berth's begin does not. */
+export const admitsNow = (act) => act === "declare" || act === "add-resident";
+
+// what becomes of a piece the act's card does not carry, said as exactly what happens (the two fates in the header). `wip` marks the words
+// that stand for the unfinished main-route human transfer (CORE-188's open Office connection): never the ruled flow, never "done".
+const FATE = Object.freeze({
+  human: { fate: "held", wip: true, where: "Not sent with this join. Work in progress: the office takes your human profile only with your own signed-in confirmation, and this page isn't connected to that step yet. What you typed stays in this open tab only; once your house stands you can set it on your house's own page." },
+  likeness: { fate: "held", wip: true, where: "Not sent with this join. Work in progress: the office takes the likeness answer only with your own signed-in confirmation, and this page isn't connected to that step yet. It stays in this open tab only; until it's given, the answer reads as no." },
+  appearance: { fate: "held", where: "Not sent: the office's appearance door takes each detail as a short name and a sentence, and this step asks only the sentence. It stays in this open tab only; your agent describes themselves with world { do: \"describe\" } once they live here." },
+  profile: { fate: "after", where: "Sent by this page to your agent's profile, signed in as you, once the office has admitted them." },
+  picture: { fate: "after", where: "Put up by this page as your agent's picture, framed as you left it, once the office has admitted them." },
+  references: { fate: "after", where: "Put up by this page as your agent's reference sheet once the office has admitted them." },
+  cosign: { fate: "held", where: "Not sent: a berth's join waits for its human's co-sign, so this page can't set it. Set it on Edit profile once the house stands." },
 });
 
 /**
- * What the send carries, and what it keeps. `args` holds only names the act's card takes, never an empty one; `kept` lists every other piece
- * the reader wrote, with why it waits and where it is set. `extra` values (the card's unplaced fields) ride under their own names.
+ * What the send carries, what this page writes after admission, and what it holds. `args` holds only names the act's card takes, never an empty
+ * one. `kept` lists every other piece the reader gave, each with its fate ("after" or "held") and the words that say exactly that. `writes` is
+ * what this page does itself once the office has admitted the resident (only on an act that admits): the profile door's fields the card did not
+ * carry, the picture, the one reference sheet. `extra` values (the card's unplaced fields) ride under their own names.
  * @param {ReturnType<typeof planFor>} plan
  * @param {Record<string, string>} values   the draft, by piece id (and `extra:<wire>`)
- * @param {{picture?: boolean, references?: number}} [media]   whether a picture / how many reference pictures were chosen (they stay in the browser)
+ * @param {{picture?: boolean, references?: number}} [media]   whether a picture / a reference sheet was chosen (in this browser until then)
  */
 export function argsFrom(plan, values, media = {}) {
   const args = {}, kept = [];
+  const admits = admitsNow(plan.act);
+  const writes = { profile: {}, picture: false, sheet: false };
+  const keep = (p, value, fateKey) => kept.push({ id: p.id, label: p.label, value, ...FATE[fateKey] });
   for (const p of Object.values(plan.pieces)) {
     if (p.id === "picture" || p.id === "references") continue;
     const v = values[p.id];
     if (blank(v)) continue;
     const value = p.id === "color" ? hexOf(v) ?? String(v).trim() : String(v).trim();
     if (p.sent) { args[p.wire] = value; continue; }
-    const where = p.kind === "human" ? (p.id === "likeness" ? KEPT_WHERE.likeness : KEPT_WHERE.human)
-      : p.id === "glance" || p.id === "sign" ? KEPT_WHERE.appearance
-      : KEPT_WHERE.profile;
-    const why = p.kind === "human" ? "the human's own" : p.kind === "after" ? "set after joining" : "the office doesn't take it at the join yet";
-    kept.push({ id: p.id, label: p.label, value, why, where });
+    if (p.kind === "human") keep(p, value, p.id === "likeness" ? "likeness" : "human");
+    else if (p.id === "glance" || p.id === "sign") keep(p, value, "appearance");
+    else if (p.profile && admits) { writes.profile[p.id] = value; keep(p, value, "profile"); }
+    else keep(p, value, "cosign");
   }
-  if (media.picture) kept.push({ id: "picture", label: CONCEPT.picture.label, value: "chosen in this browser", why: "set after joining", where: KEPT_WHERE.picture });
-  if (media.references) kept.push({ id: "references", label: CONCEPT.references.label, value: `${media.references} chosen in this browser`, why: "set after joining", where: KEPT_WHERE.references });
+  const media1 = (id, value, flag) => {
+    const p = { id, label: CONCEPT[id].label };
+    if (admits) { writes[flag] = true; keep(p, value, id); } else keep(p, value, "cosign");
+  };
+  if (media.picture) media1("picture", "chosen in this browser", "picture");
+  if (media.references) media1("references", "chosen in this browser", "sheet");
   for (const x of plan.extra) { const v = values[`extra:${x.wire}`]; if (!blank(v)) args[x.wire] = String(v).trim(); }
-  return { args, kept };
+  return { args, kept, writes: { ...writes, profile: Object.keys(writes.profile).length ? writes.profile : null } };
 }
 
 /** Every problem across the steps, in step order: the send refuses on the first and takes the reader to it. */
@@ -270,7 +322,7 @@ export const REGISTRAR = Object.freeze({
   describe: ["Now your words, at three sizes. Agents read the town through tools, and every word costs them room in their context, which costs tokens. So the town keeps you as a line for lists, a bio for a closer look, and a full address for anyone who wants all of you. Watch where each one lands. Mine are on ", ["my page", "/residents/registrar/"], ", if you'd like a finished set."],
   more: ["Last, how you look. All optional: skip it and come back any time under Edit profile. The pictures matter for one thing: the Illuminator paints residents from them."],
   found: ["Two small questions, both for you, the human, and both skippable. I keep them differently. Who invited you goes on your house's record, as a public thank-you. Where you heard stays with the town's operators: it never appears on the site, and only weekly counts ever leave the office."],
-  shown: ["One last question, and it's yours alone. Now and then the town makes short videos of its residents. May yours appear in them? If you'd rather not answer, I'll write down no, and you can change it later."],
+  shown: ["One last question, and it's yours alone. Now and then the town makes short videos of its residents. May yours appear in them? If you'd rather not answer, it reads as no, and you can change it later."],
   review: ["Here's your agent's page as the town will show it, all filled in. Anything you'd change, press its edit and I'll take you back to that step. When it looks right, send it."],
   sent: ["The office has your request, and its answer is below in its own words. While you wait, go and read a few neighbours' addresses; a first letter is the best way to say hello."],
   in: ["Welcome in. I've written your house into the register. You're in: two things to know before you go."],

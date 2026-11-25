@@ -17,7 +17,11 @@
 // take is KEPT and said so: never dropped, never claimed as sent. The prototype's form generator is no longer what draws the boxes: the design is.
 //
 // ONE DOOR. Every act rides the apex, `household { do, args }` at the office's MCP endpoint, the same door agents use. No REST call to /residency,
-// no write to a resident (there is none until the office admits one), no picture upload: those come after joining, on the resident's own page.
+// and no write to a resident before the office admits one. AFTER an admission (declare, add-resident), and only then, the page sets what the
+// card did not carry through the resident's own existing doors, signed in as the reader (src/lib/join-after.mjs: the profile door, the picture,
+// the one reference sheet), and says per part what kept. The human's own profile and the likeness are never written with this bearer: the
+// office takes them only on its signed-in consent POST, which this route does not reach yet (CORE-188's open Office connection; the page says
+// so as work in progress, holding them in the open tab only).
 //
 // The decisions live in src/lib/join-draft.mjs (the steps, the pieces, the send) and src/lib/join-move-in.mjs (the door), held by
 // test/join-draft.test.mjs and test/join-move-in.test.mjs. This file is the DOM wiring and the human words.
@@ -35,6 +39,7 @@ import { artSvg } from "@/lib/pixel-icons.mjs";
 // the Registrar's own token (CORE-185, civic-art.mjs § REGISTRAR), the guide on every step
 import { paint, SPRITE_W, SPRITE_H } from "@/lib/civic-art.mjs";
 import { STEPS, CONCEPT, REGISTRAR } from "@/lib/join-draft.mjs";
+import { SHEET_MAX_WORDS } from "@/lib/sheet-upload.mjs";
 // the town's registry as the site synced it: every declared house's nameplate,
 // so a keeper's review says "Adding to Starforge" in the word the house wears
 // everywhere else, and whether its name is still borrowed (provisional). Which
@@ -84,15 +89,17 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       </p>
     </header>
 
-    {/* THE REGISTRAR, on every step (CORE-152): her token, her name linked to her page, and what the step is for, in her words */}
-    <template data-reg-template>
+    {/* THE REGISTRAR, on every step (CORE-152): her token, her name linked to her page, and what the step is for, in her words. A hidden source the
+        script clones, NOT a <template>: Astro's compiler re-opens an <a> it finds inside a <template> after the template closes, which drew a stray
+        token above the steps and wrapped what followed in her link (CORE-188's look). test/join-move-in-browser.test.mjs holds the page to one face. */}
+    <div class="jd-reg-source" data-reg-template hidden>
       <div class="jd-reg">
         <a class="jd-reg-face" href="/residents/registrar/" aria-label="The Registrar's page" tabindex="-1">
           <svg class="px" viewBox={`0 0 ${SPRITE_W} ${SPRITE_H}`} shape-rendering="crispEdges" aria-hidden="true" focusable="false">{registrarArt.map((r) => <rect x={r.x} y={r.y} width={r.w} height="1" fill={r.fill} />)}</svg>
         </a>
         <div class="jd-reg-bubble"><a class="jd-reg-name" href="/residents/registrar/">The Registrar</a><p data-reg-words></p></div>
       </div>
-    </template>
+    </div>
     <script is:inline type="application/json" data-reg-lines set:html={JSON.stringify(REGISTRAR)}></script>
 
     <!-- SIGNED OUT — never a dead end: one question, one button, which drives
@@ -147,7 +154,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
               <p class="jd-sf-count" data-count-for={f.id} aria-live="polite"></p>
             </div>
           ))}
-          <p class="jd-kept-note">Your human profile is yours alone: the office takes it from you, signed in, on your house's page once it's up. It's kept here, in this tab, so you can set it then.</p>
+          <p class="jd-kept-note"><span class="jd-tag is-wip">work in progress</span> Your human profile is yours alone, never your agent's key's. The office takes it only with your own signed-in confirmation, and this page isn't connected to that step yet, so it isn't sent with this join: what you type stays in this open tab only.</p>
         </div>
       </div>
 
@@ -202,19 +209,17 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
               <ResidentField name={id} spec={fieldSpec(id)} {...pieceAttrs(id)} />
             ))}
             <div class="profile-edit-wide jd-refs" data-piece-field="references">
-              <span class="jd-refs-t">{C.references.label} · JPEG, PNG or WebP, 1.5 MB each</span>
+              <span class="jd-refs-t">{C.references.label} · JPEG, PNG or WebP, {SHEET_MAX_WORDS} at most</span>
               <div class="jd-refs-row">
-                {[0, 1, 2].map((i) => (
-                  <label class="jd-ref">
-                    <span class="jd-ref-thumb" data-ref-thumb={i} aria-hidden="true">+ add</span>
-                    <input type="file" accept="image/jpeg,image/png,image/webp" data-ref-input={i} aria-label={`Reference picture ${i + 1}`} />
-                  </label>
-                ))}
+                <label class="jd-ref">
+                  <span class="jd-ref-thumb" data-ref-thumb aria-hidden="true">+ add</span>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" data-ref-input aria-label="Reference sheet" />
+                </label>
               </div>
               <p class="profile-edit-avatar-status" data-ref-status role="status" aria-live="polite"></p>
             </div>
           </div>
-          <p class="jd-kept-note" data-more-kept>None of this leaves your browser at the join: your picture, your appearance and your reference pictures are set on your agent's own page once it's up, and the Look it over step lists each with where. Colour, its name and pronouns go with the join when the office takes them; until then they wait with the rest.</p>
+          <p class="jd-kept-note" data-more-kept>Nothing here leaves your browser before the office admits your agent. Then this page puts up the picture and the reference sheet itself, signed in as you, and says on "You're in" what kept. The appearance isn't sent with the join; Look it over says why.</p>
         </div>
       </div>
 
@@ -250,7 +255,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
           <label class="jd-pick"><input type="radio" name="likeness" value="yes" data-piece="likeness" /> <span>Yes</span></label>
           <label class="jd-pick"><input type="radio" name="likeness" value="no" data-piece="likeness" /> <span>No</span></label>
         </div>
-        <p class="jd-kept-note">This one is yours alone, never your agent's key's: the town asks it of you, signed in, after you join. Your answer here is kept in this tab so you can give it then.</p>
+        <p class="jd-kept-note"><span class="jd-tag is-wip">work in progress</span> This one is yours alone, never your agent's key's. The office takes it only with your own signed-in confirmation, and this page isn't connected to that step yet, so it isn't sent with this join: your answer stays in this open tab only.</p>
       </div>
 
       {/* LOOK IT OVER — the finished page (the blank page above, filled), with the human's answers, the private ones, and what waits */}
@@ -276,10 +281,15 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
             <h3>What goes to the office</h3>
             <p class="jd-review-note" data-review-sends-words></p>
           </section>
-          <section class="jd-review-sec" data-review-kept hidden>
-            <h3>Kept for after you're in</h3>
-            <p class="jd-review-note">The office doesn't take these with the join, so they aren't sent. Nothing is lost: each says where it's set once your agent lives here.</p>
-            <ul class="jd-kept" data-review-kept-list></ul>
+          <section class="jd-review-sec" data-review-after hidden>
+            <h3>Once the office admits your agent</h3>
+            <p class="jd-review-note">The join doesn't carry these. This page sets them itself, signed in as you, straight after the office admits your agent, and "You're in" says what kept.</p>
+            <ul class="jd-kept" data-review-after-list></ul>
+          </section>
+          <section class="jd-review-sec" data-review-held hidden>
+            <h3>Not sent with this join</h3>
+            <p class="jd-review-note">These stay in this open tab only; nothing stores them. Each says why, and where it's set instead.</p>
+            <ul class="jd-kept" data-review-held-list></ul>
           </section>
         </div>
       </div>
@@ -358,9 +368,13 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         <li data-in-letters></li>
       </ul>
       <p class="jd-in-from" data-in-from hidden>In the office's own words.</p>
-      <section class="jd-review-sec" data-in-kept hidden>
-        <h3>Waiting for you to set</h3>
-        <ul class="jd-kept" data-in-kept-list></ul>
+      <section class="jd-review-sec" data-in-after hidden>
+        <h3>What this page set for your agent</h3>
+        <ul class="jd-kept" data-in-after-list></ul>
+      </section>
+      <section class="jd-review-sec" data-in-held hidden>
+        <h3>Not sent with this join</h3>
+        <ul class="jd-kept" data-in-held-list></ul>
       </section>
       <p class="reply-foot"><a class="pm-btn" data-in-go href="/households/">Go to the neighbours →</a></p>
     </section>
@@ -391,8 +405,10 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     import { recallInvite } from "@/lib/join-invite.mjs";
     import {
       STEPS, planFor, countOf, countWords, hexOf, stepProblems, problemWords, argsFrom, allProblems,
-      stepOfHash, hashOfStep, kickerOf, inLines, INVITE_HEARD,
+      stepOfHash, hashOfStep, kickerOf, inLines, INVITE_HEARD, admitsNow,
     } from "@/lib/join-draft.mjs";
+    import { afterAdmission, cropOf } from "@/lib/join-after.mjs";
+    import { fileProblem } from "@/lib/sheet-upload.mjs";
 
     const $ = (sel, root = document) => root.querySelector(sel);
     const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -419,7 +435,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     function regAt(slot, key) {
       const host = $(`[data-reg-at="${slot}"]`);
       if (!host) return;
-      if (!host.firstElementChild) host.appendChild($("[data-reg-template]").content.cloneNode(true));
+      if (!host.firstElementChild) host.appendChild($("[data-reg-template] > .jd-reg").cloneNode(true));
       const p = $("[data-reg-words]", host);
       while (p.firstChild) p.removeChild(p.firstChild);
       for (const part of REG[key] ?? []) {
@@ -553,8 +569,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       // the step-1 box says required or optional from the card
       const need = $('[data-need-for="household"]');
       if (need && plan.pieces.household) need.textContent = plan.pieces.household.required ? "required" : "optional";
-      // a keeper's existing house has no human profile to set here
-      if (plan.keepsHouse) $("[data-human-profile]").hidden = true;
+      // a keeper's existing house has no human profile to set here, and a berth's human gives theirs on the office's co-sign page
+      if (!plan.pieces.town_name) $("[data-human-profile]").hidden = true;
       // the card's own words, where it has them, over the page's (the office's description says what a field is for and where it shows)
       for (const el of $$("[data-hint-for]")) { const p = plan.pieces[el.dataset.hintFor]; if (p && p.hint) el.textContent = p.hint; }
       // the heard question's own options, the office's list
@@ -645,8 +661,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     // the pronouns' Clear (the editor's own button): here it only empties the box
     $("[data-profile-pronouns-clear]")?.addEventListener("click", () => { const b = control("pronouns"); if (b) { b.value = ""; paintPiece("pronouns"); b.focus(); } });
 
-    // ── the picture, framed in this browser and shown on the page (it goes up after joining, on Edit profile) ──
-    const pic = { url: null, zoom: 1, x: 0, y: 0 };
+    // ── the picture, framed in this browser and shown on the page; it goes up only once the office has admitted the agent (join-after.mjs) ──
+    const pic = { url: null, file: null, zoom: 1, x: 0, y: 0 };
     const picInput = $("[data-profile-avatar-input]");
     const picPreview = $("[data-profile-avatar-preview]");
     const picZoomRow = $("[data-profile-avatar-zoom-row]");
@@ -671,9 +687,11 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       if (!PIC_TYPES.includes(f.type)) { picStatus.textContent = "That isn't a JPEG, PNG or WebP picture."; picStatus.className = "profile-edit-avatar-status warn"; picInput.value = ""; return; }
       if (f.size > PIC_MAX) { picStatus.textContent = "That picture is over 1.5 MB; the Darkroom can shrink it."; picStatus.className = "profile-edit-avatar-status warn"; picInput.value = ""; return; }
       if (pic.url) URL.revokeObjectURL(pic.url);
-      Object.assign(pic, { url: URL.createObjectURL(f), zoom: 1, x: 0, y: 0 });
+      Object.assign(pic, { url: URL.createObjectURL(f), file: f, zoom: 1, x: 0, y: 0 });
       picZoom.value = "1"; picZoomRow.hidden = false;
-      picStatus.textContent = "Shown on the page above. It stays in this browser: you put it up on Edit profile once your agent's page is up.";
+      picStatus.textContent = admitsNow(act)
+        ? "Shown on the page above. It stays in this browser until the office admits your agent; then this page puts it up, framed as you leave it."
+        : "Shown on the page above. It stays in this browser: a berth's join waits for its human's co-sign, so you put it up on Edit profile once the house stands.";
       picStatus.className = "profile-edit-avatar-status ok";
       drawPic();
     });
@@ -689,17 +707,36 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     });
     picPreview?.addEventListener("pointerup", () => { drag = null; });
 
-    // ── reference pictures: up to three, shown here, kept for after joining ───
-    const refs = [null, null, null];
-    for (const input of $$("[data-ref-input]")) input.addEventListener("change", () => {
-      const i = Number(input.dataset.refInput), f = input.files && input.files[0], thumb = $(`[data-ref-thumb="${i}"]`), status = $("[data-ref-status]");
+    /** The framed square, rendered as Edit profile renders it (at most 512px, re-encoded, so no camera metadata travels): `{type, base64}`. */
+    async function framedPicture() {
+      const bitmap = await createImageBitmap(pic.file);
+      const c = cropOf({ w: bitmap.width, h: bitmap.height }, pic);
+      const canvas = document.createElement("canvas");
+      canvas.width = c.out; canvas.height = c.out;
+      const g = canvas.getContext("2d");
+      g.fillStyle = "#fff"; g.fillRect(0, 0, c.out, c.out);
+      g.drawImage(bitmap, c.sx, c.sy, c.side, c.side, 0, 0, c.out, c.out);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+      if (!blob) throw new Error("the browser couldn't prepare that image");
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return { type: blob.type, base64: btoa(binary) };
+    }
+
+    // ── the one reference sheet (the profile keeps one sheet; the sheet setter's own 1 MB check), shown here until the office admits the agent ──
+    const sheet = { url: null, file: null };
+    $("[data-ref-input]")?.addEventListener("change", (e) => {
+      const input = e.currentTarget, f = input.files && input.files[0], thumb = $("[data-ref-thumb]"), status = $("[data-ref-status]");
       if (!f) return;
-      if (!PIC_TYPES.includes(f.type) || f.size > PIC_MAX) { status.textContent = "A reference picture is a JPEG, PNG or WebP, 1.5 MB at most."; status.className = "profile-edit-avatar-status warn"; input.value = ""; return; }
-      if (refs[i]) URL.revokeObjectURL(refs[i]);
-      refs[i] = URL.createObjectURL(f);
-      thumb.textContent = ""; thumb.style.backgroundImage = `url("${refs[i]}")`; thumb.classList.add("has-pic");
+      const problem = fileProblem(f) ?? (PIC_TYPES.includes(f.type) ? null : "That isn't a JPEG, PNG or WebP picture.");
+      if (problem) { status.textContent = problem; status.className = "profile-edit-avatar-status warn"; input.value = ""; return; }
+      if (sheet.url) URL.revokeObjectURL(sheet.url);
+      Object.assign(sheet, { url: URL.createObjectURL(f), file: f });
+      thumb.textContent = ""; thumb.style.backgroundImage = `url("${sheet.url}")`; thumb.classList.add("has-pic");
       status.textContent = ""; status.className = "profile-edit-avatar-status";
     });
+    const media = () => ({ picture: Boolean(pic.file), references: sheet.file ? 1 : 0 });
 
     // ── the steps (the hash is the step; Back is the browser's) ───────────────
     let at = null;
@@ -713,6 +750,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     const SKIPPABLE = new Set(["more", "found", "shown"]);
     function show(id) {
       at = id;
+      if (id === "review") returnTo = null;
       const walked = [...plan.steps, "review"];
       const i = walked.indexOf(id);
       for (const el of $$("[data-step]", gateAct)) el.hidden = el.dataset.step !== id;
@@ -732,8 +770,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       backBtn.hidden = i <= 0;
       const last = id === "review";
       nextBtn.hidden = last; submitBtn.hidden = !last;
-      skipBtn.hidden = last || !SKIPPABLE.has(id);
-      $("[data-jf-key]").textContent = last ? "Enter ↵" : "Enter ↵";
+      nextBtn.textContent = returnTo ? "Back to Look it over" : "Continue";
+      skipBtn.hidden = last || returnTo != null || !SKIPPABLE.has(id);
       if (last) paintReview();
       formError.hidden = true;
       const first = $(`[data-step="${id}"] input:not([type=hidden]):not([type=file]), [data-step="${id}"] textarea, [data-step="${id}"] select`, gateAct);
@@ -744,13 +782,17 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     window.addEventListener("popstate", () => { if (!plan) return; const id = stepOfHash(location.hash, plan); if (id) show(id); });
     backBtn.addEventListener("click", () => history.back());
 
+    // AN EDIT FROM THE LOOK-OVER COMES BACK TO IT. The approved Registrar takes the reader to the step ("press its edit and I'll take you back to
+    // that step"); Continue there returns straight to Look it over, never through every later step again (Keemin, 2026-09-27: "the look it over
+    // should just let you edit in-pane instead of sending you back").
+    let returnTo = null;
     function forward(skip) {
       const walked = [...plan.steps, "review"];
       if (!skip) {
         const probs = stepProblems(plan, at, values());
         if (probs.length) return refuse(probs[0]);
       }
-      go(walked[walked.indexOf(at) + 1]);
+      go(returnTo ?? walked[walked.indexOf(at) + 1]);
     }
     nextBtn.addEventListener("click", () => forward(false));
     skipBtn.addEventListener("click", () => forward(true));
@@ -763,7 +805,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       if (t instanceof HTMLInputElement && (t.type === "file" || t.type === "radio" || t.type === "range")) return;
       e.preventDefault(); forward(false);
     });
-    for (const b of $$("[data-edit-step]")) b.addEventListener("click", () => go(b.dataset.editStep));
+    for (const b of $$("[data-edit-step]")) b.addEventListener("click", () => { returnTo = "review"; go(b.dataset.editStep); });
 
     function refuse(p) {
       if (p.step && p.step !== at) go(p.step);
@@ -793,6 +835,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         wrap.append(dt, dd); host.appendChild(wrap);
       }
     }
+    // one line per piece: its name, what was written, and exactly what becomes of it (join-draft.mjs FATE; `wip` words are tagged as such)
     function keptInto(host, kept) {
       while (host.firstChild) host.removeChild(host.firstChild);
       for (const k of kept) {
@@ -800,8 +843,15 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         const b = document.createElement("b"); b.textContent = k.label.split(" · ")[0];
         const v = document.createElement("span"); v.className = "jd-kept-value"; v.textContent = k.value;
         const w = document.createElement("span"); w.className = "jd-kept-where"; w.textContent = k.where;
-        li.append(b, " ", v, w); host.appendChild(li);
+        li.append(b, " ", v);
+        if (k.wip) { const t = document.createElement("span"); t.className = "jd-tag is-wip"; t.textContent = "work in progress"; li.append(" ", t); }
+        li.append(w); host.appendChild(li);
       }
+    }
+    function fatesInto(prefix, kept) {
+      const after = kept.filter((k) => k.fate === "after"), held = kept.filter((k) => k.fate !== "after");
+      keptInto($(`[data-${prefix}-after-list]`), after); $(`[data-${prefix}-after]`).hidden = after.length === 0;
+      keptInto($(`[data-${prefix}-held-list]`), held); $(`[data-${prefix}-held]`).hidden = held.length === 0;
     }
     function sendsWords(args) {
       const names = Object.keys(args);
@@ -821,14 +871,14 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       ]);
       $("[data-review-found]").hidden = !(P.invited_by || P.heard || P.heard_note);
       rowsInto($("[data-review-shown-list]"), [["May the town show your agent in its shorts?", v.likeness === "yes" ? "Yes" : v.likeness === "no" ? "No" : ""]]);
-      const { args, kept } = argsFrom(plan, v, { picture: Boolean(pic.url), references: refs.filter(Boolean).length });
+      const { args, kept } = argsFrom(plan, v, media());
       put("[data-review-sends-words]", sendsWords(args));
-      keptInto($("[data-review-kept-list]"), kept);
-      $("[data-review-kept]").hidden = kept.length === 0;
+      fatesInto("review", kept);
     }
 
     // ── send ──────────────────────────────────────────────────────────────────
     let sentKept = [];
+    let sentWrites = null;
     submitBtn.addEventListener("click", async () => {
       if (sending || !plan || !act) return;
       const v = values();
@@ -836,7 +886,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       if (probs.length) return refuse(probs[0]);
       const tok = getTok();
       if (!tokenIsFresh(tok)) return signedOut("Your sign-in expired before this was sent. Nothing was sent.");
-      const { args, kept } = argsFrom(plan, v, { picture: Boolean(pic.url), references: refs.filter(Boolean).length });
+      const { args, kept, writes } = argsFrom(plan, v, media());
       formError.hidden = true;
       sending = true; submitBtn.disabled = true; setStatus("asking the office…");
       arm(tok);
@@ -848,10 +898,23 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         sending = false; submitBtn.disabled = false; setStatus("");
         return showError("the office didn't answer", "couldn't reach the town door — check your connection and try again. Nothing was sent.");
       }
-      sending = false; submitBtn.disabled = false; setStatus("");
       const said = replyShape(res.entry);
-      if (!said.ok) return showError(said.defect, said.hint);
+      if (!said.ok) { sending = false; submitBtn.disabled = false; setStatus(""); return showError(said.defect, said.hint); }
       sentKept = kept;
+      // ADMITTED: now, and only now, the pieces the card did not carry go through the resident's own doors (join-after.mjs), each answering for itself
+      sentWrites = null;
+      if (admitsNow(act)) {
+        setStatus("the office admitted them; setting what the join didn't carry…");
+        try {
+          sentWrites = await afterAdmission({
+            handle: (v.handle || "").trim(), base: officeBase(), tok, writes,
+            picture: pic.file ? framedPicture : null, sheet: sheet.file,
+            fetchFn: (u, i) => fetch(u, i),
+            send: async (req) => { try { const r = await fetch(req.url, req.init); return { status: r.status, data: await r.json().catch(() => null) }; } catch { return { status: 0, data: null }; } },
+          });
+        } catch { sentWrites = [{ id: "after", ok: false, words: "This page tripped while setting the rest; the admission stands. Set them on Edit profile, on your agent's page." }]; }
+      }
+      sending = false; submitBtn.disabled = false; setStatus("");
       showReply(said, v);
     });
 
@@ -877,7 +940,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       }
       put("[data-reply-whole]", JSON.stringify(said.whole, null, 2));
       // "You're in" only when the office has admitted the resident: a berth's begin still waits on its human's co-sign, and says so above
-      const admitted = act !== "begin";
+      const admitted = admitsNow(act);
       $("[data-to-in]").hidden = !admitted;
       if (admitted) paintIn(said, v);
       only(gateReply);
@@ -892,8 +955,12 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       if (lines.pageHref) { link.href = lines.pageHref; link.hidden = false; }
       put("[data-in-letters]", lines.letters);
       $("[data-in-from]").hidden = !lines.fromOffice;
-      keptInto($("[data-in-kept-list]"), sentKept);
-      $("[data-in-kept]").hidden = sentKept.length === 0;
+      // what this page set after the admission, part by part, in what actually happened; then what was never sent
+      const NAMES = { profile: "Profile", picture: "Picture", sheet: "Reference sheet", after: "The rest" };
+      const done = (sentWrites || []).map((r) => ({ label: NAMES[r.id] || r.id, value: r.ok ? "set" : "not set", where: r.words }));
+      keptInto($("[data-in-after-list]"), done); $("[data-in-after]").hidden = done.length === 0;
+      const held = sentKept.filter((k) => k.fate !== "after");
+      keptInto($("[data-in-held-list]"), held); $("[data-in-held]").hidden = held.length === 0;
       if (lines.pageHref) { const go2 = $("[data-in-go]"); go2.href = lines.pageHref; go2.textContent = "Go to your agent's page →"; }
     }
     $("[data-show-in]")?.addEventListener("click", () => { only(gateIn); window.scrollTo({ top: 0 }); });
@@ -945,7 +1012,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     .jf-act { padding: 1.5em 0 3em; box-sizing: border-box; }
     .jf-act:focus { outline: none; }
     .jf-act[hidden] { display: none; }
-    .jf-act [hidden] { display: none !important; }
+    /* :global: a box the plan hides may be the shared pieces' own markup (ResidentField's label), which carries no scope attribute of this page */
+    .jf-act :global([hidden]) { display: none !important; }
 
     /* THE REGISTRAR (built from a template by the script: :global) */
     .movein :global(.jd-reg) { display: flex; align-items: flex-start; gap: 0.9em; margin: 0 0 1.4em; }
@@ -977,11 +1045,18 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     .jd-sf input:focus, .jd-sf select:focus { outline: none; border-color: var(--pm-gold-bright); }
     .jd-sf-count { margin: 0.35em 0 0; text-align: right; font-family: var(--pm-mono); font-size: 0.7rem; color: rgba(232, 196, 139, 0.6); }
     .jd-sf-count[data-over="1"], .jd-fields :global(.profile-edit-count[data-over="1"]) { color: #f5b3a0; }
-    .jd-need, .jd-tag {
+    /* a tag the script draws (the look-over's, "You're in"'s) has no scope attribute, so the tag's rules are the page's global ones */
+    .jd-need, :global(.jd-tag) {
       font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(232, 196, 139, 0.6);
       border: 1px solid rgba(232, 196, 139, 0.3); border-radius: 999px; padding: 1px 7px; margin-left: 0.4em; vertical-align: 2px;
     }
-    .jd-tag.is-public, :global(.jd-tag.is-public) { color: #9be29b; border-color: rgba(155, 226, 155, 0.4); }
+    :global(.jd-tag.is-public) { color: #9be29b; border-color: rgba(155, 226, 155, 0.4); }
+    /* words that stand for unfinished work (the main route's human transfer, CORE-188): said as such wherever they show */
+    :global(.jd-tag.is-wip) { color: #c98a2b; border-color: rgba(201, 138, 43, 0.55); margin-left: 0; margin-right: 0.3em; }
+    /* on the look-over's paper the night inks wash out: the paper's own inks */
+    .movein :global(.pm-paper .jd-tag) { color: var(--pm-ink-soft); border-color: rgba(90, 62, 27, 0.35); }
+    .movein :global(.pm-paper .jd-tag.is-public) { color: #2f6b34; border-color: rgba(47, 107, 52, 0.45); }
+    .movein :global(.pm-paper .jd-tag.is-wip) { color: #8a5a12; border-color: rgba(138, 90, 18, 0.5); }
     .jd-sub-kicker { margin: 2em 0 0.3em; }
     .jd-human { margin: 0.5em 0 0; }
     .jd-kept-note { max-width: 62ch; padding-left: 0.8em; border-left: 3px solid rgba(232, 196, 139, 0.3); }
@@ -1034,6 +1109,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     .jd-review-note { margin: 0 0 0.5em; font-size: 0.9rem; color: var(--pm-ink-soft); }
     .movein :global(.jd-kept) { margin: 0.4em 0 0; padding-left: 1.1em; display: grid; gap: 0.55em; }
     .movein :global(.jd-kept li) { color: var(--pm-ink); line-height: 1.5; overflow-wrap: anywhere; }
+    /* a piece's name in ink, not the paper's wax red (postmark.css's `.pm-paper b`), which reads as a refusal in a list of what happens next */
+    .movein :global(.jd-kept li > b) { color: var(--pm-ink); }
     .movein :global(.jd-kept-value) { font-style: italic; }
     .movein :global(.jd-kept-where) { display: block; font-size: 0.86rem; color: var(--pm-ink-soft); }
 
@@ -1041,6 +1118,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     .jd-in-lines { margin: 0.6em 0 0; padding-left: 1.1em; display: grid; gap: 0.6em; }
     .jd-in-lines li { color: var(--pm-ink); line-height: 1.55; }
     .jd-in-from { font-size: 0.82rem; color: var(--pm-ink-soft) !important; }
+    .jd-in .jd-review-sec { margin-top: 1.4em; }
 
     .form-error {
       margin: 1.2em 0 0; padding: 0.75em 0.95em; max-width: 60ch;

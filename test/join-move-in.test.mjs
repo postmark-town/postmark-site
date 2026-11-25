@@ -182,14 +182,16 @@ test("the packaged script is the office's, unmodified — its own drift check pa
 
 // ── 2. the page mounts it, and owns no form of its own ───────────────────────
 
-test("the page exists, mounts the packaged script, and owns no form controls", () => {
-  // CAN FAIL: drop the <script src>, or paste an <input> onto the page, and this
-  // goes red. The second half is the one that matters — the whole point is that
-  // the fields come from the door, so a hand-typed control here is the defect.
-  assert.match(PAGE, /src="\/join\/move-in\/mcp-proto\.js"/, "the page does not load the packaged generator");
+test("the page exists, mounts the packaged script as its transport, and every box it draws is a piece the plan can hide", () => {
+  // CORE-188 changed what draws the boxes: the approved design does (the resident page's own fields, src/components/resident/*), and the
+  // office's prototype stays the TRANSPORT (connect, callTool). The door still decides: a box whose piece the act's card does not take is
+  // hidden (applyPlan), and a card field the design places nowhere is still drawn, from its own spec (drawExtra). CAN FAIL: drop the
+  // <script src>, or hand-write a box that no piece names, so the plan cannot hide it and the send cannot see it.
+  assert.match(PAGE, /src="\/join\/move-in\/mcp-proto\.js"/, "the page does not load the packaged transport");
   assert.match(PAGE, /id="pm-mcp-machinery"/, "the page has no root for the machinery to mount into");
   assert.match(PAGE, /\.init\("pm-mcp-machinery"\)/, "the page never mounts the machinery it made a root for");
-  assert.match(PAGE, /data-form-host/, "the page has nowhere to put the generated form");
+  assert.match(PAGE, /if \(!p\) \{ if \(field\) field\.hidden = true; continue; \}/, "a box the card does not take is no longer hidden");
+  assert.match(PAGE, /function drawExtra\(\) \{/, "a field the office grows no longer reaches the form");
 
   const manual = PAGE.indexOf("window.MCP_PROTO_MANUAL = true");
   const script = PAGE.indexOf('src="/join/move-in/mcp-proto.js"');
@@ -197,10 +199,10 @@ test("the page exists, mounts the packaged script, and owns no form controls", (
   assert.ok(manual < script,
     "the manual-mount flag must be parsed BEFORE the script it suppresses; after it, the script has already auto-inited");
 
-  for (const tag of ["<input", "<textarea", "<select"]) {
-    assert.ok(!PAGE.includes(tag),
-      `the page carries a hand-written ${tag}> — every field on this page must come from the door's own schema`);
-  }
+  // every box the page itself writes names its piece (or is the reference sheet's file picker), so the plan can hide it and the send reads it
+  const boxes = PAGE.match(/<(input|textarea|select)\b[^>]*>/g) ?? [];
+  assert.ok(boxes.length > 5, `${boxes.length} boxes`);
+  for (const b of boxes) assert.match(b, /data-piece=|data-ref-input/, `a box no piece names: ${b}`);
   assert.ok(!PAGE.includes('"/residency"'), "the page reaches the old REST join door; the act rides the apex");
 });
 
@@ -705,20 +707,20 @@ test("the page marks the door's required fields and shares ONE error slot", () =
   // submitAct, and the page still builds and still looks right in a browser
   // until someone submits an empty join. These are the assertions that catch a
   // wiring that was never connected.
-  assert.match(PAGE, /markRequired\(form, requiredNames\(declared\)\)/,
-    "the page builds the form and never marks the door's required fields on it");
-  // the door's fields as THIS reader is asked them (a keeper's house group is
-  // dropped on add-resident, 2026-09-27): still the door's block, nothing typed here
-  assert.match(PAGE, /const asked = fieldsForReader\(picked\.fields, act, house\);[\s\S]*declared = asked;/,
-    "the page does not keep the door's own fields, so it has nothing to check requiredness against");
-  assert.match(PAGE, /submitAct\(\{[^}]*fields: declared[^}]*\}\)/,
-    "the page's submit does not hand submitAct the door's fields, so nothing is ever required");
-  assert.match(PAGE, /res\.missing[^\n]*showMissing\(res\.missing\)/,
-    "the page never shows a missing-box refusal, so a stopped send would look like nothing happened");
+  // CORE-188: required-ness is the card's, carried by the plan (join-draft.mjs planFor) onto each box
+  assert.match(PAGE, /if \(p\.required\) \{ el\.required = true; el\.setAttribute\("aria-required", "true"\); \}/,
+    "the page never marks the door's required fields on its boxes");
+  // the door's fields as THIS reader is asked them (a keeper's house group is dropped on add-resident, 2026-09-27)
+  assert.match(PAGE, /const asked = fieldsForReader\(picked\.fields, act, house\);\s*plan = planFor\(asked, /,
+    "the page does not plan from the door's own fields, so it has nothing to check requiredness against");
+  // the send refuses on the first problem across every step, and takes the reader to it, before anything is called
+  assert.match(PAGE, /const probs = allProblems\(plan, v\);\s*if \(probs\.length\) return refuse\(probs\[0\]\);[\s\S]*?submitAct\(/,
+    "the send no longer checks the card's required pieces and limits before it calls");
+  assert.match(PAGE, /form: \{ read: \(\) => \(\{ args, errors: \[\] \}\) \}/, "the send hands submitAct something other than the plan's args");
 
-  // one slot, two speakers — the whole "one look for both"
-  const missingUsesSlot = /function showMissing\([\s\S]*?showError\(first\.defect, first\.hint\)/.test(PAGE);
-  assert.ok(missingUsesSlot, "the form's own refusal no longer goes through the same error slot as the office's");
+  // one slot, two speakers — the whole "one look for both": the page's own refusal and the office's both go through showError
+  assert.match(PAGE, /function refuse\(p\) \{[\s\S]*?showError\(problemWords\(p\), null\);/, "the page's own refusal no longer uses the one slot");
+  assert.match(PAGE, /if \(!said\.ok\) \{[^\n]*showError\(said\.defect, said\.hint\); \}/, "the office's refusal no longer uses the one slot");
   assert.match(PAGE, /data-form-error role="alert"/,
     "the shared error slot no longer announces itself, so a reader stopped on a press is not told");
 
@@ -854,6 +856,8 @@ test("the page's bare household read asks for read_shape v1 by name, so a v2 def
 
 test("the page no longer tells a reader to go find a multiline button", () => {
   assert.doesNotMatch(PAGE, /grow-note|Writing more than a line/, "the sentence the fieldsets made unnecessary is gone");
-  assert.match(PAGE, /THE BOXES KNOW THEIR OWN SHAPE NOW/, "and the page says why, where the sentence stood");
+  // the boxes know their own shape: a paragraph piece is a textarea by the piece table (CORE-188), a card field the design places nowhere by
+  // its own x-multiline (drawExtra's long template)
+  assert.match(PAGE, /x\.multiline \? "\[data-extra-template-long\]" : "\[data-extra-template\]"/);
 });
 

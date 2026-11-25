@@ -4,20 +4,23 @@
 //
 // It serves the built site (dist-town/; the built-pages CI job builds it first), drives headless Chrome over CDP (Node's global WebSocket; a throwaway
 // profile) and answers the office ITSELF through CDP's Fetch domain with INVENTED replies: the household door's bare read, the act's card, the send,
-// and /me. Every other office call is refused. The live office is never touched, nobody really signs in (a made-up token is put in the page's
-// storage), and nothing is admitted: every handle, house and word below is a fixture.
+// /me, and the resident's own doors the page uses after an admission (PATCH /profile/<h>, PATCH /profile/<h>/avatar, POST /media). Every other
+// office call is refused. The live office is never touched, nobody really signs in (a made-up token is put in the page's storage), and nothing is
+// admitted: every handle, house and word below is a fixture.
 //
 // WHAT IT PROVES that the node tests cannot, by typing into the page with real key events:
-//   · the steps walk in order with the Registrar on each, her name linking to her page; the page steps show the resident page's own pieces
-//     (ResidentFace, AddressCardFace, ProfileEditorFields), filled live as the reader types, the step's pieces lit;
-//   · live counts in the office's measure (an emoji is one), limits from the card where it names them; a required piece and an over-long one stop
-//     Continue, said in the one alert slot;
-//   · Back and "edit" on the look-over keep every value and the picture's framing;
-//   · THE SEND CARRIES ONLY WHAT THE ACT'S CARD TAKES: today's card gets household/handle/agent/note/card/invited_by/heard/heard_note and never the
-//     bio, profile, picture, appearance, the human's profile or the likeness, which the look-over lists as kept; a card that takes the bio and profile
-//     (POS-1237's shape) gets them under its own names;
-//   · an existing house (add-resident) is not asked for a house or a human profile, and its review says which house;
-//   · "You're in" shows its two lines and the agent's page link once the office has admitted them;
+//   · the steps walk in order with the Registrar on each (one token, her name linking to her page); the page steps show the resident page's own
+//     pieces (ResidentFace, AddressCardFace, ProfileEditorFields), filled live as the reader types, the step's pieces lit;
+//   · live counts in the office's units (an emoji is one; the full address in bytes), limits only from the card; a required piece and an over-long
+//     one stop Continue, said in the one alert slot;
+//   · Back and "edit" on the look-over keep every value and the picture's framing, and the edit's Continue comes straight back;
+//   · THE SEND CARRIES ONLY WHAT THE ACT'S CARD TAKES: today's card gets household/handle/agent/note/card/invited_by/heard/heard_note; the accepted
+//     card (POS-1237, f22c069a) gets full_address, note, the bio and the profile under its own names;
+//   · NOTHING IS WRITTEN TO A RESIDENT BEFORE THE OFFICE ADMITS ONE, and after it only through the resident's own doors (the profile fields the
+//     card lacked, the picture); a berth's begin writes nothing;
+//   · THE HUMAN'S PROFILE AND THE LIKENESS ARE IN NO REQUEST AT ALL: held in the tab, said as work in progress (CORE-188's open Office connection);
+//     an existing house and a berth are not asked them here;
+//   · "You're in" shows its two lines, the agent's page link, what the page set, and what was not sent;
 //   · Enter continues from a one-line box; Tab walks the fields in order; a phone frame does not scroll sideways.
 //
 // WITHOUT dist-town the test SKIPS and says so; WITH built pages and no browser it FAILS.
@@ -112,28 +115,34 @@ const TODAY = {
   heard: HEARD,
   heard_note: { type: "string", title: "Anything to add?", maxLength: 280 },
 };
-// a card in POS-1237's shape: full_address (card kept as its alias), the line, the bio and the profile at the join, each with its limit
+// the accepted card (POS-1237, Office f22c069a, src/declare.mjs § DECLARE_SCHEMA): full_address (card its alias), the directory line as note, the
+// bio and the profile at the join, each limit in its own unit (x-limit; maxLength where it counts characters)
+const chars = (max) => ({ maxLength: max, "x-limit": { max, unit: "characters" } });
 const NEXT = {
-  household: { type: "string", required: true, maxLength: 60, "x-group": "household" },
-  handle: { type: "string", required: true, maxLength: 40 },
-  full_address: { type: "string", required: true, maxLength: 50000, description: "Your full address: the Address card, as long as you like. Agents read it when they want the whole of you." },
-  agent: { type: "string", maxLength: 48 },
-  line: { type: "string", maxLength: 120, description: "One line, for lists: the directory and every list that names you (120 characters)." },
-  bio: { type: "string", maxLength: 400 },
-  pronouns: { type: "string", maxLength: 56 },
-  color: { type: "string" },
-  color_name: { type: "string", maxLength: 56 },
-  runtime: { type: "string", maxLength: 72 },
-  invited_by: { type: "string", maxLength: 64 },
+  household: { type: "string", required: true, ...chars(60), "x-group": "household" },
+  handle: { type: "string", required: true, maxLength: 40, "x-limit": { max: 40, unit: "characters" } },
+  full_address: { type: "string", required: true, "x-multiline": true, "x-limit": { max: 50000, unit: "bytes" }, description: "The whole of them, for anyone who wants it: the Address card on their resident page." },
+  agent: { type: "string", "x-limit": { max: 48, unit: "reader-characters" } },
+  note: { type: "string", title: "Directory line", ...chars(120), description: "Their one line: it is their line in the town directory and the line on their Address card." },
+  bio: { type: "string", ...chars(400) },
+  pronouns: { type: "string", ...chars(56) },
+  color: { type: "string", pattern: "^(#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6}))?$" },
+  color_name: { type: "string", ...chars(56) },
+  runtime: { type: "string", ...chars(72) },
+  invited_by: { type: "string", ...chars(64) },
   heard: HEARD,
-  heard_note: { type: "string", maxLength: 280 },
-  motto: { type: "string", maxLength: 30, title: "A motto", description: "A field this site does not place: it still reaches the form." },
+  heard_note: { type: "string", ...chars(280) },
+  motto: { type: "string", ...chars(30), title: "A motto", description: "A field this site does not place: it still reaches the form." },
 };
 const ADD = { handle: { type: "string", required: true, maxLength: 40 }, card: { type: "string", required: true }, agent: { type: "string" }, note: { type: "string" } };
+// a berth's begin: the berth is the handle, so no handle field
+const BEGIN = { household: { type: "string", required: true, "x-group": "household" }, card: { type: "string", required: true }, agent: { type: "string" }, note: { type: "string" } };
+const HUMAN_VALUES = ["Juniper", "I keep a fixture heron.", "she/her"];
 
-// a visitor is still signed in: /me answers with no handles (a 401 here would sign the page's own header out, as it should)
+// a visitor is still signed in: /me answers with no handles (a 401 here would sign the page's own header out, as it should). Once an act admits a
+// resident, /me answers with that handle too, as the office's sign-in then acts for it. Every request's body is kept, to show what never travels.
 function officeFor({ tier = "visitor", act = "declare", fields = TODAY, me = { handles: [], households: {} } } = {}) {
-  const o = { asked: [], sent: [], me };
+  const o = { asked: [], sent: [], me, writes: [], bodies: [], events: [] };
   o.answer = (msg) => {
     if (msg.method === "initialize") return { jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "fixture-office", version: "0" } } };
     if (msg.method !== "tools/call") return msg.id == null ? null : { jsonrpc: "2.0", id: msg.id, result: {} };
@@ -141,7 +150,11 @@ function officeFor({ tier = "visitor", act = "declare", fields = TODAY, me = { h
     const text = (v) => ({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: JSON.stringify(v) }] } });
     if (a.read_shape === "v1") return text({ tier, standing: tier, acts: [{ act, teaches: "Move an agent in.", fields }], next: ["Fill in the form; the office answers."] });
     if (a.read === act) return text({ card: { action: act, blurb: "Move an agent in.", fields } });
-    if (a.do === act) { o.sent.push(a.args); return text({ admitted: true, note: "Fixture: admitted. Welcome to the fixture town.", handle: a.args.handle ?? null }); }
+    if (a.do === act) {
+      o.sent.push(a.args); o.events.push("send");
+      if (act !== "begin" && a.args.handle) o.me = { ...o.me, handles: [...(o.me?.handles ?? []), a.args.handle] };
+      return text(act === "begin" ? { parked: true, note: "Fixture: parked. Your human co-signs at the link." } : { admitted: true, note: "Fixture: admitted. Welcome to the fixture town.", handle: a.args.handle ?? null });
+    }
     return text({ defect: "fixture: not asked for" });
   };
   return o;
@@ -169,8 +182,20 @@ async function openPage(b, base, path, { width, height = 900, office }) {
       body: Buffer.from(json == null ? "" : JSON.stringify(json)).toString("base64") }).catch(() => {});
     const local = u.origin === base;
     office.asked.push(`${request.method} ${local ? "" : u.origin}${u.pathname}`);
+    office.bodies.push(request.postData ?? "");
     if (local && request.method === "POST" && u.pathname === "/api/mcp") { const msg = JSON.parse(request.postData || "{}"); const r = office.answer(msg); return r ? reply(200, r) : reply(202, null); }
     if (local && request.method === "GET" && u.pathname === "/api/me") return office.me ? reply(200, office.me) : reply(401, { defect: "fixture: signed out" });
+    // the resident's own doors, after an admission (src/lib/join-after.mjs): only for a handle /me now holds
+    const own = (h) => (office.me?.handles ?? []).includes(decodeURIComponent(h));
+    const prof = /^\/api\/profile\/([^/]+)(\/avatar)?$/.exec(u.pathname);
+    if (local && request.method === "PATCH" && prof) {
+      office.writes.push({ path: u.pathname.slice(4), body: request.postData ?? "" }); office.events.push("write");
+      return own(prof[1]) ? reply(200, { saved: true }) : reply(403, { defect: "fixture: not yours" });
+    }
+    if (local && request.method === "POST" && u.pathname === "/api/media") {
+      office.writes.push({ path: "/media" + u.search, body: "(bytes)" }); office.events.push("write");
+      return reply(200, { url: `https://media.postmark.town/media/${u.searchParams.get("by")}/fixture-sheet.webp` });
+    }
     return S("Fetch.failRequest", { requestId, errorReason: "BlockedByClient" }).catch(() => {});
   });
   await S("Page.navigate", { url: base + path });
@@ -246,8 +271,14 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     assert.match(await p.js(text("[data-form-error]")), /Household name is needed before you go on/);
     assert.equal(await p.js(`document.querySelector("[data-form-error]").getAttribute("role")`), "alert");
     await p.type("#jd-household", "Fixture Hollow");
-    assert.equal(await p.js(text('[data-count-for="household"]')), "14 / 60", "a live count, the office's household cap");
-    await p.type("#jd-town_name", "Juniper");
+    assert.equal(await p.js(text('[data-count-for="household"]')), "14 characters", "a live count; today's card names no limit, so none is made up");
+    await p.type("#jd-town_name", HUMAN_VALUES[0]);
+    await p.type("#jd-short_line", HUMAN_VALUES[1]);
+    await p.type("#jd-human_pronouns", HUMAN_VALUES[2]);
+    assert.match(await p.js(text('[data-human-profile] .jd-kept-note')), /^work in progress .*isn't sent with this join/i, "the held human profile is said as unfinished work");
+    // ONE Registrar token on the page, and nothing of the page inside her link (Astro once re-opened her <a> after a <template>, CORE-188)
+    assert.equal(await p.js(`[...document.querySelectorAll("a.jd-reg-face")].filter((a) => a.offsetParent !== null).length`), 1, "one Registrar token shows");
+    assert.equal(await p.js(`[...document.querySelectorAll("a.jd-reg-face")].every((a) => a.children.length === 1 && a.firstElementChild.tagName.toLowerCase() === "svg")`), true, "her link holds her picture and nothing else");
     await p.key("Enter");
     await p.until(STEP("who"), "step 2, by Enter");
     assert.equal(await p.js("location.hash"), "#step-2");
@@ -308,15 +339,29 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     // the finished page is the same page, filled, under the review
     assert.equal(await p.js(`!!document.querySelector('[data-review-page-slot] [data-blank-page]') && !document.querySelector("[data-blank-page]").hidden`), true);
     assert.match(await p.js(text("[data-review-sends-words]")), /^8 fields, under the office's own names: household, agent, handle, note, card, invited_by, heard, heard_note\./);
-    const kept = await p.js(`[...document.querySelectorAll("[data-review-kept-list] li b")].map((b) => b.textContent).join("|")`);
-    for (const k of ["Town name", "Runtime", "Bio", "Favorite color", "Pronouns", "May the town show your agent in its shorts?", "Profile picture"]) assert.ok(kept.split("|").includes(k), `${k} is listed as kept (${kept})`);
-    // edit · the three sizes goes back to step 3 with every value, and the picture's framing, still there
+    // every other piece, by its fate: what this page sets after the admission, and what is not sent (the human's own said as work in progress)
+    const names = (sel) => p.js(`[...document.querySelectorAll(${JSON.stringify(sel)})].map((b) => b.textContent).join("|")`);
+    const after = (await names("[data-review-after-list] li > b")).split("|");
+    for (const k of ["Runtime", "Bio", "Favorite color", "Pronouns", "Profile picture"]) assert.ok(after.includes(k), `${k} is listed as set after admission (${after})`);
+    const held = (await names("[data-review-held-list] li > b")).split("|");
+    for (const k of ["Town name", "A short line about you", "Your pronouns", "May the town show your agent in its shorts?"]) assert.ok(held.includes(k), `${k} is listed as not sent (${held})`);
+    assert.equal(await p.js(`document.querySelectorAll("[data-review-held-list] .jd-tag.is-wip").length`), 4, "each held human piece says work in progress");
+    assert.equal(await p.js(`getComputedStyle(document.querySelector("[data-review-after-list] li > b")).color === getComputedStyle(document.querySelector("[data-review-after-list] li")).color`), true, "a piece's name is in ink, not the paper's refusal red");
+    // edit · the three sizes goes back to step 3 with every value, and the picture's framing, still there; its Continue comes straight back
     await p.click('[data-edit-step="describe"]');
     await p.until(STEP("describe"), "edit to step 3");
     assert.equal(await p.js(`document.getElementById("jd-bio").value`), "I keep a fixture garden of notes.");
     assert.equal(await p.js(`document.querySelector('[data-blank-page] [data-fill="picture"] img').style.transform`), framed, "the picture's framing is kept");
+    assert.equal(await p.js(text("[data-jf-next]")), "Back to Look it over");
+    assert.equal(await p.js(`document.querySelector("[data-jf-skip]").hidden`), true, "an edit has no Skip");
+    await p.click("[data-jf-next]");
+    await p.until(STEP("review"), "straight back to the look-over");
+    // and the browser's Back from an edit lands on the look-over too
+    await p.click('[data-edit-step="more"]');
+    await p.until(STEP("more"), "edit to step 4");
     await p.js("history.back(), true");
     await p.until(STEP("review"), "Back to the look-over");
+    assert.equal(office.writes.length, 0, "a resident write before the office was asked anything");
     await p.click("[data-submit]");
     await p.until(`!document.querySelector("[data-gate-reply]").hidden`, "the sent screen");
     assert.equal(office.sent.length, 1);
@@ -324,18 +369,30 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     assert.equal(office.sent[0].card, "I'm Quillon, a fixture. Write to me plainly.", "the full address under today's name");
     assert.equal(office.sent[0].note, "A fixture who answers every letter.", "the one line under today's name");
     for (const never of ["bio", "pronouns", "color", "color_name", "runtime", "town_name", "short_line", "human_pronouns", "likeness", "glance", "sign", "from_town"]) assert.equal(never in office.sent[0], false, `${never} is never sent on today's card`);
-    assert.equal(office.asked.filter((a) => !/^(POST \/api\/mcp|GET \/api\/me)$/.test(a)).length, 0, `no other office call: ${office.asked.join(", ")}`);
-    // you're in: two lines, the page's link, and what waits
+    // AFTER the admission, and only then: the profile fields the card lacked and the picture, through the resident's own doors
+    assert.deepEqual(office.events.slice(0, 1), ["send"], "a resident write went before the send");
+    assert.deepEqual(office.writes.map((w) => w.path), ["/profile/quillon-fixture", "/profile/quillon-fixture/avatar"]);
+    assert.deepEqual(Object.keys(JSON.parse(office.writes[0].body)).sort(), ["bio", "color", "pronouns", "runtime"]);
+    assert.equal(JSON.parse(office.writes[0].body).color, "#7ea1ff");
+    const pic = JSON.parse(office.writes[1].body);
+    assert.equal(pic.type, "image/jpeg", "the framed picture is re-encoded, as Edit profile does");
+    assert.ok(pic.image.length > 100, "the picture travels");
+    assert.equal(office.asked.filter((a) => !/^(POST \/api\/mcp|GET \/api\/me|PATCH \/api\/profile\/quillon-fixture(\/avatar)?)$/.test(a)).length, 0, `no other office call: ${office.asked.join(", ")}`);
+    // THE HUMAN'S OWN, IN NO REQUEST AT ALL (held in the tab; CORE-188's open Office connection)
+    for (const v of HUMAN_VALUES) assert.ok(!office.bodies.some((b) => b.includes(v)), `the human's "${v}" travelled to the office`);
+    for (const f of ["town_name", "short_line", "human_pronouns", "likeness"]) assert.ok(!office.bodies.some((b) => b.includes(`"${f}"`)), `a request carried ${f}`);
+    // you're in: two lines, the page's link, what the page set, and what was not sent
     await p.click("[data-show-in]");
     await p.until(`!document.querySelector("[data-gate-in]").hidden`, "you're in");
     assert.match(await p.js(text("[data-in-page]")), /about half an hour/);
     assert.match(await p.js(text("[data-in-letters]")), /about 15 minutes.*7 AM and 7 PM Eastern/);
     assert.equal(await p.js(`document.querySelector("[data-in-page-link]").getAttribute("href")`), "/residents/quillon-fixture/");
-    assert.ok((await p.js(`document.querySelectorAll("[data-in-kept-list] li").length`)) >= 5, "what waits is listed with where");
+    assert.equal(await p.js(`[...document.querySelectorAll("[data-in-after-list] li")].map((li) => li.querySelector("b").textContent + ":" + li.querySelector(".jd-kept-value").textContent).join("|")`), "Profile:set|Picture:set");
+    assert.ok((await names("[data-in-held-list] li > b")).split("|").includes("Town name"), "what was not sent is still said on You're in");
   } finally { await p.close(); }
 });
 
-test("A CARD THAT TAKES THE BIO AND PROFILE (POS-1237's shape): its limits count, its names carry them, and a field the design does not place still reaches the form", { skip: SKIP }, async () => {
+test("THE ACCEPTED CARD (POS-1237, f22c069a): its limits count in their own units, its names carry them, and a field the design does not place still reaches the form", { skip: SKIP }, async () => {
   await setup();
   const office = officeFor({ fields: NEXT });
   const p = await openPage(browser, base, "/join/move-in/", { width: 1440, office });
@@ -351,20 +408,22 @@ test("A CARD THAT TAKES THE BIO AND PROFILE (POS-1237's shape): its limits count
     await p.click("[data-jf-next]");
     await p.until(STEP("describe"), "step 3");
     await p.type("#jd-line", "A line");
-    assert.equal(await p.js(text('[data-count-for="line"]')), "6 / 120", "the card's own limit");
-    assert.match(await p.js(text('[data-hint-for="line"]')) + await p.js(`document.getElementById("jd-line").closest("label").textContent`), /One line/);
+    assert.equal(await p.js(text('[data-count-for="line"]')), "6 / 120", "the card's own limit, in characters");
+    assert.match(await p.js(`document.getElementById("jd-line").closest("label").textContent`), /One line/);
     await p.type("#jd-bio", "A bio.");
-    await p.type("#jd-full_address", "The whole of me.");
+    await p.type("#jd-full_address", "The whole of mé.");
+    assert.equal(await p.js(text('[data-count-for="full_address"]')), "17 / 50,000 bytes", "the full address counts UTF-8 bytes, as the office does");
     for (let i = 0; i < 4; i++) await p.click("[data-jf-next]").then(() => new Promise((r) => setTimeout(r, 150)));
     await p.until(STEP("review"), "the look-over");
     await p.click("[data-submit]");
     await p.until(`!document.querySelector("[data-gate-reply]").hidden`, "the sent screen");
     assert.equal(office.sent.length, 1);
-    assert.equal(office.sent[0].full_address, "The whole of me.");
-    assert.equal(office.sent[0].line, "A line");
+    assert.equal(office.sent[0].full_address, "The whole of mé.");
+    assert.equal(office.sent[0].note, "A line", "the directory line under the card's own name");
     assert.equal(office.sent[0].bio, "A bio.", "a card that takes the bio gets it");
     assert.equal(office.sent[0].motto, "Slow and true.");
-    assert.equal("card" in office.sent[0] || "note" in office.sent[0], false, "never the old name beside the new one");
+    assert.equal("card" in office.sent[0], false, "never the old name beside the new one");
+    assert.equal(office.writes.length, 0, "the card carried the profile itself: nothing left for the resident's doors");
   } finally { await p.close(); }
 });
 
@@ -386,6 +445,37 @@ test("AN EXISTING HOUSE (add-resident): no house to name, no human profile, and 
     await p.until(`!document.querySelector("[data-gate-reply]").hidden`, "the sent screen");
     assert.equal("household" in office.sent[0], false, "a keeper is not asked for a house");
     assert.equal(office.sent[0].card, "Added to a fixture house.");
+  } finally { await p.close(); }
+});
+
+test("A BERTH (begin): no handle, no human profile and no likeness step here (its human gives them on the office's co-sign page), and nothing is written after", { skip: SKIP }, async () => {
+  await setup();
+  const office = officeFor({ tier: "berth", act: "begin", fields: BEGIN });
+  const p = await openPage(browser, base, "/join/move-in/", { width: 1440, office });
+  try {
+    await p.until(STEP("household"), "step 1");
+    assert.equal(await p.js(`document.querySelector("[data-human-profile]").hidden`), true, "a berth's human was asked their profile here");
+    await p.type("#jd-household", "Fixture Berth");
+    await p.click("[data-jf-next]");
+    await p.until(STEP("who"), "step 2");
+    assert.equal(await p.js(`document.getElementById("jd-handle").offsetParent === null`), true, "a berth was asked a handle its card does not take");
+    await p.type("#jd-runtime", "a berth runtime");
+    await p.click("[data-jf-next]");
+    await p.until(STEP("describe"), "step 3");
+    await p.type("#jd-full_address", "A berth's whole self.");
+    await p.click("[data-jf-next]");
+    await p.until(STEP("more"), "step 4");
+    await p.setFile("[data-profile-avatar-input]", pngFile());
+    await p.click("[data-jf-next]");
+    await p.until(STEP("review"), "the look-over: no found-us, no likeness step");
+    assert.equal(await p.js(text("[data-jd-kicker]")), "Look it over");
+    assert.match(await p.js(text("[data-review-held-list]")), /co-sign/, "what waits for the co-sign says so");
+    assert.equal(await p.js(`document.querySelector("[data-review-after]").hidden`), true, "a berth promised a write after");
+    await p.click("[data-submit]");
+    await p.until(`!document.querySelector("[data-gate-reply]").hidden`, "the sent screen");
+    assert.deepEqual(Object.keys(office.sent[0]).sort(), ["card", "household"]);
+    assert.equal(await p.js(`document.querySelector("[data-to-in]").hidden`), true, "no You're in before the human co-signs");
+    assert.equal(office.writes.length, 0, "a berth's begin wrote to a resident");
   } finally { await p.close(); }
 });
 

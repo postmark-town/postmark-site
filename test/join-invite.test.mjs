@@ -163,8 +163,9 @@ test("the pages are wired: /join/ carries the roll and keeps only the link's nam
   assert.match(movein, /return recallInvite\(window\.localStorage\);/, "the box takes only what /join/ kept, never a query of its own");
   assert.match(movein, /const invited = kept && roll\.has\(kept\) \? kept : null;/, "and only a kept name the roll holds");
   assert.match(movein, /inviteRoll\(\{ households: registry, residents, live: householdsRead\?\.live === true \}\)/);
-  assert.match(movein, /form\.fields\.invited_by \? controlOf\(form\.fields\.invited_by\.node\) : null/,
-    "the box is the door's own field, found by its name");
+  // CORE-188: the box is the step's own, and it is filled only when the act's card takes invited_by (the plan's `sent`)
+  assert.match(movein, /const inviteBox = invited && plan\.pieces\.invited_by\?\.sent \? control\("invited_by"\) : null;/,
+    "the box is filled only when the door takes it, found by its piece");
   assert.match(movein, /if \(inviteBox && !inviteBox\.value\)/, "a name the human typed is never overwritten");
 });
 
