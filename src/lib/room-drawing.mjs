@@ -105,6 +105,7 @@ export function showInPane(list, row) {
  * @param {() => any} host.facesKey                                         changes when the faces land (a redraw then shows them)
  * @param {() => boolean} host.pinNext                                      true while the reader's own say is landing
  * @param {(detail: {id: any, handle: string, said: string}) => void} host.onReply   a Reply press: the say the office served on that line
+ * @param {(line: object, id: string) => string|null} [host.circleHref]     optional: where a line's "Open" goes (null: no Open); default `#circle-<id>`
  */
 export function createRoomDrawing(host) {
   var doc = host.doc, el = host.el, faceNode = host.faceNode, personLink = host.personLink, humanOf = host.humanOf, dateTimeOf = host.dateTimeOf;
@@ -146,10 +147,12 @@ export function createRoomDrawing(host) {
       acts.appendChild(r);
     }
     // "Open" is the way to link to or share ONE circle (its own view, with its own address); nothing needs it to be read. It sits on an opening
-    // message, and on a reply that stands alone here because the message it answers is not in this read.
-    if (node.id !== null && !node.parent) {
+    // message, and on a reply that stands alone here because the message it answers is not in this read. A host that lives on another page names
+    // where a circle opens (`host.circleHref(line, id)`, null for a line that opens none); without it, the circle's own anchor on this page.
+    var href = node.id === null || node.parent ? null : typeof host.circleHref === "function" ? host.circleHref(v, node.id) : "#circle-" + encodeURIComponent(node.id);
+    if (href) {
       var o = el("a", "c-act", "Open");
-      o.href = "#circle-" + encodeURIComponent(node.id);
+      o.href = href;
       o.setAttribute("data-circle-open", node.id);
       o.setAttribute("data-key", "open-" + node.key);
       o.setAttribute("aria-label", "Open " + (humanOf(handle) || handle) + "'s conversation on its own");

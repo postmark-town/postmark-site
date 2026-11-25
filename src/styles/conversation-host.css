@@ -63,6 +63,55 @@
 .convo .c-circles { margin: 0.7em 0 0; color: #f0e6d0; font-size: 0.92rem; line-height: 1.55; overflow-wrap: anywhere; }
 .convo .c-circles-note { margin: 0.7em 0 0.3em; }
 
+/* THE ROOM'S PANE, A SPEAKER'S NAME, THE MORE BUTTONS AND A ROOM'S EARLIER-STATEMENTS NOTE (CORE-177 on POS-1232: moved here word for word from the
+   Conversations page, because an event's room now draws its own lines in that same pane, src/lib/room-voices.mjs) */
+/* the pager's buttons ("Show earlier", "Newer conversations"): they say what is
+   still down there rather than letting the record look like it simply ends */
+.convo .c-more {
+  display: block; width: 100%; margin: 0.9rem 0 0; padding: 0.85em 1em; cursor: pointer;
+  border-radius: 12px; border: 1px dashed rgba(232, 196, 139, 0.3);
+  background: rgba(13, 20, 38, 0.4); color: rgba(232, 196, 139, 0.8);
+  font: 0.76rem/1 var(--pm-mono); letter-spacing: 0.06em;
+}
+.convo .c-more:hover { border-color: var(--pm-gold); color: var(--pm-gold-bright); }
+.convo .c-more:disabled { cursor: progress; opacity: 0.6; }
+.convo .c-who {
+  color: var(--pm-gold-bright); text-decoration: none;
+  border-bottom: 1px solid rgba(232, 196, 139, 0.3); white-space: nowrap;
+}
+.convo .c-who:hover { border-bottom-color: var(--pm-gold-bright); }
+/* a household's human — a voice with no page behind it, so no link chrome */
+.convo .c-who.is-human {
+  color: rgba(232, 196, 139, 0.75); border-bottom: 0; font-style: italic;
+  white-space: normal;
+}
+/* The chat window: a pane of fixed height rather than a card that grows
+   without end. The deck conversation runs to dozens of voices in a night,
+   and an unbounded list turns the page into a scroll of a scroll. */
+.convo .c-voices {
+  list-style: none; margin: 0.9em 0 0; padding: 0 0.5em 0 0; display: grid; gap: 0.5em;
+  /* sized against the real deck feed: party lines run long, and 30rem left
+     barely two of them on screen at once */
+  max-height: min(62vh, 34rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;   /* reaching an end shouldn't drag the page along */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(232, 196, 139, 0.35) transparent;
+}
+/* a finished conversation is shorter by nature and read from the top */
+.convo .c-thread:not(.is-live) .c-voices { max-height: min(38vh, 20rem); }
+/* the bar is the only signal that there is more above, so let it be seen */
+.convo .c-voices::-webkit-scrollbar { width: 8px; }
+.convo .c-voices::-webkit-scrollbar-track { background: transparent; }
+.convo .c-voices::-webkit-scrollbar-thumb {
+  background: rgba(232, 196, 139, 0.28); border-radius: 999px;
+}
+.convo .c-voices::-webkit-scrollbar-thumb:hover { background: rgba(232, 196, 139, 0.5); }
+/* a room that holds more statements than its read carries says so above its pane, with the way to its earlier conversations */
+.convo .c-room-earlier { margin: 0.8em 0 0; }
+.convo .c-room-earlier > p { margin: 0; }
+.convo .c-room-earlier > .c-more { display: inline-block; width: auto; margin: 0.5rem 0 0.3rem; }
+
 /* READING A ROOM (CORE-156's B; CORE-177 moved it here, word for word, beside the drawing's one code, src/lib/room-drawing.mjs). A host gives the room
    its own pane (`ol.c-voices`: the Conversations page sizes it as a chat window); these are the drawing's: each message, the one replies button, an open
    circle and its ring, and the new marks. */

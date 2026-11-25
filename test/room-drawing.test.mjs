@@ -11,7 +11,7 @@
 //   (3) a poll that moved nothing redraws nothing; focus and open circles survive a redraw; the faces and the sign-in are read live, each time;
 //   (4) Reply names the say the office served (the host decides what that means); keys and controlled ids are unique, across hosts too;
 //   (5) the production binding: the page's own ROOM-DRAW glue draws through this module once the module script hands it over, and not before;
-//   (6) a SECOND host (an ordinary fixture, not the event page: event rooms wait on POS-1232) draws the same input the same way.
+//   (6) a SECOND host (an ordinary fixture) draws the same input the same way. The event page's own host, on POS-1232's read, is test/room-voices.test.mjs.
 // What the page draws in a real browser stays test/conversations-circles.test.mjs ("B ·").
 
 import { test } from "node:test";

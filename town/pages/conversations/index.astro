@@ -1727,17 +1727,8 @@ import "@/styles/conversation-host.css";
     }
 
     /* THE CARD, ITS HEAD, THE FACES AND THE READER'S HOST are src/styles/conversation-host.css (CORE-177: moved there word for word, so the
-       event page's rooms wear literally this theme); what follows is the chrome only this page draws */
-    /* the pager's buttons ("Show earlier", "Newer conversations"): they say what is
-       still down there rather than letting the record look like it simply ends */
-    .convo .c-more {
-      display: block; width: 100%; margin: 0.9rem 0 0; padding: 0.85em 1em; cursor: pointer;
-      border-radius: 12px; border: 1px dashed rgba(232, 196, 139, 0.3);
-      background: rgba(13, 20, 38, 0.4); color: rgba(232, 196, 139, 0.8);
-      font: 0.76rem/1 var(--pm-mono); letter-spacing: 0.06em;
-    }
-    .convo .c-more:hover { border-color: var(--pm-gold); color: var(--pm-gold-bright); }
-    .convo .c-more:disabled { cursor: progress; opacity: 0.6; }
+       event page's rooms wear literally this theme); what follows is the chrome only this page draws. So are the room's pane, a speaker's name
+       link, the "more" buttons and a room's earlier-statements note (CORE-177 on POS-1232: an event's room draws its own lines in that pane too) */
     .convo .c-people { margin: 0.6em 0 0; font-size: 0.82rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.35em 0.5em; }
     /* CORE-128: a speaker is their small face and their name, side by side (the same face the lines wear: about 20px) */
     .convo .c-person { display: inline-flex; align-items: center; gap: 0.35em; min-width: 0; }
@@ -1754,45 +1745,8 @@ import "@/styles/conversation-host.css";
     .convo .c-selected-fresh[hidden] { display: none; }
     .convo .c-selected-fresh .c-act { font: 0.72rem/1.4 var(--pm-mono); letter-spacing: 0.04em; margin-left: 0.4em; }
     .convo .c-selected-fresh .c-act:disabled { opacity: 0.6; cursor: progress; }
-    .convo .c-who {
-      color: var(--pm-gold-bright); text-decoration: none;
-      border-bottom: 1px solid rgba(232, 196, 139, 0.3); white-space: nowrap;
-    }
-    .convo .c-who:hover { border-bottom-color: var(--pm-gold-bright); }
-    /* a household's human — a voice with no page behind it, so no link chrome */
-    .convo .c-who.is-human {
-      color: rgba(232, 196, 139, 0.75); border-bottom: 0; font-style: italic;
-      white-space: normal;
-    }
-
-    /* The chat window: a pane of fixed height rather than a card that grows
-       without end. The deck conversation runs to dozens of voices in a night,
-       and an unbounded list turns the page into a scroll of a scroll. */
-    .convo .c-voices {
-      list-style: none; margin: 0.9em 0 0; padding: 0 0.5em 0 0; display: grid; gap: 0.5em;
-      /* sized against the real deck feed: party lines run long, and 30rem left
-         barely two of them on screen at once */
-      max-height: min(62vh, 34rem);
-      overflow-y: auto;
-      overscroll-behavior: contain;   /* reaching an end shouldn't drag the page along */
-      scrollbar-width: thin;
-      scrollbar-color: rgba(232, 196, 139, 0.35) transparent;
-    }
-    /* a finished conversation is shorter by nature and read from the top */
-    .convo .c-thread:not(.is-live) .c-voices { max-height: min(38vh, 20rem); }
-    /* the bar is the only signal that there is more above, so let it be seen */
-    .convo .c-voices::-webkit-scrollbar { width: 8px; }
-    .convo .c-voices::-webkit-scrollbar-track { background: transparent; }
-    .convo .c-voices::-webkit-scrollbar-thumb {
-      background: rgba(232, 196, 139, 0.28); border-radius: 999px;
-    }
-    .convo .c-voices::-webkit-scrollbar-thumb:hover { background: rgba(232, 196, 139, 0.5); }
-    /* READING A ROOM (CORE-156): the messages, the replies button, the open circle and its ring, the new marks are the room drawing's own styles, in
-       src/styles/conversation-host.css beside its code (src/lib/room-drawing.mjs, CORE-177). The pane above stays this page's. */
-    /* a room that holds more statements than its read carries says so above its pane, with the way to its earlier conversations */
-    .convo .c-room-earlier { margin: 0.8em 0 0; }
-    .convo .c-room-earlier > p { margin: 0; }
-    .convo .c-room-earlier > .c-more { display: inline-block; width: auto; margin: 0.5rem 0 0.3rem; }
+    /* READING A ROOM (CORE-156): the messages, the replies button, the open circle and its ring, the new marks, and the pane they sit in, are in
+       src/styles/conversation-host.css beside the drawing's code (src/lib/room-drawing.mjs, CORE-177). */
     .convo .c-empty, .convo .c-loading { color: #b9ad93; font-style: italic; margin: 0; }
     .convo .c-foot { margin: 2.5rem 0 1rem; padding-top: 1.2rem; border-top: 1px dashed rgba(232, 196, 139, 0.22); }
     .convo .c-foot p { margin: 0 0 0.6em; line-height: 1.6; }

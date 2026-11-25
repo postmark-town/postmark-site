@@ -37,7 +37,8 @@ export function circleUrl(base, circleId, after) {
   return `${String(base ?? "/api").replace(/\/+$/, "")}${CONVERSATIONS}?circle=${id}${a !== null ? `&after=${a}` : ""}`;
 }
 
-async function readBody(fetchImpl, url) {
+/** One keyless read: the office's whole answer body, or a rejection for anything that is not a 200 conversations read (the reader's rule, above). */
+export async function readBody(fetchImpl, url) {
   if (!url) throw new Error("not an address the office issues");
   const res = await fetchImpl(url, { headers: { accept: "application/json" }, cache: "no-store" });
   let body = null;

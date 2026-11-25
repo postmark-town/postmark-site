@@ -286,7 +286,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     import { handleChoice, rsvpBody, submitRsvp, SECRET_LINE } from "@/lib/rsvp.mjs";
     import { fetchAnnouncements, eventReadUrl } from "@/lib/announcements.mjs";
     import { EVENT_WORDS, LOCAL_FORMAT, eventSections, isRoomId, roomPermalink, roomIdOf } from "@/lib/calendar.mjs";
-    import { mountRoom } from "@/lib/circle-reader-mount.mjs";
+    import { drawRoomVoices, sayRoomFailed } from "@/lib/room-voices.mjs";
     import { hostFaces, hostReaderOptions } from "@/lib/conversation-host.mjs";
     import { paintAttendance } from "@/lib/event-attendance.mjs";
 
@@ -302,12 +302,17 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
       const faces = hostFaces({ fetchImpl: (u, o) => fetch(u, o) });
       const drawRoom = async (box, id) => {
         const reader = box.querySelector("[data-ev-reader]");
-        const floor = reader.querySelector("[data-ev-floor]");
+        const floor = reader?.querySelector("[data-ev-floor]");
+        if (!reader) return;
         await faces.ready();
-        // the site's one reader setup with the Conversations page's host options (conversation-host.mjs: its faces, its own header). A circle's
-        // own link is the Conversations page's one-conversation view (CORE-117: `/conversations/#circle-<id>`).
-        const m = await mountRoom({ doc: document, host: reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o), hrefForCircle: (c) => `/conversations/#circle-${encodeURIComponent(c)}`, ...hostReaderOptions(document, faces.get) });
+        // THE ROOM'S OWN LINES, DRAWN AS THE CONVERSATIONS PAGE DRAWS A ROOM (CORE-177 on POS-1232, room-voices.mjs): ONE opt-in read of this room, its
+        // lines through the site's one room drawing (CORE-156's B) in that page's pane. An office that answers without the lines keeps the room as it was:
+        // the site's one reader setup with the Conversations page's host options (conversation-host.mjs: its faces, its own header), a circle's own link
+        // the Conversations page's one-conversation view (CORE-117: `/conversations/#circle-<id>`). A read that fails says so, and can be asked again.
+        const m = await drawRoomVoices({ doc: document, card: box, reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o), getFaces: faces.get,
+          readerOptions: { hrefForCircle: (c) => `/conversations/#circle-${encodeURIComponent(c)}`, ...hostReaderOptions(document, faces.get) } });
         if (m.ok) { floor?.remove(); return; }
+        if (m.failed) { sayRoomFailed(document, floor, () => drawRoom(box, id)); return; }
         if (floor) floor.textContent = EVENT_WORDS.circles.noReader;
       };
       // A room added after the build is drawn as the baked ones are: a shut Conversations card, its id as its head, the way to its whole talk inside.

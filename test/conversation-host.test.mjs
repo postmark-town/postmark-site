@@ -35,8 +35,15 @@ test("the card, its head, the faces and the reader's host are ONE stylesheet, im
     assert.equal(EVENT.includes(sel), false, `${sel} is not copied onto the event page`);
   }
   for (const [name, page] of [["conversations", CONVO], ["event", EVENT]]) assert.match(page, /^import "@\/styles\/conversation-host\.css";$/m, `the ${name} page imports the shared theme`);
-  // the card chrome only the Conversations page draws stays there (the room's pane, sized as its chat window, included)
-  for (const own of [".convo .c-people {", ".convo .c-voices {", ".convo .c-more {"]) assert.equal(CONVO.includes(own), true, `${own} stays on the Conversations page`);
+  // the card chrome only the Conversations page draws stays there
+  for (const own of [".convo .c-people {", ".convo .c-person {", ".convo .c-people-more {"]) assert.equal(CONVO.includes(own), true, `${own} stays on the Conversations page`);
+  // CORE-177 on POS-1232: an event's room draws its own lines in the Conversations pane, so the pane (sized as that page's chat window), a speaker's name link,
+  // the "more" buttons and the earlier-statements note moved here word for word
+  for (const sel of [".convo .c-voices {", ".convo .c-thread:not(.is-live) .c-voices {", ".convo .c-who {", ".convo .c-who.is-human {", ".convo .c-more {", ".convo .c-room-earlier {", ".convo .c-room-earlier > .c-more {"]) {
+    assert.equal(CSS.split("\n" + sel).length - 1, 1, `${sel} is in conversation-host.css once`);
+    assert.equal(CONVO.includes(sel), false, `${sel} is no longer kept on the Conversations page`);
+    assert.equal(EVENT.includes(sel), false, `${sel} is not copied onto the event page`);
+  }
   // CORE-177: READING A ROOM (CORE-156's B) moved here beside its one drawing, src/lib/room-drawing.mjs
   for (const sel of [".convo .c-voice {", ".convo .c-said {", ".convo .c-acts {", ".convo .c-act {", ".convo .c-fold {", ".convo .c-kids {", ".convo .c-ring {", ".convo .c-voice.is-new {"]) {
     assert.equal(CSS.split("\n" + sel).length - 1, 1, `${sel} is a top-level rule in conversation-host.css once (its phone rule sits in the media block)`);
@@ -112,7 +119,9 @@ test("PIN both hosts mount the World's reader through mountRoom: the Conversatio
   assert.equal(/loadReader\(/.test(CONVO), false, "and does not load the reader itself");
   assert.equal(/createCircleReader\(/.test(CONVO), false, "the door no longer builds the reader itself");
   assert.match(EVENT, /import \{ hostFaces, hostReaderOptions \} from "@\/lib\/conversation-host\.mjs";/);
-  assert.match(EVENT, /await mountRoom\(\{ doc: document, host: reader, roomId: id,[^\n]*?\.\.\.hostReaderOptions\(document, faces\.get\) \}\);/, "the event page mounts with the Conversations host's options");
+  // CORE-177 on POS-1232: the event page draws a room's own lines when the office serves them (room-voices.mjs), and otherwise mounts the reader through the
+  // one setup with the Conversations host's options (room-voices.mjs hands `readerOptions` to mountRoom; test/room-voices.test.mjs holds that)
+  assert.match(EVENT, /await drawRoomVoices\(\{ doc: document, card: box, reader, roomId: id,[\s\S]*?readerOptions: \{ hrefForCircle: [^\n]*?\.\.\.hostReaderOptions\(document, faces\.get\) \} \}\);/, "the event page's fallback mounts with the Conversations host's options");
   assert.equal(/createCircleReader\(/.test(EVENT), false, "and never builds a reader of its own");
 });
 
@@ -209,6 +218,7 @@ test("an early result clears its deadline, faces that land LATE reach the provid
 test("PIN the event page's room waits only on the bounded faces, never on the read itself, and mounts through the one setup with the same getter", () => {
   const draw = EVENT.slice(EVENT.indexOf("const drawRoom = async"), EVENT.indexOf("const build = (ids)"));
   assert.match(EVENT, /const faces = hostFaces\(\{ fetchImpl: \(u, o\) => fetch\(u, o\) \}\);/, "one host faces for the page");
-  assert.deepEqual([...draw.matchAll(/await ([\w.]+)\(/g)].map((m) => m[1]), ["faces.ready", "mountRoom"], "the bounded wait, then the mount: nothing else is awaited");
+  assert.deepEqual([...draw.matchAll(/await ([\w.]+)\(/g)].map((m) => m[1]), ["faces.ready", "drawRoomVoices"], "the bounded wait, then the room's one read and draw: nothing else is awaited");
+  assert.match(draw, /getFaces: faces\.get,/, "the drawn lines take their faces through the same getter");
   assert.equal(/loadFaces|readFaces/.test(EVENT), false, "no unbounded read left on the page");
 });
