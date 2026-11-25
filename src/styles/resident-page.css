@@ -1,0 +1,325 @@
+/* resident-page.css — THE RESIDENT PAGE'S OWN PIECES, ONE STYLESHEET (CORE-188). Darko, 2026-11-25: "we should try to abstract and reuse as much
+   as possible of the theme and formatting of the actual resident page and profile, so that changing it in the future means the join flow version
+   gets changed too." So the rules for the page's face (the profile bubble: picture square, title row and its chips, meta line, bio, actions and
+   record), its Edit profile form, and its cards (the Address card's face) MOVED here, word for word, from town/components/Household.astro's scoped
+   style. Each selector is prefixed with `.rpage`, one class, the same weight Astro's scoped attribute gave it, so the resident page's cascade is
+   unchanged. A host takes the look by standing inside `.rpage` (and the site's `.pm` shell): the resident page (Household.astro), and the join's
+   blank instance of the same page (town/pages/join/move-in.astro). The markup is src/components/resident/*.astro, one source for both. */
+  .rpage .profile-bubble {
+    position: relative;
+    display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 1.2em;
+    margin: 0 0 1.25em; padding: 1.45em 1.7em 1.35em;
+    text-align: left; overflow: hidden;
+    background: rgba(10, 17, 33, 0.78);
+    border: 1px solid rgba(232, 196, 139, 0.24); border-radius: 15px;
+    box-shadow: 0 18px 50px rgba(2, 6, 16, 0.18);
+  }
+  .rpage .profile-bubble::before {
+    content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
+    background: var(--profile-color);
+  }
+  .rpage .profile-edit-pencil {
+    position: absolute; top: 0.85em; right: 0.9em; z-index: 2;
+    display: inline-flex; align-items: center; gap: 0.45em;
+    padding: 5px 9px; color: rgba(232, 196, 139, 0.72); background: rgba(8, 14, 27, 0.72);
+    border: 1px solid rgba(232, 196, 139, 0.28); border-radius: 8px;
+    font-family: var(--pm-mono); font-size: 0.62rem; line-height: 1; letter-spacing: 0.09em;
+    text-transform: uppercase; cursor: pointer;
+  }
+  .rpage .profile-edit-pencil:hover { color: var(--pm-gold-bright); border-color: rgba(232, 196, 139, 0.58); }
+  .rpage .profile-edit-pencil[hidden] { display: none; }
+  .rpage .profile-avatar {
+    width: 96px; aspect-ratio: 1; align-self: start;
+    display: grid; place-items: center; overflow: hidden;
+    color: var(--profile-color); background: color-mix(in srgb, var(--profile-color) 15%, #101b31);
+    border: 2px solid var(--profile-color); border-radius: 14px;
+    font-size: 2.45rem; font-weight: 700; line-height: 1;
+    box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.035);
+  }
+  .rpage .profile-avatar img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: center; }
+  .rpage .profile-copy { min-width: 0; }
+  .rpage .profile-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5em; }
+  .rpage .profile-title-row h1:is(.rpage *) {
+    margin: 0 0.1em 0 0;
+    font-size: clamp(1.65rem, 3.6vw, 2.25rem); line-height: 1.08;
+    color: var(--pm-gold-bright);
+    text-shadow: 0 0 28px rgba(232, 196, 139, 0.24);
+  }
+  .rpage .profile-chip {
+    display: inline-flex; align-items: center; gap: 0.42em;
+    max-width: 100%; padding: 2px 8px; border-radius: 999px;
+    font-family: var(--pm-mono); font-size: 0.58rem; line-height: 1.35;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: #d9cfba; border: 1px solid rgba(232, 196, 139, 0.32);
+  }
+  .rpage .profile-chip[hidden], .rpage .profile-bio[hidden] { display: none; }
+  /* POS-807: quiet, beside the name; not a chip, nothing to click */
+  .rpage .profile-pronouns {
+    font-family: var(--pm-mono); font-size: 0.78rem; letter-spacing: 0.06em;
+    color: rgba(232, 196, 139, 0.72); overflow-wrap: anywhere;
+  }
+  .rpage .runtime-chip { color: #aabef9; border-color: rgba(126, 161, 255, 0.42); }
+  .rpage .color-chip { text-transform: none; letter-spacing: 0.045em; }
+  .rpage .color-swatch {
+    width: 0.62em; height: 0.62em; flex: 0 0 auto; border-radius: 999px;
+    background: var(--profile-color); box-shadow: 0 0 0 1px rgba(255,255,255,0.2);
+  }
+  .rpage .profile-meta {
+    display: flex; flex-wrap: wrap; gap: 0.35em 0.75em;
+    margin: 0.45em 0 0;
+    font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.07em;
+    color: rgba(232, 196, 139, 0.72);
+  }
+  .rpage .profile-meta > span:is(.rpage *) + span:is(.rpage *)::before { content: "·"; margin-right: 0.75em; color: rgba(232, 196, 139, 0.4); }
+  .rpage .profile-handle { color: var(--profile-color); font-weight: 700; }
+  .rpage .profile-bio {
+    max-width: 70ch; margin: 0.8em 0 0;
+    color: #fff8e8; font-size: 1rem; line-height: 1.55; font-style: italic;
+  }
+  .rpage .profile-actions { display: flex; flex-wrap: wrap; gap: 0.65em; margin: 1em 0 0; }
+  .rpage .profile-actions .pm-btn:is(.rpage *) { font-size: 0.72rem; padding: 7px 15px; }
+  .rpage .profile-stats {
+    display: flex; flex-wrap: wrap; gap: 1.05em 2.25em;
+    margin: 1em 0 0; padding: 0.9em 0 0;
+    border-top: 1px dashed rgba(232, 196, 139, 0.24);
+  }
+  .rpage .profile-stats > div:is(.rpage *) { display: flex; flex-direction: column; min-width: 3.2em; }
+  .rpage .profile-stats > div[hidden]:is(.rpage *) { display: none; }
+  .rpage .profile-stats dd:is(.rpage *) {
+    order: 1; margin: 0; color: #fff4d7; font-size: 1.25rem; line-height: 1; font-weight: 700;
+  }
+  .rpage .profile-stats dt:is(.rpage *) {
+    order: 2; margin: 0.5em 0 0; font-family: var(--pm-mono); font-size: 0.55rem;
+    line-height: 1; letter-spacing: 0.14em; text-transform: uppercase;
+    color: rgba(232, 196, 139, 0.72);
+  }
+  /* the one stat in the row that is stamps (it carries the ✦) wears the stamp
+     family — the law's whole value is that violet means "this is stamps" */
+  .rpage .profile-stats [data-profile-minted]:is(.rpage *) dd:is(.rpage *) { color: var(--pm-stamp-bright); }
+  .rpage .profile-stats [data-profile-minted]:is(.rpage *) dt:is(.rpage *) { color: rgba(var(--pm-stamp-rgb), 0.8); }
+  .rpage .profile-edit-form {
+    margin: 1.15em 0 0; padding: 1em 1.05em;
+    background: rgba(5, 10, 22, 0.58); border: 1px solid rgba(232, 196, 139, 0.24);
+    border-radius: 11px;
+  }
+  .rpage .profile-edit-form[hidden] { display: none; }
+  .rpage .profile-edit-avatar-row {
+    display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 0.9em;
+    margin: 0 0 1em; padding: 0 0 1em; border-bottom: 1px dashed rgba(232, 196, 139, 0.2);
+  }
+  .rpage .profile-edit-avatar-preview {
+    width: 72px; aspect-ratio: 1; display: grid; place-items: center; overflow: hidden;
+    color: var(--profile-color); background: color-mix(in srgb, var(--profile-color) 15%, #101b31);
+    border: 2px solid var(--profile-color); border-radius: 10px;
+    font-size: 1.7rem; font-weight: 700;
+  }
+  .rpage .profile-edit-avatar-preview img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: center; }
+  .rpage .profile-edit-avatar-row.framing { grid-template-columns: minmax(0, 240px) minmax(0, 1fr); }
+  .rpage .profile-edit-avatar-preview.framing { width: 240px; max-width: 100%; align-self: start; cursor: grab; touch-action: none; }
+  .rpage .profile-edit-avatar-preview.framing:active { cursor: grabbing; }
+  .rpage .profile-edit-avatar-preview canvas { width: 100%; height: 100%; display: block; }
+  @media (max-width: 540px) {
+    .rpage .profile-edit-avatar-row.framing { grid-template-columns: minmax(0, 1fr); }
+    .rpage .profile-edit-avatar-preview.framing { width: min(240px, 100%); justify-self: center; }
+  }
+  .rpage .profile-edit-avatar-zoom { margin: 0.55em 0 0; }
+  .rpage .profile-edit-avatar-zoom-ctl { display: flex; align-items: center; gap: 0.6em; }
+  .rpage .profile-edit-avatar-zoom input[type="range"]:is(.rpage *) { flex: 0 1 11em; accent-color: var(--profile-color); }
+  .rpage .profile-edit-avatar-zoom span:is(.rpage *) { font-size: 0.68rem; opacity: 0.65; }
+  .rpage .profile-edit-avatar-darkroom { margin: 0.4em 0 0; font-size: 0.68rem; opacity: 0.8; }
+  .rpage .profile-edit-avatar-darkroom a:is(.rpage *) { color: var(--pm-gold-bright, #e8c48b); }
+  .rpage .profile-edit-avatar-controls { min-width: 0; }
+  .rpage .profile-edit-avatar-controls label:is(.rpage *) { display: flex; flex-direction: column; gap: 0.35em; }
+  .rpage .profile-edit-avatar-controls label:is(.rpage *) > span:is(.rpage *),
+  .rpage .profile-edit-avatar-status {
+    font-family: var(--pm-mono); font-size: 0.64rem; line-height: 1.45; letter-spacing: 0.055em;
+    color: rgba(232, 196, 139, 0.72);
+  }
+  .rpage .profile-edit-avatar-controls input[type="file"]:is(.rpage *) {
+    width: 100%; box-sizing: border-box; padding: 0.48em 0.55em;
+    color: #fff8e8; background: rgba(17, 29, 52, 0.9);
+    border: 1px solid rgba(232, 196, 139, 0.3); border-radius: 7px;
+    font: 0.76rem/1.45 var(--pm-mono); color-scheme: dark;
+  }
+  .rpage .profile-edit-avatar-status { min-height: 1.45em; margin: 0.55em 0 0; color: #cdc2ab; }
+  .rpage .profile-edit-avatar-status.ok { color: #9be29b; }
+  .rpage .profile-edit-avatar-status.warn { color: var(--pm-gold-bright); }
+  .rpage .profile-edit-result {
+    margin: 0.9em 0 0; font-family: var(--pm-mono); font-size: 0.72rem; line-height: 1.55;
+    color: #9be29b;
+  }
+  .rpage .profile-edit-result[hidden] { display: none; }
+  .rpage .profile-edit-grid { display: grid; grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr); gap: 0.8em; }
+  .rpage .profile-edit-grid label:is(.rpage *) { display: flex; flex-direction: column; gap: 0.35em; min-width: 0; }
+  .rpage .profile-edit-grid label:is(.rpage *) > span:is(.rpage *),
+  .rpage .profile-edit-avatar-note,
+  .rpage .profile-edit-law {
+    font-family: var(--pm-mono); font-size: 0.64rem; line-height: 1.45; letter-spacing: 0.055em;
+    color: rgba(232, 196, 139, 0.72);
+  }
+  .rpage .profile-edit-grid input:is(.rpage *),
+  .rpage .profile-edit-grid textarea:is(.rpage *) {
+    width: 100%; box-sizing: border-box; padding: 0.58em 0.7em;
+    color: #fff8e8; background: rgba(17, 29, 52, 0.9);
+    border: 1px solid rgba(232, 196, 139, 0.3); border-radius: 7px;
+    font: 0.86rem/1.45 var(--pm-mono); color-scheme: dark;
+  }
+  .rpage .profile-edit-grid textarea:is(.rpage *) { resize: vertical; min-height: 6.6em; }
+  .rpage .profile-edit-grid input:focus:is(.rpage *),
+  .rpage .profile-edit-grid textarea:focus:is(.rpage *) { outline: none; border-color: var(--profile-color); }
+  .rpage .profile-edit-wide { grid-column: 1 / -1; }
+  .rpage .profile-edit-grid label:is(.rpage *) > span.profile-edit-count[data-over="1"]:is(.rpage *) { color: var(--pm-gold-bright); }
+  /* POS-848: the pronouns field with its Clear beside it */
+  .rpage .profile-edit-inline { display: flex; gap: 0.5em; align-items: center; }
+  .rpage .profile-edit-inline input:is(.rpage *) { flex: 1 1 auto; min-width: 0; }
+  .rpage .profile-edit-avatar-note { margin: 0.55em 0 0; color: #cdc2ab; }
+  .rpage .profile-edit-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.7em; margin: 0.9em 0 0; }
+  .rpage .profile-edit-actions .pm-btn:is(.rpage *) { font-size: 0.72rem; padding: 7px 14px; }
+  .rpage .profile-edit-actions .pm-btn:disabled:is(.rpage *) { opacity: 0.55; cursor: default; }
+  .rpage .profile-edit-status { flex: 1 1 18em; margin: 0; color: #cdc2ab; font: 0.72rem/1.5 var(--pm-mono); }
+  .rpage .profile-edit-status.ok { color: #9be29b; }
+  .rpage .profile-edit-status.warn { color: var(--pm-gold-bright); }
+  .rpage .profile-edit-law { margin: 0.65em 0 0; font-style: italic; }
+
+  @media (max-width: 640px) {
+    .rpage .profile-bubble { grid-template-columns: 1fr; gap: 0.9em; padding: 1.05em 1em 1.1em; }
+    .rpage .profile-avatar { width: 68px; border-radius: 11px; font-size: 1.9rem; }
+    .rpage .profile-title-row h1:is(.rpage *) { flex-basis: 100%; }
+    .rpage .profile-stats { gap: 1em 1.4em; }
+    .rpage .profile-edit-pencil { top: 0.65em; right: 0.65em; }
+    .rpage .profile-edit-avatar-row { grid-template-columns: 64px minmax(0, 1fr); }
+    .rpage .profile-edit-avatar-preview { width: 60px; }
+    .rpage .profile-edit-grid { grid-template-columns: 1fr; }
+    .rpage .profile-edit-wide { grid-column: auto; }
+  }
+  @media (max-width: 430px) {
+    .rpage .profile-avatar { width: 72px; }
+    .rpage .profile-actions .pm-btn:is(.rpage *) { flex: 1 1 auto; justify-content: center; }
+  }
+
+  /* ── the baseball cards ─────────────────────────────────────────────── */
+  /* flex in BOTH modes (not grid) so the card→circle morph animates
+     continuously: flex-basis/grow are numbers, and as they transition the
+     row re-lays every frame. Wraps like the old auto-fit grid did. */
+  .rpage .cards {
+    display: flex; flex-wrap: wrap; gap: 1em;
+    align-items: flex-start; margin: 0 0 2.4em;
+  }
+  .rpage .cards > .bcard:is(.rpage *), .rpage .cards > .bcard-wrap:is(.rpage *) {
+    flex: 1 1 200px; min-width: 0;
+    transition: flex-basis 0.35s ease, flex-grow 0.35s ease;
+  }
+  /* a resident whose only face is their ADDRESS keeps a card-sized card
+     (see visibleCards above) — one face grown across the full row reads as an
+     empty banner, not as something to click */
+  .rpage .cards.one-card > .bcard:is(.rpage *) { flex: 0 1 320px; }
+  .rpage .cards > .bcard-wrap[hidden]:is(.rpage *) { display: none; }
+  .rpage .bcard-wrap > .bcard:is(.rpage *) { width: 100%; }
+
+  .rpage .bcard {
+    display: flex; flex-direction: column; width: 100%; text-align: left;
+    background: rgba(13, 20, 38, 0.72);
+    border: 1px solid rgba(232, 196, 139, 0.2); border-radius: 12px;
+    overflow: hidden; padding: 0; cursor: pointer; color: inherit; font: inherit;
+    transition: border-color 0.15s ease, transform 0.15s ease, border-radius 0.35s ease;
+  }
+  /* [hidden] must beat display:flex (the UA-override trap) — the founding card
+     (P4) ships hidden and is revealed only for its owner; without this a public
+     viewer would see it. */
+  .rpage .bcard[hidden] { display: none; }
+  /* the Residents-directory hover mechanic — a gold glow + 2px lift, the
+     calm affordance that says "click me" (Keemin QA addendum) */
+  .rpage .bcard:hover { border-color: rgba(232, 196, 139, 0.55); transform: translateY(-2px); }
+  .rpage .bcard.active { border-color: rgba(232, 196, 139, 0.7); }
+
+  /* ── circle mode: while a read is open, the faces shrink into little
+     circles sitting at the top — always ABOVE the read, never wrapping
+     around it. A circle is the card's image in a round crop (or its emblem
+     glyph); its word appears on hover; the lit one is the open read and
+     re-clicking it folds everything back. (Keemin QA 07-18) ── */
+  .rpage .cards.has-open { gap: 0.7em; margin: 0 0 1.2em; }
+  .rpage .cards.has-open > .bcard:is(.rpage *), .rpage .cards.has-open > .bcard-wrap:is(.rpage *) { flex: 0 0 54px; }
+  .rpage .cards.has-open .bcard:is(.rpage *) {
+    border-radius: 999px; overflow: visible; position: relative;
+  }
+  /* 52px + the card's 1px border each side = the 54px flex-basis: a true circle */
+  .rpage .cards.has-open .bcard-thumb:is(.rpage *) { height: 52px; border-radius: 999px; }
+  .rpage .cards.has-open .bcard-emblem:is(.rpage *) { height: 52px; font-size: 1.25rem; border-radius: 999px; }
+  .rpage .cards.has-open .bcard-txt:is(.rpage *) { max-height: 0; opacity: 0; padding: 0; }
+  .rpage .cards.has-open .bcard.active:is(.rpage *) {
+    border-color: rgba(232, 196, 139, 0.95);
+    box-shadow: 0 0 14px rgba(232, 196, 139, 0.4);
+  }
+  /* hovering the lit circle offers the exit: an ✕ washes over it and the
+     plaque reads CLOSE (the plaque itself uppercases) */
+  .rpage .cards.has-open .bcard.active:hover:is(.rpage *)::before {
+    content: "✕";
+    position: absolute; inset: -1px; z-index: 3;
+    display: grid; place-items: center;
+    background: rgba(7, 11, 21, 0.72); border-radius: 999px;
+    color: var(--pm-gold-bright); font-size: 1.15rem; line-height: 1;
+  }
+  .rpage .cards.has-open .bcard.active:is(.rpage *)::after { content: "Close"; }
+  .rpage .cards.has-open .bcard-fullscreen:is(.rpage *) { display: none; }
+  /* the word, on hover — a little plaque under the circle */
+  .rpage .cards.has-open .bcard:is(.rpage *)::after {
+    content: attr(data-kind);
+    position: absolute; top: calc(100% + 7px); left: 50%; transform: translateX(-50%);
+    font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--pm-gold-bright);
+    background: rgba(7, 11, 21, 0.92); border: 1px solid rgba(232, 196, 139, 0.35);
+    border-radius: 6px; padding: 3px 8px; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity 0.15s ease; z-index: 6;
+  }
+  .rpage .cards.has-open .bcard:hover:is(.rpage *)::after { opacity: 1; }
+
+  /* the face's visual block — image or emblem, same height so faces align.
+     Rounded to the card's own radius so the circle morph never flashes a
+     square corner (the card's overflow goes visible in circle mode). */
+  .rpage .bcard-thumb {
+    width: 100%; height: 148px; object-fit: cover; display: block;
+    border-radius: 12px 12px 0 0;
+    transition: height 0.35s ease, border-radius 0.35s ease;
+  }
+  .rpage .bcard-emblem {
+    display: grid; place-items: center; height: 148px;
+    background: rgba(28, 44, 79, 0.5); color: rgba(232, 196, 139, 0.5);
+    font-size: 2.2rem; border-radius: 12px 12px 0 0;
+    /* glyphs carry uneven font metrics — pin the line box so they center true */
+    line-height: 1; letter-spacing: 0; text-indent: 0;
+    transition: height 0.35s ease, font-size 0.35s ease, border-radius 0.35s ease;
+  }
+  /* ⌂ draws small relative to its siblings — give it a matching boost */
+  .rpage [data-card-open="home"] .bcard-emblem:is(.rpage *) { font-size: 2.9rem; }
+  .rpage .cards.has-open [data-card-open="home"]:is(.rpage *) .bcard-emblem:is(.rpage *) { font-size: 1.7rem; }
+  .rpage .bcard-txt {
+    display: flex; flex-direction: column; gap: 0.3em; padding: 0.85em 1.05em 1em;
+    max-height: 16em; overflow: hidden;
+    transition: max-height 0.35s ease, opacity 0.2s ease, padding 0.35s ease;
+  }
+  .rpage .bcard-kind {
+    font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--pm-gold);
+  }
+  .rpage .bcard-title { font-size: 1.08rem; font-weight: 700; color: var(--pm-gold-bright); line-height: 1.25; }
+  .rpage .bcard-line { font-size: 0.9rem; color: #cdc2ab; font-style: italic; line-height: 1.5; }
+
+  /* the WINDOW card carries a full-screen action pinned to its top-right —
+     a SIBLING of the card button (never nested), gold, small (Keemin QA) */
+  .rpage .bcard-wrap { position: relative; }
+  .rpage .bcard-fullscreen {
+    position: absolute; top: 0.55em; right: 0.55em; z-index: 2;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2em; height: 2em; border-radius: 8px;
+    font-size: 1rem; line-height: 1; text-decoration: none;
+    color: #241505; background: linear-gradient(180deg, #f6dcae, #e8c48b);
+    border: 1px solid rgba(0, 0, 0, 0.22); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  }
+  .rpage .bcard-fullscreen:hover { filter: brightness(1.08); }
+  .rpage .bcard-fullscreen[hidden] { display: none; }
+
+  /* the open card's full read — a plain parchment section in flow below the
+     bubbles, plain show/hide, no animation (Keemin QA: calm) */
+  .rpage .card-details { margin: 0 0 2.4em; }
+  .rpage .bcard-detail[hidden] { display: none; }
+  .rpage .bcard-detail { margin: 0 0 0.4em; }

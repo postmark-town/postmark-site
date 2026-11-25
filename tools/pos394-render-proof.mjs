@@ -111,6 +111,9 @@ export const SOURCES = Object.freeze([
   "src/lib/sentinel-alert.mjs", "src/lib/tutorial-registry.mjs", "src/lib/tutorial.mjs", "src/lib/world-cockpit.mjs",
   "src/lib/world-feed.mjs", "src/styles/global.css", "src/styles/postmark.css",
   "tools/lib/ids.mjs",
+  // CORE-188: the resident page's own pieces, drawn once for this page and the join's blank instance of it, with their one stylesheet and field table
+  "src/components/resident/ResidentFace.astro", "src/components/resident/ResidentField.astro", "src/components/resident/ProfileEditorFields.astro",
+  "src/components/resident/AddressCardFace.astro", "src/styles/resident-page.css", "src/lib/resident-fields.mjs",
   "town/components/Household.astro", "town/pages/households/[slug].astro", "town/pages/residents/[handle].astro",
 ]);
 

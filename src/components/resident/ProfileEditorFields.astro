@@ -1,0 +1,56 @@
+---
+// ProfileEditorFields.astro — THE EDIT PROFILE FORM'S PICTURE ROW AND FIELDS (CORE-188): the resident page's own editor, drawn once. The resident
+// page (town/components/Household.astro) wraps it in its form with Save and Cancel and wires it (wireProfile, src/lib/profile-edit.mjs); its hooks
+// (data-profile-avatar-*, data-profile-pronouns-clear, data-profile-bio-count, the named boxes) are the ones that controller has always read. The
+// words, placeholders and limits are src/lib/resident-fields.mjs; the styles src/styles/resident-page.css.
+//
+// `picture` false leaves the picture row out; `fields` names which of the editor's fields to draw (all of them, in their order, by default).
+import ResidentField from "./ResidentField.astro";
+import { PROFILE_FIELDS, EDITOR_ORDER, PICTURE } from "@/lib/resident-fields.mjs";
+interface Props {
+  handle: string;
+  values?: Record<string, string | null | undefined>;
+  avatarUrl?: string | null;
+  monogram?: string;
+  picture?: boolean;
+  fields?: readonly string[];
+}
+const { handle, values = {}, avatarUrl = null, monogram = "?", picture = true, fields = EDITOR_ORDER } = Astro.props;
+const bioCount = `bio-count-${handle}`;
+---
+{picture && (
+  <div class="profile-edit-avatar-row">
+    <div class="profile-edit-avatar-preview" data-profile-avatar-preview aria-label="Avatar preview">
+      {avatarUrl
+        ? <img src={avatarUrl} alt="" />
+        : <span aria-hidden="true">{monogram}</span>}
+    </div>
+    <div class="profile-edit-avatar-controls">
+      <label>
+        <span>{PICTURE.label}</span>
+        <input type="file" name="avatar" data-profile-avatar-input accept={PICTURE.accept} />
+      </label>
+      <div class="profile-edit-avatar-zoom" data-profile-avatar-zoom-row hidden>
+        <div class="profile-edit-avatar-zoom-ctl">
+          <input type="range" data-profile-avatar-zoom min="1" max="4" step="0.01" value="1" aria-label="Zoom the picture inside its frame" />
+          <span>drag the picture · slide or scroll to zoom</span>
+        </div>
+        <p class="profile-edit-avatar-darkroom">other pictures to shrink — enclosures, paintings? <a href="/darkroom/" target="_blank" rel="noopener">the Darkroom</a> develops them in this same browser.</p>
+      </div>
+      <p class="profile-edit-avatar-status" data-profile-avatar-status role="status" aria-live="polite"></p>
+      <p class="profile-edit-avatar-note">{PICTURE.note}</p>
+    </div>
+  </div>
+)}
+<div class="profile-edit-grid">
+  {fields.map((name) => (
+    <ResidentField
+      name={name}
+      spec={PROFILE_FIELDS[name]}
+      value={values[name] ?? ""}
+      withClear={name === "pronouns"}
+      countId={name === "bio" ? bioCount : undefined}
+      countAttrs={name === "bio" ? { "data-profile-bio-count": "" } : {}}
+    />
+  ))}
+</div>

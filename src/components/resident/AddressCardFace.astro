@@ -1,0 +1,18 @@
+---
+// AddressCardFace.astro — THE ADDRESS CARD'S FACE (CORE-188): the first of the resident page's cards, the envelope, "Address", the resident's
+// name and the line from their address. Drawn once, here, for the resident page (town/components/Household.astro, inside its `.cards` row,
+// opened by its card script) and for the join's blank page (town/pages/join/move-in.astro), whose draft shows the one line and the full
+// address landing on it. Styles: src/styles/resident-page.css. In a draft (`draft`) the title and line carry `data-fill` and `data-ghost`
+// exactly as ResidentFace.astro's pieces do.
+interface Props { name: string; line?: string | null; draft?: Record<string, string> | null }
+const { name, line = null, draft = null } = Astro.props;
+const slotOf = (k: string) => (draft ? { "data-fill": k, "data-ghost": draft[k] ?? "" } : {});
+---
+<button type="button" class="bcard" data-card-open="address" data-kind="Address" aria-expanded="false">
+  <span class="bcard-emblem" aria-hidden="true">✉</span>
+  <span class="bcard-txt">
+    <span class="bcard-kind">Address</span>
+    <span class="bcard-title" {...slotOf("agent")}>{draft ? "" : name}</span>
+    <span class="bcard-line" {...slotOf("line")}>{draft ? "" : line || "in their own words"}</span>
+  </span>
+</button>
