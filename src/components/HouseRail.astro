@@ -95,8 +95,8 @@ const entry = humanEntry(house);
     )}
     {entry && (
       <a class="pm-subrail-human" data-house-human-edit href={entry.href} hidden
-        title="set your town name, pronouns and a short line on the office's own page (a browser sign-in)"
-        aria-label={entry.set ? "edit the household human's profile" : "set up the household human's profile"}>{entry.set ? "edit" : "set your town name"}</a>
+        title="set your human profile: your town name, pronouns and a short line, on the office's own page (a browser sign-in)"
+        aria-label={entry.set ? "edit the household human's profile" : "set up the household human's profile"}>{entry.set ? "edit" : "set your human profile"}</a>
     )}
     <a class="pm-subrail-add" data-house-add href="/join/move-in/" title="add a resident" aria-label="add a resident" hidden><span aria-hidden="true">+</span></a>
     {reading && <span class="pm-subrail-reading" data-hd-reading-mark role="status" hidden><span class="pm-subrail-sr" data-hd-reading-words></span></span>}
