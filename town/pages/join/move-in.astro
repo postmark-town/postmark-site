@@ -1109,7 +1109,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       content: ""; position: absolute; left: -7px; top: 22px; width: 14px; height: 14px; background: var(--pm-paper); transform: rotate(45deg);
     }
     .movein :global(.jd-reg-bubble p) { margin: 0; color: var(--pm-ink); }
-    .movein :global(.jd-reg-name) { display: block; margin: 0 0 0.25em; font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--pm-accent); }
+    /* her name in the accent's own hue, a shade deeper: var(--pm-accent) measured 4.17:1 on her paper at this small size; #975b27 is 4.7:1 */
+    .movein :global(.jd-reg-name) { display: block; margin: 0 0 0.25em; font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; color: #975b27; }
     .movein :global(.jd-reg-link) { color: var(--pm-accent); }
 
     /* the human's form: its own look, kept (steps 1 and 5) */
@@ -1121,6 +1122,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       border: 1px solid rgba(232, 196, 139, 0.32); border-radius: 9px; font: 0.95rem/1.45 var(--pm-mono); color-scheme: dark;
     }
     .jd-sf input:focus, .jd-sf select:focus { outline: none; border-color: var(--pm-gold-bright); }
+    /* the same muted ink as the shared editor's fields (resident-page.css): the browser's grey measured 3.7:1 here; this is 4.6:1 or better */
+    .jd-sf input::placeholder { color: rgba(205, 194, 171, 0.66); }
     .jd-sf-count { margin: 0.35em 0 0; text-align: right; font-family: var(--pm-mono); font-size: 0.7rem; color: rgba(232, 196, 139, 0.6); }
     .jd-sf-count[data-over="1"], .jd-fields :global(.profile-edit-count[data-over="1"]) { color: #f5b3a0; }
     /* a tag the script draws (the look-over's, "You're in"'s) has no scope attribute, so the tag's rules are the page's global ones */

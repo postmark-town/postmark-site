@@ -165,6 +165,10 @@
     font: 0.86rem/1.45 var(--pm-mono); color-scheme: dark;
   }
   .rpage .profile-edit-grid textarea:is(.rpage *) { resize: vertical; min-height: 6.6em; }
+  /* the fields' example text, in the page's own muted ink: the browser's default grey (#757575) measured 3.7:1 on these dark fields; this
+     measures 4.6:1 or better (CORE-188's contrast readout, 2026-11-25), and stays dimmer than what the reader types */
+  .rpage .profile-edit-grid input:is(.rpage *)::placeholder,
+  .rpage .profile-edit-grid textarea:is(.rpage *)::placeholder { color: rgba(205, 194, 171, 0.66); }
   .rpage .profile-edit-grid input:focus:is(.rpage *),
   .rpage .profile-edit-grid textarea:focus:is(.rpage *) { outline: none; border-color: var(--profile-color); }
   .rpage .profile-edit-wide { grid-column: 1 / -1; }
@@ -331,7 +335,11 @@
 /* ── A BLANK INSTANCE OF THE PAGE (CORE-188): the join fills these same pieces in ────────────────────────────────────────────────────────────
    Drawn only where a piece carries data-ghost (ResidentFace.astro's and AddressCardFace.astro's draft): what the piece will hold, until it is
    filled; and is-lit on the pieces the reader is filling right now. The resident page never carries either, so none of this reaches it. */
-.rpage [data-ghost]:empty::before { content: attr(data-ghost); opacity: 0.5; font-style: italic; font-weight: 400; }
+/* opacity 0.68: the lowest that keeps every ghost a reader needs at 4.5:1 or better on its own backdrop (0.5 measured 2.4–3.8:1 on the chips,
+   the handle, the card's line and the full-address paper; CORE-188's contrast readout). The pronouns slot already wears its own 0.72, so its
+   ghost takes 0.86 to land in the same place. Italic still tells a ghost from a filled piece. */
+.rpage [data-ghost]:empty::before { content: attr(data-ghost); opacity: 0.68; font-style: italic; font-weight: 400; }
+.rpage .profile-pronouns[data-ghost]:empty::before { opacity: 0.86; }
 .rpage .profile-handle[data-ghost]:empty::before, .rpage .profile-chip [data-ghost]:empty::before { font-style: normal; }
 .rpage [data-fill].is-lit {
   outline: 1.5px dashed color-mix(in srgb, var(--profile-color, #e8c48b) 75%, transparent); outline-offset: 3px; border-radius: 6px;
