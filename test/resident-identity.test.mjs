@@ -363,7 +363,7 @@ test("TEXT PIN: the Conversations door builds the identity from the poller's fac
   assert.match(door, /import \{ identityProvider, residentAliasesOf \} from "@\/lib\/resident-identity\.mjs";/, "control: the door slice holds the door");
   assert.doesNotMatch(door, /import "@\/styles\//, "the door's module imports no stylesheet (the browser harness serves it raw)");
   for (const m of door.matchAll(/^\s*import [^;]*?from "(@\/[^"]+)"/gm)) assert.match(m[1], /^@\/lib\//, `the door imports only @/lib modules: ${m[1]}`);
-  assert.match(src, /hostOwnsHeader = false, speakerFaces = null \} = \{\}\) \{/, "the door takes the faces getter");
+  assert.match(src, /hostOwnsHeader = false, primed = null, onCircleRead = null, speakerFaces = null \} = \{\}\) \{/, "the door takes the faces getter (after CORE-156's primed and onCircleRead)");
   assert.match(src, /\.\.\.\(typeof speakerFaces === "function" \? \{ identityForSpeaker: identityProvider\(document, speakerFaces, \{ aliases: residentAliasesOf\(document\) \}\) \} : \{\}\),/);
   assert.match(src, /<div hidden data-resident-aliases=\{JSON\.stringify\(mentionAliases\)\}><\/div>/, "the build's renames on the page (no new read)");
   assert.equal((src.match(/speakerFaces: function \(\) \{ return faces; \},/g) ?? []).length, 2, "every card's reader and the one conversation's");
