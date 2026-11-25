@@ -21,21 +21,35 @@
 // the mail already lives under. That asymmetry is deliberate and the tool
 // description says so before anyone opens their mouth.
 //
-// THE CIRCLE READER (CORE-82; CORE-70 call 10, Darko 2026-11-14: "A visitor sees
-// the room's top circles in the order they started and picks one"). Each room's
-// flat transcript is replaced by the World's ONE circle reader
-// (postmark-world spectator/circle-reader.mjs, staged at /world-engine/spectator/
-// by the island and loaded by the module script below through the adapter,
-// src/lib/circle-reader-mount.mjs). The room keeps its card, its map link, its
-// #<thread-id> anchor and its paging; inside it the reader draws the room's
-// top circles (a strand flat, a fork nested, history marked complete, folded or
-// unavailable). THE POLL MUST NOT DESTROY A MOUNTED READER: the cards are
-// reconciled in place (a card for the same thread is kept and only its numbers
-// move), so a reader's scroll, focus and open circles survive every tick. When
-// the reader cannot be had, or cannot read the room, the card keeps TODAY'S flat
-// transcript and says so; an unread room is never drawn as an empty one. The
-// browser never works out a reply link, a parent or a circle: it follows what the
-// office serves, and sends `reply_to` only for a say the reader handed it.
+// READING A ROOM (CORE-156; Darko 2026-11-22: "Let's keep the circles and replies
+// in, but try to keep the individual messages displayed similarly", then, of the
+// three versions he flipped through, "Let's go with B"). A room's card is its
+// messages, drawn by THIS page from the lines the room's own read already carries
+// (`voices` on every thread of `GET /api/world/conversations`: who, the whole
+// words, when, and each line's own `id` and `reply_to`). Every opening message is
+// shown whole, the way this page always drew a line (face and name, the words,
+// the time), in the order they were said. A message's replies wait behind ONE
+// button under it ("3 replies": every level counted), and that button opens the
+// whole circle in place, every level at once, each reply whole and set in under
+// the message it answers; pressing it again folds it. A reply that arrives while
+// its circle is folded is offered on the circle as "1 new", and pressing that
+// opens the circle with the new reply on screen. NOTHING IS ASKED OF THE OFFICE
+// to open a circle: the room's read already holds it, so a press costs no read,
+// and a card costs no read of its own on load. THE POLL MUST NOT DISTURB A
+// READER: the cards are reconciled in place (a card for the same thread is kept
+// and only its numbers move) and a room whose talk did not move is not redrawn,
+// so a reader's scroll, focus and open circles survive every tick. The browser
+// never works out who answers whom: a line sits under another ONLY because the
+// office served that `reply_to` on it, a reply whose parent this read does not
+// hold is drawn as itself and says so, and `reply_to` is sent only for a say the
+// office handed this page.
+//
+// THE WORLD'S CIRCLE READER (CORE-82; postmark-world spectator/circle-reader.mjs,
+// staged at /world-engine/spectator/ and loaded through src/lib/circle-reader-mount.mjs)
+// is still the ONE conversation view (a #circle-<id> link: a message's "Open", the
+// way to link to or share one circle). In a card it is no longer needed to read:
+// it is mounted only when a reader asks for the earlier part of a room that holds
+// more statements than its read carries (the named fallback, one read, on the press).
 //
 // The shell is static; every thread is drawn client-side from the office
 // (`GET /api/world/conversations`, polled) so the page is live between site
@@ -189,17 +203,6 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         if (cls) n.className = cls;
         if (text != null) n.textContent = String(text);
         return n;
-      }
-
-      function ago(ms) {
-        var s = Math.max(0, Math.round((Date.now() - ms) / 1000));
-        if (s < 15) return "just now";
-        if (s < 60) return s + "s ago";
-        var m = Math.floor(s / 60);
-        if (m < 60) return m + "m ago";
-        var h = Math.floor(m / 60);
-        if (h < 24) return h + "h ago";
-        return Math.floor(h / 24) + "d ago";
       }
 
       // A household's human speaks under a handle the town mints for them —
@@ -374,12 +377,13 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         card.appendChild(people);
         fillPeople(people, t);
 
-        // THE FLAT TRANSCRIPT is the honest floor: it is what the card shows until the circle reader is mounted, and what it keeps (with a
-        // note that says so) when the reader cannot be had or cannot read the room. It is never an empty room standing in for an unread one.
+        // THE ROOM (CORE-156): its messages, drawn from the lines this thread's own read carries. The pane is the one the page has always had
+        // (its height, its scroll); one listener on it serves every button a redraw makes.
         var list = el("ol", "c-voices");
-        fillVoices(list, t);
+        list.addEventListener("click", function (ev) { roomPress(card, ev); });
         card.appendChild(list);
         card.__t = t;
+        drawRoom(card, t);
         return card;
       }
 
@@ -411,8 +415,16 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         item.appendChild(personLink(handle));
         return item;
       }
+      // A CROWDED ROOM'S SPEAKERS ARE CAPPED (CORE-156; Darko on dev, 2026-11-22 19:02 EST: "I see a gigantic block for the evening lantern … with
+      // 1,992 statements that I can't interact with": that room's 242 speakers ran 1,672px down the page above its first message). The line shows a first
+      // run of names and an "and N more" press that opens the rest in place, and folds them again. It asks the office nothing: the names are the thread's own.
+      var PEOPLE_FIRST = 12;      // a room with a couple more than this just shows them all (no "and 1 more")
       function fillPeople(people, t) {
-        var key = (t.participants || []).join("\u0001");
+        var everyone = t.participants || [];
+        var capped = everyone.length > PEOPLE_FIRST + 2;
+        var showing = capped && !people.__open ? everyone.slice(0, PEOPLE_FIRST) : everyone;
+        people.__t = t;
+        var key = showing.join("\u0001") + "\u0001" + everyone.length;
         var faced = faces ? "1" : "0";
         if (people.getAttribute("data-people") === key) {
           if (people.getAttribute("data-faced") === faced) return;    // unchanged: the links keep their focus
@@ -427,27 +439,356 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         people.setAttribute("data-people", key);
         people.setAttribute("data-faced", faced);
         people.textContent = "";
-        (t.participants || []).forEach(function (h, i) {
+        showing.forEach(function (h, i) {
           if (i) people.appendChild(document.createTextNode(" · "));
           people.appendChild(personNode(h));
         });
+        if (!capped) return;
+        var more = el("button", "c-people-more", people.__open ? "show fewer" : "and " + (everyone.length - showing.length) + " more");
+        more.type = "button";
+        more.setAttribute("data-people-more", "");
+        more.setAttribute("aria-expanded", people.__open ? "true" : "false");
+        more.addEventListener("click", function () {
+          people.__open = !people.__open;
+          fillPeople(people, people.__t);
+          var again = people.querySelector("[data-people-more]");
+          if (again) { try { again.focus({ preventScroll: true }); } catch (e) { /* the page stands */ } }
+        });
+        people.appendChild(more);
       }
 
-      function fillVoices(list, t) {
+      // ── READING A ROOM (CORE-156) ────────────────────────────────────────
+      // ROOM-SHAPE:BEGIN
+      // WHO ANSWERS WHOM, EXACTLY AS SERVED. `roomShape` takes the lines a room's read carries, in the order it carries them (the order they were said), and
+      // puts each line under the line its own `reply_to` names, when that line is EARLIER IN THIS READ. Nothing else places a line: never a name in the
+      // words, never the clock. A line that names no parent is an opening message. A line whose parent this read does not hold is `loose`: it is drawn as
+      // itself, in its own place in time, and says so; it is never given another parent. Every line served is placed exactly once. `total` is every reply
+      // under a line, at every level: the number on its button.
+      function sayKey(raw) {
+        if (raw === null || raw === undefined || raw === "") return null;
+        var s = String(raw).trim();
+        return /^\d{1,18}$/.test(s) ? s : null;
+      }
+      function roomShape(voices) {
+        var lines = Array.isArray(voices) ? voices : [];
+        var byId = {}, nodes = [], tops = [];
+        lines.forEach(function (v) {
+          v = v && typeof v === "object" ? v : {};
+          var id = sayKey(v.id);
+          var asks = sayKey(v.reply_to);
+          var node = {
+            v: v, id: id,
+            // what a redraw finds this line again by: the office's id, or, for old talk that carries none, when it was said and by whom
+            key: id !== null ? "s" + id : "p" + String(v.at_ms != null ? v.at_ms : v.at) + "-" + String(v.handle),
+            parent: null, kids: [], total: 0, loose: false,
+          };
+          var parent = asks !== null && asks !== id && Object.prototype.hasOwnProperty.call(byId, asks) ? byId[asks] : null;
+          if (parent) { node.parent = parent; parent.kids.push(node); }
+          else { node.loose = asks !== null; tops.push(node); }
+          if (id !== null && !Object.prototype.hasOwnProperty.call(byId, id)) byId[id] = node;
+          nodes.push(node);
+        });
+        // a reply always comes after the line it answers, so walking backwards finishes each reply's own count before it is added to its parent's
+        for (var i = nodes.length - 1; i >= 0; i--) if (nodes[i].parent) nodes[i].parent.total += 1 + nodes[i].total;
+        return { tops: tops, nodes: nodes, byId: byId };
+      }
+      function topOf(node) { while (node.parent) node = node.parent; return node; }
+      function eachUnder(node, fn) { node.kids.forEach(function (c) { fn(c); eachUnder(c, fn); }); }
+      function repliesWords(n) { return n + (n === 1 ? " reply" : " replies"); }
+      // ROOM-SHAPE:END
+
+      // ROOM-DRAW:BEGIN
+      // from this level down a reply is not set in any further (a long back-and-forth must not squeeze its words off a phone); it still sits under what it answers
+      var DEEP_AT = 6;
+      var roomUid = 0;
+      function clockOf(iso) { var m = /T(\d{2}:\d{2})/.exec(String(iso == null ? "" : iso)); return m ? m[1] + "Z" : ""; }
+      function isoOf(v) {
+        if (v.at) return String(v.at);
+        try { return v.at_ms != null && isFinite(v.at_ms) ? new Date(Number(v.at_ms)).toISOString() : ""; } catch (e) { return ""; }
+      }
+      // Reply buttons exist only for a reader the module script says is signed in (the office still judges the say)
+      function canReply() {
+        var h = hook();
+        try { return !!(h && typeof h.canReply === "function" && h.canReply()); } catch (e) { return false; }
+      }
+      // What the reader has done in this room, kept on its card so a poll never undoes it: the circles they opened, the lines they have been shown, the
+      // replies marked new, and what the pane was last drawn from.
+      function roomOf(card) { return card.__room || (card.__room = { open: {}, seen: null, lit: {}, sig: null, shape: null, land: null, uid: ++roomUid }); }
+      // everything a room's drawing depends on: its lines (how many, the last one, the office's own count and latest), the pictures, and whether the reader may reply
+      function roomSig(t) {
+        var v = t.voices || [], last = v.length ? v[v.length - 1] : null;
+        return [v.length, last ? (last.id != null ? last.id : last.at_ms) : "", t.voice_count, t.latest, faces ? 1 : 0, canReply() ? 1 : 0].join("|");
+      }
+
+      // ONE MESSAGE, drawn the way this page always drew a line: face and name, the WHOLE of what they said, the time. Under it, what a reader can do with it.
+      function voiceRow(node, st, reply) {
+        var v = node.v, handle = String(v.handle == null ? "" : v.handle);
+        var li = el("li", "c-voice" + (st.lit[node.key] ? " is-new" : ""));
+        li.setAttribute("data-key", node.key);
+        if (node.id !== null) li.setAttribute("data-say", node.id);
+        // face and name travel together in one cell, so the row stays the
+        // three columns it already was: who · what they said · when
+        var who = el("span", "c-voice-who");
+        who.appendChild(faceNode(handle));
+        who.appendChild(personLink(handle));
+        li.appendChild(who);
+        li.appendChild(el("span", "c-said", v.said));       // textContent, always; and never cut
+        var iso = isoOf(v);
+        var when = el("time", "c-ago", clockOf(iso));
+        if (iso) { when.setAttribute("datetime", iso); when.title = dateTimeOf(iso); }
+        li.appendChild(when);
+        var acts = el("span", "c-acts");
+        if (reply && node.id !== null) {
+          var r = el("button", "c-act", "Reply");
+          r.type = "button";
+          r.setAttribute("data-reply", node.id);
+          r.setAttribute("data-key", "reply-" + node.key);
+          r.setAttribute("aria-label", "Reply to " + (humanOf(handle) || handle));
+          acts.appendChild(r);
+        }
+        // "Open" is the way to link to or share ONE circle (its own view, with its own address); nothing needs it to be read. It sits on an opening
+        // message, and on a reply that stands alone here because the message it answers is not in this read.
+        if (node.id !== null && !node.parent) {
+          var o = el("a", "c-act", "Open");
+          o.href = "#circle-" + encodeURIComponent(node.id);
+          o.setAttribute("data-circle-open", node.id);
+          o.setAttribute("data-key", "open-" + node.key);
+          o.setAttribute("aria-label", "Open " + (humanOf(handle) || handle) + "'s conversation on its own");
+          o.title = "this conversation on its own: a link you can share";
+          acts.appendChild(o);
+        }
+        if (acts.childNodes.length) li.appendChild(acts);
+        if (node.loose) li.appendChild(el("span", "c-fine c-loose", "A reply to an earlier message that isn't shown here."));
+        return li;
+      }
+      // a message's replies, each whole, each followed by its own replies set in under it: every level at once
+      function kidsList(node, st, reply, depth, id) {
+        var ol = el("ol", "c-kids");
+        if (id) ol.id = id;
+        if (depth >= DEEP_AT) ol.setAttribute("data-deep", "");
+        node.kids.forEach(function (k) {
+          ol.appendChild(voiceRow(k, st, reply));
+          if (k.kids.length) {
+            var w = el("li", "c-kids-wrap");
+            w.appendChild(kidsList(k, st, reply, depth + 1, null));
+            ol.appendChild(w);
+          }
+        });
+        return ol;
+      }
+      // THE ONE BUTTON under a message that has replies: its count is the whole circle, and it opens (or folds) the whole circle in place
+      function foldRow(node, st, reply) {
+        var wrap = el("li", "c-fold-wrap");
+        var open = !!st.open[node.key];
+        var b = el("button", "c-fold", repliesWords(node.total));
+        b.type = "button";
+        b.setAttribute("data-fold", node.key);
+        b.setAttribute("data-key", "fold-" + node.key);
+        b.setAttribute("aria-expanded", open ? "true" : "false");
+        wrap.appendChild(b);
+        if (open) {
+          var id = "c-kids-" + st.uid + "-" + node.key;
+          b.setAttribute("aria-controls", id);
+          var list = kidsList(node, st, reply, 1, id);
+          // THE CIRCLE ON THE LINE (Darko, 2026-11-22 19:02 EST: "have the circle design of the expandable replies reincorporated in. It's a very small but
+          // just like nice UI type touch"). An open circle is drawn the way the World's reader draws one (WLD-178): a thin line down its side and a small
+          // circle ON the line at its midpoint; pressing either folds the whole circle, exactly as the button above does. They are a pointer's
+          // convenience and say nothing new, so they are kept out of the keyboard's and a screen reader's way: the button is the control.
+          list.setAttribute("data-circle", "");
+          var ctl = el("li", "c-ring-row");
+          ctl.setAttribute("aria-hidden", "true");
+          ["c-ring-line", "c-ring"].forEach(function (cls) {
+            var x = el("button", cls);
+            x.type = "button";
+            x.tabIndex = -1;
+            x.setAttribute("data-fold", node.key);
+            x.title = "Fold " + repliesWords(node.total);
+            ctl.appendChild(x);
+          });
+          list.appendChild(ctl);
+          wrap.appendChild(list);
+          return wrap;
+        }
+        // folded, with replies the reader has not been shown: "N new" opens the circle with them on screen
+        var fresh = 0;
+        eachUnder(node, function (c) { if (!st.seen[c.key]) fresh++; });
+        if (fresh) {
+          var nb = el("button", "c-fold c-fold-new", fresh + " new");
+          nb.type = "button";
+          nb.setAttribute("data-new", node.key);
+          nb.setAttribute("data-key", "new-" + node.key);
+          nb.setAttribute("aria-label", fresh + (fresh === 1 ? " new reply: show it" : " new replies: show them"));
+          wrap.appendChild(nb);
+        }
+        return wrap;
+      }
+
+      function keyed(list, key) {
+        var all = list.querySelectorAll("[data-key]");
+        for (var i = 0; i < all.length; i++) if (all[i].getAttribute("data-key") === key) return all[i];
+        return null;
+      }
+      function focusKeyed(list, key) {
+        var n = keyed(list, key);
+        if (n && n.focus) { try { n.focus({ preventScroll: true }); } catch (e) { /* the page stands */ } }
+      }
+      // the line the reader is on: the first message with more than a sliver (a line and a half) still inside the pane, and how far its top sits from the
+      // pane's. A message that has all but scrolled away is not it: a reply landing just under that one would push down what the reader is really reading.
+      function anchorOf(list) {
+        if (!list.scrollTop) return null;        // at the top: nothing above the reader can move them
+        var top = list.getBoundingClientRect().top, rows = list.querySelectorAll(".c-voice");
+        for (var i = 0; i < rows.length; i++) {
+          var r = rows[i].getBoundingClientRect();
+          if (r.bottom > top + 24) return { key: rows[i].getAttribute("data-key"), off: r.top - top };
+        }
+        return null;
+      }
+      // bring a message into the pane without moving the page: its top when it is above (or taller than the pane), else just far enough to show all of it
+      function showInPane(list, row) {
+        var lr = list.getBoundingClientRect(), r = row.getBoundingClientRect();
+        if (r.top < lr.top || r.height >= lr.height) list.scrollTop += r.top - lr.top - 4;
+        else if (r.bottom > lr.bottom) list.scrollTop += r.bottom - lr.bottom + 8;
+      }
+
+      // Draw (or redraw) a room's pane from the lines its thread carries. A poll that moved nothing redraws nothing, so scroll, focus and a text selection
+      // all stand. `press` is the reader's own act in this room (fold, open, "N new"): always redrawn. Answers whether it drew.
+      function drawRoom(card, t, press) {
+        var list = card.querySelector(".c-voices");
+        if (!list) return false;
+        var st = roomOf(card);
+        var sig = roomSig(t);
+        if (!press && st.sig === sig) return false;
+        st.sig = sig;
+        var shape = st.shape = roomShape(t.voices);
+        var first = !st.seen;
+        if (first) st.seen = {};
+        var landed = null;
+        shape.nodes.forEach(function (n) {
+          if (st.seen[n.key]) return;
+          // what the reader arrived to is not "new"; and a new OPENING message is simply shown, in its place at the end, as this page always showed new talk
+          if (first || !n.parent) { st.seen[n.key] = true; return; }
+          var top = topOf(n);
+          if (pinNext) st.open[top.key] = true;                  // the reader just spoke: a reply that lands now is shown wherever it sits
+          // an OPEN circle takes its new reply at once, marked; a folded one keeps it behind "N new" (foldRow)
+          if (st.open[top.key]) { st.seen[n.key] = true; st.lit[n.key] = true; landed = n.key; }
+        });
+        var anchor = !press && !first ? anchorOf(list) : null;
+        var focus = document.activeElement && list.contains(document.activeElement) ? document.activeElement.getAttribute("data-key") : null;
+        var reply = canReply();
         list.textContent = "";
-        (t.voices || []).forEach(function (v) {
-          var li = el("li", "c-voice");
-          // face and name travel together in one cell, so the row stays the
-          // three columns it already was: who · what they said · when
-          var who = el("span", "c-voice-who");
-          who.appendChild(faceNode(v.handle));
-          who.appendChild(personLink(v.handle));
-          li.appendChild(who);
-          li.appendChild(el("span", "c-said", v.said));       // textContent, always
-          li.appendChild(el("span", "c-ago", ago(v.at_ms != null ? v.at_ms : Date.parse(v.at))));
-          list.appendChild(li);
+        shape.tops.forEach(function (n) {
+          list.appendChild(voiceRow(n, st, reply));
+          if (n.kids.length) list.appendChild(foldRow(n, st, reply));
+        });
+        if (focus) focusKeyed(list, focus);
+        // for the paint that called: where the reader's line was, and their own reply if one just landed (restoreScroll places the pane)
+        st.land = { anchor: anchor, own: pinNext ? landed : null };
+        return true;
+      }
+      // a redraw that is not a poll's (the pictures landed, the reader signed in): the pane stays where it is
+      function redrawRoom(card) {
+        var list = card.querySelector(".c-voices");
+        if (!list || !card.__t) return;
+        var top = list.scrollTop;
+        if (drawRoom(card, card.__t, false)) { list.scrollTop = top; roomOf(card).land = null; }
+        drawEarlier(card, card.__t);
+      }
+      function redrawRooms() {
+        [liveBox, closedBox].forEach(function (box) { Array.prototype.forEach.call(box.querySelectorAll(".c-thread"), redrawRoom); });
+      }
+
+      // THE READER PRESSED SOMETHING IN A ROOM (one listener per pane). Reply names the say for the speaking box; the replies button opens or folds its
+      // whole circle; "N new" opens the circle with the new replies on screen. None of them asks the office anything: the room's read already holds it all.
+      function roomPress(card, ev) {
+        var hit = ev.target && ev.target.closest ? ev.target.closest("[data-fold],[data-new],[data-reply]") : null;
+        var st = card.__room, list = card.querySelector(".c-voices");
+        if (!hit || !st || !st.shape || !list || !card.__t) return;
+        if (hit.hasAttribute("data-reply")) {
+          var say = st.shape.byId[hit.getAttribute("data-reply")];
+          // the id is the one the OFFICE served on that line; the words are theirs (text, never markup)
+          if (say) document.dispatchEvent(new CustomEvent("pm:reply-target", { detail: { id: say.v.id, handle: String(say.v.handle), said: String(say.v.said == null ? "" : say.v.said) } }));
+          return;
+        }
+        var showNew = hit.hasAttribute("data-new");
+        var key = hit.getAttribute(showNew ? "data-new" : "data-fold");
+        var node = null;
+        st.shape.tops.forEach(function (n) { if (n.key === key) node = n; });
+        if (!node) return;
+        var firstNew = null;
+        if (st.open[key] && !showNew) {
+          delete st.open[key];
+          eachUnder(node, function (c) { delete st.lit[c.key]; });         // folded: its "new" marks are spent
+        } else {
+          st.open[key] = true;
+          eachUnder(node, function (c) {
+            if (st.seen[c.key]) return;
+            st.seen[c.key] = true; st.lit[c.key] = true;
+            if (firstNew === null) firstNew = c.key;
+          });
+        }
+        var top = list.scrollTop;
+        drawRoom(card, card.__t, true);
+        st.land = null;
+        list.scrollTop = top;                       // everything above the button is as it was, so the button stays under the reader's finger
+        focusKeyed(list, "fold-" + key);
+        // "N new" (and a circle opened while it held new replies): the first new reply is ON SCREEN after the press, not merely in the page
+        var row = firstNew !== null ? keyed(list, firstNew) : null;
+        if (row && row.scrollIntoView) row.scrollIntoView({ block: "nearest" });
+      }
+
+      // A ROOM LONGER THAN ITS READ (the named fallback). The list read carries a room's newest lines (the office's `voices` dial) and says so with
+      // `voices_earlier`. The card then says how many statements the room holds and how many are here, and offers the earlier part through the World's
+      // circle reader, the way this page showed every room until CORE-156: ONE read (`?room=`), asked only when the reader presses, never a second
+      // time while it is in flight or once it is mounted, and not at all while the page is waiting out a failed read.
+      function drawEarlier(card, t) {
+        var ve = t.voices_earlier && typeof t.voices_earlier === "object" && Number(t.voices_earlier.remaining) > 0 ? t.voices_earlier : null;
+        var box = card.querySelector("[data-room-earlier]");
+        if (!ve) { if (box && !card.__cr) box.remove(); return; }
+        if (!box) {
+          box = el("div", "c-room-earlier");
+          box.setAttribute("data-room-earlier", "");
+          box.appendChild(el("p", "c-fine")).setAttribute("data-room-earlier-words", "");
+          card.insertBefore(box, card.querySelector(".c-voices"));
+        }
+        var words = box.querySelector("[data-room-earlier-words]");
+        // The World's reader lists a room's CONVERSATIONS (a say with an id, and its replies). A room of older talk, whose lines carry no id, has none
+        // to list (the office answers such a room with its newest lines again), so the button is offered only where it can show something earlier.
+        var listable = (t.voices || []).some(function (v) { return sayKey(v && v.id) !== null; });
+        var canList = listable && !!hook() && !!t.id;
+        var text = "This room holds " + statementsWords(t) + ". The newest " + (t.voices || []).length + " are shown below in full. The "
+          + Number(ve.remaining) + " said before them are not shown on this page"
+          + (canList && !card.__cr ? "; the button lists this room's conversations by their first line." : ".")
+          // a room of older talk: its messages can be read, and that is all; said once, so nobody presses at nothing
+          + (listable ? "" : " The messages in this room can't be replied to, so there is nothing here to open, fold or answer.");
+        if (words && words.textContent !== text) words.textContent = text;
+        if (card.__cr || box.querySelector("[data-room-earlier-show]") || !canList) return;
+        var b = el("button", "c-more c-room-earlier-show", "List this room's conversations");
+        b.type = "button";
+        b.setAttribute("data-room-earlier-show", "");
+        b.addEventListener("click", function () { showEarlierOf(card); });
+        box.appendChild(b);
+      }
+      function showEarlierOf(card) {
+        if (card.__cr) return;                      // asked already (in flight or mounted): one read, never a second
+        var box = card.querySelector("[data-room-earlier]");
+        var b = box && box.querySelector("[data-room-earlier-show]");
+        if (!box || !b) return;
+        var said = box.querySelector("[data-room-earlier-note]");
+        if (!said) { said = el("p", "c-fine"); said.setAttribute("data-room-earlier-note", ""); said.setAttribute("role", "status"); box.appendChild(said); }
+        if (poller.state().fails) {
+          said.textContent = "The office isn't answering just now, so this page is not asking it for more. Try again once the conversations refresh.";
+          return;
+        }
+        var ready = ensureReader(card);
+        if (!ready) { said.textContent = "The earlier conversations can't be listed just now."; return; }
+        b.disabled = true; b.textContent = "Reading…";
+        said.textContent = "Every conversation in this room, by its first line. Open shows one whole:";
+        ready.then(function (reader) {
+          b.remove();
+          if (!reader) said.textContent = "The circle reader isn't available on this page, so this room's earlier conversations can't be listed here.";
         });
       }
+      // ROOM-DRAW:END
 
       // A kept card moves only its numbers: place, live chip, counts, last, people. Nothing a reader is standing on is rebuilt.
       function updateCard(card, t) {
@@ -504,14 +845,25 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // real and the whole swap still lands in one frame — no visible jump.
       // A thread drawn for the first time starts where its kind wants to start:
       // a live one at the newest line, a finished one at the beginning.
+      //
+      // CORE-156: a room's replies now sit under the message they answer, so new talk can land ABOVE the line a reader is on, and their own
+      // reply can land in the middle of the room. Two more rules, from what drawRoom left on the card for this paint (`land`): a reader's own
+      // reply is brought into view where it sits (the bottom is only where a new opening message lands); and a reader who has climbed up
+      // keeps the very line they were on in place, whatever was added above it.
       function restoreScroll(box, was, followsNew) {
         box.querySelectorAll("[data-thread]").forEach(function (card) {
           var list = card.querySelector(".c-voices");
           if (!list) return;
+          var st = card.__room, land = st && st.land;
+          if (st) st.land = null;
           var prior = was[card.getAttribute("data-thread")];
           if (!prior) { if (followsNew) list.scrollTop = list.scrollHeight; return; }
-          if (pinNext || prior.following) list.scrollTop = list.scrollHeight;
-          else list.scrollTop = prior.top;
+          var mine = land && land.own ? keyed(list, land.own) : null;
+          if (mine) { list.scrollTop = prior.top; showInPane(list, mine); return; }
+          if (pinNext || prior.following) { list.scrollTop = list.scrollHeight; return; }
+          list.scrollTop = prior.top;
+          var at = land && land.anchor ? keyed(list, land.anchor.key) : null;
+          if (at) list.scrollTop += (at.getBoundingClientRect().top - list.getBoundingClientRect().top) - land.anchor.off;
         });
       }
 
@@ -676,12 +1028,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           var card = existing[key];
           if (card) {
             updateCard(card, t);
-            var list = card.querySelector(".c-voices");
-            // legacy mode only: with the reader mounted the flat words are not what the card shows (and are not rebuilt under it)
-            if (list && !(card.__cr && card.__cr.flatHidden)) fillVoices(list, t);
+            drawRoom(card, t, false);      // only a room whose talk moved is redrawn (CORE-156)
           } else {
             card = threadNode(t);
           }
+          drawEarlier(card, t);
           order.push(card);
         });
         Object.keys(existing).forEach(function (k) { if (!want[k]) dropCard(existing[k]); });
@@ -690,48 +1041,25 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           if (at !== card) box.insertBefore(card, at);      // only a card out of place moves
         });
         restoreScroll(box, was, followsNew);
-        wireReaders(box);
       }
 
-      // ── THE CIRCLE READER, per card (the module script below supplies window.__pmCircleReaders) ──
-      // A card shows the flat transcript until its reader says it has read the room; it shows it again, with a note, when the reader cannot
-      // be had or cannot read. Live rooms mount at once; finished ones when they come near the screen (one read each, not forty).
-      var io = ("IntersectionObserver" in window)
-        ? new IntersectionObserver(function (entries) {
-          entries.forEach(function (e) {
-            if (!e.isIntersecting) return;
-            io.unobserve(e.target);
-            if (selected) { e.target.__observed = false; return; }      // one conversation is on show: the rest mount when the list is back
-            ensureReader(e.target, false);
-          });
-        }, { rootMargin: "400px 0px" })
-        : null;
+      // ── THE WORLD'S CIRCLE READER IN A CARD: only the long room's fallback (the module script below supplies window.__pmCircleReaders) ──
+      // Until CORE-156 every card mounted the reader (one `?room=` read each: live rooms at once, finished ones as they came near the screen)
+      // and the reader drew the room. A card now reads from its own thread's lines and asks nothing. The reader is mounted in a card ONLY by
+      // showEarlierOf above: a reader pressed for the earlier part of a room that holds more than its read carries. One mount per card, ever.
       function hook() { return window.__pmCircleReaders || null; }
 
-      function flatNoteOf(card) {
-        var n = card.querySelector(".c-circles-note");
-        if (!n) { n = el("p", "c-fine c-circles-note"); n.setAttribute("data-circles-note", ""); var list = card.querySelector(".c-voices"); card.insertBefore(n, list); }
-        return n;
-      }
-      function showFlat(card, show, words) {
-        var list = card.querySelector(".c-voices");
-        if (list) list.hidden = !show;
-        var note = flatNoteOf(card);
-        note.hidden = !show || !words;
-        note.textContent = words || "";
-        if (card.__cr) card.__cr.flatHidden = !show;
-      }
-
-      function ensureReader(card, force) {
+      function ensureReader(card) {
         if (card.__cr) return card.__cr.ready;
         if (selected) return null;                  // the lists are hidden behind a selected conversation: no reads for rooms nobody can see
         var h = hook();
         var t = card.__t;
-        if (!h || !t || !t.id) return null;         // not yet (pm:circles-ready asks again), or a room with no id to read
+        var box = card.querySelector("[data-room-earlier]");
+        if (!h || !t || !t.id || !box) return null; // no reader on this page, or a room with no id to read
         var host = el("div", "c-circles");
         host.setAttribute("data-circles-host", "");
-        card.insertBefore(host, card.querySelector(".c-voices"));
-        var rec = { host: host, reader: null, ready: null, seen: t.latest + ":" + t.voice_count, flatHidden: false };
+        box.appendChild(host);
+        var rec = { host: host, reader: null, ready: null };
         card.__cr = rec;
         rec.ready = h.mount(host, String(t.id), {
           // "Open" on a statement goes to that conversation on its own (the #circle- link), and the card goes back to its room view
@@ -742,57 +1070,36 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           },
           faceForSpeaker: faceForSpeaker,
           hostOwnsHeader: true,
-          onState: function (st) {
-            if (st === "room" || st === "circle") showFlat(card, false, "");
-            else if (st === "unavailable") showFlat(card, true, "The circles couldn't be read just now, so these are the words this page already holds:");
-          },
         }).then(function (m) {
-          if (!m || !m.ok) {
-            rec.failed = true;
-            showFlat(card, true, "Showing the plain transcript: the circle reader isn't available on this page.");
-            return null;
-          }
+          if (!m || !m.ok) { rec.failed = true; return null; }
           rec.reader = m.reader;
           return m.reader;
         }, function () {
           rec.failed = true;
-          showFlat(card, true, "Showing the plain transcript: the circle reader isn't available on this page.");
           return null;
         });
         return rec.ready;
       }
 
-      function wireReaders(box) {
-        if (!hook() || selected) return;
-        Array.prototype.forEach.call(box.querySelectorAll(".c-thread"), function (card) {
-          if (card.__cr || card.__observed) return;
-          if (!io || (card.__t && card.__t.live)) ensureReader(card, false);
-          else { card.__observed = true; io.observe(card); }
-        });
-      }
-
-      // a poll refreshes only the readers whose room moved (its latest or its count), in place and quietly: the reader offers "new — show"
+      // NO ASK, EVER, FROM HERE (CORE-156). The poll, the pictures landing and a say all call this, and until now it re-read `?room=` for every mounted
+      // reader whose room had moved (and `?circle=` for each circle opened in it), on the timer. A reader mounted in a card (the long room's list) is read
+      // ONCE, on the press that mounted it, and never again by the page: it is a list of where the room's conversations start, and the room's own pane
+      // beside it is what stays current. `all` (the pictures landed, a say was spoken) redraws each room's own pane from the lines it already holds.
       function refreshReaders(box, all) {
-        Array.prototype.forEach.call(box.querySelectorAll(".c-thread"), function (card) {
-          var rec = card.__cr;
-          if (!rec || !rec.reader || !card.__t) return;
-          var seen = card.__t.latest + ":" + card.__t.voice_count;
-          if (!all && seen === rec.seen) return;
-          rec.seen = seen;
-          rec.reader.refresh({ quiet: true });
-        });
+        if (!all) return;
+        Array.prototype.forEach.call(box.querySelectorAll(".c-thread"), redrawRoom);
       }
 
       function dropCard(card) {
-        if (io) io.unobserve(card);
         var rec = card.__cr;
         if (rec && rec.reader) { try { rec.reader.destroy(); } catch (e) { /* gone */ } }
         if (card.parentNode) card.parentNode.removeChild(card);
       }
 
-      // the module script says the hook is there (it may land after the first paint): mount what is waiting, and the selected conversation if one is
+      // the module script says the hook is there (it may land after the first paint): the rooms are redrawn from the lines they hold (a signed-in
+      // reader's Reply buttons, a long room's "earlier" button), with no ask of the office; and the selected conversation is mounted if one is waiting
       document.addEventListener("pm:circles-ready", function () {
-        wireReaders(liveBox); wireReaders(closedBox);
+        redrawRooms();
         if (selected) mountSelected(selected);
       });
 
@@ -840,8 +1147,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // shows THAT conversation and nothing else: the lists step aside, the one shared reader draws it, and the speaking area comes in
       // under it, in the page's flow. The office says which room the circle is in (`find.room`, the keyless ?circle= read: the circle's
       // own served identity, so it needs no list page to be held first). The page works out neither the room nor the circle: it asks.
-      // Other talk, and the poll, never replace it: it lives outside the lists the poll paints, and its reader refreshes in place and
-      // quietly (it offers "new - show", never pulls the visitor along). A refused or missing circle says so, and is not an empty one.
+      // Other talk, and the poll, never replace it: it lives outside the lists the poll paints. The poll never asks the office about it either
+      // (CORE-156, SELECTED-ASKS below): new lines are offered from the list the page already holds, and one press asks for them. A refused or
+      // missing circle says so, and is not an empty one.
       var selBox = document.querySelector("[data-selected]");
       var sayEl = document.querySelector("[data-say]");
       var h1El = document.querySelector(".c-head h1");
@@ -883,15 +1191,23 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         // place/live line stands down (onState below), so there is ONE effective metadata group on screen, never both.
         // The reader navigates INSIDE this view (its "Back to the room", a room opener's "Open", a stub's link): onNavigate follows it, so the address, the selected
         // conversation and the reply target never diverge from what is on screen (followSelected).
+        // ONE ASK ON ARRIVAL (CORE-156): the page has just asked the office for this circle (loadSelected, to learn its room). That same answer is handed
+        // to the reader for its first read (`primed`, spent once), where until now the reader asked for it a second time. And every answer the reader is
+        // given for a circle is told to the page (`onCircleRead`), so the page never asks again for what the reader was just told.
+        var primed = sel.answer;
+        sel.answer = null;
         h.mount(sel.host, String(sel.room), {
           circle: sel.cid, faceForSpeaker: faceForSpeaker,
-          onState: function (st) { if (selected === sel) sel.card.classList.toggle("is-room-step", st === "room"); },
+          onState: function (st) { if (selected === sel) { sel.step = st; sel.card.classList.toggle("is-room-step", st === "room"); offerSelected(sel); } },
           onNavigate: function (n) { followSelected(sel, n); },
+          primed: primed,
+          onCircleRead: function (id, first, body) { selectedWasRead(sel, id, first, body); },
         }).then(function (m) {
           sel.mounting = false;
           if (selected !== sel) { if (m && m.reader) { try { m.reader.destroy(); } catch (e) { /* gone */ } } return; }
           if (!m || !m.ok) { selNote(sel, "The circle reader isn't available on this page, so this conversation can't be shown here.", false); return; }
           sel.reader = m.reader;
+          offerSelected(sel);
         }, function () {
           sel.mounting = false;
           selNote(sel, "This conversation couldn't be read just now, so it can't be shown. That is not the same as it being empty.", true);
@@ -909,6 +1225,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
               selNote(sel, "The office couldn't open this conversation" + (res.d && res.d.defect ? " (" + res.d.defect + ")" : " just now") + ". That is not the same as it being empty.", true);
               return;
             }
+            sel.answer = res.d;                 // the one answer: the reader is given it, not sent to ask again (mountSelected)
             paintSelectedPlace(sel, room);
             mountSelected(sel);
           })
@@ -928,8 +1245,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       }
       // THE READER MOVED INSIDE THE VIEW (its Back to the room, a room opener's Open, a stub's link). The page follows what is on screen: whatever moved, a reply
       // target chosen before it is dropped (a target belongs to the conversation it was chosen in); a different circle becomes the selected one (the card, the
-      // address: pushState, so the browser's Back returns to the one before, with no remount), and the office is asked again who it says that circle is in, so the
-      // place line is never the first conversation's. The room step keeps the address: the selected conversation is still the one the visitor chose.
+      // address: pushState, so the browser's Back returns to the one before, with no remount). The place line is the office's own word for THAT circle: it is
+      // painted from the answer the reader's press was just given (selectedWasRead), where until CORE-156 the page asked the office a second time for it.
+      // The room step keeps the address: the selected conversation is still the one the visitor chose.
       function followSelected(sel, n) {
         if (selected !== sel || !n) return;
         document.dispatchEvent(new CustomEvent("pm:selected-change"));
@@ -937,18 +1255,72 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var id = String(n.circleId);
         if (!/^\d{1,18}$/.test(id) || id === sel.cid) return;
         sel.cid = id;
+        sel.says = null;                        // the count the view holds is the earlier circle's until this one's answer lands
         sel.card.setAttribute("data-selected-card", id);
         try { history.pushState(null, "", "#circle-" + encodeURIComponent(id)); } catch (e) { /* the address stays; the view on screen is right */ }
-        var asked = id;
-        fetch(API + "?circle=" + encodeURIComponent(id), { headers: { accept: "application/json" } })
-          .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (d) {
-            if (selected !== sel || sel.cid !== asked) return;
-            var room = d && d.find && d.find.room ? d.find.room : null;
-            if (room && room.id !== undefined && room.id !== null) paintSelectedPlace(sel, room);   // else the line stays as the office last said it: no guess
-          })
-          .catch(function () { /* quiet: the reader is showing the circle; the place line keeps what the office last said */ });
+        offerSelected(sel);
       }
+
+      // ── THE ONE CONVERSATION ASKS ONLY WHEN ITS READER DOES (CORE-156) ──
+      // SELECTED-ASKS:BEGIN
+      // Until now this view asked `?circle=` twice on arrival and once more on EVERY answered poll, moved or not, with nothing keeping two asks from
+      // overlapping. It now asks once on arrival and never on the timer. What the poll does instead costs nothing: the list answer it already holds says
+      // how many lines that conversation has, and when that is more than the view was last given the view offers them ("2 new in this conversation. Show").
+      // Otherwise it says plainly that it does not update by itself, with a Refresh press. A press is ONE ask, never a second while it is in flight, and
+      // none while the page is waiting out a failed read. On the reader's own room step there is nothing to refresh, and the line stands down.
+      function selectedWasRead(sel, id, first, body) {
+        if (selected !== sel || !first || String(id) !== sel.cid) return;
+        var find = body && body.find && typeof body.find === "object" ? body.find : null;
+        var read = find && find.circle_read && typeof find.circle_read === "object" ? find.circle_read : null;
+        sel.says = read && isFinite(read.says) ? Number(read.says) : null;        // how many lines the office says this conversation holds, as of this read
+        if (find && find.room && find.room.id !== undefined && find.room.id !== null) paintSelectedPlace(sel, find.room);
+        offerSelected(sel);
+      }
+      // how many lines the LIST the page already holds shows in this conversation (the say and everything under it), or null when no room on the page holds it
+      function selectedInList(sel) {
+        var found = null;
+        [liveBox, closedBox].forEach(function (box) {
+          Array.prototype.forEach.call(box.querySelectorAll(".c-thread"), function (card) {
+            if (found !== null || !card.__t) return;
+            var shape = card.__room && card.__room.shape;      // the shape the card was last drawn from: nothing is worked out again
+            var node = shape ? shape.byId[sel.cid] : null;
+            if (node) found = 1 + node.total;
+          });
+        });
+        return found;
+      }
+      function offerSelected(sel) {
+        if (selected !== sel) return;
+        var row = sel.card.querySelector("[data-selected-fresh]");
+        if (!row) return;
+        row.hidden = !sel.reader || sel.step !== "circle";
+        if (row.hidden) return;
+        var words = row.querySelector("[data-selected-fresh-words]"), b = row.querySelector("[data-selected-refresh]");
+        var held = selectedInList(sel);
+        var fresh = held !== null && sel.says !== null && held > sel.says ? held - sel.says : 0;
+        var text = sel.waiting ? "The office isn't answering just now, so this page is not asking it for more. Try again once the conversations refresh."
+          : fresh ? fresh + " new in this conversation." : "This view does not update by itself.";
+        if (words.textContent !== text) words.textContent = text;
+        var label = sel.asking ? "Reading…" : fresh ? "Show" : "Refresh";
+        if (b.textContent !== label) b.textContent = label;
+        b.disabled = !!sel.asking;
+      }
+      function askSelected(sel) {
+        if (selected !== sel || !sel.reader || sel.asking || sel.step !== "circle") return;
+        sel.waiting = !!poller.state().fails;
+        if (sel.waiting) { offerSelected(sel); return; }
+        sel.asking = true;
+        offerSelected(sel);
+        var done = function () { sel.asking = false; offerSelected(sel); };
+        try { Promise.resolve(sel.reader.refresh({ quiet: false })).then(done, done); } catch (e) { done(); }
+      }
+      // the poll's call (no argument) asks the office NOTHING; the visitor's own say (`own`) is their act, and is one ask
+      function refreshSelected(own) {
+        if (!selected) return;
+        if (own) askSelected(selected);
+        else { selected.waiting = false; offerSelected(selected); }
+      }
+      // SELECTED-ASKS:END
       function enterSelected(cid) {
         var card = el("article", "c-thread c-selected");
         card.setAttribute("data-selected-card", cid);
@@ -966,6 +1338,19 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         var host = el("div", "c-circles");
         host.setAttribute("data-circles-host", "");
         card.appendChild(host);
+        // under the reader: whether there is anything new, and the one press that asks for it (SELECTED-ASKS above); hidden until the conversation is on screen
+        var freshRow = el("p", "c-fine c-selected-fresh");
+        freshRow.setAttribute("data-selected-fresh", "");
+        freshRow.setAttribute("role", "status");
+        freshRow.hidden = true;
+        freshRow.appendChild(el("span", null, "")).setAttribute("data-selected-fresh-words", "");
+        var freshBtn = el("button", "c-act", "Refresh");
+        freshBtn.type = "button";
+        freshBtn.setAttribute("data-selected-refresh", "");
+        freshBtn.addEventListener("click", function () { if (selected && selected.card === card) askSelected(selected); });
+        freshRow.appendChild(document.createTextNode(" "));
+        freshRow.appendChild(freshBtn);
+        card.appendChild(freshRow);
         selBox.textContent = "";
         selBox.appendChild(card);
         selBox.hidden = false;
@@ -974,7 +1359,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         // the speaking area is the page's own (one form, one auth, one submit): it moves in under the reader and goes home afterwards
         if (sayEl && !sayHome) { sayHome = document.createComment("c-say-home"); sayEl.parentNode.insertBefore(sayHome, sayEl); }
         if (sayEl) card.appendChild(sayEl);
-        selected = { cid: cid, card: card, host: host, room: null, reader: null, mounting: false, mine: ++selSeq };
+        selected = { cid: cid, card: card, host: host, room: null, reader: null, mounting: false, mine: ++selSeq, answer: null, says: null, step: null, asking: false, waiting: false };
         document.dispatchEvent(new CustomEvent("pm:selected-change"));      // a reply target belongs to the conversation it was chosen in
         loadSelected(selected);
       }
@@ -987,7 +1372,6 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         document.documentElement.classList.remove("c-selecting");
         if (h1El) h1El.textContent = h1Home;
         document.dispatchEvent(new CustomEvent("pm:selected-change"));
-        wireReaders(liveBox); wireReaders(closedBox);
       }
       function syncSelected() {
         var cid = selectedHash();
@@ -996,8 +1380,6 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         if (selected) leaveSelected();
         enterSelected(cid);
       }
-      // the poll's refresh is quiet (new talk is offered, never pulled in); the visitor's OWN say is shown at once
-      function refreshSelected(own) { if (selected && selected.reader) selected.reader.refresh({ quiet: !own }); }
 
       function anchorFromHash() {
         var id = decodeURIComponent((location.hash || "").slice(1));
@@ -1156,7 +1538,10 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     // and a Reply press is announced as a `pm:reply-target` event for the speak box below. Nothing here derives a link, a parent or a circle.
     const __getTok = () => { try { return JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch { return null; } };
     window.__pmCircleReaders = {
-      async mount(host, roomId, { onState = null, onNavigate = null, circle = null, faceForSpeaker = null, hostOwnsHeader = false } = {}) {
+      // CORE-156: the page draws each room's messages itself, and gives a message its Reply button only for a reader this says is signed in
+      // (read at each drawing, never frozen; the office still judges the say)
+      canReply: () => tokenIsFresh(__getTok()),
+      async mount(host, roomId, { onState = null, onNavigate = null, circle = null, faceForSpeaker = null, hostOwnsHeader = false, primed = null, onCircleRead = null } = {}) {
         const mod = await loadReader({});
         if (!mod) return { ok: false, why: "the circle reader is not on this site's pinned World yet" };
         if (typeof mod.READER_CSS === "string" && mod.READER_CSS && !document.querySelector("style[data-circle-reader-css]")) {
@@ -1165,8 +1550,24 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           style.textContent = mod.READER_CSS;
           document.head.append(style);
         }
+        // CORE-156: the reader's reads go through here so that (1) a circle the page has ALREADY asked the office for is not asked for twice: `primed` is
+        // that answer, handed to the reader for its first read of that circle and spent once; and (2) the page is told every circle answer the reader is
+        // given (`onCircleRead(id, first, body)`), so it never asks again to learn what the reader just learned. Nothing here asks by itself.
+        const office = officeSource({ base: OFFICE_BASE });
+        let unspent = circle !== null && circle !== undefined && primed && typeof primed === "object" && primed.find && typeof primed.find === "object" ? primed : null;
+        const source = {
+          room: (id) => office.room(id),
+          circle: async (id, after) => {
+            const first = after === undefined || after === null || after === "";
+            let body;
+            if (unspent && first && String(id) === String(circle)) { body = unspent; unspent = null; }
+            else body = await office.circle(id, after);
+            if (typeof onCircleRead === "function") { try { onCircleRead(id, first, body); } catch { /* the page's own note never fails a read */ } }
+            return body;
+          },
+        };
         const reader = mod.createCircleReader({
-          doc: document, host, source: officeSource({ base: OFFICE_BASE }), roomId,
+          doc: document, host, source, roomId,
           canReply: tokenIsFresh(__getTok()),
           onReply: (target) => document.dispatchEvent(new CustomEvent("pm:reply-target", { detail: target })),
           onState, onNavigate,
@@ -1546,6 +1947,18 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     /* CORE-128: a speaker is their small face and their name, side by side (the same face the lines wear: about 20px) */
     .convo .c-person { display: inline-flex; align-items: center; gap: 0.35em; min-width: 0; }
     .convo .c-person > .c-face { width: 20px; height: 20px; font-size: 0.62rem; box-sizing: border-box; }
+    /* CORE-156: a crowded room's speakers are capped; "and N more" opens the rest in place, "show fewer" folds them */
+    .convo .c-people-more {
+      font: 0.72rem/1.4 var(--pm-mono); letter-spacing: 0.04em; color: rgba(232, 196, 139, 0.8); background: none; border: 0; margin: 0 0 0 0.3em; padding: 0.35em 0; cursor: pointer;
+      text-decoration: underline; text-decoration-color: rgba(232, 196, 139, 0.4); text-underline-offset: 2px;
+    }
+    .convo .c-people-more:hover { color: var(--pm-gold-bright); }
+    .convo .c-people-more:focus-visible { outline: 2px solid var(--pm-gold-bright); outline-offset: 2px; border-radius: 4px; }
+    /* CORE-156: under the one conversation, whether there is anything new and the one press that asks for it */
+    .convo .c-selected-fresh { margin: 0.8em 0 0; }
+    .convo .c-selected-fresh[hidden] { display: none; }
+    .convo .c-selected-fresh .c-act { font: 0.72rem/1.4 var(--pm-mono); letter-spacing: 0.04em; margin-left: 0.4em; }
+    .convo .c-selected-fresh .c-act:disabled { opacity: 0.6; cursor: progress; }
     .convo .c-who {
       color: var(--pm-gold-bright); text-decoration: none;
       border-bottom: 1px solid rgba(232, 196, 139, 0.3); white-space: nowrap;
@@ -1604,15 +2017,84 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       border-style: dashed; border-color: rgba(232, 196, 139, 0.45);
       background: transparent; color: rgba(232, 196, 139, 0.7);
     }
-    .convo .c-voice:first-child { border-top: 0; padding-top: 0; }
-    .convo .c-said { line-height: 1.55; overflow-wrap: anywhere; }
+    .convo .c-voices > .c-voice:first-child { border-top: 0; padding-top: 0; }
+    /* the WHOLE message, as it was written (its own line breaks kept): never clamped, never cut (CORE-156) */
+    .convo .c-said { line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; min-width: 0; }
     .convo .c-ago {
       font: 0.68rem/1 var(--pm-mono); letter-spacing: 0.05em;
       color: rgba(232, 196, 139, 0.5); white-space: nowrap;
     }
+
+    /* CORE-156: READING A ROOM. Under a message's words, what a reader can do with it: Reply (signed in) and Open (the circle on its own, a link to share) */
+    .convo .c-acts {
+      grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.1em 1.1em;
+      font: 0.7rem/1.4 var(--pm-mono); letter-spacing: 0.04em;
+    }
+    .convo .c-act {
+      font: inherit; letter-spacing: inherit; color: rgba(232, 196, 139, 0.72); background: none; border: 0; margin: 0; padding: 0.25em 0; cursor: pointer;
+      text-decoration: underline; text-decoration-color: rgba(232, 196, 139, 0.35); text-underline-offset: 2px;
+    }
+    .convo .c-act:hover { color: var(--pm-gold-bright); text-decoration-color: var(--pm-gold-bright); }
+    .convo .c-act:focus-visible, .convo .c-fold:focus-visible { outline: 2px solid var(--pm-gold-bright); outline-offset: 2px; border-radius: 4px; }
+    .convo .c-loose { grid-column: 2 / -1; font-style: italic; }
+    /* the ONE button under a message that has replies ("3 replies": the whole circle, every level): it opens the circle in place and folds it again */
+    .convo .c-fold-wrap, .convo .c-kids-wrap { list-style: none; min-width: 0; }
+    .convo .c-fold {
+      display: inline-flex; align-items: center; margin: 0 0.5em 0.1em 0; padding: 0.5em 0.95em; min-height: 2.25rem; cursor: pointer;
+      font: 500 0.74rem/1 var(--pm-mono); letter-spacing: 0.04em; color: var(--pm-gold);
+      background: rgba(232, 196, 139, 0.08); border: 1px solid rgba(232, 196, 139, 0.3); border-radius: 999px;
+    }
+    .convo .c-fold:hover { border-color: var(--pm-gold); color: var(--pm-gold-bright); }
+    .convo .c-fold[aria-expanded="true"] { background: rgba(232, 196, 139, 0.16); border-color: rgba(232, 196, 139, 0.5); }
+    /* "N new": replies that arrived while the circle was folded; pressing it opens the circle with them on screen */
+    .convo .c-fold-new, .convo .c-fold-new:hover { color: #1b2233; background: var(--pm-gold); border-color: var(--pm-gold); font-weight: 600; }
+    .convo .c-fold-new:hover { background: var(--pm-gold-bright); border-color: var(--pm-gold-bright); }
+    /* an open circle: each reply whole, set in from the left under the message it answers, beside a thin line; every level at once */
+    .convo .c-kids {
+      list-style: none; margin: 0.4em 0 0.2em 0.9rem; padding: 0 0 0 0.9rem; display: grid; gap: 0.5em;
+      border-left: 2px solid rgba(232, 196, 139, 0.3);
+    }
+    .convo .c-kids .c-kids { margin-top: 0; margin-bottom: 0; }
+    .convo .c-kids > .c-voice { border-top: 1px dashed rgba(232, 196, 139, 0.14); }
+    /* a very long back-and-forth stops stepping in (its words must keep their width on a phone); each reply still sits under what it answers */
+    .convo .c-kids[data-deep] { margin-left: 0; padding-left: 0; border-left: 0; }
+    /* THE CIRCLE (Darko, 2026-11-22: "the circle design of the expandable replies"): the replies button wears a small circle, and an OPEN circle's own
+       line carries one at its midpoint, as the World's reader draws it (WLD-178). The line is drawn in two pieces so the circle needs no fill behind it.
+       Line and circle fold the whole circle, like the button; the levels inside keep their plain thin lines (they open and fold with it). */
+    .convo .c-fold:not(.c-fold-new)::before {
+      content: ""; flex: none; box-sizing: border-box; width: 0.85rem; height: 0.85rem; margin-right: 0.6em;
+      border: 2px solid currentColor; border-radius: 50%; background: rgba(232, 196, 139, 0.22);
+    }
+    .convo .c-fold[aria-expanded="true"]::before { background: transparent; }
+    .convo .c-kids[data-circle] { position: relative; margin-left: 0.1rem; padding-left: 1.75rem; border-left: 0; }
+    .convo .c-ring-row { position: absolute; left: 0; top: 0; bottom: 0; width: 1.5rem; list-style: none; }
+    .convo .c-ring-line, .convo .c-ring { position: absolute; margin: 0; padding: 0; cursor: pointer; color: var(--pm-gold); background: transparent; }
+    .convo .c-ring-line { inset: 0; width: 100%; border: 0; border-radius: 0; }
+    .convo .c-ring-line::before {
+      content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); border-radius: 1px; opacity: 0.45;
+      background: linear-gradient(to bottom, currentColor 0, currentColor calc(50% - 0.85rem), transparent calc(50% - 0.85rem), transparent calc(50% + 0.85rem), currentColor calc(50% + 0.85rem), currentColor 100%);
+    }
+    .convo .c-ring { left: 50%; top: 50%; width: 1.05rem; height: 1.05rem; box-sizing: border-box; border: 2px solid currentColor; border-radius: 50%; transform: translate(-50%, -50%); opacity: 0.85; }
+    .convo .c-ring-line:hover::before { opacity: 0.85; }
+    .convo .c-ring:hover, .convo .c-ring-line:hover + .c-ring { opacity: 1; background: rgba(232, 196, 139, 0.2); }
+    /* a reply the reader has not seen before: marked, and said in words beside its time (colour is never the only sign) */
+    .convo .c-voice.is-new { background: rgba(232, 196, 139, 0.09); box-shadow: inset 3px 0 0 var(--pm-gold); border-radius: 4px; padding: 0.5em 0.5em 0.45em 0.75em; }
+    .convo .c-voice.is-new > .c-ago::before { content: "new · "; color: var(--pm-gold-bright); }
+    /* a room that holds more statements than its read carries says so above its pane, with the way to its earlier conversations */
+    .convo .c-room-earlier { margin: 0.8em 0 0; }
+    .convo .c-room-earlier > p { margin: 0; }
+    .convo .c-room-earlier > .c-more { display: inline-block; width: auto; margin: 0.5rem 0 0.3rem; }
     @media (max-width: 34rem) {
       .convo .c-voice { grid-template-columns: 1fr auto; }
-      .convo .c-said { grid-column: 1 / -1; }
+      .convo .c-said, .convo .c-acts, .convo .c-loose { grid-column: 1 / -1; }
+      /* the time sits beside the name, on the message's first line (until CORE-156 it fell under the words) */
+      .convo .c-voice > .c-ago { grid-column: 2; grid-row: 1; }
+      .convo .c-kids { margin-left: 0.25rem; padding-left: 0.6rem; }
+      .convo .c-kids[data-circle] { margin-left: 0; padding-left: 1.55rem; }
+      .convo .c-ring-row { width: 1.4rem; }
+      /* a finger's target: the links under a message stand taller, the replies button taller still */
+      .convo .c-act { padding: 0.55em 0; }
+      .convo .c-fold { min-height: 2.6rem; padding: 0.5em 1.05em; }
     }
 
     .convo .c-empty, .convo .c-loading { color: #b9ad93; font-style: italic; margin: 0; }
@@ -1620,11 +2102,10 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     .convo .c-foot p { margin: 0 0 0.6em; line-height: 1.6; }
     .convo .c-fine { font-size: 0.78rem; color: rgba(185, 173, 147, 0.85); }
 
-    /* CORE-82: the circle reader's host inside a room card, the flat floor's note, the reply target and the #circle- note.
+    /* CORE-82: the circle reader's host (the one-conversation view, and a long room's earlier conversations), the reply target and the #circle- note.
        The reader brings its own stylesheet (READER_CSS, added once by the module script). */
     .convo .c-circles { margin: 0.7em 0 0; color: #f0e6d0; font-size: 0.92rem; line-height: 1.55; overflow-wrap: anywhere; }
-    .convo .c-circles-note { margin: 0.7em 0 0.3em; }
-    .convo .c-voices[hidden], .convo .c-circles-note[hidden], .convo .c-say-reply[hidden], .convo .c-say-linked[hidden], .convo [data-selected][hidden], .convo .c-selected-note[hidden] { display: none; }
+    .convo .c-say-reply[hidden], .convo .c-say-linked[hidden], .convo [data-selected][hidden], .convo .c-selected-note[hidden] { display: none; }
     /* CORE-117: ONE conversation. The lists, the pins and the page's intro step aside; the card is the page's one thread, the speaking area sits under it */
     html.c-selecting .convo > *:not(.c-head):not([data-selected]) { display: none; }
     html.c-selecting .convo .c-head > *:not(h1):not(.c-crumb) { display: none; }
