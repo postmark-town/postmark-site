@@ -141,8 +141,9 @@ test("room ids are opaque string-or-number values: a positive number and zero su
   // a room id is never a circle: no #circle- anchor is made from it
   assert.equal(roomHref(42).includes("circle-"), false);
   // CORE-177: the room's whole-talk permalink, the id as written (opaque, encoded, never rewritten)
-  assert.equal(roomPermalink(0), "/conversations/#room-0"); assert.equal(roomPermalink("t1-a b"), "/conversations/#room-t1-a%20b");
-  assert.equal(roomPermalink("t1793057576000-corrie"), "/conversations/#room-t1793057576000-corrie");
+  assert.equal(roomPermalink(0), "/conversations/?room=0"); assert.equal(roomPermalink("t1-a b"), "/conversations/?room=t1-a%20b");
+  assert.equal(roomPermalink("t1793057576000-corrie"), "/conversations/?room=t1793057576000-corrie");
+  assert.equal(roomPermalink("room-abc").includes("#"), false, "a query, never the card anchor's fragment");
 });
 
 test("an ABSENT completion flag on a served gallery is unknown, never complete; true and false stay literal", () => {
@@ -366,8 +367,8 @@ test("BUILT FALSIFIER: the ended event outside the seven-day list has its page a
   const circ = section(html, "data-ev-circles");
   const roomsAt = [...circ.matchAll(/data-ev-room="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(roomsAt, ["t1792519260000-supperkeeper-test", "t1792520400000-guest-test"]);
-  // CORE-177: the whole talk is the room's permalink (#room-), which the conversations page opens through the office's named room read
-  for (const r of roomsAt) assert.ok(circ.includes(`href="/conversations/#room-${r}"`), `${r}: no link to its whole talk`);
+  // CORE-177: the whole talk is the room's permalink (?room=), which the conversations page opens through the office's named room read
+  for (const r of roomsAt) assert.ok(circ.includes(`href="/conversations/?room=${r}"`), `${r}: no link to its whole talk`);
   const rooms = [...circ.matchAll(/<details\b[^>]*data-ev-room="[^"]+"[^>]*>/g)].map((m) => m[0]);
   assert.equal(rooms.length, 2, "each room is a disclosure");
   for (const tag of rooms) assert.doesNotMatch(tag, /\sopen[\s>=]/, "and shut until the reader opens it");
@@ -472,7 +473,7 @@ test("BUILT: each state is its own sentence: known none, unknown, a claim not ac
   // a room whose id is the NUMBER 0 is a room: drawn, linked, and mounted by its id, never lost to a truthiness check
   const circ = section(live, "data-ev-circles");
   assert.deepEqual([...circ.matchAll(/data-ev-room="([^"]+)"/g)].map((m) => m[1]), ["t1794686460000-walker-test", "0"], "both rooms, the numeric one included, in the office's order");
-  assert.ok(circ.includes('href="/conversations/#room-0"'), "the numeric room links to its own whole talk");
+  assert.ok(circ.includes('href="/conversations/?room=0"'), "the numeric room links to its own whole talk");
   // the SAME gallery section as the ended page, once the doors are open (CORE-174 FIX): the so-far note and the known none; never before the event
   assert.match(live, /<section[^>]*id="gallery"[^>]*data-ev-gallery|<section[^>]*data-ev-gallery[^>]*id="gallery"/, "a running event has the gallery at its #gallery anchor");
   assert.ok(say(live, "data-ev-gallery").includes(EVENT_WORDS.gallery.none), "an empty gallery of a running event is said as none");

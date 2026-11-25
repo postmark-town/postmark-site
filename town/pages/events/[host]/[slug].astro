@@ -170,7 +170,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
               {/* EACH ROOM IS A CONVERSATIONS CARD (CORE-177, Darko 08:48 EST: "literally the same theme as like how it looks in the conversations page"): the
                   card, its head and the reader's host wear src/styles/conversation-host.css, the rules the Conversations page wears, inside `.convo`; the reader
                   is mounted through the site's one setup with that page's host options (conversation-host.mjs: its faces, its own header). The card's head is
-                  its place; its meta line is the room's id and the way to its whole talk on the Conversations page: `#room-<id>` (calendar.mjs § roomPermalink),
+                  its place; its meta line is the room's id and the way to its whole talk on the Conversations page: `?room=<id>` (calendar.mjs § roomPermalink),
                   which that page opens through the office's named room read, so a historical room past its retained list still opens, under its own header. */}
               {rooms.map((room) => ({ id: roomIdOf(room), place: typeof room?.place === "string" && room.place.trim() ? room.place.trim() : null })).filter((r) => isRoomId(r.id)).map(({ id, place }) => (
                 <details class="c-thread ev-room" data-ev-room={id}>

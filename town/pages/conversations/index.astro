@@ -1152,10 +1152,11 @@ import "@/styles/conversation-host.css";
       // Other talk, and the poll, never replace it: it lives outside the lists the poll paints. The poll never asks the office about it either
       // (CORE-156, SELECTED-ASKS below): new lines are offered from the list the page already holds, and one press asks for them. A refused or
       // missing circle says so, and is not an empty one.
-      // A #room-<id> link (CORE-177: an event page's "whole conversation") shows THAT room the same way: the office's NAMED room read (`?room=`, the keyless read that
+      // A /conversations/?room=<id> link (CORE-177: an event page's "whole conversation") shows THAT room the same way: the office's NAMED room read (`?room=`, the keyless read that
       // resolves the id it is given, a historical one too, and answers with the room's own canonical header) says which room it is, and the same shared reader
       // draws it. It needs no list page to hold the room first: a room past the retained page, or recorded under another spelling, still opens. The id is opaque:
-      // asked exactly as written, never rewritten, guessed or looked for in the lists. A bare #<id> stays the lists' card anchor (anchorFromHash), as it was.
+      // asked exactly as written, never rewritten, guessed or looked for in the lists. It is a QUERY, outside the fragment, so a bare #<id> (any id, `room-abc`
+      // too) stays the lists' card anchor (anchorFromHash), as it was.
       // SELECTED-VIEW:BEGIN
       var selBox = document.querySelector("[data-selected]");
       var sayEl = document.querySelector("[data-say]");
@@ -1164,13 +1165,16 @@ import "@/styles/conversation-host.css";
       var sayHome = null;                      // where the speaking area lives on the ordinary page
       var selected = null;                     // { cid, rid, card, host, room, reader, mine }: cid a circle, else rid the room asked for
       var selSeq = 0;
+      // what the address selects: a #circle-<id> fragment, else a ?room=<id> query (CORE-177: outside the fragment, so every bare #<id> stays the lists'
+      // card anchor, whatever the id spells, `room-abc` included); a circle the reader opens inside a room's view is its fragment over that query
       function selectedHash() {
         var h = "";
         try { h = decodeURIComponent(location.hash || ""); } catch (e) { return null; }
         var m = /^#circle-(\d{1,18})$/.exec(h);
         if (m) return { cid: m[1], rid: null };
-        var r = /^#room-([\s\S]{1,200})$/.exec(h);
-        return r ? { cid: null, rid: r[1] } : null;
+        var rid = null;
+        try { rid = new URLSearchParams(location.search || "").get("room"); } catch (e) { return null; }
+        return rid && rid.length <= 200 ? { cid: null, rid: rid } : null;
       }
       // what the view on screen is: its circle once it has one (a room's reader can open one of its circles), else the room it was asked for
       function selectedKey(s) { return !s ? null : s.cid ? "circle:" + s.cid : "room:" + s.rid; }
@@ -1400,7 +1404,7 @@ import "@/styles/conversation-host.css";
         var id = decodeURIComponent((location.hash || "").slice(1));
         if (!id) return;
         var circle = /^circle-(\d{1,18})$/.exec(id);
-        if (circle || /^room-/.test(id)) return;       // a circle or room link is the selected view (syncSelected), not a card to scroll to
+        if (circle) return;       // a circle link is the selected view (syncSelected), not a card to scroll to
         var card = document.getElementById(id);
         if (!card) return; // a thread past the closed cap, or a stale link — the page stands
         card.scrollIntoView({ block: "start" });
@@ -1408,6 +1412,9 @@ import "@/styles/conversation-host.css";
       }
       // SELECTED-VIEW:END
       window.addEventListener("hashchange", function () { syncSelected(); anchored = false; tick(); });
+      // CORE-177: Back and Forward between "All conversations" and a ?room= view change the query, not the fragment, so no hashchange fires; the view
+      // follows the address the same way (syncSelected keeps a view that already matches, so a fragment move that fires both is one sync)
+      window.addEventListener("popstate", function () { syncSelected(); });
 
       // POLL-SCHEDULER:BEGIN
       // ONE ASK AT A TIME, AND A WAIT THAT GROWS WHILE THE OFFICE DOES NOT ANSWER (CORE-158; Wright 2026-11-22: "one ask at a time per tab; back off after a
@@ -1530,7 +1537,7 @@ import "@/styles/conversation-host.css";
       // right away — waiting out the poll to see your own voice land feels broken.
       // Their own voice also beats wherever they were reading: pin to newest.
       document.addEventListener("pm:spoke", function () { pinNext = true; tick(); refreshReaders(liveBox, true); refreshReaders(closedBox, true); refreshSelected(true); });
-      syncSelected();       // a #circle- or #room- link on arrival shows its conversation at once, before the first poll answers (and whatever that page holds)
+      syncSelected();       // a #circle- or ?room= link on arrival shows its conversation at once, before the first poll answers (and whatever that page holds)
     })();
   </script>
 
@@ -1564,7 +1571,7 @@ import "@/styles/conversation-host.css";
         // CORE-156: the reader's reads go through here so that (1) a circle the page has ALREADY asked the office for is not asked for twice: `primed` is
         // that answer, handed to the reader for its first read of that circle and spent once; and (2) the page is told every circle answer the reader is
         // given (`onCircleRead(id, first, body)`), so it never asks again to learn what the reader just learned. Nothing here asks by itself.
-        // CORE-177: a #room- view is primed the same way: the page's named room read already answered under this room's canonical header, so the reader's
+        // CORE-177: a ?room= view is primed the same way: the page's named room read already answered under this room's canonical header, so the reader's
         // first read of exactly that room is that answer, spent once (one ask on arrival, as for a circle)
         const office = officeSource({ base: OFFICE_BASE });
         let unspent = circle !== null && circle !== undefined && primed && typeof primed === "object" && primed.find && typeof primed.find === "object" ? primed : null;
