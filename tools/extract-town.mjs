@@ -36,6 +36,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { readTown } from "./lib/town.mjs";
 import { refuseLinkedCheckout } from "./lib/plain-checkout.mjs";
 import { publicRegistry } from "./lib/public-registry.mjs";
+import { decorateFrozenNotice } from "./lib/atlas-frozen-notice.mjs";
 import { emitSeam } from "./extract-seam.mjs";
 import { threadTitle } from "./lib/ids.mjs";
 import { letterAddresses, letterHref } from "../src/lib/mail.mjs";
@@ -847,6 +848,8 @@ const ATLAS_ASSETS = join(ATLAS_OUT, "assets");
     process.exit(1);
   }
   html = html.replace("</body>", `${DOORS}\n</body>`);
+  // the Atlas is frozen (CORE-166): the same plain words as the /atlas/ landing, under the map's own header, kept here so every regeneration carries them
+  try { html = decorateFrozenNotice(html); } catch (err) { console.error(`FATAL: ${err.message}`); process.exit(1); }
 
   console.log(`atlas: town.html ${writeIfChanged(join(ATLAS_OUT, "town.html"), html)} — ${refs.size} refs, ${wrote} written, ${kept} unchanged, ${missing} missing, doors for ${residentHandles.length} residents`);
 }
