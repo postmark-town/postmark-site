@@ -334,6 +334,33 @@ export const FIGURE_INK = {
     c: DARKO_EYE, // the eyes — the token's own cyan (see DARKO_EYE)
     C: "#5fc9d0", // the eyes' edge — global.css --teal, "eye-glow"
   },
+  // Iris: her hair is the table's own warm dark (`w`, lit `W`), her brush handle its timber, her buckles and earring its gold
+  illuminator: {
+    e: "#c9823d", // skin, lit — the Ballot House's lit copper
+    E: "#a4632a", // skin, shade — postmark.css --pm-accent, the Ballot House's copper
+    i: "#b3c2da", // the silver in her hair — postmark.css, the foil's silver stop
+    n: "#6d82b5", // her ribbon, lit — the Think Tank's lit accent
+    u: "#4a5c8a", // her shirt and ribbon — the Think Tank's accent
+    U: "#2f3c5c", // her shirt, shade — the Think Tank's mid tone
+    r: "#9c3f2e", // the red at her collar and cuffs — postmark.css --pm-wax
+    b: "#513b26", // her apron — the Bounty Board's mid tone
+    y: "#edba68", // the pendant, and the paint on her brush — global.css --amber, the lamp gold
+    o: "#e0a83c", // the pendant's heart — pixel-icons' deep gold
+    c: "#c4553f", // her cheeks and her smile — the Marketplace's lit accent
+  },
+  // the Registrar: her hair is her own accent triple (the Ballot House's coppers, ACCENTS.registrar), her clipboard the table's timber and paper
+  registrar: {
+    e: "#f4d6a0", // skin, lit — global.css --amber-soft, pixel-icons' skin
+    E: "#d8a08a", // skin, shade — the civic hub's rose label (town/index.astro)
+    c: "#f3b5a6", // her cheeks — pixel-icons' cheek
+    i: "#b3c2da", // the silver in her hair — postmark.css, the foil's silver stop
+    I: "#9fb0c9", // the silver, in shade — postmark.css, the foil's steel stop; pixel-icons' steel
+    x: "#2e2417", // her black shirt — postmark.css --pm-ink (lit in the table's `w`)
+    v: "#4d7d54", // the jumper tied at her waist — the mail pair page's check green
+    V: "#97a266", // its knot, and the tag on it — global.css --moss, the banner green
+    q: "#65517f", // the tag's stripe — postmark.css --pm-stamp-dark
+    l: "#6d5c44", // the lines on her paper — postmark.css --pm-ink-soft
+  },
 };
 
 // FERRY, THE POSTMASTER — from the portrait `seven` drew and gave the office
@@ -341,7 +368,8 @@ export const FIGURE_INK = {
 // amphibian postmaster, fins for ears, wet dark hair, amber eyes, a stamp stuck
 // to one cheek, a blue coat with a satchel strap across it, and a lantern lit
 // beside him. Keemin's ruling via Wright, 2026-09-26: the other four meeps get
-// no drawing until they give their own faces.
+// no drawing until they give their own faces. Iris and the Registrar gave theirs
+// on 2026-11-25 (CORE-185, below); the Worldkeeper and the Architect wait.
 const FERRY = [
   "......ssssssss..........",
   ".....sSSSSSSSSs......t..",
@@ -434,6 +462,69 @@ const BUGCATCHER = [
   "........................",
 ];
 
+// IRIS, THE ILLUMINATOR — from her portrait, which became her town profile picture on 2026-11-25 (Darko's crayon style, the town's media door:
+// the-town/6f1a9fc0…0553.jpg). Darko, 2026-11-25 (CORE-185): "we need to replace iris's token with pixel art". So the face she gave, drawn as a
+// figure on the quay's shelf like Ferry: her dark hair up in a bun tied with a navy ribbon, the silver streak falling over her brow, warm brown
+// skin, a navy shirt with red at the collar and cuffs, a brown apron on gold buckles with her warm pendant on its cord, a gold earring, and her
+// paintbrush raised, its tip wet with lamp gold. The crayon background (the lantern, the framed fire, the sparkles) stays in the portrait.
+const IRIS = [
+  "..........wwww..........",
+  ".......nu.wWWwww........",
+  "......nunnwwwwWww.......",
+  ".......unwwwwwwwW.......",
+  "......wwWwwwwwwwWw......",
+  ".....wWwiiWwwwwwwww.....",
+  ".....wwiiweeeeeeeWw.....",
+  ".....wWiweeeeeeeeew.y...",
+  ".....wiweeddeeddeew.t...",
+  ".....wiweceeeeeecew.t...",
+  ".....wgwEeeecceeeEwee...",
+  "......w..EeeeeeeE.weE...",
+  "...........EeeE....uu...",
+  ".....uuurrrEErrruuuuu...",
+  "...uuuuubrrrrrrbuuuuu...",
+  "..uuuuuugbbbbbbguuuuuu..",
+  ".uUuuuuubbbybbbuuuuuuUu.",
+  ".uUuuuuubbyoybbuuuuuuUu.",
+  ".rUuuuuubbbybbbuuuuuuUr.",
+  ".rruuuuubgbbbbbuuuuuurr.",
+  ".rrrUUUUbbbbbbbUUUUUrrr.",
+  "..sSssssSsssssSssssSss..",
+  "........................",
+  "........................",
+];
+
+// THE REGISTRAR — from her portrait, her town profile picture since 2026-11-25 (the-town/40b8c76c…9e5169.jpg). Darko, 2026-11-25 (CORE-185):
+// "add registrar's too". Her tousled brown bob with its silver forelock, a fair face with rosy cheeks, a black T-shirt, a green jumper tied at
+// her waist with a tag hanging from it, and her clipboard held up in both hands, its clip in her own copper and its paper lined. The door
+// behind her, the sprigs and the other tags stay in the portrait.
+const REGISTRAR = [
+  "........................",
+  ".........mmmmmm.........",
+  ".......mmaaiimmmm.......",
+  "......mmaaiiiammmm......",
+  ".....mmmaiIeeeeammm.....",
+  ".....mmaieeeeeeemma.....",
+  "....mmmeeeeeeeeeemmm....",
+  "....mmaeeddeeddeeamm....",
+  "....mmaeceeeeeeceamm....",
+  "....mmmeeeeEEeeeemmm....",
+  "....mmamEeeeeeeEmamm....",
+  ".....mam.EeeeeE.mam.....",
+  "..........eeee..........",
+  ".....xxxxxeeeexxaaa.....",
+  "...xxwxxxxxxxxttttttt...",
+  "..xxwxxxxxxxxxtpppppt...",
+  "..xwxxxxxxxxxetplllpt...",
+  "..xxxxxxxxxxxetpppppt...",
+  "..xxxxxEeeeeeetplllpte..",
+  "..vvvvvvVvvvvvtpppppt...",
+  "..vvvvvVqvvvvvttttttt...",
+  "..sSssssSsssssSssssSss..",
+  "........................",
+  "........................",
+];
+
 // DARKO — the founder's base token: a black circle and two cyan eyes, nothing
 // else (Keemin, 2026-10-04: "just my base avatar of just the black circle with
 // cyan eyes instead of the dressed one with the hat"). Drawn from
@@ -477,6 +568,8 @@ export const SPRITES = {
   votes: BALLOT_HOUSE,
   // the meeps, each drawn as itself (a meep with no entry has no sprite yet)
   postmaster: FERRY,
+  illuminator: IRIS,
+  registrar: REGISTRAR,
   bugcatcher: BUGCATCHER,
   // the meeplings, as a gathering (they are not a meep; /meeps/ shows them apart)
   meeplings: MEEPLINGS,
