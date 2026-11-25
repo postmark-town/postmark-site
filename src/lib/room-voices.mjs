@@ -11,6 +11,10 @@
 //   · a page with earlier lines behind it says how many, and offers them: one press, one read of exactly the cursor the office served (`voices_before`),
 //     and every line that page serves goes in front of what is shown (a page may hold more than it was asked for, so ties are never cut);
 //   · an answer that does not say what its page is, says so;
+//   · WHAT THE LINES WERE READ FROM is said too (the producer's `voices_page.source`, else `find.source`). Only the town's record is the room's whole
+//     history: an office answering from its MEMORY keeps only the last voices it heard, so its page, even a `complete` one, is complete for that memory
+//     and never for the room, and an answer that names no source is not taken for the record either. Those two always say so in the same fine note;
+//     the record's own page reads exactly as it did;
 //   · an office that answers WITHOUT the lines (one that predates POS-1232, production today) keeps the room exactly as it was: the World's circle
 //     reader, mounted through the site's one setup, and handed the answer this read already holds, so its first read is not asked twice;
 //   · a read that fails says so, with the way to ask again; a room is never shown as empty because its read was not had.
@@ -34,8 +38,11 @@ export function voicesOf(body) {
   if (!find || !Array.isArray(find.voices)) return null;
   const p = find.voices_page && typeof find.voices_page === "object" ? find.voices_page : null;
   const earlier = p && p.earlier && typeof p.earlier === "object" && Number(p.earlier.remaining) > 0 ? p.earlier : null;
+  const named = (s) => (typeof s === "string" && s.trim() ? s.trim() : null);
   return {
     voices: find.voices,
+    // what the office read the lines from, as it says it: the page's own word, else the answer's (null when it says neither)
+    source: named(p && p.source) ?? named(find.source),
     room: find.room && typeof find.room === "object" ? find.room : null,
     page: p ? {
       total: Number.isFinite(Number(p.total)) ? Number(p.total) : null,
@@ -47,13 +54,25 @@ export function voicesOf(body) {
   };
 }
 
+/** What a page was read from, as its words say it: the town's `record` (the room's whole history), this office's `memory`, or `unknown`. */
+export const coverageOf = (source) => (source === "record" ? "record" : source === "memory" ? "memory" : "unknown");
+
 export const ROOM_VOICES_WORDS = {
   statements: (n) => `${n} ${n === 1 ? "statement" : "statements"}`,
-  earlier: (total, shown, remaining) =>
-    `This room holds ${ROOM_VOICES_WORDS.statements(total)}. The newest ${shown} are shown below in full; the ${remaining} said before them are not shown yet.`,
+  // how many there are, said for what was read: only the record's count is the room's
+  holds: (coverage, total) => coverage === "record" ? `This room holds ${ROOM_VOICES_WORDS.statements(total)}.`
+    : coverage === "memory" ? `This office's memory holds ${ROOM_VOICES_WORDS.statements(total)} from this room.`
+    : `This answer counts ${ROOM_VOICES_WORDS.statements(total)} in this room.`,
+  earlier: (shown, remaining) => `The newest ${shown} are shown below in full; the ${remaining} said before them are not shown yet.`,
   later: (n) => `${ROOM_VOICES_WORDS.statements(n)} said after these are not on this page.`,
+  memory: "These come from this office's memory of the town's talk, which keeps only the last things it heard, so this room may hold more than is shown here.",
+  unknown: "The office didn't say what it read these from, so they may not be all of this room's statements.",
   unsaid: "The office didn't say whether these are all of this room's statements.",
-  none: "Nothing is recorded as said in this room.",
+  none: {
+    record: "Nothing is recorded as said in this room.",
+    memory: "This office's memory holds nothing said in this room. That is not the same as nothing having been said.",
+    unknown: "This answer holds nothing said in this room, and the office didn't say what it read. That is not the same as nothing having been said.",
+  },
   more: "Show earlier statements",
   reading: "Reading…",
   moreFailed: "The earlier statements couldn't be read just now. That is not the same as there being none.",
@@ -121,6 +140,7 @@ export async function drawRoomVoices({ doc, card, reader, roomId, base, fetchImp
 
   const t = { id: (got.room && got.room.id) || roomId, voices: got.voices.slice(), voice_count: got.page && got.page.total !== null ? got.page.total : got.voices.length, latest: got.room ? got.room.latest : null };
   let page = got.page;
+  let source = got.source;
 
   const box = el("div", "c-room-earlier");
   box.setAttribute("data-room-voices-page", "");
@@ -132,14 +152,20 @@ export async function drawRoomVoices({ doc, card, reader, roomId, base, fetchImp
   reader.replaceWith(box, list);
   card.__t = t;
 
+  // THE FINE NOTE: what this page is, for what it was read from. A record page that is the whole room says nothing more, as before; a memory page
+  // or one that names no source always says so, complete or not, because its completeness is never the room's.
   const say = () => {
-    const parts = [];
-    if (!page) parts.push(ROOM_VOICES_WORDS.unsaid);
+    const W = ROOM_VOICES_WORDS, coverage = coverageOf(source), parts = [];
+    const partial = !!page && page.remaining > 0;
+    const empty = !t.voices.length && !partial;
+    if (partial) parts.push(W.holds(coverage, t.voice_count), W.earlier(t.voices.length, page.remaining));
+    if (page && page.later > 0) parts.push(W.later(page.later));
+    if (empty) parts.push(W.none[page ? coverage : "unknown"]);
     else {
-      if (page.remaining > 0) parts.push(ROOM_VOICES_WORDS.earlier(t.voice_count, t.voices.length, page.remaining));
-      if (page.later > 0) parts.push(ROOM_VOICES_WORDS.later(page.later));
+      if (!page) parts.push(W.unsaid);
+      if (coverage === "memory") parts.push(W.memory);
+      else if (coverage === "unknown" && page) parts.push(W.unknown);
     }
-    if (!t.voices.length && !(page && page.remaining > 0)) parts.push(ROOM_VOICES_WORDS.none);
     words.textContent = parts.join(" ");
     words.hidden = !parts.length;
     let b = box.querySelector("[data-room-voices-more]");
@@ -176,6 +202,8 @@ export async function drawRoomVoices({ doc, card, reader, roomId, base, fetchImp
     for (const n of roomShape(more.voices).nodes) st.seen[n.key] = true;
     t.voices = more.voices.concat(t.voices);
     if (more.page && more.page.total !== null) t.voice_count = more.page.total;
+    // lines read from anything but the record make the whole pane no longer the record's
+    if (coverageOf(source) === "record" && coverageOf(more.source) !== "record") source = more.source;
     page = page && more.page ? { ...page, remaining: more.page.remaining, before: more.page.before } : null;
     drawing.drawRoom(card, t);
     list.scrollTop = 0;                          // the reader asked for what came before: it starts at the top of the pane

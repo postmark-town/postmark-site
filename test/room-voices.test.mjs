@@ -190,7 +190,7 @@ test("PARTIAL: says what the page is and offers the lines before it; one read of
   ]);
   await drawRoomVoices({ doc, card, reader, roomId: ROOM, base: BASE, fetchImpl: o.fetchImpl });
   const words = card.querySelector("[data-room-voices-words]");
-  assert.equal(words.textContent, ROOM_VOICES_WORDS.earlier(5, 2, 3));
+  assert.equal(words.textContent, `${ROOM_VOICES_WORDS.holds("record", 5)} ${ROOM_VOICES_WORDS.earlier(2, 3)}`);
   assert.equal(words.textContent, "This room holds 5 statements. The newest 2 are shown below in full; the 3 said before them are not shown yet.");
   assert.equal(rowsOf(card)[0].querySelector(".c-loose").textContent, "A reply to an earlier message that isn't shown here.", "a reply whose parent is behind the cursor says so");
   assert.equal(rowsOf(card)[0].querySelector("[data-circle-open]").href, "/conversations/#circle-201", "and opens the circle the WHOLE room puts it in");
@@ -279,7 +279,95 @@ test("UNSAID: lines with no page say the office didn't say whether they are all;
   assert.equal(c.card.__t.voice_count, 4, "the count is what was served when the office gave no total");
   doc = makeDoc(); c = cardOf(doc);
   await drawRoomVoices({ doc, card: c.card, reader: c.reader, roomId: ROOM, base: BASE, fetchImpl: office([answer([], page([]))]).fetchImpl });
-  assert.equal(c.card.querySelector("[data-room-voices-words]").textContent, ROOM_VOICES_WORDS.none);
+  assert.equal(c.card.querySelector("[data-room-voices-words]").textContent, ROOM_VOICES_WORDS.none.record, "the record's empty page: nothing recorded");
+});
+
+// ── (8) what the lines were read from (Facet's return review of 8148db13, Finding 1) ──
+// Office #1229's MEMORY path is a valid source: it keeps only the last voices it heard, and may say `complete: true` within that memory. The page must
+// never pass that memory off as the room's whole history; only the record's page reads as the room's.
+
+const sourced = (body, { page: pageSource, find: findSource }) => {
+  const f = { ...body.find };
+  if (findSource === undefined) delete f.source; else f.source = findSource;
+  if (f.voices_page) { f.voices_page = { ...f.voices_page }; if (pageSource === undefined) delete f.voices_page.source; else f.voices_page.source = pageSource; }
+  return { ...body, find: f };
+};
+const drawn = async (body) => {
+  const doc = makeDoc(), c = cardOf(doc);
+  const o = office([body]);
+  await drawRoomVoices({ doc, card: c.card, reader: c.reader, roomId: ROOM, base: BASE, fetchImpl: o.fetchImpl });
+  const box = c.card.querySelector("[data-room-voices-page]");
+  return { card: c.card, box, words: c.card.querySelector("[data-room-voices-words]").textContent, shown: !box.hidden };
+};
+
+test("SOURCE: the page's own source is kept, else the answer's; neither is unknown, never assumed the record", () => {
+  const body = answer(OLD, page(OLD));
+  assert.equal(voicesOf(sourced(body, { page: "memory", find: "record" })).source, "memory", "the page's own word first");
+  assert.equal(voicesOf(sourced(body, { page: undefined, find: "memory" })).source, "memory", "else the answer's");
+  assert.equal(voicesOf(sourced(body, { page: undefined, find: undefined })).source, null);
+  assert.equal(voicesOf(sourced(body, { page: " ", find: 7 })).source, null, "nothing that is not a word is taken for one");
+  assert.equal(voicesOf(sourced(answer(OLD, null), { find: "memory" })).source, "memory", "lines with no page still say what they were read from");
+});
+
+test("FALSIFIER: a MEMORY page that says complete:true, with no earlier cursor, still says it is the office's memory and not the whole room", async () => {
+  for (const s of [{ page: "memory", find: "memory" }, { page: undefined, find: "memory" }]) {
+    const r = await drawn(sourced(answer(MODERN, page(MODERN, { complete: true })), s));
+    assert.equal(r.shown, true, "the note is shown");
+    assert.equal(r.words, ROOM_VOICES_WORDS.memory);
+    assert.match(r.words, /memory .* keeps only the last things it heard, so this room may hold more than is shown here\./);
+    assert.equal(r.card.querySelector("[data-room-voices-more]"), null, "no control is invented");
+    assert.equal(rowsOf(r.card).length, 2, "the lines are drawn as served");
+  }
+});
+
+test("MEMORY partial and empty: the count is the memory's, never 'this room holds'; empty memory never says nothing is recorded", async () => {
+  const first = [MODERN[3]];
+  const part = await drawn(sourced(answer(first, page(first, { total: 4, served: 1, complete: false, earlier: { remaining: 3, before_ms: MODERN[3].at_ms, before: MODERN[3].at } })), { page: "memory", find: "memory" }));
+  assert.equal(part.words, "This office's memory holds 4 statements from this room. The newest 1 are shown below in full; the 3 said before them are not shown yet. " + ROOM_VOICES_WORDS.memory);
+  assert.equal(/This room holds/.test(part.words), false);
+  assert.ok(part.card.querySelector("[data-room-voices-more]"), "the served cursor is still offered");
+  const empty = await drawn(sourced(answer([], page([])), { page: "memory", find: "memory" }));
+  assert.equal(empty.words, ROOM_VOICES_WORDS.none.memory);
+  assert.equal(/recorded/.test(empty.words), false);
+});
+
+test("UNKNOWN coverage: a page that names no source says so, complete, partial or empty; it is never read as the record", async () => {
+  const none = { page: undefined, find: undefined };
+  const whole = await drawn(sourced(answer(MODERN, page(MODERN)), none));
+  assert.equal(whole.shown, true); assert.equal(whole.words, ROOM_VOICES_WORDS.unknown);
+  const other = await drawn(sourced(answer(MODERN, page(MODERN)), { page: "cache", find: "cache" }));
+  assert.equal(other.words, ROOM_VOICES_WORDS.unknown, "a source this site does not know is not the record");
+  const first = [MODERN[3]];
+  const part = await drawn(sourced(answer(first, page(first, { total: 4, served: 1, complete: false, earlier: { remaining: 3, before_ms: MODERN[3].at_ms, before: MODERN[3].at } })), none));
+  assert.equal(part.words, `This answer counts 4 statements in this room. ${ROOM_VOICES_WORDS.earlier(1, 3)} ${ROOM_VOICES_WORDS.unknown}`);
+  const empty = await drawn(sourced(answer([], page([])), none));
+  assert.equal(empty.words, ROOM_VOICES_WORDS.none.unknown);
+  const unpaged = await drawn(sourced(answer(OLD, null), { find: undefined }));
+  assert.equal(unpaged.words, ROOM_VOICES_WORDS.unsaid, "no page and no source: the one honest line, not two");
+});
+
+test("RECORD unchanged: a whole record page says nothing more; lines with no page from memory say both things", async () => {
+  const whole = await drawn(answer(MODERN, page(MODERN)));
+  assert.equal(whole.shown, false); assert.equal(whole.words, "");
+  const fromFind = await drawn(sourced(answer(MODERN, page(MODERN)), { page: undefined, find: "record" }));
+  assert.equal(fromFind.shown, false, "the answer's own `record` when the page names none");
+  const unpaged = await drawn(sourced(answer(OLD, null), { find: "memory" }));
+  assert.equal(unpaged.words, `${ROOM_VOICES_WORDS.unsaid} ${ROOM_VOICES_WORDS.memory}`);
+});
+
+test("CONTINUATION: earlier lines read from memory make a record pane say so; a record continuation keeps the record's words", async () => {
+  const first = [MODERN[2], MODERN[3]];
+  const firstPage = page(first, { total: 4, served: 2, complete: false, earlier: { remaining: 2, before_ms: MODERN[2].at_ms, before: MODERN[2].at } });
+  const second = [MODERN[0], MODERN[1]];
+  for (const [src, want] of [["memory", ROOM_VOICES_WORDS.memory], ["record", ""]]) {
+    const doc = makeDoc(), c = cardOf(doc);
+    const o = office([answer(first, firstPage), sourced(answer(second, page(second, { total: 4, later_not_served: 2 })), { page: src, find: src })]);
+    await drawRoomVoices({ doc, card: c.card, reader: c.reader, roomId: ROOM, base: BASE, fetchImpl: o.fetchImpl });
+    await press(c.card.querySelector("[data-room-voices-more]"));
+    assert.equal(c.card.__t.voices.length, 4);
+    // the continuation's own "later" count is the lines already shown (its cursor's doing), so it is not said again
+    assert.equal(c.card.querySelector("[data-room-voices-words]").textContent, want);
+  }
 });
 
 // ── (7) the Conversations page and the event page's binding ──
