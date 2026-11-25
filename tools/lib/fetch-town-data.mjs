@@ -5,6 +5,7 @@ import { readFileSync, readdirSync, existsSync, writeFileSync, renameSync, mkdir
 import { join, dirname } from "node:path";
 import { buildThreads, normalizeProfile, parseFrontmatter, readResidentProfiles } from "./town.mjs";
 import { publicRegistry } from "./public-registry.mjs";
+import { residentsOnly } from "../../src/lib/non-residents.mjs";
 import { joinSnapshots, mergeArchive, mergeEvidence, pickEvidenceWork, stampHeld, wantsEvidence } from "../../src/lib/event-archive.mjs";
 import { readEventsArchive, writeEventsArchive } from "./events-archive-state.mjs";
 
@@ -801,7 +802,9 @@ export async function buildOfficeData({
     apiGet("/bulletin", { apiBase, fetchImpl, retries, gate }),
   ]);
 
-  const residentHandles = rollRes.roll.map((r) => r.handle).sort();
+  // THE PEN IS NOT A RESIDENT (CORE-187, src/lib/non-residents.mjs): an office whose roll still names it does not put it in the roll the build walks, so it has no card read, no
+  // row in residents.json, no count and no page. Every other row, the real meeps and the Registrar included, is the roll's as it was.
+  const residentHandles = residentsOnly(rollRes.roll).map((r) => r.handle).sort();
   // WHICH ROUTE BUILT THE ROLL, in the build log — the same discipline the
   // letter corpus keeps below. A deploy that silently stopped paging is then
   // visible in the log rather than only in a resident-page count nobody is
@@ -951,7 +954,8 @@ export async function buildOfficeData({
   // `profile` half was taken; the held-over row below needs the row itself, and
   // reading the same file twice for two halves of it is how the two halves
   // start disagreeing.
-  const snapshotResidents = ensureArray(readSnapshot("residents.json", []), "snapshot residents.json");
+  // (the Pen is not a resident, so an older snapshot that still carries its row never lends it back: CORE-187)
+  const snapshotResidents = residentsOnly(ensureArray(readSnapshot("residents.json", []), "snapshot residents.json"));
   const snapshotRowByHandle = new Map(snapshotResidents.map((r) => [r.handle, r]));
   const profileByHandle = new Map(snapshotResidents.map((r) => [r.handle, r.profile ?? {}]));
   if (townRoot) {

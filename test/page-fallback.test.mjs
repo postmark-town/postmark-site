@@ -12,6 +12,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { whereIs, checkPage, WORDS, WHERE_TO_GO } from "../src/lib/page-fallback.mjs";
 import { housePath } from "../src/lib/houses.mjs";
@@ -82,6 +83,39 @@ test("an identity the office does not know is unknown, for a resident and for a 
   // control: the same stub does know the others, so "unknown" above is an answer and not a stub that refuses everything
   assert.equal((await checkPage(whereIs("/residents/ada-test/"), office({ residents: { "ada-test": "Ada" } }))).state, "waiting");
   assert.equal((await checkPage(whereIs("/households/fox-hearth/"), office())).state, "waiting");
+});
+
+// ── THE PEN IS NOT A RESIDENT (CORE-187): its page is deliberately never built, so it is never "on its way" ─────────────────────────────────────────────────
+
+test("a known NON-RESIDENT is `other`, never waiting, even with an office that answers its card 200; the office is not asked; real meeps and residents are unchanged", async () => {
+  // a FENCED office that WOULD answer the Pen 200 (its card), and counts what it is asked
+  const asked = [];
+  const base = office({ residents: { "postmark-pen": "Postmark Pen", "ada-test": "Ada Test", architect: "The Architect", bugcatcher: "Bug Catcher", registrar: "The Registrar" } });
+  const fenced = async (url) => { asked.push(String(url)); return base(url); };
+  for (const path of ["/residents/postmark-pen/", "/residents/postmark-pen", "/residents/Postmark-Pen/", "/residents/POSTMARK-PEN"]) {
+    const where = whereIs(path);
+    assert.deepEqual(where, { kind: "other" }, `${path}: not a resident's missing page`);
+    const r = await checkPage(where, fenced);
+    assert.deepEqual(r, { state: "other" }, `${path}: the existing absent state, no 'on its way', no record link`);
+    assert.notEqual(r.state, "waiting");
+  }
+  // a caller that hands the resident in by hand (an accepted form) gets the same answer, and the office is still not asked
+  for (const handle of ["postmark-pen", "Postmark-Pen"]) assert.deepEqual(await checkPage({ kind: "resident", handle }, fenced), { state: "other" });
+  assert.deepEqual(asked, [], "the office was never asked about the Pen");
+  // the words of that state are the existing absent words: no promise of a build, no resident record
+  assert.equal(JSON.stringify(WORDS.other).includes("on its way"), false);
+  // POSITIVE: an ordinary resident and the real meeps with no page built are still waiting, as before
+  for (const [h, name] of [["ada-test", "Ada Test"], ["architect", "The Architect"], ["bugcatcher", "Bug Catcher"], ["registrar", "The Registrar"]]) {
+    assert.deepEqual(await checkPage(whereIs(`/residents/${h}/`), fenced), { state: "waiting", kind: "resident", handle: h, name }, h);
+  }
+  assert.equal(asked.length, 4, "and each of those asked the office once");
+  // UNKNOWN and UNCHECKED handling is untouched; an exact handle, not a prefix
+  assert.deepEqual(await checkPage(whereIs("/residents/nobody-test/"), office({})), { state: "unknown", kind: "resident" });
+  assert.equal((await checkPage(whereIs("/residents/ada-test/"), async () => json(503, {}))).state, "unchecked");
+  assert.deepEqual(whereIs("/residents/postmark-pen-fan/"), { kind: "resident", handle: "postmark-pen-fan" });
+  // the 404 page's own script reads `other` as the baked floor, with no check
+  const page = readFileSync(new URL("../town/pages/404.astro", import.meta.url), "utf8");
+  assert.match(page, /if \(where\.kind === "other"\) \{ show\("other", WORDS\.other\);/);
 });
 
 test("any other missing path is `other`, and the office is not asked", async () => {

@@ -17,9 +17,10 @@ import { excerpt } from "@/lib/pm.mjs";
 import media from "@/data/postmark/media.json";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { residentPreview } from "@/lib/og-image.mjs";
+import { residentsOnly } from "@/lib/non-residents.mjs";
 
 export function getStaticPaths() {
-  return residents.map((r) => ({ params: { handle: r.handle }, props: { resident: r } }));
+  return residentsOnly(residents).map((r) => ({ params: { handle: r.handle }, props: { resident: r } }));   // the Pen is not a resident (CORE-187)
 }
 
 const { resident: r } = Astro.props;

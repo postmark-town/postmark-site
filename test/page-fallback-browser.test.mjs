@@ -286,6 +286,27 @@ test("a registered household, with no page built: 'on its way' by its name; a re
 
 // ── unknown: only when the office answered no ─────────────────────────────────────────────────────────────────
 
+// the Pen is not a resident (CORE-187): its page is deliberately never built, so it is never "on its way"
+test("the Pen's address, with an office that WOULD answer its card 200: 'isn't here', never 'on its way', no record link, the office not asked; a real meep stays 'on its way'", async () => {
+  if (SKIP) return;
+  await boot();
+  const p = await openPage(browser, base, "/residents/postmark-pen/", { office: officeKnowing({ "postmark-pen": "Postmark Pen", architect: "The Architect" }) });
+  try {
+    await waitState(p, "other");
+    const v = await p.evalJs(VIEW);
+    assert.equal(p.docStatus, 404, "still the server's real 404");
+    assert.equal(v.title, "That page isn't here");
+    assert.doesNotMatch(`${v.title} ${v.lead}`, /on its way|Postmark Pen/i, "no promise of a build and no resident named");
+    assert.equal(v.recordShown, false, "no resident-record link");
+    assert.deepEqual(p.asked, [], "the office was never asked about the Pen");
+  } finally { await p.close(); }
+  const m = await openPage(browser, base, "/residents/architect/", { office: officeKnowing({ architect: "The Architect" }) });
+  try {
+    await waitState(m, "waiting");
+    assert.equal((await m.evalJs(VIEW)).title, "The Architect's page is on its way", "a real meep with no page built is unchanged");
+  } finally { await m.close(); }
+});
+
 test("an identity the office does not know is 'isn't here', never 'on its way' (resident and household)", async () => {
   if (SKIP) return;
   await boot();

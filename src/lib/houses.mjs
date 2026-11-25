@@ -11,6 +11,8 @@
 import { ENTRY_ID } from "./hearth/slots.mjs";
 // the human's chosen profile, three public fields (pure)
 import { publicHumanProfile } from "./human-profile.mjs";
+// who is never a resident (the Pen, CORE-187)
+import { residentHandlesOnly, residentsOnly } from "./non-residents.mjs";
 
 // "the-rookery" → "The Rookery"; "mads-and-dylan" → "Mads and Dylan";
 // "cadaeic.space" → "cadaeic.space" (a slug that carries a dot is already a
@@ -95,13 +97,15 @@ export function nameplate(house) {
 // town→site, so a join lands the registry first: the arriving tab appears on
 // the next extract and the member's whole page on the one after. A tab still
 // has to have a page behind it, so arriving handles are never members.
-export function buildHouses(residents, registry) {
+export function buildHouses(allResidents, registry) {
+  // THE PEN IS NOT A RESIDENT (CORE-187): never a member, never arriving, never a house of its own, whatever an older roll or registry still says
+  const residents = residentsOnly(allResidents);
   const byHandle = new Map(residents.map((r) => [r.handle, r]));
   const houseOf = new Map();   // handle -> house
   const bySlug = new Map();    // slug   -> house
 
   for (const [slug, dec] of Object.entries(registry?.households ?? {})) {
-    const declared = dec.residents ?? [];
+    const declared = residentHandlesOnly(dec.residents ?? []);
     const members = declared.filter((h) => byHandle.has(h));
     // a house with nobody ashore yet has no page to hang a tab on
     if (!members.length) continue;

@@ -18,10 +18,20 @@
 // the registry itself, and from every row whether `households` is a map of rows
 // (the office's shape) or an array of them, and a row that is not an object (it
 // can carry no key) is left as it is.
+//
+// THE PEN IS NOT A RESIDENT (CORE-187, src/lib/non-residents.mjs): the registry names the Pen among the-town's `residents`, and a registry row's member list is resident
+// population, so the one handle is dropped from each row's `residents` array. It is the only member change; every other member, key and row stays as the office served it.
+import { residentHandlesOnly } from "../../src/lib/non-residents.mjs";
+
 export const PRIVATE_HOUSE_KEYS = Object.freeze(["human"]);
 
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
-const dropPrivate = (v) => (isObject(v) ? Object.fromEntries(Object.entries(v).filter(([key]) => !PRIVATE_HOUSE_KEYS.includes(key))) : v);
+const dropPrivate = (v) => {
+  if (!isObject(v)) return v;
+  const row = Object.fromEntries(Object.entries(v).filter(([key]) => !PRIVATE_HOUSE_KEYS.includes(key)));
+  if (Array.isArray(row.residents)) row.residents = residentHandlesOnly(row.residents);
+  return row;
+};
 
 export function publicRegistry(registry) {
   if (!isObject(registry)) return registry;
