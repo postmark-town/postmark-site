@@ -40,6 +40,7 @@ function node(tag) {
     addEventListener(ev, fn) { this.listeners[ev] = fn; },
     scrollIntoView() { this.scrolled = true; },
     querySelector(sel) { return find(this, sel); },
+    querySelectorAll() { return []; },
   };
   Object.defineProperty(n, "className", { get() { return [...n.classList.set].join(" "); }, set(v) { n.classList.set = new Set(String(v).split(/\s+/).filter(Boolean)); } });
   return n;
@@ -62,7 +63,7 @@ function world({ hash = "", cards = [], office }) {
   const location = { hash };
   const document = {
     querySelector: (s) => (s === "[data-selected]" ? selBox : s === "[data-say]" ? sayEl : s === ".c-head h1" ? h1El : null),
-    createElement: node, createComment: (t) => ({ comment: t, parentNode: null }),
+    createElement: node, createComment: (t) => ({ comment: t, parentNode: null }), createTextNode: (t) => { const n = node("#text"); n.textContent = String(t); return n; },
     documentElement: { classList: node("html").classList },
     dispatchEvent: (e) => events.push(e.type), getElementById: (id) => byId.get(id) ?? null,
   };
@@ -72,10 +73,11 @@ function world({ hash = "", cards = [], office }) {
   const hook = () => ({ mount: (host, roomId, opts) => { mounts.push({ roomId, opts }); const reader = { refreshed: 0, refresh() { this.refreshed++; }, destroy() { this.destroyed = true; } }; readers.push(reader); return Promise.resolve({ ok: true, reader }); } });
   const faceForSpeaker = () => null;
   let anchored = false, ticks = 0;
-  const run = new Function("document", "location", "history", "fetch", "API", "hook", "faceForSpeaker", "wireReaders", "liveBox", "closedBox", "tick", "CustomEvent", "anchored",
+  const run = new Function("document", "location", "history", "fetch", "API", "hook", "faceForSpeaker", "wireReaders", "liveBox", "closedBox", "tick", "CustomEvent", "anchored", "poller",
     `${EL}\n${BLOCK}\nreturn { syncSelected, anchorFromHash, selectedHash, refreshSelected, get selected() { return selected; }, followSelected };`);
   class CE { constructor(type) { this.type = type; } }
-  const api = run(document, location, history, fetch, API, hook, faceForSpeaker, () => {}, node("div"), node("div"), () => { ticks++; }, CE, anchored);
+  const poller = { state: () => ({ fails: 0 }) };
+  const api = run(document, location, history, fetch, API, hook, faceForSpeaker, () => {}, node("div"), node("div"), () => { ticks++; }, CE, anchored, poller);
   return { api, location, selBox, h1El, byId, asked, mounts, pushed, events, readers };
 }
 const flush = async () => { for (let i = 0; i < 8; i++) await new Promise((r) => setImmediate(r)); };
@@ -108,6 +110,7 @@ test("FALSIFIER: a historical room on NO list page, asked under a spelling the o
   assert.equal(w.mounts.length, 1);
   assert.equal(w.mounts[0].roomId, CANON, "the shared reader is mounted on the canonical room");
   assert.equal(w.mounts[0].opts.circle, null, "on its room, not a circle");
+  assert.equal(w.mounts[0].opts.primed?.find?.room?.id, CANON, "the reader is handed the named answer the page already holds (CORE-156's one ask on arrival)");
   assert.equal(typeof w.mounts[0].opts.faceForSpeaker, "function"); assert.equal(typeof w.mounts[0].opts.onNavigate, "function");
   assert.equal("hostOwnsHeader" in w.mounts[0].opts, false, "the reader keeps its own room header (the canonical one), as for a circle");
   assert.equal(w.selBox.hidden, false); assert.equal(w.h1El.textContent, "One conversation");
@@ -160,6 +163,43 @@ test("UNCHANGED: a #circle- link, a bare #<id> card anchor, an id the lists don'
   assert.deepEqual(m.pushed, ["#circle-7"]); assert.equal(m.api.selected.cid, "7");
   m.api.syncSelected(); await flush();
   assert.equal(m.mounts.length, 1, "no remount: the view on screen is the address");
+});
+
+// ── the page's door (module script), run over fakes: what the reader is given to read with ──
+const d0 = page.indexOf("    window.__pmCircleReaders = {"), d1 = page.indexOf("\n    };\n", d0);
+assert.ok(d0 > -1 && d1 > d0, "the page still carries its circle-reader door");
+const DOOR = page.slice(d0, d1 + "\n    };\n".length);
+function door() {
+  const officeAsked = [], mounted = [];
+  const office = { room: async (id) => { officeAsked.push(["room", id]); return { find: { room: { id } } }; }, circle: async (id, after) => { officeAsked.push(["circle", id, after]); return { find: { circle_read: { says: 1 } } }; } };
+  const win = {};
+  new Function("window", "officeSource", "mountRoom", "tokenIsFresh", "__getTok", "OFFICE_BASE", "document", "CustomEvent", DOOR)(
+    win, () => office, async (o) => { mounted.push(o); return { ok: true, reader: {} }; }, () => false, () => null, "/api", { dispatchEvent() {} }, class {});
+  return { mount: win.__pmCircleReaders.mount, officeAsked, mounted };
+}
+
+test("THE DOOR: a #room- view's reader reads its room first from the named answer the page holds (spent once), through the ONE setup; a circle's priming is unchanged", async () => {
+  const answer = { find: { room: { id: CANON, place: "The Old Quay (invented)" } } };
+  const d = door();
+  await d.mount({}, CANON, { primed: answer, faceForSpeaker: () => null });
+  const src = d.mounted[0].source;
+  assert.equal(d.mounted[0].roomId, CANON); assert.equal(d.mounted[0].circle, null);
+  assert.equal(await src.room(CANON), answer, "the first read of exactly that room is the answer already held");
+  assert.deepEqual(d.officeAsked, [], "so the office is not asked again on arrival");
+  await src.room(CANON);
+  assert.deepEqual(d.officeAsked, [["room", CANON]], "spent once: a later read (a refresh) asks the office");
+  // an answer under another room's header is never handed to this room
+  const other = door(); await other.mount({}, CANON, { primed: { find: { room: { id: "t-someone-else-test" } } } });
+  await other.mounted[0].source.room(CANON); assert.deepEqual(other.officeAsked, [["room", CANON]]);
+  // a circle view: its room is read from the office as before, and its circle from the primed answer, the page told of each circle read (CORE-156, unchanged)
+  const told = [];
+  const c = door(); const circleAnswer = { find: { room: { id: "t-circle-room-test" }, circle_read: { says: 3 } } };
+  await c.mount({}, "t-circle-room-test", { circle: "42", primed: circleAnswer, onCircleRead: (id, first) => told.push([id, first]) });
+  assert.equal(await c.mounted[0].source.circle("42"), circleAnswer); assert.deepEqual(c.officeAsked, []);
+  await c.mounted[0].source.room("t-circle-room-test"); assert.deepEqual(c.officeAsked, [["room", "t-circle-room-test"]], "a circle's priming is not a room's");
+  assert.deepEqual(told, [["42", true]]);
+  // no priming at all: the plain office reads
+  const bare = door(); await bare.mount({}, "t-x-test", {}); await bare.mounted[0].source.room("t-x-test"); assert.deepEqual(bare.officeAsked, [["room", "t-x-test"]]);
 });
 
 test("PRODUCTION BINDING: the event page's whole-talk link is the address this page opens, for any opaque id, and the lists' anchors are untouched", () => {

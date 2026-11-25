@@ -13,9 +13,14 @@
 // extensions) and answers every /api/* request itself with INVENTED answers (the CORE-70 worked example, test/fixtures/circles.sample.json,
 // "invented speech"); the live office is never read. THE READER is served from CORE82_WORLD_READER (a file path), else the pinned
 // postmark-world package (node_modules/postmark-world/spectator/circle-reader.mjs), else it is NOT served (404): a pinned World that predates it.
-// No test skips. Each behaviour is asserted for whichever world it runs in: with the reader, the circles; always (with the reader withheld on
-// purpose, whether or not the real one exists) the honest floor: today's flat transcript, said to be the floor, never an empty room.
+// No test skips. Each behaviour is asserted for whichever world it runs in: with the reader, the one-conversation view (a #circle- link) and a long
+// room's fallback; always (with the reader withheld on purpose, whether or not the real one exists) READING A ROOM, which needs no reader.
 // A Chrome that cannot be found FAILS the file (a skipped render is not a passed one).
+//
+// READING A ROOM (CORE-156; Darko 2026-11-22, of three versions: "Let's go with B"): a card's room is drawn by the PAGE from the lines its own read
+// carries (each line's `id` and `reply_to`, as the office serves them): every opening message whole, its replies behind one button that opens the whole
+// circle in place. The "B ·" tests below hold it, and that none of it asks the office for anything. Until then every card mounted the World's reader.
+// Each B test's guarded line has been removed in a COPY of the page and the test seen red (CORE156_PAGE; the PR lists the flips).
 
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
@@ -27,7 +32,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const PAGE_SRC = readFileSync(join(ROOT, "town/pages/conversations/index.astro"), "utf8");
+// CORE-156: the page is read with LF line ends (a Windows checkout under core.autocrlf holds CRLF, and the slices below are cut at "\n", so the file
+// could not even load there); CORE156_PAGE points a run at a COPY of the page (a flip is made on a copy, never in the tree)
+const PAGE_SRC = readFileSync(process.env.CORE156_PAGE || join(ROOT, "town/pages/conversations/index.astro"), "utf8").replace(/\r\n/g, "\n");
 const FX = JSON.parse(readFileSync(join(ROOT, "test/fixtures/circles.sample.json"), "utf8"));
 
 // ── the harness page, read out of the real one ──────────────────────────────────────────────────────────────────────────
@@ -36,6 +43,7 @@ const between = (s, a, b, from = 0) => { const i = s.indexOf(a, from); const j =
 const MAIN = between(PAGE_SRC, '<main class="pm-wrap convo">', "</main>");
 const INLINE = between(PAGE_SRC, "<script is:inline>", "</script>");
 const MODULE = between(PAGE_SRC, "\n  <script>\n", "</script>", PAGE_SRC.indexOf("</script>", PAGE_SRC.indexOf("<script is:inline>")));
+const STYLE = between(PAGE_SRC, "<style is:global>", "</style>");     // CORE-156: the page's own stylesheet, for the tests that measure the drawing (openPage's `styled`)
 const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>harness</title></head><body class="pm convo">
 <main class="pm-wrap convo">${MAIN}</main>
 <script>${INLINE}</script>
@@ -123,7 +131,9 @@ async function launch(chrome, { startMs = 20_000 } = {}) {
       try { ws.close(); } catch { /* gone */ }
       try { process.kill(-child.pid, "SIGKILL"); } catch { try { child.kill("SIGKILL"); } catch { /* gone */ } }
       try { child.stderr.destroy(); } catch { /* gone */ }
-      rmSync(profile, { recursive: true, force: true });
+      // CORE-156: Windows holds the profile for a moment after the kill (EPERM); a throw here used to skip closing the servers, and the file never exited.
+      // The folder is this run's own mkdtemp: retried, and a leftover temp folder is not a failed test.
+      try { rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 150 }); } catch { /* left in the temp dir */ }
     },
   };
 }
@@ -136,7 +146,8 @@ async function openPage(b, base, { hash = "", office, signedIn = false, width = 
   await S("Page.enable"); await S("Runtime.enable");
   await S("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
   if (signedIn) await S("Page.addScriptToEvaluateOnNewDocument", { source: `localStorage.setItem("pm.oauth.token", JSON.stringify({ access_token: "invented-token", obtained: Date.now(), expires_in: 3600 })); window.__pwned = 0;` });
-  else await S("Page.addScriptToEvaluateOnNewDocument", { source: "window.__pwned = 0;" });
+  // CORE-156: a visitor is really signed out. The pages of one run share a browser profile, so a token an earlier signed-in page left for this origin is removed.
+  else await S("Page.addScriptToEvaluateOnNewDocument", { source: `try { localStorage.removeItem("pm.oauth.token"); } catch (e) { /* about:blank has none */ } window.__pwned = 0;` });
   await S("Fetch.enable", { patterns: [{ urlPattern: "*/api/*", requestStage: "Request" }] });
   const calls = [];
   const listener = (m) => {
@@ -162,7 +173,13 @@ async function openPage(b, base, { hash = "", office, signedIn = false, width = 
     throw new Error(`timed out waiting for ${what}`);
   };
   const tick = () => evalJs(`document.dispatchEvent(new CustomEvent("pm:spoke")); true`);      // the page's own "ask for a repaint now"
-  return { evalJs, until, calls, tick, close: async () => { b.listeners.splice(b.listeners.indexOf(listener), 1); await b.send("Target.closeTarget", { targetId }).catch(() => {}); } };
+  // CORE-156: `tick` is the reader's OWN say (pm:spoke), and a reply that lands on that paint is shown at once. `poll` is an ordinary ask of the list (the
+  // page's hashchange path, the same tick the 7 s timer makes), with nobody having spoken: new replies wait behind "N new".
+  let polls = 0;
+  const poll = () => evalJs(`history.replaceState(null, "", "#poll-${++polls}"); window.dispatchEvent(new HashChangeEvent("hashchange")); true`);
+  // the harness page carries no stylesheet; a test that measures what is DRAWN (a message uncut, a row inside its pane) adds the page's own, read out of the source
+  const styled = () => evalJs(`(() => { const s = document.createElement("style"); s.textContent = ${JSON.stringify(STYLE)}; document.head.appendChild(s); document.body.style.margin = "0"; return true; })()`);
+  return { evalJs, until, calls, tick, poll, styled, close: async () => { b.listeners.splice(b.listeners.indexOf(listener), 1); await b.send("Target.closeTarget", { targetId }).catch(() => {}); } };
 }
 
 // ── the invented office (the CORE-70 worked example; INVENTED speech) ──────────────────────────────────────────────────────
@@ -170,7 +187,9 @@ async function openPage(b, base, { hash = "", office, signedIn = false, width = 
 const ROOM = "t1794686460000-pica";
 const ROOM_B = "t1794690000000-noe";
 const FLAT = FX.views.flat_lines;                                   // 14 says, 7 speakers
-const voicesOf = (lines = FLAT) => lines.map((l) => ({ handle: l.handle, standing: l.standing, said: l.said, at: l.at, at_ms: l.at_ms, ...(l.id ? { id: l.id } : {}) }));
+// a thread's `voices` as the office serves them since POS-1035 (office src/circles.mjs `sayLine`): the flat line, plus each line's own `id`, the `reply_to` it
+// answers and its top `circle`. (Until CORE-156 this helper dropped `reply_to` and `circle`: the page did not read them then; it draws the room from them now.)
+const voicesOf = (lines = FLAT) => lines.map((l) => ({ handle: l.handle, standing: l.standing, said: l.said, at: l.at, at_ms: l.at_ms, ...(l.id ? { id: l.id } : {}), ...(l.reply_to ? { reply_to: l.reply_to } : {}), ...(l.circle ? { circle: l.circle } : {}) }));
 const thread = (over = {}) => ({
   id: ROOM, live: true, place: "Cave Interior", at: { x: 0, y: 0 }, started: "2026-11-14T20:01:00.000Z", latest: "2026-11-14T20:14:00.000Z",
   voice_count: 14, participants: [...new Set(FLAT.map((l) => l.handle))], voices: voicesOf(), ...over,
@@ -196,6 +215,7 @@ function makeOffice(state) {
     if ((m = /^\/world\/conversations\?circle=(\d+)(?:&after=(\d+))?$/.exec(path))) {
       if (state.circleRoom) return { status: 200, body: { now: 1, find: { circle: Number(m[1]), history: "complete", source: "record", room: roomHeader(state.circleRoom), circle_read: { circle: Number(m[1]), path: [Number(m[1])], says: 1, people: 1, lines: [], next: null, complete: true, budget: { bytes: 8192, used: 1 } }, sparks: null } } };
       const page = circlePage(m[2] ? 2 : 1);
+      if (state.circleSays) page.find.circle_read.says = state.circleSays;      // CORE-156: the office's own count of the circle, when a test lets it grow
       // CORE-117: `echoCircle` makes the invented office answer a DIFFERENT circle id as itself (same invented lines), so a reader that navigates to another circle
       // in the one view reads what it asked for, not a page that names circle 50101
       if (state.echoCircle) { const id = Number(m[1]); page.find.circle = id; page.find.circle_read.circle = id; page.find.circle_read.path = [id]; }
@@ -233,27 +253,511 @@ const CARD = `document.querySelector('[data-thread="${ROOM}"]')`;
 const SELECTED = `document.querySelector("[data-selected-card]")`;          // CORE-117: the page's one-conversation view (a #circle-<id> link)
 const SELECTED_READY = `(() => { const c = ${SELECTED}; const r = c && c.querySelector("[data-circle-reader]"); return !!r && r.dataset.state === "circle"; })()`;
 const READY = (extra = "") => `(() => { const c = ${CARD}; return !!c ${extra}; })()`;
-const MOUNTED = `(() => { const c = ${CARD}; return !!c && !!c.querySelector("[data-circle-reader]") && c.querySelector("[data-circle-reader]").dataset.state !== "loading"; })()`;
-const FLAT_SHOWN = `(() => { const c = ${CARD}; const l = c && c.querySelector(".c-voices"); return !!l && !l.hidden && l.children.length > 0; })()`;
-const FLAT_NOTE = `(() => { const n = ${CARD}?.querySelector("[data-circles-note]"); return n && !n.hidden ? n.textContent : null; })()`;
+// CORE-156: a card's room is drawn by the page itself. These read it the way a visitor does.
+const ROOM_SHOWN = `(() => { const c = ${CARD}; const l = c && c.querySelector(".c-voices"); return !!l && l.querySelectorAll(".c-voice").length > 0; })()`;
+const ROWS = `[...${CARD}.querySelectorAll(".c-voices .c-voice")]`;
+const SAYS = `${ROWS}.map((r) => Number(r.dataset.say))`;
+const FOLD = (id) => `${CARD}.querySelector('button.c-fold[data-fold="s${id}"]')`;      // the replies button (the circle on an open circle's line folds too: RING)
+const RING = (id) => `${CARD}.querySelector('ol.c-kids[data-circle] .c-ring[data-fold="s${id}"]')`;
+const press = (p, js) => p.evalJs(`(${js}).click(); true`);
+const findReads = (p) => p.calls.map((c) => c.path).filter((x) => /[?&](room|circle)=/.test(x));      // every read that names a room or a circle
+// the fixture room, as the office served it: who answers whom, and how deep each say sits
+const SERVED = Object.fromEntries(FLAT.map((l) => [l.id, l.reply_to ?? null]));
+const depthOf = (id, served = SERVED) => { let d = 0; for (let at = served[id]; at !== null && at !== undefined; at = served[at]) d += 1; return d; };
+const topCircleOf = (id) => { let at = id; while (SERVED[at] !== null && SERVED[at] !== undefined) at = SERVED[at]; return at; };
+const OPENERS = FLAT.filter((l) => !l.reply_to).map((l) => l.id);                       // 50101, 50107, 50114
+const under = (top) => FLAT.filter((l) => l.id !== top && topCircleOf(l.id) === top).map((l) => l.id);
+// what the page drew: for every reply on screen, the message its list hangs under, and how many lists deep it sits
+const DRAWN = `Object.fromEntries(${ROWS}.filter((r) => r.parentElement.matches("ol.c-kids")).map((r) => { const wrap = r.parentElement.parentElement; let d = 0; for (let n = r.parentElement; n && n.matches && !n.matches(".c-voices"); n = n.parentElement) if (n.matches("ol.c-kids")) d += 1; return [r.dataset.say, { under: wrap.previousElementSibling?.dataset.say ?? null, deep: d }]; }))`;
 
-// ── the honest floor: the reader withheld on purpose (a pinned World that predates it), in every environment ───────────────
+// ── READING A ROOM (CORE-156): Emily's words and Darko's pick ──────────────────────────────────────────────────────────────
+//
+// Emily, a Core Team human, 2026-11-22: "I see at most one unfinished line of everyone's chat. When I click on open … it goes to a whole new screen just to
+// read the original message … I have to click on "view replies" for every level of reply to read them." and "clicking on "1 New" item in a circle doesn't
+// actually open the reply." Darko, 17:38 EST: "Let's keep the circles and replies in, but try to keep the individual messages displayed similarly"; 17:47 EST,
+// of the three versions: "Let's go with B". B, in the mock-up's own words: "Every opening message in full. Its replies wait behind one button, and that
+// button opens the whole circle in place, every level at once."
 
-test("FLOOR: with no reader the card keeps TODAY'S flat transcript and SAYS it is the plain transcript; a hostile line is text, never markup", async () => {
-  const { b, base } = await boot(false);
-  const evil = `<img src=x onerror="window.__pwned=1"> & <b>bold</b>`;
-  const state = { live: [thread({ voices: voicesOf().map((v, i) => (i === 0 ? { ...v, said: evil } : v)) })] };
-  const p = await openPage(b, base, { office: makeOffice(state) });
+test("B · WHOLE: an opening message is drawn WHOLE (every word to its last, its line breaks kept, nothing clipped at phone width), as face and name, the words, the time; a hostile line is text", async () => {
+  const { b, base } = await boot(false);                 // the reader withheld on purpose: reading a room needs no reader at all
+  // real-shaped: the say's own limit is 500 characters (the office's text_max), so this is as long as an opening message gets
+  const LONG = `${"This opening message runs long, and every word of it has to be on the page. ".repeat(5).trim()}\nA second paragraph, after a line break, <b>bold</b> & <img src=x onerror="window.__pwned=1">, down to THE-LAST-WORD`;
+  assert.ok(LONG.length > 400 && LONG.length <= 500, `a real-shaped long say (${LONG.length} characters)`);
+  const state = { live: [thread({ voices: voicesOf().map((v) => (v.id === 50101 ? { ...v, said: LONG } : v)) })] };
+  const p = await openPage(b, base, { office: makeOffice(state), width: 390, height: 844 });
   try {
-    await p.until(FLAT_SHOWN, "the flat transcript");
-    await p.until(`(${FLAT_NOTE}) !== null`, "the note that this is the plain transcript");
-    assert.match(await p.evalJs(FLAT_NOTE), /the circle reader isn't available on this page/);
-    assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-voice").length`), 14, "every statement the poll holds is still there");
-    assert.equal(await p.evalJs(`${CARD}.querySelector("[data-circle-reader]")`), null, "no reader, so no reader and no empty room");
-    assert.equal(await p.evalJs(`${CARD}.querySelector(".c-voice .c-said").textContent`), evil, "the words, literally");
-    assert.equal(await p.evalJs(`${CARD}.querySelectorAll("img").length`), 0, "no element was made from a say");
+    await p.until(ROOM_SHOWN, "the room");
+    await p.styled();
+    const row = `${CARD}.querySelector('.c-voice[data-say="50101"]')`;
+    // LAW (Darko, 2026-11-22, B): "Every opening message in full."
+    assert.equal(await p.evalJs(`${row}.querySelector(".c-said").textContent`), LONG, "B: \"Every opening message in full\": the words on the page are the words served, all of them (not the 80-character opener, no ellipsis)");
+    assert.equal(await p.evalJs(`${row}.querySelector(".c-said").textContent.length`), LONG.length, "and it is NOT a cut of them");
+    const drawn = await p.evalJs(`(() => {
+      const said = ${row}.querySelector(".c-said"), cs = getComputedStyle(said), box = said.getBoundingClientRect();
+      const text = said.firstChild, last = document.createRange(); last.setStart(text, text.length - 1); last.setEnd(text, text.length);
+      const lr = last.getBoundingClientRect();
+      return { whiteSpace: cs.whiteSpace, textOverflow: cs.textOverflow, clamp: cs.webkitLineClamp, overflow: cs.overflow, lines: Math.round(box.height / parseFloat(cs.lineHeight)),
+        lastInside: lr.height > 0 && lr.bottom <= box.bottom + 1 && lr.right <= box.right + 1, wider: said.scrollWidth > said.clientWidth + 1, taller: said.scrollHeight > said.clientHeight + 1,
+        pageWide: document.documentElement.scrollWidth > window.innerWidth + 1 };
+    })()`);
+    assert.equal(drawn.whiteSpace, "pre-wrap", "wrapped, its own line breaks kept (never one line)");
+    assert.equal(drawn.textOverflow, "clip", "no ellipsis rule on the words");
+    assert.equal(drawn.clamp, "none", "no line clamp on the words");
+    assert.ok(drawn.lines >= 8, `the message takes the lines it needs at phone width (${drawn.lines}), not one`);
+    assert.equal(drawn.lastInside, true, "its LAST word is laid out inside the message's own box");
+    assert.deepEqual([drawn.wider, drawn.taller, drawn.pageWide], [false, false, false], "nothing of it is clipped, and the page does not scroll sideways on a phone");
+    // drawn the way this page always drew a line: face and name, the words, the time
+    const parts = await p.evalJs(`(() => { const r = ${row}; return { cls: r.className, who: r.querySelector(".c-voice-who .c-who")?.textContent, face: !!r.querySelector(".c-voice-who .c-face"), time: r.querySelector("time.c-ago")?.textContent, iso: r.querySelector("time.c-ago")?.getAttribute("datetime"), order: [...r.children].slice(0, 3).map((e) => e.className.split(" ")[0]) }; })()`);
+    assert.deepEqual(parts, { cls: "c-voice", who: "pica", face: true, time: "20:01Z", iso: "2026-11-14T20:01:00.000Z", order: ["c-voice-who", "c-said", "c-ago"] }, "the old row: who, what they said, when");
+    // every opening message is there, in the order they were said, and none of them is a reader's one-line stub
+    assert.deepEqual(await p.evalJs(SAYS), OPENERS, "the room's opening messages, in the order they started");
+    assert.equal(await p.evalJs(`${CARD}.querySelector("[data-circle-reader]")`), null, "no circle reader in the card, and none needed");
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll("[data-circles-note], [data-room-earlier]").length`), 0, "and no note: nothing is missing");
+    // speech is the most user-authored text on the site: it is text, never markup
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-said b, .c-said img").length`), 0, "no element was made from a say");
     assert.equal(await p.evalJs(`window.__pwned`), 0, "and nothing ran");
   } finally { await p.close(); }
+});
+
+test("B · COUNT: the one button under a message says how many replies its WHOLE circle holds (every level), and a message with no replies has no button", async () => {
+  const { b, base } = await boot(false);
+  const p = await openPage(b, base, { office: makeOffice({ live: [thread()] }) });
+  try {
+    await p.until(ROOM_SHOWN, "the room");
+    // derived from the served lines, never hand-copied: everything under each opener, however deep
+    const want = Object.fromEntries(OPENERS.map((id) => [id, under(id).length]));
+    assert.deepEqual(want, { 50101: 9, 50107: 2, 50114: 0 }, "control: the fixture's circles are 9, 2 and 0 replies deep");
+    const direct = FLAT.filter((l) => l.reply_to === 50101).length;
+    assert.equal(direct, 3, "control: only 3 of the 9 answer the opener directly, so a count of direct replies would read 3");
+    assert.deepEqual(await p.evalJs(`Object.fromEntries([...${CARD}.querySelectorAll("[data-fold]")].map((f) => [f.dataset.fold, f.textContent]))`), { s50101: "9 replies", s50107: "2 replies" },
+      "B: \"Its replies wait behind one button\": the count is the whole circle, every level, and it is NOT the 3 direct replies; the message with none has no button");
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll('[data-fold="s50114"]').length`), 0, "no button under a message nobody answered");
+    // each button sits directly under its own message, and starts folded
+    assert.deepEqual(await p.evalJs(`[...${CARD}.querySelectorAll("[data-fold]")].map((f) => [f.closest("li").previousElementSibling.dataset.say, f.getAttribute("aria-expanded")])`), [["50101", "false"], ["50107", "false"]]);
+    // one reply reads "1 reply"
+    const one = await openPage(b, base, { office: makeOffice({ live: [thread({ voices: voicesOf().filter((v) => [50107, 50108].includes(v.id)), voice_count: 2 })] }) });
+    try {
+      await one.until(ROOM_SHOWN, "the room");
+      assert.equal(await one.evalJs(`${FOLD(50107)}.textContent`), "1 reply");
+    } finally { await one.close(); }
+  } finally { await p.close(); }
+});
+
+test("B · OPEN AND FOLD: ONE press opens the whole circle in place, every level at once, each reply whole and under the message it answers; a second press folds it; the office is asked nothing", async () => {
+  const { b, base } = await boot(true);
+  const state = { live: [thread()], room: (id) => roomFind(id) };
+  const p = await openPage(b, base, { office: makeOffice(state) });
+  try {
+    await p.until(ROOM_SHOWN, "the room");
+    assert.deepEqual(await p.evalJs(SAYS), OPENERS, "folded: the opening messages only");
+    const callsBefore = p.calls.length;
+    await press(p, FOLD(50101));                         // ONE press
+    const circle = under(50101);
+    assert.deepEqual((await p.evalJs(SAYS)).sort(), [...OPENERS, ...circle].sort(), "B: \"that button opens the whole circle in place, every level at once\": all 9 replies after one press, and the other circle still folded");
+    assert.equal(await p.evalJs(`location.hash`), "", "in place: the reader is still in the room, not in another view");
+    assert.equal(await p.evalJs(`!!document.querySelector("[data-selected-card]")`), false);
+    // each reply sits under the message the office served it as a reply to, as deep as its ancestry
+    const drawn = await p.evalJs(DRAWN);
+    for (const id of circle) {
+      assert.equal(Number(drawn[id]?.under), SERVED[id], `say ${id} is drawn under say ${SERVED[id]}, the one it answers (the served reply_to)`);
+      assert.equal(drawn[id].deep, depthOf(id), `say ${id} sits ${depthOf(id)} level(s) in`);
+    }
+    assert.equal(Math.max(...circle.map((id) => drawn[id].deep)), 4, "every level: the deepest reply of this circle is four levels in, and it is on the page");
+    // each reply whole
+    const words = await p.evalJs(`Object.fromEntries(${ROWS}.map((r) => [r.dataset.say, r.querySelector(".c-said").textContent]))`);
+    for (const l of FLAT.filter((x) => circle.includes(x.id))) assert.equal(words[l.id], l.said, `reply ${l.id} is whole`);
+    assert.equal(await p.evalJs(`${FOLD(50101)}.getAttribute("aria-expanded")`), "true");
+    assert.equal(await p.evalJs(`!!document.getElementById(${FOLD(50101)}.getAttribute("aria-controls"))`), true, "the button names the list it opened");
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll("button.c-fold[data-fold]").length`), 2, "one button per circle: no reply inside the circle has a fold of its own");
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll("[data-thread-view], [data-thread-dot]").length`), 0, "no per-level 'View replies'");
+    // THE CIRCLE ON THE LINE (Darko, 2026-11-22 19:02 EST: "have the circle design of the expandable replies reincorporated in"): the open circle's own
+    // line carries one small circle, at its midpoint, as the World's reader drew it; the levels inside carry none (they open and fold with the circle)
+    await p.styled();
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll("ol.c-kids[data-circle] .c-ring").length`), 1, "the open circle's line carries its circle");
+    const ring = await p.evalJs(`(() => {
+      const list = document.getElementById(${FOLD(50101)}.getAttribute("aria-controls")), r = ${RING(50101)}, line = list.querySelector(".c-ring-line");
+      const lb = list.getBoundingClientRect(), rb = r.getBoundingClientRect(), cs = getComputedStyle(r), pill = getComputedStyle(${FOLD(50107)}, "::before");
+      return { rings: ${CARD}.querySelectorAll(".c-ring").length, lines: ${CARD}.querySelectorAll(".c-ring-line").length, onOpenCircle: r.closest("ol") === list, round: cs.borderRadius, square: Math.abs(rb.width - rb.height) < 1 && rb.width >= 12,
+        midway: Math.abs((rb.top + rb.height / 2) - (lb.top + lb.height / 2)) <= 2, atTheLeft: rb.left >= lb.left - 1 && rb.right <= list.querySelector(".c-voice").getBoundingClientRect().left + 1,
+        lineFull: Math.abs(line.getBoundingClientRect().height - lb.height) <= 1, hidden: r.closest("li").getAttribute("aria-hidden"), tab: [r.tabIndex, line.tabIndex], pillRing: [pill.content !== "none", pill.borderRadius] };
+    })()`);
+    assert.deepEqual(ring, { rings: 1, lines: 1, onOpenCircle: true, round: "50%", square: true, midway: true, atTheLeft: true, lineFull: true, hidden: "true", tab: [-1, -1], pillRing: [true, "50%"] },
+      "one circle on the open circle's line: round, at the line's midpoint, left of the replies; the line runs the circle's whole height; both are a pointer's convenience (the button is the control); and the folded button wears a small circle too");
+    // pressing the circle folds the WHOLE circle, as the button does; so does pressing the line
+    await press(p, RING(50101));
+    assert.deepEqual(await p.evalJs(SAYS), OPENERS, "the circle on the line folds the whole circle");
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-ring, .c-ring-line").length`), 0, "a folded circle has no line");
+    await press(p, FOLD(50101));
+    await press(p, `${CARD}.querySelector('ol.c-kids[data-circle] .c-ring-line')`);
+    assert.deepEqual(await p.evalJs(SAYS), OPENERS, "and so does its line");
+    await press(p, FOLD(50101));
+    // a second press folds it
+    await press(p, FOLD(50101));
+    assert.deepEqual(await p.evalJs(SAYS), OPENERS, "a second press folds the circle again");
+    assert.equal(await p.evalJs(`${FOLD(50101)}.getAttribute("aria-expanded")`), "false");
+    // and again, to the same whole circle; then both circles open at once
+    await press(p, FOLD(50101)); await press(p, FOLD(50107));
+    assert.equal(await p.evalJs(`${ROWS}.length`), FLAT.length, "both circles open: every statement of the room is on the page");
+    // THE OFFICE WAS ASKED NOTHING for any of it: the room's own read carried every line
+    await new Promise((ok) => setTimeout(ok, 300));
+    assert.deepEqual(findReads(p), [], "no ?room= and no ?circle= read: opening a circle costs no read");
+    assert.deepEqual([...new Set(p.calls.slice(callsBefore).map((c) => c.path))].filter((x) => !x.startsWith("/world/conversations?closed=")), [], "nothing but the page's ordinary list poll was asked while pressing");
+  } finally { await p.close(); }
+});
+
+test("B · N NEW: a reply that lands in a folded circle is counted and offered as '1 new' on that circle; pressing it opens the circle with the new reply ON SCREEN, marked; an open circle takes a new reply at once", async () => {
+  const { b, base } = await boot(true);
+  const state = { live: [thread()], room: (id) => roomFind(id) };
+  const p = await openPage(b, base, { office: makeOffice(state), width: 390, height: 844 });
+  try {
+    await p.until(ROOM_SHOWN, "the room");
+    await p.styled();
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll("[data-new]").length`), 0, "what the reader arrived to is not 'new'");
+    // a reply to the LAST line of pica's circle (50113), three levels down, lands while the circle is folded
+    const fresh = { handle: "seth", standing: "resident", said: "An invented new reply, deep in the circle.", at: "2026-11-14T20:20:00.000Z", at_ms: 1794687600000, id: 50120, reply_to: 50113, circle: 50101 };
+    state.live = [thread({ voice_count: 15, latest: fresh.at, voices: [...voicesOf(), fresh] })];
+    await p.poll();
+    await p.until(`!!${CARD}.querySelector('[data-new="s50101"]')`, "the circle offers what is new");
+    assert.equal(await p.evalJs(`${CARD}.querySelector('[data-new="s50101"]').textContent`), "1 new");
+    assert.equal(await p.evalJs(`${FOLD(50101)}.textContent`), "10 replies", "and the count is the whole circle, the new reply included");
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll('[data-new]').length`), 1, "only the circle that got the reply says so");
+    assert.equal(await p.evalJs(`!!${CARD}.querySelector('.c-voice[data-say="50120"]')`), false, "before the press the new reply is not on the page (its circle is folded)");
+    const before = p.calls.length;
+    await press(p, `${CARD}.querySelector('[data-new="s50101"]')`);
+    // Emily: "clicking on "1 New" item in a circle doesn't actually open the reply." Now it does.
+    const seen = await p.evalJs(`(() => {
+      const row = ${CARD}.querySelector('.c-voice[data-say="50120"]'); if (!row) return null;
+      const pane = ${CARD}.querySelector(".c-voices").getBoundingClientRect(), r = row.getBoundingClientRect();
+      return { said: row.querySelector(".c-said").textContent, isNew: row.classList.contains("is-new"), inPane: r.top >= pane.top - 1 && r.bottom <= pane.bottom + 1, inWindow: r.top >= 0 && r.bottom <= window.innerHeight,
+        under: row.parentElement.parentElement.previousElementSibling.dataset.say, open: ${FOLD(50101)}.getAttribute("aria-expanded"), chip: ${CARD}.querySelectorAll("[data-new]").length, scrolled: ${CARD}.querySelector(".c-voices").scrollTop };
+    })()`);
+    assert.ok(seen, "after the press the new reply IS on the page");
+    assert.equal(seen.said, fresh.said, "whole");
+    assert.equal(seen.under, "50113", "under the message it answers");
+    assert.equal(seen.open, "true", "its circle is open, in place");
+    assert.equal(seen.isNew, true, "marked as new");
+    assert.deepEqual([seen.inPane, seen.inWindow], [true, true], "and it is ON SCREEN: inside its pane and inside the window, not merely in the page");
+    assert.ok(seen.scrolled > 0, `control: it sat below the pane's first screen (the pane moved ${seen.scrolled}px to show it), so 'on screen' is the press's doing`);
+    assert.equal(seen.chip, 0, "the offer is spent");
+    assert.equal(await p.evalJs(`${ROWS}.filter((r) => r.classList.contains("is-new")).length`), 1, "only the new reply is marked");
+    assert.deepEqual(findReads(p), [], "and the press asked the office nothing");
+    assert.deepEqual([...new Set(p.calls.slice(before).map((c) => c.path))].filter((x) => !x.startsWith("/world/conversations?closed=")), []);
+    // the circle is OPEN now: the next reply to it is shown at once, marked, with no offer to press
+    const next = { handle: "pica", standing: "resident", said: "An invented answer to it.", at: "2026-11-14T20:21:00.000Z", at_ms: 1794687660000, id: 50121, reply_to: 50120, circle: 50101 };
+    state.live = [thread({ voice_count: 16, latest: next.at, voices: [...voicesOf(), fresh, next] })];
+    await p.poll();
+    await p.until(`!!${CARD}.querySelector('.c-voice[data-say="50121"]')`, "an open circle takes its new reply at once");
+    assert.equal(await p.evalJs(`${CARD}.querySelector('.c-voice[data-say="50121"]').classList.contains("is-new")`), true);
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll("[data-new]").length`), 0, "nothing to press: it is already shown");
+    // a NEW OPENING message is simply shown, in its place at the end, as this page always showed new talk
+    const opener = { handle: "noe", standing: "resident", said: "An invented new opening message.", at: "2026-11-14T20:22:00.000Z", at_ms: 1794687720000, id: 50122, circle: 50122 };
+    state.live = [thread({ voice_count: 17, latest: opener.at, voices: [...voicesOf(), fresh, next, opener] })];
+    await p.poll();
+    await p.until(`!!${CARD}.querySelector('.c-voice[data-say="50122"]')`, "a new opening message is shown at once");
+    assert.equal(await p.evalJs(`${CARD}.querySelector(".c-voices").lastElementChild.dataset.say`), "50122", "last, where it was said");
+    // folding spends the marks
+    await press(p, FOLD(50101)); await press(p, FOLD(50101));
+    assert.equal(await p.evalJs(`${ROWS}.filter((r) => r.classList.contains("is-new")).length`), 0, "a circle folded and opened again shows nothing as new");
+  } finally { await p.close(); }
+});
+
+test("B · READS: a page of rooms asks the office for the LIST and nothing else: no read per room on load, and none for opening or folding any circle (until CORE-156 every card read its own ?room=); Open is another view, and is the one ask the control at the end sees", async () => {
+  const { b, base } = await boot(true);                  // the reader IS available here, and the office WOULD answer ?room= and ?circle=: the page simply does not ask
+  const second = thread({ id: ROOM_B, place: "The Quay", at: { x: 5, y: 5 } });
+  const closed = [thread({ id: "t1794600000000-old", live: false, place: "An Earlier Room" }), thread({ id: "t1794500000000-older", live: false, place: "An Older Room" })];
+  const state = { live: [thread(), second], closed, room: (id) => roomFind(id) };
+  const p = await openPage(b, base, { office: makeOffice(state) });
+  try {
+    await p.until(`document.querySelectorAll(".c-thread .c-voices .c-voice").length >= 12`, "four rooms, drawn");
+    await new Promise((ok) => setTimeout(ok, 1200));     // long enough for any read a card would make on load (the old page mounted live cards at once)
+    assert.deepEqual(findReads(p), [], "on load: not one ?room= or ?circle= read (four rooms on the page)");
+    assert.deepEqual([...new Set(p.calls.map((c) => c.path))], ["/world/conversations?closed=40"], "the office was asked for the list, and only the list");
+    // every circle of every room, opened, folded and opened again
+    const pressed = await p.evalJs(`(() => { let n = 0; for (let round = 0; round < 3; round++) for (const [room, fold] of [...document.querySelectorAll(".c-thread button.c-fold[data-fold]")].map((f) => [f.closest(".c-thread").dataset.thread, f.dataset.fold])) { document.querySelector('.c-thread[data-thread="' + room + '"] [data-fold="' + fold + '"]').click(); n++; } return n; })()`);
+    assert.equal(pressed, 24, "control: 8 circles (2 in each of 4 rooms) were each pressed three times");
+    assert.equal(await p.evalJs(`document.querySelectorAll(".c-thread .c-voices .c-voice").length`), 4 * FLAT.length, "and every statement of all four rooms is on the page");
+    await new Promise((ok) => setTimeout(ok, 500));
+    assert.deepEqual(findReads(p), [], "at most one read per circle press was allowed; a press costs NONE");
+    assert.deepEqual([...new Set(p.calls.map((c) => c.path))], ["/world/conversations?closed=40"], "still only the list");
+    // CONTROL: this instrument does see such a read when one is made (a message's Open is the one-conversation view, which asks the office about that circle)
+    await press(p, `${CARD}.querySelector('a[data-circle-open="50101"]')`);
+    await p.until(`location.hash === "#circle-50101"`, "Open is the circle's own link");
+    for (const t0 = Date.now(); Date.now() - t0 < 5000 && !findReads(p).length;) await new Promise((ok) => setTimeout(ok, 80));
+    assert.ok(findReads(p).includes("/world/conversations?circle=50101"), "control: a ?circle= read is recorded when the page makes one");
+  } finally { await p.close(); }
+});
+
+test("B · REPLY AND OPEN stay: a signed-in reader has Reply on every message (it names the say the office served); a visitor has none; Open is a link to the circle on its own, on opening messages", async () => {
+  const { b, base } = await boot(false);
+  const state = { live: [thread()] };
+  const out = await openPage(b, base, { office: makeOffice(state), signedIn: false });
+  try {
+    await out.until(ROOM_SHOWN, "the room");
+    await press(out, FOLD(50101)); await press(out, FOLD(50107));
+    assert.equal(await out.evalJs(`${ROWS}.length`), FLAT.length, "control: every message is on the page");
+    assert.equal(await out.evalJs(`document.querySelectorAll("[data-reply]").length`), 0, "no Reply for a visitor who is not signed in");
+    // Open: only the way to link to or share one circle; a plain link with the circle's own address
+    assert.deepEqual(await out.evalJs(`[...${CARD}.querySelectorAll("a[data-circle-open]")].map((a) => [a.dataset.circleOpen, a.getAttribute("href"), a.textContent, a.closest(".c-voice").dataset.say])`),
+      OPENERS.map((id) => [String(id), `#circle-${id}`, "Open", String(id)]), "Open sits on each opening message, as a link to that circle's own view");
+  } finally { await out.close(); }
+  const inn = await openPage(b, base, { office: makeOffice(state), signedIn: true });
+  try {
+    await inn.until(SAY, "the speak box");
+    await inn.until(`${CARD}?.querySelectorAll("[data-reply]").length === 3`, "Reply on each opening message once the page knows the reader is signed in");
+    await press(inn, FOLD(50101)); await press(inn, FOLD(50107));
+    assert.deepEqual((await inn.evalJs(`[...${CARD}.querySelectorAll("[data-reply]")].map((r) => Number(r.dataset.reply))`)).sort(), FLAT.map((l) => l.id).sort(), "Reply on every message, replies at every level included");
+    await press(inn, `${CARD}.querySelector('[data-reply="50105"]')`);
+    assert.equal(await inn.evalJs(`document.querySelector("[data-say-reply-text]").textContent`), "replying to claran: Who painted the sign outside?");
+    await sendSay(inn, "an invented reply");
+    await inn.until(`document.querySelector("[data-say-text]").value === ""`, "the say landed");
+    assert.equal(state.said[0].reply_to, 50105, "reply_to is exactly the id the office served on that line");
+  } finally { await inn.close(); }
+});
+
+test("B · THE POLL DOES NOT DISTURB A READER: a poll that moved nothing redraws nothing; a reply that lands ABOVE the line they are on does not move it; their own reply lands in view", async () => {
+  const { b, base } = await boot(false);
+  const state = { live: [thread()] };
+  const p = await openPage(b, base, { office: makeOffice(state), width: 390, height: 600 });
+  try {
+    await p.until(ROOM_SHOWN, "the room");
+    await p.styled();
+    await press(p, FOLD(50101));
+    // the reader puts focus on the other circle's button and reads claran's reply (50105, in the MIDDLE of the open circle): that is the line they are on
+    await p.evalJs(`(() => { const list = ${CARD}.querySelector(".c-voices"), row = ${CARD}.querySelector('.c-voice[data-say="50105"]'); list.scrollTop += row.getBoundingClientRect().top - list.getBoundingClientRect().top - 10; ${FOLD(50107)}.focus({ preventScroll: true }); window.__keep = { btn: ${FOLD(50107)}, row }; window.__muts = 0; new MutationObserver((r) => { for (const m of r) window.__muts += m.addedNodes.length + m.removedNodes.length; }).observe(list, { childList: true, subtree: true }); return true; })()`);
+    const where = () => p.evalJs(`(() => { const list = ${CARD}.querySelector(".c-voices"), row = ${CARD}.querySelector('.c-voice[data-say="50105"]'); return { off: Math.round(row.getBoundingClientRect().top - list.getBoundingClientRect().top), top: Math.round(list.scrollTop) }; })()`);
+    const at = await where();
+    assert.equal(at.off, 10, "control: the line they are on sits at the top of the pane");
+    assert.ok(at.top > 100, `control: the reader has climbed into the room (the pane is scrolled ${at.top}px)`);
+    const below = await p.evalJs(`(() => { const list = ${CARD}.querySelector(".c-voices"); return Math.round(list.scrollHeight - list.scrollTop - list.clientHeight); })()`);
+    assert.ok(below > 60, `control: and is NOT at the bottom (${below}px of the room is still below the pane), so nothing here is the "following" rule's doing`);
+    // (1) a poll that moved nothing
+    const polled = p.calls.length;
+    await p.poll();
+    for (const t0 = Date.now(); Date.now() - t0 < 5000 && p.calls.length === polled;) await new Promise((ok) => setTimeout(ok, 60));
+    await new Promise((ok) => setTimeout(ok, 400));
+    assert.ok(p.calls.length > polled, "control: the poll DID run");
+    assert.equal(await p.evalJs(`window.__muts`), 0, "a poll that moved nothing rebuilt nothing in the pane");
+    assert.deepEqual(await where(), at, "the pane is where the reader left it");
+    assert.equal(await p.evalJs(`document.activeElement === window.__keep.btn && ${FOLD(50107)} === window.__keep.btn`), true, "focus is on the very button it was on");
+    // (2) a reply lands inside the open circle, ABOVE the line the reader is on
+    // (seth's "Then I'm in." (50104) is drawn before claran's line, so a reply to it lands above the reader)
+    const fresh = { handle: "seth", standing: "resident", said: "An invented reply that lands above the reader. ".repeat(4).trim(), at: "2026-11-14T20:20:00.000Z", at_ms: 1794687600000, id: 50120, reply_to: 50104, circle: 50101 };
+    state.live = [thread({ voice_count: 15, latest: fresh.at, voices: [...voicesOf(), fresh] })];
+    await p.poll();
+    await p.until(`!!${CARD}.querySelector('.c-voice[data-say="50120"]')`, "the new reply is in the open circle");
+    const after = await where();
+    const grew = await p.evalJs(`Math.round(${CARD}.querySelector('.c-voice[data-say="50120"]').getBoundingClientRect().height)`);
+    assert.ok(grew > 40, `control: ${grew}px of new talk was added above the reader's line`);
+    assert.ok(Math.abs(after.off - at.off) <= 1, `the line the reader was on did not move (it sat ${at.off}px from the pane's top, and sits ${after.off}px)`);
+    assert.ok(after.top - at.top >= grew - 2, "because the pane took up exactly what was added above it");
+    assert.equal(await p.evalJs(`document.activeElement === ${FOLD(50107)}`), true, "and the keyboard focus is on the same button, redrawn");
+    // (3) the reader speaks (pm:spoke), and their reply lands in the OTHER, folded circle: it is opened and brought into view where it sits
+    const own = { handle: "claran", standing: "resident", said: "My own invented reply.", at: "2026-11-14T20:23:00.000Z", at_ms: 1794687780000, id: 50123, reply_to: 50109, circle: 50107 };
+    await p.evalJs(`${CARD}.querySelector(".c-voices").scrollTop = 0; true`);
+    state.live = [thread({ voice_count: 16, latest: own.at, voices: [...voicesOf(), fresh, own] })];
+    await p.tick();
+    await p.until(`!!${CARD}.querySelector('.c-voice[data-say="50123"]')`, "their own reply is shown without a press");
+    const mine = await p.evalJs(`(() => { const pane = ${CARD}.querySelector(".c-voices").getBoundingClientRect(), r = ${CARD}.querySelector('.c-voice[data-say="50123"]').getBoundingClientRect(); return { inPane: r.top >= pane.top - 1 && r.bottom <= pane.bottom + 1, open: ${FOLD(50107)}.getAttribute("aria-expanded") }; })()`);
+    assert.deepEqual(mine, { inPane: true, open: "true" }, "its circle opened and the reply is inside the pane");
+  } finally { await p.close(); }
+});
+
+test(`B · A ROOM LONGER THAN ITS READ (${readerNote}): the card says how many statements the room holds and how many are here; listing its conversations costs ONE read, on the press, and none on any poll after it, however the room moves (never twice, never while the office is not answering); a room of older talk says there is nothing to open`, async () => {
+  const { b, base } = await boot(true);
+  const long = () => thread({ voice_count: 94, voices_earlier: { remaining: 80, before_ms: 1794686460000, before: "2026-11-14T20:01:00.000Z", note: "pass voices_before=1794686460000 for the 80 before these" } });
+  const state = { live: [long()], room: (id) => roomFind(id) };
+  const p = await openPage(b, base, { office: makeOffice(state) });
+  try {
+    await p.until(ROOM_SHOWN, "the room");
+    await p.until(`!!${CARD}.querySelector("[data-room-earlier-words]")`, "the room says it is longer than its read");
+    assert.deepEqual(await p.evalJs(SAYS), OPENERS, "the lines the read carries are drawn as any room's are");
+    await p.until(`!!${CARD}.querySelector("[data-room-earlier-show]")`, "the way to the earlier conversations");
+    // the card says plainly what it holds, what is here, and what the button does
+    assert.equal(await p.evalJs(`${CARD}.querySelector("[data-room-earlier-words]").textContent`), "This room holds 94 statements. The newest 14 are shown below in full. The 80 said before them are not shown on this page; the button lists this room's conversations by their first line.");
+    assert.equal(await p.evalJs(`${CARD}.querySelector("[data-room-earlier-show]").textContent`), "List this room's conversations");
+    if (!HAS_READER) return;                    // a pinned World that predates the reader: the last part below (the reader withheld on purpose) is what holds
+    await new Promise((ok) => setTimeout(ok, 600));
+    assert.deepEqual(findReads(p), [], "nothing was read for it on load");
+    // two presses at once: ONE read
+    await p.evalJs(`(() => { const b = ${CARD}.querySelector("[data-room-earlier-show]"); b.click(); b.click(); b.dispatchEvent(new MouseEvent("click", { bubbles: true })); return true; })()`);
+    await p.until(`${CARD}.querySelector("[data-circle-reader]")?.dataset.state === "room"`, "the World's reader lists the room's conversations");
+    assert.deepEqual(findReads(p), [`/world/conversations?room=${ROOM}`], "ONE ?room= read for three presses");
+    assert.deepEqual(await p.evalJs(`[...${CARD}.querySelectorAll("[data-circle-reader] [data-circle-stub]")].map((s) => Number(s.dataset.circle))`), OPENERS, "the room's conversations, in the office's start order (the reader's own list)");
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll("[data-room-earlier-show]").length`), 0, "the button is spent");
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".cr-head").length`), 0, "the reader repeats no header (the card owns it)");
+    assert.deepEqual(await p.evalJs(SAYS), OPENERS, "and the room's own messages are still drawn whole beside it");
+    // ONE READ MEANS ONE: the room keeps talking, and several real polls answer after the mount (until CORE-156's review the page re-read ?room= on
+    // every poll that moved a room whose reader was mounted). The list is read each time; the room is never read again.
+    const listReads = () => p.calls.filter((c) => c.path.startsWith("/world/conversations?closed=")).length;
+    for (let i = 1; i <= 3; i++) {
+      const before = listReads();
+      const said = { handle: "noe", standing: "resident", said: `An invented new opening message, number ${i}.`, at: `2026-11-14T20:3${i}:00.000Z`, at_ms: 1794688200000 + i * 60000, id: 50130 + i, circle: 50130 + i };
+      state.live = [{ ...long(), voice_count: 94 + i, latest: said.at, voices: [...voicesOf(), ...Array.from({ length: i }, (_, k) => ({ ...said, id: 50131 + k, circle: 50131 + k, said: `An invented new opening message, number ${k + 1}.` }))] }];
+      await p.poll();
+      for (const t0 = Date.now(); Date.now() - t0 < 9000 && listReads() === before;) await new Promise((ok) => setTimeout(ok, 60));
+      await p.until(`${CARD}.querySelector("[data-c-count]").textContent === "${94 + i} statements"`, `poll ${i} moved the room`);
+      await new Promise((ok) => setTimeout(ok, 400));
+    }
+    assert.equal(await p.evalJs(`${ROWS}.length`), 3 + 3, "control: the room moved three times, and its own pane took each new message");
+    assert.deepEqual(findReads(p), [`/world/conversations?room=${ROOM}`], "three polls that each moved the room: still ONE ?room= read, the press's, and no ?circle=");
+  } finally { await p.close(); }
+  // the office is not answering: the press asks it nothing more, and says so
+  const down = { live: [long()], room: (id) => roomFind(id) };
+  const q = await openPage(b, base, { office: makeOffice(down) });
+  try {
+    if (!HAS_READER) return;
+    await q.until(`!!${CARD}?.querySelector("[data-room-earlier-show]")`, "the button");
+    down.down = true;
+    await q.poll();
+    await q.until(`!!document.querySelector("[data-live] [data-office-down]")`, "the page is waiting out a failed read");
+    const asked = q.calls.length;
+    await press(q, `${CARD}.querySelector("[data-room-earlier-show]")`);
+    await new Promise((ok) => setTimeout(ok, 400));
+    assert.match(await q.evalJs(`${CARD}.querySelector("[data-room-earlier-note]").textContent`), /isn't answering just now/);
+    assert.equal(q.calls.length, asked, "no ask was made while the page is backing off");
+    assert.equal(await q.evalJs(`${CARD}.querySelector("[data-circle-reader]")`), null);
+  } finally { await q.close(); }
+  // A ROOM OF OLDER TALK (its lines carry no id): the World's reader lists CONVERSATIONS, and such a room has none to list, so there is NO button that
+  // could show nothing; the card still says what it holds. (Darko on dev, 2026-11-22 19:02 EST, of a 1,992-statement room of this kind: "a gigantic block
+  // … that I can't interact with": its one button led to "We couldn't read this".)
+  const oldTalk = () => thread({ voice_count: 1992, voices: voicesOf().map(({ id, reply_to, circle, ...v }) => v), voices_earlier: { remaining: 1978, before_ms: 1794686460000, before: "2026-11-14T20:01:00.000Z", note: "pass voices_before" } });
+  const o = await openPage(b, base, { office: makeOffice({ live: [oldTalk()], room: (id) => roomFind(id) }), signedIn: true });
+  try {
+    await o.until(ROOM_SHOWN, "the room");
+    await o.until(SAY, "the speak box (so the page's module, and with it the reader's hook, has loaded)");
+    await o.poll();
+    await new Promise((ok) => setTimeout(ok, 700));
+    assert.equal(await o.evalJs(`${CARD}.querySelector("[data-room-earlier-words]").textContent`), "This room holds 1992 statements. The newest 14 are shown below in full. The 1978 said before them are not shown on this page. The messages in this room can't be replied to, so there is nothing here to open, fold or answer.",
+      "the card says in one plain line that nothing in it opens, so nobody presses at nothing");
+    assert.equal(await o.evalJs(`${CARD}.querySelectorAll("[data-fold], [data-circle-open], [data-reply]").length`), 0, "and indeed nothing in it opens, folds or takes a reply, signed in or not");
+    assert.equal(await o.evalJs(`${CARD}.querySelectorAll("[data-room-earlier-show]").length`), 0, "no button that could only fail");
+    assert.equal(await o.evalJs(`${ROWS}.length`), 14, "its lines are all there, whole, in order (plain lines: nothing to fold)");
+    assert.deepEqual(findReads(o), [], "and nothing was read for it");
+  } finally { await o.close(); }
+  // THE READER WITHHELD (a pinned World that predates it): the press says so, and asks the office nothing
+  const bare = await boot(false);
+  const n = await openPage(bare.b, bare.base, { office: makeOffice({ live: [long()], room: (id) => roomFind(id) }) });
+  try {
+    await n.until(`!!${CARD}?.querySelector("[data-room-earlier-show]")`, "the button");
+    await press(n, `${CARD}.querySelector("[data-room-earlier-show]")`);
+    await n.until(`/isn't available on this page/.test(${CARD}.querySelector("[data-room-earlier-note]")?.textContent ?? "")`, "the page says the reader is not here");
+    assert.equal(await n.evalJs(`${CARD}.querySelectorAll("[data-room-earlier-show]").length`), 0);
+    assert.deepEqual(findReads(n), [], "no read was made for a reader that is not there");
+  } finally { await n.close(); }
+});
+
+// Darko on dev, 2026-11-22 19:02 EST: "I see a gigantic block for the evening lantern, the harbor reach, with 1,992 statements that I can't interact with."
+// Measured there: the block was the speakers list, 242 names, 1,672px at 1440 and 6,873px on a phone, above the room's first message.
+test("B · A CROWDED ROOM'S SPEAKERS ARE CAPPED: a first run of names and 'and N more', which opens the rest in place and folds them again; no ask; a poll keeps what the reader opened", async () => {
+  const { b, base } = await boot(false);
+  const crowd = Array.from({ length: 242 }, (_, i) => `speaker-${String(i + 1).padStart(3, "0")}`);
+  const state = { live: [thread({ participants: crowd }), thread({ id: ROOM_B, place: "The Quay", participants: crowd.slice(0, 14) })] };
+  const p = await openPage(b, base, { office: makeOffice(state), width: 390, height: 844 });
+  try {
+    await p.until(ROOM_SHOWN, "the room");
+    await p.styled();
+    const people = `${CARD}.querySelector(".c-people")`;
+    const names = () => p.evalJs(`[...${people}.querySelectorAll(".c-person")].map((x) => x.dataset.handle)`);
+    const more = `${people}.querySelector("[data-people-more]")`;
+    assert.deepEqual(await names(), crowd.slice(0, 12), "the first twelve speakers, in the office's order");
+    assert.deepEqual(await p.evalJs(`[${more}.textContent, ${more}.getAttribute("aria-expanded"), ${more}.tagName]`), ["and 230 more", "false", "BUTTON"], "and the rest behind one press that says how many");
+    assert.equal(await p.evalJs(`${CARD}.querySelector("[data-c-speakers]").textContent`), "242 speakers", "the count above still says all of them");
+    const capped = await p.evalJs(`Math.round(${people}.getBoundingClientRect().height)`);
+    assert.ok(capped < 400, `the speakers block is short at phone width (${capped}px), not thousands of pixels`);
+    // a room with a couple more than twelve shows them all: no "and 2 more"
+    assert.deepEqual(await p.evalJs(`(() => { const c = document.querySelector('[data-thread="${ROOM_B}"] .c-people'); return [c.querySelectorAll(".c-person").length, c.querySelectorAll("[data-people-more]").length]; })()`), [14, 0]);
+    // the press opens the rest IN PLACE, and asks the office nothing
+    const asked = p.calls.length;
+    await p.evalJs(`${more}.focus(); ${more}.click(); true`);
+    assert.deepEqual(await names(), crowd, "all 242, in place");
+    assert.deepEqual(await p.evalJs(`[${more}.textContent, ${more}.getAttribute("aria-expanded"), document.activeElement === ${more}]`), ["show fewer", "true", true], "the same press folds them again, and the keyboard is still on it");
+    const opened = await p.evalJs(`Math.round(${people}.getBoundingClientRect().height)`);
+    assert.ok(opened > capped * 5, `control: uncapped, the block is ${opened}px tall at phone width`);
+    await new Promise((ok) => setTimeout(ok, 300));
+    assert.deepEqual([...new Set(p.calls.slice(asked).map((c) => c.path))].filter((x) => !x.startsWith("/world/conversations?closed=")), [], "no ask for the names: they are the thread's own");
+    assert.deepEqual(findReads(p), []);
+    // a poll that moves the room keeps the list as the reader left it
+    state.live = [thread({ participants: crowd, voice_count: 15, latest: "2026-11-14T20:16:00.000Z" }), state.live[1]];
+    await p.poll();
+    await p.until(`${CARD}.querySelector("[data-c-count]").textContent === "15 statements"`, "the poll moved the room");
+    assert.equal((await names()).length, 242, "still open after the poll");
+    await p.evalJs(`${more}.click(); true`);
+    assert.deepEqual(await names(), crowd.slice(0, 12), "folded again");
+    assert.equal(await p.evalJs(`${more}.textContent`), "and 230 more");
+  } finally { await p.close(); }
+});
+
+// Truey's review of ed999477f (2026-11-22): "The one-conversation view asks `?circle=` on load and again on every poll … one tab resting in this view asks
+// the office for a circle about every 7 seconds for as long as it stays open." On the w48 office each such ask scans the whole record.
+test(`ONE CONVERSATION · ASKS (${readerNote}): arriving asks the office for the circle ONCE; no poll asks for it again, moved or unmoved; new lines are offered from the list the page already holds; one press is one ask, and none while the office is not answering`, async () => {
+  if (!HAS_READER) return;
+  const { b, base } = await boot(true);
+  const state = { live: [thread()], room: (id) => roomFind(id) };
+  const p = await openPage(b, base, { office: makeOffice(state), hash: "#circle-50101" });
+  const circleAsks = () => p.calls.map((c) => c.path).filter((x) => /[?&]circle=/.test(x));
+  const roomAsks = () => p.calls.map((c) => c.path).filter((x) => /[?&]room=/.test(x));
+  const listAsks = () => p.calls.filter((c) => c.path.startsWith("/world/conversations?closed=")).length;
+  // one REAL poll, answered: the page's own ask of the list (its hashchange path, the same tick the 7 s timer makes), waited for
+  const polled = async (change) => {
+    const before = listAsks();
+    if (change) change();
+    await p.evalJs(`window.dispatchEvent(new HashChangeEvent("hashchange")); true`);
+    for (const t0 = Date.now(); Date.now() - t0 < 9000 && listAsks() === before;) await new Promise((ok) => setTimeout(ok, 60));
+    assert.ok(listAsks() > before, "control: the poll ran");
+    await new Promise((ok) => setTimeout(ok, 500));
+  };
+  const FRESH = `${SELECTED}.querySelector("[data-selected-fresh]")`;
+  const says = () => p.evalJs(`(() => { const r = ${FRESH}; return r && !r.hidden ? [r.querySelector("[data-selected-fresh-words]").textContent, r.querySelector("[data-selected-refresh]").textContent] : null; })()`);
+  try {
+    await p.until(SELECTED_READY, "the conversation");
+    await p.until(`!!${FRESH} && !${FRESH}.hidden`, "the view says how it updates");
+    await new Promise((ok) => setTimeout(ok, 500));
+    assert.deepEqual(circleAsks(), ["/world/conversations?circle=50101"], "arriving on the link: exactly ONE ask for the circle (the page's; the reader is handed that answer, not sent to ask again)");
+    assert.deepEqual(roomAsks(), [], "and none for the room");
+    assert.ok(await p.evalJs(`${SELECTED}.querySelectorAll("li[data-say]").length`) >= 1, "control: the reader drew the circle from that one answer");
+    assert.deepEqual(await says(), ["This view does not update by itself.", "Refresh"], "the view says plainly that it does not update by itself, with its one press");
+    // three answered polls: nothing moved; another room spoke and this room took a new OPENING message; nothing moved again
+    await polled();
+    const opener = { handle: "noe", standing: "resident", said: "An invented new opening message.", at: "2026-11-14T20:22:00.000Z", at_ms: 1794687720000, id: 50122, circle: 50122 };
+    await polled(() => { state.live = [thread({ voice_count: 15, latest: opener.at, voices: [...voicesOf(), opener] }), thread({ id: ROOM_B, place: "The Quay", voice_count: 3, voices: voicesOf().slice(0, 3) })]; });
+    await polled();
+    assert.deepEqual(circleAsks(), ["/world/conversations?circle=50101"], "three answered polls, moved and unmoved: NOT ONE more ask for the circle");
+    assert.deepEqual(roomAsks(), []);
+    assert.deepEqual(await says(), ["This view does not update by itself.", "Refresh"], "a new opening message elsewhere in the room is not new in THIS conversation");
+    // a reply lands IN this conversation: the list the page already holds shows it, and the view offers it. Still no ask.
+    const fresh = { handle: "seth", standing: "resident", said: "An invented new reply, deep in the circle.", at: "2026-11-14T20:25:00.000Z", at_ms: 1794687900000, id: 50120, reply_to: 50113, circle: 50101 };
+    await polled(() => { state.live = [thread({ voice_count: 16, latest: fresh.at, voices: [...voicesOf(), opener, fresh] })]; });
+    assert.deepEqual(await says(), ["1 new in this conversation.", "Show"], "offered from the list read: the office's count for this conversation was 10, the list now holds 11");
+    assert.equal(circleAsks().length, 1, "and offering it asked nothing");
+    // the press: ONE ask, however fast it is pressed
+    state.circleSays = 11;
+    await p.evalJs(`(() => { const b = ${FRESH}.querySelector("[data-selected-refresh]"); b.click(); b.click(); b.dispatchEvent(new MouseEvent("click", { bubbles: true })); return true; })()`);
+    await p.until(`${FRESH}.querySelector("[data-selected-fresh-words]").textContent === "This view does not update by itself."`, "the press read the conversation again, and the offer is spent");
+    await new Promise((ok) => setTimeout(ok, 400));
+    assert.deepEqual(circleAsks(), ["/world/conversations?circle=50101", "/world/conversations?circle=50101"], "three presses at once: ONE more ask");
+    // and the polls after it ask nothing more
+    await polled(); await polled();
+    assert.equal(circleAsks().length, 2, "two more polls: still two asks in all (arriving, and the one press)");
+    assert.deepEqual(roomAsks(), []);
+    // the office stops answering: a press asks it nothing, and says so
+    state.down = true;
+    await p.evalJs(`window.dispatchEvent(new HashChangeEvent("hashchange")); true`);
+    await p.until(`!!document.querySelector("[data-live] [data-office-down]")`, "the page is waiting out a failed read");
+    const attempts = p.calls.length;
+    await press(p, `${FRESH}.querySelector("[data-selected-refresh]")`);
+    await new Promise((ok) => setTimeout(ok, 400));
+    assert.equal(p.calls.length, attempts, "no ask of any kind was made while the page is backing off");
+    assert.match((await says())[0], /isn't answering just now/);
+  } finally { await p.close(); }
+  // arriving by a message's Open (the press B puts on every opening message): the same ONE ask
+  const q = await openPage(b, base, { office: makeOffice({ live: [thread()], room: (id) => roomFind(id) }) });
+  try {
+    await q.until(ROOM_SHOWN, "the room");
+    await press(q, `${CARD}.querySelector('a[data-circle-open="50107"]')`);
+    await q.until(SELECTED_READY, "the one conversation");
+    await new Promise((ok) => setTimeout(ok, 600));
+    assert.deepEqual(q.calls.map((c) => c.path).filter((x) => /[?&](circle|room)=/.test(x)), ["/world/conversations?circle=50107"], "Open: ONE ask");
+  } finally { await q.close(); }
 });
 
 test("RECONCILE: a poll KEEPS a card for the same thread (same node), adds the new one, removes the one that left, and a no-change poll moves nothing", async () => {
@@ -305,38 +809,31 @@ test("OFFICE DOWN: an unanswered poll keeps the cards and says the office is sil
   } finally { await p.close(); }
 });
 
-// ── the reader in the page (when the world's reader exists in this environment) ────────────────────────────────────────────
-
-test(`READER (${readerNote}): the room's top circles come in the order they started, the flat transcript steps aside, and a poll keeps the reader, its focus and its state`, async () => {
+// ── the World's reader in the page (when it exists in this environment): the one-conversation view, and a long room's fallback ────
+//
+// Until 2026-11-22 (CORE-156) a test here, "READER: the room's top circles come in the order they started, the flat transcript steps aside, and a poll keeps
+// the reader, its focus and its state", asserted that EVERY card mounted the World's reader (one ?room= read each) and hid the page's own lines. Darko's B
+// retires that: a card draws its room itself (the B tests above: the order they started, no invented "your circle", the poll keeping focus and place), and
+// the reader is mounted in a card only for a room longer than its read (B · A ROOM LONGER THAN ITS READ above, which holds the office's start order and the
+// one read). This one holds the other half: a room that fits its read never mounts the reader, however long the page is open.
+test(`READER (${readerNote}): a room that fits its read never mounts the World's reader in its card, on load or on any poll; the order is the order the messages were said, with no invented 'your circle'`, async () => {
   const { b, base } = await boot(true);
   const state = { live: [thread()], room: (id) => roomFind(id) };
-  const p = await openPage(b, base, { office: makeOffice(state) });
+  const p = await openPage(b, base, { office: makeOffice(state), signedIn: true });
   try {
-    if (!HAS_READER) {
-      // no reader in this world: the floor, said (the same assertion as FLOOR, reached through the ordinary server)
-      await p.until(`(${FLAT_NOTE}) !== null`, "the floor's note");
-      assert.equal(await p.evalJs(`${CARD}.querySelector("[data-circle-reader]")`), null);
-      assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-voice").length`), 14);
-      return;
-    }
-    await p.until(MOUNTED, "the reader mounted");
-    assert.deepEqual(await p.evalJs(`[...${CARD}.querySelectorAll("[data-circle-stub]")].map((s) => Number(s.dataset.circle))`), [50101, 50107, 50114], "the office's start order, none ranked or chosen");
-    assert.equal(await p.evalJs(`${CARD}.querySelector(".c-voices").hidden`), true, "the flat transcript steps aside");
+    await p.until(ROOM_SHOWN, "the room");
+    await p.until(SAY, "the speak box (the module script has run, so the reader's hook is there)");
+    assert.deepEqual(await p.evalJs(SAYS), OPENERS, "the office's order, none ranked or chosen");
     assert.equal(await p.evalJs(`${CARD}.querySelectorAll("[data-yours], [data-your-circle]").length`), 0, "no invented 'your circle'");
-    // the visitor picks one; a poll with new talk must not rebuild the reader or take their place
-    // the published reader (WLD-178, S180): a room's circle is a list item with its OWN "Open" button; that button is what a visitor focuses
-    await p.evalJs(`document.querySelector('[data-circle-open="50107"]').focus(); window.__keep = { root: ${CARD}.querySelector("[data-circle-reader]"), btn: document.activeElement }; true`);
-    const asked = p.calls.filter((c) => c.path.startsWith("/world/conversations?room=")).length;
+    await p.evalJs(`window.__keep = ${CARD}.querySelector(".c-voices"); true`);
     state.live = [thread({ voice_count: 15, latest: "2026-11-14T20:16:00.000Z" })];
-    await p.tick();
+    await p.poll();
     await p.until(`${CARD}.querySelector("[data-c-count]").textContent === "15 statements"`, "the room's number moved");
-    await p.until(`true`, "-", 1);
     await new Promise((ok) => setTimeout(ok, 700));
-    assert.ok(p.calls.filter((c) => c.path.startsWith("/world/conversations?room=")).length > asked, "the poll refreshed the reader's room, by the office's own read");
-    assert.equal(await p.evalJs(`${CARD}.querySelector("[data-circle-reader]") === window.__keep.root`), true, "the reader is the same node");
-    // the reader redraws its buttons and puts focus back on the equivalent one (by its stable key): the visitor is where they left themselves
-    assert.equal(await p.evalJs(`document.activeElement?.getAttribute("data-key")`), "open-50107", "the keyboard focus is where the visitor left it");
-    assert.equal(await p.evalJs(`document.activeElement.isConnected && ${CARD}.contains(document.activeElement)`), true, "on a live button inside the same card");
+    assert.equal(await p.evalJs(`${CARD}.querySelector("[data-circle-reader]")`), null, "no reader in the card");
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll("[data-room-earlier]").length`), 0, "and no 'earlier' note: the read holds the room");
+    assert.equal(await p.evalJs(`${CARD}.querySelector(".c-voices") === window.__keep && !window.__keep.hidden`), true, "the room's own pane is the same node, and shown");
+    assert.deepEqual(findReads(p), [], "no ?room= read, by the load or by the poll");
   } finally { await p.close(); }
 });
 
@@ -574,8 +1071,10 @@ test(`ONE CONVERSATION (${readerNote}): a card's Open goes to that conversation'
   const state = { live: [thread()], room: (id) => roomFind(id) };
   const p = await openPage(b, base, { office: makeOffice(state), signedIn: true });
   try {
-    await p.until(MOUNTED, "the reader on the card");
+    // CORE-156: the card's "Open" is the page's own link on the opening message (until then it was the reader's button in the card)
+    await p.until(ROOM_SHOWN, "the room on the card");
     await p.until(SAY, "the speak box");
+    assert.equal(await p.evalJs(`document.querySelector('[data-circle-open="50101"]').matches('.c-voice[data-say="50101"] a[href="#circle-50101"]')`), true, "Open is a link on the opening message itself");
     await p.evalJs(`document.querySelector('[data-circle-open="50101"]').click(); true`);
     await p.until(`location.hash === "#circle-50101"`, "Open is the circle link");
     await p.until(SELECTED_READY, "the one-conversation view");
@@ -588,10 +1087,11 @@ test(`ONE CONVERSATION (${readerNote}): a card's Open goes to that conversation'
     await p.evalJs(`location.hash = "#circle-50107"; true`);
     await p.until(`${SELECTED}?.dataset.selectedCard === "50107"`, "the other conversation");
     assert.equal(await p.evalJs(`document.querySelector("[data-say-reply]").hidden`), true, "no stale reply target");
-    // and the card's reader went back to its room (not left in a circle under the lists)
+    // and the card reads as its room when the lists come back (until CORE-156: "the card's reader went back to its room")
     await p.evalJs(`location.hash = ""; true`);
     await p.until(`!!${CARD}`, "lists back");
-    await p.until(`${CARD}.querySelector("[data-circle-reader]")?.dataset.state === "room"`, "the card reads as a room again");
+    await p.until(ROOM_SHOWN, "the card reads as a room again");
+    assert.deepEqual(await p.evalJs(SAYS), OPENERS, "its opening messages, as before");
   } finally { await p.close(); }
 });
 
@@ -740,16 +1240,22 @@ test(`CORE-128 (${readerNote}): the host owns the room's header (none repeated i
   RESIDENTS_META = { residents: { pica: { name: "Pica", avatar: "/media/pica-avatar-card.jpg", color: "#2f5aa8" }, noe: { name: "Noe", avatar: null, color: "#c0703c" } } };
   const p = await openPage(b, base, { office: makeOffice({ live: [thread()], room: (id) => roomFind(id) }) });
   try {
-    if (!HAS_READER) return;                      // a pinned World that predates the reader: the FLOOR tests above are what runs
-    await p.until(MOUNTED, "the reader mounted");
-    // the room's one header is the host's: the reader draws none of its own (WLD-215 hostOwnsHeader), so the metadata is said once, above the talk
-    assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".cr-head").length`), 0, "no second header inside the reader");
+    if (!HAS_READER) return;                      // a pinned World that predates the reader: the B tests above are what runs
+    await p.until(ROOM_SHOWN, "the room");
+    // the room's one header is the card's own, said once, above the talk. (Until CORE-156 the card held the World's reader, told `hostOwnsHeader` so it drew
+    // none of its own; a long room's fallback still mounts it that way, and "B · A ROOM LONGER THAN ITS READ" holds that there is no second header.)
+    assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".cr-head").length`), 0, "no second header in the card");
     assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-thread-head").length`), 1, "the host's one title/live group");
     assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-meta").length`), 1, "the host's one counts/began/latest group");
     assert.equal(await p.evalJs(`/\\bnow\\b/i.test(${CARD}.querySelector(".c-thread-head").textContent + " " + ${CARD}.querySelector(".c-meta").textContent)`), false, "no 'now' row");
-    // the room's circle list: each opener's byline wears a face, inline, first (a fresh node per line)
-    const bylines = `[...${CARD}.querySelectorAll("[data-circle-reader] .cr-head-line")]`;
-    assert.equal(await p.evalJs(`${bylines}.length > 0 && ${bylines}.every((l) => l.firstElementChild?.classList.contains("c-face"))`), true, "every listed opener has its face first in the byline");
+    // the room's messages: each wears its speaker's face first, beside the name (a fresh node per line), openers and replies alike
+    await press(p, FOLD(50101));
+    const bylines = `[...${CARD}.querySelectorAll(".c-voices .c-voice-who")]`;
+    assert.equal(await p.evalJs(`${bylines}.length === 12 && ${bylines}.every((l) => l.firstElementChild?.classList.contains("c-face") && l.lastElementChild?.classList.contains("c-who"))`), true, "every message, replies included, has its face first and its name after");
+    assert.equal(await p.evalJs(`new Set(${bylines}.map((l) => l.firstElementChild)).size === ${bylines}.length`), true, "a fresh face node per line");
+    await p.until(`${CARD}.querySelectorAll(".c-voices img.c-face").length >= 1`, "the public picture arrives on the lines too");
+    assert.equal(await p.evalJs(`${CARD}.querySelector('.c-voice[data-say="50101"] img.c-face').getAttribute("src")`), "/media/pica-avatar-card.jpg");
+    assert.equal(await p.evalJs(`${FOLD(50101)}.getAttribute("aria-expanded")`), "true", "and the pictures landing did not fold what the reader opened");
     // an opened circle: every statement, replies included. CORE-117: a statement's "Open" goes to that conversation's OWN view (the #circle- link: the one-conversation view),
     // so the opened circle is read THERE, in the page's one selected card, wearing the same provider the lists do
     const picked = `[...${SELECTED}.querySelectorAll("[data-circle-reader] .cr-head-line")]`;

@@ -303,11 +303,11 @@ test("a press while one is in flight asks nothing more; an office that does not 
 test("source pins (text pins, labelled): the poll asks for one page; the old lazy accumulation is gone; the page holds the map's 40", () => {
   assert.match(page, /fetch\(pageUrl\(null\)/, "the poll asks for the newest page");
   assert.doesNotMatch(page, /shown \+= CHUNK/, "no chunked growth");
-  // CORE-82: an IntersectionObserver now exists, but ONLY to mount a finished room's circle reader when it nears the screen (ensureReader):
-  // it never grows the list. The pin is that nothing near it touches closedList / the page held.
-  const io = page.slice(page.indexOf("new IntersectionObserver"), page.indexOf("function hook()"));
-  assert.match(io, /ensureReader\(e\.target, false\)/, "the observer mounts a reader");
-  assert.doesNotMatch(io, /closedList|CLOSED_PAGE|showEarlier|goPage/, "and grows no page: no scroll-triggered growth");
+  // No scroll-triggered growth: nothing on the page watches the scroll at all. (From CORE-82 until 2026-11-22 this asserted that an IntersectionObserver
+  // existed ONLY to mount a finished room's circle reader as it neared the screen, `ensureReader(e.target, false)`, and touched no page held. CORE-156 draws a
+  // room from its own thread's lines, so no card mounts a reader on load and the observer is gone.)
+  assert.equal(page.includes(["Intersection", "Observer"].join("")), false, "no observer: nothing is mounted or grown by scrolling");
+  assert.doesNotMatch(page, /addEventListener\("scroll"/, "and no scroll listener either");
   // CORE-82: the cards are RECONCILED (kept by thread key), still one per thread of the page held
   assert.match(page, /threads\.forEach\(function \(t\) \{\s*var key = threadKey\(t\);/, "one card per thread of the page held, kept by its key");
   assert.match(page, /if \(at !== card\) box\.insertBefore\(card, at\)/, "a card moves only when it is out of place");

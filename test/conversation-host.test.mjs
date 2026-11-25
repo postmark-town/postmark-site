@@ -87,11 +87,24 @@ test("mountRoom hands the reader exactly the host options it is given, and a bar
   for (const k of ["faceForSpeaker", "hostOwnsHeader", "onState"]) assert.equal(k in b, false, `a bare mount passes no ${k}`);
   assert.equal(b.canReply, false, "and no Reply");
   assert.deepEqual(bare.filter((l) => l[0] !== "create"), [["showRoom", "r2"]], "it opens on its room");
+  // a caller's own reads (the Conversations door's CORE-156 source) are used only when they answer both reads; anything else is the keyless office reads
+  const own = { room: async () => ({}), circle: async () => ({}) };
+  const given = [];
+  await mountRoom({ doc: fakeDoc(), host: {}, roomId: "r3", importImpl: async () => fakeReader(given), source: own });
+  assert.equal(given.find((l) => l[0] === "create")[1].source, own);
+  for (const half of [{ room: async () => ({}) }, "x", null]) {
+    const l = [];
+    await mountRoom({ doc: fakeDoc(), host: {}, roomId: "r4", importImpl: async () => fakeReader(l), source: half });
+    const s = l.find((x) => x[0] === "create")[1].source;
+    assert.notEqual(s, half); assert.equal(typeof s.room, "function"); assert.equal(typeof s.circle, "function");
+  }
 });
 
 test("PIN both hosts mount the World's reader through mountRoom: the Conversations door with its own options, the event page with the shared host options", () => {
-  assert.match(CONVO, /import \{ mountRoom \} from "@\/lib\/circle-reader-mount\.mjs";/);
-  assert.match(CONVO, /const m = await mountRoom\(\{[\s\S]*?onState, onNavigate, circle,[\s\S]*?faceForSpeaker, hostOwnsHeader,\s*\}\);/, "the door delegates, passing what it was given");
+  // the door's own reads (CORE-156: the primed answer, the page told of each circle read) are the office source it hands the one setup
+  assert.match(CONVO, /import \{ mountRoom, officeSource \} from "@\/lib\/circle-reader-mount\.mjs";/);
+  assert.match(CONVO, /const m = await mountRoom\(\{[\s\S]*?source,[\s\S]*?onState, onNavigate, circle,[\s\S]*?faceForSpeaker, hostOwnsHeader,\s*\}\);/, "the door delegates, passing what it was given");
+  assert.equal(/loadReader\(/.test(CONVO), false, "and does not load the reader itself");
   assert.equal(/createCircleReader\(/.test(CONVO), false, "the door no longer builds the reader itself");
   assert.match(EVENT, /import \{ hostFaces, hostReaderOptions \} from "@\/lib\/conversation-host\.mjs";/);
   assert.match(EVENT, /await mountRoom\(\{ doc: document, host: reader, roomId: id,[^\n]*?\.\.\.hostReaderOptions\(document, faces\.get\) \}\);/, "the event page mounts with the Conversations host's options");
