@@ -61,11 +61,18 @@ test("a sprite on the quay is a well-formed map; the retired buildings are gone"
   }
 });
 
-test("Ferry and the Bug Catcher are drawn, and only they: the others' faces wait for their own word", () => {
+test("Ferry, Iris, the Registrar and the Bug Catcher are drawn, and only they: the others' faces wait for their own word", () => {
   // Wright's ruling, 2026-09-26: a sprite from the portrait seven gave the
   // office; no invented likeness for a meep that has given no face. The Bug
   // Catcher's face is the one the bug video gave him (Keemin, 2026-09-29).
-  assert.deepEqual(MEEPS.filter((m) => SPRITES[m.key]).map((m) => m.key), ["postmaster", "bugcatcher"]);
+  // Iris and the Registrar gave theirs as their portraits on 2026-11-25, and Darko
+  // asked for both (CORE-185: "replace iris's token with pixel art … and add
+  // registrar's too (worldkeeper architect wait for now, arbiter too)").
+  assert.deepEqual(MEEPS.filter((m) => SPRITES[m.key]).map((m) => m.key), ["postmaster", "illuminator", "registrar", "bugcatcher"]);
+  for (const waits of ["worldkeeper", "architect", "arbiter"]) {
+    assert.equal(Object.hasOwn(SPRITES, waits), false, `${waits} waits: no drawing yet`);
+    assert.equal(Object.hasOwn(FIGURE_INK, waits), false, `${waits} waits: no inks yet`);
+  }
   assert.deepEqual(checkAllSprites(), {});
 });
 
@@ -75,6 +82,11 @@ test("a meep's own inks are hexes the site already wears", () => {
     ...Object.values(ACCENTS).flatMap((a) => Object.values(a)),
     readFileSync(join(ROOT, "src", "styles", "global.css"), "utf8"),
     readFileSync(join(ROOT, "town", "pages", "mail", "with", "[pair].astro"), "utf8"),
+    // CORE-185: Iris's and the Registrar's inks are named where they are worn: the town's stylesheet (its ink, wax, foil, stamp), the site's
+    // pixel icons (their skin, cheek and gold), and the civic hub's rose label
+    readFileSync(join(ROOT, "src", "styles", "postmark.css"), "utf8"),
+    readFileSync(join(ROOT, "src", "lib", "pixel-icons.mjs"), "utf8"),
+    readFileSync(join(ROOT, "town", "pages", "town", "index.astro"), "utf8"),
     // the one named exception: DARKO's eyes, the token's own cyan (civic-art § DARKO_EYE)
     DARKO_EYE,
   ].join(" ").toLowerCase();
@@ -84,8 +96,28 @@ test("a meep's own inks are hexes the site already wears", () => {
       assert.ok(worn.includes(hex.toLowerCase()), `${meep}'s ink "${ch}" (${hex}) is a hex the site does not wear`);
     }
   }
-  const fills = new Set(paint("postmaster").map((r) => r.fill));
-  for (const hex of Object.values(FIGURE_INK.postmaster)) assert.ok(fills.has(hex), `Ferry's ink ${hex} is declared and never painted`);
+  for (const meep of ["postmaster", "illuminator", "registrar"]) {
+    const fills = new Set(paint(meep).map((r) => r.fill));
+    for (const hex of Object.values(FIGURE_INK[meep])) assert.ok(fills.has(hex), `${meep}'s ink ${hex} is declared and never painted`);
+  }
+});
+
+test("CORE-185: Iris and the Registrar are drawn as the set is, from their portraits' markers, in no ink the set's palette rule forbids", () => {
+  // the set's frame: 24×24, standing on the quay's shelf at row 21 like Ferry, the two rows under it empty
+  for (const meep of ["illuminator", "registrar"]) {
+    const rows = SPRITES[meep];
+    assert.equal(rows[21], SPRITES.postmaster[21], `${meep} stands on the same shelf as Ferry`);
+    assert.equal(rows[22] + rows[23], ".".repeat(48));
+    // no shared palette entry is changed by a meep: its inks are its own letters, never a redefinition of the table's
+    for (const ch of Object.keys(FIGURE_INK[meep])) assert.equal(Object.hasOwn(INK, ch), false, `${meep} redefines the table's ink "${ch}"`);
+  }
+  const has = (meep, hex) => paint(meep).some((r) => r.fill === hex);
+  // Iris: the navy ribbon in her dark bun, the silver in her hair, her red collar, the brown apron and her gold pendant
+  for (const [what, hex] of [["the ribbon", FIGURE_INK.illuminator.n], ["the silver streak", FIGURE_INK.illuminator.i], ["the red collar", FIGURE_INK.illuminator.r], ["the apron", FIGURE_INK.illuminator.b], ["the pendant", FIGURE_INK.illuminator.o], ["her dark hair", INK.w]]) assert.ok(has("illuminator", hex), `Iris has lost ${what}`);
+  // the Registrar: the brown bob in her own copper, the silver forelock, the black shirt, the clipboard's timber and paper
+  for (const [what, hex] of [["her bob", ACCENTS.registrar.m], ["the silver forelock", FIGURE_INK.registrar.i], ["the black shirt", FIGURE_INK.registrar.x], ["the clipboard", INK.t], ["its paper", INK.p]]) assert.ok(has("registrar", hex), `the Registrar has lost ${what}`);
+  // what the others wear is untouched by the two
+  assert.deepEqual(Object.keys(FIGURE_INK).sort(), ["bugcatcher", "darko", "illuminator", "meeplings", "postmaster", "registrar"]);
 });
 
 test("the Bug Catcher's inks are the video kit's, so the page and the video draw the same frog", () => {
@@ -161,6 +193,23 @@ test("profileOf holds avatar_url to the town's media door", () => {
   assert.equal(at("https://media.postmark.town/avatars/face.jpg"), null, "the right host, outside /media/");
   const good = "https://media.postmark.town/media/illuminator/face.jpg";
   assert.equal(at(good), good);
+});
+
+test("CORE-185: a drawn meep's profile card stays portrait-first; the drawing takes the quay, never the portrait's place", () => {
+  // Their portraits as the town serves them (CORE-185's two immutable sources): with a drawing now, each still resolves as the card's portrait
+  const PORTRAITS = {
+    illuminator: "https://media.postmark.town/media/the-town/6f1a9fc0d60b7fca29e792b179670e6e5cfe366233135bddf8d229aea0f50553.jpg",
+    registrar: "https://media.postmark.town/media/the-town/40b8c76c3c6d381d4950eb83793ecc7a93c2c5c3dd0c5c7a4f21ce0aad9e5169.jpg",
+  };
+  for (const [key, url] of Object.entries(PORTRAITS)) {
+    const meep = MEEPS.find((m) => m.key === key);
+    assert.ok(SPRITES[key], `${key} is drawn`);
+    assert.equal(profileOf(meep, { handle: meep.handle, profile: { avatar_url: url } }).portrait, url, `${key}'s portrait is still the card's`);
+  }
+  // the page's rules, unchanged: the quay wears the sprite first; the card wears the portrait first, and the quay's face only without one
+  const src = readFileSync(join(ROOT, "town", "pages", "meeps", "index.astro"), "utf8");
+  assert.match(src, /face: sprite \? "sprite" : profile\.portrait \? "portrait" : "monogram",/);
+  assert.match(src, /<div class="mc-face" data-face=\{m\.profile\.portrait \? "portrait" : m\.face\}>\s*\{m\.profile\.portrait\s*\? <img src=\{m\.profile\.portrait\}/);
 });
 
 test("each card names its door as a read or a GET, spelled the office's way", () => {
