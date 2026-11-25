@@ -30,7 +30,6 @@
 
 import { residentFace } from "./household-dashboard/faces.mjs";
 import { sectionOf } from "./nav.mjs";
-import { pictureOf } from "./calendar.mjs";
 
 export const BANNER = "/banner.png";
 export const LARGE = "summary_large_image";
@@ -120,16 +119,16 @@ export function residentPreview(r, members, src = {}) {
 const VIDEO_EXT = /\.(?:mp4|m4v|mov|webm|ogv|mkv|avi|m3u8)$/i;
 
 /**
- * The still a Spark's own share preview wears, or null (CORE-190). It is the picture the Spark's page already draws (calendar.mjs pictureOf, the same one SparkCard
- * uses: a site path or an https address, as a string or `{url|src, alt}`), never a regex over the record and never a related thumbnail. On top of pictureOf's rule it
- * keeps a share scraper's own: the address carries no login (`https://user:pass@…`), and it is not a video file. A site path is returned as given, for the layout to
- * resolve against the site's origin; an https address is returned in its normalised form.
- * @param {object} spark  the Spark as the office serves it
+ * The still a Spark's own share preview wears, or null (CORE-190). It is handed the picture the Spark's page already draws: calendar.mjs `pictureOf(spark)`, the one rule
+ * SparkCard uses too (a site path or an https address, as a string or `{url|src, alt}`; this module takes the result rather than importing it, so the page's pick and its card
+ * cannot differ and the build-harness copies that list og-image.mjs need not also list calendar.mjs). Never a regex over the record and never a related thumbnail. On top of
+ * pictureOf's rule it keeps a share scraper's own: the address carries no login (`https://user:pass@…`), and it is not a video file. A site path is returned as given, for the
+ * layout to resolve against the site's origin; an https address is returned in its normalised form.
+ * @param {{ src: string, alt?: string | null } | null | undefined} pic  `pictureOf(spark)`
  * @returns {string | null}
  */
-export function sparkStillOf(spark) {
-  const pic = pictureOf(spark);
-  if (!pic) return null;
+export function sparkStillOf(pic) {
+  if (!pic || typeof pic.src !== "string") return null;
   const raw = pic.src;
   if (raw.startsWith("/")) {
     let u;
@@ -145,10 +144,10 @@ export function sparkStillOf(spark) {
 /**
  * A Spark detail page's preview: its own still as a large card, else the Sparks section's card (the banner until one is drawn). Both og:image and twitter:image carry
  * the one address (BaseLayout writes `ogImage` to both), and the card is always summary_large_image: a Spark's picture is the page's wide, image-first view.
- * @param {object} spark
+ * @param {{ src: string, alt?: string | null } | null | undefined} pic  `pictureOf(spark)`
  */
-export function sparkPreview(spark) {
-  const still = sparkStillOf(spark);
+export function sparkPreview(pic) {
+  const still = sparkStillOf(pic);
   return wide(still ?? sectionCard("sparks"));
 }
 
