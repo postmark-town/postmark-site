@@ -212,6 +212,24 @@ test("a video address is not a still, and an address with a login is not safe to
   assert.equal(still("https://media.postmark.town/media/h/video-notes.jpg"),"https://media.postmark.town/media/h/video-notes.jpg", "CONTROL: only the file's own extension decides, not a word in its name");
 });
 
+test("a root path that the URL parser sends to ANOTHER host is no still (frontier review of a6cde2d1)", () => {
+  // pictureOf admits a leading slash that is not followed by a second slash; the URL parser reads `/\` as `//` and strips tabs and newlines, so these leave the site (and the second
+  // carries a login). INVENTED hosts. Each must fall back, and BaseLayout (which resolves the same way) must never be handed one.
+  const fallback = { image: SECTION_CARDS.sparks, card: LARGE };
+  const SITE = "https://site.invalid";
+  for (const raw of ["/\\evil.example/x.jpg", "/\\user:pw@evil.example/x.jpg", "/\\u@evil.example/x.jpg", "/\\\\evil.example/x.jpg", "/\t/evil.example/x.jpg", "/\n/evil.example/x.jpg", "/\r/evil.example/x.jpg"]) {
+    assert.ok(pictureOf(spark(raw)), `CONTROL: pictureOf admits ${JSON.stringify(raw)} (so the guard is the helper's, not the shared rule)`);
+    assert.equal(new URL(raw, SITE).origin !== SITE || !!new URL(raw, SITE).username, true, `CONTROL: ${JSON.stringify(raw)} really parses off the site`);
+    assert.deepEqual(prev(raw), fallback, JSON.stringify(raw));
+    assert.equal(still(raw), null, JSON.stringify(raw));
+  }
+  // the ordinary controls still pass: a plain site path, one with a query, one that climbs (it stays on the site), and an https address
+  assert.equal(still("/media/x/y.png"), "/media/x/y.png");
+  assert.equal(still("/media/x/y.png?v=2"), "/media/x/y.png?v=2");
+  assert.equal(still("/a/../../b.jpg"), "/a/../../b.jpg", "a path that climbs is still on the site's own origin");
+  assert.equal(still("https://media.postmark.town/media/h/p.jpg"), "https://media.postmark.town/media/h/p.jpg");
+});
+
 test("a Spark's still is the picture its own card draws, not a second rule", () => {
   const card = read("../src/components/SparkCard.astro");
   assert.match(card, /import \{[^}]*\bpictureOf\b[^}]*\} from "@\/lib\/calendar\.mjs"/, "the card's picture is calendar.mjs pictureOf");

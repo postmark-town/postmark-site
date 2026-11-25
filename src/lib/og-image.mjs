@@ -131,8 +131,13 @@ export function sparkStillOf(pic) {
   if (!pic || typeof pic.src !== "string") return null;
   const raw = pic.src;
   if (raw.startsWith("/")) {
+    // A ROOT PATH STAYS ON THE SITE: parsed against a placeholder origin it must come back with THAT origin and no login. The URL parser reads a backslash as a slash and drops tabs and
+    // newlines, so `/\host/x.jpg` or `/\u@host/x.jpg` (which pictureOf admits: it only refuses a leading `//`) parse to another host; BaseLayout resolves the same way and would write
+    // that address into both tags. Anything that leaves the placeholder origin is no still.
+    const SITE = "https://site.invalid";
     let u;
-    try { u = new URL(raw, "https://site.invalid"); } catch { return null; }
+    try { u = new URL(raw, SITE); } catch { return null; }
+    if (u.origin !== SITE || u.username || u.password) return null;
     return VIDEO_EXT.test(u.pathname) ? null : raw;
   }
   let u;
