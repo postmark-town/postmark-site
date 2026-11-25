@@ -34,14 +34,17 @@ test("(1) the face's, the editor's and the cards' rules live once, in the shared
 });
 
 test("(1) every moved selector carries the weight Astro's scope gave it: .rpage first, :is(.rpage *) on each later compound", () => {
-  const rules = CSS.replace(/\/\*[^]*?\*\//g, "").match(/[^{}]+\{/g).map((s) => s.slice(0, -1).trim()).filter((s) => s && !s.startsWith("@"));
+  // the moved rules are everything above the blank instance's own section (whose rules are new, and only reach a draft)
+  const moved = CSS.slice(0, CSS.indexOf("/* ── A BLANK INSTANCE OF THE PAGE"));
+  assert.ok(moved.length > 1000 && moved.length < CSS.length, "the sheet keeps the moved rules apart from the draft's own");
+  const rules = moved.replace(/\/\*[^]*?\*\//g, "").match(/[^{}]+\{/g).map((s) => s.slice(0, -1).trim()).filter((s) => s && !s.startsWith("@"));
   assert.ok(rules.length > 100, `${rules.length} rules`);
   for (const rule of rules) for (const sel of rule.split(",").map((s) => s.trim())) {
     assert.ok(sel.startsWith(".rpage "), `${sel} is not under .rpage`);
     const compounds = sel.slice(".rpage ".length).replaceAll(":is(.rpage *)", "§").split(/\s*[>+~]\s*|\s+/).filter(Boolean);
     compounds.slice(1).forEach((c) => {
       // a part that was :global() in Household (an img or canvas the controller makes) had no scope attribute, and gets nothing
-      if (/^(img|canvas)$/.test(c)) return;
+      if (/^(img|canvas|:first-child)$/.test(c)) return;
       assert.ok(c.includes("§"), `${sel}: "${c}" lost its share of the scope's weight`);
     });
     assert.equal(compounds[0].includes("§"), false, `${sel}: the first compound's share is the .rpage ancestor, not a second one`);

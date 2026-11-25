@@ -5,6 +5,8 @@
 // words, placeholders and limits are src/lib/resident-fields.mjs; the styles src/styles/resident-page.css.
 //
 // `picture` false leaves the picture row out; `fields` names which of the editor's fields to draw (all of them, in their order, by default).
+// `piece` (the join's blank instance) puts the join's own hook on each box (data-piece) and a live count on every field with a limit
+// (data-count-for), the approved join's "a live count on every field"; without it the editor is drawn exactly as the resident page has it.
 import ResidentField from "./ResidentField.astro";
 import { PROFILE_FIELDS, EDITOR_ORDER, PICTURE } from "@/lib/resident-fields.mjs";
 interface Props {
@@ -14,9 +16,13 @@ interface Props {
   monogram?: string;
   picture?: boolean;
   fields?: readonly string[];
+  piece?: boolean;
 }
-const { handle, values = {}, avatarUrl = null, monogram = "?", picture = true, fields = EDITOR_ORDER } = Astro.props;
+const { handle, values = {}, avatarUrl = null, monogram = "?", picture = true, fields = EDITOR_ORDER, piece = false } = Astro.props;
 const bioCount = `bio-count-${handle}`;
+const countOf = (name: string) => piece
+  ? (PROFILE_FIELDS[name].maxLength || PROFILE_FIELDS[name].count) && name !== "color" ? { countId: `jd-count-${name}`, countAttrs: { "data-count-for": name } } : {}
+  : name === "bio" ? { countId: bioCount, countAttrs: { "data-profile-bio-count": "" } } : {};
 ---
 {picture && (
   <div class="profile-edit-avatar-row">
@@ -49,8 +55,8 @@ const bioCount = `bio-count-${handle}`;
       spec={PROFILE_FIELDS[name]}
       value={values[name] ?? ""}
       withClear={name === "pronouns"}
-      countId={name === "bio" ? bioCount : undefined}
-      countAttrs={name === "bio" ? { "data-profile-bio-count": "" } : {}}
+      {...countOf(name)}
+      inputAttrs={piece ? { "data-piece": name, id: `jd-${name}` } : {}}
     />
   ))}
 </div>

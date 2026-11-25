@@ -323,3 +323,19 @@
   .rpage .card-details { margin: 0 0 2.4em; }
   .rpage .bcard-detail[hidden] { display: none; }
   .rpage .bcard-detail { margin: 0 0 0.4em; }
+
+  /* a card's full read, on its paper (the Address card's is the resident's full address) */
+  .rpage .res-paper { padding: 1.2em 1.5em; font-size: 0.96rem; line-height: 1.65; margin: 0; }
+  .rpage .res-paper > :first-child { margin-top: 0; }
+
+/* ── A BLANK INSTANCE OF THE PAGE (CORE-188): the join fills these same pieces in ────────────────────────────────────────────────────────────
+   Drawn only where a piece carries data-ghost (ResidentFace.astro's and AddressCardFace.astro's draft): what the piece will hold, until it is
+   filled; and is-lit on the pieces the reader is filling right now. The resident page never carries either, so none of this reaches it. */
+.rpage [data-ghost]:empty::before { content: attr(data-ghost); opacity: 0.5; font-style: italic; font-weight: 400; }
+.rpage .profile-handle[data-ghost]:empty::before, .rpage .profile-chip [data-ghost]:empty::before { font-style: normal; }
+.rpage [data-fill].is-lit {
+  outline: 1.5px dashed color-mix(in srgb, var(--profile-color, #e8c48b) 75%, transparent); outline-offset: 3px; border-radius: 6px;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--profile-color, #e8c48b) 22%, transparent);
+}
+.rpage .profile-avatar[data-fill] > img { transform-origin: center; }
+.rpage .res-paper[data-ghost] { white-space: pre-wrap; overflow-wrap: anywhere; }

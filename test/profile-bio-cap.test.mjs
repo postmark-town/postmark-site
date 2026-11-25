@@ -89,7 +89,7 @@ test("the real source: no native maxlength is left on the bio box, and the count
   const textarea = field.split("\n").find((l) => l.includes("<textarea"));
   assert.ok(textarea, "the bio textarea line was found");
   assert.doesNotMatch(textarea, /maxlength/, "a native maxlength would silently clip a paste");
-  assert.match(editor, /countAttrs=\{name === "bio" \? \{ "data-profile-bio-count": "" \} : \{\}\}/);
+  assert.match(editor, /: name === "bio" \? \{ countId: bioCount, countAttrs: \{ "data-profile-bio-count": "" \} \} : \{\};/);
   assert.match(SRC, /<ProfileEditorFields handle=\{t\.handle\}/, "the resident page draws the editor's fields through it");
   assert.equal(BIO_MAX, 400, "the cap is the office's, unchanged");
 });
