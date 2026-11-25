@@ -36,7 +36,7 @@ import residents from "@/data/postmark/residents.json";
 import { mentionAliases, publicFaces } from "@/lib/resident-mentions.mjs";
 import { attendanceNote, attendeeLabel, unplacedLine } from "@/lib/event-attendance.mjs";
 import {
-  EVENT_WORDS, allEventViews, eventForPage, eventParams, eventSections, eventsOf, evidenceRead, isRoomId, legacyEventHref, roomHref, roomIdOf, utcText,
+  EVENT_WORDS, allEventViews, eventForPage, eventParams, eventSections, eventsOf, evidenceRead, isRoomId, legacyEventHref, roomPermalink, roomIdOf, utcText,
 } from "@/lib/calendar.mjs";
 import { eventReadAt, GALLERY_PHASES } from "@/lib/event-archive.mjs";
 import { rsvpGate, BUDGET_DEFAULT, BUDGET_MAX, COALESCE_MIN } from "@/lib/rsvp.mjs";
@@ -170,13 +170,14 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
               {/* EACH ROOM IS A CONVERSATIONS CARD (CORE-177, Darko 08:48 EST: "literally the same theme as like how it looks in the conversations page"): the
                   card, its head and the reader's host wear src/styles/conversation-host.css, the rules the Conversations page wears, inside `.convo`; the reader
                   is mounted through the site's one setup with that page's host options (conversation-host.mjs: its faces, its own header). The card's head is
-                  its place; its meta line is the room's id and the way to its whole talk on the Conversations page. */}
+                  its place; its meta line is the room's id and the way to its whole talk on the Conversations page: `#room-<id>` (calendar.mjs § roomPermalink),
+                  which that page opens through the office's named room read, so a historical room past its retained list still opens, under its own header. */}
               {rooms.map((room) => ({ id: roomIdOf(room), place: typeof room?.place === "string" && room.place.trim() ? room.place.trim() : null })).filter((r) => isRoomId(r.id)).map(({ id, place }) => (
                 <details class="c-thread ev-room" data-ev-room={id}>
                   <summary class="c-thread-head ev-room-h"><h3 class="c-place">{place ?? id}</h3><span class="ev-room-toggle" aria-hidden="true"></span></summary>
-                  <p class="c-meta ev-room-whole"><span>{id}</span><a class="c-perma" href={roomHref(id)}>{EVENT_WORDS.circles.whole} →</a></p>
+                  <p class="c-meta ev-room-whole"><span>{id}</span><a class="c-perma" href={roomPermalink(id)}>{EVENT_WORDS.circles.whole} →</a></p>
                   <div class="c-circles ev-reader" data-ev-reader>
-                    <p class="c-fine ev-note" data-ev-floor>{EVENT_WORDS.circles.noJs} <a href={roomHref(id)}>{id}</a>.</p>
+                    <p class="c-fine ev-note" data-ev-floor>{EVENT_WORDS.circles.noJs} <a href={roomPermalink(id)}>{id}</a>.</p>
                   </div>
                 </details>
               ))}
@@ -284,7 +285,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     import { AS, KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import { handleChoice, rsvpBody, submitRsvp, SECRET_LINE } from "@/lib/rsvp.mjs";
     import { fetchAnnouncements, eventReadUrl } from "@/lib/announcements.mjs";
-    import { EVENT_WORDS, LOCAL_FORMAT, eventSections, isRoomId, roomHref, roomIdOf } from "@/lib/calendar.mjs";
+    import { EVENT_WORDS, LOCAL_FORMAT, eventSections, isRoomId, roomPermalink, roomIdOf } from "@/lib/calendar.mjs";
     import { mountRoom } from "@/lib/circle-reader-mount.mjs";
     import { hostFaces, hostReaderOptions } from "@/lib/conversation-host.mjs";
     import { paintAttendance } from "@/lib/event-attendance.mjs";
@@ -322,7 +323,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
           h.append(name, toggle);
           const whole = document.createElement("p"); whole.className = "c-meta ev-room-whole";
           const idSpan = document.createElement("span"); idSpan.textContent = id;
-          const a = document.createElement("a"); a.className = "c-perma"; a.href = roomHref(id); a.textContent = `${EVENT_WORDS.circles.whole} →`; whole.append(idSpan, a);
+          const a = document.createElement("a"); a.className = "c-perma"; a.href = roomPermalink(id); a.textContent = `${EVENT_WORDS.circles.whole} →`; whole.append(idSpan, a);
           const reader = document.createElement("div"); reader.className = "c-circles ev-reader"; reader.dataset.evReader = "";
           const note = document.createElement("p"); note.className = "c-fine ev-note"; note.dataset.evFloor = ""; note.textContent = EVENT_WORDS.circles.noReader;
           reader.append(note); box.append(h, whole, reader); wrap.append(box);

@@ -844,19 +844,28 @@ import "@/styles/conversation-host.css";
       // own served identity, so it needs no list page to be held first). The page works out neither the room nor the circle: it asks.
       // Other talk, and the poll, never replace it: it lives outside the lists the poll paints, and its reader refreshes in place and
       // quietly (it offers "new - show", never pulls the visitor along). A refused or missing circle says so, and is not an empty one.
+      // A #room-<id> link (CORE-177: an event page's "whole conversation") shows THAT room the same way: the office's NAMED room read (`?room=`, the keyless read that
+      // resolves the id it is given, a historical one too, and answers with the room's own canonical header) says which room it is, and the same shared reader
+      // draws it. It needs no list page to hold the room first: a room past the retained page, or recorded under another spelling, still opens. The id is opaque:
+      // asked exactly as written, never rewritten, guessed or looked for in the lists. A bare #<id> stays the lists' card anchor (anchorFromHash), as it was.
+      // SELECTED-VIEW:BEGIN
       var selBox = document.querySelector("[data-selected]");
       var sayEl = document.querySelector("[data-say]");
       var h1El = document.querySelector(".c-head h1");
       var h1Home = h1El ? h1El.textContent : "";
       var sayHome = null;                      // where the speaking area lives on the ordinary page
-      var selected = null;                     // { cid, card, host, room, reader, mine }
+      var selected = null;                     // { cid, rid, card, host, room, reader, mine }: cid a circle, else rid the room asked for
       var selSeq = 0;
       function selectedHash() {
         var h = "";
         try { h = decodeURIComponent(location.hash || ""); } catch (e) { return null; }
         var m = /^#circle-(\d{1,18})$/.exec(h);
-        return m ? m[1] : null;
+        if (m) return { cid: m[1], rid: null };
+        var r = /^#room-([\s\S]{1,200})$/.exec(h);
+        return r ? { cid: null, rid: r[1] } : null;
       }
+      // what the view on screen is: its circle once it has one (a room's reader can open one of its circles), else the room it was asked for
+      function selectedKey(s) { return !s ? null : s.cid ? "circle:" + s.cid : "room:" + s.rid; }
       function selNote(sel, words, retry) {
         if (selected !== sel) return;
         var n = sel.card.querySelector("[data-selected-note]");
@@ -902,7 +911,9 @@ import "@/styles/conversation-host.css";
       function loadSelected(sel) {
         if (selected !== sel) return;
         selNote(sel, "", false);
-        fetch(API + "?circle=" + encodeURIComponent(sel.cid), { headers: { accept: "application/json" } })
+        // a circle: the circle read says its room; a room: the named room read (the requested id, as written) answers with the room's own header
+        var ask = sel.cid ? "?circle=" + encodeURIComponent(sel.cid) : "?room=" + encodeURIComponent(sel.rid);
+        fetch(API + ask, { headers: { accept: "application/json" } })
           .then(function (r) { return r.json().catch(function () { return null; }).then(function (d) { return { ok: r.ok, d: d }; }); })
           .then(function (res) {
             if (selected !== sel) return;       // another conversation, or the list, was chosen since
@@ -951,9 +962,11 @@ import "@/styles/conversation-host.css";
           })
           .catch(function () { /* quiet: the reader is showing the circle; the place line keeps what the office last said */ });
       }
-      function enterSelected(cid) {
+      function enterSelected(want) {
+        var cid = want.cid, rid = want.rid;
         var card = el("article", "c-thread c-selected");
-        card.setAttribute("data-selected-card", cid);
+        if (cid) card.setAttribute("data-selected-card", cid);
+        else card.setAttribute("data-selected-room", rid);
         var back = el("a", "c-selected-back", "← All conversations");
         back.href = "/conversations/";
         // an ordinary primary press leaves IN PLACE (the page, its one speaking area, an unsent draft and the chosen actor all stay); the link keeps its ordinary
@@ -976,7 +989,7 @@ import "@/styles/conversation-host.css";
         // the speaking area is the page's own (one form, one auth, one submit): it moves in under the reader and goes home afterwards
         if (sayEl && !sayHome) { sayHome = document.createComment("c-say-home"); sayEl.parentNode.insertBefore(sayHome, sayEl); }
         if (sayEl) card.appendChild(sayEl);
-        selected = { cid: cid, card: card, host: host, room: null, reader: null, mounting: false, mine: ++selSeq };
+        selected = { cid: cid, rid: rid, card: card, host: host, room: null, reader: null, mounting: false, mine: ++selSeq };
         document.dispatchEvent(new CustomEvent("pm:selected-change"));      // a reply target belongs to the conversation it was chosen in
         loadSelected(selected);
       }
@@ -992,11 +1005,11 @@ import "@/styles/conversation-host.css";
         wireReaders(liveBox); wireReaders(closedBox);
       }
       function syncSelected() {
-        var cid = selectedHash();
-        if (!cid) { if (selected) leaveSelected(); return; }
-        if (selected && selected.cid === cid) return;
+        var want = selectedHash();
+        if (!want) { if (selected) leaveSelected(); return; }
+        if (selected && selectedKey(selected) === selectedKey(want)) return;
         if (selected) leaveSelected();
-        enterSelected(cid);
+        enterSelected(want);
       }
       // the poll's refresh is quiet (new talk is offered, never pulled in); the visitor's OWN say is shown at once
       function refreshSelected(own) { if (selected && selected.reader) selected.reader.refresh({ quiet: !own }); }
@@ -1005,12 +1018,13 @@ import "@/styles/conversation-host.css";
         var id = decodeURIComponent((location.hash || "").slice(1));
         if (!id) return;
         var circle = /^circle-(\d{1,18})$/.exec(id);
-        if (circle) return;       // a circle link is the selected view (syncSelected), not a card to scroll to
+        if (circle || /^room-/.test(id)) return;       // a circle or room link is the selected view (syncSelected), not a card to scroll to
         var card = document.getElementById(id);
         if (!card) return; // a thread past the closed cap, or a stale link — the page stands
         card.scrollIntoView({ block: "start" });
         card.classList.add("is-anchored");
       }
+      // SELECTED-VIEW:END
       window.addEventListener("hashchange", function () { syncSelected(); anchored = false; tick(); });
 
       // POLL-SCHEDULER:BEGIN
@@ -1134,7 +1148,7 @@ import "@/styles/conversation-host.css";
       // right away — waiting out the poll to see your own voice land feels broken.
       // Their own voice also beats wherever they were reading: pin to newest.
       document.addEventListener("pm:spoke", function () { pinNext = true; tick(); refreshReaders(liveBox, true); refreshReaders(closedBox, true); refreshSelected(true); });
-      syncSelected();       // a #circle- link on arrival shows its conversation at once, before the first poll answers
+      syncSelected();       // a #circle- or #room- link on arrival shows its conversation at once, before the first poll answers (and whatever that page holds)
     })();
   </script>
 

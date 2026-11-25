@@ -53,7 +53,7 @@ test("PIN the event page's own fallbacks stop at the room card's chrome, so the 
     }
   }
   // both paths draw the chrome with the shared classes: the baked card and the island's build()
-  assert.match(EVENT, /<a class="c-perma" href=\{roomHref\(id\)\}>/); assert.match(EVENT, /a\.className = "c-perma";/);
+  assert.match(EVENT, /<a class="c-perma" href=\{roomPermalink\(id\)\}>/); assert.match(EVENT, /a\.className = "c-perma";/);
   assert.match(EVENT, /<p class="c-fine ev-note" data-ev-floor>/); assert.match(EVENT, /note\.className = "c-fine ev-note";/);
 });
 

@@ -224,6 +224,13 @@ export function pictureOf(spark) {
 export const roomHref = (id) => `/conversations/#${encodeURIComponent(String(id ?? ""))}`;
 
 /**
+ * A room's WHOLE conversation on the conversations page (CORE-177): `#room-<id>` opens that room in the page's one-conversation view through the
+ * office's named room read, which resolves the id as the record wrote it (a historical room too) and answers with the room's own header. Unlike the
+ * card anchor above it needs no list page to hold the room. The id is passed as written, never rewritten.
+ */
+export const roomPermalink = (id) => `/conversations/#room-${encodeURIComponent(String(id ?? ""))}`;
+
+/**
  * A room id is OPAQUE: a non-empty string or a finite number (`room.id` may be numeric, and 0 is a number, not an absence). Tested by type, never by
  * truthiness, and never read as a say id.
  */
