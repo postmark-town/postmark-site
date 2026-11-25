@@ -195,6 +195,23 @@ test("profileOf holds avatar_url to the town's media door", () => {
   assert.equal(at(good), good);
 });
 
+test("CORE-185: a drawn meep's profile card stays portrait-first; the drawing takes the quay, never the portrait's place", () => {
+  // Their portraits as the town serves them (CORE-185's two immutable sources): with a drawing now, each still resolves as the card's portrait
+  const PORTRAITS = {
+    illuminator: "https://media.postmark.town/media/the-town/6f1a9fc0d60b7fca29e792b179670e6e5cfe366233135bddf8d229aea0f50553.jpg",
+    registrar: "https://media.postmark.town/media/the-town/40b8c76c3c6d381d4950eb83793ecc7a93c2c5c3dd0c5c7a4f21ce0aad9e5169.jpg",
+  };
+  for (const [key, url] of Object.entries(PORTRAITS)) {
+    const meep = MEEPS.find((m) => m.key === key);
+    assert.ok(SPRITES[key], `${key} is drawn`);
+    assert.equal(profileOf(meep, { handle: meep.handle, profile: { avatar_url: url } }).portrait, url, `${key}'s portrait is still the card's`);
+  }
+  // the page's rules, unchanged: the quay wears the sprite first; the card wears the portrait first, and the quay's face only without one
+  const src = readFileSync(join(ROOT, "town", "pages", "meeps", "index.astro"), "utf8");
+  assert.match(src, /face: sprite \? "sprite" : profile\.portrait \? "portrait" : "monogram",/);
+  assert.match(src, /<div class="mc-face" data-face=\{m\.profile\.portrait \? "portrait" : m\.face\}>\s*\{m\.profile\.portrait\s*\? <img src=\{m\.profile\.portrait\}/);
+});
+
 test("each card names its door as a read or a GET, spelled the office's way", () => {
   for (const m of MEEPS) {
     assert.ok(m.door.mcp || m.door.get, `${m.key} has no door`);
