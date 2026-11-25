@@ -21,6 +21,7 @@ import { readFileSync } from "node:fs";
 import {
   BANNER, LARGE, SMALL, SECTION_CARDS, sectionCard,
   portraitOf, householdPreview, residentPreview, handlesPreview, openerFirst,
+  sparkStillOf, sparkPreview,
 } from "../src/lib/og-image.mjs";
 import { RAIL } from "../src/lib/nav.mjs";
 
@@ -131,6 +132,7 @@ test("each page with a picture of its own passes it", () => {
     "mail/with/[pair].astro": "handlesPreview(",
     "mail/with/[pair]/older/[part].astro": "handlesPreview(",
     "events/[host]/[slug].astro": "handlesPreview(",     // CORE-82: the event page moved from calendar/[host]/[slug].astro
+    "sparks/[...id].astro": "sparkPreview(",              // CORE-190: a Spark's page previews with its own picture
   };
   // until 2026-11-17 (POS-1085) the four mail pages picked in their own text; they build their
   // share card in src/lib/mail-routes.mjs now and the page only hands it on (its prop)
@@ -164,4 +166,67 @@ test("/world, which emits its own document, carries the share tags", () => {
   for (const tag of ['property="og:image"', 'name="twitter:image"', 'name="twitter:card"', 'property="og:title"'])
     assert.ok(world.includes(tag), tag);
   assert.match(world, /sectionCard\("world"\)/);
+});
+
+// ── 5. a Spark's own page (CORE-190) ─────────────────────────────────────────
+//
+// Darko, 2026-11-25: the filed Spark page carries its picture, but og:image and twitter:image were the town banner. A Spark's page passes the picture its own card draws
+// (calendar.mjs pictureOf), as a large card, into the one `image` the layout writes to BOTH tags; with no usable still it keeps the Sparks section's card.
+
+// The filed Spark's picture, the shape the office serves it (a bare https address) and the object form pictureOf also reads. INVENTED ids; the media address is the public one the filing names.
+const FILED_PIC = "https://media.postmark.town/media/harpylandfall/6ebfda9f2bfb16e4416a067b1ce9aef91215502e8df03d14cb28a9eef3b9eeca.jpg";
+const spark = (picture) => ({ id: "landfall/low-tide-a-bird-folds-and-the-beach-hands-it-back", body: "Low tide", picture });
+
+test("a pictured Spark previews with its own picture, as a large card", () => {
+  assert.deepEqual(sparkPreview(spark(FILED_PIC)), { image: FILED_PIC, card: LARGE });
+  assert.deepEqual(sparkPreview(spark({ url: FILED_PIC, alt: "a bird" })), { image: FILED_PIC, card: LARGE }, "the {url, alt} form");
+  assert.deepEqual(sparkPreview(spark({ src: "/media/x/y.png" })), { image: "/media/x/y.png", card: LARGE }, "a site path is kept for the layout to resolve against the site's origin");
+  // CONTROL: the pictured result is not the banner
+  assert.notEqual(sparkPreview(spark(FILED_PIC)).image, BANNER);
+});
+
+test("a Spark with no usable still falls back to the Sparks section's card, still a large card", () => {
+  const fallback = { image: SECTION_CARDS.sparks, card: LARGE };
+  assert.equal(SECTION_CARDS.sparks, BANNER, "CONTROL: the Sparks card is the banner until one is drawn");
+  for (const [what, p] of [
+    ["no picture", undefined], ["null", null], ["empty string", ""], ["blank", "   "],
+    ["a protocol-relative address", "//evil.example/x.jpg"], ["a plain http address", "http://media.postmark.town/x.jpg"],
+    ["a javascript: address", "javascript:alert(1)"], ["a data: address", "data:image/png;base64,AAAA"], ["a bare relative path", "media/x.jpg"],
+    ["a number", 7], ["an empty object", {}], ["an object with no address", { alt: "only an alt" }],
+  ]) assert.deepEqual(sparkPreview(spark(p)), fallback, what);
+  assert.deepEqual(sparkPreview(null), fallback, "no spark at all");
+  assert.deepEqual(sparkPreview({}), fallback, "a spark with no picture field");
+});
+
+test("a video address is not a still, and an address with a login is not safe to hand a scraper", () => {
+  const fallback = { image: SECTION_CARDS.sparks, card: LARGE };
+  for (const v of ["https://media.postmark.town/media/h/clip.mp4", "https://media.postmark.town/media/h/clip.WEBM", "https://media.postmark.town/media/h/clip.mov?x=1", "/media/h/clip.m4v", "https://media.postmark.town/h/stream.m3u8"])
+    assert.deepEqual(sparkPreview(spark(v)), fallback, v);
+  assert.deepEqual(sparkPreview(spark("https://user:pw@media.postmark.town/x.jpg")), fallback, "credentials in the address");
+  assert.equal(sparkStillOf(spark("https://media.postmark.town/media/h/photo.jpg?v=2")), "https://media.postmark.town/media/h/photo.jpg?v=2", "CONTROL: an image with a query is still an image");
+  assert.equal(sparkStillOf(spark("https://media.postmark.town/media/h/video-notes.jpg")), "https://media.postmark.town/media/h/video-notes.jpg", "CONTROL: only the file's own extension decides, not a word in its name");
+});
+
+test("a Spark's still is the picture its own card draws, not a second rule", () => {
+  const card = read("../src/components/SparkCard.astro");
+  assert.match(card, /import \{[^}]*\bpictureOf\b[^}]*\} from "@\/lib\/calendar\.mjs"/, "the card's picture is calendar.mjs pictureOf");
+  const lib = read("../src/lib/og-image.mjs");
+  assert.match(lib, /import \{ pictureOf \} from "\.\/calendar\.mjs";/);
+  assert.match(lib, /const pic = pictureOf\(spark\);/, "the preview asks the same function");
+});
+
+test("the Spark page hands its pick to the layout, and the layout writes the one address to BOTH tags", () => {
+  const page = read("../town/pages/sparks/[...id].astro");
+  assert.match(page, /const preview = sparkPreview\(s\);/);
+  assert.match(page, /image=\{preview\.image\}\s+card=\{preview\.card\}/);
+  const base = read("../src/layouts/BaseLayout.astro");
+  assert.match(base, /<meta property="og:image" content=\{ogImage\} \/>/);
+  assert.match(base, /<meta name="twitter:image" content=\{ogImage\} \/>/, "twitter:image is the SAME ogImage, so the two cannot disagree");
+  assert.match(base, /const ogImage = new URL\(image, Astro\.site\)\.href;/, "a site path is made absolute; an https address stays as it is");
+});
+
+test("other pages' previews are unchanged by the Spark's (a resident's face stays a small card, a section keeps its card)", () => {
+  assert.deepEqual(residentPreview(withFace("wren"), [withFace("wren")], src), { image: "/media/wren-avatar-card.jpg", card: SMALL });
+  assert.deepEqual(handlesPreview(["nobody"], new Map(), sectionCard("calendar"), src), { image: SECTION_CARDS.calendar, card: LARGE });
+  assert.equal(sectionCard("sparks"), SECTION_CARDS.sparks);
 });
