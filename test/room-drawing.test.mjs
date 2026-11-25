@@ -176,23 +176,84 @@ const g0 = page.indexOf("// ROOM-DRAW:BEGIN"), g1 = page.indexOf("// ROOM-DRAW:E
 assert.ok(g0 > -1 && g1 > g0, "the page still carries its ROOM-DRAW glue");
 const GLUE = page.slice(g0, g1);
 
-test("PRODUCTION BINDING: the page draws every room through this module once its module script hands it over, and keeps its pane until then", () => {
+// the page's glue over a small page: its two lists hold the cards the poll made; `fire` is the browser (load) and the module script (its two events)
+function pageGlue({ readyState = "loading" } = {}) {
   const doc = makeDoc();
-  const listeners = {};
-  const document = Object.assign(doc, { addEventListener: (ev, fn) => { listeners[ev] = fn; }, dispatchEvent: () => {} });
-  const window = {};
-  const liveBox = { querySelectorAll: () => [] }, closedBox = { querySelectorAll: () => [] };
+  const on = { doc: {}, win: {} }, cards = [];
+  const document = Object.assign(doc, { readyState, addEventListener: (ev, fn) => { (on.doc[ev] ||= []).push(fn); }, dispatchEvent: () => {} });
+  const window = { addEventListener: (ev, fn) => { (on.win[ev] ||= []).push(fn); } };
+  const box = { querySelectorAll: (sel) => (sel === ".c-thread" ? cards.map((x) => x.c) : []) };
   const el = (tag, cls, text) => { const n = doc.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = String(text); return n; };
-  const api = new Function("document", "window", "hook", "el", "faceNode", "personLink", "humanOf", "dateTimeOf", "faces", "pinNext", "liveBox", "closedBox", "statementsWords", "ensureReader", "poller", "CustomEvent",
+  const nope = () => { throw new Error("the glue asked for something it must not (a read, a reader)"); };
+  const api = new Function("document", "window", "hook", "el", "faceNode", "personLink", "humanOf", "dateTimeOf", "faces", "pinNext", "liveBox", "closedBox", "statementsWords", "ensureReader", "poller", "CustomEvent", "fetch",
     `${GLUE}\nreturn { drawRoom, roomPress, drawEarlier, redrawRooms };`)(
-    document, window, () => null, el, (h) => el("span", "c-face", h[0]), (h) => el("a", "c-who", h), () => null, (i) => i, null, false, liveBox, closedBox, () => "", () => null, { state: () => ({ fails: 0 }) }, class {});
-  const { c, list } = card(doc);
-  c.__t = thread(LINES);
-  assert.equal(api.drawRoom(c, c.__t), false, "before the module script runs: nothing drawn, the pane stands");
-  assert.equal(api.drawEarlier(c, c.__t), undefined);
-  assert.equal(typeof listeners["pm:rooms-ready"], "function", "the page waits for the drawing to be handed over");
-  window.__pmRoomDrawing = createRoomDrawing;          // what the module script does
-  assert.equal(api.drawRoom(c, c.__t), true, "then every room is drawn by the shared module");
+    document, window, () => null, el, (h) => el("span", "c-face", h[0]), (h) => el("a", "c-who", h), () => null, (i) => i, null, false, box, { querySelectorAll: () => [] }, () => "", nope, { state: () => ({ fails: 0 }) }, class {}, nope);
+  const fire = (where, ev) => (on[where][ev] || []).forEach((fn) => fn());
+  // a card as the poll makes it (threadNode): its pane, then a first draw
+  const add = (voices = LINES) => { const x = card(doc); x.c.className = "c-thread"; x.c.__t = thread(voices); cards.push(x); api.drawRoom(x.c, x.c.__t); return x; };
+  return { api, window, document, fire, add, on };
+}
+const floorOf = (list) => list.querySelectorAll("[data-room-floor]");
+
+test("THE ROOM FLOOR: while the drawing is on its way a pane says its messages are loading, in the pane's own list, as a fine note; never an empty room", () => {
+  const g = pageGlue();
+  const { c, list } = g.add();
+  assert.equal(floorOf(list).length, 1, "one floor");
+  const f = floorOf(list)[0];
+  assert.equal(f.tagName, "LI", "valid list markup inside the pane"); assert.ok(f.className.includes("c-fine"), "the page's fine-note look");
+  assert.equal(f.getAttribute("role"), "status"); assert.equal(f.textContent, "Loading this room's messages…");
+  assert.equal(list.children.length, 1, "and nothing else");
+  // a poll that redraws the same card keeps one floor, not two
+  g.api.drawRoom(c, c.__t);
+  g.api.redrawRooms();
+  assert.equal(floorOf(list).length, 1);
+});
+
+test("NEVER ARRIVES: once the page has loaded (or the module script spoke) without the drawing, every pane says its messages can't be shown here, a card that comes later too; no read is made", () => {
+  const g = pageGlue();
+  const a = g.add();
+  g.fire("win", "load");
+  assert.equal(floorOf(a.list)[0].textContent, "This room's messages can't be shown on this page just now. That is not the same as it being empty.");
+  const b = g.add();                                   // the list's answer lands after the page finished
+  assert.equal(floorOf(b.list).length, 1); assert.match(floorOf(b.list)[0].textContent, /can't be shown on this page just now/);
+  // the module script's own signal does the same when it speaks without the drawing
+  const h = pageGlue(); const c = h.add(); h.fire("doc", "pm:circles-ready");
+  assert.match(floorOf(c.list)[0].textContent, /can't be shown/);
+  // a page whose document had already finished when the card arrived: the disclosure, at once
+  const done = pageGlue({ readyState: "complete" }); const d = done.add();
+  assert.match(floorOf(d.list)[0].textContent, /can't be shown/);
+  // and the floor never claims the office failed: that is the lists' own words
+  assert.equal(/office/i.test(floorOf(d.list)[0].textContent), false);
+});
+
+test("LATE RECOVERY: a late pm:rooms-ready draws every room through the same module, replacing the floor; nothing stale, nothing doubled, drawn rooms left alone", () => {
+  const g = pageGlue();
+  const a = g.add(), b = g.add();
+  g.fire("win", "load");                              // the drawing was late: disclosed
+  g.window.__pmRoomDrawing = createRoomDrawing;        // then the module script runs after all
+  g.fire("doc", "pm:rooms-ready");
+  for (const x of [a, b]) {
+    assert.equal(floorOf(x.list).length, 0, "the floor is gone");
+    assert.equal(tops(x.list).length, 3); assert.deepEqual(x.list.querySelectorAll(".c-fold").map((n) => n.textContent), ["9 replies", "2 replies"]);
+    assert.equal(/can't be shown|Loading/.test(x.list.textContent), false, "no stale words");
+  }
+  // a drawn room is never given a floor again: a later load or signal leaves it drawn
+  const before = a.list.children.slice();
+  g.fire("win", "load"); g.fire("doc", "pm:circles-ready");
+  assert.deepEqual(a.list.children, before, "untouched");
+  assert.equal(g.api.drawRoom(a.c, a.c.__t), false, "nothing moved: no redraw");
+  // a new card after recovery is drawn at once
+  const c = g.add(); assert.equal(tops(c.list).length, 3); assert.equal(floorOf(c.list).length, 0);
+});
+
+test("PRODUCTION BINDING: the page draws every room through this module once its module script hands it over", () => {
+  const g = pageGlue();
+  const { c, list } = g.add();
+  assert.equal(g.api.drawRoom(c, c.__t), false, "before the module script runs: nothing drawn (the floor stands)");
+  assert.equal(g.api.drawEarlier(c, c.__t), undefined);
+  assert.equal(typeof (g.on.doc["pm:rooms-ready"] || [])[0], "function", "the page waits for the drawing to be handed over");
+  g.window.__pmRoomDrawing = createRoomDrawing;          // what the module script does
+  assert.equal(g.api.drawRoom(c, c.__t), true, "then every room is drawn by the shared module");
   assert.equal(tops(list).length, 3); assert.deepEqual(list.querySelectorAll(".c-fold").map((b) => b.textContent), ["9 replies", "2 replies"]);
   // the module script: imports the module and hands it over, then says so
   assert.match(page, /^    import \{ createRoomDrawing \} from "@\/lib\/room-drawing\.mjs";$/m);

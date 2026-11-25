@@ -467,7 +467,7 @@ import "@/styles/conversation-host.css";
       // messages, the one replies button, "N new", the circle on the line), the one implementation every host uses. This inline script cannot import, so
       // the module script below hands it over (`window.__pmRoomDrawing`, then `pm:rooms-ready`), and this page makes its ONE drawing with what is its own:
       // its nodes, faces and name links, whether the reader may reply, the pictures, the reader's own say landing, and what a Reply press means here.
-      // A card drawn before it arrives keeps its pane until `pm:rooms-ready` redraws every room.
+      // A card drawn before it arrives says so in its pane (ROOM FLOOR below) until `pm:rooms-ready` redraws every room.
       // Reply buttons exist only for a reader the module script says is signed in (the office still judges the say)
       function canReply() {
         var h = hook();
@@ -486,8 +486,38 @@ import "@/styles/conversation-host.css";
         });
         return rooms;
       }
+      // THE ROOM FLOOR (CORE-177): a pane is never an empty room. Until the drawing is here it says the messages are loading; once the page has finished
+      // loading (or the module script has spoken) without handing the drawing over, it says they can't be shown here. That is the page's own part failing,
+      // not the office: the office's silence is said on the lists. When the drawing does arrive, however late, `pm:rooms-ready` redraws every room and the
+      // drawing's own first draw clears the floor (`list.textContent = ""`); a room it has drawn is never given a floor again.
+      var ROOM_FLOOR = {
+        wait: "Loading this room's messages…",
+        gone: "This room's messages can't be shown on this page just now. That is not the same as it being empty.",
+      };
+      var roomsGone = false;
+      function roomFloor(card) {
+        var list = card.querySelector(".c-voices");
+        if (!list) return;
+        if (!roomsGone && document.readyState === "complete") roomsGone = true;   // the page had already finished: the drawing is not coming with it
+        var words = roomsGone ? ROOM_FLOOR.gone : ROOM_FLOOR.wait;
+        var n = list.querySelector("[data-room-floor]");
+        if (!n) {
+          list.textContent = "";
+          n = el("li", "c-fine c-room-floor", words);
+          n.setAttribute("data-room-floor", "");
+          n.setAttribute("role", "status");
+          list.appendChild(n);
+        } else if (n.textContent !== words) n.textContent = words;
+      }
+      function roomsDone() {
+        if (roomsGone || roomDrawing()) return;
+        roomsGone = true;
+        [liveBox, closedBox].forEach(function (box) { Array.prototype.forEach.call(box.querySelectorAll(".c-thread"), roomFloor); });
+      }
+      window.addEventListener("load", roomsDone);
+      document.addEventListener("pm:circles-ready", roomsDone);
       function roomOf(card) { var r = roomDrawing(); return r ? r.roomOf(card) : (card.__room || {}); }
-      function drawRoom(card, t, press) { var r = roomDrawing(); return r ? r.drawRoom(card, t, press) : false; }
+      function drawRoom(card, t, press) { var r = roomDrawing(); if (r) return r.drawRoom(card, t, press); roomFloor(card); return false; }
       function roomPress(card, ev) { var r = roomDrawing(); if (r) r.roomPress(card, ev); }
       function keyed(list, key) { var r = roomDrawing(); return r ? r.keyed(list, key) : null; }
       function showInPane(list, row) { var r = roomDrawing(); if (r) r.showInPane(list, row); }
