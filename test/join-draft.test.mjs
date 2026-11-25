@@ -8,8 +8,8 @@
 //   (2) the wire is the card's: only names the act's card takes are sent, under the card's own names (full_address or its alias card; the
 //       directory line as note), with the card's required flags and limits; a field the design places nowhere is still asked; from_town is not;
 //   (3) counts are the office's units (POS-1237 x-limit): code points, what a reader sees, UTF-8 bytes; never an inferred cap;
-//   (4) the human's own profile and the likeness NEVER enter an agent act's arguments (declare, begin, add-resident), and their held words say
-//       work in progress; a keeper and a berth are not asked them here;
+//   (4) the human's own profile and the likeness are the office co-sign page's (Darko's ruled fallback): no site step asks them and no act
+//       carries them; a new house takes the co-sign road, where the handle follows the berth's narrower rule, said out loud;
 //   (5) every other piece has an honest fate: AFTER (this page writes it through the resident's own doors once admitted) or HELD (not sent);
 //   (6) after admission, writes go only through the resident's existing doors, only for a handle this sign-in holds, never to a human door, and
 //       a part that fails says so without undoing the rest.
@@ -21,7 +21,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   STEPS, CONCEPT, DROPPED, REGISTRAR, UNITS, planFor, argsFrom, countOf, countWords, lengthIn, limitOf, stepProblems, problemWords, allProblems,
-  admitsNow, kickerOf, stepOfHash, hashOfStep, inLines, hexOf,
+  admitsNow, cosignRoad, kickerOf, stepOfHash, hashOfStep, inLines, hexOf,
 } from "../src/lib/join-draft.mjs";
 import { afterAdmission, cropOf, PICTURE_OUT_MAX } from "../src/lib/join-after.mjs";
 
@@ -69,13 +69,15 @@ const EVERYTHING = {
 // ── (1) the steps ────────────────────────────────────────────────────────────
 
 test("(1) the approved steps, in order, and the Registrar has words for each, her name linking to her page", () => {
-  assert.deepEqual(STEPS.map((s) => s.title), ["Your household", "Who's moving in", "Describe yourself", "More about you", "How you found us", "Being shown"]);
-  for (const k of ["gate", ...STEPS.map((s) => s.id), "keeper", "review", "sent", "in"]) assert.ok(Array.isArray(REGISTRAR[k]) && REGISTRAR[k].length, `no Registrar line for ${k}`);
+  // the approved "Being shown" step went to the office's co-sign page with the human profile (Darko's ruled fallback, applied 2026-11-25)
+  assert.deepEqual(STEPS.map((s) => s.title), ["Your household", "Who's moving in", "Describe yourself", "More about you", "How you found us"]);
+  for (const k of ["gate", ...STEPS.map((s) => s.id), "keeper", "review", "reviewCosign", "cosign", "sent", "in"]) assert.ok(Array.isArray(REGISTRAR[k]) && REGISTRAR[k].length, `no Registrar line for ${k}`);
   assert.deepEqual(REGISTRAR.gate.find((p) => Array.isArray(p)), ["the Registrar", "/residents/registrar/"]);
-  // she never claims a write the page does not make (the likeness is held, not written down)
-  assert.doesNotMatch(REGISTRAR.shown.join(" "), /write down/);
+  // she says where the human's own part went, on step 1, before Send and when the link is handed over: the handoff is legible
+  for (const k of ["household", "reviewCosign", "cosign"]) assert.match(REGISTRAR[k].join(" "), /co-sign page/, `${k} doesn't say the office's co-sign page asks the human's part`);
+  assert.match(REGISTRAR.household.join(" "), /profile.*short videos|short videos.*profile/);
   const plan = planFor(DECLARE_F22, { act: "declare" });
-  assert.equal(kickerOf(plan, "describe"), "Step 3 of 6 · Describe yourself");
+  assert.equal(kickerOf(plan, "describe"), "Step 3 of 5 · Describe yourself");
   assert.equal(stepOfHash(hashOfStep("found"), plan), "found");
   assert.equal(stepOfHash("#review", plan), "review");
   assert.equal(stepOfHash("#step-99", plan), null);
@@ -166,30 +168,32 @@ test("(3) a step's problems: a blank required piece, an over-long one in its uni
 
 // ── (4) the human's own ──────────────────────────────────────────────────────
 
-test("(4) the human's profile and the likeness never enter any act's arguments, and their words say work in progress", () => {
+test("(4) the human's profile and the likeness: no act asks them here, and none carries them, under any name, even if a value turned up", () => {
+  // Darko's ruled fallback (Facet, 2026-11-25 21:11Z): the office's co-sign page asks them, under its own GitHub-bound pair. CAN FAIL: a human
+  // piece comes back onto a site step (asked twice, or asked and dropped), or a stray value rides an act or the agent's profile door.
   for (const [card, act, keepsHouse] of [[DECLARE_F22, "declare", false], [DECLARE_F0, "declare", false], [BEGIN, "begin", false], [ADD, "add-resident", true]]) {
-    const { args, writes, kept } = argsFrom(planFor(card, { act, keepsHouse }), EVERYTHING, { picture: true, references: 1 });
-    for (const h of [...HUMAN, "human_pronouns"]) assert.ok(!(h in args), `${act} carried the human's ${h}`);
+    const plan = planFor(card, { act, keepsHouse });
+    for (const h of HUMAN) assert.ok(!plan.pieces[h], `${act} asks the human's ${h} on the site`);
+    assert.ok(!plan.steps.includes("shown"), `${act} walks a likeness step`);
+    const { args, writes, kept } = argsFrom(plan, EVERYTHING, { picture: true, references: 1 });
+    for (const h of HUMAN) assert.ok(!(h in args), `${act} carried the human's ${h}`);
     assert.ok(!Object.values(args).includes("Juniper") && !Object.values(args).includes("I keep a heron."), `${act} carried a human value under another name`);
     assert.ok(!writes.profile || !Object.keys(writes.profile).some((k) => HUMAN.includes(k)), `${act} would write a human field with the agent's door`);
-    for (const k of kept.filter((x) => HUMAN.includes(x.id))) {
-      assert.equal(k.fate, "held");
-      assert.equal(k.wip, true, `${k.id}'s words are not marked work in progress`);
-      assert.match(k.where, /^Not sent with this join\. Work in progress:/);
-      assert.match(k.where, /open tab only/);
-    }
+    assert.ok(!kept.some((k) => HUMAN.includes(k.id)), `${act} lists a human piece as kept or held, as if the site had asked it`);
   }
+  assert.ok(!Object.keys(CONCEPT).some((id) => HUMAN.includes(id)), "a human piece is back in the site's table");
 });
 
-test("(4) a keeper is not asked a human profile here, and a berth's human gives theirs on the office's co-sign page", () => {
-  const add = planFor(ADD, { act: "add-resident", keepsHouse: true });
-  for (const h of ["town_name", "short_line", "human_pronouns"]) assert.ok(!add.pieces[h], `a keeper was asked ${h}`);
-  const begin = planFor(BEGIN, { act: "begin" });
-  for (const h of HUMAN) assert.ok(!begin.pieces[h], `a berth was asked ${h} (its human gives it on the co-sign page)`);
-  assert.ok(!begin.steps.includes("shown"), "a berth walked the likeness step");
-  const declare = planFor(DECLARE_F22, { act: "declare" });
-  for (const h of HUMAN) assert.ok(declare.pieces[h], `the approved early ${h} is gone from the founding join`);
-  assert.ok(declare.steps.includes("shown"), "the likeness lost its own step");
+test("(4) a new house takes the co-sign road, and on it the handle follows the berth's rule out loud: 31 at most, said in the box's own words", () => {
+  const plan = planFor(DECLARE_F22, { act: "declare" });
+  assert.equal(cosignRoad("declare"), true);
+  assert.ok(!cosignRoad("add-resident") && !cosignRoad("begin"), "an existing house, or the agent route, was sent down the berth road");
+  assert.deepEqual([plan.pieces.handle.max, plan.pieces.handle.maxFrom, plan.pieces.handle.berth], [31, "berth", true]);
+  assert.match(plan.pieces.handle.hint, /boards your agent's berth.*2–31/);
+  assert.equal(planFor(ADD, { act: "add-resident", keepsHouse: true }).pieces.handle.max, 40, "add-resident's handle was narrowed by a road it doesn't take");
+  assert.equal(problemWords(stepProblems(plan, "who", { handle: "the-heron" })[0]), "A handle can't start with the- or berth-: those are the town's own prefixes.");
+  assert.equal(stepProblems(plan, "who", { handle: "x".repeat(32) })[0].kind, "over", "32 characters is over the berth's 31");
+  assert.deepEqual(stepProblems(plan, "who", { handle: "quillon" }), []);
 });
 
 // ── (5) every other piece's fate ─────────────────────────────────────────────
@@ -280,11 +284,14 @@ test("(6) the picture travels as framed: the square the preview shows, at most 5
 test("(6) the page writes after admission only through join-after, and never to the office's consent or human doors", () => {
   const page = readFileSync(new URL("../town/pages/join/move-in.astro", import.meta.url), "utf8");
   const script = page.slice(page.indexOf("<script>"), page.indexOf("</script>", page.indexOf("<script>")));
-  assert.match(script, /if \(admitsNow\(act\)\) \{[\s\S]*?sentWrites = await afterAdmission\(\{/, "the after-admission writes run outside an admitting act");
-  const sendAt = script.indexOf("res = await submitAct(");
-  assert.ok(sendAt > 0 && script.indexOf("afterAdmission({") > sendAt, "a resident write can run before the office has answered");
+  // the two places a resident write may start: add-resident's answer, and the co-sign the berth key's /me confirms (join-berth.mjs § admittedBy)
+  assert.match(script, /if \(admitsNow\(act\)\) \{[\s\S]*?sentWrites = await finishAfter\(/, "add-resident's writes run outside its admission");
+  assert.match(script, /if \(!admittedBy\(me, cosign\.slug\)\) \{[\s\S]*?return watchCosign\(\);\s*\}\s*cosign\.finished = true;[\s\S]*?sentWrites = await finishAfter\(cosign\.slug, berthToken\(berth\), cosign\.writes\);/,
+    "a new house's writes run before the office has admitted it");
+  assert.equal((script.match(/afterAdmission\(\{/g) ?? []).length, 1, "a second way to write to the resident");
+  assert.equal((script.match(/finishAfter\(/g) ?? []).length, 3, "finishAfter is called from somewhere new");
   assert.doesNotMatch(script, /oauth\/consent|oauth\/human|oauth\/likeness/, "the page posts to a human-only door");
-  assert.doesNotMatch(script, /method: "(PATCH|POST)"/, "the page makes a write of its own outside join-after.mjs");
+  assert.doesNotMatch(script, /method: "(PATCH|POST)"/, "the page makes a write of its own outside the shared request shapers");
 });
 
 test("(6) \"You're in\": the office's own next lines when it sends them, else the approved two, with the page link", () => {

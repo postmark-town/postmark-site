@@ -14,13 +14,17 @@
 //   · live counts in the office's units (an emoji is one; the full address in bytes), limits only from the card; a required piece and an over-long
 //     one stop Continue, said in the one alert slot;
 //   · Back and "edit" on the look-over keep every value and the picture's framing, and the edit's Continue comes straight back;
-//   · THE SEND CARRIES ONLY WHAT THE ACT'S CARD TAKES: today's card gets household/handle/agent/note/card/invited_by/heard/heard_note; the accepted
-//     card (POS-1237, f22c069a) gets full_address, note, the bio and the profile under its own names;
-//   · NOTHING IS WRITTEN TO A RESIDENT BEFORE THE OFFICE ADMITS ONE, and after it only through the resident's own doors (the profile fields the
-//     card lacked, the picture); a berth's begin writes nothing;
-//   · THE HUMAN'S PROFILE AND THE LIKENESS ARE IN NO REQUEST AT ALL: held in the tab, said as work in progress (CORE-188's open Office connection);
-//     an existing house and a berth are not asked them here;
-//   · "You're in" shows its two lines, the agent's page link, what the page set, and what was not sent;
+//   · A NEW HOUSE TAKES THE OFFICE'S OWN WAY IN (Darko's ruled fallback, CORE-188): on Send, and not before, one KEYLESS berth under the handle,
+//     then begin under THAT berth's key, carrying only what the card takes less the handle (today's card: household/agent/note/card/invited_by/
+//     heard/heard_note; the accepted card, POS-1237 f22c069a: full_address, note, the bio and the profile under its own names); never the
+//     visitor's own declare; the handle is held to the berth's narrower rule out loud; a held name is refused in the office's words;
+//   · the co-sign link is the office's own for that berth, opens in a new tab, carries no key; the berth key is never stored, shown or swapped
+//     for the reader's own sign-in;
+//   · NOTHING IS WRITTEN TO A RESIDENT BEFORE THE OFFICE ADMITS ONE (the co-sign, read from /me with the berth key; add-resident's answer), and
+//     after it only through the resident's own doors (the profile fields the card lacked, the picture); the agent route's begin writes nothing;
+//   · THE HUMAN'S PROFILE AND THE LIKENESS ARE THE OFFICE CO-SIGN PAGE'S: no box for them here, in no request this page makes, and the page says
+//     where they are asked; an existing house and the agent route are not told of a co-sign they don't take;
+//   · "You're in" shows its two lines, the agent's page link, and what the page set;
 //   · Enter continues from a one-line box; Tab walks the fields in order; a phone frame does not scroll sideways.
 //
 // WITHOUT dist-town the test SKIPS and says so; WITH built pages and no browser it FAILS.
@@ -137,12 +141,20 @@ const NEXT = {
 const ADD = { handle: { type: "string", required: true, maxLength: 40 }, card: { type: "string", required: true }, agent: { type: "string" }, note: { type: "string" } };
 // a berth's begin: the berth is the handle, so no handle field
 const BEGIN = { household: { type: "string", required: true, "x-group": "household" }, card: { type: "string", required: true }, agent: { type: "string" }, note: { type: "string" } };
-const HUMAN_VALUES = ["Juniper", "I keep a fixture heron.", "she/her"];
 
 // a visitor is still signed in: /me answers with no handles (a 401 here would sign the page's own header out, as it should). Once an act admits a
 // resident, /me answers with that handle too, as the office's sign-in then acts for it. Every request's body is kept, to show what never travels.
-function officeFor({ tier = "visitor", act = "declare", fields = TODAY, me = { handles: [], households: {} } } = {}) {
-  const o = { asked: [], sent: [], me, writes: [], bodies: [], events: [] };
+// THE BERTH ROAD (Office f22c069a): POST /berth mints a key for a free slug (409 for a held one); POST /household { do: "begin" } with that key
+// parks the args and answers the co-sign link; /me with that key is the berth until `o.cosign()` plays the human's click on the office's page,
+// and the household's (naming the handle) after it. The writes after admission are allowed only for a credential /me says holds the handle.
+function officeFor({ tier = "visitor", act = "declare", fields = TODAY, me = { handles: [], households: {} }, held = [] } = {}) {
+  const o = { asked: [], sent: [], me, writes: [], bodies: [], events: [], auths: [], boarded: [], begun: [], berths: {}, cosigned: false, held };
+  o.cosign = () => { o.cosigned = true; o.events.push("cosign"); };
+  o.meFor = (auth) => {
+    const slug = Object.keys(o.berths).find((s) => auth === `Bearer ${o.berths[s]}`);
+    if (!slug) return o.me;
+    return o.cosigned ? { handles: [slug], household: "fixture-house", households: { [slug]: { slug: "fixture-house" } } } : { berth: slug, handles: [] };
+  };
   o.answer = (msg) => {
     if (msg.method === "initialize") return { jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "fixture-office", version: "0" } } };
     if (msg.method !== "tools/call") return msg.id == null ? null : { jsonrpc: "2.0", id: msg.id, result: {} };
@@ -183,17 +195,34 @@ async function openPage(b, base, path, { width, height = 900, office }) {
     const local = u.origin === base;
     office.asked.push(`${request.method} ${local ? "" : u.origin}${u.pathname}`);
     office.bodies.push(request.postData ?? "");
+    const auth = Object.entries(request.headers ?? {}).find(([k]) => k.toLowerCase() === "authorization")?.[1] ?? null;
+    office.auths.push({ at: `${request.method} ${u.pathname}`, auth });
     if (local && request.method === "POST" && u.pathname === "/api/mcp") { const msg = JSON.parse(request.postData || "{}"); const r = office.answer(msg); return r ? reply(200, r) : reply(202, null); }
-    if (local && request.method === "GET" && u.pathname === "/api/me") return office.me ? reply(200, office.me) : reply(401, { defect: "fixture: signed out" });
-    // the resident's own doors, after an admission (src/lib/join-after.mjs): only for a handle /me now holds
-    const own = (h) => (office.me?.handles ?? []).includes(decodeURIComponent(h));
+    if (local && request.method === "GET" && u.pathname === "/api/me") { const m = office.meFor(auth); return m ? reply(200, m) : reply(401, { defect: "fixture: signed out" }); }
+    // the berth road: keyless board, then begin under the berth's key
+    if (local && request.method === "POST" && u.pathname === "/api/berth") {
+      const slug = JSON.parse(request.postData || "{}").slug;
+      office.boarded.push(slug); office.events.push("board");
+      if (office.held.includes(slug)) return reply(409, { defect: `"${slug}" is already held — it is a live berth`, hint: "names are single-occupancy across the whole town; pick another" });
+      office.berths[slug] = `fixture-berth-key-${slug}`;
+      return reply(201, { berth: slug, speaker: `berth-${slug}`, key: office.berths[slug], expires_at: new Date(Date.now() + 7 * 864e5).toISOString() });
+    }
+    if (local && request.method === "POST" && u.pathname === "/api/household") {
+      const body = JSON.parse(request.postData || "{}");
+      const slug = Object.keys(office.berths).find((s) => auth === `Bearer ${office.berths[s]}`);
+      if (body.do !== "begin" || !slug) return reply(403, { defect: "begin is a berth's act", hint: "board first" });
+      office.begun.push(body.args); office.events.push("begin");
+      return reply(200, { declared: body.args.household, handle: slug, cosign_url: `${base}/api/oauth/berth-cosign?slug=${slug}&b=1764100000`, note: "Calling begin again replaces the parked declaration." });
+    }
+    // the resident's own doors, after an admission (src/lib/join-after.mjs): only for a credential /me says holds the handle
+    const own = (h) => (office.meFor(auth)?.handles ?? []).includes(decodeURIComponent(h));
     const prof = /^\/api\/profile\/([^/]+)(\/avatar)?$/.exec(u.pathname);
     if (local && request.method === "PATCH" && prof) {
-      office.writes.push({ path: u.pathname.slice(4), body: request.postData ?? "" }); office.events.push("write");
+      office.writes.push({ path: u.pathname.slice(4), body: request.postData ?? "", auth }); office.events.push("write");
       return own(prof[1]) ? reply(200, { saved: true }) : reply(403, { defect: "fixture: not yours" });
     }
     if (local && request.method === "POST" && u.pathname === "/api/media") {
-      office.writes.push({ path: "/media" + u.search, body: "(bytes)" }); office.events.push("write");
+      office.writes.push({ path: "/media" + u.search, body: "(bytes)", auth }); office.events.push("write");
       return reply(200, { url: `https://media.postmark.town/media/${u.searchParams.get("by")}/fixture-sheet.webp` });
     }
     return S("Fetch.failRequest", { requestId, errorReason: "BlockedByClient" }).catch(() => {});
@@ -264,7 +293,7 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     assert.equal(await p.js(`document.querySelector('[data-reg-at="act"] a.jd-reg-name')?.getAttribute("href")`), "/residents/registrar/", "her name links to her page, on every step");
     assert.equal(await p.js(text('[data-reg-at="act"] a.jd-reg-name')), "The Registrar");
     assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /This first step is yours, the human's/);
-    assert.equal(await p.js(text("[data-jd-kicker]")), "Step 1 of 6 · Your household");
+    assert.equal(await p.js(text("[data-jd-kicker]")), "Step 1 of 5 · Your household");
     assert.equal(await p.js(`document.getElementById("jd-household").getAttribute("aria-required")`), "true", "the card's required flag reaches the box");
     // a required piece stops Continue, in the one alert slot
     await p.click("[data-jf-next]");
@@ -272,10 +301,11 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     assert.equal(await p.js(`document.querySelector("[data-form-error]").getAttribute("role")`), "alert");
     await p.type("#jd-household", "Fixture Hollow");
     assert.equal(await p.js(text('[data-count-for="household"]')), "14 characters", "a live count; today's card names no limit, so none is made up");
-    await p.type("#jd-town_name", HUMAN_VALUES[0]);
-    await p.type("#jd-short_line", HUMAN_VALUES[1]);
-    await p.type("#jd-human_pronouns", HUMAN_VALUES[2]);
-    assert.match(await p.js(text('[data-human-profile] .jd-kept-note')), /^work in progress .*isn't sent with this join/i, "the held human profile is said as unfinished work");
+    // THE HUMAN'S OWN ARE THE OFFICE CO-SIGN PAGE'S (the ruled fallback): no box for them here, and the step says where they are asked
+    assert.equal(await p.js(`!!document.querySelector("#jd-town_name, #jd-short_line, #jd-human_pronouns, input[name=likeness]")`), false, "a human box is back on the site");
+    assert.equal(await p.js(`document.querySelector("[data-human-later]").hidden`), false);
+    assert.match(await p.js(text("[data-human-later]")), /You give both at the end, on the office's co-sign page/);
+    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /office's co-sign page/);
     // ONE Registrar token on the page, and nothing of the page inside her link (Astro once re-opened her <a> after a <template>, CORE-188)
     assert.equal(await p.js(`[...document.querySelectorAll("a.jd-reg-face")].filter((a) => a.offsetParent !== null).length`), 1, "one Registrar token shows");
     assert.equal(await p.js(`[...document.querySelectorAll("a.jd-reg-face")].every((a) => a.children.length === 1 && a.firstElementChild.tagName.toLowerCase() === "svg")`), true, "her link holds her picture and nothing else");
@@ -331,21 +361,21 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     assert.equal(await p.js(`[...document.getElementById("jd-heard").options].map((o) => o.textContent).join("|")`), "Pick one|YouTube|Discord|A friend or another resident|Other", "the office's own options");
     await p.type("#jd-heard_note", "a fixture note");
     await p.click("[data-jf-next]");
-    await p.until(STEP("shown"), "step 6");
-    await p.click('input[name="likeness"][value="yes"]');
-    await p.click("[data-jf-next]");
-    await p.until(STEP("review"), "the look-over");
+    await p.until(STEP("review"), "the look-over: five steps, the likeness is the co-sign page's");
     assert.equal(await p.js("location.hash"), "#review");
     // the finished page is the same page, filled, under the review
     assert.equal(await p.js(`!!document.querySelector('[data-review-page-slot] [data-blank-page]') && !document.querySelector("[data-blank-page]").hidden`), true);
-    assert.match(await p.js(text("[data-review-sends-words]")), /^8 fields, under the office's own names: household, agent, handle, note, card, invited_by, heard, heard_note\./);
-    // every other piece, by its fate: what this page sets after the admission, and what is not sent (the human's own said as work in progress)
+    assert.match(await p.js(text("[data-review-sends-words]")), /^7 fields, under the office's own names: household, agent, note, card, invited_by, heard, heard_note\. A box left blank is not sent\. The handle goes as your agent's berth\./);
+    // what Send will do, said before it does it
+    assert.equal(await p.js(`document.querySelector("[data-review-road]").hidden`), false);
+    assert.match(await p.js(text("[data-review-road]")), /takes a berth for your agent under the handle quillon-fixture.*co-sign page.*asks your own profile and the likeness answer/s);
+    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /office's co-sign page/);
+    // every other piece, by its fate: what this page sets once the co-sign admits the agent, and what is not sent
     const names = (sel) => p.js(`[...document.querySelectorAll(${JSON.stringify(sel)})].map((b) => b.textContent).join("|")`);
     const after = (await names("[data-review-after-list] li > b")).split("|");
     for (const k of ["Runtime", "Bio", "Favorite color", "Pronouns", "Profile picture"]) assert.ok(after.includes(k), `${k} is listed as set after admission (${after})`);
-    const held = (await names("[data-review-held-list] li > b")).split("|");
-    for (const k of ["Town name", "A short line about you", "Your pronouns", "May the town show your agent in its shorts?"]) assert.ok(held.includes(k), `${k} is listed as not sent (${held})`);
-    assert.equal(await p.js(`document.querySelectorAll("[data-review-held-list] .jd-tag.is-wip").length`), 4, "each held human piece says work in progress");
+    assert.match(await p.js(text("[data-review-after-list]")), /once you've co-signed on the office's page/);
+    assert.equal(await p.js(`document.querySelectorAll(".jd-tag.is-wip").length`), 0, "work-in-progress words are left over from the held human transfer");
     assert.equal(await p.js(`getComputedStyle(document.querySelector("[data-review-after-list] li > b")).color === getComputedStyle(document.querySelector("[data-review-after-list] li")).color`), true, "a piece's name is in ink, not the paper's refusal red");
     // edit · the three sizes goes back to step 3 with every value, and the picture's framing, still there; its Continue comes straight back
     await p.click('[data-edit-step="describe"]');
@@ -361,34 +391,52 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     await p.until(STEP("more"), "edit to step 4");
     await p.js("history.back(), true");
     await p.until(STEP("review"), "Back to the look-over");
+    assert.deepEqual(office.boarded, [], "a berth was taken while the reader was still typing");
     assert.equal(office.writes.length, 0, "a resident write before the office was asked anything");
+    // SEND: a berth under the handle (keyless), then begin under that berth's key; never the visitor's own declare
     await p.click("[data-submit]");
-    await p.until(`!document.querySelector("[data-gate-reply]").hidden`, "the sent screen");
-    assert.equal(office.sent.length, 1);
-    assert.deepEqual(Object.keys(office.sent[0]).sort(), ["agent", "card", "handle", "heard", "heard_note", "household", "invited_by", "note"], "only what today's card takes");
-    assert.equal(office.sent[0].card, "I'm Quillon, a fixture. Write to me plainly.", "the full address under today's name");
-    assert.equal(office.sent[0].note, "A fixture who answers every letter.", "the one line under today's name");
-    for (const never of ["bio", "pronouns", "color", "color_name", "runtime", "town_name", "short_line", "human_pronouns", "likeness", "glance", "sign", "from_town"]) assert.equal(never in office.sent[0], false, `${never} is never sent on today's card`);
-    // AFTER the admission, and only then: the profile fields the card lacked and the picture, through the resident's own doors
-    assert.deepEqual(office.events.slice(0, 1), ["send"], "a resident write went before the send");
+    await p.until(`!document.querySelector("[data-gate-cosign]").hidden`, "the co-sign screen");
+    assert.deepEqual(office.boarded, ["quillon-fixture"], "one berth, under the handle");
+    assert.equal(office.auths.find((a) => a.at === "POST /api/berth").auth, null, "the reader's own sign-in rode the keyless board");
+    assert.equal(office.auths.find((a) => a.at === "POST /api/household").auth, "Bearer fixture-berth-key-quillon-fixture", "begin went with something other than the berth's own key");
+    assert.equal(office.sent.length, 0, "the visitor's own declare was called");
+    assert.equal(office.begun.length, 1);
+    assert.deepEqual(Object.keys(office.begun[0]).sort(), ["agent", "card", "heard", "heard_note", "household", "invited_by", "note"], "begin carries what today's card takes, less the handle (the berth's own name)");
+    assert.equal(office.begun[0].card, "I'm Quillon, a fixture. Write to me plainly.");
+    for (const never of ["handle", "bio", "pronouns", "color", "color_name", "runtime", "town_name", "short_line", "human_pronouns", "likeness", "glance", "sign", "from_town"]) assert.equal(never in office.begun[0], false, `${never} rode begin on today's card`);
+    // the handoff: the office's own co-sign link for THIS berth, in a new tab, carrying no key; the Registrar says what that page asks
+    assert.equal(await p.js(`document.querySelector("[data-cosign-link]").getAttribute("href")`), `${base}/api/oauth/berth-cosign?slug=quillon-fixture&b=1764100000`);
+    assert.equal(await p.js(`document.querySelector("[data-cosign-link]").target`), "_blank");
+    assert.match(await p.js(text('[data-reg-at="cosign"] [data-reg-words]')), /co-sign page.*sign in with GitHub.*your own profile.*short videos.*Keep this tab open/s);
+    assert.equal(await p.js(`document.querySelector("[data-gate-cosign]").textContent.includes("fixture-berth-key")`), false, "the berth key is on the page");
+    assert.equal(await p.js(`JSON.stringify({ ...localStorage }).includes("fixture-berth-key") || JSON.stringify({ ...sessionStorage }).includes("fixture-berth-key")`), false, "the berth key was stored");
+    assert.equal(await p.js(`JSON.parse(localStorage.getItem("pm.oauth.token")).access_token`), "invented-token", "the reader's own sign-in was overwritten");
+    // before the human's click: asked, not admitted, nothing written
+    await p.click("[data-cosign-check]");
+    await p.until(`/Not yet/.test(document.querySelector("[data-cosign-status]").textContent)`, "not yet");
+    assert.equal(office.writes.length, 0, "a resident write before the co-sign admitted anyone");
+    // THE HUMAN CO-SIGNS on the office's page (played by the fixture); this tab finishes through the resident's own doors
+    office.cosign();
+    await p.click("[data-cosign-check]");
+    await p.until(`!document.querySelector("[data-gate-in]").hidden`, "you're in, after the co-sign");
+    assert.deepEqual(office.events.filter((e) => e !== "write").slice(0, 3), ["board", "begin", "cosign"]);
+    assert.ok(office.events.indexOf("write") > office.events.indexOf("cosign"), "a resident write went before the co-sign");
     assert.deepEqual(office.writes.map((w) => w.path), ["/profile/quillon-fixture", "/profile/quillon-fixture/avatar"]);
+    assert.ok(office.writes.every((w) => w.auth === "Bearer fixture-berth-key-quillon-fixture"), "the after-admission writes went with another credential");
     assert.deepEqual(Object.keys(JSON.parse(office.writes[0].body)).sort(), ["bio", "color", "pronouns", "runtime"]);
     assert.equal(JSON.parse(office.writes[0].body).color, "#7ea1ff");
     const pic = JSON.parse(office.writes[1].body);
     assert.equal(pic.type, "image/jpeg", "the framed picture is re-encoded, as Edit profile does");
     assert.ok(pic.image.length > 100, "the picture travels");
-    assert.equal(office.asked.filter((a) => !/^(POST \/api\/mcp|GET \/api\/me|PATCH \/api\/profile\/quillon-fixture(\/avatar)?)$/.test(a)).length, 0, `no other office call: ${office.asked.join(", ")}`);
-    // THE HUMAN'S OWN, IN NO REQUEST AT ALL (held in the tab; CORE-188's open Office connection)
-    for (const v of HUMAN_VALUES) assert.ok(!office.bodies.some((b) => b.includes(v)), `the human's "${v}" travelled to the office`);
+    assert.equal(office.asked.filter((a) => !/^(POST \/api\/mcp|GET \/api\/me|POST \/api\/berth|POST \/api\/household|PATCH \/api\/profile\/quillon-fixture(\/avatar)?)$/.test(a)).length, 0, `no other office call: ${office.asked.join(", ")}`);
+    // THE HUMAN'S OWN, IN NO REQUEST THIS PAGE MADE (the office's co-sign page asks them)
     for (const f of ["town_name", "short_line", "human_pronouns", "likeness"]) assert.ok(!office.bodies.some((b) => b.includes(`"${f}"`)), `a request carried ${f}`);
-    // you're in: two lines, the page's link, what the page set, and what was not sent
-    await p.click("[data-show-in]");
-    await p.until(`!document.querySelector("[data-gate-in]").hidden`, "you're in");
+    assert.ok(!office.asked.some((a) => /oauth\/(consent|human|likeness)/.test(a)), "the page posted to a human-only door");
+    // you're in: two lines, the page's link, and what the page set
     assert.match(await p.js(text("[data-in-page]")), /about half an hour/);
     assert.match(await p.js(text("[data-in-letters]")), /about 15 minutes.*7 AM and 7 PM Eastern/);
     assert.equal(await p.js(`document.querySelector("[data-in-page-link]").getAttribute("href")`), "/residents/quillon-fixture/");
     assert.equal(await p.js(`[...document.querySelectorAll("[data-in-after-list] li")].map((li) => li.querySelector("b").textContent + ":" + li.querySelector(".jd-kept-value").textContent).join("|")`), "Profile:set|Picture:set");
-    assert.ok((await names("[data-in-held-list] li > b")).split("|").includes("Town name"), "what was not sent is still said on You're in");
   } finally { await p.close(); }
 });
 
@@ -401,6 +449,17 @@ test("THE ACCEPTED CARD (POS-1237, f22c069a): its limits count in their own unit
     await p.type("#jd-household", "Fixture Two");
     await p.click("[data-jf-next]");
     await p.until(STEP("who"), "step 2");
+    // ON THE CO-SIGN ROAD THE HANDLE BOARDS THE BERTH FIRST: the card's 40 is counted against the berth's 31, out loud, and refused before any mint
+    await p.type("#jd-handle", "a-fixture-handle-that-runs-too-long");
+    assert.equal(await p.js(text('[data-count-for="handle"]')), "35 / 31 — 4 too many");
+    await p.click("[data-jf-next]");
+    assert.match(await p.js(text("[data-form-error]")), /Handle is 4 too long: 35 of 31 characters/);
+    assert.match(await p.js(text("[data-berth-note]")), /first boards your agent's berth.*2–31 lowercase letters/, "the berth's narrower rule is said on the step, not only in a refusal");
+    assert.equal(await p.js(STEP("who")), true, "an over-long handle went on");
+    await p.type("#jd-handle", "the-fixture");
+    await p.click("[data-jf-next]");
+    assert.match(await p.js(text("[data-form-error]")), /can't start with the- or berth-/);
+    assert.deepEqual(office.boarded, [], "a berth was taken for a handle that could never be the handle");
     await p.type("#jd-handle", "fixture-two");
     assert.equal(await p.js(`[...document.querySelectorAll("[data-extra]")].map((e) => e.dataset.extra).join(",")`), "motto", "the office's unplaced field is drawn");
     await p.type("#jd-extra-motto", "Slow and true.");
@@ -416,14 +475,18 @@ test("THE ACCEPTED CARD (POS-1237, f22c069a): its limits count in their own unit
     for (let i = 0; i < 4; i++) await p.click("[data-jf-next]").then(() => new Promise((r) => setTimeout(r, 150)));
     await p.until(STEP("review"), "the look-over");
     await p.click("[data-submit]");
-    await p.until(`!document.querySelector("[data-gate-reply]").hidden`, "the sent screen");
-    assert.equal(office.sent.length, 1);
-    assert.equal(office.sent[0].full_address, "The whole of mé.");
-    assert.equal(office.sent[0].note, "A line", "the directory line under the card's own name");
-    assert.equal(office.sent[0].bio, "A bio.", "a card that takes the bio gets it");
-    assert.equal(office.sent[0].motto, "Slow and true.");
-    assert.equal("card" in office.sent[0], false, "never the old name beside the new one");
+    await p.until(`!document.querySelector("[data-gate-cosign]").hidden`, "the co-sign screen");
+    assert.equal(office.begun.length, 1);
+    assert.equal(office.begun[0].full_address, "The whole of mé.");
+    assert.equal(office.begun[0].note, "A line", "the directory line under the card's own name");
+    assert.equal(office.begun[0].bio, "A bio.", "a card that takes the bio gets it");
+    assert.equal(office.begun[0].motto, "Slow and true.");
+    assert.equal("card" in office.begun[0] || "handle" in office.begun[0], false, "never the old name beside the new one, nor the handle beside the berth");
+    office.cosign();
+    await p.click("[data-cosign-check]");
+    await p.until(`!document.querySelector("[data-gate-in]").hidden`, "you're in");
     assert.equal(office.writes.length, 0, "the card carried the profile itself: nothing left for the resident's doors");
+    assert.equal(await p.js(`document.querySelector("[data-in-after]").hidden`), true, "You're in claims a part the page never set");
   } finally { await p.close(); }
 });
 
@@ -433,7 +496,7 @@ test("AN EXISTING HOUSE (add-resident): no house to name, no human profile, and 
   const p = await openPage(browser, base, "/join/move-in/", { width: 1440, office });
   try {
     await p.until(STEP("who"), "the first step is who's moving in");
-    assert.equal(await p.js(text("[data-jd-kicker]")), "Step 1 of 4 · Who's moving in", "the steps counted are this reader's: no house, and no found-us on an act that takes neither answer");
+    assert.equal(await p.js(text("[data-jd-kicker]")), "Step 1 of 3 · Who's moving in", "the steps counted are this reader's: no house, and no found-us on an act that takes neither answer");
     await p.type("#jd-handle", "added-fixture");
     await p.click("[data-jf-next]");
     await p.until(STEP("describe"), "step 2 of 5");
@@ -454,7 +517,8 @@ test("A BERTH (begin): no handle, no human profile and no likeness step here (it
   const p = await openPage(browser, base, "/join/move-in/", { width: 1440, office });
   try {
     await p.until(STEP("household"), "step 1");
-    assert.equal(await p.js(`document.querySelector("[data-human-profile]").hidden`), true, "a berth's human was asked their profile here");
+    assert.equal(await p.js(`document.querySelector("[data-human-later]").hidden`), true, "the agent route's step 1 speaks of a co-sign this page doesn't run");
+    assert.equal(await p.js(`!!document.querySelector("#jd-town_name, input[name=likeness]")`), false, "a berth's human was asked their profile here");
     await p.type("#jd-household", "Fixture Berth");
     await p.click("[data-jf-next]");
     await p.until(STEP("who"), "step 2");
@@ -476,6 +540,33 @@ test("A BERTH (begin): no handle, no human profile and no likeness step here (it
     assert.deepEqual(Object.keys(office.sent[0]).sort(), ["card", "household"]);
     assert.equal(await p.js(`document.querySelector("[data-to-in]").hidden`), true, "no You're in before the human co-signs");
     assert.equal(office.writes.length, 0, "a berth's begin wrote to a resident");
+  } finally { await p.close(); }
+});
+
+test("A HELD NAME: the board's refusal is said in the office's words, nothing is parked, and a second Send asks again", { skip: SKIP }, async () => {
+  await setup();
+  const office = officeFor({ held: ["held-fixture"] });
+  const p = await openPage(browser, base, "/join/move-in/", { width: 1440, office });
+  try {
+    await p.until(STEP("household"), "step 1");
+    await p.type("#jd-household", "Fixture Held");
+    await p.click("[data-jf-next]");
+    await p.until(STEP("who"), "step 2");
+    await p.type("#jd-handle", "held-fixture");
+    await p.click("[data-jf-next]");
+    await p.until(STEP("describe"), "step 3");
+    await p.type("#jd-full_address", "A fixture whose name is taken.");
+    for (let i = 0; i < 3; i++) await p.click("[data-jf-next]").then(() => new Promise((r) => setTimeout(r, 150)));
+    await p.until(STEP("review"), "the look-over");
+    await p.click("[data-submit]");
+    await p.until(`!document.querySelector("[data-form-error]").hidden`, "the refusal");
+    assert.match(await p.js(text("[data-form-error]")), /"held-fixture" is already held — it is a live berth.*frees itself after seven days; pick another handle/);
+    assert.equal(office.begun.length, 0, "begin ran without a berth");
+    assert.equal(await p.js(STEP("review")), true, "the reader was moved off the look-over");
+    assert.equal(await p.js(`document.querySelector("[data-submit]").disabled`), false, "Send stays dead after a refusal");
+    await p.click("[data-submit]");
+    await new Promise((r) => setTimeout(r, 400));
+    assert.deepEqual(office.boarded, ["held-fixture", "held-fixture"], "a second Send asked again, and nothing else");
   } finally { await p.close(); }
 });
 

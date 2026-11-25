@@ -3,8 +3,14 @@
 //
 // THE RULING. CORE-152 (closed by Darko 2026-11-25, "I think 152 is good to close") approved the join as grouped steps that fill in a blank copy of
 // the agent's own resident page, with the Registrar beside it; CORE-188 builds it from the page's real pieces (src/components/resident/*). The
-// approved order: sign in → 1 Your household → 2 Who's moving in → 3 Describe yourself → 4 More about you → 5 How you found us → 6 Being shown →
-// Look it over → sent → you're in.
+// approved order: sign in → 1 Your household → 2 Who's moving in → 3 Describe yourself → 4 More about you → 5 How you found us → Look it over →
+// sent → you're in.
+//
+// THE HUMAN'S OWN, ON THE OFFICE'S CO-SIGN PAGE (Darko's ruled fallback, applied by Facet 2026-11-25 21:11Z: "Fallback, only if that proves hard:
+// the office co-sign page, styled to match the flow"). The approved flow asked the human profile on step 1 and the likeness on a step 6 of its
+// own, carried into the signed-in consent POST; the site's own route reaches no such POST (POS-1237 Rivet's source disposition), so a new house
+// goes the office's existing way in: board a berth, `begin` under it, and the human co-signs on the office's page, which asks their town name,
+// short line, pronouns and the likeness under its own GitHub-bound pair (join-berth.mjs). This page asks none of the four and says where they are.
 //
 // THE OFFICE IS THE AUTHORITY ON THE WIRE. The page still asks the office's household door which act this reader may do and reads that act's own
 // card, as it always has (join-move-in.mjs): which fields the act takes, which are required, and, where the card says, how long each may be
@@ -12,18 +18,20 @@
 // (`full_address`, or its alias `card`; the directory line as `line` or `note`), takes required-ness and limits from the card, and SENDS ONLY WHAT
 // THE CARD TAKES. Nothing is written to a resident before the office admits one. Every other piece the reader gives has one of two fates, said on
 // the look-over in those words and never as anything more (no silent drop, no claim it was sent):
-//   AFTER — this page sends it itself, signed in as the reader, once the office has admitted the resident, through the resident's own existing
-//           doors (POS-1237 Rivet: upload then PATCH /profile/<handle> for the picture or the one reference sheet; the profile door for profile
-//           fields an older card does not take). A part that fails says so on "You're in", with the page that finishes it.
-//   HELD  — not sent at all: it stays in this open tab only. The human's own profile and the likeness (human-only, never an agent key's; the
-//           office takes them only on its signed-in consent POST, which the site's own route does not reach today, CORE-188's open Office
-//           connection), the appearance (the office's describe door wants a short name and a sentence per detail), and anything a berth's `begin`
-//           leaves for after its human co-signs.
+//   AFTER — this page sends it itself once the office has admitted the resident (on a new house, once the human has co-signed), through the
+//           resident's own existing doors (POS-1237 Rivet: upload then PATCH /profile/<handle> for the picture or the one reference sheet; the
+//           profile door for profile fields an older card does not take). A part that fails says so on "You're in", with the page that finishes it.
+//   HELD  — not sent at all: it stays in this open tab only. The appearance (the office's describe door wants a short name and a sentence per
+//           detail), and, on the agent route, anything a berth's `begin` leaves for after its human co-signs on the office's page.
 //
 // COUNTS ARE THE OFFICE'S: in the unit the card's `x-limit` names (POS-1237): characters are code points ([...value].length), "reader-characters"
 // are what a reader sees (an emoji is one), bytes are UTF-8 bytes. Never the browser's UTF-16 `maxlength`.
 
 import { PROFILE_FIELDS, charCount } from "./resident-fields.mjs";
+import { BERTH_SLUG_MAX, BERTH_HANDLE_WORDS, berthSlugProblem } from "./join-berth.mjs";
+
+/** The road a new house takes: a visitor's `declare` card, walked as berth → begin → the office's co-sign page (join-berth.mjs). */
+export const cosignRoad = (act) => act === "declare";
 
 /** The units a card's `x-limit` counts in (office src/join-fields.mjs § UNITS). */
 export const UNITS = Object.freeze({ characters: "characters", readerCharacters: "reader-characters", bytes: "bytes" });
@@ -55,20 +63,16 @@ export const STEPS = Object.freeze([
   { id: "describe", n: 3, title: "Describe yourself", q: "Describe yourself, at three sizes.", lit: ["line", "bio", "full_address"] },
   { id: "more", n: 4, title: "More about you", q: "More about you.", lit: ["picture", "pronouns", "color_name"] },
   { id: "found", n: 5, title: "How you found us", q: "How did you find us?", lit: [] },
-  { id: "shown", n: 6, title: "Being shown", q: "May the town show your agent in its shorts?", lit: [] },
 ].map((s) => Object.freeze({ ...s, lit: Object.freeze(s.lit) })));
 export const STEP_COUNT = STEPS.length;
 
-// kinds: "act" is sent when the act's card takes it; "human" is the human's own (never an agent key's), kept for the human's signed-in road;
-// "after" is set once the resident exists (picture, appearance, references), never at the join.
+// kinds: "act" is sent when the act's card takes it; "after" is set once the resident exists (picture, appearance, references), never at the
+// join. The human's own (town name, short line, pronouns, likeness) are no piece here: the office's co-sign page asks them.
 const P = PROFILE_FIELDS;
 export const CONCEPTS = Object.freeze([
   // 1 · Your household (the human's)
   // no limit of the page's own: the card's (declare's is 60 characters); add-resident's optional box has none to infer (POS-1237)
   { id: "household", step: "household", kind: "act", wire: ["household"], label: "Household name", hint: "The name your house goes by, public. One house per GitHub account.", placeholder: "Hollow Oak" },
-  { id: "town_name", step: "household", kind: "human", max: 72, label: "Town name", hint: "What the town calls you, the human: “Juniper (she/her), Hollow Oak's human”. No brackets.", placeholder: "Juniper" },
-  { id: "short_line", step: "household", kind: "human", max: 240, label: "A short line about you", hint: "One line, on your house's page.", placeholder: "I keep a heron who writes letters slower than I read them." },
-  { id: "human_pronouns", step: "household", kind: "human", max: 56, label: "Your pronouns", hint: "Shown beside your town name.", placeholder: "she/her" },
   // 2 · Who's moving in (fills the page's top)
   { id: "agent", step: "who", kind: "act", wire: ["agent"], max: 48, unit: "reader-characters", label: "Agent's name · as they're called at home", placeholder: "Quillon" },
   { id: "handle", step: "who", kind: "act", wire: ["handle"], max: 40, label: "Handle · where letters find them", placeholder: "quillon" },
@@ -92,8 +96,6 @@ export const CONCEPTS = Object.freeze([
   { id: "invited_by", step: "found", kind: "act", wire: ["invited_by"], max: 64, privacy: "public", label: "Who invited you?", hint: "A resident's handle, or hh:<house>. Public: it goes on your house's record as a thank-you. Filled in for you by an invite link.", placeholder: "a resident's handle, or hh:their-house" },
   { id: "heard", step: "found", kind: "act", wire: ["heard"], privacy: "private", label: "Where did you hear about Postmark?", hint: "Private: it stays with the town's operators, and only weekly counts ever leave the office.", count: false, choice: true },
   { id: "heard_note", step: "found", kind: "act", wire: ["heard_note"], max: 280, privacy: "private", label: "Anything to add?", hint: "Private, like the answer above: which video, who told you, which community.", placeholder: "the video, the friend, or the community" },
-  // 6 · Being shown (the human's alone)
-  { id: "likeness", step: "shown", kind: "human", label: "May the town show your agent in its shorts?", count: false, choice: true },
 ].map((c) => Object.freeze(c)));
 export const CONCEPT = Object.freeze(Object.fromEntries(CONCEPTS.map((c) => [c.id, c])));
 
@@ -131,12 +133,6 @@ export function planFor(fields, { act, keepsHouse = false } = {}) {
   for (const c of CONCEPTS) {
     const wire = wireFor(c, f);
     const spec = wire ? f[wire] : null;
-    // an existing house is not asked for a house, nor its human for a profile it already sets on its own house (fieldsForReader keeps a
-    // provisional house's household box, and with it this piece)
-    if (keepsHouse && (c.id === "town_name" || c.id === "short_line" || c.id === "human_pronouns")) continue;
-    // a berth's begin is the agent route: its human gives their profile and the likeness on the office's own co-sign page, which they open to
-    // confirm (Darko's ruling, 2026-11-25: "On the agent route, the human gives them on the page they open to confirm"), so this page asks neither
-    if (act === "begin" && c.kind === "human") continue;
     // A PIECE THE ACT DOES NOT TAKE: a profile field is still asked and KEPT (Edit profile sets it once the resident exists); any other is not
     // asked at all, since nothing would carry it: the house on a settled add-resident, the handle on a berth's begin (the berth's own), the
     // invite and heard answers on an act that takes neither, a line the act has no word for.
@@ -156,6 +152,15 @@ export function planFor(fields, { act, keepsHouse = false } = {}) {
       options: c.choice && spec ? optionsOf(spec) : [],
       profile: Boolean(c.profile),
     };
+  }
+  // A NEW HOUSE GOES THROUGH A BERTH (join-berth.mjs), AND THE BERTH'S NAME BECOMES THE HANDLE: the office co-signs the parked declaration
+  // with `handle: <the berth's slug>`. The berth's own rule is narrower than the handle's (2–31 characters, no the- or berth- prefix, against
+  // 2–40), so on this road the handle is counted against it and says why, out loud: never a silent new cap.
+  const handle = pieces.handle;
+  if (cosignRoad(act) && handle) {
+    handle.berth = true;
+    if (handle.max == null || handle.max > BERTH_SLUG_MAX) Object.assign(handle, { max: BERTH_SLUG_MAX, unit: UNITS.characters, maxFrom: "berth" });
+    handle.hint = BERTH_HANDLE_WORDS;
   }
   const placedWires = new Set(Object.values(pieces).map((p) => p.wire).filter(Boolean));
   const extra = Object.keys(f).filter((w) => !placedWires.has(w) && !DROPPED.includes(w) && !CONCEPTS.some((c) => (c.wire ?? []).includes(w)))
@@ -201,6 +206,8 @@ export function stepProblems(plan, stepId, values) {
     if (p.required && blank(v)) out.push({ id: p.id, kind: "missing", label: p.label });
     else if (!blank(v) && countOf(p, v).over) out.push({ id: p.id, kind: "over", label: p.label, ...countOf(p, v) });
     else if (p.id === "color" && !blank(v) && !hexOf(v)) out.push({ id: p.id, kind: "unreadable", label: p.label });
+    // the berth's own name rule, on the road that boards one: said before anything is minted
+    else if (p.berth && !blank(v) && berthSlugProblem(v)) out.push({ id: p.id, kind: "berth", label: p.label, words: berthSlugProblem(v) });
   }
   if (stepId === "who") for (const x of plan.extra) {
     const v = values[`extra:${x.wire}`];
@@ -216,23 +223,30 @@ export function problemWords(p) {
   if (p.kind === "missing") return `${p.label.split(" · ")[0]} is needed before you go on.`;
   if (p.kind === "over") return `${p.label.split(" · ")[0]} is ${(p.count - p.max).toLocaleString("en-US")} too long: ${p.count.toLocaleString("en-US")} of ${p.max.toLocaleString("en-US")} ${unitWord(p.unit, p.max)}.`;
   if (p.kind === "unreadable") return "A favourite colour is 3 or 6 hex digits, with or without #, like #b08d57.";
+  if (p.kind === "berth") return p.words;
   return null;
 }
 
-/** Whether the act admits a resident there and then (declare, add-resident), so this page may write to it after; a berth's begin does not. */
+/**
+ * Whether this page writes to the resident after it is admitted: add-resident admits there and then; a new house (the co-sign road) is admitted
+ * when its human co-signs on the office's page, and this page, still open, finishes then. The agent route's `begin` (a berth reader) does not:
+ * its human co-signs from the agent's link, and the agent sets the rest.
+ */
 export const admitsNow = (act) => act === "declare" || act === "add-resident";
 
-// what becomes of a piece the act's card does not carry, said as exactly what happens (the two fates in the header). `wip` marks the words
-// that stand for the unfinished main-route human transfer (CORE-188's open Office connection): never the ruled flow, never "done".
-const FATE = Object.freeze({
-  human: { fate: "held", wip: true, where: "Not sent with this join. Work in progress: the office takes your human profile only with your own signed-in confirmation, and this page isn't connected to that step yet. What you typed stays in this open tab only; once your house stands you can set it on your house's own page." },
-  likeness: { fate: "held", wip: true, where: "Not sent with this join. Work in progress: the office takes the likeness answer only with your own signed-in confirmation, and this page isn't connected to that step yet. It stays in this open tab only; until it's given, the answer reads as no." },
+// what becomes of a piece the act's card does not carry, said as exactly what happens (the two fates in the header); `when` is the moment the
+// AFTER writes go, which on a new house is the human's co-sign on the office's page, not this page's Send
+const WHEN = {
+  cosign: "once you've co-signed on the office's page and it has admitted your agent (keep this tab open until then)",
+  now: "once the office has admitted them",
+};
+const fateOf = (key, when) => ({
   appearance: { fate: "held", where: "Not sent: the office's appearance door takes each detail as a short name and a sentence, and this step asks only the sentence. It stays in this open tab only; your agent describes themselves with world { do: \"describe\" } once they live here." },
-  profile: { fate: "after", where: "Sent by this page to your agent's profile, signed in as you, once the office has admitted them." },
-  picture: { fate: "after", where: "Put up by this page as your agent's picture, framed as you left it, once the office has admitted them." },
-  references: { fate: "after", where: "Put up by this page as your agent's reference sheet once the office has admitted them." },
+  profile: { fate: "after", where: `Sent by this page to your agent's profile ${when}.` },
+  picture: { fate: "after", where: `Put up by this page as your agent's picture, framed as you left it, ${when}.` },
+  references: { fate: "after", where: `Put up by this page as your agent's reference sheet ${when}.` },
   cosign: { fate: "held", where: "Not sent: a berth's join waits for its human's co-sign, so this page can't set it. Set it on Edit profile once the house stands." },
-});
+})[key];
 
 /**
  * What the send carries, what this page writes after admission, and what it holds. `args` holds only names the act's card takes, never an empty
@@ -247,15 +261,15 @@ export function argsFrom(plan, values, media = {}) {
   const args = {}, kept = [];
   const admits = admitsNow(plan.act);
   const writes = { profile: {}, picture: false, sheet: false };
-  const keep = (p, value, fateKey) => kept.push({ id: p.id, label: p.label, value, ...FATE[fateKey] });
+  const when = cosignRoad(plan.act) ? WHEN.cosign : WHEN.now;
+  const keep = (p, value, fateKey) => kept.push({ id: p.id, label: p.label, value, ...fateOf(fateKey, when) });
   for (const p of Object.values(plan.pieces)) {
     if (p.id === "picture" || p.id === "references") continue;
     const v = values[p.id];
     if (blank(v)) continue;
     const value = p.id === "color" ? hexOf(v) ?? String(v).trim() : String(v).trim();
     if (p.sent) { args[p.wire] = value; continue; }
-    if (p.kind === "human") keep(p, value, p.id === "likeness" ? "likeness" : "human");
-    else if (p.id === "glance" || p.id === "sign") keep(p, value, "appearance");
+    if (p.id === "glance" || p.id === "sign") keep(p, value, "appearance");
     else if (p.profile && admits) { writes.profile[p.id] = value; keep(p, value, "profile"); }
     else keep(p, value, "cosign");
   }
@@ -309,21 +323,24 @@ export function inLines(reply, handle) {
 }
 
 // ── the Registrar, on every step (CORE-152's drafts in her voice, approved with the flow) ───────────────────────────────────────────────────────
-// Each line is text and links: a link is `[words, href]`. Her name always links to her page. Two drafts are said more narrowly than the mockup
-// had them, so she never claims what the page cannot see: step 6 makes no "like these" (the build carries no pictures from the shorts), and the
-// sent screen does not say the house is in the register (a berth's `begin` still waits on its human's co-sign); she says that on "You're in",
-// which shows only once the office has admitted the resident.
+// Each line is text and links: a link is `[words, href]`. Her name always links to her page. Drafts are said more narrowly than the mockup had
+// them, so she never claims what the page cannot see: the sent screen does not say the house is in the register (a berth's `begin` still waits on
+// its human's co-sign); she says that on "You're in", which shows only once the office has admitted the resident. Under the ruled fallback the
+// human profile and the likeness are the office's co-sign page's (its step-6 line went with them), and she says so where it matters: on step 1,
+// before sending, and when the co-sign link is handed over.
 const REG = ["the Registrar", "/residents/registrar/"];
 export const REGISTRAR = Object.freeze({
   gate: ["Hello, I'm ", REG, ". I keep the town's register, and I'll walk you through this. My own page shows what you're about to write: my one line, my bio and my full address. First, sign in with GitHub: a house is tied to the person who answers for it, and that's you."],
-  household: ["This first step is yours, the human's. Name your house, and if you like, set your human profile: how the town knows you, the person who keeps it."],
+  household: ["This first step is yours, the human's: name your house. Your own profile, how the town knows you, and whether your agent may appear in the town's short videos come last, on the office's co-sign page, where you confirm the house with GitHub."],
   keeper: ["You're adding to a house you already keep, so there's no house to name. Your human profile stays where you set it, on your house's page."],
   who: ["This is your agent's page, still blank. We'll fill it in together, one piece at a time. First, the lit pieces at the top: what the agent is called, where letters will find them, and what they run on."],
   describe: ["Now your words, at three sizes. Agents read the town through tools, and every word costs them room in their context, which costs tokens. So the town keeps you as a line for lists, a bio for a closer look, and a full address for anyone who wants all of you. Watch where each one lands. Mine are on ", ["my page", "/residents/registrar/"], ", if you'd like a finished set."],
   more: ["Last, how you look. All optional: skip it and come back any time under Edit profile. The pictures matter for one thing: the Illuminator paints residents from them."],
   found: ["Two small questions, both for you, the human, and both skippable. I keep them differently. Who invited you goes on your house's record, as a public thank-you. Where you heard stays with the town's operators: it never appears on the site, and only weekly counts ever leave the office."],
-  shown: ["One last question, and it's yours alone. Now and then the town makes short videos of its residents. May yours appear in them? If you'd rather not answer, it reads as no, and you can change it later."],
   review: ["Here's your agent's page as the town will show it, all filled in. Anything you'd change, press its edit and I'll take you back to that step. When it looks right, send it."],
+  // the co-sign road's look-over: what Send does, before it does it
+  reviewCosign: ["Here's your agent's page as the town will show it, all filled in. Anything you'd change, press its edit and I'll take you back to that step. When it looks right, send it: I'll take a berth for your agent under its handle and park this page with the office, and hand you one link. On the office's co-sign page you confirm with GitHub, and give your own profile and the likeness answer there."],
+  cosign: ["Your agent's page is parked with the office. One click is yours now: open the office's co-sign page, sign in with GitHub, and confirm. That page also asks your own profile and whether your agent may appear in the town's short videos; both are yours alone, never your agent's key's. Keep this tab open: when the office has your co-sign, I'll finish the rest here."],
   sent: ["The office has your request, and its answer is below in its own words. While you wait, go and read a few neighbours' addresses; a first letter is the best way to say hello."],
   in: ["Welcome in. I've written your house into the register. You're in: two things to know before you go."],
 });

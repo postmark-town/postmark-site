@@ -16,12 +16,13 @@
 // the design does not place where the agent's fields are, so a field the office grows still reaches the form the same day. What the act does not
 // take is KEPT and said so: never dropped, never claimed as sent. The prototype's form generator is no longer what draws the boxes: the design is.
 //
-// ONE DOOR. Every act rides the apex, `household { do, args }` at the office's MCP endpoint, the same door agents use. No REST call to /residency,
-// and no write to a resident before the office admits one. AFTER an admission (declare, add-resident), and only then, the page sets what the
-// card did not carry through the resident's own existing doors, signed in as the reader (src/lib/join-after.mjs: the profile door, the picture,
-// the one reference sheet), and says per part what kept. The human's own profile and the likeness are never written with this bearer: the
-// office takes them only on its signed-in consent POST, which this route does not reach yet (CORE-188's open Office connection; the page says
-// so as work in progress, holding them in the open tab only).
+// ONE DOOR. Every act rides the apex, `household { do, args }`, the same door agents use. No REST call to /residency, and no write to a resident
+// before the office admits one. A NEW HOUSE takes the office's own way in under Darko's ruled fallback (src/lib/join-berth.mjs): on Send, a berth
+// is boarded under the handle (keyless POST /berth), the page is parked under it (`begin`, with the berth key), and the human co-signs on the
+// office's page from the link it answers, which asks their profile and the likeness: this page asks neither. An existing house (add-resident)
+// is unchanged: the reader's own sign-in, the act, admitted there and then. AFTER an admission, and only then, the page sets what the card did
+// not carry through the resident's own existing doors (src/lib/join-after.mjs: the profile door, the picture, the one reference sheet), and says
+// per part what kept. The berth key is this page's for the one send: in memory only, never stored, shown or put in the prototype's key slot.
 //
 // The decisions live in src/lib/join-draft.mjs (the steps, the pieces, the send) and src/lib/join-move-in.mjs (the door), held by
 // test/join-draft.test.mjs and test/join-move-in.test.mjs. This file is the DOM wiring and the human words.
@@ -60,7 +61,6 @@ const C = CONCEPT;
 // the human's form (steps 1 and 5): the form's own look, kept (CORE-152: "The human's form keeps its look; only its order and grouping change")
 const humanField = (id: string) => ({ id, ...C[id] });
 const HOUSEHOLD = humanField("household");
-const HUMAN = ["town_name", "short_line", "human_pronouns"].map(humanField);
 const FOUND = ["invited_by", "heard_note"].map(humanField);
 // the agent's page (steps 2 to 4): the resident page's own Edit profile fields, from one table, drawn by ResidentField
 const fieldSpec = (id: string) => ({ label: C[id].label, placeholder: C[id].placeholder, multiline: C[id].multiline, rows: C[id].rows, wide: C[id].wide, count: C[id].count !== false });
@@ -143,18 +143,11 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
           <input id="jd-household" type="text" data-piece="household" placeholder={HOUSEHOLD.placeholder} autocomplete="off" />
           <p class="jd-sf-count" data-count-for="household" aria-live="polite"></p>
         </div>
-        <div class="jd-human" data-human-profile>
-          <p class="jf-kicker jd-sub-kicker">Your human profile <span class="jd-need">optional</span></p>
-          <p class="jd-sf-hint">Three things about you, the human, shown beside your house. Public, and never your real name.</p>
-          {HUMAN.map((f) => (
-            <div class="jd-sf" data-piece-field={f.id}>
-              <label class="jd-sf-t" for={`jd-${f.id}`}>{f.label} <span class="jd-need">optional</span></label>
-              <p class="jd-sf-hint">{f.hint}</p>
-              <input id={`jd-${f.id}`} type="text" data-piece={f.id} placeholder={f.placeholder} autocomplete="off" />
-              <p class="jd-sf-count" data-count-for={f.id} aria-live="polite"></p>
-            </div>
-          ))}
-          <p class="jd-kept-note"><span class="jd-tag is-wip">work in progress</span> Your human profile is yours alone, never your agent's key's. The office takes it only with your own signed-in confirmation, and this page isn't connected to that step yet, so it isn't sent with this join: what you type stays in this open tab only.</p>
+        {/* THE HUMAN'S OWN, SAID WHERE THEY'RE ASKED (the ruled fallback, Facet 2026-11-25 21:11Z): the office's co-sign page asks them, under its own
+            GitHub-bound pair, so this page asks none and says so here, before anything is typed that would be asked again */}
+        <div class="jd-human-later" data-human-later hidden>
+          <p class="jf-kicker jd-sub-kicker">Your human profile, and being shown</p>
+          <p class="jd-kept-note">Two things are yours alone, never your agent's key's: your own profile (a town name, a short line and your pronouns, public and never your real name) and whether your agent may appear in the town's short videos. You give both at the end, on the office's co-sign page, where you confirm your house with GitHub.</p>
         </div>
       </div>
 
@@ -186,6 +179,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
               <ResidentField name={id} spec={fieldSpec(id)} {...pieceAttrs(id)} />
             ))}
           </div>
+          {/* on a new house's road the handle first boards the berth, whose name rule is narrower: said here, before anything is typed past it */}
+          <p class="jd-kept-note jd-berth-note" data-berth-note hidden></p>
           {/* the card's fields this design places nowhere, drawn as the office describes them (join-draft.mjs planFor `extra`) */}
           <div class="profile-edit-grid jd-extra" data-extra-host hidden></div>
           <template data-extra-template><ResidentField name="extra" spec={{ label: "", wide: true, count: true }} countId="jd-count-extra" countAttrs={{ "data-count-for": "" }} inputAttrs={{ "data-extra": "" }} /></template>
@@ -247,17 +242,6 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         ))}
       </div>
 
-      {/* 6 · BEING SHOWN — the likeness, alone; the human's */}
-      <div class="jd-step" data-step="shown" hidden>
-        <h2 class="jf-q">{stepOf("shown").q} <span class="jd-need">optional</span></h2>
-        <p class="jf-sub">Skippable; unanswered reads as no. You can change it any time on your agent's appearance page.</p>
-        <div class="jd-choice" role="radiogroup" aria-label={C.likeness.label} data-piece-field="likeness">
-          <label class="jd-pick"><input type="radio" name="likeness" value="yes" data-piece="likeness" /> <span>Yes</span></label>
-          <label class="jd-pick"><input type="radio" name="likeness" value="no" data-piece="likeness" /> <span>No</span></label>
-        </div>
-        <p class="jd-kept-note"><span class="jd-tag is-wip">work in progress</span> This one is yours alone, never your agent's key's. The office takes it only with your own signed-in confirmation, and this page isn't connected to that step yet, so it isn't sent with this join: your answer stays in this open tab only.</p>
-      </div>
-
       {/* LOOK IT OVER — the finished page (the blank page above, filled), with the human's answers, the private ones, and what waits */}
       <div class="jd-step" data-step="review" hidden>
         <h2 class="jf-q">Look it over.</h2>
@@ -273,13 +257,18 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
             <h3>How you found us <button type="button" class="jd-edit" data-edit-step="found">edit</button></h3>
             <dl data-review-found-list></dl>
           </section>
-          <section class="jd-review-sec" data-review-shown>
-            <h3>Being shown <button type="button" class="jd-edit" data-edit-step="shown">edit</button></h3>
-            <dl data-review-shown-list></dl>
-          </section>
           <section class="jd-review-sec" data-review-sends>
             <h3>What goes to the office</h3>
             <p class="jd-review-note" data-review-sends-words></p>
+          </section>
+          {/* the co-sign road, said before Send does it (join-berth.mjs): a berth, the parked page, the office's own page for the human's part */}
+          <section class="jd-review-sec" data-review-road hidden>
+            <h3>When you send</h3>
+            <ol class="jd-road">
+              <li>This page takes a berth for your agent under the handle <b data-road-handle></b>: the office's own way in for a new house. Its key stays in this tab and goes nowhere else.</li>
+              <li>Your agent's page, as above, is parked with the office under that berth. Nothing is admitted yet.</li>
+              <li>You open the office's co-sign page, sign in with GitHub and confirm. That page asks your own profile and the likeness answer; then the office admits your agent, and this tab finishes the rest.</li>
+            </ol>
           </section>
           <section class="jd-review-sec" data-review-after hidden>
             <h3>Once the office admits your agent</h3>
@@ -359,6 +348,19 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       </p>
     </section>
 
+    <!-- CO-SIGN — a new house's page is parked under its berth; the human's one click is on the office's own page (the ruled fallback,
+         join-berth.mjs). The link opens a new tab, so this one keeps the picture and sheet it will finish with; it carries no key. -->
+    <section class="movein-card pm-paper jd-cosign" data-gate-cosign hidden>
+      <div data-reg-at="cosign"></div>
+      <p class="jf-kicker">Parked with the office · one click is yours</p>
+      <h2>Co-sign on the office's page</h2>
+      <p class="jd-cosign-line">Your agent, <b data-cosign-handle></b>, is parked with the office under its berth. Nothing is admitted until you confirm.</p>
+      <p class="reply-foot"><a class="pm-btn" data-cosign-link target="_blank" rel="noopener">Open the co-sign page ↗</a></p>
+      <p class="jd-cosign-small">The office's page asks you to sign in with GitHub, then shows what you're co-signing, with your own profile and the likeness question beside it. The link is safe to keep: it names the berth, never a key. <span data-cosign-url></span></p>
+      <p class="jd-cosign-status" data-cosign-status role="status" aria-live="polite"></p>
+      <p class="reply-foot"><button type="button" class="pm-btn ghost" data-cosign-check>I've co-signed — check now</button></p>
+    </section>
+
     <!-- YOU'RE IN — once the office has admitted the resident: two things to know (CORE-152), and what waits for them to set -->
     <section class="movein-card pm-paper jd-in" data-gate-in hidden>
       <div data-reg-at="in"></div>
@@ -405,9 +407,11 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     import { recallInvite } from "@/lib/join-invite.mjs";
     import {
       STEPS, planFor, countOf, countWords, hexOf, stepProblems, problemWords, argsFrom, allProblems,
-      stepOfHash, hashOfStep, kickerOf, inLines, INVITE_HEARD, admitsNow,
+      stepOfHash, hashOfStep, kickerOf, inLines, INVITE_HEARD, admitsNow, cosignRoad,
     } from "@/lib/join-draft.mjs";
     import { afterAdmission, cropOf } from "@/lib/join-after.mjs";
+    import { boardRequest, berthOf, boardRefusal, beginBody, berthToken, cosignOf, admittedBy } from "@/lib/join-berth.mjs";
+    import { sendAct } from "@/lib/office-write.mjs";
     import { fileProblem } from "@/lib/sheet-upload.mjs";
 
     const $ = (sel, root = document) => root.querySelector(sel);
@@ -421,12 +425,13 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     const gateShut = $("[data-gate-doorshut]");
     const gateReply = $("[data-gate-reply]");
     const gateIn = $("[data-gate-in]");
+    const gateCosign = $("[data-gate-cosign]");
     const head = $("[data-movein-head]");
     const shell = $("[data-movein]");
     function only(el) {
-      for (const s of [gateOut, gateAsking, gateAct, gateNoAct, gateShut, gateReply, gateIn]) if (s) s.hidden = s !== el;
+      for (const s of [gateOut, gateAsking, gateAct, gateNoAct, gateShut, gateReply, gateCosign, gateIn]) if (s) s.hidden = s !== el;
       // the one-question screens fill the page themselves; the page's own heading stands over the others
-      if (head) head.hidden = el === gateOut || el === gateAct || el === gateIn;
+      if (head) head.hidden = el === gateOut || el === gateAct || el === gateCosign || el === gateIn;
     }
     function put(sel, value) { const el = $(sel); if (el) el.textContent = value == null ? "" : String(value); }
 
@@ -570,7 +575,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       const need = $('[data-need-for="household"]');
       if (need && plan.pieces.household) need.textContent = plan.pieces.household.required ? "required" : "optional";
       // a keeper's existing house has no human profile to set here, and a berth's human gives theirs on the office's co-sign page
-      if (!plan.pieces.town_name) $("[data-human-profile]").hidden = true;
+      if (cosignRoad(act)) $("[data-human-later]").hidden = false;
+      if (plan.pieces.handle?.berth) { const n = $("[data-berth-note]"); n.textContent = plan.pieces.handle.hint; n.hidden = false; }
       // the card's own words, where it has them, over the page's (the office's description says what a field is for and where it shows)
       for (const el of $$("[data-hint-for]")) { const p = plan.pieces[el.dataset.hintFor]; if (p && p.hint) el.textContent = p.hint; }
       // the heard question's own options, the office's list
@@ -747,7 +753,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     const status = $("[data-status]");
     const formError = $("[data-form-error]");
     const PAGE_STEPS = new Set(["who", "describe", "more", "review"]);
-    const SKIPPABLE = new Set(["more", "found", "shown"]);
+    const SKIPPABLE = new Set(["more", "found"]);
     function show(id) {
       at = id;
       if (id === "review") returnTo = null;
@@ -762,7 +768,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       const lit = new Set(STEPS.find((s) => s.id === id)?.lit ?? []);
       for (const el of $$("[data-fill]", page)) el.classList.toggle("is-lit", lit.has(el.dataset.fill));
       gateAct.dataset.jfStep = id === "review" ? "review" : "field";
-      regAt("act", id === "household" && plan.keepsHouse ? "keeper" : id);
+      regAt("act", id === "household" && plan.keepsHouse ? "keeper" : id === "review" && cosignRoad(act) ? "reviewCosign" : id);
       put("[data-jd-kicker]", id === "review" ? "Look it over" : kickerOf(plan, id));
       const d = $("[data-jf-dots]");
       while (d.firstChild) d.removeChild(d.firstChild);
@@ -862,7 +868,6 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       const P = plan.pieces;
       rowsInto($("[data-review-house-list]"), [
         ...(P.household ? [["Household name", v.household]] : house ? [["Adding to", house.name]] : []),
-        ...(P.town_name ? [["Town name", v.town_name], ["A short line about you", v.short_line], ["Your pronouns", v.human_pronouns]] : []),
       ]);
       rowsInto($("[data-review-found-list]"), [
         ...(P.invited_by ? [["Who invited you?", v.invited_by, "public"]] : []),
@@ -870,9 +875,12 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         ...(P.heard_note ? [["Anything to add?", v.heard_note, "private"]] : []),
       ]);
       $("[data-review-found]").hidden = !(P.invited_by || P.heard || P.heard_note);
-      rowsInto($("[data-review-shown-list]"), [["May the town show your agent in its shorts?", v.likeness === "yes" ? "Yes" : v.likeness === "no" ? "No" : ""]]);
       const { args, kept } = argsFrom(plan, v, media());
-      put("[data-review-sends-words]", sendsWords(args));
+      // on the co-sign road the handle is the berth's own name, so begin carries everything else
+      const road = cosignRoad(act);
+      put("[data-review-sends-words]", road ? sendsWords(beginBody(args).args) + " The handle goes as your agent's berth." : sendsWords(args));
+      $("[data-review-road]").hidden = !road;
+      if (road) put("[data-road-handle]", (v.handle || "").trim());
       fatesInto("review", kept);
     }
 
@@ -888,6 +896,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       if (!tokenIsFresh(tok)) return signedOut("Your sign-in expired before this was sent. Nothing was sent.");
       const { args, kept, writes } = argsFrom(plan, v, media());
       formError.hidden = true;
+      if (cosignRoad(act)) return sendCosign(v, args, kept, writes);
       sending = true; submitBtn.disabled = true; setStatus("asking the office…");
       arm(tok);
       let res;
@@ -901,22 +910,91 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       const said = replyShape(res.entry);
       if (!said.ok) { sending = false; submitBtn.disabled = false; setStatus(""); return showError(said.defect, said.hint); }
       sentKept = kept;
-      // ADMITTED: now, and only now, the pieces the card did not carry go through the resident's own doors (join-after.mjs), each answering for itself
+      // ADMITTED (add-resident): now, and only now, the pieces the card did not carry go through the resident's own doors
       sentWrites = null;
       if (admitsNow(act)) {
         setStatus("the office admitted them; setting what the join didn't carry…");
-        try {
-          sentWrites = await afterAdmission({
-            handle: (v.handle || "").trim(), base: officeBase(), tok, writes,
-            picture: pic.file ? framedPicture : null, sheet: sheet.file,
-            fetchFn: (u, i) => fetch(u, i),
-            send: async (req) => { try { const r = await fetch(req.url, req.init); return { status: r.status, data: await r.json().catch(() => null) }; } catch { return { status: 0, data: null }; } },
-          });
-        } catch { sentWrites = [{ id: "after", ok: false, words: "This page tripped while setting the rest; the admission stands. Set them on Edit profile, on your agent's page." }]; }
+        sentWrites = await finishAfter((v.handle || "").trim(), tok, writes);
       }
       sending = false; submitBtn.disabled = false; setStatus("");
       showReply(said, v);
     });
+
+    const sendJSON = async (req) => { try { const r = await fetch(req.url, req.init); return { status: r.status, data: await r.json().catch(() => null) }; } catch { return { status: 0, data: null }; } };
+    /** The pieces the card did not carry, through the resident's own doors (join-after.mjs), each answering for itself; never undoes an admission. */
+    async function finishAfter(handle, tok, writes) {
+      try {
+        return await afterAdmission({ handle, base: officeBase(), tok, writes, picture: pic.file ? framedPicture : null, sheet: sheet.file, fetchFn: (u, i) => fetch(u, i), send: sendJSON });
+      } catch { return [{ id: "after", ok: false, words: "This page tripped while setting the rest; the admission stands. Set them on Edit profile, on your agent's page." }]; }
+    }
+
+    // ── A NEW HOUSE: berth → begin → the office's co-sign page (join-berth.mjs; Darko's ruled fallback) ──────────────────────────────────────
+    // The berth is this page's, for this send: minted on Send, held here and nowhere else, reused when the same handle is sent again.
+    let berth = null;
+    let cosign = null;
+    async function sendCosign(v, args, kept, writes) {
+      const slug = (v.handle || "").trim();
+      sending = true; submitBtn.disabled = true;
+      const done = (words, hint) => { sending = false; submitBtn.disabled = false; setStatus(""); if (words) showError(words, hint ?? null); };
+      if (!berth || berth.slug !== slug) {
+        setStatus("taking a berth for your agent…");
+        const r = await sendJSON(boardRequest(officeBase(), slug));
+        const got = r.status === 201 || r.status === 200 ? berthOf(r.data, slug) : null;
+        if (!got) return done(boardRefusal(r.status, r.data));
+        berth = got;
+      }
+      setStatus("parking your agent's page with the office…");
+      const r = await sendAct({ base: officeBase(), door: "household", body: beginBody(args), token: berth.key });
+      if (!r.ok) {
+        if (r.unreachable) return done("the office didn't answer", "the page may or may not have parked; sending again under the same berth replaces it, so it's safe to try again.");
+        const b = r.body || {};
+        return done(typeof b.defect === "string" ? b.defect : `the office said no (${r.status})`, typeof b.hint === "string" ? b.hint : null);
+      }
+      const link = cosignOf(r.body, slug, [location.origin, "https://postmark.town"]);
+      if (!link) return done("the office parked your agent's page but gave no co-sign link this page can open", "nothing is admitted yet; send again to ask for it.");
+      done(null);
+      sentKept = kept;
+      cosign = { slug, link, writes, v, tries: 0, timer: null, finished: false };
+      showCosign();
+    }
+    function showCosign() {
+      regAt("cosign", "cosign");
+      put("[data-cosign-handle]", cosign.slug);
+      const a = $("[data-cosign-link]"); a.href = cosign.link;
+      put("[data-cosign-url]", cosign.link);
+      put("[data-cosign-status]", "Waiting for your co-sign on the office's page…");
+      only(gateCosign);
+      window.scrollTo({ top: 0 });
+      watchCosign();
+    }
+    // the office's answer to "is it admitted yet?": /me with the berth key names the handle once the co-sign has run. Asked every few seconds while
+    // this tab is in front, for up to an hour, and on demand; nothing is written until it does.
+    const COSIGN_EVERY_MS = 4000, COSIGN_FOR_MS = 60 * 60 * 1000;
+    function watchCosign() {
+      clearTimeout(cosign.timer);
+      cosign.started ??= Date.now();
+      if (Date.now() - cosign.started > COSIGN_FOR_MS) { put("[data-cosign-status]", "Still waiting. Once you've co-signed, press the button below."); return; }
+      cosign.timer = setTimeout(() => { if (document.visibilityState === "visible") checkCosign(); else watchCosign(); }, COSIGN_EVERY_MS);
+    }
+    async function checkCosign(asked = false) {
+      if (!cosign || cosign.finished || cosign.checking) return;
+      cosign.checking = true;
+      let me = null;
+      try { const r = await fetch(officeBase() + "/me", { headers: { accept: "application/json", authorization: "Bearer " + berth.key } }); me = r.ok ? await r.json() : null; } catch { me = null; }
+      cosign.checking = false;
+      if (!admittedBy(me, cosign.slug)) {
+        if (asked) put("[data-cosign-status]", "Not yet: the office hasn't admitted your agent. If you've just confirmed, give it a moment; this page keeps asking.");
+        return watchCosign();
+      }
+      cosign.finished = true;
+      put("[data-cosign-status]", "The office has your co-sign. Setting what the join didn't carry…");
+      sentWrites = await finishAfter(cosign.slug, berthToken(berth), cosign.writes);
+      paintIn({}, cosign.v);
+      only(gateIn);
+      window.scrollTo({ top: 0 });
+    }
+    $("[data-cosign-check]")?.addEventListener("click", () => { put("[data-cosign-status]", "Asking the office…"); checkCosign(true); });
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && cosign && !cosign.finished) checkCosign(); });
 
     function showReply(said, v) {
       regAt("sent", "sent");
@@ -1089,13 +1167,16 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     }
     .jd-page-edits .jd-edit { color: var(--pm-gold-bright); background: rgba(232, 196, 139, 0.08); border-color: rgba(232, 196, 139, 0.35); }
 
-    /* the likeness: two answers, and skip */
-    .jd-choice { display: flex; gap: 0.8em; margin: 1.2em 0 0; }
-    .jd-pick {
-      display: inline-flex; align-items: center; gap: 0.5em; padding: 0.65em 1.2em; border-radius: 10px; cursor: pointer;
-      border: 1px solid rgba(232, 196, 139, 0.35); color: var(--pm-gold-bright); font-family: var(--pm-mono);
-    }
-    .jd-pick:has(input:checked) { background: rgba(232, 196, 139, 0.14); border-color: var(--pm-gold-bright); }
+    /* the co-sign road: said on step 1, before sending, and on its own screen (the ruled fallback) */
+    .jd-human-later { margin: 0.5em 0 0; }
+    .jd-road { margin: 0.4em 0 0; padding-left: 1.3em; display: grid; gap: 0.45em; color: var(--pm-ink); line-height: 1.5; }
+    .jd-road b { color: var(--pm-ink); font-family: var(--pm-mono); font-size: 0.92em; }
+    .jd-cosign h2 { margin: 0.2em 0 0.4em; }
+    .jd-cosign-line { color: var(--pm-ink); }
+    .jd-cosign-line b { color: var(--pm-ink); font-family: var(--pm-mono); }
+    .jd-cosign-small { font-size: 0.86rem; color: var(--pm-ink-soft); overflow-wrap: anywhere; }
+    .jd-cosign-small span { display: block; margin-top: 0.3em; font-family: var(--pm-mono); font-size: 0.78rem; }
+    .jd-cosign-status { font-family: var(--pm-mono); font-size: 0.8rem; color: var(--pm-ink); min-height: 1.4em; }
 
     /* look it over */
     .jd-review { padding: 1.2em 1.4em; margin: 0 0 1.2em; }
@@ -1160,7 +1241,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     }
     .reply-facts :global(dd) { margin: 0; color: var(--pm-ink); font-size: 0.92rem; overflow-wrap: anywhere; }
     .reply-facts :global(dd a) { color: var(--pm-accent); }
-    .receipt :global(.jd-reg-bubble), .jd-in :global(.jd-reg-bubble) { box-shadow: none; border: 1px solid rgba(90, 62, 27, 0.25); }
+    .receipt :global(.jd-reg-bubble), .jd-in :global(.jd-reg-bubble), .jd-cosign :global(.jd-reg-bubble) { box-shadow: none; border: 1px solid rgba(90, 62, 27, 0.25); }
 
     .reply-credential {
       margin: 1.3em 0 0; padding: 0.9em 1em;

@@ -1,15 +1,16 @@
 // join-after.mjs — WHAT THE JOIN DOES ONCE THE OFFICE HAS ADMITTED THE RESIDENT (CORE-188).
 //
-// The join writes nothing to a resident before there is one. Once the office answers a declare or an add-resident with an admission, the page
-// sets the pieces the act's card did not carry through the resident's OWN EXISTING DOORS, signed in as the reader, exactly as Edit profile and
-// the sheet setter on the resident page do (POS-1237 Rivet: "upload media, then PATCH /profile/<handle> with image or sheet"; one sheet URL per
-// write, never a list):
+// The join writes nothing to a resident before there is one. Once the office has admitted the resident (an add-resident's answer, or a new
+// house's co-sign on the office's own page, read from /me with its berth key: join-berth.mjs), the page sets the pieces the act's card did not
+// carry through the resident's OWN EXISTING DOORS, exactly as Edit profile and the sheet setter on the resident page do (POS-1237 Rivet: "upload
+// media, then PATCH /profile/<handle> with image or sheet"; one sheet URL per write, never a list), with the credential that now acts for it:
 //   · the profile door's fields an older card did not take: PATCH /profile/<handle>        (profile-edit.mjs § profileRequest)
 //   · the picture, framed in this browser:                    PATCH /profile/<handle>/avatar (the editor's own request, Household.astro)
 //   · the one reference sheet:                                POST /media, then PATCH /profile/<handle> { sheet } (sheet-upload.mjs)
 // First it asks /me whether this sign-in acts for the new handle (sheet-upload.mjs § ownerGate); if not yet, it writes nothing and says where
 // each piece is set instead. Each part answers for itself: one that fails says so with the office's words, and never undoes the admission.
-// The human's own profile and the likeness are NOT here: they are the human's, never written with this bearer (CORE-188, POS-1237).
+// The human's own profile and the likeness are NOT here: they are the human's, given on the office's co-sign page under its GitHub-bound pair,
+// never written with an agent's or a berth's bearer (CORE-188, POS-1237).
 //
 // Pure apart from the `send` and `fetchFn` it is handed: the page passes fetch; the tests pass a fake office.
 

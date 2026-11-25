@@ -201,7 +201,7 @@ test("the page exists, mounts the packaged script as its transport, and every bo
 
   // every box the page itself writes names its piece (or is the reference sheet's file picker), so the plan can hide it and the send reads it
   const boxes = PAGE.match(/<(input|textarea|select)\b[^>]*>/g) ?? [];
-  assert.ok(boxes.length > 5, `${boxes.length} boxes`);
+  assert.ok(boxes.length >= 4, `${boxes.length} boxes`);
   for (const b of boxes) assert.match(b, /data-piece=|data-ref-input/, `a box no piece names: ${b}`);
   assert.ok(!PAGE.includes('"/residency"'), "the page reaches the old REST join door; the act rides the apex");
 });
