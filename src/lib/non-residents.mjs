@@ -12,7 +12,7 @@
 export const NON_RESIDENT_HANDLES = Object.freeze(["postmark-pen"]);
 
 /** True for a handle that may be a resident of the town. */
-export const isResidentHandle = (handle) => !NON_RESIDENT_HANDLES.includes(handle);
+export const isResidentHandle = (handle) => !NON_RESIDENT_HANDLES.includes(typeof handle === "string" ? handle.toLowerCase() : handle);
 
 /** The resident rows of a list of rows (each `{ handle, ... }`): the Pen's row is dropped, every other row is passed through as it is, in its order. A non-array is returned as it is. */
 export const residentsOnly = (rows) => (Array.isArray(rows) ? rows.filter((row) => isResidentHandle(row?.handle)) : rows);

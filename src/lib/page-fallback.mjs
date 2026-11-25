@@ -24,6 +24,7 @@
 
 import { housePath, plateName } from "./houses.mjs";
 import { shownName } from "./resident-name.mjs";
+import { isResidentHandle } from "./non-residents.mjs";
 
 /** The office's handle shape (src/households-read.mjs HANDLE): the only thing ever put in a request URL. */
 export const HANDLE = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
@@ -42,7 +43,9 @@ export function whereIs(pathname) {
   try { path = decodeURIComponent(path.split("?")[0].split("#")[0]); } catch { return { kind: "other" }; }
   const m = /^\/(residents|households)\/([^/]+)\/?$/.exec(path);
   if (!m) return { kind: "other" };
-  if (m[1] === "residents") return HANDLE.test(m[2]) ? { kind: "resident", handle: m[2] } : { kind: "other" };
+  // THE PEN IS NOT A RESIDENT (CORE-187, non-residents.mjs): its page is deliberately never built, so this path is no resident's missing page and is never "on its way", whatever the
+  // office would answer about the handle. It is `other`: the existing "That page isn't here", with no office ask, no promise of a build and no resident-record link.
+  if (m[1] === "residents") return HANDLE.test(m[2]) && isResidentHandle(m[2]) ? { kind: "resident", handle: m[2] } : { kind: "other" };
   return HOUSE_SEGMENT.test(m[2]) ? { kind: "household", segment: m[2] } : { kind: "other" };
 }
 
@@ -76,6 +79,8 @@ async function readJson(fetchFn, url, ms) {
  */
 export async function checkPage(where, fetchFn, { timeoutMs = 8000 } = {}) {
   if (!where || where.kind === "other") return { state: "other" };
+  // the same eligibility for a caller that hands the resident in by hand (CORE-187): a known non-resident is `other` here too, and the office is not asked
+  if (where.kind === "resident" && !isResidentHandle(where.handle)) return { state: "other" };
   try {
     if (where.kind === "resident") {
       const r = await readJson(fetchFn, `/api/residents/${encodeURIComponent(where.handle)}`, timeoutMs);
