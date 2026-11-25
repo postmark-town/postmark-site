@@ -62,3 +62,89 @@
    The reader brings its own stylesheet (READER_CSS, added once by the module script). */
 .convo .c-circles { margin: 0.7em 0 0; color: #f0e6d0; font-size: 0.92rem; line-height: 1.55; overflow-wrap: anywhere; }
 .convo .c-circles-note { margin: 0.7em 0 0.3em; }
+
+/* READING A ROOM (CORE-156's B; CORE-177 moved it here, word for word, beside the drawing's one code, src/lib/room-drawing.mjs). A host gives the room
+   its own pane (`ol.c-voices`: the Conversations page sizes it as a chat window); these are the drawing's: each message, the one replies button, an open
+   circle and its ring, and the new marks. */
+.convo .c-voice {
+  display: grid; grid-template-columns: minmax(8.5rem, auto) 1fr auto;
+  gap: 0.4em 0.8em; align-items: baseline;
+  padding-top: 0.5em; border-top: 1px solid rgba(232, 196, 139, 0.1);
+}
+/* face and name ride together as the row's first column */
+.convo .c-voice-who { display: flex; align-items: center; gap: 0.45em; min-width: 0; }
+.convo .c-voices > .c-voice:first-child { border-top: 0; padding-top: 0; }
+/* the WHOLE message, as it was written (its own line breaks kept): never clamped, never cut (CORE-156) */
+.convo .c-said { line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; min-width: 0; }
+.convo .c-ago {
+  font: 0.68rem/1 var(--pm-mono); letter-spacing: 0.05em;
+  color: rgba(232, 196, 139, 0.5); white-space: nowrap;
+}
+
+/* CORE-156: READING A ROOM. Under a message's words, what a reader can do with it: Reply (signed in) and Open (the circle on its own, a link to share) */
+.convo .c-acts {
+  grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.1em 1.1em;
+  font: 0.7rem/1.4 var(--pm-mono); letter-spacing: 0.04em;
+}
+.convo .c-act {
+  font: inherit; letter-spacing: inherit; color: rgba(232, 196, 139, 0.72); background: none; border: 0; margin: 0; padding: 0.25em 0; cursor: pointer;
+  text-decoration: underline; text-decoration-color: rgba(232, 196, 139, 0.35); text-underline-offset: 2px;
+}
+.convo .c-act:hover { color: var(--pm-gold-bright); text-decoration-color: var(--pm-gold-bright); }
+.convo .c-act:focus-visible, .convo .c-fold:focus-visible { outline: 2px solid var(--pm-gold-bright); outline-offset: 2px; border-radius: 4px; }
+.convo .c-loose { grid-column: 2 / -1; font-style: italic; }
+/* the ONE button under a message that has replies ("3 replies": the whole circle, every level): it opens the circle in place and folds it again */
+.convo .c-fold-wrap, .convo .c-kids-wrap { list-style: none; min-width: 0; }
+.convo .c-fold {
+  display: inline-flex; align-items: center; margin: 0 0.5em 0.1em 0; padding: 0.5em 0.95em; min-height: 2.25rem; cursor: pointer;
+  font: 500 0.74rem/1 var(--pm-mono); letter-spacing: 0.04em; color: var(--pm-gold);
+  background: rgba(232, 196, 139, 0.08); border: 1px solid rgba(232, 196, 139, 0.3); border-radius: 999px;
+}
+.convo .c-fold:hover { border-color: var(--pm-gold); color: var(--pm-gold-bright); }
+.convo .c-fold[aria-expanded="true"] { background: rgba(232, 196, 139, 0.16); border-color: rgba(232, 196, 139, 0.5); }
+/* "N new": replies that arrived while the circle was folded; pressing it opens the circle with them on screen */
+.convo .c-fold-new, .convo .c-fold-new:hover { color: #1b2233; background: var(--pm-gold); border-color: var(--pm-gold); font-weight: 600; }
+.convo .c-fold-new:hover { background: var(--pm-gold-bright); border-color: var(--pm-gold-bright); }
+/* an open circle: each reply whole, set in from the left under the message it answers, beside a thin line; every level at once */
+.convo .c-kids {
+  list-style: none; margin: 0.4em 0 0.2em 0.9rem; padding: 0 0 0 0.9rem; display: grid; gap: 0.5em;
+  border-left: 2px solid rgba(232, 196, 139, 0.3);
+}
+.convo .c-kids .c-kids { margin-top: 0; margin-bottom: 0; }
+.convo .c-kids > .c-voice { border-top: 1px dashed rgba(232, 196, 139, 0.14); }
+/* a very long back-and-forth stops stepping in (its words must keep their width on a phone); each reply still sits under what it answers */
+.convo .c-kids[data-deep] { margin-left: 0; padding-left: 0; border-left: 0; }
+/* THE CIRCLE (Darko, 2026-11-22: "the circle design of the expandable replies"): the replies button wears a small circle, and an OPEN circle's own
+   line carries one at its midpoint, as the World's reader draws it (WLD-178). The line is drawn in two pieces so the circle needs no fill behind it.
+   Line and circle fold the whole circle, like the button; the levels inside keep their plain thin lines (they open and fold with it). */
+.convo .c-fold:not(.c-fold-new)::before {
+  content: ""; flex: none; box-sizing: border-box; width: 0.85rem; height: 0.85rem; margin-right: 0.6em;
+  border: 2px solid currentColor; border-radius: 50%; background: rgba(232, 196, 139, 0.22);
+}
+.convo .c-fold[aria-expanded="true"]::before { background: transparent; }
+.convo .c-kids[data-circle] { position: relative; margin-left: 0.1rem; padding-left: 1.75rem; border-left: 0; }
+.convo .c-ring-row { position: absolute; left: 0; top: 0; bottom: 0; width: 1.5rem; list-style: none; }
+.convo .c-ring-line, .convo .c-ring { position: absolute; margin: 0; padding: 0; cursor: pointer; color: var(--pm-gold); background: transparent; }
+.convo .c-ring-line { inset: 0; width: 100%; border: 0; border-radius: 0; }
+.convo .c-ring-line::before {
+  content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); border-radius: 1px; opacity: 0.45;
+  background: linear-gradient(to bottom, currentColor 0, currentColor calc(50% - 0.85rem), transparent calc(50% - 0.85rem), transparent calc(50% + 0.85rem), currentColor calc(50% + 0.85rem), currentColor 100%);
+}
+.convo .c-ring { left: 50%; top: 50%; width: 1.05rem; height: 1.05rem; box-sizing: border-box; border: 2px solid currentColor; border-radius: 50%; transform: translate(-50%, -50%); opacity: 0.85; }
+.convo .c-ring-line:hover::before { opacity: 0.85; }
+.convo .c-ring:hover, .convo .c-ring-line:hover + .c-ring { opacity: 1; background: rgba(232, 196, 139, 0.2); }
+/* a reply the reader has not seen before: marked, and said in words beside its time (colour is never the only sign) */
+.convo .c-voice.is-new { background: rgba(232, 196, 139, 0.09); box-shadow: inset 3px 0 0 var(--pm-gold); border-radius: 4px; padding: 0.5em 0.5em 0.45em 0.75em; }
+.convo .c-voice.is-new > .c-ago::before { content: "new · "; color: var(--pm-gold-bright); }
+@media (max-width: 34rem) {
+  .convo .c-voice { grid-template-columns: 1fr auto; }
+  .convo .c-said, .convo .c-acts, .convo .c-loose { grid-column: 1 / -1; }
+  /* the time sits beside the name, on the message's first line (until CORE-156 it fell under the words) */
+  .convo .c-voice > .c-ago { grid-column: 2; grid-row: 1; }
+  .convo .c-kids { margin-left: 0.25rem; padding-left: 0.6rem; }
+  .convo .c-kids[data-circle] { margin-left: 0; padding-left: 1.55rem; }
+  .convo .c-ring-row { width: 1.4rem; }
+  /* a finger's target: the links under a message stand taller, the replies button taller still */
+  .convo .c-act { padding: 0.55em 0; }
+  .convo .c-fold { min-height: 2.6rem; padding: 0.5em 1.05em; }
+}

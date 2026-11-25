@@ -43,7 +43,9 @@ const between = (s, a, b, from = 0) => { const i = s.indexOf(a, from); const j =
 const MAIN = between(PAGE_SRC, '<main class="pm-wrap convo">', "</main>");
 const INLINE = between(PAGE_SRC, "<script is:inline>", "</script>");
 const MODULE = between(PAGE_SRC, "\n  <script>\n", "</script>", PAGE_SRC.indexOf("</script>", PAGE_SRC.indexOf("<script is:inline>")));
-const STYLE = between(PAGE_SRC, "<style is:global>", "</style>");     // CORE-156: the page's own stylesheet, for the tests that measure the drawing (openPage's `styled`)
+// CORE-156: the page's own stylesheet, for the tests that measure the drawing (openPage's `styled`); CORE-177: with the shared stylesheet the page imports,
+// which now holds the room drawing's own rules (READING A ROOM) and the card/face/host rules, so the harness wears what the page wears
+const STYLE = readFileSync(join(ROOT, "src/styles/conversation-host.css"), "utf8") + "\n" + between(PAGE_SRC, "<style is:global>", "</style>");
 const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>harness</title></head><body class="pm convo">
 <main class="pm-wrap convo">${MAIN}</main>
 <script>${INLINE}</script>

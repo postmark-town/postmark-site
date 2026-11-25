@@ -35,8 +35,13 @@ test("the card, its head, the faces and the reader's host are ONE stylesheet, im
     assert.equal(EVENT.includes(sel), false, `${sel} is not copied onto the event page`);
   }
   for (const [name, page] of [["conversations", CONVO], ["event", EVENT]]) assert.match(page, /^import "@\/styles\/conversation-host\.css";$/m, `the ${name} page imports the shared theme`);
-  // the card chrome only the Conversations page draws stays there
+  // the card chrome only the Conversations page draws stays there (the room's pane, sized as its chat window, included)
   for (const own of [".convo .c-people {", ".convo .c-voices {", ".convo .c-more {"]) assert.equal(CONVO.includes(own), true, `${own} stays on the Conversations page`);
+  // CORE-177: READING A ROOM (CORE-156's B) moved here beside its one drawing, src/lib/room-drawing.mjs
+  for (const sel of [".convo .c-voice {", ".convo .c-said {", ".convo .c-acts {", ".convo .c-act {", ".convo .c-fold {", ".convo .c-kids {", ".convo .c-ring {", ".convo .c-voice.is-new {"]) {
+    assert.equal(CSS.split("\n" + sel).length - 1, 1, `${sel} is a top-level rule in conversation-host.css once (its phone rule sits in the media block)`);
+    assert.equal(CONVO.includes(sel), false, `${sel} is no longer kept on the Conversations page`);
+  }
 });
 
 test("PIN the event page's own fallbacks stop at the room card's chrome, so the shared .c-perma and .c-fine win on a baked card as on an island-built one", () => {
