@@ -53,7 +53,8 @@ test("DISPLAY ONLY: the name is never changed: the search string and the own pag
   const card = src("src/components/ResidentCard.astro");
   // CORE-178: the card's name is the site's one mention (name styling only), which shows the name through shownName (until 2026-11-24 this pinned
   // the card's own `<b>{shownName(r.address?.agent ?? r.handle)}</b>`)
-  assert.match(card, /<b><ResidentMention handle=\{r\.handle\} link=\{false\} noFace \/><\/b>/, "the directory card shows the mention's name");
+  // CORE-178 FIX (Facet): the card's picture is the household's HOME art, so the mention now draws the resident's face before the name too
+  assert.match(card, /<b><ResidentMention handle=\{r\.handle\} link=\{false\} \/><\/b>/, "the directory card shows the mention's name");
   assert.match(src("src/lib/resident-mention.mjs"), /import \{ shownName \} from "\.\/resident-name\.mjs";/, "and the mention shortens it with this file's rule");
   assert.match(src("src/lib/resident-mention.mjs"), /name: shownName\(whole\)/, "on the name it shows");
   assert.match(card, /data-search=\{residentKey\(r\)\}/, "and searches on the whole one");

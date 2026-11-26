@@ -60,9 +60,11 @@ const active = residentActiveWords(r);
     ? <img class="res-img" src={img} alt={`${r.handle}'s home`} loading="lazy" />
     : <div class="res-img res-img-empty"><span>✉</span></div>}
   <span class="res-txt">
-    {/* CORE-178: the site's one mention styling for the name, with no second picture (Darko b: "Card portrait counts as the picture"); it shows the name
-        through resident-name.mjs § shownName, as this card always has */}
-    <b><ResidentMention handle={r.handle} link={false} noFace /></b>
+    {/* CORE-178: the site's one mention, the resident's own face before the name (residentFace / profile-picture.mjs, or its shared fallback).
+        The card's big picture is the household's HOME art (cardImageOf: home_images, then the HOME assets; alt "<handle>'s home"), not the
+        resident's portrait, so Darko b's "card portrait counts as the picture" does not cover it (Facet's FIX, 2026-11-26). The name shows through
+        resident-name.mjs § shownName, as this card always has */}
+    <b><ResidentMention handle={r.handle} link={false} /></b>
     {/* explicit label — a bare "since" can't tell join from birth;
         pre-field residents (no joined:) show no date rather than a
         mislabeled one, until the office backfills joined:. */}

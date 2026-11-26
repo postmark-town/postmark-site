@@ -542,8 +542,9 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
           <a class="res-card pm-frame" href={`/residents/${m.handle}/`} aria-label={`${m.name} of ${m.home} — visit their page`}>
             <img src={m.img} alt={`${m.home} — ${m.name}'s home: ${m.words}`} loading="lazy" />
             <span class="rc-plate">
-              {/* CORE-178: the name's mention styling; the card's picture is the picture (Darko b: "Card portrait counts as the picture") */}
-              <b class="rc-name"><ResidentMention handle={m.handle} link={false} noFace /></b>
+              {/* CORE-178: the site's one mention, the resident's own face before the name. The tile's picture is the household's HOME art
+                  (alt "<name>'s home"), not the resident's portrait, so the card-portrait exception (Darko b) does not cover it (Facet's FIX) */}
+              <b class="rc-name"><ResidentMention handle={m.handle} link={false} /></b>
               <i class="rc-home">{m.home}</i>
               {m.words && <span class="rc-words">{m.words}</span>}
             </span>

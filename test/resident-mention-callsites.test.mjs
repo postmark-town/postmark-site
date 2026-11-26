@@ -183,14 +183,16 @@ const MOVED = {
   "town/pages/mail/with/[pair].astro": [/<ResidentMentionModel model=\{mentions\.a\} \/>/, /<ResidentMentionModel model=\{mentions\.b\} \/>/],
   // the ruling of 17:38Z: cards and chips take the name's styling beside their own portrait (b), the ticker and labels the whole mention
   "src/components/HouseRail.astro": [/<ResidentMention handle=\{f\.handle\} face=\{f\} link=\{false\} noFace cls="pm-chip-name" \/>/, /--pm-chip-color: \$\{inkOn\(f\.accent, "night"\) \?\? NEUTRAL\}/],
-  "src/components/ResidentCard.astro": [/<b><ResidentMention handle=\{r\.handle\} link=\{false\} noFace \/><\/b>/],
+  // CORE-178 FIX (Facet): the directory tile's big picture is the household's HOME art, not the resident's portrait, so the name wears its face
+  "src/components/ResidentCard.astro": [/<b><ResidentMention handle=\{r\.handle\} link=\{false\} \/><\/b>/],
   "src/components/household-dashboard/ResidentCard.astro": [/<ResidentMention handle=\{f\.handle\} face=\{f\} href=\{href\} noFace cls="hd-card-name" \/>/],
   "town/pages/meeps/index.astro": [/<span class="cq-name">\{m\.profile\.inRoll \? <ResidentMention handle=\{m\.handle\} link=\{false\} noFace \/> : m\.display\}<\/span>/, /<h2>\{m\.profile\.inRoll \? <ResidentMention/],
   "town/pages/bulletin/index.astro": [/<span class="hand-name">\{m\.handle \? <ResidentMention handle=\{m\.handle\} link=\{false\} noFace surface=\{HAND_PLATE\} \/> : m\.name\}<\/span>/, /const HAND_PLATE = "#2f3a56";/],
 };
 // and the front page's newer ones (the same file as its credits, above)
 const FRONT_MORE = [
-  /<b class="rc-name"><ResidentMention handle=\{m\.handle\} link=\{false\} noFace \/><\/b>/,
+  // CORE-178 FIX (Facet): "Meet the Residents" tiles show the household's HOME art, so the name wears the resident's face
+  /<b class="rc-name"><ResidentMention handle=\{m\.handle\} link=\{false\} \/><\/b>/,
   /<ResidentMention handle=\{it\.parts\.from\} link=\{false\} \/> → <ResidentMention handle=\{it\.parts\.to\} link=\{false\} \/>/,
   /★ <ResidentMention handle=\{it\.arrival\.handle\} link=\{false\} \/> joined the white pages/,
   /h\.handle \? <ResidentMention handle=\{h\.handle\} link=\{false\} \/> : h\.label/,
@@ -345,6 +347,34 @@ test("the Hearth's small lines that hold names fade their words through colour, 
   // and these are the lines that hold names (the closest correspondents' "with …", an event's host)
   assert.match(read("src/components/hearth/HearthSlot.astro"), /<span class="hx-with"> with \{rows\.map\(\(r, i\) => <>\{i > 0 && ", "\}<ResidentMention handle=\{r\.handle\} \/>/);
   assert.match(read("src/lib/hearth/paint.mjs"), /const meta = el\("span", "hx-when",[\s\S]{0,400}meta\.appendChild\(ctx\.faces\[e\.host\] \? resident\(/);
+});
+
+// CORE-178 FIX (Facet, the frames): a home-art card is not a portrait card. The directory tile and the front page's "Meet the Residents" tile show the
+// household's HOME art (cardImageOf; alt "…'s home"), so their names wear the resident's own face; the actual portrait cards keep one face.
+test("home-art cards give the name its face; actual portrait cards keep one face", () => {
+  const card = read("src/components/ResidentCard.astro");
+  assert.match(card, /const img = cardImageOf\(r, media, homePictureOf\);/, "the directory tile's picture is the home art");
+  assert.match(card, /alt=\{`\$\{r\.handle\}'s home`\}/);
+  assert.doesNotMatch(card, /<ResidentMention[^>]*noFace/, "the name is not stripped of its face under home art");
+  const front = read("town/pages/index.astro");
+  assert.match(front, /alt=\{`\$\{m\.home\} — \$\{m\.name\}'s home: \$\{m\.words\}`\}/, "the Meet tile's picture is the home art");
+  assert.doesNotMatch(front, /<b class="rc-name"><ResidentMention[^>]*noFace/, "the Meet tile's name is not stripped of its face");
+  // the portrait cards and chips keep the no-second-face form (Darko b)
+  assert.match(read("src/components/household-dashboard/ResidentCard.astro"), /noFace cls="hd-card-name"/);
+  assert.match(read("src/components/HouseRail.astro"), /noFace cls="pm-chip-name"/);
+  assert.match(read("town/pages/meeps/index.astro"), /<span class="cq-name">\{m\.profile\.inRoll \? <ResidentMention handle=\{m\.handle\} link=\{false\} noFace \/>/);
+});
+
+// CORE-178 FIX (Facet, Truey's FIX): the bulletin's Meeps roster drew a sprite-less meep with a portrait (Iris) as an initial, while the quay showed her
+// face. The roster takes the quay's own choice: the sprite, else the portrait, else the monogram.
+test("the bulletin's Meeps roster stands each meep as its sprite, else its portrait, else its monogram (the quay's order)", () => {
+  const page = read("town/pages/bulletin/index.astro");
+  assert.match(page, /import \{ MEEPS, displayName, profileOf \} from "@\/lib\/meeps-quarter\.mjs";/);
+  assert.match(page, /const portrait = profileOf\(m, byHandle\.get\(m\.handle\), media\)\.portrait \?\? null;/, "the portrait the quay uses");
+  assert.match(page, /face: sprite \? "sprite" : portrait \? "portrait" : "monogram",/, "the quay's order");
+  assert.match(page, /m\.face === "sprite"\s*\? <svg class="px"[\s\S]*?: m\.face === "portrait"\s*\? <img class="portrait" src=\{m\.portrait\} alt="" loading="lazy" \/>\s*: <span class="mono">\{m\.monogram\}<\/span>/, "sprite, then portrait, then monogram, drawn");
+  // the same order the quay draws (meeps/index.astro), so the two never disagree
+  assert.match(read("town/pages/meeps/index.astro"), /face: sprite \? "sprite" : profile\.portrait \? "portrait" : "monogram",/);
 });
 
 test("control: the census pattern catches each written form, and comments are not counted", () => {
