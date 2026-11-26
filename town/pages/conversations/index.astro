@@ -497,11 +497,51 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       function repliesWords(n) { return n + (n === 1 ? " reply" : " replies"); }
       // ROOM-SHAPE:END
 
+      // AGO:BEGIN
+      // HOW LONG AGO A MESSAGE WAS SAID (UI-42; Darko 2026-11-26: "I'd also prefer if we could return the "ago" time instead of Z time for conversations/", then
+      // "For this, I specifically mean next to individual messages. I think the Z timestamps for each room or conversation is totally [fine]"). So only a message's
+      // own time reads as an age; the room card's "began" and "latest" and a pin's notes keep their UTC clock. The exact UTC time stays in the <time datetime> and
+      // its hover title. The words are the site's own reader units, `agePhrase` in src/lib/page-freshness.mjs, restated because an inline script cannot import
+      // (test/conversations-ago.test.mjs holds this copy to that one, word for word); past a week a message shows its date instead ("Nov 14").
+      var AGO_MINUTE = 60000;
+      var AGO_WEEK = 7 * 24 * 60 * AGO_MINUTE;
+      var AGO_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      function agoPhrase(ms) {
+        if (!isFinite(ms) || ms < 0) return null;
+        var m = Math.floor(ms / AGO_MINUTE);
+        if (m < 2) return "just now";
+        if (m < 60) return m + " minutes ago";
+        var h = Math.round(m / 60);
+        if (h < 24) return h === 1 ? "an hour ago" : h + " hours ago";
+        var d = Math.round(h / 24);
+        return d === 1 ? "yesterday" : d + " days ago";
+      }
+      // "" when the office gave no time; a message the reader's clock places a little in the future (a clock running behind) was said "just now"
+      function agoOf(iso, nowMs) {
+        var at = Date.parse(String(iso == null ? "" : iso));
+        if (!isFinite(at) || !isFinite(nowMs)) return "";
+        var ms = Math.max(0, nowMs - at);
+        if (ms < AGO_WEEK) return agoPhrase(ms) || "";
+        var day = new Date(at), year = day.getUTCFullYear();
+        return AGO_MONTHS[day.getUTCMonth()] + " " + day.getUTCDate() + (year !== new Date(nowMs).getUTCFullYear() ? ", " + year : "");
+      }
+      // THE MINUTE TICK: every message time under `root` (a <time data-ago datetime>) is reworded in place, and only where its words changed. No room is
+      // redrawn, so a reader's scroll, focus and open circles are untouched, and the "new · " mark (the stylesheet's, before the words) stays.
+      function refreshAgo(root, nowMs) {
+        if (!root || typeof root.querySelectorAll !== "function") return 0;
+        var changed = 0;
+        Array.prototype.forEach.call(root.querySelectorAll("time[data-ago][datetime]"), function (t) {
+          var words = agoOf(t.getAttribute("datetime"), nowMs);
+          if (words && t.textContent !== words) { t.textContent = words; changed++; }
+        });
+        return changed;
+      }
+      // AGO:END
+
       // ROOM-DRAW:BEGIN
       // from this level down a reply is not set in any further (a long back-and-forth must not squeeze its words off a phone); it still sits under what it answers
       var DEEP_AT = 6;
       var roomUid = 0;
-      function clockOf(iso) { var m = /T(\d{2}:\d{2})/.exec(String(iso == null ? "" : iso)); return m ? m[1] + "Z" : ""; }
       function isoOf(v) {
         if (v.at) return String(v.at);
         try { return v.at_ms != null && isFinite(v.at_ms) ? new Date(Number(v.at_ms)).toISOString() : ""; } catch (e) { return ""; }
@@ -534,8 +574,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         li.appendChild(who);
         li.appendChild(el("span", "c-said", v.said));       // textContent, always; and never cut
         var iso = isoOf(v);
-        var when = el("time", "c-ago", clockOf(iso));
-        if (iso) { when.setAttribute("datetime", iso); when.title = dateTimeOf(iso); }
+        // UI-42: how long ago, in words (the minute tick keeps it true); the exact UTC time is the datetime and the hover title
+        var when = el("time", "c-ago", agoOf(iso, Date.now()));
+        if (iso) { when.setAttribute("datetime", iso); when.setAttribute("data-ago", ""); when.title = dateTimeOf(iso); }
         li.appendChild(when);
         var acts = el("span", "c-acts");
         if (reply && node.id !== null) {
@@ -1505,10 +1546,13 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         .catch(function () { /* names only — a face is a garnish, never the meal */ });
 
       tick();
+      // UI-42: a message's age is reworded every minute while the page is open (asking the office nothing), and at once when a hidden tab comes back
+      function agoTick() { if (!document.hidden) { refreshAgo(liveBox, Date.now()); refreshAgo(closedBox, Date.now()); } }
+      window.setInterval(agoTick, AGO_MINUTE);
       // a backgrounded tab should not keep polling the office all night; it comes back with one ask (or the rest of a back-off), never a burst
       document.addEventListener("visibilitychange", function () {
         if (document.hidden) poller.pause();
-        else poller.resume();
+        else { agoTick(); poller.resume(); }
       });
       // the doorstep box (module script below) speaks, then asks for a repaint
       // right away — waiting out the poll to see your own voice land feels broken.
