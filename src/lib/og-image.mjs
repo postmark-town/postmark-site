@@ -113,6 +113,49 @@ export function residentPreview(r, members, src = {}) {
   return p ? square(p) : householdPreview(members, src);
 }
 
+// A MOVING PICTURE IS NOT A STILL (CORE-190). A share preview is one still image: a scraper that is handed a video address shows nothing, or the banner, and a frame
+// is never worked out here. These are the file extensions the office's media door serves for a video; a spark whose only picture is one of them previews with its
+// section's card, exactly as a spark with no picture does.
+const VIDEO_EXT = /\.(?:mp4|m4v|mov|webm|ogv|mkv|avi|m3u8)$/i;
+
+/**
+ * The still a Spark's own share preview wears, or null (CORE-190). It is handed the picture the Spark's page already draws: calendar.mjs `pictureOf(spark)`, the one rule
+ * SparkCard uses too (a site path or an https address, as a string or `{url|src, alt}`; this module takes the result rather than importing it, so the page's pick and its card
+ * cannot differ and the build-harness copies that list og-image.mjs need not also list calendar.mjs). Never a regex over the record and never a related thumbnail. On top of
+ * pictureOf's rule it keeps a share scraper's own: the address carries no login (`https://user:pass@…`), and it is not a video file. A site path is returned as given, for the
+ * layout to resolve against the site's origin; an https address is returned in its normalised form.
+ * @param {{ src: string, alt?: string | null } | null | undefined} pic  `pictureOf(spark)`
+ * @returns {string | null}
+ */
+export function sparkStillOf(pic) {
+  if (!pic || typeof pic.src !== "string") return null;
+  const raw = pic.src;
+  if (raw.startsWith("/")) {
+    // A ROOT PATH STAYS ON THE SITE: parsed against a placeholder origin it must come back with THAT origin and no login. The URL parser reads a backslash as a slash and drops tabs and
+    // newlines, so `/\host/x.jpg` or `/\u@host/x.jpg` (which pictureOf admits: it only refuses a leading `//`) parse to another host; BaseLayout resolves the same way and would write
+    // that address into both tags. Anything that leaves the placeholder origin is no still.
+    const SITE = "https://site.invalid";
+    let u;
+    try { u = new URL(raw, SITE); } catch { return null; }
+    if (u.origin !== SITE || u.username || u.password) return null;
+    return VIDEO_EXT.test(u.pathname) ? null : raw;
+  }
+  let u;
+  try { u = new URL(raw); } catch { return null; }
+  if (u.protocol !== "https:" || u.username || u.password || !u.hostname) return null;
+  return VIDEO_EXT.test(u.pathname) ? null : u.href;
+}
+
+/**
+ * A Spark detail page's preview: its own still as a large card, else the Sparks section's card (the banner until one is drawn). Both og:image and twitter:image carry
+ * the one address (BaseLayout writes `ogImage` to both), and the card is always summary_large_image: a Spark's picture is the page's wide, image-first view.
+ * @param {{ src: string, alt?: string | null } | null | undefined} pic  `pictureOf(spark)`
+ */
+export function sparkPreview(pic) {
+  const still = sparkStillOf(pic);
+  return wide(still ?? sectionCard("sparks"));
+}
+
 /**
  * A thread's handles, its opener first. threads.json sorts `participants` by
  * name, not by who wrote first (806 of 1,626 threads open with the second
