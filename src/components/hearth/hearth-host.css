@@ -42,7 +42,10 @@
 .hearth-stage .hx-list { list-style: none; margin: 0.3em 0 0; padding: 0; }
 .hearth-stage .hx-list > li { padding: 0.45em 0; border-top: 1px dashed var(--hx-hair); font-size: 0.93rem; overflow-wrap: anywhere; }
 .hearth-stage .hx-list > li:first-child { border-top: 0; }
-.hearth-stage .hx-note, .hearth-stage .hx-when, .hearth-stage .hx-state, .hearth-stage .hx-with { font-family: var(--pm-mono); font-size: 0.7rem; color: var(--hx-ink); opacity: 0.85; }
+/* these small lines hold resident names (the closest correspondents' "with …", an event's "hosted by …"): their words fade through their colour, not
+   the element's opacity, so each name inside keeps its own readable ink on its actual surface (CORE-178, Darko a: an opacity of 0.85 here drew the
+   closest correspondents at 3.99-4.36:1 however well the ink was measured) */
+.hearth-stage .hx-note, .hearth-stage .hx-when, .hearth-stage .hx-state, .hearth-stage .hx-with { font-family: var(--pm-mono); font-size: 0.7rem; color: color-mix(in srgb, var(--hx-ink) 85%, transparent); }
 .hearth-stage .hx-note { margin: 0.5em 0 0; }
 .hearth-stage .hx-kind { display: inline-block; font-family: var(--pm-mono); font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; margin-right: 0.5em; padding: 0 0.5em; border: 1px solid var(--hx-hair); border-radius: 999px; color: var(--hx-accent); }
 /* a resident, named: the site's one mention (CORE-178, resident-mention.css draws it); `hx-who` and `hd-who` stay on it as hooks. On the

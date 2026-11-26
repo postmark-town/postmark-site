@@ -334,6 +334,19 @@ test("no page link rule or hook-class rule paints over a resident mention's ink 
   assert.match(read("town/pages/replay/index.astro"), /\.replay \.r-who\.is-human \{/);
 });
 
+// CORE-178 (Facet's bounded completion: the opened Hearth tab's closest correspondents measured 3.99-4.36:1). A name inside an element drawn with
+// opacity is faded with it, and no ink measured for the surface can undo that, so the Hearth's small lines that hold names fade their words by colour.
+test("the Hearth's small lines that hold names fade their words through colour, never the element's opacity", () => {
+  const css = read("src/components/hearth/hearth-host.css");
+  const rule = css.match(/\.hearth-stage \.hx-note, \.hearth-stage \.hx-when, \.hearth-stage \.hx-state, \.hearth-stage \.hx-with \{([^}]*)\}/)?.[1];
+  assert.ok(rule, "the four hooks share one rule");
+  assert.match(rule, /color: color-mix\(in srgb, var\(--hx-ink\) 85%, transparent\);/, "the words fade through their colour");
+  assert.doesNotMatch(rule, /opacity/, "no opacity on a line a name sits in");
+  // and these are the lines that hold names (the closest correspondents' "with …", an event's host)
+  assert.match(read("src/components/hearth/HearthSlot.astro"), /<span class="hx-with"> with \{rows\.map\(\(r, i\) => <>\{i > 0 && ", "\}<ResidentMention handle=\{r\.handle\} \/>/);
+  assert.match(read("src/lib/hearth/paint.mjs"), /const meta = el\("span", "hx-when",[\s\S]{0,400}meta\.appendChild\(ctx\.faces\[e\.host\] \? resident\(/);
+});
+
 test("control: the census pattern catches each written form, and comments are not counted", () => {
   const forms = ["href={`/residents/${h}/`}", 'a.href = "/residents/" + h;', "residentHref(h)", "'/residents/' + h"];
   for (const f of forms) assert.equal((code(f).match(PATTERN) ?? []).length, 1, f);
