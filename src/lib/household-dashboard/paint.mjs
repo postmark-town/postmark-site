@@ -13,6 +13,8 @@ import {
 } from "./fold.mjs";
 import { hungLine } from "./hung-line.mjs";
 import { editLinkShown } from "../profile-edit.mjs";
+import { inkOn, mentionModel, mentionNode } from "../resident-mention.mjs";
+import { resolveHandle } from "../resident-identity.mjs";
 
 const TOWN_REPO = "https://github.com/postmark-town/postmark/blob/main/";
 const FEED_MAX = 14;       // fresh lines shown before "N more"
@@ -28,27 +30,21 @@ const el = (tag, cls, text) => {
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const clip = (s, max) => (s.length > max ? s.slice(0, max - 1).trimEnd() + "…" : s);
 
-/** A resident's name as every line wears it: their face, their colour. */
+/** A resident's name as every line wears it: the site's one mention (CORE-178), their face and their colour, to their seat. `hd-who` stays
+ *  on it as the page's hook (the Hearth's designs style it inside the stage). */
 function who(faces, handle, seatHref) {
-  const f = faces[handle];
-  const a = el("a", "hd-who");
-  a.href = seatHref(handle);
-  if (f?.accent) a.style.setProperty("--hd-c", f.accent);
-  else a.classList.add("is-neutral");
-  const dot = el("span", "hd-who-face");
-  dot.setAttribute("aria-hidden", "true");
-  if (f?.avatar) { const img = el("img"); img.src = f.avatar; img.alt = ""; img.loading = "lazy"; dot.appendChild(img); }
-  else dot.textContent = f?.monogram ?? "·";
-  a.appendChild(dot);
-  a.appendChild(document.createTextNode(f?.name ?? handle));
-  return a;
+  return mentionNode(document, mentionModel({ handle, face: faces[handle] ?? null, href: seatHref(handle) }), { cls: "hd-who" });
 }
 
-// someone outside the house, by handle, to their own page
-function other(handle) {
-  const a = el("a", "hd-other", handle);
-  a.href = "/residents/" + encodeURIComponent(handle) + "/";
-  return a;
+// someone outside the house, by handle, to their own page: the site's one mention (CORE-178), the honest neutral one, since this page holds no face
+// for a resident of another house (their initial, no invented colour; no new read). A house's human stays plain text (mentionModel's rule).
+// An old handle is its resident's current one (the page's build renames, `aliases`: resident-identity.mjs § resolveHandle, no second rename rule).
+function other(handle, aliases = null) {
+  const cur = resolveHandle(handle, aliases);
+  const href = "/residents/" + encodeURIComponent(cur) + "/";
+  const m = mentionModel({ handle: cur, face: null, href });
+  if (m.kind === "resident") return mentionNode(document, m, { cls: "hd-other" });
+  return el("span", "hd-other", handle);
 }
 
 function feedLine(it, ctx) {
@@ -56,16 +52,17 @@ function feedLine(it, ctx) {
   li.dataset.kind = it.kind;
   li.dataset.who = it.who;
   const f = ctx.faces[it.who];
-  if (f?.accent) li.style.setProperty("--hd-c", f.accent);
+  // the line's accent is the resident's colour at readable darkness (CORE-178, Darko a), re-inked on a design's own glass by the Hearth stage
+  if (f?.accent && inkOn(f.accent, "night")) { li.style.setProperty("--hd-c", inkOn(f.accent, "night")); li.setAttribute("data-rm-accent", f.accent); }
   li.appendChild(el("span", "hd-t", whenOf(it.at, ctx.now)));
   const glyph = { letter: "✉", said: "❝", mark: it.verdict === "refused" ? "✕" : "◆", stamps: "✦" }[it.kind];
   li.appendChild(el("span", "hd-g g-" + (it.kind === "mark" ? it.verdict : it.kind), glyph));
   const line = el("span", "hd-l");
   const me = who(ctx.faces, it.who, ctx.seatHref);
   if (it.kind === "letter" && it.dir === "out") {
-    line.append(me, " wrote to ", other(it.other ?? "someone"));
+    line.append(me, " wrote to ", other(it.other ?? "someone", ctx.aliases));
   } else if (it.kind === "letter") {
-    line.append(other(it.other ?? "someone"), " wrote to ", me);
+    line.append(other(it.other ?? "someone", ctx.aliases), " wrote to ", me);
   } else if (it.kind === "said") {
     line.append(me, " said" + (it.place ? ", in " + it.place : ""));
   } else if (it.kind === "mark") {
@@ -381,11 +378,15 @@ function paintComing(root, events, ctx) {
     h3.appendChild(link);
     body.appendChild(h3);
     const time = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-    body.appendChild(el("p", null, [
+    const lead = [
       e.doorsOpen != null ? "doors at " + time(e.doorsOpen) : e.starts != null ? time(e.starts) : null,
       e.place,
-      "hosted by " + (ctx.faces[e.host]?.name ?? e.host),
-    ].filter(Boolean).join(" · ")));
+    ].filter(Boolean);
+    const facts = el("p", null, (lead.length ? lead.join(" · ") + " · " : "") + "hosted by ");
+    // a host of this house is named as every line names a resident (CORE-178); a host from outside it is the neutral mention, since this page
+    // holds no face for them (other(), the same)
+    facts.appendChild(ctx.faces[e.host] ? who(ctx.faces, e.host, ctx.seatHref) : other(e.host, ctx.aliases));
+    body.appendChild(facts);
     row.appendChild(body);
     const going = el("div", "hd-going");
     e.going.forEach((h) => going.appendChild(who(ctx.faces, h, ctx.seatHref)));

@@ -71,7 +71,10 @@ test("exact: each item's text is the base page's formula, character for characte
     // the base page's own template, with the real fmtDate and threadTitle
     assert.equal(it.text, `${fmtDate(d.date)} · ${d.from} → ${d.to} — “${threadTitle(d.id)}”`, d.id);
     assert.equal(it.href, letterHref(d.id, book), d.id);
-    assert.deepEqual(Object.keys(it).sort(), ["href", "text"]);
+    // CORE-178: the words in their parts too, so the page names the two residents as mentions (until 2026-11-24 the item was href and text only)
+    assert.deepEqual(Object.keys(it).sort(), ["href", "parts", "text"]);
+    assert.deepEqual(it.parts, { date: fmtDate(d.date), from: d.from, to: d.to, title: threadTitle(d.id) }, d.id);
+    assert.equal(`${it.parts.date} · ${it.parts.from} → ${it.parts.to} — “${it.parts.title}”`, it.text, "the parts are the text's own words");
   });
 });
 
@@ -93,7 +96,7 @@ test("exact: the items use the functions they are handed, not copies", () => {
     threadTitle: () => "TITLE",
     book,
   });
-  assert.deepEqual(items, [{ href: "HREF", text: "DATE · marrow-lark → tansy-fen — “TITLE”" }]);
+  assert.deepEqual(items, [{ href: "HREF", text: "DATE · marrow-lark → tansy-fen — “TITLE”", parts: { date: "DATE", from: "marrow-lark", to: "tansy-fen", title: "TITLE" } }]);
 });
 
 test("the ticker module offers the selector and the item builder, and no title helper", () => {

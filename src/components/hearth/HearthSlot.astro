@@ -21,6 +21,8 @@
 //
 // RESIDENT WORDS ARE TEXT: names, bios, titles go through Astro's escaping here, never set:html.
 import ResidentCard from "../household-dashboard/ResidentCard.astro";
+import ResidentMention from "../ResidentMention.astro";
+import "@/styles/resident-mention.css";
 import { correspondentsOf } from "@/lib/correspondents.mjs";
 import { fmtDate } from "@/lib/pm.mjs";
 
@@ -118,8 +120,8 @@ const closer = name === "closer"
       : <ul class="hx-list">
           {closer.map(({ f, rows }) => (
             <li>
-              <a class="hx-who" href={seat(f.handle)}>{f.name}</a>
-              <span class="hx-with"> with {rows.map((r, i) => <>{i > 0 && ", "}<a href={`/residents/${encodeURIComponent(r.handle)}/`}>{r.name}</a> ({r.count})</>)}</span>
+              <ResidentMention handle={f.handle} face={f} href={seat(f.handle)} cls="hx-who" />
+              <span class="hx-with"> with {rows.map((r, i) => <>{i > 0 && ", "}<ResidentMention handle={r.handle} /> ({r.count})</>)}</span>
             </li>
           ))}
         </ul>}

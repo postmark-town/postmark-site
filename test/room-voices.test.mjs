@@ -46,7 +46,9 @@ function makeDoc() {
       append(...cs) { cs.forEach((c) => this.appendChild(c)); },
       remove() { const p = this.parentNode; if (p) { p.children = p.children.filter((c) => c !== this); this.parentNode = null; } },
       replaceWith(...cs) { const p = this.parentNode; if (!p) return; const i = p.children.indexOf(this); cs.forEach((c) => { if (c.parentNode) c.remove(); c.parentNode = p; }); p.children.splice(i, 1, ...cs); this.parentNode = null; },
-      setAttribute(k, v) { this.attrs[k] = String(v); }, getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }, hasAttribute(k) { return k in this.attrs; },
+      // as a real DOM: `class` and `href` set as attributes are the element's className and href (the one mention builds with setAttribute only)
+      setAttribute(k, v) { this.attrs[k] = String(v); if (k === "class") this.className = String(v); if (k === "href") this.href = String(v); },
+      getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }, hasAttribute(k) { return k in this.attrs; },
       addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); },
       querySelector(sel) { let hit = null; walk(this, (c) => { if (!hit && matches(c, sel)) hit = c; }); return hit; },
       querySelectorAll(sel) { const out = []; walk(this, (c) => { if (matches(c, sel)) out.push(c); }); return out; },
@@ -58,6 +60,10 @@ function makeDoc() {
     };
     return n;
   };
+  // a text node, as the one mention's builder makes them (createElement / setAttribute / createTextNode only): text, no children, no class
+  doc.createTextNode = (text) => ({ nodeType: 3, tagName: "#text", children: [], className: "", attrs: {}, parentNode: null, _t: String(text),
+    get textContent() { return this._t; }, hasAttribute() { return false; },
+    remove() { const p = this.parentNode; if (p) { p.children = p.children.filter((c) => c !== this); this.parentNode = null; } } });
   return doc;
 }
 // a press: the event reaches every listener from the target up (the pane's one listener serves B's buttons)
@@ -161,6 +167,32 @@ test("faces: drawn through the same getter the page's bounded faces give, read a
   faces = { wren: { name: "Wren", avatar: "/media/wren.png" } };
   await press(card.querySelector("[data-fold]"));
   assert.equal(rowsOf(card)[0].querySelector(".c-face").tagName, "IMG", "the picture on the next drawing");
+});
+
+// THE UNION OF #491 INTO #488 (CORE-177 on CORE-178): a drawn speaker is named as the Conversations page names one, the site's one resident mention
+// (resident-mention-bridge.mjs, the module behind window.__pmMention), with no second picture (the line's face is the picture); a speaker recorded under
+// an old handle is the resident they are now (the build's renames, consulted before any faces row); before the faces land, the plain link is the floor.
+test("NAMES: once the faces are here a drawn speaker is the one mention; an old handle is its current resident; the plain link is only the floor", async () => {
+  const doc = makeDoc(), { card, reader } = cardOf(doc);
+  let faces = null;
+  await drawRoomVoices({ doc, card, reader, roomId: ROOM, base: BASE, fetchImpl: office([answer(MODERN, page(MODERN))]).fetchImpl, getFaces: () => faces,
+    aliases: { ash: "ash-alder" } });
+  let first = rowsOf(card)[0].querySelector(".c-who");
+  assert.equal(first.href, "/residents/wren/", "the floor before the faces land: the plain link");
+  assert.equal(String(first.className).split(/\s+/).includes("rm"), false, "and not dressed as a mention it can't vouch for");
+  faces = { wren: { name: "Wren", avatar: "/media/wren.png", color: "#5f7a8f" }, "ash-alder": { name: "Ash Alder", color: "#7a5f8f" } };
+  await press(card.querySelector("[data-fold]"));
+  first = rowsOf(card)[0].querySelector(".c-who");
+  const cls = String(first.className).split(/\s+/);
+  assert.ok(cls.includes("rm") && cls.includes("c-who"), `the mention, keeping the hook class (got "${first.className}")`);
+  assert.equal(first.href, "/residents/wren/");
+  assert.equal(first.querySelector("img"), null, "no second picture: the line's own face is the picture");
+  // the renamed speaker: recorded as "ash", drawn as the resident ash-alder now is (their page, their face)
+  const ash = rowsOf(card).find((r) => r.getAttribute("data-say") === "202").querySelector(".c-who");
+  assert.equal(ash.href, "/residents/ash-alder/");
+  assert.ok(String(ash.className).split(/\s+/).includes("rm"));
+  // a house's human is still never a resident: no link, no mention
+  assert.equal(rowsOf(card)[3].querySelector(".c-who").tagName, "SPAN");
 });
 
 // ── (3) the old room ──

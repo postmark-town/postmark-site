@@ -37,6 +37,7 @@ import residents from "@/data/postmark/residents.json";
 import { settlementsOnReplay, repoHref } from "@/lib/record.mjs";
 import renames from "@/data/postmark/renames.json";
 import { residentHref } from "@/lib/resident-pages.mjs";
+import ResidentMention from "@/components/ResidentMention.astro";
 import { buildIndex, crossingNumbers } from "../../scripts/replay-record.mjs";
 
 // THE SETTLEMENTS LIVE HERE (the Site Lift, POS-255, 2026-09-26). The Record's
@@ -265,8 +266,9 @@ const residentPages = { pages: residents.map((r) => r.handle), renames };
                     <ul>
                       {byWho(list).map((g) => (
                         <li>
+                          {/* a resident whose page stands is the site's one resident mention (CORE-178), keeping `r-who`; anyone else is text */}
                           {residentHref(g.who)
-                            ? <a class="r-who" href={residentHref(g.who)}>{nameOf(g.who)}</a>
+                            ? <ResidentMention handle={g.who} cls="r-who" />
                             : <span class="r-who">{nameOf(g.who)}</span>}
                           <span class="r-set-marks">{g.marks.join(" · ")}</span>
                         </li>
@@ -626,9 +628,23 @@ const residentPages = { pages: residents.map((r) => r.handle), renames };
       if (/^human-of-/.test(handle || "")) return el("span", "r-who is-human", nameOf(handle));
       const page = pageOf(handle);
       if (!page) return el("span", "r-who", nameOf(handle));
+      // CORE-178: a resident whose page stands is the site's one mention (window.__pmMention, PostmarkLayout's bridge: this inline module can't
+      // import), from the faces this page already reads; without the bridge, the plain link below
+      const href = "/residents/" + encodeURIComponent(page) + "/";
+      // the face and name are the resident's the walk reached: a speaker recorded under an old handle is named and pictured as they are now (CORE-178)
+      const row = faces[page] ?? faces[handle];
+      const mention = window.__pmMention?.fromMeta(handle, row, href, { cls: "r-who" });
+      if (mention) return mention;
       const a = el("a", "r-who");
-      a.href = "/residents/" + encodeURIComponent(page) + "/";
-      a.textContent = nameOf(handle);
+      a.href = href;
+      a.textContent = nameOf(page);
+      // the bridge is not here yet: marked with the row this page already holds, so the bridge makes this link the mention in place when it arrives
+      // (resident-mention-bridge.mjs § upgradePending; no second read)
+      if (!window.__pmMention) {
+        a.setAttribute("data-rm-pending", handle);
+        if (row) a.setAttribute("data-rm-meta", JSON.stringify(row));
+        a.setAttribute("data-rm-opts", JSON.stringify({ cls: "r-who" }));
+      }
       return a;
     };
 
@@ -1734,11 +1750,12 @@ const residentPages = { pages: residents.map((r) => r.handle), renames };
     }
     .replay .r-move:first-child { border-top: 0; padding-top: 0; }
     .replay .r-move-what { color: #cdc2ab; }
-    .replay .r-who {
+    /* the plain name the page draws without the bridge; a resident mention (.rm, which keeps the hook class) wears its own ink and underline (CORE-178) */
+    .replay .r-who:where(:not(.rm)) {
       color: var(--pm-gold-bright); text-decoration: none;
       border-bottom: 1px solid rgba(232, 196, 139, 0.3); white-space: nowrap;
     }
-    .replay .r-who:hover { border-bottom-color: var(--pm-gold-bright); }
+    .replay .r-who:where(:not(.rm)):hover { border-bottom-color: var(--pm-gold-bright); }
     /* a name with no resident page is text, so it does not wear the link's rule */
     .replay span.r-who { border-bottom: 0; }
     .replay .r-who.is-human { color: rgba(232, 196, 139, 0.75); border-bottom: 0; font-style: italic; white-space: normal; }

@@ -99,7 +99,10 @@ test("PIN the faces and renames the page carries are the build's own projection 
   assert.match(SRC, /\[h, \{ name: f\.name, accent: f\.accent, avatar: f\.avatar, monogram: f\.monogram \}\]/, "publicFaces' projection is the one this test carries");
   assert.match(SRC, /export const mentionAliases = roll\.aliases\(\);/);
   assert.match(PAGE, /^import \{ mentionAliases, publicFaces \} from "@\/lib\/resident-mentions\.mjs";$/m);
-  assert.match(PAGE, /const liveFaces = attendRefresh \? publicFaces\(residents\.map\(\(r\) => r\.handle\)\) : null;/);
+  // (the union of #491 into #488: the same projection rides whenever the section can mount a reader, CORE-178's F1 rule, whose case includes the
+  // roster repaint's own attendRefresh, so the repaint still has it)
+  assert.match(PAGE, /const liveFaces = carriesSpeakerFaces\(sections\) \? publicFaces\(residents\.map\(\(r\) => r\.handle\)\) : null;/);
+  assert.match(PAGE, /const attendRefresh = !sections\.cancelled && /, "the repaint's case is inside F1's (not cancelled)");
 });
 
 test("the island's mention is the build's, for a resident, a RENAMED resident (an alias), a public human, an unshown human and a handle with no resident", () => {

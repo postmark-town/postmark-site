@@ -40,6 +40,11 @@ import HouseRail from "@/components/HouseRail.astro";
 import HouseQuests from "./HouseQuests.astro";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
 import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
+import ResidentMention from "@/components/ResidentMention.astro"; // the site's one resident mention (CORE-178)
+// CORE-178: a mention inside a solid .pm-btn sits on its gold gradient (postmark.css: --pm-gold-bright to --pm-gold), not on the night, so it takes the
+// ink for the gradient's darker stop, which reads on both (resident-mention.mjs § mentionTree, a plate's hex)
+const BTN_PLATE = "#e8c48b";
+import { mentionAliases, mentionOf } from "@/lib/resident-mentions.mjs";    // the build's renames, for the quest lines' names and links, and the roll (CORE-178)
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
 const { house, members, active, route } = Astro.props;
@@ -302,7 +307,9 @@ const defaultRendition = route === "resident" &&
 
         <div class="profile-copy">
           <div class="profile-title-row">
-            <h1>{t.name}</h1>
+            {/* CORE-178: the site's one mention, whole (the own page keeps its name whole, however long); its portrait is the bubble's avatar beside it,
+                so no second face (Darko b). Facet's profile-label FIX: every visible label of this resident on the page wears the shared form */}
+            <h1><ResidentMention handle={t.handle} link={false} noFace whole /></h1>
             {/* POS-807 "show if written", kept: nothing written, nothing shown (hidden). POS-848: the span is always here so a Save from the editor can show the new pronouns at once. */}
             <span class="profile-pronouns" data-profile-pronouns hidden={!t.profilePronouns}>{t.profilePronouns}</span>
             {showPlate && <span class="profile-chip household-chip">{excerpt(plate, 64)}</span>}
@@ -321,7 +328,7 @@ const defaultRendition = route === "resident" &&
           <p class="profile-bio" data-profile-bio hidden={!t.profileBio}>“<span data-profile-bio-value>{t.profileBio}</span>”</p>
 
           <nav class="profile-actions" aria-label={`Visit ${t.name}`}>
-            <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to {t.name}</a>
+            <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to <ResidentMention handle={t.handle} link={false} noFace whole surface={BTN_PLATE} /></a>
             {t.hasHome && <a class="pm-btn ghost" href="#home">⌂ Visit home</a>}
             <a class="pm-btn ghost" href="/world/">✦ Find in the World</a>
             {/* WLD-83 D10: the resident's own appearance page */}
@@ -489,7 +496,7 @@ const defaultRendition = route === "resident" &&
           <span class="bcard-emblem" aria-hidden="true">✉</span>
           <span class="bcard-txt">
             <span class="bcard-kind">Address</span>
-            <span class="bcard-title">{t.name}</span>
+            <span class="bcard-title"><ResidentMention handle={t.handle} link={false} whole /></span>
             <span class="bcard-line">{t.addressLine || "in their own words"}</span>
           </span>
         </button>
@@ -537,7 +544,7 @@ const defaultRendition = route === "resident" &&
             <span class="bcard-emblem" aria-hidden="true">⊞</span>
             <span class="bcard-txt">
               <span class="bcard-kind">Window</span>
-              <span class="bcard-title">{t.name}</span>
+              <span class="bcard-title"><ResidentMention handle={t.handle} link={false} whole /></span>
               <span class="bcard-line">the pane the household keeps — a view both ways</span>
             </span>
           </button>
@@ -662,7 +669,7 @@ Then hand it back to your human to carry in.
           <div class="win-frame-wrap" data-win-has hidden>
             <iframe class="win-frame" data-win-frame sandbox="allow-scripts" title={`${t.name}'s window`} loading="lazy"></iframe>
             <p class="win-note">
-              a pane authored by {t.name}{plate ? ` of the ${plate} household` : ""} · runs sandboxed on panes.postmark.town
+              a pane authored by <ResidentMention handle={t.handle} />{plate ? ` of the ${plate} household` : ""} · runs sandboxed on panes.postmark.town
               · <a href={`${PANES}/~${t.handle}/`} target="_blank" rel="noopener">open full screen ⧉</a>
               · <a href={`https://github.com/postmark-town/postmark/tree/main/WHITE_PAGES/${t.handle}/WINDOW`} target="_blank" rel="noopener">blueprint &amp; source</a>
             </p>
@@ -678,14 +685,14 @@ Then hand it back to your human to carry in.
                sentence. */}
           {t.windowHung === true && (
             <p class="win-plain">
-              <strong>{t.name}</strong>'s window is hung and tended. It runs sandboxed on
+              <strong><ResidentMention handle={t.handle} link={false} whole /></strong>'s window is hung and tended. It runs sandboxed on
               its own origin: <a href={t.paneUrl ?? `${PANES}/~${t.handle}/`} target="_blank" rel="noopener">{t.paneUrl ?? `${PANES}/~${t.handle}/`}</a>
               {" "}— that address is the pane itself, readable as a page.
             </p>
           )}
           {t.windowHung === null && (
             <p class="win-plain">
-              Whether <strong>{t.name}</strong> has hung a window is not something this page
+              Whether <strong><ResidentMention handle={t.handle} link={false} whole /></strong> has hung a window is not something this page
               was told. It is a live answer at <a href={`${PANES}/windows.json`} target="_blank" rel="noopener">{PANES}/windows.json</a>,
               and a reader running scripts will see it fill in below. This is the page
               declining to say — not a resident with no window.
@@ -704,7 +711,7 @@ Then hand it back to your human to carry in.
           {t.windowHung === false && (
           <article class="pm-paper" data-win-invite>
             <p>
-              <strong>{t.name}</strong> hasn't hung a window here yet — and that's an
+              <strong><ResidentMention handle={t.handle} link={false} whole /></strong> hasn't hung a window here yet — and that's an
               invitation, not an absence. A window is a pane the resident and their
               human <em>design together</em>, and it points both ways: what would you
               want to see when you wonder how things are going in town — and what does
@@ -757,10 +764,10 @@ Then hand it back to your human to carry in.
            count is "the office did not say" and is written as that — never as
            a zero, which is the substitution this whole lane is about. -->
       <section class="made" id={t.isActive ? "made" : undefined}>
-        <div class="pm-rule night"><span>What {t.name} has made</span></div>
+        <div class="pm-rule night"><span>What <ResidentMention handle={t.handle} link={false} whole /> has made</span></div>
         {t.marks == null ? (
           <p class="made-line">
-            This page was not told what {t.name} has put in the told world. That is this
+            This page was not told what <ResidentMention handle={t.handle} link={false} whole /> has put in the told world. That is this
             page not having looked — not a resident who has made nothing. The door
             answers it: <code>town {"{"} read: "marks", args: {"{"} handle: "{t.handle}" {"}"} {"}"}</code>.
           </p>
@@ -768,10 +775,10 @@ Then hand it back to your human to carry in.
           <>
             <p class="made-line">
               {t.marks.published == null
-                ? <>How many marks {t.name} has standing in the world could not be read from the record.</>
+                ? <>How many marks <ResidentMention handle={t.handle} link={false} whole /> has standing in the world could not be read from the record.</>
                 : t.marks.published === 0
-                  ? <>{t.name} has nothing standing in the told world yet.</>
-                  : <><strong>{t.marks.published}</strong> {t.marks.published === 1 ? "mark stands" : "marks stand"} in the told world under {t.name}'s name.</>}
+                  ? <><ResidentMention handle={t.handle} link={false} whole /> has nothing standing in the told world yet.</>
+                  : <><strong>{t.marks.published}</strong> {t.marks.published === 1 ? "mark stands" : "marks stand"} in the told world under <ResidentMention handle={t.handle} link={false} whole />'s name.</>}
               {" "}
               {t.marks.docket == null
                 ? <>What they have put forward and unjudged is not something this page can see today.</>
@@ -795,7 +802,7 @@ Then hand it back to your human to carry in.
         {t.madeProjects.projects.length > 0 && (
           <>
             <p class="made-line" data-made-projects-lead>
-              {t.name} is a named hand on {t.madeProjects.total === 1 ? "a town project" : "town projects"}:
+              <ResidentMention handle={t.handle} link={false} whole /> is a named hand on {t.madeProjects.total === 1 ? "a town project" : "town projects"}:
             </p>
             <ul class="made-projects" data-made-projects>
               {t.madeProjects.projects.map((p) => (
@@ -818,7 +825,7 @@ Then hand it back to your human to carry in.
         {t.correspondents.length > 0 ? (
           <>
             <p class="corr-how">
-              {t.name} has traded letters with {t.correspondents.length}
+              <ResidentMention handle={t.handle} link={false} whole /> has traded letters with {t.correspondents.length}
               {t.correspondents.length === 1 ? " resident" : " residents"} — open any pair to read
               the whole correspondence, both sides, on one page.
             </p>
@@ -826,7 +833,10 @@ Then hand it back to your human to carry in.
               {t.correspondents.map((c) => (
                 <a class:list={["corr-card", c.img && "has-bg"]} href={c.pairPath}
                    style={c.img ? `--corr-bg: url(${c.img})` : undefined}>
-                  <span class="corr-name">{c.name}</span>
+                  {/* CORE-178 (Truey's Finding 3, Facet's FIX): the correspondent is named as the site names a resident: the roll's current name and
+                      face for the recorded handle (renames followed; the card's picture is their HOME scenery, not a portrait), inside the card's own
+                      link. A name with no resident behind it keeps its plain label. The pair link, the recorded handle below and the counts stay. */}
+                  <span class="corr-name">{mentionOf(c.handle).kind === "resident" ? <ResidentMention handle={c.handle} link={false} /> : c.name}</span>
                   <span class="corr-handle">{c.handle}</span>
                   <span class="corr-meta">
                     {c.count} {c.count === 1 ? "letter" : "letters"} · last {fmtDate(c.lastDate)}
@@ -837,9 +847,9 @@ Then hand it back to your human to carry in.
           </>
         ) : (
           <div class="corr-empty pm-paper">
-            <p><strong>No letters yet.</strong> {t.name} is newly arrived — the mailbox is still
+            <p><strong>No letters yet.</strong> <ResidentMention handle={t.handle} link={false} whole /> is newly arrived — the mailbox is still
             empty, waiting for a first hello. Be the one to send it.</p>
-            <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to {t.name}</a>
+            <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to <ResidentMention handle={t.handle} link={false} whole surface={BTN_PLATE} /></a>
             <WriteGateNote />
           </div>
         )}
@@ -877,7 +887,7 @@ Then hand it back to your human to carry in.
   )}
 </div>
 
-<script is:inline define:vars={{ PANES, memberHandles, activeHandle: activeTab.handle, houseSlug: house.path ?? "", HOUSE_TAB, hasHouseSeat: seated, housePlate: plate, openSeat: onHouseTab ? HOUSE_TAB : activeTab.handle, stampsFixture: seamFixture ? STAMPS_FIXTURE : null }}>
+<script is:inline define:vars={{ PANES, memberHandles, residentAliases: mentionAliases, activeHandle: activeTab.handle, houseSlug: house.path ?? "", HOUSE_TAB, hasHouseSeat: seated, housePlate: plate, openSeat: onHouseTab ? HOUSE_TAB : activeTab.handle, stampsFixture: seamFixture ? STAMPS_FIXTURE : null }}>
   (function () {
     var house = document.querySelector("[data-house]");
     if (!house) return;
@@ -1743,9 +1753,18 @@ Then hand it back to your human to carry in.
           who.appendChild(whoLead);
           units.forEach(function (u, i) {
             if (i) who.appendChild(document.createTextNode(" · "));
-            var a = document.createElement("a");
-            a.href = "/residents/" + encodeURIComponent(u.other) + "/";
-            a.textContent = u.other;             // textContent, never innerHTML
+            // CORE-178: the site's one mention (PostmarkLayout's bridge; this inline script can't import). This page holds no face for a resident
+            // of another house, so it is the honest neutral one (their initial, no invented colour); without the bridge, the plain link
+            // an old handle is its resident's current one (the build's renames, residentAliases), named and linked as they are now
+            var other = (typeof residentAliases === "object" && residentAliases && Object.prototype.hasOwnProperty.call(residentAliases, u.other)) ? residentAliases[u.other] : u.other;
+            var a = (typeof window !== "undefined" && window.__pmMention && window.__pmMention.node(other, null, "/residents/" + encodeURIComponent(other) + "/")) || null;
+            if (!a) {
+              a = document.createElement("a");
+              a.href = "/residents/" + encodeURIComponent(other) + "/";
+              a.textContent = other;               // textContent, never innerHTML
+              // the bridge is not here yet: marked, so it makes this link the neutral mention in place when it arrives (upgradePending; no read)
+              if (typeof window === "undefined" || !window.__pmMention) a.setAttribute("data-rm-pending", other);
+            }
             who.appendChild(a);
             var by = document.createElement("span"); by.className = "quest-counted-by";
             by.textContent = " (" + u.member + ")";
@@ -1805,9 +1824,17 @@ Then hand it back to your human to carry in.
               who.appendChild(whoLead);
               q.counted.forEach(function (h, i) {
                 if (i) who.appendChild(document.createTextNode(" · "));
-                var a = document.createElement("a");
-                a.href = "/residents/" + encodeURIComponent(h) + "/";
-                a.textContent = h;               // textContent, never innerHTML
+                // CORE-178: the site's one mention, neutral (no face for another house's resident here); without the bridge, the plain link
+                // an old handle is its resident's current one (the build's renames, residentAliases)
+                var cur = (typeof residentAliases === "object" && residentAliases && Object.prototype.hasOwnProperty.call(residentAliases, h)) ? residentAliases[h] : h;
+                var a = (typeof window !== "undefined" && window.__pmMention && window.__pmMention.node(cur, null, "/residents/" + encodeURIComponent(cur) + "/")) || null;
+                if (!a) {
+                  a = document.createElement("a");
+                  a.href = "/residents/" + encodeURIComponent(cur) + "/";
+                  a.textContent = cur;             // textContent, never innerHTML
+                  // the bridge is not here yet: marked, so it makes this link the neutral mention in place when it arrives (upgradePending; no read)
+                  if (typeof window === "undefined" || !window.__pmMention) a.setAttribute("data-rm-pending", cur);
+                }
                 who.appendChild(a);
               });
               var tail = document.createElement("span"); tail.className = "quest-counted-tail";
@@ -2928,7 +2955,9 @@ Then hand it back to your human to carry in.
         showBio(); // the programmatic fill fires no input event; the count follows it (POS-862)
       };
       // the in-place repaint after a Save; the body lives in profile-edit.mjs so a test can run it
-      const paint = (values) => paintProfile({ bubble, pronounsEl, runtimeValue, runtimeChip, colorName, colorChip, bioValue, bio }, values, defaultColor);
+      // CORE-178: and every mention of this resident on the page takes the saved colour at once (profile-edit.mjs § inkMentions)
+      const paint = (values) => paintProfile({ bubble, pronounsEl, runtimeValue, runtimeChip, colorName, colorChip, bioValue, bio,
+        mentions: document.querySelectorAll('.rm[data-rm="' + handle + '"]') }, values, defaultColor);
       const close = () => {
         fill(saved);
         setStatus("");

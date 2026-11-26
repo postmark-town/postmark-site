@@ -4,6 +4,7 @@
 // Starforge main site. One rail, not two — the town keeps its room.
 import BaseLayout from "./BaseLayout.astro";
 import "../styles/postmark.css";
+import "../styles/resident-mention.css";   // the site's one resident mention, on every page (CORE-178)
 // The rail is not written here. Its membership — the top-level seats and
 // each section's chip row — lives in ONE structure, `src/lib/nav.mjs`, under the
 // law "a page per read, a read per page; this structure is the rail's single
@@ -464,6 +465,17 @@ const pageLists = railPageLists({ path: Astro.url.pathname, flags: navFlags(impo
         window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
       });
     })();
+  </script>
+
+  <script>
+    // THE SITE'S ONE RESIDENT MENTION, FOR THE INLINE SCRIPTS (CORE-178): a page's `is:inline` script can't import a module, so this hands it
+    // resident-mention-bridge.mjs as window.__pmMention; a script that finds it absent (or gets null) keeps the plain text it always drew.
+    // The order is not fixed: a script whose data came first drew plain text and marked it (data-rm-pending); upgradePending turns each mark into
+    // the mention in place now, so data-first and bridge-first both end in the one form, with no second read.
+    import { mentionBridge, upgradePending } from "@/lib/resident-mention-bridge.mjs";
+    window.__pmMention = mentionBridge(document);
+    upgradePending(document, window.__pmMention);
+    document.dispatchEvent(new CustomEvent("pm:mention-ready"));
   </script>
 
   <script>

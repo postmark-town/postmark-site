@@ -35,6 +35,7 @@ import { houseDirectory, marksByAuthor, fold } from "@/lib/households-directory.
 import { activeWords, houseLastActive } from "@/lib/last-active.mjs";
 import { publicHouses, cardLine, DISCLAIMER } from "@/lib/write-someone-new.mjs";
 import { shownName } from "@/lib/resident-name.mjs";
+import { mentionFaceOf } from "@/lib/resident-mentions.mjs";
 import { excerpt } from "@/lib/pm.mjs";
 
 let world = null;
@@ -47,6 +48,7 @@ const wsn = JSON.stringify(publicHouses(houses, {
   houseLast: houseLastActive,                  // the canonical household reading: an act, null (said none) or undefined (unknown, partial reads included)
   noteOf: (r) => cardLine(r, excerpt),
   nameOf: (r) => shownName(r.address?.agent ?? r.handle),
+  faceOf: (r) => mentionFaceOf(r.handle),       // CORE-178: the public face the dealt card names them with (colour, picture, initial)
 })).replace(/</g, "\\u003c");
 const residentCount = houses.reduce((n, h) => n + h.members.length, 0);
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
@@ -131,6 +133,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   <script>
     import { searchHouse } from "@/lib/households-directory.mjs";
     import { deal, stillValid, emptyWords } from "@/lib/write-someone-new.mjs";
+    import { mentionModel, mentionNode } from "@/lib/resident-mention.mjs";
 
     const form = document.querySelector<HTMLFormElement>("[data-dir-search]");
     const input = document.querySelector<HTMLInputElement>("[data-dir-q]");
@@ -206,7 +209,12 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
         empty.hidden = ok || !r;
         if (!ok) { empty.textContent = r ? emptyWords(r.status) : ""; return; }
         const name = q("[data-wsn-name]") as HTMLAnchorElement;
-        name.textContent = shown.name; name.href = shown.profileHref;
+        name.href = shown.profileHref;
+        // CORE-178: the dealt resident named as the site names a resident (a span inside the link: the card has no portrait, so the mention's face is
+        // the picture), from the public face the build handed in; without one, the plain name
+        const m = shown.face ? mentionModel({ handle: shown.handle, face: shown.face, href: shown.profileHref }) : null;
+        if (m && m.kind === "resident") name.replaceChildren(mentionNode(document, m, { link: false }));
+        else name.textContent = shown.name;
         // a declared house is named and linked; a house of one has no page and no name but its resident's, so there is no "of ..." to say
         const hl = q("[data-wsn-house-link]") as HTMLAnchorElement;
         q("[data-wsn-house]").hidden = !shown.house.href;

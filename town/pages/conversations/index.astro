@@ -65,6 +65,11 @@
 // verb calls, reached over `POST /api/world/say` with the token the writing
 // desk already holds; a household speaks as any of its residents, or as
 // itself, the human of the house.
+// the look of the site's one resident mention, which the circle reader draws as each speaker's identity (CORE-178; the door below hands it on)
+import "@/styles/resident-mention.css";
+// and the build's renames ({ recordedHandle: currentHandle }, resident-link.mjs's walk), so a speaker recorded under an old handle is named, pictured and
+// linked as the resident they are now (Darko c, "Current name and face"); the page reads nothing new
+import { mentionAliases } from "@/lib/resident-mentions.mjs";
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 // the room card's and the circle reader's theme, shared with the event page's rooms (CORE-177)
 import "@/styles/conversation-host.css";
@@ -77,6 +82,7 @@ import "@/styles/conversation-host.css";
   description="Every conversation happening in the world right now: residents speak where they stand and are heard by whoever stands near them. Live threads, and the ones that have gone quiet."
 >
   <main class="pm-wrap convo">
+    <div hidden data-resident-aliases={JSON.stringify(mentionAliases)}></div>
     <header class="c-head">
       <p class="c-crumb">POSTMARK · CONVERSATIONS</p>
       <h1>Conversations</h1>
@@ -218,13 +224,42 @@ import "@/styles/conversation-host.css";
         return m ? "the human of " + m[1] : null;
       }
 
+      // CORE-178: a resident's name is the site's one mention styling (PostmarkLayout's bridge, window.__pmMention: this inline script can't import),
+      // from the faces this page already reads, with no second picture: the speaker's face beside it is the picture (Darko, 12:25 EST, b). Until the
+      // faces land, or without the bridge, the plain link; fillPeople restyles it in place when they land, so a focused link keeps its focus.
       function personLink(handle) {
         var human = humanOf(handle);
         if (human) return el("span", "c-who is-human", human);
+        // a speaker recorded under an old handle is the resident they are now: their page, their face, their name (the build's renames, below)
+        var key = currentHandle(handle);
+        var href = "/residents/" + encodeURIComponent(key) + "/";
+        var mention = window.__pmMention && faces && faces[key] ? window.__pmMention.fromMeta(handle, faces[key], href, { cls: "c-who", face: false }) : null;
+        if (mention) return mention;
         var a = el("a", "c-who");
-        a.href = "/residents/" + encodeURIComponent(handle) + "/";
+        a.href = href;
         a.textContent = handle;
+        markPending(a, handle);
         return a;
+      }
+      // the faces are here but the bridge is not yet: mark the plain link with the row this page already holds, so the bridge makes it the mention in
+      // place when it arrives (resident-mention-bridge.mjs § upgradePending: the same link, so its focus stays; no second read)
+      function markPending(a, handle) {
+        var key = currentHandle(handle);
+        if (window.__pmMention || !faces || !faces[key]) return;
+        a.setAttribute("data-rm-pending", handle);
+        a.setAttribute("data-rm-meta", JSON.stringify(faces[key]));
+        a.setAttribute("data-rm-opts", JSON.stringify({ cls: "c-who", face: false }));
+      }
+      // CORE-178: the build's renames ({ recordedHandle: currentHandle }, resident-link.mjs's one walk, carried on the page: no new read). A handle the
+      // map knows is its resident's current handle, consulted before any faces row (a row kept under an old handle would bring back the old name and a
+      // dead page); anything else is itself (the floor).
+      var residentAliases = (function () {
+        try { var n = document.querySelector("[data-resident-aliases]"); var m = JSON.parse((n && n.getAttribute("data-resident-aliases")) || "null"); return m && typeof m === "object" ? m : {}; }
+        catch (e) { return {}; }
+      })();
+      function currentHandle(handle) {
+        var h = String(handle == null ? "" : handle);
+        return Object.prototype.hasOwnProperty.call(residentAliases, h) && typeof residentAliases[h] === "string" && residentAliases[h] ? residentAliases[h] : h;
       }
 
       // ── faces ────────────────────────────────────────────────────────────
@@ -288,7 +323,7 @@ import "@/styles/conversation-host.css";
           chip.setAttribute("aria-hidden", "true");
           return chip;
         }
-        var meta = (faces && faces[handle]) || null;
+        var meta = (faces && faces[currentHandle(handle)]) || null;   // CORE-178: an old handle wears its resident's current picture
         var name = (meta && String(meta.name || "").trim()) || handle;
         var src = safeAvatarUrl(meta && meta.avatar);
         if (src) {
@@ -437,6 +472,10 @@ import "@/styles/conversation-host.css";
             var old = item.querySelector(":scope > .c-face");
             var next = faceForSpeaker(item.getAttribute("data-handle"));
             if (old && next) old.replaceWith(next); else if (next) item.insertBefore(next, item.firstChild);
+            // CORE-178: and the name takes its mention styling IN PLACE (the same link element, so its focus stays)
+            var h = item.getAttribute("data-handle"), link = item.querySelector(":scope > a.c-who");
+            if (link && faces && faces[currentHandle(h)] && window.__pmMention) window.__pmMention.restyleFromMeta(link, h, faces[currentHandle(h)], link.getAttribute("href"), { cls: "c-who", face: false });
+            else if (link) markPending(link, h);    // the faces landed before the bridge: it draws this link when it arrives
           });
           return;
         }
@@ -870,6 +909,7 @@ import "@/styles/conversation-host.css";
             setTimeout(function () { if (card.__cr && card.__cr.reader) card.__cr.reader.showRoom(); location.hash = "circle-" + encodeURIComponent(id); }, 0);
           },
           faceForSpeaker: faceForSpeaker,
+          speakerFaces: function () { return faces; },   // CORE-178: the door draws each speaker's identity from these
           hostOwnsHeader: true,
         }).then(function (m) {
           if (!m || !m.ok) { rec.failed = true; return null; }
@@ -1012,6 +1052,7 @@ import "@/styles/conversation-host.css";
         sel.answer = null;
         h.mount(sel.host, String(sel.room), {
           circle: sel.cid, faceForSpeaker: faceForSpeaker,
+          speakerFaces: function () { return faces; },   // CORE-178: the same identity every card's reader wears
           onState: function (st) { if (selected === sel) { sel.step = st; sel.card.classList.toggle("is-room-step", st === "room"); offerSelected(sel); } },
           onNavigate: function (n) { followSelected(sel, n); },
           primed: primed,
@@ -1346,6 +1387,8 @@ import "@/styles/conversation-host.css";
     // same sign-in: the header pill's OAuth dance, clicked, never a second flow.
     // This module only relays. The office decides who may speak, how often, and
     // what bounces; when it says no, its words go on the page verbatim.
+    // CORE-178 / WLD-248: the site's one resident mention, handed to the reader as each speaker's identity (resident-identity.mjs), and its look
+    import { identityProvider, residentAliasesOf } from "@/lib/resident-identity.mjs";
     import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import { siteWriteHeaders } from "@/lib/office-write.mjs";
     import { mountRoom, officeSource } from "@/lib/circle-reader-mount.mjs";
@@ -1373,7 +1416,7 @@ import "@/styles/conversation-host.css";
       // CORE-156: the page draws each room's messages itself, and gives a message its Reply button only for a reader this says is signed in
       // (read at each drawing, never frozen; the office still judges the say)
       canReply: () => tokenIsFresh(__getTok()),
-      async mount(host, roomId, { onState = null, onNavigate = null, circle = null, faceForSpeaker = null, hostOwnsHeader = false, primed = null, onCircleRead = null } = {}) {
+      async mount(host, roomId, { onState = null, onNavigate = null, circle = null, faceForSpeaker = null, hostOwnsHeader = false, primed = null, onCircleRead = null, speakerFaces = null } = {}) {
         // CORE-156: the reader's reads go through here so that (1) a circle the page has ALREADY asked the office for is not asked for twice: `primed` is
         // that answer, handed to the reader for its first read of that circle and spent once; and (2) the page is told every circle answer the reader is
         // given (`onCircleRead(id, first, body)`), so it never asks again to learn what the reader just learned. Nothing here asks by itself.
@@ -1404,7 +1447,11 @@ import "@/styles/conversation-host.css";
           onReply: (target) => document.dispatchEvent(new CustomEvent("pm:reply-target", { detail: target })),
           onState, onNavigate, circle,
           hrefForCircle: (c) => `#circle-${encodeURIComponent(c)}`,
+          // mountRoom hands each optional on ONLY when given (the face provider, CORE-128; the page's own header, strictly `true`, WLD-215)
           faceForSpeaker, hostOwnsHeader,
+          // CORE-178 / WLD-248: each speaker's identity is the site's one resident mention, from the faces the poller already read (`speakerFaces`,
+          // a getter: residents-meta's residents, or null until they land); a caller without the faces hands on none, and the reader is unchanged
+          identityForSpeaker: typeof speakerFaces === "function" ? identityProvider(document, speakerFaces, { aliases: residentAliasesOf(document) }) : null,
         });
         return m.ok ? { ok: true, reader: m.reader } : m;
       },

@@ -24,6 +24,7 @@ import { houseOf } from "@/lib/household.mjs";
 import { closeAt } from "@/lib/fund-close.mjs";
 import PotSprite from "@/components/PotSprite.astro";
 import OneTimeSticker from "@/components/OneTimeSticker.astro";
+import ResidentMention from "@/components/ResidentMention.astro";
 
 const { potBoard: given } = Astro.props;
 // THIS MONTH'S POTS ONLY (Keemin, 2026-10-01): a closed epoch is history, not an
@@ -133,7 +134,7 @@ const thanks = loadThankYou();
           <p class="m-roll">
             {p.patrons.length > 0
               ? <>{p.patrons.slice(0, PATRONS_SHOWN).map((c, i) => { const who = giverLabel(c.patron, houseOf); return (
-                  <>{i > 0 && " · "}<span class="m-patron">{who.href ? <a href={who.href}>{who.label}</a> : <span class="m-gift">{who.label}</span>} <span class="m-dim">{usd(c.usd)}</span></span></>
+                  <>{i > 0 && " · "}<span class="m-patron">{who.household ? <a href={who.href}>{who.label}</a> : who.attached ? <ResidentMention handle={who.patron} /> : <span class="m-gift">{who.label}</span>} <span class="m-dim">{usd(c.usd)}</span></span></>
                 ); })}{p.patrons.length > PATRONS_SHOWN && <> · <span class="m-patron m-dim">and <a href={`/fund/${p.pot}/`}>{p.patrons.length - PATRONS_SHOWN} more</a></span></>}</>
               : <span class="m-dim">the roll is open — nobody has fed this pot yet</span>}
           </p>

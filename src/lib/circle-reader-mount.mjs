@@ -82,7 +82,7 @@ export async function loadReader({ url = READER_MODULE, importImpl = (u) => impo
  * @returns {Promise<{ ok: true, reader: object, module: object } | { ok: false, why: string }>}
  *   ok:false means the reader is not here: the host keeps its floor (the caller says which, it is never an empty room).
  */
-export async function mountRoom({ doc, host, roomId, base = "/api", fetchImpl, importImpl, canReply = false, onReply = null, onNavigate = null, hrefForCircle = null, faceForSpeaker = null, hostOwnsHeader = false, onState = null, circle = null, source: given = null } = {}) {
+export async function mountRoom({ doc, host, roomId, base = "/api", fetchImpl, importImpl, canReply = false, onReply = null, onNavigate = null, hrefForCircle = null, faceForSpeaker = null, hostOwnsHeader = false, identityForSpeaker = null, onState = null, circle = null, source: given = null } = {}) {
   if (!host || !roomId) return { ok: false, why: "no room to draw" };
   const module = await loadReader({ importImpl });
   if (!module) return { ok: false, why: "the circle reader is not on this site's pinned World yet" };
@@ -100,7 +100,9 @@ export async function mountRoom({ doc, host, roomId, base = "/api", fetchImpl, i
   // `hostOwnsHeader` (WLD-215, strictly `true`): the host already shows this room's title/live/counts/began/latest itself, so the reader leaves its own `.cr-head` out; same rule, only when given
   // `onState` (the reader's room/circle/unavailable signal) is handed on only when given, as the face provider is (CORE-177: the conversations page's door
   // mounts through here now, and it is the one caller that listens)
-  const reader = module.createCircleReader({ doc, host, source, roomId, canReply, onReply, onNavigate, hrefForCircle, ...(typeof onState === "function" ? { onState } : {}), ...(typeof faceForSpeaker === "function" ? { faceForSpeaker } : {}), ...(hostOwnsHeader === true ? { hostOwnsHeader: true } : {}) });
+  // CORE-178 / WLD-248: the optional speaker identity (`identityForSpeaker(handle) -> a fresh accessible Element | null`, the site's one resident mention,
+  // resident-identity.mjs) replaces a byline's face and name; same rule, handed on only when the caller gave one
+  const reader = module.createCircleReader({ doc, host, source, roomId, canReply, onReply, onNavigate, hrefForCircle, ...(typeof onState === "function" ? { onState } : {}), ...(typeof faceForSpeaker === "function" ? { faceForSpeaker } : {}), ...(typeof identityForSpeaker === "function" ? { identityForSpeaker } : {}), ...(hostOwnsHeader === true ? { hostOwnsHeader: true } : {}) });
   // a selected conversation (CORE-117) opens on its circle, with its room one named step back; otherwise the reader opens on its room
   if (circle !== null && circle !== undefined) await reader.showCircle(circle);
   else await reader.showRoom(roomId);

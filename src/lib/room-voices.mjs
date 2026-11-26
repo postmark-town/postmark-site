@@ -22,6 +22,10 @@
 import { mountRoom, officeSource, readBody, roomUrl } from "./circle-reader-mount.mjs";
 import { faceNode, humanOf } from "./conversation-host.mjs";
 import { createRoomDrawing, roomShape, sayKey } from "./room-drawing.mjs";
+// CORE-178: the site's one resident mention (the bridge the Conversations page's inline script reaches as window.__pmMention; a module imports it) and
+// the build's rename rule, so a drawn speaker is named here exactly as that page names one
+import { mentionBridge } from "./resident-mention-bridge.mjs";
+import { resolveHandle } from "./resident-identity.mjs";
 
 /** The opt-in read of one room's lines, or of the lines before `before` (only ever the `before_ms` the office served), or null for an id it never issued. */
 export function roomVoicesUrl(base, roomId, before = null) {
@@ -97,10 +101,11 @@ function dateTimeOf(iso) {
  * @param {string} o.base         the office (auth.mjs officeBase)
  * @param {Function} o.fetchImpl
  * @param {() => object|null} [o.getFaces]   residents-meta as it stands (conversation-host.mjs hostFaces().get)
+ * @param {object|null} [o.aliases]          the build's renames ({ recordedHandle: currentHandle }, resident-mentions.mjs § mentionAliases), or none
  * @param {object} [o.readerOptions]         what the page hands mountRoom when the office answers without lines
  * @returns {Promise<{ ok: true, drawn: "voices"|"reader" } | { ok: false, why: string, failed?: true }>}
  */
-export async function drawRoomVoices({ doc, card, reader, roomId, base, fetchImpl, getFaces = () => null, readerOptions = {} }) {
+export async function drawRoomVoices({ doc, card, reader, roomId, base, fetchImpl, getFaces = () => null, aliases = null, readerOptions = {} }) {
   let body;
   try {
     body = await readBody(fetchImpl, roomVoicesUrl(base, roomId));
@@ -121,15 +126,25 @@ export async function drawRoomVoices({ doc, card, reader, roomId, base, fetchImp
   }
 
   const el = (tag, cls, text) => { const n = doc.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = String(text); return n; };
+  const mention = mentionBridge(doc);
+  // CORE-178: a speaker recorded under an old handle is the resident they are now (the build's renames, consulted before any faces row)
+  const current = (handle) => resolveHandle(String(handle ?? ""), aliases);
   const drawing = createRoomDrawing({
     doc, el, humanOf, dateTimeOf,
-    faceNode: (handle) => { try { return faceNode(doc, handle, getFaces()); } catch { return el("span", "c-face"); } },
-    // a speaker's name, linked as the Conversations page links residents; a house's human has no page, so no link
+    faceNode: (handle) => { try { return faceNode(doc, current(handle), getFaces()); } catch { return el("span", "c-face"); } },
+    // a speaker's name, linked as the Conversations page links residents (CORE-178: the site's one mention, with no second picture, the face beside it
+    // being the picture; until the faces are here, the plain link); a house's human has no page, so no link
     personLink: (handle) => {
       const human = humanOf(handle);
       if (human) return el("span", "c-who is-human", human);
+      const key = current(handle);
+      const href = `/residents/${encodeURIComponent(key)}/`;
+      const faces = getFaces();
+      const meta = faces && typeof faces === "object" && Object.hasOwn(faces, key) ? faces[key] : null;
+      const named = meta ? mention.fromMeta(handle, meta, href, { cls: "c-who", face: false }) : null;
+      if (named) return named;
       const a = el("a", "c-who", handle);
-      a.href = `/residents/${encodeURIComponent(handle)}/`;
+      a.href = href;
       return a;
     },
     canReply: () => false, pinNext: () => false, onReply: () => {},
