@@ -104,6 +104,27 @@ export function sheetNameProblem(raw) {
   return null;
 }
 
+/** Whose sheet it is, as its caption has always said it (unchanged by a name). */
+export function sheetWhose(s) {
+  return s?.own ? "the household's own" : "the town's";
+}
+
+/** The sheet image's alt: who it shows after the handle, when named; today's words when not. Set as an attribute, never as markup. */
+export function sheetAlt(handle, name) {
+  return name ? `${handle}'s reference sheet: ${name}` : `${handle}'s reference sheet`;
+}
+
+/**
+ * What a Save under a kept sheet means, before anything is sent. `standing` is the name the page shows (null: unnamed).
+ * Returns { send: true, name } (name "" is the explicit clear) or { send: false, words }. A blank box on an unnamed sheet sends nothing.
+ */
+export function nameEditIntent(raw, standing) {
+  const t = String(raw ?? "").trim();
+  if (!t) return standing ? { send: true, name: "" } : { send: false, words: "Type who this sheet shows, then save." };
+  const problem = sheetNameProblem(t);
+  return problem ? { send: false, words: problem } : { send: true, name: t };
+}
+
 /**
  * What the page says when the sheet read did not answer: the office's own words when it gave them (a 503 is "the office's record cannot be
  * reached"), never "no sheet yet" and never an unnamed sheet. `status` 0 is unreachable.

@@ -160,7 +160,8 @@ const okStatus = (n) => n >= 200 && n < 300;
 /**
  * The whole act, as the page runs it: upload (`makeUpload(token)` builds the request), then keep
  * the returned url as the sheet. `send(req)` answers { status, data } (status 0: unreachable,
- * data null: not JSON). An expired token sends nothing. Returns { ok, words }; `say` is told each step.
+ * data null: not JSON). An expired token sends nothing. Returns { ok, words, name }; `say` is told each step. `name` (CORE-175) is who the
+ * sheet shows, trimmed by the caller; undefined sends the bare keep.
  */
 export async function setSheetFlow({ handle, base, tok, makeUpload, send, say = () => {}, now = Date.now(), name }) {
   if (!tokenIsFresh(tok, now)) return { ok: false, words: refusalWords("upload", 401, null) };
@@ -173,7 +174,11 @@ export async function setSheetFlow({ handle, base, tok, makeUpload, send, say = 
   // CORE-175: who it shows rides the same keep, only when the household gave one (`name` undefined: the bare call, as before)
   const set = await send(setSheetRequest(base, handle, url, tok.access_token, name === undefined ? {} : { name }));
   if (!okStatus(set.status)) return { ok: false, words: refusalWords("set", set.status, set.data) };
-  return { ok: true, words: "Set. This page now shows it.", name: keptNameOf(set.data) };
+  const kept = keptNameOf(set.data);
+  // the picture is kept either way; a name the answer doesn't carry is never claimed (`named: false`: the page keeps the typed name and doesn't reload)
+  if (name !== undefined && String(name).trim() && kept !== String(name).trim())
+    return { ok: true, named: false, name: kept, words: "The sheet is set, but the office's answer doesn't show its name as saved. Reload the page, then name it under the sheet." };
+  return { ok: true, words: "Set. This page now shows it.", name: kept };
 }
 
 /**

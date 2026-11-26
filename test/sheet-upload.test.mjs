@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import {
   SHEET_MAX_BYTES, ownsResident, fileProblem, urlProblem,
   uploadFileRequest, uploadUrlRequest, setSheetRequest, mediaUrlOf, refusalWords, ownerGate, setSheetFlow,
+  nameSheetRequest, nameSheetFlow, keptNameOf,
 } from "../src/lib/sheet-upload.mjs";
 
 const BASE = "/api";
@@ -182,4 +183,98 @@ test("error mapping: the edge's HTML 413 is explained, the office's own words ar
     assert.match(refusalWords("upload", st, null), /town is briefly unreachable/);
     assert.doesNotMatch(refusalWords("set", st, null), /office said no/, "an edge fault is not the office refusing");
   }
+});
+
+// ── CORE-175: who a sheet shows (POS-1202's `sheet_name`, accepted Office #1213 at f0ea0fab). Invented handles and media only. ──────────
+
+const SHEET_A = "https://media.postmark.town/media/qa-many/a.webp";
+const SHEET_B = "https://media.postmark.town/media/qa-many/b.webp";
+const keepAnswer = (url, name) => ({ status: 200, data: { updated: ["sheet"], sheet: { id: "s1", url, made_by: "qa-many", own: true, ...(name ? { name } : {}) } } });
+
+test("CORE-175: a bare keep's body is exactly { sheet }; a name rides only when the caller gives one; the edit's clear is an explicit \"\"", () => {
+  for (const opts of [undefined, {}, { name: undefined }])
+    assert.deepEqual(JSON.parse(setSheetRequest(BASE, "qa-many", SHEET_A, TOK, opts).init.body), { sheet: SHEET_A }, "no empty sheet_name on an untouched box");
+  assert.deepEqual(JSON.parse(setSheetRequest(BASE, "qa-many", SHEET_A, TOK, { name: "Vex" }).init.body), { sheet: SHEET_A, sheet_name: "Vex" });
+  const named = nameSheetRequest(BASE, "qa-many", SHEET_A, "Julian", TOK);
+  assert.equal(named.url, "/api/profile/qa-many");
+  assert.equal(named.init.method, "PATCH");
+  assert.equal(named.init.headers.authorization, "Bearer tok-abc");
+  assert.deepEqual(JSON.parse(named.init.body), { sheet: SHEET_A, sheet_name: "Julian" }, "the kept URL says which sheet; no upload");
+  assert.deepEqual(JSON.parse(nameSheetRequest(BASE, "qa-many", SHEET_A, "", TOK).init.body), { sheet: SHEET_A, sheet_name: "" });
+  assert.deepEqual(JSON.parse(nameSheetRequest(BASE, "qa-many", SHEET_A, null, TOK).init.body), { sheet: SHEET_A, sheet_name: "" });
+});
+
+test("CORE-175: the kept name is read off the office's answer (`sheet.name`); absent, empty or odd is unnamed", () => {
+  assert.equal(keptNameOf(keepAnswer(SHEET_A, "Vex").data), "Vex");
+  assert.equal(keptNameOf(keepAnswer(SHEET_A).data), null);
+  assert.equal(keptNameOf({ sheet: { name: "" } }), null);
+  assert.equal(keptNameOf({ sheet: { name: 7 } }), null);
+  assert.equal(keptNameOf({ updated: ["bio"] }), null);
+  assert.equal(keptNameOf(null), null);
+});
+
+test("CORE-175: the upload with a name sends it on the keep and reads it back; with none, the keep is bare (a re-kept sheet's name stands)", async () => {
+  const run = async (name, answerName) => {
+    const sent = [];
+    const send = async (req) => { sent.push(req); return sent.length === 1 ? { status: 200, data: { url: SHEET_A } } : keepAnswer(SHEET_A, answerName); };
+    const out = await setSheetFlow({ handle: "qa-many", base: BASE, tok: fresh, now: NOW, send, name,
+      makeUpload: (t) => uploadUrlRequest(BASE, "qa-many", "https://example.org/a.png", t) });
+    return { out, keep: JSON.parse(sent[1].init.body) };
+  };
+  let r = await run("Alaric", "Alaric");
+  assert.deepEqual(r.keep, { sheet: SHEET_A, sheet_name: "Alaric" });
+  assert.equal(r.out.ok, true); assert.equal(r.out.name, "Alaric"); assert.notEqual(r.out.named, false);
+  r = await run(undefined, "Alaric");
+  assert.deepEqual(r.keep, { sheet: SHEET_A }, "no naming intent: nothing added");
+  assert.equal(r.out.ok, true); assert.equal(r.out.name, "Alaric", "the office's standing name comes back as it stands");
+  // an answer that doesn't carry the sent name (an office without POS-1202): the picture is set, the name is never claimed
+  r = await run("Alaric", undefined);
+  assert.equal(r.out.ok, true); assert.equal(r.out.named, false);
+  assert.match(r.out.words, /doesn't show its name as saved/);
+  assert.doesNotMatch(r.out.words, /^Set\. This page now shows it\.$/);
+});
+
+test("CORE-175: name, correct, clear a kept sheet: one PATCH each, the office's answer is what stands", async () => {
+  const sent = [];
+  const answers = [keepAnswer(SHEET_A, "Julian"), keepAnswer(SHEET_A, "Vex"), keepAnswer(SHEET_A)];
+  const send = async (req) => { sent.push(req); return answers[sent.length - 1]; };
+  const flow = (name) => nameSheetFlow({ handle: "qa-many", base: BASE, tok: fresh, now: NOW, url: SHEET_A, name, send });
+  assert.deepEqual(await flow("Julian"), { ok: true, name: "Julian", words: "Saved." });
+  assert.deepEqual(await flow("Vex"), { ok: true, name: "Vex", words: "Saved." });
+  assert.deepEqual(await flow(""), { ok: true, name: null, words: "Name cleared." });
+  assert.deepEqual(sent.map((r) => JSON.parse(r.init.body)), [
+    { sheet: SHEET_A, sheet_name: "Julian" }, { sheet: SHEET_A, sheet_name: "Vex" }, { sheet: SHEET_A, sheet_name: "" }]);
+  assert.ok(sent.every((r) => r.init.method === "PATCH" && r.url === "/api/profile/qa-many"), "never an upload");
+  assert.ok(sent.every((r) => !r.init.body.includes(SHEET_B)), "the other sheet is never named");
+});
+
+test("CORE-175: a refusal or a 503 claims nothing: never saved, never unnamed or cleared, and no name comes back to paint", async () => {
+  const flow = (status, data, name = "Vex") => nameSheetFlow({ handle: "qa-many", base: BASE, tok: fresh, now: NOW, url: SHEET_A, name, send: async () => ({ status, data }) });
+  let out = await flow(422, { defect: "a sheet's name is at most 80 characters", hint: "shorten it" });
+  assert.equal(out.ok, false); assert.equal("name" in out, false);
+  assert.match(out.words, /naming the sheet \(422\): a sheet's name is at most 80 characters: shorten it/);
+  for (const name of ["Vex", ""]) {
+    out = await flow(503, { defect: "the sheet names can't be read just now", hint: "try again shortly" }, name);
+    assert.equal(out.ok, false); assert.equal("name" in out, false);
+    assert.match(out.words, /\(503\): the sheet names can't be read just now/);
+    assert.doesNotMatch(out.words, /unnamed|cleared|saved/i);
+  }
+  out = await flow(403, null);
+  assert.equal(out.ok, false); assert.match(out.words, /isn't yours/);
+  out = await flow(0, null);
+  assert.equal(out.ok, false); assert.match(out.words, /Couldn't reach the office/);
+  // a 200 whose answer doesn't carry what was sent is not a save (and a clear answered still-named is not a clear)
+  out = await flow(200, { updated: ["sheet"] });
+  assert.equal(out.ok, false); assert.match(out.words, /doesn't show that name as saved/);
+  out = await flow(200, keepAnswer(SHEET_A, "Vex").data, "");
+  assert.equal(out.ok, false);
+  out = await flow(200, keepAnswer(SHEET_A, "Vex").data, "  Vex  ");
+  assert.equal(out.ok, true, "the office trims; so does the comparison");
+});
+
+test("CORE-175: an expired sign-in names nothing and says sign in again", async () => {
+  const sent = [];
+  const out = await nameSheetFlow({ handle: "qa-many", base: BASE, tok: expired, now: LATER, url: SHEET_A, name: "Vex", send: async (r) => { sent.push(r); return keepAnswer(SHEET_A, "Vex"); } });
+  assert.equal(out.ok, false); assert.match(out.words, /sign-in has expired/); assert.equal(sent.length, 0);
+  assert.match(refusalWords("name", 500, null), /naming the sheet \(500\)\. Nothing was changed\./);
 });
