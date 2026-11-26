@@ -2006,11 +2006,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     .convo .c-selected-fresh .c-act { font: 0.72rem/1.4 var(--pm-mono); letter-spacing: 0.04em; margin-left: 0.4em; }
     .convo .c-selected-fresh .c-act:disabled { opacity: 0.6; cursor: progress; }
     /* the plain name the page draws without the bridge; a resident mention (.rm, which keeps the hook class) wears its own ink and underline (CORE-178) */
-    .convo .c-who:not(.rm) {
+    .convo .c-who:where(:not(.rm)) {
       color: var(--pm-gold-bright); text-decoration: none;
       border-bottom: 1px solid rgba(232, 196, 139, 0.3); white-space: nowrap;
     }
-    .convo .c-who:not(.rm):hover { border-bottom-color: var(--pm-gold-bright); }
+    .convo .c-who:where(:not(.rm)):hover { border-bottom-color: var(--pm-gold-bright); }
     /* a household's human — a voice with no page behind it, so no link chrome */
     .convo .c-who.is-human {
       color: rgba(232, 196, 139, 0.75); border-bottom: 0; font-style: italic;

@@ -1751,11 +1751,11 @@ const residentPages = { pages: residents.map((r) => r.handle), renames };
     .replay .r-move:first-child { border-top: 0; padding-top: 0; }
     .replay .r-move-what { color: #cdc2ab; }
     /* the plain name the page draws without the bridge; a resident mention (.rm, which keeps the hook class) wears its own ink and underline (CORE-178) */
-    .replay .r-who:not(.rm) {
+    .replay .r-who:where(:not(.rm)) {
       color: var(--pm-gold-bright); text-decoration: none;
       border-bottom: 1px solid rgba(232, 196, 139, 0.3); white-space: nowrap;
     }
-    .replay .r-who:not(.rm):hover { border-bottom-color: var(--pm-gold-bright); }
+    .replay .r-who:where(:not(.rm)):hover { border-bottom-color: var(--pm-gold-bright); }
     /* a name with no resident page is text, so it does not wear the link's rule */
     .replay span.r-who { border-bottom: 0; }
     .replay .r-who.is-human { color: rgba(232, 196, 139, 0.75); border-bottom: 0; font-style: italic; white-space: normal; }

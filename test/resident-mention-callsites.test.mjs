@@ -310,16 +310,19 @@ test("THE CENSUS: every resident-page link left in the Site's source is declared
 // of their own colour. The FIX-round probe found each by the ink it drew; every one now leaves .rm alone. A rule that colours a page's links or a
 // page's own hook class must not reach a resident mention (Darko a: the favourite hue at readable darkness, everywhere).
 test("no page link rule or hook-class rule paints over a resident mention's ink (the rules the frames caught)", () => {
+  // `:where(:not(.rm))`: the rule no longer matches a mention, and its weight stays what it was, so every OTHER element it styles resolves exactly as
+  // before (a bare `:not(.rm)` adds (0,1,0) and out-ranked the waiting page's own link colour: page-fallback-browser caught it, 4.17:1)
+  const NOT = String.raw`:where\(:not\(\.rm\)\)`;
   const rules = [
-    ["src/styles/postmark.css", /\.pm \.pm-paper a:not\(\.rm\) \{ color: var\(--pm-accent\); \}/, /\.pm \.pm-paper a \{ color:/],
-    ["src/styles/postmark.css", /\.pm \.pm-paper a:not\(\.rm\):hover \{ color: var\(--pm-wax\); \}/, /\.pm \.pm-paper a:hover \{/],
-    ["town/pages/events/[host]/[slug].astro", /\.ev-sec\.pm-paper a:not\(\.rm\) \{ color: var\(--pm-wax\);/, /\.ev-sec\.pm-paper a \{/],
-    ["town/pages/events/[host]/[slug].astro", /\.ev-sec:not\(\.pm-paper\) a:not\(\.rm\) \{ color: var\(--pm-gold-bright\); \}/, /\.ev-sec:not\(\.pm-paper\) a \{/],
-    ["town/pages/events/[host]/[slug].astro", /\.ev-sec\.pm-paper :global\(a:not\(\.rm\)\) \{ color: var\(--pm-wax\);/, /\.ev-sec\.pm-paper :global\(a\) \{/],
-    ["town/pages/conversations/index.astro", /\.convo \.c-who:not\(\.rm\) \{\s*color: var\(--pm-gold-bright\);/, /\.convo \.c-who \{/],
-    ["town/pages/conversations/index.astro", /\.convo \.c-who:not\(\.rm\):hover \{/, /\.convo \.c-who:hover \{/],
-    ["town/pages/replay/index.astro", /\.replay \.r-who:not\(\.rm\) \{\s*color: var\(--pm-gold-bright\);/, /\.replay \.r-who \{/],
-    ["town/pages/replay/index.astro", /\.replay \.r-who:not\(\.rm\):hover \{/, /\.replay \.r-who:hover \{/],
+    ["src/styles/postmark.css", new RegExp(String.raw`\.pm \.pm-paper a${NOT} \{ color: var\(--pm-accent\); \}`), /\.pm \.pm-paper a(:not\(\.rm\))? \{ color:/],
+    ["src/styles/postmark.css", new RegExp(String.raw`\.pm \.pm-paper a${NOT}:hover \{ color: var\(--pm-wax\); \}`), /\.pm \.pm-paper a(:not\(\.rm\))?:hover \{/],
+    ["town/pages/events/[host]/[slug].astro", new RegExp(String.raw`\.ev-sec\.pm-paper a${NOT} \{ color: var\(--pm-wax\);`), /\.ev-sec\.pm-paper a(:not\(\.rm\))? \{/],
+    ["town/pages/events/[host]/[slug].astro", new RegExp(String.raw`\.ev-sec:not\(\.pm-paper\) a${NOT} \{ color: var\(--pm-gold-bright\); \}`), /\.ev-sec:not\(\.pm-paper\) a(:not\(\.rm\))? \{/],
+    ["town/pages/events/[host]/[slug].astro", new RegExp(String.raw`\.ev-sec\.pm-paper :global\(a${NOT}\) \{ color: var\(--pm-wax\);`), /\.ev-sec\.pm-paper :global\(a(:not\(\.rm\))?\) \{/],
+    ["town/pages/conversations/index.astro", new RegExp(String.raw`\.convo \.c-who${NOT} \{\s*color: var\(--pm-gold-bright\);`), /\.convo \.c-who(:not\(\.rm\))? \{/],
+    ["town/pages/conversations/index.astro", new RegExp(String.raw`\.convo \.c-who${NOT}:hover \{`), /\.convo \.c-who(:not\(\.rm\))?:hover \{/],
+    ["town/pages/replay/index.astro", new RegExp(String.raw`\.replay \.r-who${NOT} \{\s*color: var\(--pm-gold-bright\);`), /\.replay \.r-who(:not\(\.rm\))? \{/],
+    ["town/pages/replay/index.astro", new RegExp(String.raw`\.replay \.r-who${NOT}:hover \{`), /\.replay \.r-who(:not\(\.rm\))?:hover \{/],
   ];
   for (const [file, now, was] of rules) {
     const src = read(file);
