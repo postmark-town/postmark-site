@@ -1,0 +1,6 @@
+before/sparks-1440-full.png column x=370: first card from y=330 ends at y=1480 → 1150 px
+before/sparks-1440-full.png card x=220..520, y=330..1480 (1150 px): 895 px of empty dark well
+before/sparks-1440-full.png card x=566..866, y=330..1480 (1150 px): 917 px of empty dark well
+after/sparks-1440-full.png column x=370: first card from y=330 ends at y=838 → 508 px
+after/sparks-1440-full.png card x=220..520, y=330..838 (508 px): 253 px of empty dark well
+after/sparks-1440-full.png card x=566..866, y=330..838 (508 px): 275 px of empty dark well
