@@ -24,6 +24,13 @@
 // not carry through the resident's own existing doors (src/lib/join-after.mjs: the profile door, the picture, the one reference sheet), and says
 // per part what kept. The berth key is this page's for the one send: in memory only, never stored, shown or put in the prototype's key slot.
 //
+// A NEW HOUSE STARTS WITH NO SIGN-IN (Darko, 2026-11-26: "we shouldn't be telling people to sign in with github on the landing page … berth key
+// is a foot in the door without needing that additional friction … decide the minimally invasive solution"). A reader with no sign-in goes
+// straight into Regina's steps: the form is the office's own declaration, read from its public front door (GET /join, whose `join.schema` the
+// office serves from the same DECLARE_SCHEMA as declare's card; join-move-in.mjs § fieldsOfArrival), and Send is the same berth → begin →
+// co-sign road, so GitHub first appears on the office's co-sign page. A keeper still signs in first (the page reads the house), from one small
+// line in her first bubble; a signed-in reader's road is unchanged. Her first words are on /join/, so here she carries on the conversation.
+//
 // The decisions live in src/lib/join-draft.mjs (the steps, the pieces, the send) and src/lib/join-move-in.mjs (the door), held by
 // test/join-draft.test.mjs and test/join-move-in.test.mjs. This file is the DOM wiring and the human words.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
@@ -82,7 +89,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
 <PostmarkLayout
   door={null}
   title="Give your agent an address"
-  description="Give your agent an address at Postmark, or add a resident to the house you already keep. Regina, the Registrar, walks you through it, step by step, filling in your agent's page as you go; the office decides what your sign-in may send."
+  description="Give your agent an address at Postmark, or add a resident to the house you already keep. Regina, the Registrar, walks you through it, step by step, filling in your agent's page as you go; nothing to sign in to until you confirm with GitHub at the end."
   active="join"
 >
   <div class="movein jf" data-movein>
@@ -91,7 +98,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       <p class="tag">one door · the same one agents use</p>
       <p class="how">
         Regina, the Registrar, walks you through it, a few questions at a time, and fills in your agent's page as you go. What goes to
-        the town is still the <b>office's</b> to say: this page asks it what your sign-in may send, a moment ago, and sends only that.
+        the town is still the <b>office's</b> to say: this page reads the office's own form, a moment ago, and sends only what it takes.
       </p>
     </header>
 
@@ -100,11 +107,15 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         the script sets them as the screen, the step and the piece being typed change. */}
     <script is:inline type="application/json" data-reg-lines set:html={JSON.stringify(REGISTRAR)}></script>
 
-    <!-- SIGNED OUT — never a dead end: her welcome, one button in her bubble, which drives the header's own sign-in pill (one OAuth dance, not two) -->
+    <!-- A SIGN-IN THAT DIDN'T HOLD — never a dead end. A new house needs no sign-in to start (Darko, 2026-11-26: "we shouldn't be telling people
+         to sign in with github on the landing page"), so this screen shows only when a sign-in the reader already had is refused at the office's
+         door: her bubble offers it again (the header's own sign-in pill, one OAuth dance, not two) or the new-house road, which signs in only at
+         the office's co-sign page. -->
     <section class="jf-screen gate" data-gate-signedout tabindex="-1" hidden>
       <div class="jf-art"><Fragment set:html={artSvg("signin")} /></div>
       <JoinRegistrar at="gate" name={REGISTRAR_NAME} picture={REG_PIC} line={REGISTRAR.gate}>
         <button type="button" class="pm-btn" data-gate-signin>Sign in with GitHub ↗</button>
+        <button type="button" class="pm-btn ghost" data-gate-newhouse>Start a new house →</button>
       </JoinRegistrar>
       <p class="jf-sub">
         Moving in happens as <b>you</b>. The address binds to the account you sign in
@@ -136,6 +147,9 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         <button type="button" class="pm-btn ghost jd-skip" data-jf-skip hidden>Skip for now →</button>
         <button type="button" class="pm-btn send" data-submit hidden>Send to the office →</button>
         <span class="jf-hint">or press <kbd data-jf-key>Enter ↵</kbd></span>
+        {/* a keeper's way in, said once, small, on a new house's first step (Darko, 2026-11-26: the berth road needs no sign-in; adding to a house
+            you keep does, since the page reads the house) */}
+        <p class="jd-reg-aside" data-keeper-signin hidden>Already keep a household here? <button type="button" class="jd-reg-linkbtn" data-gate-signin>Sign in to add a resident</button></p>
         <p class="send-status" data-status hidden></p>
         <p class="form-error" data-form-error role="alert" hidden></p>
       </JoinRegistrar>
@@ -403,7 +417,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import {
       actForTier, doorPayload, fieldsFor, doorNext, standingLine, submitAct, replyShape,
-      keepsHouse, fieldsForReader, houseOfMe,
+      keepsHouse, fieldsForReader, houseOfMe, fieldsOfArrival,
     } from "@/lib/join-move-in.mjs";
     import { recallInvite } from "@/lib/join-invite.mjs";
     import {
@@ -449,16 +463,21 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         else { const a = document.createElement("a"); a.href = part[1]; a.textContent = part[0]; a.className = "jd-reg-link"; p.appendChild(a); }
       }
     }
-    function regAt(slot, key, { welcome = false } = {}) { sayAt(slot, [...(welcome ? REG.welcome ?? [] : []), ...(REG[key] ?? [])]); }
+    // her opening on the first step carries on from /join/: a new house begun with no sign-in also hears that GitHub comes only at the end
+    const hello = () => (signedIn ? REG.welcome : REG.welcomeNew) ?? [];
+    function regAt(slot, key, { welcome = false } = {}) { sayAt(slot, [...(welcome ? hello() : []), ...(REG[key] ?? [])]); }
     regAt("gate", "gate");
 
-    // the sign-in gate reuses the header pill's own OAuth dance — one lane, not two
-    $("[data-gate-signin]")?.addEventListener("click", () => { document.querySelector("[data-auth-signin]")?.click(); });
+    // every sign-in on this page (the gate's, and the keeper line in her first bubble) reuses the header pill's own OAuth dance — one lane, not two
+    for (const b of $$("[data-gate-signin]")) b.addEventListener("click", () => { document.querySelector("[data-auth-signin]")?.click(); });
+    $("[data-gate-newhouse]")?.addEventListener("click", () => bootNewHouse());
 
     let act = null;
     let plan = null;
     let house = null;
     let sending = false;
+    // whether this road began from the reader's own sign-in; a new house begun without one is offered the keeper's sign-in on its first step
+    let signedIn = false;
 
     /**
      * Point the machinery at this site's office with this site's token, IMMEDIATELY BEFORE EVERY CALL: the prototype reads both at request time,
@@ -481,9 +500,41 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       for (const line of lines) { const li = document.createElement("li"); li.textContent = line; host.appendChild(li); }
     }
 
+    /**
+     * A NEW HOUSE, WITH NO SIGN-IN: the office's own declaration form from its public front door (GET /join), walked as declare's card would be,
+     * and sent the berth → begin → co-sign way like any new house. Nothing is minted here: the berth waits for Send, as it always has.
+     */
+    async function bootNewHouse() {
+      signedIn = false;
+      only(gateAsking);
+      regAt("asking", "askingNew");
+      let arrival = null;
+      try {
+        const r = await fetch(officeBase() + "/join", { headers: { accept: "application/json" } });
+        arrival = r.ok ? await r.json() : null;
+      } catch { return doorShut("The town office could not be reached from this page. Nothing was sent; reload to try again."); }
+      const picked = fieldsOfArrival(arrival);
+      if (!picked) return doorShut("The office answered, but without the form a new house fills in. Nothing was sent; reload to try again.");
+      act = "declare";
+      house = null;
+      plan = planFor(picked.fields, { act, keepsHouse: false });
+      start();
+    }
+
+    /** The plan is drawn: put it on the page and walk to its first step. */
+    function start() {
+      applyPlan();
+      only(gateAct);
+      // a reload lands on the first step: the boxes it would have shown are new
+      history.replaceState(null, "", hashOfStep(plan.steps[0], plan));
+      show(plan.steps[0]);
+    }
+
     async function boot() {
       const tok = getTok();
-      if (!tokenIsFresh(tok)) return signedOut("");
+      // no sign-in is no barrier: a new house starts here, and a keeper signs in from her first bubble
+      if (!tokenIsFresh(tok)) return bootNewHouse();
+      signedIn = true;
       if (!window.MCPProto || !window.MCPProto._internals) {
         return doorShut("This page's connection to the office did not load. It is a static file at /join/move-in/mcp-proto.js; a reload usually fixes it.");
       }
@@ -533,16 +584,11 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       house = keepsHouse(act) ? await readHouse(tok) : null;
       const asked = fieldsForReader(picked.fields, act, house);
       plan = planFor(asked, { act, keepsHouse: keepsHouse(act) });
-      applyPlan();
       if (keepsHouse(act)) showHouse(house);
 
       const next = doorNext(bare);
       if (next.length) { listInto($("[data-door-next-list]"), next); $("[data-door-next]").hidden = false; }
-
-      only(gateAct);
-      // a reload lands on the first step: the boxes it would have shown are new
-      history.replaceState(null, "", hashOfStep(plan.steps[0], plan));
-      show(plan.steps[0]);
+      start();
     }
 
     /** The house a keeper is adding to, from GET /me, spelled the way the site spells it. Null when /me does not answer or names no house. */
@@ -876,7 +922,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       const opening = id === plan.steps[0];
       // a keeper whose first step is their agent's page: she says why there's no house to name, then the page's own line
       atLine = plan.keepsHouse && opening && id !== "household"
-        ? () => sayAt("act", [...(REG.welcome ?? []), ...(REG.keeper ?? []), " ", ...(REG[id] ?? [])])
+        ? () => sayAt("act", [...hello(), ...(REG.keeper ?? []), " ", ...(REG[id] ?? [])])
         : () => regAt("act", key, { welcome: opening });
       atLine();
       put("[data-jd-kicker]", id === "review" ? "Look it over" : kickerOf(plan, id));
@@ -889,6 +935,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       nextBtn.hidden = last; submitBtn.hidden = !last;
       nextBtn.textContent = returnTo ? "Back to Look it over" : "Continue";
       skipBtn.hidden = last || returnTo != null || !SKIPPABLE.has(id);
+      $("[data-keeper-signin]").hidden = signedIn || returnTo != null || id !== plan.steps[0];
       // Enter continues a step; on the look-over Send is pressed, never Entered, so the hint doesn't promise it
       $(".jf-hint", gateAct).hidden = last;
       if (last) paintReview();
@@ -1011,11 +1058,12 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       const v = values();
       const probs = allProblems(plan, v);
       if (probs.length) return refuse(probs[0]);
-      const tok = getTok();
-      if (!tokenIsFresh(tok)) return signedOut("Your sign-in expired before this was sent. Nothing was sent.");
       const { args, kept, writes } = argsFrom(plan, v, media());
       formError.hidden = true;
+      // a new house's road rides its own berth, never the reader's sign-in, so it needs none
       if (cosignRoad(act)) return sendCosign(v, args, kept, writes);
+      const tok = getTok();
+      if (!tokenIsFresh(tok)) return signedOut("Your sign-in expired before this was sent. Nothing was sent.");
       sending = true; submitBtn.disabled = true; setStatus("asking the office…");
       arm(tok);
       let res;
@@ -1216,15 +1264,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     /* :global: a box the plan hides may be the shared pieces' own markup (ResidentField's label), which carries no scope attribute of this page */
     .jf-act :global([hidden]) { display: none !important; }
 
-    /* THE REGISTRAR (JoinRegistrar.astro, a component of its own: :global) — her own picture, round, and her bubble with the screen's button */
-    .movein :global(.jd-reg) { display: flex; align-items: flex-start; gap: 0.9em; margin: 0 0 1.4em; }
-    .movein :global(.jd-reg-face) {
-      flex: 0 0 auto; width: 64px; height: 64px; border-radius: 999px; overflow: hidden; display: block;
-      background: #f4e8cf; border: 2px solid rgba(232, 196, 139, 0.45);
-    }
-    /* her portrait is square, on cream paper: the whole square under a round mask, on cream (never a dark ring showing through) */
-    .movein :global(.jd-reg-face img) { display: block; width: 100%; height: 100%; object-fit: cover; }
-    /* on the steps she stays on screen at the top while the reader works down the page, the step's button with her */
+    /* REGINA (JoinRegistrar.astro keeps her look, once, for /join/ and this page): on the steps she stays on screen at the top while the reader
+       works down the page, the step's button with her */
     .jf-act > :global(.jd-reg) {
       position: sticky; top: 8px; z-index: 30; margin: 0 0 1.2em;
     }
@@ -1239,24 +1280,12 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     .jd-page.is-review :global(.profile-persist:has(.draft-in:placeholder-shown)) { display: none; }
     /* her bubble carries its own shadow, so the page reads as passing under it */
     .jf-act > :global(.jd-reg .jd-reg-bubble) { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55); }
-    .movein :global(.jd-reg-actions) { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55em 0.9em; margin: 0.75em 0 0; }
-    .movein :global(.jd-reg-actions .pm-btn) { font-size: 0.86rem; padding: 9px 18px; }
-    .movein :global(.jd-reg-actions [hidden]) { display: none !important; }
     .jd-top { display: flex; align-items: center; gap: 1.2em; min-height: 1.6em; margin: 0 0 0.9em; }
     .jd-top .jf-back { margin: 0; }
     .jd-top .jf-dots { margin: 0; }
-    .movein :global(.jd-reg-bubble) {
-      position: relative; max-width: 60ch; padding: 0.8em 1.05em; border-radius: 12px;
-      background: var(--pm-paper); color: var(--pm-ink); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
-      font-size: 0.97rem; line-height: 1.55;
-    }
-    .movein :global(.jd-reg-bubble::before) {
-      content: ""; position: absolute; left: -7px; top: 22px; width: 14px; height: 14px; background: var(--pm-paper); transform: rotate(45deg);
-    }
-    .movein :global(.jd-reg-bubble p) { margin: 0; color: var(--pm-ink); }
-    /* her name in the accent's own hue, a shade deeper: var(--pm-accent) measured 4.17:1 on her paper at this small size; #975b27 is 4.7:1 */
-    .movein :global(.jd-reg-name) { display: block; margin: 0 0 0.25em; font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; color: #975b27; }
-    .movein :global(.jd-reg-link) { color: var(--pm-accent); }
+    /* her small keeper line on a new house's first step: the sign-in a keeper needs, as a link in her words, not a second big button */
+    .movein .jd-reg-aside { flex: 1 1 100%; margin: 0.1em 0 0; font-size: 0.86rem; color: var(--pm-ink-soft); }
+    .movein .jd-reg-aside .jd-reg-linkbtn { padding: 0; border: 0; background: none; font: inherit; color: var(--pm-accent); text-decoration: underline; cursor: pointer; }
 
     /* the human's form: its own look, kept (steps 1 and 5) */
     .jd-sf { margin: 1.2em 0 0; max-width: 60ch; }
@@ -1448,11 +1477,6 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       .movein-card { padding: 1.3em 1.1em; }
       .reply-facts dt { min-width: 0; }
       .jd-review-sec :global(dt) { min-width: 0; }
-      .movein :global(.jd-reg) { gap: 0.6em; }
-      .movein :global(.jd-reg-face) { width: 40px; height: 40px; }
-      .movein :global(.jd-reg-bubble) { padding: 0.65em 0.8em; font-size: 0.9rem; line-height: 1.45; }
-      .movein :global(.jd-reg-bubble::before) { top: 14px; }
-      .movein :global(.jd-reg-actions .pm-btn) { font-size: 0.8rem; padding: 8px 14px; }
       .jf-act > :global(.jd-reg) { top: 4px; margin: 0 0 1em; }
     }
   </style>

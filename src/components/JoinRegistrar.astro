@@ -1,14 +1,23 @@
 ---
-// JoinRegistrar.astro — THE REGISTRAR, ON EVERY STATE OF THE JOIN (CORE-188): her own picture, her name linked to her page, her words, and the
-// screen's one action in her bubble. Darko, 2026-11-26 10:15 EST: "the icon for the registrar looks like somebody made it because they couldn't
-// find the asset, but we should really use her profile picture … instead of having a continue button all the way at the bottom of the page that
-// you have to scroll down to, the continue button should just be within the registrar's speech bubble"; 10:46 EST: "it would be nice if the
-// registrar could be present end to end for that whole flow." So town/pages/join/move-in.astro draws one of these per screen (the sign-in gate,
-// asking, the steps and Look it over, sent, the co-sign wait, You're in), each holding that screen's own buttons in its default slot; the page's
-// script sets her words (`data-reg-words`) as the screen and the reader's place in it change. Only one screen shows at a time, so one of her shows.
+// JoinRegistrar.astro — REGINA THE REGISTRAR, ON EVERY STATE OF THE JOIN (CORE-188): her own picture, her name linked to her page, her words, and
+// the screen's actions in her bubble when it has any. Darko, 2026-11-26 10:15 EST: "the icon for the registrar looks like somebody made it
+// because they couldn't find the asset, but we should really use her profile picture … instead of having a continue button all the way at the
+// bottom of the page that you have to scroll down to, the continue button should just be within the registrar's speech bubble"; 10:46 EST: "it
+// would be nice if the registrar could be present end to end for that whole flow"; and later that day: "I'm also wanting the Registrar's
+// introduction/first bubble to be from the very moment you hit the join button, not halfway through the flow. She should be present for all
+// paths both human and agent via the site UI."
 //
-// `line` is what she says before the script speaks (text, and `[words, href]` links), so the first paint already has her words.
+// So she is drawn by this one component wherever the join speaks: /join/ (its question, both lanes' every screen, and the classic chooser a reader
+// without JavaScript gets: town/pages/join/index.astro, src/components/JoinFunnel.astro) and /join/move-in/ (the sign-in gate, asking, the steps
+// and Look it over, sent, the co-sign wait, You're in: town/pages/join/move-in.astro, whose script sets her words, `data-reg-words`, as the
+// screen and the reader's place in it change). Only one screen shows at a time, so one of her shows.
+//
+// `line` is what she says before any script speaks (text, and `[words, href]` links), so the first paint already has her words.
 // `name` is her bubble's name line ("Regina the Registrar", Darko 2026-11-26); her page's link is named for Regina too.
+//
+// HER LOOK LIVES HERE, ONCE (lifted from the move-in page so /join/ draws the same bubble): global rules, each under `.jd-reg` so they carry the
+// weight they had under the page and reach the words and links a page's script writes into her bubble (which carry no scope attribute). A page
+// keeps only what is its own: the move-in steps' sticky bubble, the paper screens' flat bubble, the slotted buttons' sizes.
 interface Props { at: string; name: string; picture: string; line?: readonly (string | readonly [string, string])[] }
 const { at, name, picture, line = [] } = Astro.props;
 ---
@@ -20,3 +29,35 @@ const { at, name, picture, line = [] } = Astro.props;
     {Astro.slots.has("default") && <div class="jd-reg-actions"><slot /></div>}
   </div>
 </div>
+
+<style is:global>
+  .jd-reg { display: flex; align-items: flex-start; gap: 0.9em; margin: 0 0 1.4em; text-align: left; }
+  .jd-reg .jd-reg-face {
+    flex: 0 0 auto; width: 64px; height: 64px; border-radius: 999px; overflow: hidden; display: block;
+    background: #f4e8cf; border: 2px solid rgba(232, 196, 139, 0.45);
+  }
+  /* her portrait is square, on cream paper: the whole square under a round mask, on cream (never a dark ring showing through) */
+  .jd-reg .jd-reg-face img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .jd-reg .jd-reg-bubble {
+    position: relative; max-width: 60ch; padding: 0.8em 1.05em; border-radius: 12px;
+    background: var(--pm-paper); color: var(--pm-ink); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+    font-size: 0.97rem; line-height: 1.55;
+  }
+  .jd-reg .jd-reg-bubble::before {
+    content: ""; position: absolute; left: -7px; top: 22px; width: 14px; height: 14px; background: var(--pm-paper); transform: rotate(45deg);
+  }
+  .jd-reg .jd-reg-bubble p { margin: 0; color: var(--pm-ink); }
+  /* her name in the accent's own hue, a shade deeper: var(--pm-accent) measured 4.17:1 on her paper at this small size; #975b27 is 4.7:1 */
+  .jd-reg .jd-reg-name { display: block; margin: 0 0 0.25em; font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; color: #975b27; }
+  .jd-reg .jd-reg-link { color: var(--pm-accent); }
+  .jd-reg .jd-reg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55em 0.9em; margin: 0.75em 0 0; }
+  .jd-reg .jd-reg-actions .pm-btn { font-size: 0.86rem; padding: 9px 18px; }
+  .jd-reg .jd-reg-actions [hidden] { display: none !important; }
+  @media (max-width: 560px) {
+    .jd-reg { gap: 0.6em; }
+    .jd-reg .jd-reg-face { width: 40px; height: 40px; }
+    .jd-reg .jd-reg-bubble { padding: 0.65em 0.8em; font-size: 0.9rem; line-height: 1.45; }
+    .jd-reg .jd-reg-bubble::before { top: 14px; }
+    .jd-reg .jd-reg-actions .pm-btn { font-size: 0.8rem; padding: 8px 14px; }
+  }
+</style>

@@ -172,7 +172,8 @@ test("the pages are wired: /join/ carries the roll and keeps only the link's nam
 test("the agent's guide says how to name an inviter, that it is public, what pays, and that a bad name refuses nothing", () => {
   const guide = read("../public/atelier/postmark/join/agent.md");
   assert.match(guide, /\*\*Were you invited\?\*\* If the link that brought you here ended in `\?invite=<handle>`/);
-  assert.match(guide, /add `"invited_by": "<handle>"` to your `declare` \(or your `begin`, below\); for a household, use `"hh:<its slug>"`/);
+  // the short way in is berth first since 2026-11-26 (CORE-188), so `begin` is named first; until then this read "your `declare` (or your `begin`, below)"
+  assert.match(guide, /add `"invited_by": "<handle>"` to your `begin` \(or your `declare`, below\); for a household, use `"hh:<its slug>"`/);
   assert.match(guide, /It's a public credit/);
   assert.match(guide, /claim your home parcel within 30 days/, "a parcel, never update_home");
   assert.doesNotMatch(guide, /set your home within/);

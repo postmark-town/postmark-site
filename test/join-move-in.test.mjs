@@ -31,8 +31,9 @@ import vm from "node:vm";
 import {
   ACT_FOR_TIER, actForTier, doorPayload, fieldsFor, actSentence,
   doorNext, standingLine, callEnvelope, submitAct, replyShape,
-  requiredNames, markRequired, missingRequired, controlOf,
+  requiredNames, markRequired, missingRequired, controlOf, fieldsOfArrival,
 } from "../src/lib/join-move-in.mjs";
+import { planFor } from "../src/lib/join-draft.mjs";
 // the office's own join refusals, copied with their sha — see that module's
 // header, and test/ceremony-refusals.test.mjs for the copy's own falsifier.
 import { REFUSALS } from "../src/lib/ceremony-refusals.mjs";
@@ -859,5 +860,56 @@ test("the page no longer tells a reader to go find a multiline button", () => {
   // the boxes know their own shape: a paragraph piece is a textarea by the piece table (CORE-188), a card field the design places nowhere by
   // its own x-multiline (drawExtra's long template)
   assert.match(PAGE, /x\.multiline \? "\[data-extra-template-long\]" : "\[data-extra-template\]"/);
+});
+
+// ── a new house with no sign-in: the office's own form from its front door (CORE-188, Darko 2026-11-26) ──────────────────────────────────────
+
+// GET /join's `join.schema`, shaped as the live office serves it (measured 2026-11-26 on postmark.town/api/join at release/2026-w48.12: a JSON
+// schema, `properties` beside a `required` list of household, handle and card); invented values
+const ARRIVAL = {
+  town: "Postmark",
+  join: {
+    how: "POST https://postmark.town/api/households",
+    schema: {
+      type: "object",
+      properties: {
+        household: { type: "string", title: "Household name", "x-group": "household", examples: ["Fixture House"] },
+        handle: { type: "string", title: "Handle", "x-group": "resident" },
+        card: { type: "string", title: "Address Card", "x-multiline": true },
+        agent: { type: "string", title: "Agent's name" },
+        note: { type: "string", title: "Directory line" },
+        invited_by: { type: "string", maxLength: 64 },
+      },
+      required: ["household", "handle", "card"],
+      additionalProperties: false,
+    },
+  },
+};
+
+test("a new house's form is the office's own: GET /join's schema read as declare's card (each required name marked), never a copy in the site", () => {
+  const got = fieldsOfArrival(ARRIVAL);
+  assert.equal(got.source, "arrival");
+  assert.deepEqual(Object.keys(got.fields), ["household", "handle", "card", "agent", "note", "invited_by"], "the office's order is kept");
+  // the office's own projection (world-apex.mjs § actionFields): the spec whole, human hints kept, `required: true` on a required name only
+  assert.deepEqual(got.fields.household, { type: "string", title: "Household name", "x-group": "household", examples: ["Fixture House"], required: true });
+  assert.equal(got.fields.card.required, true);
+  assert.equal("required" in got.fields.agent, false, "an optional field was marked required");
+  assert.equal(got.fields.invited_by.maxLength, 64, "a limit the office states was lost");
+  // and the plan drawn from it is the plan drawn from the same fields read as a card: one form, whichever door it came from
+  const card = { card: { act: "declare", fields: Object.fromEntries(Object.entries(ARRIVAL.join.schema.properties).map(([k, v]) => [k, { ...v, ...(ARRIVAL.join.schema.required.includes(k) ? { required: true } : {}) }])) } };
+  assert.deepEqual(planFor(got.fields, { act: "declare" }), planFor(fieldsFor(card, null).fields, { act: "declare" }));
+  assert.equal(planFor(got.fields, { act: "declare" }).pieces.handle.berth, true, "a new house's handle is not held to the berth's rule");
+});
+
+test("an answer without the declaration's schema draws no form: the page says the office didn't send it, never guesses one", () => {
+  for (const bad of [null, {}, { join: {} }, { join: { schema: {} } }, { join: { schema: { properties: {} } } }, { join: { schema: { properties: [] } } }, "text"]) {
+    assert.equal(fieldsOfArrival(bad), null, `drew a form from ${JSON.stringify(bad)}`);
+  }
+  // a schema with no `required` list marks nothing required, rather than everything
+  const loose = fieldsOfArrival({ join: { schema: { properties: { household: { type: "string" } } } } });
+  assert.deepEqual(loose.fields, { household: { type: "string" } });
+  // the page reads the front door, and only when there is no sign-in: a signed-in reader still reads the household door's card
+  assert.match(PAGE, /if \(!tokenIsFresh\(tok\)\) return bootNewHouse\(\);/);
+  assert.match(PAGE, /fetch\(officeBase\(\) \+ "\/join", \{ headers: \{ accept: "application\/json" \} \}\)/);
 });
 

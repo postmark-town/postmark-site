@@ -24,6 +24,7 @@ import {
   admitsNow, cosignRoad, kickerOf, stepOfHash, hashOfStep, dotsOf, pieceProblem, inLines, hexOf, appearanceOf, slotOf, slotProblem,
 } from "../src/lib/join-draft.mjs";
 import { afterAdmission, cropOf, PICTURE_OUT_MAX, describeRequest } from "../src/lib/join-after.mjs";
+import { REGINA } from "../src/lib/join-funnel.mjs";
 
 const plain = (v) => JSON.parse(JSON.stringify(v));
 const chars = (max) => ({ maxLength: max, "x-limit": { max, unit: "characters" } });
@@ -71,8 +72,7 @@ const EVERYTHING = {
 test("(1) the approved steps, in order, and the Registrar has words for each, her name linking to her page", () => {
   // the approved "Being shown" step went to the office's co-sign page with the human profile (Darko's ruled fallback, applied 2026-11-25)
   assert.deepEqual(STEPS.map((s) => s.title), ["Your household", "Who's moving in", "Describe yourself", "More about you", "How you found us"]);
-  for (const k of ["gate", ...STEPS.map((s) => s.id), "keeper", "review", "reviewCosign", "cosign", "sent", "in"]) assert.ok(Array.isArray(REGISTRAR[k]) && REGISTRAR[k].length, `no Registrar line for ${k}`);
-  assert.deepEqual(REGISTRAR.gate.find((p) => Array.isArray(p)), ["Regina", "/residents/registrar/"]);
+  for (const k of ["gate", "asking", "askingNew", ...STEPS.map((s) => s.id), "keeper", "review", "reviewCosign", "cosign", "sent", "in"]) assert.ok(Array.isArray(REGISTRAR[k]) && REGISTRAR[k].length, `no Registrar line for ${k}`);
   // she says where the human's own part went, on step 1, before Send and when the link is handed over: the handoff is legible
   for (const k of ["household", "reviewCosign", "cosign"]) assert.match(REGISTRAR[k].join(" "), /co-sign page/, `${k} doesn't say the office's co-sign page asks the human's part`);
   assert.match(REGISTRAR.household.join(" "), /profile.*short videos|short videos.*profile/);
@@ -83,17 +83,25 @@ test("(1) the approved steps, in order, and the Registrar has words for each, he
   assert.equal(stepOfHash("#step-99", plan), null);
 });
 
-test("(1) she speaks first: her first bubble opens with a welcome, and her lines on the steps stay short", () => {
+test("(1) she speaks first, on /join/, the moment you press Join; the move-in page carries her conversation on, and her lines on the steps stay short", () => {
   // Darko, 2026-11-26 10:15 EST: "we should have the registrar say, like, welcome to Postmark, I'm the registrar and I will, you know, help you
-  // join, or some kind of like intro sentence first". CAN FAIL: drop the welcome from the gate's line or the prefix the first step wears.
+  // join, or some kind of like intro sentence first"; later that day: "I'm also wanting the Registrar's introduction/first bubble to be from the
+  // very moment you hit the join button, not halfway through the flow". Until 2026-11-26 this asserted the welcome on the move-in gate and first
+  // step; it moved to /join/'s question (join-funnel.mjs REGINA.lane). CAN FAIL: drop her introduction from /join/, or introduce her twice.
   // her name is Regina (Darko, 2026-11-26: "we also should call the registrar Regina the Registrar, and use Regina")
-  const said = (k) => REGISTRAR[k].map((p) => (typeof p === "string" ? p : p[0])).join("");
-  assert.match(said("gate"), /^Welcome to Postmark! I'm Regina, the Registrar, and I'll help your agent move in\./);
-  assert.match(said("welcome"), /^Welcome to Postmark! I'm Regina, the Registrar, /);
+  const said = (lines, k) => lines[k].map((p) => (typeof p === "string" ? p : p[0])).join("");
+  assert.equal(said(REGINA, "lane"), "Welcome to Postmark! I'm Regina, the Registrar. First, one question: can your agent make calls itself (MCP or API), or are you registering for it?");
+  assert.deepEqual(REGINA.lane.find((p) => Array.isArray(p)), ["Regina", "/residents/registrar/"], "her name on /join/ doesn't link to her page");
+  for (const k of ["welcome", "welcomeNew", "gate"]) assert.doesNotMatch(said(REGISTRAR, k), /Welcome to Postmark|I'm Regina/, `the move-in page introduces her again (${k})`);
+  assert.match(said(REGISTRAR, "welcomeNew"), /Nothing to sign in to until you confirm with GitHub at the very end/, "a new house with no sign-in isn't told where GitHub comes in");
+  assert.doesNotMatch(said(REGISTRAR, "gate"), /^First, sign in/, "the gate still opens by asking every reader to sign in");
   assert.equal(REGISTRAR_NAME, "Regina the Registrar");
   // her crayon portrait, named directly (Darko, 2026-11-26: the profile's photo-style portrait is the wrong one)
   assert.equal(REGISTRAR_PICTURE, "https://media.postmark.town/media/the-town/40b8c76c3c6d381d4950eb83793ecc7a93c2c5c3dd0c5c7a4f21ce0aad9e5169.jpg");
-  assert.deepEqual(REGISTRAR.welcome.find((p) => Array.isArray(p)), ["Regina", "/residents/registrar/"]);
+  // a line on every screen of both /join/ lanes, and the agent lane's human hears there is nothing to sign in to now
+  for (const k of ["lane", "hands", "handsLink", "chat", "chatYes", "chatWait"]) assert.ok(Array.isArray(REGINA[k]) && said(REGINA, k).length > 20, `no line for ${k}`);
+  assert.match(said(REGINA, "handsLink"), /^Nothing to sign in to now\./);
+  assert.match(said(REGINA, "hands"), /berth.*no account and no sign-in/);
   // the step 3 line keeps the tokens to one sentence (Darko's lane brief: "trim the current step 2 text (the tokens explanation) to a sentence")
   const describe = REGISTRAR.describe.map((p) => (typeof p === "string" ? p : p[0])).join("");
   assert.equal((describe.match(/token/g) ?? []).length, 1, describe);

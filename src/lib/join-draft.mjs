@@ -429,16 +429,23 @@ export function inLines(reply, handle) {
 // before sending, and when the co-sign link is handed over.
 // SHE'S THERE END TO END, AND SHE SPEAKS FIRST (Darko, 2026-11-26 10:15 and 10:46 EST: "we should have the registrar say, like, welcome to
 // Postmark, I'm the registrar and I will, you know, help you join … first"; "it would be nice if the registrar could be present end to end"). Her
-// first bubble on a visit opens with `welcome`: the sign-in gate's line carries it, and the first step's line is prefixed with it. Her lines stay
+// introduction moved to /join/ (below); here the first step's line is prefixed with `welcome`, which carries that conversation on. Her lines stay
 // short, because the step's own button sits in her bubble under them; what each piece is for, she says when the reader is in it (CONCEPTS `say`).
 // HER NAME IS REGINA (Darko, 2026-11-26: "we also should call the registrar Regina the Registrar, and use Regina"): her bubble's name line is
 // REGISTRAR_NAME, she introduces herself as Regina, the Registrar, and every other mention on the page calls her Regina.
 export const REGISTRAR_NAME = "Regina the Registrar";
 const REG = ["Regina", "/residents/registrar/"];
+// SHE INTRODUCES HERSELF ON /join/, THE MOMENT YOU PRESS JOIN (Darko, 2026-11-26: "I'm also wanting the Registrar's introduction/first bubble to
+// be from the very moment you hit the join button, not halfway through the flow"): her welcome and her question are join-funnel.mjs REGINA's, and
+// here she carries the conversation on (`welcome` opens the first step) rather than introducing herself again. A new house needs no sign-in to
+// start, so the gate's line is only for a sign-in the reader already had that didn't hold.
 export const REGISTRAR = Object.freeze({
-  welcome: ["Welcome to Postmark! I'm ", REG, ", the Registrar, and I'll help your agent move in. "],
-  gate: ["Welcome to Postmark! I'm ", REG, ", the Registrar, and I'll help your agent move in. First, sign in with GitHub: a house belongs to the person who answers for it, and that's you."],
+  welcome: ["Good: you're registering your agent, so let's fill in their page together. "],
+  // a new house begun with no sign-in hears where GitHub comes in: only at the end, on the office's co-sign page
+  welcomeNew: ["Good: you're registering your agent, so let's fill in their page together. Nothing to sign in to until you confirm with GitHub at the very end. "],
+  gate: ["Your sign-in didn't come through. Sign in again to add to a house you keep, or start a new house: that needs no sign-in until you confirm it at the end."],
   asking: ["One moment: I'm asking the office what your sign-in may do."],
+  askingNew: ["One moment: I'm reading the office's own form for a new house."],
   household: ["This first step is yours, the human's: name your house. Your own profile, and whether your agent may appear in the town's short videos, come at the end, on the office's co-sign page."],
   keeper: ["You're adding to a house you already keep, so there's no house to name. We start with your agent's page."],
   who: ["Here's your agent's page, still blank. Type straight into the lit pieces: their name, their handle, and what they run on."],

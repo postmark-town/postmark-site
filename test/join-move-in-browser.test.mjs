@@ -25,7 +25,10 @@
 //   · THE HUMAN'S PROFILE AND THE LIKENESS ARE THE OFFICE CO-SIGN PAGE'S: no box for them here, in no request this page makes, and the page says
 //     where they are asked; an existing house and the agent route are not told of a co-sign they don't take;
 //   · "You're in" shows its two lines, the agent's page link, and what the page set;
-//   · Enter continues from a one-line box; Tab walks the fields in order; a phone frame does not scroll sideways.
+//   · Enter continues from a one-line box; Tab walks the fields in order; a phone frame does not scroll sideways;
+//   · A NEW HOUSE NEEDS NO SIGN-IN (Darko, 2026-11-26): with no token the form comes from the office's public front door (GET /join) and the road
+//     runs berth → begin → co-sign link with no household-door call; a keeper still signs in first, and that road is unchanged;
+//   · /join/: Regina asks its one question as her first words, the two lanes are her two answers, and her bubble is on every screen of both.
 //
 // WITHOUT dist-town the test SKIPS and says so; WITH built pages and no browser it FAILS.
 
@@ -148,7 +151,7 @@ const BEGIN = { household: { type: "string", required: true, "x-group": "househo
 // parks the args and answers the co-sign link; /me with that key is the berth until `o.cosign()` plays the human's click on the office's page,
 // and the household's (naming the handle) after it. The writes after admission are allowed only for a credential /me says holds the handle.
 function officeFor({ tier = "visitor", act = "declare", fields = TODAY, me = { handles: [], households: {} }, held = [], refuseDescribe = null } = {}) {
-  const o = { asked: [], sent: [], me, writes: [], bodies: [], events: [], auths: [], boarded: [], begun: [], berths: {}, cosigned: false, held, refuseDescribe };
+  const o = { asked: [], sent: [], me, writes: [], bodies: [], events: [], auths: [], boarded: [], begun: [], berths: {}, cosigned: false, held, refuseDescribe, fields };
   o.cosign = () => { o.cosigned = true; o.events.push("cosign"); };
   o.meFor = (auth) => {
     const slug = Object.keys(o.berths).find((s) => auth === `Bearer ${o.berths[s]}`);
@@ -172,7 +175,13 @@ function officeFor({ tier = "visitor", act = "declare", fields = TODAY, me = { h
   return o;
 }
 
-async function openPage(b, base, path, { width, height = 900, office }) {
+// THE OFFICE'S FRONT DOOR (GET /join): the declaration's schema as it serves it, `properties` beside a `required` list, read by a reader with no
+// sign-in (CORE-188, Darko 2026-11-26); built from a card's fields, so the two doors describe one form, as the office's one DECLARE_SCHEMA does
+const arrivalOf = (fields) => ({ town: "fixture", join: { how: "POST /households", schema: { type: "object",
+  properties: Object.fromEntries(Object.entries(fields).map(([k, { required, ...spec }]) => [k, spec])),
+  required: Object.entries(fields).filter(([, s]) => s.required).map(([k]) => k) } } });
+
+async function openPage(b, base, path, { width, height = 900, office, signedIn = true }) {
   const { targetId } = await b.send("Target.createTarget", { url: "about:blank" });
   const { sessionId } = await b.send("Target.attachToTarget", { targetId, flatten: true });
   const S = (m, p) => b.send(m, p, sessionId);
@@ -184,7 +193,8 @@ async function openPage(b, base, path, { width, height = 900, office }) {
     if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error") faults.push(m.params.args?.map((a) => a.value ?? a.description).join(" "));
   });
   await S("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 600 });
-  await S("Page.addScriptToEvaluateOnNewDocument", { source: `try { localStorage.setItem("pm.oauth.token", JSON.stringify({ access_token: "invented-token", obtained: Date.now(), expires_in: 3600 })); localStorage.removeItem("pm.invite"); localStorage.removeItem("mcp-proto.history"); } catch {}` });
+  const seed = signedIn ? `localStorage.setItem("pm.oauth.token", JSON.stringify({ access_token: "invented-token", obtained: Date.now(), expires_in: 3600 }));` : `localStorage.removeItem("pm.oauth.token");`;
+  await S("Page.addScriptToEvaluateOnNewDocument", { source: `try { ${seed} localStorage.removeItem("pm.invite"); localStorage.removeItem("mcp-proto.history"); } catch {}` });
   await S("Fetch.enable", { patterns: [{ urlPattern: "*/api/*", requestStage: "Request" }] });
   b.listeners.push((m) => {
     if (m.sessionId !== sessionId || m.method !== "Fetch.requestPaused") return;
@@ -199,6 +209,8 @@ async function openPage(b, base, path, { width, height = 900, office }) {
     office.auths.push({ at: `${request.method} ${u.pathname}`, auth });
     if (local && request.method === "POST" && u.pathname === "/api/mcp") { const msg = JSON.parse(request.postData || "{}"); const r = office.answer(msg); return r ? reply(200, r) : reply(202, null); }
     if (local && request.method === "GET" && u.pathname === "/api/me") { const m = office.meFor(auth); return m ? reply(200, m) : reply(401, { defect: "fixture: signed out" }); }
+    // the front door, public: the declaration's schema, for a reader with no sign-in
+    if (local && request.method === "GET" && u.pathname === "/api/join") return reply(200, arrivalOf(office.fields));
     // the berth road: keyless board, then begin under the berth's key
     if (local && request.method === "POST" && u.pathname === "/api/berth") {
       const slug = JSON.parse(request.postData || "{}").slug;
@@ -292,18 +304,30 @@ after(() => { browser?.close(); server?.close(); });
 const STEP = (n) => `!document.querySelector('[data-step="${n}"]').hidden`;
 const text = (sel) => `(document.querySelector(${JSON.stringify(sel)})?.textContent ?? "").trim()`;
 
-test("TODAY'S CARD: the steps fill the real page, count and refuse in the office's measure, keep values across Back and edit, and send only what the card takes", { skip: SKIP }, async () => {
+test("TODAY'S CARD, WITH NO SIGN-IN: a new house goes straight into her steps, fills the real page, counts and refuses in the office's measure, keeps values across Back and edit, and sends only what the card takes, berth → begin → the co-sign link", { skip: SKIP }, async () => {
   await setup();
   const office = officeFor();
-  const p = await openPage(browser, base, "/join/move-in/", { width: 1440, office });
+  // A NEW HOUSE STARTS WITH NO SIGN-IN (Darko, 2026-11-26: "we shouldn't be telling people to sign in with github on the landing page … berth key is
+  // a foot in the door without needing that additional friction"): no token in this browser, and the page never asks for one
+  const p = await openPage(browser, base, "/join/move-in/", { width: 1440, office, signedIn: false });
   try {
-    await p.until(STEP("household"), "step 1");
+    await p.until(STEP("household"), "step 1, with no sign-in");
+    assert.equal(await p.js(`document.querySelector("[data-gate-signedout]").hidden`), true, "the GitHub gate stands in front of a new house");
+    assert.equal(await p.js(`localStorage.getItem("pm.oauth.token")`), null, "this browser holds a sign-in, so the test proves nothing");
+    // the form is the office's own, from its public front door: no household-door read, which needs a key
+    assert.ok(office.asked.includes("GET /api/join"), `the office's front door wasn't read: ${office.asked.join(", ")}`);
+    assert.equal(office.asked.filter((a) => a === "POST /api/mcp").length, 0, "the page called the household door with no key");
+    // her first bubble here carries on from /join/ (she introduced herself there), and tells a new house where GitHub comes in
+    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Good: you're registering your agent, so let's fill in their page together\. Nothing to sign in to until you confirm with GitHub at the very end\. This first step is yours, the human's/);
+    // A KEEPER STILL SIGNS IN FIRST: one small line in her first bubble, the header's own sign-in behind it, gone after the first step
+    assert.equal(await p.js(`document.querySelector('[data-reg-at="act"] [data-keeper-signin]').hidden`), false, "a keeper has no way to sign in");
+    assert.match(await p.js(text("[data-keeper-signin]")), /^Already keep a household here\? Sign in to add a resident$/);
+    assert.equal(await p.js(`!!document.querySelector("[data-keeper-signin] [data-gate-signin]")`), true);
     // the Registrar, her name linked to her page, and her step-1 words, her welcome first (Darko, 2026-11-26: "intro sentence first")
     assert.equal(await p.js(`document.querySelector('[data-reg-at="act"] a.jd-reg-name')?.getAttribute("href")`), "/residents/registrar/", "her name links to her page, on every step");
     // her name is Regina (Darko, 2026-11-26: "we also should call the registrar Regina the Registrar, and use Regina")
     assert.equal(await p.js(text('[data-reg-at="act"] a.jd-reg-name')), "Regina the Registrar");
     assert.equal(await p.js(`[...document.querySelectorAll(".jd-reg-name")].every((a) => a.textContent.trim() === "Regina the Registrar")`), true, "a bubble still says The Registrar");
-    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Welcome to Postmark! I'm Regina, the Registrar, and I'll help your agent move in\. This first step is yours, the human's/);
     // ONE COUNT: five dots for five steps, "Step 1 of 5", #step-1
     assert.equal(await p.js(text("[data-jd-kicker]")), "Step 1 of 5 · Your household");
     assert.equal(await p.js(`document.querySelectorAll("[data-jf-dots] span").length`), 5, "a dot per step, none for the look-over");
@@ -333,8 +357,9 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     await p.key("Enter");
     await p.until(STEP("who"), "step 2, by Enter");
     assert.equal(await p.js("location.hash"), "#step-2");
-    // the step's line, without the welcome now
+    // the step's line, without the welcome now, and without the keeper's line
     assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Here's your agent's page, still blank\./);
+    assert.equal(await p.js(`document.querySelector("[data-keeper-signin]").hidden`), true, "the keeper's sign-in line stays past the first step");
     // the page steps show the resident page's own pieces, its top lit; THE PIECES ARE THE BOXES: no form of their own under the page
     assert.equal(await p.js(`!document.querySelector("[data-blank-page]").hidden && !!document.querySelector("[data-blank-page] .profile-bubble[data-profile-bubble]") && !!document.querySelector("[data-blank-page] .bcard[data-kind=Address]")`), true);
     for (const id of ["agent", "handle", "runtime", "architecture", "since", "line", "bio", "full_address", "pronouns", "color", "color_name"])
@@ -494,7 +519,7 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     assert.match(await p.js(text('[data-reg-at="cosign"] [data-reg-words]')), /co-sign page.*sign in with GitHub.*your own profile.*short videos.*Keep this tab open/s);
     assert.equal(await p.js(`document.querySelector("[data-gate-cosign]").textContent.includes("fixture-berth-key")`), false, "the berth key is on the page");
     assert.equal(await p.js(`JSON.stringify({ ...localStorage }).includes("fixture-berth-key") || JSON.stringify({ ...sessionStorage }).includes("fixture-berth-key")`), false, "the berth key was stored");
-    assert.equal(await p.js(`JSON.parse(localStorage.getItem("pm.oauth.token")).access_token`), "invented-token", "the reader's own sign-in was overwritten");
+    assert.equal(await p.js(`localStorage.getItem("pm.oauth.token")`), null, "the berth key, or any sign-in, was stored as the reader's own");
     // before the human's click: asked, not admitted, nothing written
     await p.click("[data-cosign-check]");
     await p.until(`/Not yet/.test(document.querySelector("[data-cosign-status]").textContent)`, "not yet");
@@ -515,7 +540,9 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     const pic = JSON.parse(office.writes[1].body);
     assert.equal(pic.type, "image/jpeg", "the framed picture is re-encoded, as Edit profile does");
     assert.ok(pic.image.length > 100, "the picture travels");
-    assert.equal(office.asked.filter((a) => !/^(POST \/api\/mcp|GET \/api\/me|POST \/api\/berth|POST \/api\/household|PATCH \/api\/profile\/quillon-fixture(\/avatar)?|POST \/api\/world\/apex)$/.test(a)).length, 0, `no other office call: ${office.asked.join(", ")}`);
+    assert.equal(office.asked.filter((a) => !/^(GET \/api\/join|GET \/api\/me|POST \/api\/berth|POST \/api\/household|PATCH \/api\/profile\/quillon-fixture(\/avatar)?|POST \/api\/world\/apex)$/.test(a)).length, 0, `no other office call: ${office.asked.join(", ")}`);
+    // with no sign-in from start to finish: every /me was asked with the berth's key, never a sign-in of the reader's
+    assert.ok(office.auths.filter((a) => a.at === "GET /api/me").every((a) => a.auth === "Bearer fixture-berth-key-quillon-fixture"), "a /me went without the berth's key");
     // THE HUMAN'S OWN, IN NO REQUEST THIS PAGE MADE (the office's co-sign page asks them)
     for (const f of ["town_name", "short_line", "human_pronouns", "likeness"]) assert.ok(!office.bodies.some((b) => b.includes(`"${f}"`)), `a request carried ${f}`);
     assert.ok(!office.asked.some((a) => /oauth\/(consent|human|likeness)/.test(a)), "the page posted to a human-only door");
@@ -596,7 +623,11 @@ test("AN EXISTING HOUSE (add-resident): no house to name, no human profile, and 
     assert.equal(await p.js("location.hash"), "#step-1");
     assert.equal(await p.js(`[...document.querySelectorAll("[data-jf-dots] span")].map((s) => s.className || "-").join(",")`), "is-now,-,-");
     // a keeper's first bubble: her welcome, why there's no house to name, then the page's own line
-    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Welcome to Postmark! .*no house to name.*Here's your agent's page/);
+    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Good: you're registering your agent.*no house to name.*Here's your agent's page/);
+    // THE KEEPER ROAD IS UNCHANGED (CORE-188): signed in first, the household door's card, no "nothing to sign in to", no keeper line to press
+    assert.doesNotMatch(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /Nothing to sign in to/);
+    assert.equal(await p.js(`document.querySelector("[data-keeper-signin]").hidden`), true, "a signed-in keeper is offered the sign-in again");
+    assert.equal(office.asked.includes("GET /api/join"), false, "a signed-in keeper's form came from the front door, not the household door's card");
     await p.type("#jd-handle", "added-fixture");
     await p.click("[data-jf-next]");
     await p.until(STEP("describe"), "step 2 of 5");
@@ -761,5 +792,43 @@ test("A PHONE FRAME: every step fits 375 wide with no sideways scroll, her butto
     await p.until(STEP("review"), "the look-over");
     await fits("the look-over");
     assert.equal(await p.js(whole), true, "the long line is cut or doesn't wrap at 375 on the look-over, the page as the town will show it");
+  } finally { await p.close(); }
+});
+
+test("/join/: Regina from the moment you press Join, her question first, her two answers, and her bubble on every screen of both lanes", { skip: SKIP }, async () => {
+  await setup();
+  const office = officeFor();
+  const p = await openPage(browser, base, "/join/", { width: 1440, office, signedIn: false });
+  // Darko, 2026-11-26: "I'm also wanting the Registrar's introduction/first bubble to be from the very moment you hit the join button, not halfway
+  // through the flow. She should be present for all paths both human and agent via the site UI"
+  const shown = `[...document.querySelectorAll("[data-join-funnel] .jd-reg")].filter((r) => r.offsetParent !== null)`;
+  const regina = async (screen) => {
+    await p.until(`!document.querySelector('[data-jf-screen="${screen}"]').hidden`, screen);
+    assert.equal(await p.js(`${shown}.length`), 1, `not one Regina on ${screen}`);
+    assert.equal(await p.js(`${shown}[0].closest("[data-jf-screen]").dataset.jfScreen`), screen, `her bubble on ${screen} is another screen's`);
+    assert.equal(await p.js(`${shown}[0].querySelector(".jd-reg-name").textContent.trim()`), "Regina the Registrar", `her name on ${screen}`);
+    assert.equal(await p.js(`${shown}[0].querySelector(".jd-reg-face img").getAttribute("src")`), "https://media.postmark.town/media/the-town/40b8c76c3c6d381d4950eb83793ecc7a93c2c5c3dd0c5c7a4f21ce0aad9e5169.jpg", `her picture on ${screen}`);
+    return p.js(`${shown}[0].querySelector("[data-reg-words]").textContent.trim()`);
+  };
+  try {
+    assert.equal(await regina("lane"), "Welcome to Postmark! I'm Regina, the Registrar. First, one question: can your agent make calls itself (MCP or API), or are you registering for it?", "her first words are not the question");
+    // her two answers, in her question's order: A, the agent makes calls itself; B, the human registers it
+    assert.deepEqual(await p.js(`[...document.querySelectorAll('[data-jf-screen="lane"] .jf-choice')].map((c) => c.dataset.jfGo + ":" + c.querySelector(".jf-choice-t").textContent.trim())`), ["hands:It can make calls itself", "chat:I'm registering for it"]);
+    // the agent lane: berth first, and nothing for the human to sign in to now
+    await p.click('[data-jf-go="hands"]');
+    assert.match(await regina("hands"), /first move is a berth.*no account and no sign-in/);
+    assert.match(await p.js(text('[data-jf-screen="hands"] [data-prompt-text]')), /read https:\/\/postmark\.town\/join\/agent\.md.*take a berth first, one call with no account/s);
+    await p.click('[data-jf-screen="hands"] [data-jf-go="hands/link"]');
+    assert.match(await regina("hands/link"), /^Nothing to sign in to now\./);
+    assert.equal(await p.js(text('[data-jf-screen="hands/link"] .jf-q')), "Nothing to sign in to now.");
+    // the registering lane: the chat-only letter, then /join/move-in/, which starts with no sign-in
+    await p.js(`history.replaceState(null, "", location.pathname + "#chat"), dispatchEvent(new HashChangeEvent("hashchange")), true`);
+    assert.match(await regina("chat"), /register them with me here/);
+    await p.click('[data-jf-screen="chat"] [data-jf-go="chat/yes"]');
+    assert.match(await regina("chat/yes"), /Nothing to sign in to until you confirm with GitHub at the end/);
+    assert.equal(await p.js(`document.querySelector('[data-jf-screen="chat/yes"] [data-jf-primary]').getAttribute("href")`), "/join/move-in/");
+    assert.doesNotMatch(await p.js(text('[data-jf-screen="chat/yes"] [data-jf-primary]')), /sign in with GitHub, then/, "the registering lane still opens with a GitHub sign-in");
+    await p.click('[data-jf-screen="chat/yes"] [data-jf-go="chat/wait"]');
+    assert.match(await regina("chat/wait"), /No rush/);
   } finally { await p.close(); }
 });
