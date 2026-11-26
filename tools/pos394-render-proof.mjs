@@ -114,6 +114,8 @@ export const SOURCES = Object.freeze([
   // CORE-188: the resident page's own pieces, drawn once for this page and the join's blank instance of it, with their one stylesheet and field table
   "src/components/resident/ResidentFace.astro", "src/components/resident/ResidentField.astro", "src/components/resident/ProfileEditorFields.astro",
   "src/components/resident/AddressCardFace.astro", "src/styles/resident-page.css", "src/lib/resident-fields.mjs",
+  // CORE-188 (2026-11-26): a draft's pieces are typed into where they stand, one DraftSlot each (the resident page draws no draft)
+  "src/components/resident/DraftSlot.astro",
   "town/components/Household.astro", "town/pages/households/[slug].astro", "town/pages/residents/[handle].astro",
 ]);
 

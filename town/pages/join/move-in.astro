@@ -181,13 +181,15 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         </div>
         <div class="pm-paper res-paper jd-full"><DraftSlot name="full_address" {...DRAFT.full_address} /></div>
 
-        {/* THE "MORE" DRAWER, under the page: what the resident page has no spot for, in the Edit profile form's own look (ResidentField), one
-            step's worth at a time; hidden on a step that has nothing here */}
-        <details class="profile-edit-form jd-drawer" data-drawer open hidden>
-          <summary>more about your agent</summary>
+        {/* THE DRAWER UNDER THE PAGE (Darko's lane brief, 2026-11-26: "a small 'more' drawer directly under the preview card"): what the resident
+            page has no spot for, in the Edit profile form's own look (ResidentField), one step's worth at a time, hidden on a step that has nothing
+            here. Always open, never a "more" expand to press (the Site Lift's rule, POS-250: test/no-more-no-hover.test.mjs); each step's part
+            says in its own heading what it holds. */}
+        <section class="profile-edit-form jd-drawer" data-drawer hidden>
 
         {/* 2 · WHO'S MOVING IN: the card's fields this design places nowhere, drawn as the office describes them (join-draft.mjs planFor `extra`) */}
         <div class="jd-step" data-step="who" hidden>
+          <h3 class="jd-drawer-t">The office also asks</h3>
           <div class="profile-edit-grid jd-extra" data-extra-host hidden></div>
           <template data-extra-template><ResidentField name="extra" spec={{ label: "", wide: true, count: true }} countId="jd-count-extra" countAttrs={{ "data-count-for": "" }} inputAttrs={{ "data-extra": "" }} problemAttrs={{ "data-problem-for": "" }} /></template>
           <template data-extra-template-long><ResidentField name="extra" spec={{ label: "", wide: true, multiline: true, rows: 3, count: true }} countId="jd-count-extra" countAttrs={{ "data-count-for": "" }} inputAttrs={{ "data-extra": "" }} problemAttrs={{ "data-problem-for": "" }} /></template>
@@ -198,6 +200,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
 
         {/* 4 · MORE ABOUT YOU: the resident page's own Edit profile picture row, then the appearance and the reference sheet */}
         <div class="jd-step" data-step="more" hidden>
+          <h3 class="jd-drawer-t">Their picture, how they look, and a reference sheet</h3>
           <ProfileEditorFields handle="join" piece fields={[]} />
           <div class="profile-edit-grid jd-more">
             {/* the glance and what it is; the detail, its part and what that part is (the describe door's slot, value and body: join-draft.mjs appearanceOf) */}
@@ -217,7 +220,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
           </div>
           <p class="jd-kept-note" data-more-kept>Nothing here leaves your browser before the office admits your agent. Then this page puts up the picture, the reference sheet and the appearance itself, signed in as you, and says on "You're in" what kept. The glance goes with what it is; the detail with its part and what that part is.</p>
         </div>
-        </details>
+        </section>
 
         {/* the review's edits, one per step's pieces (Look it over: "each piece with its edit") */}
         <p class="jd-page-edits" data-page-edits hidden>
@@ -722,7 +725,6 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     // the picture's square on the page, lit on its step, opens the drawer's picker (the picture is framed in the drawer, as on Edit profile)
     $('[data-fill="picture"]', page)?.addEventListener("click", (e) => {
       if (!e.currentTarget.classList.contains("is-lit")) return;
-      const drawer = $("[data-drawer]"); if (drawer) drawer.open = true;
       $("[data-profile-avatar-input]")?.click();
     });
 
@@ -1260,11 +1262,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     /* the page's buttons, pictured: nothing to press (Wright's walk, 2026-11-26: "Write to" and "Appearance" looked live) */
     .jd-inert :global(.pm-btn) { pointer-events: none; cursor: default; opacity: 0.5; box-shadow: none; filter: saturate(0.5); }
     .jd-drawer { margin: 0 0 1.2em; }
-    .jd-drawer > summary {
-      cursor: pointer; font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase;
-      color: rgba(232, 196, 139, 0.8); margin: 0 0 0.2em;
-    }
-    .jd-drawer[open] > summary { margin-bottom: 0.9em; }
+    .jd-drawer-t { margin: 0 0 0.9em; font-family: var(--pm-mono); font-size: 0.7rem; font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(232, 196, 139, 0.8); }
     .jd-more { margin: 1em 0 0; }
     .jd-drawer :global(.profile-edit-count) { text-align: right; }
     .jd-drawer :global(.jd-extra-hint) { font-size: 0.7rem; opacity: 0.8; }
