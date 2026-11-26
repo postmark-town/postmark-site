@@ -313,7 +313,7 @@ function paintCards(root, items, reads, ctx) {
       const what = act.kind === "said" ? "said" + (act.place ? ", in " + act.place : "") : "a letter to " + (act.other ?? "someone");
       set("[data-hd-last]", whenOf(act.at, ctx.now) + " — " + what);
     } else set("[data-hd-last]", reading.house.includes("conversations") ? "still reading…" : "nothing on the record lately");
-    row("stands", stands ? (stands.moving ? "walking toward " : "") + stands.place : null);
+    row("stands", stands ? (stands.moving ? (stands.place ? "walking toward " + stands.place : "walking") : stands.place) : null);
     row("doing", act?.text ? "“" + clip(act.text, 120) + "”" : null);
     if (live) live.hidden = false;
 
