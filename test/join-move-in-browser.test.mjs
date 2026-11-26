@@ -509,7 +509,10 @@ test("THE ACCEPTED CARD (POS-1237, f22c069a): its limits count in their own unit
     assert.equal(office.begun[0].note, "A line", "the directory line under the card's own name");
     assert.equal(office.begun[0].bio, "A bio.", "a card that takes the bio gets it");
     assert.equal(office.begun[0].motto, "Slow and true.");
-    assert.equal("card" in office.begun[0] || "handle" in office.begun[0], false, "never the old name beside the new one, nor the handle beside the berth");
+    assert.equal("card" in office.begun[0], false, "never the old name beside the new one");
+    // the chosen resident rides begin beside the berth (Office #1237 candidate c1bd858b parks it apart; under the 31 rule it is the berth's name)
+    assert.equal(office.begun[0].handle, "fixture-two");
+    assert.deepEqual(office.boarded, ["fixture-two"], "the berth is still boarded under the handle while the 31 rule stands");
     office.cosign();
     await p.click("[data-cosign-check]");
     await p.until(`!document.querySelector("[data-gate-in]").hidden`, "you're in");
