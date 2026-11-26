@@ -181,8 +181,10 @@ export function mentionModel({ handle, face = null, href = null, label } = {}) {
  *                                   as `--rm-ink` with `on-ink`, the same contract resident-mention-surface.mjs writes for a surface measured in the
  *                                   browser
  * @param {boolean} [opts.face=true]   false: the name's styling only, for a card or chip whose own portrait is the resident's picture
+ * @param {boolean} [opts.whole=false] true: the whole name, never shortened (the resident's own page keeps its name whole, however long;
+ *                                   everywhere else the shown name is resident-name.mjs's shortened one, with the whole as its title)
  */
-export function mentionTree(m, { link = true, cls = "", surface, face: withFace = true } = {}) {
+export function mentionTree(m, { link = true, cls = "", surface, face: withFace = true, whole = false } = {}) {
   if (!m || m.kind !== "resident") return [String(m?.text ?? "")];
   const plate = m.accent && !Object.hasOwn(SURFACES, surface ?? "") ? hexOf(surface) : null;
   const plateInk = plate ? inkOn(m.accent, plate) : null;
@@ -191,12 +193,13 @@ export function mentionTree(m, { link = true, cls = "", surface, face: withFace 
   const anchor = link && m.href;
   if (anchor) attrs.href = m.href;
   attrs["data-rm"] = m.handle;
-  if (m.title !== m.name) attrs.title = m.title;
+  const shown = whole ? m.title : m.name;
+  if (m.title !== shown) attrs.title = m.title;
   if (m.accent) attrs.style = `--rm-c: ${m.accent}; --rm-ink-n: ${m.inkNight}; --rm-ink-p: ${m.inkPaper}` + (plateInk ? `; --rm-ink: ${plateInk}` : "");
   const face = { tag: "span", attrs: { class: "rm-face", "aria-hidden": "true" }, children: m.avatar
     ? [{ tag: "img", attrs: { src: m.avatar, alt: "", loading: "lazy" }, children: [] }]
     : [m.monogram] };
-  const name = { tag: "span", attrs: { class: "rm-name" }, children: [m.name] };
+  const name = { tag: "span", attrs: { class: "rm-name" }, children: [shown] };
   // `face: false` (Darko, 12:25 EST, b: "Card portrait counts as the picture"): a card or chip that already shows the resident's picture takes the
   // name's styling only, so each resident wears ONE face
   return [{ tag: anchor ? "a" : "span", attrs, children: withFace ? [face, name] : [name] }];

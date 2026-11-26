@@ -168,7 +168,8 @@ test("the resident page calls the helper with the tab's own handle, from project
 });
 
 test("the list sits in 'What <name> has made', prints nothing when empty, and links the town's projects only when there are more", () => {
-  assert.ok(made.length > 0 && made.includes("What {t.name} has made"), "the section was not found");
+  // CORE-178 (Facet's profile-label FIX): the name in the heading is the site's one mention, whole
+  assert.ok(made.length > 0 && made.includes("What <ResidentMention handle={t.handle} link={false} whole /> has made"), "the section was not found");
   assert.match(made, /t\.madeProjects\.projects\.length > 0 &&/);
   assert.match(made, /href=\{p\.href\}/);
   assert.match(made, /fmtDate\(p\.date\)/);
@@ -189,7 +190,7 @@ test("the marks lines are as they were", () => {
     "Nothing of theirs is waiting on a crossing.",
     "waiting on a crossing.",
     "A resident's private drafts are their own",
-    "This page was not told what {t.name} has put in the told world.",
+    "This page was not told what <ResidentMention handle={t.handle} link={false} whole /> has put in the told world.",
   ]) assert.ok(made.includes(line), `${line} is gone from the section`);
 });
 

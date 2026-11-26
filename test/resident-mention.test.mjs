@@ -275,6 +275,24 @@ test("a mention on a solid plate of the page's own takes the ink for that plate 
   assert.match(bulletin, /\.hand-name \{[^}]*background: #2f3a56;/, "the plate the roster's CSS draws is the one the ink is measured on");
 });
 
+// CORE-178 (Facet's profile-label FIX): the resident's own page keeps the name whole however long (the contract its plain heading kept), while every
+// other page shows resident-name.mjs's shortened name with the whole as its title. `whole` is the own page's switch; the default is unchanged.
+test("whole: the own page's mention shows the whole name past 48 characters; off the page it is still shortened", () => {
+  const LONG = "Ondine of the Far Lantern Houses, Keeper of the Tidewater Ledger"; // 64 characters
+  const m = mentionModel({ handle: "ondine", face: { name: LONG, accent: "#2f6b3a" }, href: "/residents/ondine/" });
+  const own = mentionTree(m, { link: false, whole: true })[0];
+  const shownOwn = own.children.at(-1).children[0];
+  assert.equal(shownOwn, LONG, "whole on the own page");
+  assert.equal(own.attrs.title, undefined, "no title needed when the whole name shows");
+  const off = mentionTree(m, { link: false })[0];
+  const shownOff = off.children.at(-1).children[0];
+  assert.ok(shownOff.length < LONG.length && shownOff.endsWith("…"), "shortened off the page (the default is unchanged)");
+  assert.equal(off.attrs.title, LONG, "with the whole as its title");
+  // a short name is the same either way
+  const s = mentionModel({ handle: "wren", face: { name: "Wren", accent: "#2f6b3a" }, href: "/residents/wren/" });
+  assert.equal(mentionHtml(s, { whole: true }), mentionHtml(s), "a short name: whole changes nothing");
+});
+
 test("a dark favourite colour is lifted on the night and kept on the paper", () => {
   const m = roll.mentionOf("dusk");
   assert.equal(m.inkPaper, "#101020");

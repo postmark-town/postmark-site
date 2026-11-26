@@ -32,10 +32,12 @@ interface Props {
   surface?: "night" | "paper" | string;
   /** the name's styling only, for a card or chip whose own portrait is the picture (Darko b, 2026-11-24 12:25 EST) */
   noFace?: boolean;
+  /** the whole name, never shortened: the resident's own page keeps its name whole (elsewhere the shortened name, the whole as its title) */
+  whole?: boolean;
 }
-const { handle, label, href, link = true, face, cls = "", surface, noFace = false } = Astro.props;
+const { handle, label, href, link = true, face, cls = "", surface, noFace = false, whole = false } = Astro.props;
 const model = face
   ? mentionModel({ handle, face, href: href !== undefined ? href : (mentionOf(handle) as any).href ?? null, label })
   : mentionOf(handle, { label, href });
 ---
-<ResidentMentionModel model={model} link={link} cls={cls} surface={surface} noFace={noFace} />
+<ResidentMentionModel model={model} link={link} cls={cls} surface={surface} noFace={noFace} whole={whole} />

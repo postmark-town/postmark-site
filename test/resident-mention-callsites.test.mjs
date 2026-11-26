@@ -377,6 +377,24 @@ test("the bulletin's Meeps roster stands each meep as its sprite, else its portr
   assert.match(read("town/pages/meeps/index.astro"), /face: sprite \? "sprite" : profile\.portrait \? "portrait" : "monogram",/);
 });
 
+// CORE-178 (Facet's profile-label FIX, Truey's FIX on fb2dd59a): the resident's own page painted its visible person labels straight from `t.name`
+// (the heading, the Write buttons, the Address and Window cards, the window, marks, projects and letters copy, empty branches included), and the
+// rendition page's back label printed the raw agent. Every visible label is the site's one mention now; attributes (ARIA, alt, title, data) stay plain.
+test("the own page's visible person labels and the rendition back label are the site's one mention; attributes stay plain", () => {
+  const page = code(read("town/components/Household.astro"));
+  const raw = [...page.matchAll(/(?<![=$])\{t\.name\}/g)];
+  assert.equal(raw.length, 0, `a visible label still paints t.name: ${raw.map((m) => page.slice(m.index - 40, m.index + 12).replace(/\s+/g, " ")).join(" | ")}`);
+  assert.match(page, /<h1><ResidentMention handle=\{t\.handle\} link=\{false\} noFace whole \/><\/h1>/, "the heading: whole, and no second face beside the bubble's avatar");
+  assert.match(page, /✍ Write to <ResidentMention handle=\{t\.handle\} link=\{false\} noFace whole \/><\/a>/, "the header's Write button");
+  assert.ok((page.match(/<ResidentMention handle=\{t\.handle\} link=\{false\} whole \/>/g) ?? []).length >= 14, "the cards, window, marks, projects and letters labels, with their faces");
+  assert.match(page, /<img src=\{t\.avatarUrl\} alt=\{t\.name\} \/>/, "the avatar's alt stays plain text");
+  assert.match(page, /aria-label=\{`Visit \$\{t\.name\}`\}/, "ARIA stays plain text");
+  // the rendition page's back label
+  const rv = read("town/pages/residents/[handle]/view/[rendition].astro");
+  assert.match(rv, /data-rv-town>← <ResidentMention handle=\{handle\} link=\{false\} \/>'s page<\/a>/, "the person in the back label is the mention; the link and its words stay");
+  assert.doesNotMatch(rv, /\{payloadBase\.agent\}'s page/, "the raw agent is gone from the label");
+});
+
 test("control: the census pattern catches each written form, and comments are not counted", () => {
   const forms = ["href={`/residents/${h}/`}", 'a.href = "/residents/" + h;', "residentHref(h)", "'/residents/' + h"];
   for (const f of forms) assert.equal((code(f).match(PATTERN) ?? []).length, 1, f);

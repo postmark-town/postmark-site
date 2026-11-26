@@ -11,6 +11,7 @@
 // Pure: no DOM, no fetch. The page's script calls these; the tests do too.
 
 import { ownsResident } from "./sheet-upload.mjs";
+import { hexOf, inkOn } from "./resident-mention.mjs";
 import { pronounsOf } from "./pronouns.mjs";
 import { siteWriteHeaders } from "./office-write.mjs";
 
@@ -18,6 +19,30 @@ import { siteWriteHeaders } from "./office-write.mjs";
  * The in-place repaint after a Save: pronouns, colour, runtime, colour name and bio, from the values the
  * office kept. `els` are the page's elements. Every resident word goes in through textContent.
  */
+/**
+ * CORE-178 (Facet's profile-label FIX): this resident's mentions on the page (`els.mentions`, the `.rm[data-rm="<handle>"]` nodes) take a saved
+ * favourite colour at once, through the same inks a rebuild writes (resident-mention.mjs inkOn: the night and the paper), so no label is left in a
+ * stale ink; a cleared colour turns them neutral, as a rebuild would. Ring and underline follow the name (currentColor).
+ */
+export function inkMentions(mentions, color) {
+  const c = hexOf(color);
+  let n = 0;
+  for (const m of mentions ?? []) {
+    if (!m?.style || !m.classList) continue;
+    if (c) {
+      m.classList.remove("is-neutral");
+      m.style.setProperty("--rm-c", c);
+      m.style.setProperty("--rm-ink-n", inkOn(c, "night"));
+      m.style.setProperty("--rm-ink-p", inkOn(c, "paper"));
+    } else {
+      m.classList.add("is-neutral");
+      for (const v of ["--rm-c", "--rm-ink-n", "--rm-ink-p", "--rm-ink"]) m.style.removeProperty(v);
+    }
+    n++;
+  }
+  return n;
+}
+
 export function paintProfile(els, values, defaultColor) {
   const color = values.color || "";
   const named = values.color_name || "";
@@ -27,6 +52,7 @@ export function paintProfile(els, values, defaultColor) {
   els.pronounsEl.textContent = pronouns;
   els.pronounsEl.hidden = !pronouns;
   els.bubble.style.setProperty("--profile-color", color || defaultColor);
+  inkMentions(els.mentions, color);
   els.runtimeValue.textContent = runtime;
   els.runtimeChip.hidden = !runtime;
   els.colorName.textContent = named;
