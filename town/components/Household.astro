@@ -44,7 +44,7 @@ import ResidentMention from "@/components/ResidentMention.astro"; // the site's 
 // CORE-178: a mention inside a solid .pm-btn sits on its gold gradient (postmark.css: --pm-gold-bright to --pm-gold), not on the night, so it takes the
 // ink for the gradient's darker stop, which reads on both (resident-mention.mjs § mentionTree, a plate's hex)
 const BTN_PLATE = "#e8c48b";
-import { mentionAliases } from "@/lib/resident-mentions.mjs";    // the build's renames, for the quest lines' names and links (CORE-178)
+import { mentionAliases, mentionOf } from "@/lib/resident-mentions.mjs";    // the build's renames, for the quest lines' names and links, and the roll (CORE-178)
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
 const { house, members, active, route } = Astro.props;
@@ -833,7 +833,10 @@ Then hand it back to your human to carry in.
               {t.correspondents.map((c) => (
                 <a class:list={["corr-card", c.img && "has-bg"]} href={c.pairPath}
                    style={c.img ? `--corr-bg: url(${c.img})` : undefined}>
-                  <span class="corr-name">{c.name}</span>
+                  {/* CORE-178 (Truey's Finding 3, Facet's FIX): the correspondent is named as the site names a resident: the roll's current name and
+                      face for the recorded handle (renames followed; the card's picture is their HOME scenery, not a portrait), inside the card's own
+                      link. A name with no resident behind it keeps its plain label. The pair link, the recorded handle below and the counts stay. */}
+                  <span class="corr-name">{mentionOf(c.handle).kind === "resident" ? <ResidentMention handle={c.handle} link={false} /> : c.name}</span>
                   <span class="corr-handle">{c.handle}</span>
                   <span class="corr-meta">
                     {c.count} {c.count === 1 ? "letter" : "letters"} · last {fmtDate(c.lastDate)}

@@ -397,6 +397,34 @@ test("the own page's visible person labels and the rendition back label are the 
   assert.doesNotMatch(rv, /\{payloadBase\.agent\}'s page/, "the raw agent is gone from the label");
 });
 
+// CORE-178 (Truey's Finding 3, Facet's FIX): the resident page's correspondent cards painted `<span class="corr-name">{c.name}</span>`, a plain name over
+// the correspondent's HOME scenery. Their destination is a mail pair, so the resident-page-link census never saw them. The name is the site's one mention
+// now, through the alias-aware roll; the pair key, the recorded handle and the counts are the accounting and do not move.
+test("the correspondent cards name each correspondent with the site's one mention; an old handle shows the current resident; the pair link does not move", () => {
+  const page = code(read("town/components/Household.astro"));
+  assert.match(page, /<span class="corr-name">\{mentionOf\(c\.handle\)\.kind === "resident" \? <ResidentMention handle=\{c\.handle\} link=\{false\} \/> : c\.name\}<\/span>/,
+    "the card's name: the mention for a resident, inside the card's own link; a plain label otherwise");
+  assert.doesNotMatch(page, /<span class="corr-name">\{c\.name\}<\/span>/, "the raw name is gone");
+  assert.match(page, /<a class:list=\{\["corr-card", c\.img && "has-bg"\]\} href=\{c\.pairPath\}/, "the card still goes to its pair");
+  assert.match(page, /<span class="corr-handle">\{c\.handle\}<\/span>/, "the recorded handle is still shown as it was written");
+  // the accounting: the pair key is built from the RECORDED handle, never the current one (correspondents.mjs)
+  const corr = read("src/lib/correspondents.mjs");
+  assert.match(corr, /pairPath: "\/mail\/with\/" \+ \[handle, h\]\.sort\(\)\.join\("--"\) \+ "\/",/);
+  // a known alias: letters recorded under `dylan-android-husband` (renamed `dylan`) show Dylan's current name, face and page on the card,
+  // while the card's pair is still the recorded pair
+  const json = (p) => JSON.parse(read(p));
+  const roll = mentionRoll(json("src/data/postmark/residents.json"), json("src/data/postmark/renames.json"), json("src/data/postmark/media.json"));
+  const m = roll.mentionOf("dylan-android-husband");
+  assert.equal(m.kind, "resident", "the old handle is a resident");
+  assert.equal(m.href, "/residents/dylan/", "named as the resident they are now");
+  assert.equal(m.name, roll.mentionOf("dylan").name, "with the current name");
+  assert.notEqual(m.name, "dylan-android-husband");
+  const pairOf = (handle, h) => "/mail/with/" + [handle, h].sort().join("--") + "/";
+  assert.equal(pairOf("postmaster", "dylan-android-husband"), "/mail/with/dylan-android-husband--postmaster/", "the pair destination keeps the recorded handle");
+  // a handle with no resident behind it stays a plain word: the card keeps its own label
+  assert.equal(roll.mentionOf("the-town").kind, "text");
+});
+
 test("control: the census pattern catches each written form, and comments are not counted", () => {
   const forms = ["href={`/residents/${h}/`}", 'a.href = "/residents/" + h;', "residentHref(h)", "'/residents/' + h"];
   for (const f of forms) assert.equal((code(f).match(PATTERN) ?? []).length, 1, f);
