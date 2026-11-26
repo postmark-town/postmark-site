@@ -226,16 +226,25 @@ function paintNeeds(root, needs, ctx) {
     li.appendChild(el("span", "k", k));
     return li;
   };
+  const stancePartial = needs.stances.complete === false || needs.stances.uncertain === true;
   if (needs.stances.total > 0) {
-    const li = item("awaiting the house’s word · " + needs.stances.total);
+    const li = item("awaiting the house’s word · " + (stancePartial ? "at least " : "") + needs.stances.total);
     const p = el("p", null, "Marks set down over ground your house holds, waiting for a stance: ");
     needs.stances.by.forEach((x, i) => {
       if (i) p.append(", ");
-      const w = who(ctx.faces, x.handle, ctx.seatHref);
-      p.append(w, " " + x.n);
+      if (x.household) p.append("household-wide " + x.n);
+      else {
+        const w = who(ctx.faces, x.handle, ctx.seatHref);
+        p.append(w, " " + x.n);
+      }
     });
     p.append(".");
     li.appendChild(p);
+    ul.appendChild(li);
+  }
+  if (stancePartial) {
+    const li = item("stance count");
+    li.appendChild(el("p", "hd-empty", ctx.reading?.residents.length ? "Still reading the house’s record…" : needs.stances.total > 0 ? "The exact stance count is uncertain." : "The stance count is unavailable or uncertain."));
     ul.appendChild(li);
   }
   for (const b of needs.bounces) {
