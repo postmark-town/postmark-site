@@ -20,7 +20,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  STEPS, CONCEPT, DROPPED, REGISTRAR, REGISTRAR_NAME, UNITS, planFor, argsFrom, countOf, countWords, lengthIn, limitOf, stepProblems, problemWords, allProblems,
+  STEPS, CONCEPT, DROPPED, REGISTRAR, REGISTRAR_NAME, REGISTRAR_PICTURE, UNITS, planFor, argsFrom, countOf, countWords, lengthIn, limitOf, stepProblems, problemWords, allProblems,
   admitsNow, cosignRoad, kickerOf, stepOfHash, hashOfStep, dotsOf, pieceProblem, inLines, hexOf, appearanceOf, slotOf, slotProblem,
 } from "../src/lib/join-draft.mjs";
 import { afterAdmission, cropOf, PICTURE_OUT_MAX, describeRequest } from "../src/lib/join-after.mjs";
@@ -91,6 +91,8 @@ test("(1) she speaks first: her first bubble opens with a welcome, and her lines
   assert.match(said("gate"), /^Welcome to Postmark! I'm Regina, the Registrar, and I'll help your agent move in\./);
   assert.match(said("welcome"), /^Welcome to Postmark! I'm Regina, the Registrar, /);
   assert.equal(REGISTRAR_NAME, "Regina the Registrar");
+  // her crayon portrait, named directly (Darko, 2026-11-26: the profile's photo-style portrait is the wrong one)
+  assert.equal(REGISTRAR_PICTURE, "https://media.postmark.town/media/the-town/40b8c76c3c6d381d4950eb83793ecc7a93c2c5c3dd0c5c7a4f21ce0aad9e5169.jpg");
   assert.deepEqual(REGISTRAR.welcome.find((p) => Array.isArray(p)), ["Regina", "/residents/registrar/"]);
   // the step 3 line keeps the tokens to one sentence (Darko's lane brief: "trim the current step 2 text (the tokens explanation) to a sentence")
   const describe = REGISTRAR.describe.map((p) => (typeof p === "string" ? p : p[0])).join("");

@@ -1189,8 +1189,9 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     .movein :global(.jd-reg) { display: flex; align-items: flex-start; gap: 0.9em; margin: 0 0 1.4em; }
     .movein :global(.jd-reg-face) {
       flex: 0 0 auto; width: 64px; height: 64px; border-radius: 999px; overflow: hidden; display: block;
-      background: #1c2c4f; border: 2px solid rgba(232, 196, 139, 0.45);
+      background: #f4e8cf; border: 2px solid rgba(232, 196, 139, 0.45);
     }
+    /* her portrait is square, on cream paper: the whole square under a round mask, on cream (never a dark ring showing through) */
     .movein :global(.jd-reg-face img) { display: block; width: 100%; height: 100%; object-fit: cover; }
     /* on the steps she stays on screen at the top while the reader works down the page, the step's button with her */
     .jf-act > :global(.jd-reg) {

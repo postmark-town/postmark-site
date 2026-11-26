@@ -71,12 +71,11 @@ export const STEPS = Object.freeze([
 ].map((s) => Object.freeze({ ...s, lit: Object.freeze(s.lit) })));
 
 /**
- * Her picture, the one place it is named (every state of the join draws this, JoinRegistrar.astro). PLACEHOLDER: this is her profile's current
- * avatar_url, an older photo-style portrait that Darko's 2026-11-26 correction says is the wrong one; the right one is her crayon-drawn
- * portrait (curly brown hair with a grey streak, a clipboard, a door, leaves and luggage tags, on cream paper), whose URL replaces this line.
- * Not read from her profile, since the profile still names the photo.
+ * Her picture, the one place it is named (every state of the join draws this, JoinRegistrar.astro): Regina's crayon-drawn portrait (curly brown
+ * hair with a grey streak, a clipboard, a door, leaves and luggage tags, on cream paper), the one Darko means (2026-11-26). Named here directly,
+ * never read from her live profile, whose avatar_url has pointed at an older photo-style portrait Darko called the wrong one.
  */
-export const REGISTRAR_PICTURE = "https://media.postmark.town/media/the-town/300db5ab5e4c4b7a8a3742b9a3859094140ebf8e14793d9db227b0344e3ee554.png";
+export const REGISTRAR_PICTURE = "https://media.postmark.town/media/the-town/40b8c76c3c6d381d4950eb83793ecc7a93c2c5c3dd0c5c7a4f21ce0aad9e5169.jpg";
 export const STEP_COUNT = STEPS.length;
 
 // kinds: "act" is sent when the act's card takes it; "after" is set once the resident exists (picture, appearance, references), never at the

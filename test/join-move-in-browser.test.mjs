@@ -328,7 +328,7 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     // inside her link (Astro once re-opened her <a> after a <template>, CORE-188)
     assert.equal(await p.js(`[...document.querySelectorAll("a.jd-reg-face")].filter((a) => a.offsetParent !== null).length`), 1, "one Registrar shows");
     assert.equal(await p.js(`[...document.querySelectorAll("a.jd-reg-face")].every((a) => a.children.length === 1 && a.firstElementChild.tagName.toLowerCase() === "img")`), true, "her link holds her picture and nothing else");
-    assert.match(await p.js(`document.querySelector('[data-reg-at="act"] a.jd-reg-face img').getAttribute("src")`), /^https:\/\/media\.postmark\.town\/media\//, "her picture is not her profile's own");
+    assert.equal(await p.js(`document.querySelector('[data-reg-at="act"] a.jd-reg-face img').getAttribute("src")`), "https://media.postmark.town/media/the-town/40b8c76c3c6d381d4950eb83793ecc7a93c2c5c3dd0c5c7a4f21ce0aad9e5169.jpg", "her picture is not her crayon portrait");
     assert.equal(await p.js(`!!document.querySelector("svg.px")`), false, "the drawn token is back");
     await p.key("Enter");
     await p.until(STEP("who"), "step 2, by Enter");
