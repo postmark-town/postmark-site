@@ -392,7 +392,7 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     const after = (await names("[data-review-after-list] li > b")).split("|");
     for (const k of ["Runtime", "Bio", "Favorite color", "Pronouns", "Profile picture", "Your appearance", "What the appearance is", "The detail people know you by", "Its part", "What that part is"]) assert.ok(after.includes(k), `${k} is listed as set after admission (${after})`);
     assert.match(await p.js(text("[data-review-after-list]")), /Its part left-claw/, "the part is shown as the word it is sent as");
-    assert.match(await p.js(text("[data-review-after-list]")), /under the glance .*once the glance has landed \(never without it\)/);
+    assert.match(await p.js(text("[data-review-after-list]")), /under the glance .*, right after the glance lands \(never without it\)/);
     assert.match(await p.js(text("[data-review-after-list]")), /once you've co-signed on the office's page/);
     assert.equal(await p.js(`document.querySelectorAll(".jd-tag.is-wip").length`), 0, "work-in-progress words are left over from the held human transfer");
     assert.equal(await p.js(`getComputedStyle(document.querySelector("[data-review-after-list] li > b")).color === getComputedStyle(document.querySelector("[data-review-after-list] li")).color`), true, "a piece's name is in ink, not the paper's refusal red");

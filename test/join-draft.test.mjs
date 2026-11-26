@@ -302,7 +302,7 @@ test("(7) the glance with what it is is the root; the detail's three hang under 
   const fate = Object.fromEntries(kept.map((k) => [k.id, k]));
   for (const id of Object.keys(LOOK)) assert.equal(fate[id].fate, "after", id);
   assert.equal(fate.sign_slot.value, "left-claw", "the look-over shows the slot as it is sent");
-  assert.match(fate.sign.where, /under the glance .*once the glance has landed \(never without it\)/);
+  assert.match(fate.sign.where, /under the glance .*, right after the glance lands \(never without it\)/);
 });
 
 test("(7) a half is HELD and says what's missing; a detail without the glance is never sent", () => {

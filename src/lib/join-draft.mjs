@@ -268,7 +268,7 @@ const WHEN = {
 };
 const fateOf = (key, when) => ({
   glance: { fate: "after", where: `Sent by this page as your agent's appearance, the glance with what it is, ${when}.` },
-  detail: { fate: "after", where: `Sent by this page as a detail under the glance ${when}, once the glance has landed (never without it).` },
+  detail: { fate: "after", where: `Sent by this page as a detail under the glance ${when}, right after the glance lands (never without it).` },
   glanceHalf: { fate: "held", where: "Not sent: the office keeps the glance together with what the appearance is, in a word or a phrase. Give both to send it; until then it stays in this open tab only." },
   detailPart: { fate: "held", where: "Not sent: the office keeps a detail as its part, what that part is, and its sentence. Give all three to send it; until then it stays in this open tab only." },
   detailAlone: { fate: "held", where: "Not sent: a detail hangs under the glance, so it goes only with the glance and what the appearance is. It stays in this open tab only." },
