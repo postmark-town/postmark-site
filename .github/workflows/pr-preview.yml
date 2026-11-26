@@ -1,0 +1,268 @@
+name: pr-preview
+
+# A SITE PR'S STATIC BUILD ON DEV, AT /pr/<n>/ (POS-1256 step 1; Darko, 2026-11-26:
+# "yes please set up 1 2 and 3 now"). Each same-repo PR is built the way deploy.yml's
+# snapshot lane builds dev, with PREVIEW_BASE=/pr/<n>/ (astro.config.town.mjs turns it
+# into build.assetsPrefix, never Astro `base`, which breaks the static build), rsynced
+# to its OWN folder on the box, and linked from one comment on the PR.
+#
+#   opened / synchronize / reopened -> build, publish, comment
+#   closed                          -> remove the folder, edit the comment
+#
+# WHERE IT SERVES FROM. /var/www/postmark-dev-pr/<n>/, outside dev's webroot on
+# purpose: deploy.yml's dev lane runs `rsync --delete` on /var/www/postmark-dev-site/
+# and would wipe a folder kept inside it. The box's dev nginx serves /pr/ from that
+# root, behind dev's Cloudflare Access gate (the box side is Jetto's).
+#
+# THE KEY NEVER MEETS THE PR'S CODE. The build job runs the PR's code (npm ci, the
+# Town's seam fold, astro) and holds NO secret and only a read token. The publish and
+# remove jobs hold the EC2 key and run none of it: publish takes the built folder as
+# an artifact and only rsyncs it. The comment job holds the one write permission.
+#
+# FORKS GET NO SECRETS, so a PR whose head is not in this repo is skipped (the job
+# conditions say so), and so is dependabot's, whose runs get no secrets either.
+#
+# KNOWN LIMIT (printed in the PR comment): hand-written root-relative links (/data,
+# /media, nav hrefs) resolve to dev's root, which is the open train, and /api reaches
+# the dev office. A preview proves the PR's own pages; navigation lands on the
+# train's pages. Preview builds are regenerable output, not records.
+#
+# WHERE IT RUNS FROM. A pull_request run takes this file from the PR's merge commit,
+# so it has to be on every base a PR targets: the open train and main.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+# The job that comments adds pull-requests: write for itself; no other job has it.
+permissions:
+  contents: read
+
+# One run per PR number. A newer push, or the close, cancels the older run.
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: ${{ github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # The snapshot lane's funding seam (deploy.yml, the town-seam job and the step
+      # that takes it into the build), in one job here: this job holds no secret, so
+      # running the Town's code beside the PR's is safe. Same checks: a seam that was
+      # not freshly folded fails the run rather than previewing the committed copy.
+      - name: Check the Town's main out beside the site
+        run: git clone --depth 1 https://github.com/postmark-town/postmark.git .postmark-checkout
+      - name: Fold the funding seam from the Town
+        run: |
+          START=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+          TOWN_DATE=$(git -C .postmark-checkout log -1 --format=%cs)
+          node tools/extract-seam.mjs --town .postmark-checkout
+          START="$START" TOWN_DATE="$TOWN_DATE" node -e '
+            const { readFileSync } = require("node:fs");
+            const read = (name) => JSON.parse(readFileSync("src/data/postmark/" + name, "utf8"));
+            const rows = read("pots.json");
+            const fresh = (r) => typeof r?.generated_at === "string" && Date.parse(r.generated_at) >= Date.parse(process.env.START);
+            if (!Array.isArray(rows) || rows.length === 0 || !rows.every(fresh)) {
+              console.error("pots.json was not emitted by this run: the preview would show the committed copy");
+              process.exit(1);
+            }
+            const asOf = read("economy.json")?.as_of;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(process.env.TOWN_DATE) || asOf !== process.env.TOWN_DATE) {
+              console.error(`economy.json is as of ${asOf}, the Town HEAD is ${process.env.TOWN_DATE}: the preview would show the committed copy`);
+              process.exit(1);
+            }
+            console.log(`pots.json: ${rows.length} pot-epoch rows from this run; economy.json as of ${asOf}`);
+          '
+
+      - name: Refresh Postmark data from office API
+        env:
+          POSTMARK_API: https://postmark.town/api
+          BUILD_CODE_REF: ${{ github.event.pull_request.head.ref }}
+          PUBLIC_CHANNEL: snapshot
+        run: node tools/fetch-town.mjs
+
+      - name: Build (snapshot, PREVIEW_BASE=/pr/${{ github.event.pull_request.number }}/)
+        env:
+          PREVIEW_BASE: /pr/${{ github.event.pull_request.number }}/
+          PUBLIC_CHANNEL: snapshot
+          PUBLIC_BUILD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUBLIC_PAYPAL_CLIENT_ID: ${{ vars.PAYPAL_CLIENT_ID_SANDBOX }}
+        run: npm run build
+
+      # A build that did not read PREVIEW_BASE looks deployed and 404s its assets
+      # (tools/preview-deploy.mjs in the office guards the same way). Prove the
+      # prefix landed, and that no asset URL on the home page escaped it.
+      - name: Assert the _astro URLs carry /pr/<n>/
+        env:
+          PREVIEW_BASE: /pr/${{ github.event.pull_request.number }}/
+        run: |
+          set -euo pipefail
+          [ -f dist-town/index.html ] || { echo "::error::dist-town/index.html is missing"; exit 1; }
+          if ! grep -qF "${PREVIEW_BASE}_astro/" dist-town/index.html; then
+            echo "::error::built index.html has no ${PREVIEW_BASE}_astro/ reference: the prefix did not apply. Refusing to publish."
+            exit 1
+          fi
+          if grep -qE '(href|src)="/_astro/' dist-town/index.html; then
+            echo "::error::built index.html still has an unprefixed /_astro/ URL. Refusing to publish."
+            exit 1
+          fi
+          echo "the _astro URLs carry ${PREVIEW_BASE}"
+
+      - name: Stamp the build (/build.json)
+        env:
+          PUBLIC_CHANNEL: snapshot
+          BUILD_CODE_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if [ -f tools/build-stamp.mjs ]; then
+            node tools/build-stamp.mjs --out dist-town/build.json
+          else
+            echo "stamper absent at this head: /build.json not emitted"
+          fi
+
+      - name: Write preview.json
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          printf '{"pr":%s,"head_sha":"%s","built_at":"%s"}\n' "$PR" "$SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > dist-town/preview.json
+          cat dist-town/preview.json
+
+      # Only regular files and folders go to the box: a link in the build could point
+      # at a path the box's nginx serves.
+      - name: Refuse links in the build
+        run: |
+          LINKS=$(find dist-town -type l | wc -l)
+          if [ "$LINKS" -ne 0 ]; then
+            echo "::error::dist-town holds $LINKS symbolic link(s); refusing to publish"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr-preview-${{ github.event.pull_request.number }}
+          path: dist-town
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: pr-preview-${{ github.event.pull_request.number }}
+          path: ${{ runner.temp }}/preview
+      - name: Rsync to the box, this PR's folder only
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+          USER: ${{ secrets.EC2_USER }}
+          PR: ${{ github.event.pull_request.number }}
+          SRC: ${{ runner.temp }}/preview
+        run: |
+          set -euo pipefail
+          case "$PR" in ''|*[!0-9]*) echo "::error::the PR number is not digits"; exit 1;; esac
+          [ -f "$SRC/index.html" ] || { echo "::error::the artifact has no index.html"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # -r without -l: a link would be skipped, never copied. --delete reaches
+          # only the one folder named here; dev's webroot is never touched.
+          rsync -rz --delete --chmod=D755,F644 -e "ssh -i ~/.ssh/deploy_key" "$SRC/" "$USER@$HOST:/var/www/postmark-dev-pr/$PR/"
+          echo "published $(du -sh "$SRC" | cut -f1) to $HOST:/var/www/postmark-dev-pr/$PR/"
+
+  remove:
+    if: ${{ github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Remove this PR's folder from the box
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+          USER: ${{ secrets.EC2_USER }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          case "$PR" in ''|*[!0-9]*) echo "::error::the PR number is not digits"; exit 1;; esac
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # One exact path, with the number already checked to be digits.
+          ssh -i ~/.ssh/deploy_key "$USER@$HOST" "rm -rf /var/www/postmark-dev-pr/$PR"
+          echo "removed /var/www/postmark-dev-pr/$PR on $HOST"
+
+  comment:
+    needs: [publish, remove]
+    if: ${{ always() && (needs.publish.result == 'success' || needs.remove.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Create or update the one preview comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          ACTION: ${{ github.event.action }}
+          MARKER: "<!-- pr-preview:postmark-site -->"
+        run: |
+          set -euo pipefail
+          case "$PR" in ''|*[!0-9]*) echo "::error::the PR number is not digits"; exit 1;; esac
+          if [ "$ACTION" = "closed" ]; then
+            cat > "$RUNNER_TEMP/body.md" <<'EOF'
+          @@MARKER@@
+          **Preview removed.** This PR is closed, so `https://dev.postmark.town/pr/@@N@@/` is gone. Preview builds are regenerable output; reopen the PR to build it again.
+          EOF
+          else
+            cat > "$RUNNER_TEMP/body.md" <<'EOF'
+          @@MARKER@@
+          **Preview:** https://dev.postmark.town/pr/@@N@@/ (behind dev's Cloudflare Access sign-in)
+
+          Built from head `@@SHA@@`. It updates on every push to this PR and is removed when the PR closes.
+
+          **Known limit:** root-relative links (`/data`, `/media`, and the nav hrefs) resolve to dev's root, which is the open train, and `/api` reaches the dev office. So the preview proves this PR's own pages; clicking through lands on the train's pages.
+          EOF
+          fi
+          sed -i -e "s|@@MARKER@@|$MARKER|" -e "s|@@N@@|$PR|g" -e "s|@@SHA@@|$SHA|g" "$RUNNER_TEMP/body.md"
+          # Only this workflow's own bot comment counts, so a copied marker in someone
+          # else's comment is never edited.
+          ID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith(env.MARKER))) | .id' | sed -n 1p)
+          if [ -z "$ID" ] && [ "$ACTION" = "closed" ]; then
+            echo "no preview comment to edit; nothing to say"
+            exit 0
+          fi
+          if [ -n "$ID" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$ID" -F body=@"$RUNNER_TEMP/body.md" --silent
+            echo "updated comment $ID"
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$RUNNER_TEMP/body.md" --silent
+            echo "created the comment"
+          fi
