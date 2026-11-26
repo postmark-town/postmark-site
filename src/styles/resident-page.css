@@ -365,6 +365,10 @@
 .rpage .draft-slot.is-lit:focus-within { outline-style: solid; outline-color: var(--profile-color, #e8c48b); }
 .rpage .draft-slot.is-long { display: block; width: 100%; }
 .rpage .draft-slot.is-long .draft-in { display: block; box-sizing: border-box; width: 100%; resize: none; overflow: hidden; min-height: 1.5em; }
+/* a one-line piece is a one-row box that wraps as the page's own text does (DraftSlot.astro; the review of 18bd5144 saw the Address card's line
+   cut mid-sentence at 375): as wide as its words, then on down the next line, never a scrolling frame. A short piece (a date, a hex) is an input. */
+.rpage .draft-in.is-one-row { resize: none; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; min-height: 1.2em; }
+.rpage .profile-chip .draft-slot.is-one-row { min-width: 0; }
 .rpage .draft-in[aria-invalid="true"] { text-decoration: underline wavy rgba(245, 179, 160, 0.85); text-underline-offset: 3px; }
 /* the count (while the box has focus, or always once it's over) and the problem (as soon as there is one), just under the piece: one small
    label each, on night so they read on any backdrop, the parchment's included */

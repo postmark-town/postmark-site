@@ -69,9 +69,10 @@ const FOUND = ["invited_by", "heard_note"].map(humanField);
 const fieldSpec = (id: string) => ({ label: C[id].label, placeholder: C[id].placeholder, multiline: C[id].multiline, rows: C[id].rows, wide: C[id].wide, count: C[id].count !== false });
 const pieceAttrs = (id: string) => ({ countId: `jd-count-${id}`, countAttrs: { "data-count-for": id }, inputAttrs: { "data-piece": id, id: `jd-${id}`, autocomplete: "off" }, problemAttrs: { "data-problem-for": id } });
 // THE BLANK PAGE'S OWN BOXES (Darko, 2026-11-26): every piece with a ghost is typed into where it sits on the page, its ghost the box's only
-// placeholder, its name (the label's first half) what a screen reader hears; the Registrar says the rest when the reader is in it
+// placeholder; the Registrar says the rest when the reader is in it. A screen reader hears the whole label as its name, "optional" included, and
+// her words as its description (the review of 18bd5144: it heard "Since, edit text" and nothing more)
 const DRAFT = {
-  ...Object.fromEntries(CONCEPTS.filter((c) => c.ghost).map((c) => [c.id, { ghost: c.ghost, label: c.label.split(" · ")[0], multiline: c.multiline, rows: c.rows }])),
+  ...Object.fromEntries(CONCEPTS.filter((c) => c.ghost).map((c) => [c.id, { ghost: c.ghost, label: c.label, say: c.say, multiline: c.multiline, rows: c.rows, short: c.short }])),
   // shown on the page, filled from the human's own step 1
   household: "your house",
 };
@@ -116,7 +117,6 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     <!-- ASKING — the two reads, before anything is drawn -->
     <section class="movein-card pm-paper asking" data-gate-asking>
       <JoinRegistrar at="asking" name={REGISTRAR_NAME} picture={REG_PIC} line={REGISTRAR.asking} />
-      <p class="asking-line">Asking the office what your sign-in may do…</p>
     </section>
 
     <!-- THE STEPS (CORE-188). Every step is here from the start and shown one at a time; the step lives in the URL hash (#step-N, #review), so the
@@ -581,6 +581,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       if (cosignRoad(act)) $("[data-human-later]").hidden = false;
       // the berth's narrower name rule, said under the page on the handle's own step (show() reveals it there)
       if (plan.pieces.handle?.berth) $("[data-berth-note]").textContent = plan.pieces.handle.hint;
+      // what a screen reader hears as a piece's description is what she says about it, the plan's words (the berth road's handle rule included)
+      for (const el of $$("[data-say-for]")) { const p = plan.pieces[el.dataset.sayFor]; if (p) el.textContent = p.say || ""; }
       // the card's own words, where it has them, over the page's (the office's description says what a field is for and where it shows)
       for (const el of $$("[data-hint-for]")) { const p = plan.pieces[el.dataset.hintFor]; if (p && p.hint) el.textContent = p.hint; }
       // the heard question's own options, the office's list
@@ -645,14 +647,22 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     function show1(id, text) { for (const el of $$(`[data-show="${id}"]`, page)) el.textContent = text; }
     function fillHouseChip() { show1("household", (control("household")?.value || "").trim() || (house ? house.name : "")); }
     const boxOf = (id) => (id.startsWith("extra:") ? $(`[data-extra="${id.slice(6)}"]`) : control(id));
-    // A BOX AS WIDE AS ITS WORDS, AND A LONG ONE AS TALL: the page's own text doesn't scroll inside a frame. `field-sizing: content` does this
-    // where the browser has it (resident-page.css); elsewhere, and for a long box's height, here.
+    // A BOX AS WIDE AS ITS WORDS, AND AS TALL: the page's own text doesn't scroll inside a frame, and a one-line piece wraps when it runs past
+    // its spot, as the page's own line does (the review of 18bd5144). `field-sizing: content` sizes a box where the browser has it
+    // (resident-page.css); elsewhere a one-row box takes its width from its words here, and every textarea its height. Asked again whenever the
+    // window changes width, so a box that wraps onto more lines after a rotation isn't clipped until the next keystroke.
     const SIZES = typeof CSS !== "undefined" && CSS.supports?.("field-sizing", "content");
+    const widthOf = (el) => Math.max(3, [...(el.value || el.placeholder || "")].length + 1);
     function fit(el) {
-      if (!el || !el.classList?.contains("draft-in")) return;
-      if (el instanceof HTMLTextAreaElement) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; }
-      else if (!SIZES) el.size = Math.max(3, [...(el.value || el.placeholder || "")].length + 1);
+      if (!el || !el.classList?.contains("draft-in") || el.offsetParent === null) return;
+      if (el instanceof HTMLTextAreaElement) {
+        if (el.dataset.oneRow != null && !SIZES) el.cols = widthOf(el);
+        el.style.height = "auto"; el.style.height = el.scrollHeight + "px";
+      }
+      else if (!SIZES) el.size = widthOf(el);
     }
+    let refit = 0;
+    window.addEventListener("resize", () => { cancelAnimationFrame(refit); refit = requestAnimationFrame(() => { for (const b of $$(".draft-in")) fit(b); }); });
     // the pieces a refusal has stopped the reader for: their "is needed" shows beside them until they're filled
     const stoppedFor = new Set();
     function paintPiece(id) {
@@ -684,12 +694,16 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     document.addEventListener("input", (e) => {
       const el = e.target;
       if (!(el instanceof HTMLElement)) return;
+      // a one-row box is one line, however it wraps: a pasted line break becomes a space, never a newline in the line
+      if (el instanceof HTMLTextAreaElement && el.dataset.oneRow != null && /[\r\n]/.test(el.value)) {
+        const at = el.selectionStart;
+        el.value = el.value.replace(/\r\n?|\n/g, " ");
+        el.setSelectionRange(at, at);
+      }
       if (el.dataset.piece) paintPiece(el.dataset.piece);
       else if (el.dataset.extra) paintPiece("extra:" + el.dataset.extra);
       if (!formError.hidden) formError.hidden = true;
     });
-    // the pronouns' Clear (the editor's own button): here it only empties the box
-    $("[data-profile-pronouns-clear]")?.addEventListener("click", () => { const b = control("pronouns"); if (b) { b.value = ""; paintPiece("pronouns"); b.focus(); } });
 
     // ── SHE SAYS WHAT A PIECE IS FOR, WHILE THE READER IS IN IT (Darko's lane brief, 2026-11-26: "The hints come from her") ──
     // No small label sits over a piece of the page; when the reader is in one, her bubble says what it's for (join-draft.mjs CONCEPTS `say`, or
@@ -708,6 +722,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       if (quietFocus || !(el instanceof HTMLElement) || !(el.dataset.piece || el.dataset.extra) || el.readOnly) return;
       const words = sayOf(el);
       if (words) sayAt("act", [words]);
+      // her bubble grows as she speaks: a box tapped just under it must not end up behind it
+      requestAnimationFrame(() => clearOfBubble(el));
     });
     gateAct.addEventListener("focusout", () => {
       setTimeout(() => {
@@ -717,6 +733,20 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       }, 0);
     });
     const actBubble = $('[data-reg-at="act"]');
+    // HER BUBBLE NEVER HIDES THE BOX IT SENDS THE READER TO (the review of 18bd5144). She stays on screen at the top (sticky), and she is far
+    // taller than the page's 24px scroll margin, taller still when she speaks a piece's help or a refusal lands in her error slot. So the boxes'
+    // scroll margin is her measured height (`--reg-h`, kept by a ResizeObserver, resident-page.css's .jf-act rules read it), and a box the page
+    // sends the reader to is brought clear of her: centred, then nudged down past her bottom edge if centring alone leaves it under her.
+    const REG_GAP = 12;
+    if (actBubble && typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(() => gateAct.style.setProperty("--reg-h", Math.ceil(actBubble.getBoundingClientRect().height) + "px")).observe(actBubble);
+    }
+    function clearOfBubble(box, { centre = false } = {}) {
+      if (!box || box.offsetParent === null || !actBubble) return;
+      if (centre) box.scrollIntoView({ block: "center" });
+      const under = actBubble.getBoundingClientRect().bottom + REG_GAP - box.getBoundingClientRect().top;
+      if (under > 0) window.scrollBy(0, -under);
+    }
     actBubble?.addEventListener("pointerdown", () => { holdWords = true; });
     window.addEventListener("pointerup", () => { if (!holdWords) return; setTimeout(() => { holdWords = false; }, 0); });
 
@@ -825,6 +855,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       page.hidden = !PAGE_STEPS.has(id);
       if (id === "review") $("[data-review-page-slot]").appendChild(page); else if (page.parentNode !== gateAct) $('[data-step="household"]', gateAct).after(page);
       shell.classList.toggle("is-wide", PAGE_STEPS.has(id));
+      page.classList.toggle("is-review", id === "review");
       $("[data-page-edits]", page).hidden = id !== "review";
       // ONLY THIS STEP'S PIECES ARE LIT AND TYPED INTO; every other piece reads as the page (read-only, out of the tab order)
       const litOrder = STEPS.find((s) => s.id === id)?.lit ?? [];
@@ -887,12 +918,13 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     }
     nextBtn.addEventListener("click", () => forward(false));
     skipBtn.addEventListener("click", () => forward(true));
-    // Enter continues from a one-line box; in a paragraph box it is Ctrl/⌘+Enter, so a line break is still a line break
+    // Enter continues from a one-line box, a one-row box that wraps included (it never takes a line break); in a paragraph box it is
+    // Ctrl/⌘+Enter, so a line break is still a line break
     gateAct.addEventListener("keydown", (e) => {
       if (e.key !== "Enter" || e.isComposing || at === "review") return;
       const t = e.target;
       if (t instanceof HTMLButtonElement || t instanceof HTMLAnchorElement || t instanceof HTMLSelectElement) return;
-      if (t instanceof HTMLTextAreaElement && !(e.ctrlKey || e.metaKey)) return;
+      if (t instanceof HTMLTextAreaElement && t.dataset.oneRow == null && !(e.ctrlKey || e.metaKey)) return;
       if (t instanceof HTMLInputElement && (t.type === "file" || t.type === "radio" || t.type === "range")) return;
       e.preventDefault(); forward(false);
     });
@@ -904,7 +936,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       for (const q of stepProblems(plan, at, values())) { stoppedFor.add(q.id); paintPiece(q.id); }
       showError(problemWords(p), null);
       const box = boxOf(p.id);
-      if (box && typeof box.focus === "function") box.focus();
+      if (box && typeof box.focus === "function") { box.focus({ preventScroll: true }); clearOfBubble(box, { centre: true }); }
     }
     function showError(defect, hint) {
       // UNHIDDEN FIRST, THEN FILLED: an assertive live region announces a mutation inside itself, and a hidden element is out of the tree
@@ -912,7 +944,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       while (formError.firstChild) formError.removeChild(formError.firstChild);
       const b = document.createElement("b"); b.textContent = defect; formError.appendChild(b);
       if (hint) { const s = document.createElement("span"); s.textContent = " — " + hint; formError.appendChild(s); }
-      // no scroll: the slot is in her bubble, which stays on screen (sticky), and a refused piece is focused, which brings it into view
+      // no scroll here: the slot is in her bubble, which stays on screen (sticky); refuse() brings the refused piece clear of her
       formError.hidden = false;
     }
     function setStatus(msg) { status.hidden = !msg; status.textContent = msg; }
@@ -1176,7 +1208,6 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     .movein-card a { color: var(--pm-accent); }
 
     .gate .jf-sub b { color: var(--pm-gold); }
-    .asking-line { margin: 0; font-family: var(--pm-mono); font-size: 0.85rem; color: var(--pm-ink-soft) !important; }
 
     /* THE ACT, on night */
     .jf-act { padding: 1.5em 0 3em; box-sizing: border-box; }
@@ -1197,6 +1228,15 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     .jf-act > :global(.jd-reg) {
       position: sticky; top: 8px; z-index: 30; margin: 0 0 1.2em;
     }
+    /* A BOX THE PAGE SENDS THE READER TO LANDS CLEAR OF HER (the review of 18bd5144): its scroll margin is her measured height (`--reg-h`, kept by
+       the script's ResizeObserver), her sticky offset and a gap, over postmark.css's 24px for any [id]. The drawer's and the extra boxes are the
+       shared pieces' markup (no scope attribute of this page), so :global. */
+    .jf-act :global(.draft-in), .jf-act :global(.jd-drawer input), .jf-act :global(.jd-drawer textarea), .jf-act .jd-sf input, .jf-act .jd-sf select {
+      scroll-margin-top: calc(var(--reg-h, 0px) + 20px);
+    }
+    /* on the look-over the page reads as the town will show it: the draft's own "how they persist" line, which the resident page never draws,
+       doesn't show its ghost there when it was left blank */
+    .jd-page.is-review :global(.profile-persist:has(.draft-in:placeholder-shown)) { display: none; }
     /* her bubble carries its own shadow, so the page reads as passing under it */
     .jf-act > :global(.jd-reg .jd-reg-bubble) { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55); }
     .movein :global(.jd-reg-actions) { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55em 0.9em; margin: 0.75em 0 0; }
@@ -1400,7 +1440,6 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       border: 1px solid rgba(90, 62, 27, 0.3); border-radius: 8px;
       white-space: pre-wrap; overflow-wrap: anywhere;
     }
-    .reply-foot { margin: 1.6em 0 0; }
 
     /* the machinery is never seen and never measured */
     .pm-mcp-machinery { display: none !important; }

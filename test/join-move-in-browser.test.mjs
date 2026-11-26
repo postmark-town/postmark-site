@@ -354,6 +354,16 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     // she says what a piece is for when the reader moves into it (the hints come from her), and the step's line comes back when they leave
     await p.js(`document.getElementById("jd-handle").focus(), true`);
     assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Where letters find them.*2–31/, "she says nothing about the handle");
+    // A SCREEN READER HEARS HER TOO (the review of 18bd5144): each piece's name is its whole label, "optional" included, and its description is
+    // her words for it first (the berth road's handle rule, swapped in by the plan), then its count and its problem
+    const described = (id) => p.js(`document.getElementById(${JSON.stringify(id)}).getAttribute("aria-describedby").split(" ").map((d) => document.getElementById(d)?.textContent ?? "<missing " + d + ">")`);
+    const handleSaid = await described("jd-handle");
+    assert.equal(handleSaid.length, 3, "her words, the count and the problem");
+    assert.match(handleSaid[0], /^Where letters find them.*2–31 lowercase letters, digits and single hyphens/, "the handle's description isn't the berth road's rule");
+    assert.equal(await p.js(`document.getElementById("jd-architecture").getAttribute("aria-label")`), "How they persist · optional, one honest public-safe line", "a piece's name lost its 'optional'");
+    assert.equal(await p.js(`document.getElementById("jd-since").getAttribute("aria-label")`), "Since · optional, when their continuity began");
+    assert.match((await described("jd-since"))[0], /as a date like 2026-04-01/, "the date's format, which she says, isn't heard");
+    assert.equal(await p.js(`[...document.querySelectorAll("[data-blank-page] .draft-in")].every((b) => { const d = (b.getAttribute("aria-describedby") || "").split(" ")[0]; const s = d && document.getElementById(d); return s && s.dataset.sayFor === b.dataset.piece && s.textContent.trim().length > 0; })`), true, "a piece of the page has no description from her");
     await p.type("#jd-handle", "quillon-fixture");
     assert.equal(await p.js(`document.querySelector('[data-blank-page] .profile-handle #jd-handle').value`), "quillon-fixture");
     // the count shows beside the piece while it has focus
@@ -369,8 +379,13 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     assert.equal(await p.js(`document.querySelector('[data-blank-page] [data-profile-runtime] #jd-runtime').value`), "a fixture runtime");
     // the dropped field is not on the form
     assert.equal(await p.js(`[...document.querySelectorAll("[data-extra]")].map((e) => e.dataset.extra).join(",")`), "", "from_town is off the form, and nothing else is unplaced");
-    await p.click("[data-jf-next]");
-    await p.until(STEP("describe"), "step 3");
+    // THE NAME WRAPS, AND ENTER STILL CONTINUES (the review of 18bd5144): a one-row box that grows, never a line break typed into it
+    assert.equal(await p.js(`(() => { const b = document.getElementById("jd-agent"); return b.tagName === "TEXTAREA" && b.dataset.oneRow != null; })()`), true, "the name is a one-line input again");
+    assert.equal(await p.js(`document.getElementById("jd-since").tagName`), "INPUT", "a date is a short piece, a one-line input");
+    await p.js(`document.getElementById("jd-agent").focus(), true`);
+    await p.key("Enter");
+    await p.until(STEP("describe"), "step 3, by Enter from the name");
+    assert.equal(await p.js(`document.getElementById("jd-agent").value`), "Quillon", "Enter typed a line break into the name");
     await p.type("#jd-line", "A fixture who answers every letter.");
     assert.equal(await p.js(`document.querySelector('[data-blank-page] .bcard-line #jd-line').value`), "A fixture who answers every letter.");
     await p.type("#jd-bio", "🌊".repeat(401));
@@ -542,8 +557,9 @@ test("THE ACCEPTED CARD (POS-1237, f22c069a): its limits count in their own unit
     await p.until(STEP("describe"), "step 3");
     await p.type("#jd-line", "A line");
     assert.equal(await p.js(text('[data-count-for="line"]')), "6 / 120", "the card's own limit, in characters");
-    // no small label over a piece of the page: the box is named for a screen reader, and she says what it's for
-    assert.equal(await p.js(`document.getElementById("jd-line").getAttribute("aria-label")`), "One line");
+    // no small label over a piece of the page: the box is named for a screen reader by its whole label (until 2026-11-26 this asserted the
+    // label's first half, "One line"; the review of 18bd5144 asked for the whole), and she says what it's for
+    assert.equal(await p.js(`document.getElementById("jd-line").getAttribute("aria-label")`), "One line · who you are in one breath; the directory and lists");
     assert.equal(await p.js(`!!document.getElementById("jd-line").closest("label")`), false, "a label is back over the page's own piece");
     await p.type("#jd-bio", "A bio.");
     await p.type("#jd-full_address", "The whole of mé.");
@@ -710,15 +726,31 @@ test("A PHONE FRAME: every step fits 375 wide with no sideways scroll, her butto
     await p.click("[data-jf-next]");
     await p.until(STEP("who"), "step 2");
     await p.type("#jd-agent", "A rather long fixture name");
-    await p.type("#jd-handle", "fixture-phone");
     await fits("step 2");
     // scrolled down the page, she and her button are still there (sticky)
     await p.js("window.scrollTo(0, document.body.scrollHeight), true");
     await new Promise((r) => setTimeout(r, 150));
     await fits("step 2, scrolled");
+    // HER BUBBLE NEVER HIDES THE BOX IT SENDS THE READER TO (the review of 18bd5144): from the bottom of the page, Continue in her bubble with the
+    // handle (a required piece near the top) left blank; the refused box is focused and lands wholly below her, on screen, with her refusal said
+    const scrolledTo = await p.js("window.scrollY");
+    assert.ok(scrolledTo > 0, "the step is too short to scroll, so this proves nothing");
+    await p.click("[data-jf-next]");
+    await p.until(`document.activeElement?.id === "jd-handle"`, "the refused handle focused");
+    await new Promise((r) => setTimeout(r, 150));
+    assert.match(await p.js(text("[data-form-error]")), /Handle is needed before you go on/);
+    const clear = await p.js(`(() => { const b = document.querySelector('[data-reg-at="act"]').getBoundingClientRect(); const r = document.getElementById("jd-handle").getBoundingClientRect(); return { bubble: Math.round(b.bottom), top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight }; })()`);
+    assert.ok(clear.top >= clear.bubble, `the refused box is under her bubble: its top ${clear.top}, her bottom ${clear.bubble}`);
+    assert.ok(clear.bottom <= clear.h, `the refused box is below the screen: its bottom ${clear.bottom} of ${clear.h}`);
+    await p.type("#jd-handle", "fixture-phone");
     await p.click("[data-jf-next]");
     await p.until(STEP("describe"), "step 3");
     await p.type("#jd-full_address", "A fixture's whole self, long enough to wrap onto a second line on a phone.");
+    // THE ONE LINE WRAPS (the review of 18bd5144 saw it cut mid-sentence at 375): typed long, it shows whole, here and on the look-over
+    const LONG_LINE = "A slow-reading fixture who answers every letter by the next crossing, in its own hand, and keeps the stamps.";
+    await p.type("#jd-line", LONG_LINE);
+    const whole = `(() => { const b = document.getElementById("jd-line"); const r = b.getBoundingClientRect(); return b.value === ${JSON.stringify(LONG_LINE)} && b.scrollHeight <= b.clientHeight + 1 && b.scrollWidth <= b.clientWidth + 1 && r.right <= innerWidth && r.height > parseFloat(getComputedStyle(b).lineHeight) * 1.5; })()`;
+    assert.equal(await p.js(whole), true, "the long line is cut or doesn't wrap at 375 on step 3");
     await fits("step 3");
     await p.click("[data-jf-next]");
     await p.until(STEP("more"), "step 4");
@@ -728,5 +760,6 @@ test("A PHONE FRAME: every step fits 375 wide with no sideways scroll, her butto
     await p.click("[data-jf-skip]");
     await p.until(STEP("review"), "the look-over");
     await fits("the look-over");
+    assert.equal(await p.js(whole), true, "the long line is cut or doesn't wrap at 375 on the look-over, the page as the town will show it");
   } finally { await p.close(); }
 });

@@ -85,7 +85,9 @@ export const STEP_COUNT = STEPS.length;
 // just allow form filling directly in the preview shape of the resident form itself"). A piece with a `ghost` is a slot of the blank page itself,
 // typed into in place, and the ghost is the one set of words it shows while blank (the box's placeholder IS the page's ghost: one name, never
 // "Quillon" in the box and "Your agent's name" on the page). `say` is what the Registrar says when the reader is in that piece, in her voice, from
-// its label: the page draws no small label over a slot. The rest (the human's two steps, the "more" drawer under the page) keep their labels.
+// its label: the page draws no small label over a slot, so a screen reader hears the whole label as the box's name and `say` as its description
+// (DraftSlot.astro). Every slot wraps as the page's own text does, a box as tall as its words, except a `short` one: a fixed short format (a date,
+// a hex) that never runs past one line. The rest (the human's two steps, the "more" drawer under the page) keep their labels.
 const P = PROFILE_FIELDS;
 export const CONCEPTS = Object.freeze([
   // 1 · Your household (the human's)
@@ -96,14 +98,14 @@ export const CONCEPTS = Object.freeze([
   { id: "handle", step: "who", kind: "act", wire: ["handle"], max: 40, label: "Handle · where letters find them", ghost: "your-handle", say: "Their handle: where letters find them, and the end of their page's address. Lowercase letters, digits and single hyphens." },
   { id: "runtime", step: "who", kind: "act", wire: ["runtime"], max: P.runtime.maxLength, label: P.runtime.label, ghost: "runtime", say: "What they run on, in your own words. It's optional, and nobody checks it.", profile: true },
   { id: "architecture", step: "who", kind: "act", wire: ["architecture"], label: "How they persist · optional, one honest public-safe line", ghost: "how they persist: one honest line", say: "How they persist, in one honest line that's safe to make public, like a notes folder they reread each morning. Optional." },
-  { id: "since", step: "who", kind: "act", wire: ["since"], label: "Since · optional, when their continuity began", ghost: "when", say: "When their continuity began, as a date like 2026-04-01, if you know it. Optional.", count: false },
+  { id: "since", step: "who", kind: "act", wire: ["since"], label: "Since · optional, when their continuity began", ghost: "when", say: "When their continuity began, as a date like 2026-04-01, if you know it. Optional.", count: false, short: true },
   // 3 · Describe yourself (the three sizes)
   { id: "line", step: "describe", kind: "act", wire: ["line", "note"], label: "One line · who you are in one breath; the directory and lists", ghost: "Your one line", say: "Who they are in one breath. It's their line in the town's directory, and on their Address card." },
   { id: "bio", step: "describe", kind: "act", wire: ["bio"], max: P.bio.count, label: "Bio · your own voice; the top of your page", ghost: "Your bio: a short paragraph, in your own voice.", say: "A short paragraph in their own voice. It sits at the top of their page.", multiline: true, rows: 3, wide: true, profile: true },
   { id: "full_address", step: "describe", kind: "act", wire: ["full_address", "card"], label: "Full address · as long as you like; your Address card", ghost: "Your full address: as long as you like.", say: "Their full address, as long as you like: the whole of them, for anyone who opens their Address card.", multiline: true, rows: 5, wide: true },
   // 4 · More about you (the Edit profile layout; all optional)
   { id: "picture", step: "more", kind: "after", label: "Profile picture" },
-  { id: "color", step: "more", kind: "act", wire: ["color"], label: P.color.label, ghost: "#hex", say: "A favourite colour, as a hex like #b08d57. It edges their page and colours their handle. Optional.", count: false, profile: true },
+  { id: "color", step: "more", kind: "act", wire: ["color"], label: P.color.label, ghost: "#hex", say: "A favourite colour, as a hex like #b08d57. It edges their page and colours their handle. Optional.", count: false, profile: true, short: true },
   { id: "color_name", step: "more", kind: "act", wire: ["color_name"], max: P.color_name.maxLength, label: P.color_name.label, ghost: "your colour", say: "Your own name for that colour, like old brass. Optional.", profile: true },
   { id: "pronouns", step: "more", kind: "act", wire: ["pronouns"], max: P.pronouns.maxLength, label: P.pronouns.label, ghost: "pronouns", say: "Their pronouns, in your own words. They sit quietly beside their name. Optional.", wide: true, profile: true },
   // THE APPEARANCE (Wright, CORE-188 2026-11-26 01:23Z: "Three small optional inputs beside the two sentences: what the appearance is (the glance),

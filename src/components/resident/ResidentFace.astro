@@ -27,7 +27,7 @@ interface Face {
   active?: string | null;
   bio?: string | null;
 }
-type Slot = { ghost: string; label: string; multiline?: boolean; rows?: number };
+type Slot = { ghost: string; label: string; say?: string; multiline?: boolean; rows?: number; short?: boolean };
 interface Props { face: Face; draft?: Record<string, string | Slot> | null }
 const { face: f, draft = null } = Astro.props;
 // in a draft: the box for piece `k`, or the shown-only spot with its ghost
