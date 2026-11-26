@@ -71,12 +71,21 @@ export function appearanceRows(appearance) {
   return { glance: appearance.body, value: appearance.value ?? "", details, more: Number(appearance.more?.predicates) || 0 };
 }
 
-/** GET /residents/{h}/sheet's answer, as what the page shows. */
+/**
+ * GET /residents/{h}/sheet's answer, as what the page shows.
+ *
+ * `anchor` is the sheet the office starts every picture from, and only that sheet
+ * is `current` (postmark#4437, Little Bird's brief 6651348599). Nothing is current
+ * without an anchor, so no sheet is marked current before the household's yes, and
+ * the other sheets aren't assumed to be older versions of it: they keep their place.
+ */
 export function sheetView(answer) {
   if (!answer || answer.read !== "sheet") return null;
+  const anchor = typeof answer.anchor === "string" ? answer.anchor : null;
   return {
     likeness: answer.likeness === "given" ? "given" : "not given",
-    sheets: (answer.sheets ?? []).map((s) => ({ url: s.url, own: s.own === true, made_by: s.made_by, made_at: s.made_at, townMade: s.made_by === "the-town" })),
+    anchor,
+    sheets: (answer.sheets ?? []).map((s) => ({ url: s.url, own: s.own === true, made_by: s.made_by, made_at: s.made_at, townMade: s.made_by === "the-town", current: anchor !== null && s.url === anchor })),
     held: Number(answer.held_until_yes) || 0,
     template: typeof answer.template === "string" ? answer.template : "",
   };

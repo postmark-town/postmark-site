@@ -166,7 +166,8 @@ const likeness = likenessWords(house, house?.residents?.length ?? 1);
       for (const s of view.sheets) {
         const fig = document.createElement("figure");
         const img = document.createElement("img"); img.src = s.url; img.alt = `${handle}'s reference sheet`; img.loading = "lazy";
-        const cap = document.createElement("figcaption"); cap.textContent = s.own ? "the household's own" : "the town's";
+        // only the office's anchor is captioned current (postmark#4437); every other sheet keeps its caption
+        const cap = document.createElement("figcaption"); cap.textContent = (s.own ? "the household's own" : "the town's") + (s.current ? " · current" : "");
         // a plain link to the full-size image, in a new tab
         const open = document.createElement("a"); open.href = s.url; open.target = "_blank"; open.rel = "noopener"; open.title = "Open the full-size sheet";
         open.append(img);
