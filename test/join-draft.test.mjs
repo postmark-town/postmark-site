@@ -21,7 +21,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   STEPS, CONCEPT, DROPPED, REGISTRAR, UNITS, planFor, argsFrom, countOf, countWords, lengthIn, limitOf, stepProblems, problemWords, allProblems,
-  admitsNow, cosignRoad, kickerOf, stepOfHash, hashOfStep, inLines, hexOf, appearanceOf, slotOf, slotProblem,
+  admitsNow, cosignRoad, kickerOf, stepOfHash, hashOfStep, dotsOf, pieceProblem, inLines, hexOf, appearanceOf, slotOf, slotProblem,
 } from "../src/lib/join-draft.mjs";
 import { afterAdmission, cropOf, PICTURE_OUT_MAX, describeRequest } from "../src/lib/join-after.mjs";
 
@@ -78,9 +78,69 @@ test("(1) the approved steps, in order, and the Registrar has words for each, he
   assert.match(REGISTRAR.household.join(" "), /profile.*short videos|short videos.*profile/);
   const plan = planFor(DECLARE_F22, { act: "declare" });
   assert.equal(kickerOf(plan, "describe"), "Step 3 of 5 · Describe yourself");
-  assert.equal(stepOfHash(hashOfStep("found"), plan), "found");
+  assert.equal(stepOfHash(hashOfStep("found", plan), plan), "found");
   assert.equal(stepOfHash("#review", plan), "review");
   assert.equal(stepOfHash("#step-99", plan), null);
+});
+
+test("(1) she speaks first: her first bubble opens with a welcome, and her lines on the steps stay short", () => {
+  // Darko, 2026-11-26 10:15 EST: "we should have the registrar say, like, welcome to Postmark, I'm the registrar and I will, you know, help you
+  // join, or some kind of like intro sentence first". CAN FAIL: drop the welcome from the gate's line or the prefix the first step wears.
+  assert.match(REGISTRAR.gate.filter((p) => typeof p === "string").join(""), /^Welcome to Postmark! I'm , and I'll help your agent move in\./);
+  assert.deepEqual(REGISTRAR.welcome.find((p) => Array.isArray(p)), ["the Registrar", "/residents/registrar/"]);
+  // the step 3 line keeps the tokens to one sentence (Darko's lane brief: "trim the current step 2 text (the tokens explanation) to a sentence")
+  const describe = REGISTRAR.describe.map((p) => (typeof p === "string" ? p : p[0])).join("");
+  assert.equal((describe.match(/token/g) ?? []).length, 1, describe);
+  for (const k of ["who", "describe", "more", "found", "review"]) {
+    const words = REGISTRAR[k].map((p) => (typeof p === "string" ? p : p[0])).join("");
+    assert.ok(words.length <= 260, `${k}'s line is ${words.length} characters: the button sits under it, in her bubble`);
+  }
+});
+
+test("(1) one step count: the dots, the kicker and the hash all count the steps THIS reader walks", () => {
+  // Wright's walk, 2026-11-26: four dots, "Step 1 of 3" and #step-2 on one screen. CAN FAIL: number a hash by the approved step's own n, or give
+  // the look-over a dot of its own.
+  // a settled keeper's card as the page asks it: the house group dropped (join-move-in.mjs fieldsForReader)
+  const { household: _house, ...addNoHouse } = ADD;
+  const keeper = planFor(addNoHouse, { act: "add-resident", keepsHouse: true });
+  const first = keeper.steps[0];
+  assert.notEqual(first, "household", "a keeper with a settled house has no house to name");
+  assert.equal(kickerOf(keeper, first), `Step 1 of ${keeper.steps.length} · ${STEPS.find((s) => s.id === first).title}`);
+  assert.equal(hashOfStep(first, keeper), "#step-1");
+  assert.equal(stepOfHash("#step-1", keeper), first);
+  assert.deepEqual(dotsOf(keeper, first), ["now", ...Array(keeper.steps.length - 1).fill("")]);
+  assert.equal(dotsOf(keeper, "review").length, keeper.steps.length, "the look-over got a dot of its own");
+  assert.ok(dotsOf(keeper, "review").every((d) => d === "done"));
+  const plan = planFor(DECLARE_F22, { act: "declare" });
+  for (const [i, id] of plan.steps.entries()) {
+    assert.equal(hashOfStep(id, plan), `#step-${i + 1}`);
+    assert.equal(dotsOf(plan, id).length, plan.steps.length);
+    assert.equal(dotsOf(plan, id).indexOf("now"), i);
+    assert.match(kickerOf(plan, id), new RegExp(`^Step ${i + 1} of ${plan.steps.length} · `));
+  }
+});
+
+test("(1) the page's own pieces are its boxes: one ghost per piece, a word from her for each, and the step's pieces lit", () => {
+  // Darko, 2026-11-26: "we should just allow form filling directly in the preview shape of the resident form itself" and "The hints come from
+  // her". CAN FAIL: give a slot a placeholder that isn't the page's ghost (the old "Quillon" box under "Your agent's name"), or drop her word.
+  const plan = planFor(DECLARE_F22, { act: "declare" });
+  const slots = ["agent", "handle", "runtime", "architecture", "since", "line", "bio", "full_address", "pronouns", "color", "color_name"];
+  for (const id of slots) {
+    assert.ok(CONCEPT[id].ghost, `${id} has no ghost`);
+    assert.equal(plan.pieces[id].placeholder, CONCEPT[id].ghost, `${id}'s box says something other than the page's ghost`);
+    assert.ok(plan.pieces[id].say.length > 20, `she has nothing to say about ${id}`);
+  }
+  assert.equal(CONCEPT.agent.ghost, "Your agent's name");
+  // every lit piece is a slot of its step (or the picture, filled from the drawer)
+  for (const s of STEPS) for (const id of s.lit) assert.ok(id === "picture" || (slots.includes(id) && CONCEPT[id].step === s.id), `${s.id} lights ${id}`);
+  // on the berth's road she says the berth's rule when the reader is in the handle
+  assert.match(plan.pieces.handle.say, /2–31/);
+  // the problem beside a piece: too long at once; "needed" only once the reader has been stopped for it
+  assert.equal(pieceProblem(plan, "handle", { handle: "" }), null);
+  assert.equal(pieceProblem(plan, "handle", { handle: "" }, { missing: true }).kind, "missing");
+  assert.equal(pieceProblem(plan, "bio", { bio: "x".repeat(401) }).kind, "over");
+  assert.equal(pieceProblem(plan, "color", { color: "blue" }).kind, "unreadable");
+  assert.equal(pieceProblem(plan, "line", { line: "fine" }), null);
 });
 
 test("(1) the join's blank page IS the resident page's own pieces, inside .rpage hosts, with no copy of their markup or rules", () => {
@@ -90,9 +150,15 @@ test("(1) the join's blank page IS the resident page's own pieces, inside .rpage
   for (const c of ["ResidentFace", "AddressCardFace", "ResidentField", "ProfileEditorFields"])
     assert.match(page, new RegExp(`^import ${c} from "@/components/resident/${c}\\.astro";$`, "m"), `the join no longer draws ${c}`);
   assert.match(page, /^import "@\/styles\/resident-page\.css";$/m);
-  assert.match(page, /<div class="rpage jd-page" data-blank-page hidden>\s*<ResidentFace face=\{BLANK_FACE\} draft=\{GHOST\}>/);
+  assert.match(page, /<div class="rpage jd-page" data-blank-page hidden>\s*<ResidentFace face=\{BLANK_FACE\} draft=\{DRAFT\}>/);
   assert.match(page, /<AddressCardFace name="" draft=\{/);
-  assert.match(page, /<ProfileEditorFields handle="join" piece fields=\{\["color", "color_name", "pronouns"\]\} \/>/);
+  // the picture row is the editor's own, in the drawer; colour, its name and the pronouns are the page's own boxes now (Darko, 2026-11-26)
+  assert.match(page, /<ProfileEditorFields handle="join" piece fields=\{\[\]\} \/>/);
+  assert.match(page, /<DraftSlot name="full_address" /);
+  // no separate form for the page's pieces: the one list the page draws as ResidentFields is the drawer's appearance (CAN FAIL: draw the old
+  // step 2 or 3 field lists under the page again)
+  const lists = [...page.matchAll(/\{\[([^\]]*)\]\.map\(\(id\) => \(\s*<ResidentField/g)].map((m) => m[1].replace(/\s/g, ""));
+  assert.deepEqual(lists, ['"glance","glance_value","sign","sign_slot","sign_value"']);
   for (const copy of ['class="profile-bubble"', 'class="profile-avatar"', 'class="bcard-kind"', "rp-", ".profile-bubble {", ".bcard {", ".profile-edit-grid {"])
     assert.ok(!page.includes(copy), `the join carries its own copy of the page's ${copy}`);
 });
