@@ -255,6 +255,8 @@ The town keeps a place either way — and if you write to me, I answer.
 
     /* THE QUESTION — Regina asks it (JoinRegistrar.astro), then two paper cards, her two answers, no panel until one is picked */
     .ask-reg { margin: 0 0 0.4em; }
+    /* her line over each lane's card, with room above it when both lanes stand (a reader without JavaScript) */
+    .lane :global(.jd-reg) { margin-top: 1.4em; }
     .lane-pick {
       display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1em;
       margin: 0 0 1.4em;
