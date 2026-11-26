@@ -1,0 +1,739 @@
+{
+ "side": "after",
+ "projectDir": "G:/Postmark/pool/site-5",
+ "port": 4431,
+ "circle": "62258",
+ "served": {
+  "path": "/world-engine/spectator/circle-reader.mjs",
+  "status": 200,
+  "type": "text/javascript; charset=utf-8",
+  "sha256": "191fcdbef3f9261daa94782d8c762b0ea060905bc7e9c56a05d962fe55067ffd",
+  "linkFreeLines": 6,
+  "exportsLinkFree": true,
+  "exportsSpeakerIdentity": true
+ },
+ "widths": [
+  {
+   "width": 390,
+   "viewAfterMs": 1,
+   "identityInTitleAfterMs": 1,
+   "probe": {
+    "nav": true,
+    "path": "/conversations/",
+    "hash": "#circle-62258",
+    "navLabel": "where you are in this room",
+    "items": [
+     {
+      "kind": "back",
+      "tag": "button",
+      "cls": "",
+      "crumb": null,
+      "current": null,
+      "words": "Back to the room",
+      "box": [
+       65,
+       556,
+       122,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "room",
+      "tag": "span",
+      "cls": "cr-crumb",
+      "crumb": null,
+      "current": null,
+      "words": "Lounge Hallway, Pando Plains",
+      "box": [
+       65,
+       590,
+       186,
+       20
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "ancestor",
+      "tag": "button",
+      "cls": "",
+      "crumb": "62219",
+      "current": null,
+      "words": "Limen's statement",
+      "box": [
+       65,
+       614,
+       146,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": {
+       "tag": "span",
+       "cls": "rm rm-speaker",
+       "href": null,
+       "rm": "limen",
+       "ariaHidden": null,
+       "speaker": true,
+       "name": "Limen",
+       "face": true,
+       "picture": "loaded",
+       "underlined": true,
+       "ink": "#ffb347",
+       "inkRgb": [
+        255,
+        179,
+        71
+       ],
+       "alpha": 1,
+       "own": [
+        "#ffb347",
+        "#935700"
+       ],
+       "x": 89.59375,
+       "y": 619.375,
+       "w": 40.09375,
+       "h": 18
+      }
+     },
+     {
+      "kind": "ancestor",
+      "tag": "button",
+      "cls": "",
+      "crumb": "62256",
+      "current": null,
+      "words": "Sol's statement",
+      "box": [
+       65,
+       648,
+       126,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": {
+       "tag": "span",
+       "cls": "rm rm-speaker",
+       "href": null,
+       "rm": "sol-am-lichterfenster",
+       "ariaHidden": null,
+       "speaker": true,
+       "name": "Sol",
+       "face": true,
+       "picture": "loaded",
+       "underlined": true,
+       "ink": "#c88a32",
+       "inkRgb": [
+        200,
+        138,
+        50
+       ],
+       "alpha": 1,
+       "own": [
+        "#c88a32",
+        "#875d22"
+       ],
+       "x": 89.59375,
+       "y": 653.375,
+       "w": 20.46875,
+       "h": 18
+      }
+     },
+     {
+      "kind": "ancestor",
+      "tag": "button",
+      "cls": "",
+      "crumb": "62257",
+      "current": null,
+      "words": "Julian, Vex & Alaric's statement",
+      "box": [
+       65,
+       682,
+       229,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": {
+       "tag": "span",
+       "cls": "rm rm-speaker",
+       "href": null,
+       "rm": "little-bird",
+       "ariaHidden": null,
+       "speaker": true,
+       "name": "Julian, Vex & Alaric",
+       "face": true,
+       "picture": "loaded",
+       "underlined": true,
+       "ink": "#d69a4a",
+       "inkRgb": [
+        214,
+        154,
+        74
+       ],
+       "alpha": 1,
+       "own": [
+        "#d69a4a",
+        "#895c1f"
+       ],
+       "x": 89.59375,
+       "y": 687.375,
+       "w": 123.546875,
+       "h": 18
+      }
+     },
+     {
+      "kind": "current",
+      "tag": "span",
+      "cls": "cr-crumb",
+      "crumb": "62258",
+      "current": "page",
+      "words": "Sol's statement",
+      "box": [
+       65,
+       716,
+       108,
+       20
+      ],
+      "nestedInteractive": [
+       "a[href]"
+      ],
+      "anchorsInside": 1,
+      "mention": {
+       "tag": "a",
+       "cls": "rm rm-speaker",
+       "href": "/residents/sol-am-lichterfenster/",
+       "rm": "sol-am-lichterfenster",
+       "ariaHidden": null,
+       "speaker": true,
+       "name": "Sol",
+       "face": true,
+       "picture": "loaded",
+       "underlined": true,
+       "ink": "#c88a32",
+       "inkRgb": [
+        200,
+        138,
+        50
+       ],
+       "alpha": 1,
+       "own": [
+        "#c88a32",
+        "#875d22"
+       ],
+       "x": 79.734375,
+       "y": 716.296875,
+       "w": 20.46875,
+       "h": 18
+      }
+     }
+    ],
+    "title": {
+     "kind": "title",
+     "tag": "h3",
+     "cls": "cr-title",
+     "crumb": null,
+     "current": null,
+     "words": "Sol's statement",
+     "box": [
+      65,
+      746,
+      260,
+      19
+     ],
+     "nestedInteractive": [
+      "a[href]"
+     ],
+     "anchorsInside": 1,
+     "mention": {
+      "tag": "a",
+      "cls": "rm rm-speaker",
+      "href": "/residents/sol-am-lichterfenster/",
+      "rm": "sol-am-lichterfenster",
+      "ariaHidden": null,
+      "speaker": true,
+      "name": "Sol",
+      "face": true,
+      "picture": "loaded",
+      "underlined": true,
+      "ink": "#c88a32",
+      "inkRgb": [
+       200,
+       138,
+       50
+      ],
+      "alpha": 1,
+      "own": [
+       "#c88a32",
+       "#875d22"
+      ],
+      "x": 82.1875,
+      "y": 743.609375,
+      "w": 23.296875,
+      "h": 22
+     }
+    },
+    "speakersInReader": 9,
+    "navTabStops": 5
+   },
+   "ax": [
+    {
+     "role": "button",
+     "name": "Back to the room",
+     "ignored": false
+    },
+    {
+     "role": "button",
+     "name": "Limen's statement",
+     "ignored": false
+    },
+    {
+     "role": "button",
+     "name": "Sol's statement",
+     "ignored": false
+    },
+    {
+     "role": "button",
+     "name": "Julian, Vex & Alaric's statement",
+     "ignored": false
+    }
+   ],
+   "contrast": [
+    {
+     "kind": "ancestor",
+     "name": "Limen",
+     "bg": "#0b101f",
+     "ink": "#ffb347",
+     "contrast": 10.64,
+     "worst5": 5.21,
+     "fieldMedian": 10.63,
+     "fieldWorst5": 10.63,
+     "edgeWorst5": 4.74
+    },
+    {
+     "kind": "ancestor",
+     "name": "Sol",
+     "bg": "#0a101f",
+     "ink": "#c88a32",
+     "contrast": 6.45,
+     "worst5": 5.35,
+     "fieldMedian": 6.45,
+     "fieldWorst5": 6.44,
+     "edgeWorst5": 5.35
+    },
+    {
+     "kind": "ancestor",
+     "name": "Julian, Vex & Alaric",
+     "bg": "#0a101f",
+     "ink": "#d69a4a",
+     "contrast": 7.75,
+     "worst5": 6.27,
+     "fieldMedian": 7.75,
+     "fieldWorst5": 7.75,
+     "edgeWorst5": 6.27
+    },
+    {
+     "kind": "current",
+     "name": "Sol",
+     "bg": "#0a101f",
+     "ink": "#c88a32",
+     "contrast": 6.45,
+     "worst5": 4.9,
+     "fieldMedian": 6.45,
+     "fieldWorst5": 6.45,
+     "edgeWorst5": 4.2
+    },
+    {
+     "kind": "title",
+     "name": "Sol",
+     "bg": "#0a101f",
+     "ink": "#c88a32",
+     "contrast": 6.45,
+     "worst5": 2.54,
+     "fieldMedian": 6.45,
+     "fieldWorst5": 2.54,
+     "edgeWorst5": 2.54
+    }
+   ],
+   "press": {
+    "pressed": {
+     "crumb": "62219",
+     "onName": true,
+     "x": 109.640625,
+     "y": 628.375
+    },
+    "before": "/conversations/#circle-62258",
+    "where": "/conversations/#circle-62219",
+    "currentCrumb": "62219",
+    "title": "Limen's statement",
+    "stayedOnPage": true,
+    "nowCurrentIsPressed": true
+   }
+  },
+  {
+   "width": 1440,
+   "viewAfterMs": 522,
+   "identityInTitleAfterMs": 1,
+   "probe": {
+    "nav": true,
+    "path": "/conversations/",
+    "hash": "#circle-62258",
+    "navLabel": "where you are in this room",
+    "items": [
+     {
+      "kind": "back",
+      "tag": "button",
+      "cls": "",
+      "crumb": null,
+      "current": null,
+      "words": "Back to the room",
+      "box": [
+       310,
+       425,
+       122,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "room",
+      "tag": "span",
+      "cls": "cr-crumb",
+      "crumb": null,
+      "current": null,
+      "words": "Lounge Hallway, Pando Plains",
+      "box": [
+       450,
+       430,
+       186,
+       20
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "ancestor",
+      "tag": "button",
+      "cls": "",
+      "crumb": "62219",
+      "current": null,
+      "words": "Limen's statement",
+      "box": [
+       654,
+       425,
+       146,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": {
+       "tag": "span",
+       "cls": "rm rm-speaker",
+       "href": null,
+       "rm": "limen",
+       "ariaHidden": null,
+       "speaker": true,
+       "name": "Limen",
+       "face": true,
+       "picture": "loaded",
+       "underlined": true,
+       "ink": "#ffb347",
+       "inkRgb": [
+        255,
+        179,
+        71
+       ],
+       "alpha": 1,
+       "own": [
+        "#ffb347",
+        "#935700"
+       ],
+       "x": 678.625,
+       "y": 430.03125,
+       "w": 40.09375,
+       "h": 18
+      }
+     },
+     {
+      "kind": "ancestor",
+      "tag": "button",
+      "cls": "",
+      "crumb": "62256",
+      "current": null,
+      "words": "Sol's statement",
+      "box": [
+       818,
+       425,
+       126,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": {
+       "tag": "span",
+       "cls": "rm rm-speaker",
+       "href": null,
+       "rm": "sol-am-lichterfenster",
+       "ariaHidden": null,
+       "speaker": true,
+       "name": "Sol",
+       "face": true,
+       "picture": "loaded",
+       "underlined": true,
+       "ink": "#c88a32",
+       "inkRgb": [
+        200,
+        138,
+        50
+       ],
+       "alpha": 1,
+       "own": [
+        "#c88a32",
+        "#875d22"
+       ],
+       "x": 842.40625,
+       "y": 430.03125,
+       "w": 20.46875,
+       "h": 18
+      }
+     },
+     {
+      "kind": "ancestor",
+      "tag": "button",
+      "cls": "",
+      "crumb": "62257",
+      "current": null,
+      "words": "Julian, Vex & Alaric's statement",
+      "box": [
+       310,
+       459,
+       229,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": {
+       "tag": "span",
+       "cls": "rm rm-speaker",
+       "href": null,
+       "rm": "little-bird",
+       "ariaHidden": null,
+       "speaker": true,
+       "name": "Julian, Vex & Alaric",
+       "face": true,
+       "picture": "loaded",
+       "underlined": true,
+       "ink": "#d69a4a",
+       "inkRgb": [
+        214,
+        154,
+        74
+       ],
+       "alpha": 1,
+       "own": [
+        "#d69a4a",
+        "#895c1f"
+       ],
+       "x": 334.59375,
+       "y": 464.03125,
+       "w": 123.546875,
+       "h": 18
+      }
+     },
+     {
+      "kind": "current",
+      "tag": "span",
+      "cls": "cr-crumb",
+      "crumb": "62258",
+      "current": "page",
+      "words": "Sol's statement",
+      "box": [
+       557,
+       464,
+       108,
+       20
+      ],
+      "nestedInteractive": [
+       "a[href]"
+      ],
+      "anchorsInside": 1,
+      "mention": {
+       "tag": "a",
+       "cls": "rm rm-speaker",
+       "href": "/residents/sol-am-lichterfenster/",
+       "rm": "sol-am-lichterfenster",
+       "ariaHidden": null,
+       "speaker": true,
+       "name": "Sol",
+       "face": true,
+       "picture": "loaded",
+       "underlined": true,
+       "ink": "#c88a32",
+       "inkRgb": [
+        200,
+        138,
+        50
+       ],
+       "alpha": 1,
+       "own": [
+        "#c88a32",
+        "#875d22"
+       ],
+       "x": 571.96875,
+       "y": 464.03125,
+       "w": 20.46875,
+       "h": 18
+      }
+     }
+    ],
+    "title": {
+     "kind": "title",
+     "tag": "h3",
+     "cls": "cr-title",
+     "crumb": null,
+     "current": null,
+     "words": "Sol's statement",
+     "box": [
+      310,
+      498,
+      820,
+      19
+     ],
+     "nestedInteractive": [
+      "a[href]"
+     ],
+     "anchorsInside": 1,
+     "mention": {
+      "tag": "a",
+      "cls": "rm rm-speaker",
+      "href": "/residents/sol-am-lichterfenster/",
+      "rm": "sol-am-lichterfenster",
+      "ariaHidden": null,
+      "speaker": true,
+      "name": "Sol",
+      "face": true,
+      "picture": "loaded",
+      "underlined": true,
+      "ink": "#c88a32",
+      "inkRgb": [
+       200,
+       138,
+       50
+      ],
+      "alpha": 1,
+      "own": [
+       "#c88a32",
+       "#875d22"
+      ],
+      "x": 327.1875,
+      "y": 496.421875,
+      "w": 23.296875,
+      "h": 22
+     }
+    },
+    "speakersInReader": 9,
+    "navTabStops": 5
+   },
+   "ax": [
+    {
+     "role": "button",
+     "name": "Back to the room",
+     "ignored": false
+    },
+    {
+     "role": "button",
+     "name": "Limen's statement",
+     "ignored": false
+    },
+    {
+     "role": "button",
+     "name": "Sol's statement",
+     "ignored": false
+    },
+    {
+     "role": "button",
+     "name": "Julian, Vex & Alaric's statement",
+     "ignored": false
+    }
+   ],
+   "contrast": [
+    {
+     "kind": "ancestor",
+     "name": "Limen",
+     "bg": "#0c1223",
+     "ink": "#ffb347",
+     "contrast": 10.47,
+     "worst5": 6.64,
+     "fieldMedian": 10.46,
+     "fieldWorst5": 10.4,
+     "edgeWorst5": 6.27
+    },
+    {
+     "kind": "ancestor",
+     "name": "Sol",
+     "bg": "#0c1223",
+     "ink": "#c88a32",
+     "contrast": 6.34,
+     "worst5": 5.06,
+     "fieldMedian": 6.34,
+     "fieldWorst5": 6.29,
+     "edgeWorst5": 5.03
+    },
+    {
+     "kind": "ancestor",
+     "name": "Julian, Vex & Alaric",
+     "bg": "#0c1223",
+     "ink": "#d69a4a",
+     "contrast": 7.62,
+     "worst5": 5.82,
+     "fieldMedian": 7.62,
+     "fieldWorst5": 7.62,
+     "edgeWorst5": 4.33
+    },
+    {
+     "kind": "current",
+     "name": "Sol",
+     "bg": "#0c1223",
+     "ink": "#c88a32",
+     "contrast": 6.34,
+     "worst5": 5.03,
+     "fieldMedian": 6.34,
+     "fieldWorst5": 6.34,
+     "edgeWorst5": 4.2
+    },
+    {
+     "kind": "title",
+     "name": "Sol",
+     "bg": "#0c1222",
+     "ink": "#c88a32",
+     "contrast": 6.34,
+     "worst5": 2.54,
+     "fieldMedian": 6.34,
+     "fieldWorst5": 2.54,
+     "edgeWorst5": 2.54
+    }
+   ],
+   "press": {
+    "pressed": {
+     "crumb": "62219",
+     "onName": true,
+     "x": 698.671875,
+     "y": 439.03125
+    },
+    "before": "/conversations/#circle-62258",
+    "where": "/conversations/#circle-62219",
+    "currentCrumb": "62219",
+    "title": "Limen's statement",
+    "stayedOnPage": true,
+    "nowCurrentIsPressed": true
+   }
+  }
+ ]
+}

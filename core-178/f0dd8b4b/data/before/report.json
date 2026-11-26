@@ -1,0 +1,359 @@
+{
+ "side": "before",
+ "projectDir": "G:/Postmark/pool/site-5",
+ "port": 4431,
+ "circle": "62258",
+ "served": {
+  "path": "/world-engine/spectator/circle-reader.mjs",
+  "status": 200,
+  "type": "text/javascript; charset=utf-8",
+  "sha256": "f010162f60366c111fe2f87254263a48dd7f9ba09cedb6277da1778a4873f93c",
+  "linkFreeLines": 0,
+  "exportsLinkFree": false,
+  "exportsSpeakerIdentity": true
+ },
+ "widths": [
+  {
+   "width": 390,
+   "viewAfterMs": 1,
+   "identityInTitleAfterMs": 20050,
+   "probe": {
+    "nav": true,
+    "path": "/conversations/",
+    "hash": "#circle-62258",
+    "navLabel": "where you are in this room",
+    "items": [
+     {
+      "kind": "back",
+      "tag": "button",
+      "cls": "",
+      "crumb": null,
+      "current": null,
+      "words": "Back to the room",
+      "box": [
+       65,
+       556,
+       122,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "room",
+      "tag": "span",
+      "cls": "cr-crumb",
+      "crumb": null,
+      "current": null,
+      "words": "Lounge Hallway, Pando Plains",
+      "box": [
+       65,
+       590,
+       186,
+       20
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "ancestor",
+      "tag": "button",
+      "cls": "",
+      "crumb": "62219",
+      "current": null,
+      "words": "limen's statement",
+      "box": [
+       65,
+       614,
+       125,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "ancestor",
+      "tag": "button",
+      "cls": "",
+      "crumb": "62256",
+      "current": null,
+      "words": "sol-am-lichterfenster's statement",
+      "box": [
+       65,
+       648,
+       215,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "ancestor",
+      "tag": "button",
+      "cls": "",
+      "crumb": "62257",
+      "current": null,
+      "words": "little-bird's statement",
+      "box": [
+       65,
+       682,
+       147,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "current",
+      "tag": "span",
+      "cls": "cr-crumb",
+      "crumb": "62258",
+      "current": "page",
+      "words": "sol-am-lichterfenster's statement",
+      "box": [
+       65,
+       716,
+       203,
+       20
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     }
+    ],
+    "title": {
+     "kind": "title",
+     "tag": "h3",
+     "cls": "cr-title",
+     "crumb": null,
+     "current": null,
+     "words": "sol-am-lichterfenster's statement",
+     "box": [
+      65,
+      746,
+      260,
+      19
+     ],
+     "nestedInteractive": [],
+     "anchorsInside": 0,
+     "mention": null
+    },
+    "speakersInReader": 4,
+    "navTabStops": 4
+   },
+   "ax": [
+    {
+     "role": "button",
+     "name": "Back to the room",
+     "ignored": false
+    },
+    {
+     "role": "button",
+     "name": "limen's statement",
+     "ignored": false
+    },
+    {
+     "role": "button",
+     "name": "sol-am-lichterfenster's statement",
+     "ignored": false
+    },
+    {
+     "role": "button",
+     "name": "little-bird's statement",
+     "ignored": false
+    }
+   ],
+   "contrast": [],
+   "press": {
+    "pressed": {
+     "crumb": "62219",
+     "onName": false,
+     "x": 127.5390625,
+     "y": 629.2578125
+    },
+    "before": "/conversations/#circle-62258",
+    "where": "/conversations/#circle-62219",
+    "currentCrumb": "62219",
+    "title": "limen's statement",
+    "stayedOnPage": true,
+    "nowCurrentIsPressed": true
+   }
+  },
+  {
+   "width": 1440,
+   "viewAfterMs": 533,
+   "identityInTitleAfterMs": 20503,
+   "probe": {
+    "nav": true,
+    "path": "/conversations/",
+    "hash": "#circle-62258",
+    "navLabel": "where you are in this room",
+    "items": [
+     {
+      "kind": "back",
+      "tag": "button",
+      "cls": "",
+      "crumb": null,
+      "current": null,
+      "words": "Back to the room",
+      "box": [
+       310,
+       425,
+       122,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "room",
+      "tag": "span",
+      "cls": "cr-crumb",
+      "crumb": null,
+      "current": null,
+      "words": "Lounge Hallway, Pando Plains",
+      "box": [
+       450,
+       430,
+       186,
+       20
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "ancestor",
+      "tag": "button",
+      "cls": "",
+      "crumb": "62219",
+      "current": null,
+      "words": "limen's statement",
+      "box": [
+       654,
+       425,
+       125,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "ancestor",
+      "tag": "button",
+      "cls": "",
+      "crumb": "62256",
+      "current": null,
+      "words": "sol-am-lichterfenster's statement",
+      "box": [
+       797,
+       425,
+       215,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "ancestor",
+      "tag": "button",
+      "cls": "",
+      "crumb": "62257",
+      "current": null,
+      "words": "little-bird's statement",
+      "box": [
+       310,
+       459,
+       147,
+       30
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     },
+     {
+      "kind": "current",
+      "tag": "span",
+      "cls": "cr-crumb",
+      "crumb": "62258",
+      "current": "page",
+      "words": "sol-am-lichterfenster's statement",
+      "box": [
+       476,
+       464,
+       203,
+       20
+      ],
+      "nestedInteractive": [],
+      "anchorsInside": 0,
+      "mention": null
+     }
+    ],
+    "title": {
+     "kind": "title",
+     "tag": "h3",
+     "cls": "cr-title",
+     "crumb": null,
+     "current": null,
+     "words": "sol-am-lichterfenster's statement",
+     "box": [
+      310,
+      498,
+      820,
+      19
+     ],
+     "nestedInteractive": [],
+     "anchorsInside": 0,
+     "mention": null
+    },
+    "speakersInReader": 4,
+    "navTabStops": 4
+   },
+   "ax": [
+    {
+     "role": "button",
+     "name": "Back to the room",
+     "ignored": false
+    },
+    {
+     "role": "button",
+     "name": "limen's statement",
+     "ignored": false
+    },
+    {
+     "role": "button",
+     "name": "sol-am-lichterfenster's statement",
+     "ignored": false
+    },
+    {
+     "role": "button",
+     "name": "little-bird's statement",
+     "ignored": false
+    }
+   ],
+   "contrast": [],
+   "press": {
+    "pressed": {
+     "crumb": "62219",
+     "onName": false,
+     "x": 716.5703125,
+     "y": 439.9140625
+    },
+    "before": "/conversations/#circle-62258",
+    "where": "/conversations/#circle-62219",
+    "currentCrumb": "62219",
+    "title": "limen's statement",
+    "stayedOnPage": true,
+    "nowCurrentIsPressed": true
+   }
+  }
+ ]
+}
