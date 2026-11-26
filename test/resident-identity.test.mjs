@@ -63,6 +63,58 @@ test("CONTRACT: a FRESH element per call, so a reader never moves one statement'
   assert.notEqual(a.children[0], b.children[0]);
 });
 
+// CORE-178 for WLD-256 (Facet's settled contract): World's breadcrumb is already a button, so it asks `identityForSpeaker(handle, { link: false })` for
+// the same identity as a span, with no anchor nested in its control. ONLY an explicit `false` opts out; every other call draws today's linked identity.
+const shape = (n) => (n.children ? { tag: n.tag, attrs: { ...n.attrs }, children: n.children.map(shape) } : { text: n.textContent });
+const withoutHref = (s) => { const { href, ...attrs } = s.attrs; return { ...s, attrs }; };
+test("WLD-256: link:false gives the same identity as a fresh accessible span, no anchor, no href; nothing else changes", () => {
+  const linked = provide("wren-alder");
+  const plain = provide("wren-alder", { link: false });
+  assert.equal(plain.tag, "span", "a span, to sit inside World's breadcrumb button");
+  assert.equal(plain.attrs.href, undefined, "no href");
+  const anchors = (n) => (n.tag === "a" ? 1 : 0) + (n.children ?? []).reduce((s, c) => s + anchors(c), 0);
+  assert.equal(anchors(plain), 0, "no anchor anywhere inside it");
+  assert.equal(plain.attrs["aria-hidden"], undefined, "still a whole accessible identity, never aria-hidden");
+  assert.equal(heard(plain), heard(linked), "a screen reader hears the same name");
+  // the same name, face, colour (ink variables), underline (the name's class) and recorded handle: the only difference is the tag and the href
+  assert.deepEqual({ ...shape(plain), tag: "a" }, withoutHref(shape(linked)), "identical apart from the anchor and its href");
+  // a renamed resident: the current identity, the recorded handle kept, under both forms
+  const aliased = identityProvider(doc, () => FACES, { aliases: { "wren-old": "wren-alder" } });
+  const a1 = aliased("wren-old"), a2 = aliased("wren-old", { link: false });
+  assert.equal(a2.attrs["data-rm"], "wren-old", "the recorded handle is kept");
+  assert.equal(heard(a2), "Wren Alder", "the current name");
+  assert.deepEqual({ ...shape(a2), tag: "a" }, withoutHref(shape(a1)));
+  // fresh every call
+  const p2 = provide("wren-alder", { link: false });
+  assert.notEqual(plain, p2); assert.notEqual(plain.children[0], p2.children[0]);
+});
+
+test("WLD-256: one argument, no options, {} and { link: true } (and anything but an explicit false) draw exactly today's linked identity", () => {
+  const today = shape(provide("wren-alder"));
+  for (const opts of [undefined, {}, { link: true }, { link: "false" }, { link: 0 }, { link: null }, null, "x"]) {
+    assert.deepEqual(shape(provide("wren-alder", opts)), today, `${JSON.stringify(opts)}: unchanged`);
+  }
+  assert.equal(provide("wren-alder").attrs.href, "/residents/wren-alder/");
+  // the floors do not move under the option
+  for (const opts of [undefined, { link: false }]) {
+    assert.equal(identityProvider(doc, () => ({ "human-of-fox": { name: "Fox" } }))("human-of-fox", opts), null, "a house's human: null");
+    assert.equal(provide("never-was", opts), null, "unknown: null");
+    assert.equal(identityProvider(doc, () => null)("wren-alder", opts), null, "faces not landed: null");
+    assert.equal(identityProvider({ createElement() { throw new Error("no dom"); } }, () => FACES)("wren-alder", opts), null, "a failure: null, never a throw");
+  }
+});
+
+test("WLD-256: every Site caller hands the provider on by reference, so World's second argument reaches it (no one-argument wrapper)", () => {
+  const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.match(read("../src/lib/circle-reader-mount.mjs"), /\.\.\.\(typeof identityForSpeaker === "function" \? \{ identityForSpeaker \} : \{\}\)/, "mountRoom passes the function itself");
+  assert.match(read("../src/lib/world-identity.mjs"), /mod\.setViewerIdentityForSpeaker\(app, identityProvider\(/, "the World page sets the provider itself");
+  assert.match(read("../town/pages/conversations/index.astro"), /\{ identityForSpeaker: identityProvider\(document, speakerFaces,/);
+  assert.match(read("../town/pages/events/[host]/[slug].astro"), /identityForSpeaker: speakerIdentity \}\)/);
+  for (const f of ["../src/lib/circle-reader-mount.mjs", "../src/lib/world-identity.mjs", "../town/pages/conversations/index.astro", "../town/pages/events/[host]/[slug].astro"]) {
+    assert.doesNotMatch(read(f), /identityForSpeaker\s*[:=]\s*\(\s*\w+\s*\)\s*=>/, `${f}: no one-argument wrapper around the provider`);
+  }
+});
+
 test("the deliberate human handling: a house's human gets null, so the reader keeps its own path (never a resident's picture, colour or page)", () => {
   const withHuman = identityProvider(doc, () => ({ ...FACES, "human-of-fox": { name: "Fox", avatar: "/media/x.jpg", color: "#123456" } }));
   assert.equal(withHuman("human-of-fox"), null);

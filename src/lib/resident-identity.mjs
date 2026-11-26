@@ -76,7 +76,13 @@ export function resolveHandle(handle, aliases, faces = null) {
  *   "Current name and face"); the mention keeps the recorded handle as `data-rm`.
  */
 export function identityProvider(doc, getFaces = () => null, { hrefOf = speakerHref, toFace = speakerFace, aliases = null } = {}) {
-  return function identityForSpeaker(handle) {
+  /**
+   * @param {string} handle  the speaker's handle as the record wrote it
+   * @param {{ link?: boolean }} [opts]  per call (CORE-178 for WLD-256): ONLY an explicit `{ link: false }` draws the same identity as a span, for a host
+   *   control that is already the link or button (World's breadcrumb button), so no anchor nests in it. Anything else (no second argument, `true`,
+   *   any other value) draws exactly what one argument always drew. No other mention option is exposed.
+   */
+  return function identityForSpeaker(handle, opts) {
     try {
       const h = String(handle ?? "").trim();
       if (!h || isHuman(h)) return null;
@@ -86,7 +92,7 @@ export function identityProvider(doc, getFaces = () => null, { hrefOf = speakerH
       if (!meta) return null;
       const model = mentionModel({ handle: h, face: toFace(meta), href: hrefOf(key) });
       if (model.kind !== "resident") return null;
-      return mentionNode(doc, model, { cls: "rm-speaker" });
+      return mentionNode(doc, model, opts && opts.link === false ? { cls: "rm-speaker", link: false } : { cls: "rm-speaker" });
     } catch {
       return null;
     }
