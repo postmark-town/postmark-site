@@ -618,6 +618,7 @@ test("BUILT: /sparks/ (register read OK) lists ONLY the register's Sparks, once 
   assert.doesNotMatch(gallery.match(/\.spk-grid \{[^}]*\}/)[0], /align-items:\s*start/, "the grid no longer pins cards to the top of a taller row");
   assert.match(gallery, /\.spk-cell \{[^}]*display: flex;/);
   assert.match(gallery, /\.spk-cell > :global\(\.spark-card\) \{[^}]*flex: 1 1 auto;[^}]*margin: 0;/, "a card fills its cell and has no margin of its own");
+  assert.match(gallery, /\.spk-cell > :global\(\.spark-card:not\(\.has-picture\) \.spark-recounting\) \{[^}]*line-clamp: 6;[^}]*overflow: hidden;/, "an unpictured card's recounting is clamped in the gallery, so it cannot stretch its row past its pictured neighbours");
   assert.doesNotMatch(html, /harvest-supper-pending-test|withdrawn-one-test|before-the-record-test/, "a pending/withdrawn reference is not a Spark here");
   assert.match(html, /data-spark-filters/); for (const f of SPARK_FILTERS) assert.ok(html.includes(`data-filter="${f.key}"`), f.key);
   assert.equal((html.match(/data-has-event="0"/g) ?? []).length, 2, "the register's eventless Sparks are drawn, the lamp among them");
