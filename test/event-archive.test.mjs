@@ -230,8 +230,9 @@ test("RESET BOUNDARY, through the production caller: the archive file is carried
 
 test("FAILURE FAILS THE PASS, NEVER A FALSE EMPTY: an unreadable archive and a failed save both REJECT (the short-fetch path), the unreadable file is left untouched; an absent file is a first run; a bare events.json seeds the archive with its own time", async () => {
   const home = mkdtempSync(join(tmpdir(), "core174-archive-"));
+  // the held e8/e9 reads answer 503 (a transient failure, which holds): a 404 is the office's definitive refusal, which since CORE-180 withdraws a held event (own test below)
   const run = (path, tracked = EMPTY_EVENTS) => fetchEventsArchived({ apiBase: OFFICE, retries: 1, calendar: EMPTY_CALENDAR, trackedSnapshot: tracked, eventsArchivePath: path, maxPages: 1,
-    fetchImpl: stubOffice({ pages: listPages(1), events: { "h/e0": SPARKY(0), "h/e1": SPARKY(1) } }) });
+    fetchImpl: stubOffice({ pages: listPages(1), events: { "h/e0": SPARKY(0), "h/e1": SPARKY(1) }, refuse: new Set(["h/e8", "h/e9"]) }) });
 
   // corrupt: not JSON, then JSON that is not an archive; the tracked snapshot is the EMPTY committed one (the box's state after the reset)
   for (const [name, bytes] of [["corrupt.json", "{ this is not json"], ["wrong.json", JSON.stringify({ hello: "world" })]]) {
@@ -301,10 +302,11 @@ test("stampHeld: a good read with no stamp gets the snapshot's own as_of; no as_
 test("the production entry passes the archive home through: tools/fetch-town.mjs reads POSTMARK_EVENTS_ARCHIVE, buildOfficeData hands it to fetchEventsArchived over the committed snapshot", () => {
   const entry = readFileSync(join(ROOT, "tools/fetch-town.mjs"), "utf8");
   assert.match(entry, /const EVENTS_ARCHIVE = process\.env\.POSTMARK_EVENTS_ARCHIVE \|\| null;/);
-  assert.match(entry, /buildOfficeData\(\{[^}]*letterCachePath: LETTER_CACHE, eventsArchivePath: EVENTS_ARCHIVE \}\)/);
+  assert.match(entry, /buildOfficeData\(\{[^}]*letterCachePath: LETTER_CACHE, eventsArchivePath: EVENTS_ARCHIVE, eventsSeedUrl: EVENTS_SEED_URL, lettersSeedUrl: LETTERS_SEED_URL \}\)/);
   const data = readFileSync(join(ROOT, "tools/lib/fetch-town-data.mjs"), "utf8");
-  assert.match(data, /eventsArchivePath = null,\n\} = \{\}\) \{/, "an option with a null default: unset, the bare call is unchanged");
-  assert.match(data, /await fetchEventsArchived\(\{ apiBase, fetchImpl, retries, gate, calendar, trackedSnapshot: readSnapshot\("events\.json", EMPTY_EVENTS\), eventsArchivePath \}\)/);
+  assert.match(data, /\n  eventsArchivePath = null,\n/, "an option with a null default: unset, the bare call is unchanged");
+  assert.match(data, /\n  eventsSeedUrl = null,\n[\s\S]*\n  lettersSeedUrl = null,\n\} = \{\}\) \{/, "main's seed options default null beside it: both homes are opt-in");
+  assert.match(data, /await fetchEventsArchived\(\{ apiBase, fetchImpl, retries, gate, calendar, trackedSnapshot: readSnapshot\("events\.json", EMPTY_EVENTS\), eventsArchivePath, seed: seedRead\.state === "ok" \? seedRead\.events : null \}\)/);
 });
 
 test("joinSnapshots: the archive file's events and evidence win, the committed snapshot's fill what it lacks", () => {

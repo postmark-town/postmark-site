@@ -149,8 +149,8 @@ test("EVIDENCE IS AS FRESH AS MAIN'S: every wanted event is asked every pass; a 
   const asked = [];
   const r = await run({ seed, fetchImpl: office({ events: TOWN, reads: changed, asked }) });
   assert.equal(readsOf(asked).length, 45, "every wanted event, as on main: nothing is held back");
-  assert.deepEqual(r.events.evidence["h/e5"], { read: "ok", event: changed["h/e5"] }, "the office's answer, whole: nothing of the held read is mixed in");
-  assert.equal(JSON.stringify(Object.keys(r.events.evidence["h/e5"])), JSON.stringify(["read", "event"]), "and no field is added to the entry");
+  assert.deepEqual(r.events.evidence["h/e5"], { read: "ok", event: changed["h/e5"], read_at: r.events.as_of }, "the office's answer, whole: nothing of the held read is mixed in, stamped with the time of this read");
+  assert.equal(JSON.stringify(Object.keys(r.events.evidence["h/e5"])), JSON.stringify(["read", "event", "read_at"]), "the one field added is the archive's own `read_at` (CORE-174, additive; the viewers' footer reads it)");
   assert.deepEqual(Object.keys(r.events).sort(), ["as_of", "evidence", "past"]);
 });
 
@@ -171,7 +171,7 @@ test("WITHDRAWAL vs FAILURE: a held event the office stops serving leaves the ca
     assert.equal(r.events.past.events.some((e) => e.id === "h/e41"), true, `${status}: a failure is not a withdrawal: the row stays`);
     assert.deepEqual(r.events.evidence["h/e41"], { read: "unavailable" }, `${status}: the evidence is "couldn't be read" as on main, NEVER the held read republished under this pass's time`);
     assert.notEqual(r.events.evidence["h/e41"].read, "ok");
-    assert.ok(r.gaps.some((g) => /1 of 45 one-event reads were not served, so those events' pages say their evidence couldn't be read/.test(g)), `${status}: said`);
+    assert.ok(r.gaps.some((g) => /1 of 45 one-event reads were not served, so 1 of those events' pages say their evidence couldn't be read and 0 kept/.test(g)), `${status}: said`);
     assert.equal(r.gaps.some((g) => /keep the good read/.test(g)), false, `${status}: there is no keep-the-held-read fallback to name`);
   }
   // REPEATED failure, through the actual consumer: the same transient failure pass after pass never turns into a read the office did not just give
@@ -183,7 +183,7 @@ test("WITHDRAWAL vs FAILURE: a held event the office stops serving leaves the ca
     carried = r.events;
   }
   const recovered = await run({ seed: carried, fetchImpl: office({ events: TOWN }) });
-  assert.deepEqual(recovered.events.evidence["h/e41"], { read: "ok", event: READS["h/e41"] }, "and the next answered read is the office's, whole");
+  assert.deepEqual(recovered.events.evidence["h/e41"], { read: "ok", event: READS["h/e41"], read_at: recovered.events.as_of }, "and the next answered read is the office's, whole");
   // an event the list served THIS pass is served: its refused read is `unavailable` as on main, and the row stays
   const onPage = await run({ seed, fetchImpl: office({ events: TOWN, fail: { "read h/e3": 404 } }) });
   assert.equal(onPage.events.past.events.some((e) => e.id === "h/e3"), true);
@@ -210,7 +210,7 @@ test("a failed read with none held is `unavailable` (as on main), never an empty
   const reads = { ...READS, "h/e60": evidenceOf(60) };
   const r = await run({ seed, fetchImpl: office({ events: grown, reads, fail: { "read h/e60": 503 } }) });
   assert.deepEqual(r.events.evidence["h/e60"], { read: "unavailable" });
-  assert.ok(r.gaps.some((g) => /1 of 46 one-event reads were not served, so those events' pages say their evidence couldn't be read/.test(g)), JSON.stringify(r.gaps));
+  assert.ok(r.gaps.some((g) => /1 of 46 one-event reads were not served, so 1 of those events' pages say their evidence couldn't be read and 0 kept/.test(g)), JSON.stringify(r.gaps));
   const again = [];
   const r2 = await run({ seed: r.events, fetchImpl: office({ events: grown, reads, asked: again }) });
   assert.ok(readsOf(again).includes("h/e60"));
@@ -223,7 +223,7 @@ test("PROJECTION: held rows pass through byte-identical; an answered read is the
   const r = await run({ seed, fetchImpl: office({ events: TOWN }) });
   assert.equal(JSON.stringify(seed), before);
   for (const e of TOWN) assert.deepEqual(r.events.past.events.find((x) => x.id === e.id), e, `${e.id}: the row as served`);
-  for (const e of TOWN) assert.deepEqual(r.events.evidence[e.id], { read: "ok", event: READS[e.id] }, `${e.id}: the office's answer, nothing added`);
+  for (const e of TOWN) assert.deepEqual(r.events.evidence[e.id], { read: "ok", event: READS[e.id], read_at: r.events.as_of }, `${e.id}: the office's answer, whole, plus only the archive's additive read_at`);
 });
 
 test("RESTORED after a fresh checkout: the tracked events.json is the EMPTY committed one and the seed comes from the published file over HTTP", async () => {
@@ -274,7 +274,7 @@ test("THE SEED IS OFF FOR ANOTHER OFFICE: the default is the production API's pu
   assert.equal(defaultEventsSeedUrl({ env: { POSTMARK_EVENTS_SEED_URL: "" }, ...prod }), null, "the empty string is none");
   const entry = readFileSync(join(ROOT, "tools/fetch-town.mjs"), "utf8");
   assert.match(entry, /const EVENTS_SEED_URL = defaultEventsSeedUrl\(\{ env: process\.env, api: API, defaultApi: DEFAULT_API, townBase: TOWN_BASE \}\);/);
-  assert.match(entry, /letterCachePath: LETTER_CACHE, eventsSeedUrl: EVENTS_SEED_URL, lettersSeedUrl: LETTERS_SEED_URL \}\)/);
+  assert.match(entry, /letterCachePath: LETTER_CACHE, eventsArchivePath: EVENTS_ARCHIVE, eventsSeedUrl: EVENTS_SEED_URL, lettersSeedUrl: LETTERS_SEED_URL \}\)/);
   const data = readFileSync(join(ROOT, "tools/lib/fetch-town-data.mjs"), "utf8");
   assert.match(data, /eventsSeedUrl = null,\n[^}]*lettersSeedUrl = null,\n\} = \{\}\) \{/, "options with a null default: unset, the bare call is unchanged");
   assert.match(data, /const seedRead = await readEventsSeed\(\{ url: eventsSeedUrl, fetchImpl \}\);/);

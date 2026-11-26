@@ -1422,7 +1422,7 @@ export async function fetchEvents({ apiBase, fetchImpl = fetch, retries = 3, gat
       evidence: merged.evidence,
     },
     gaps: [
-      ...(seed ? [`events.json built over the last published file (${seedRows.length} past events held there): the list was read in ${past.pages} page(s)${past.stopped ? ", stopping at the first page whose oldest event it already held" : ""}; ${asked} one-event read(s)`] : []),
+      ...(seed ? [`events.json built from the last published file (${seedRows.length} past events held): the list was read in ${past.pages} page(s)${past.stopped ? ", stopping at the first page whose oldest event it already held" : ""}; ${asked} one-event read(s), every wanted event as ever`] : []),
       ...(unavailable ? [EVENTS_GAP] : []),
       ...(withdrawn.size ? [`events.json: ${withdrawn.size} held past event(s) the office no longer serves (the list did not return them and their one-event read was refused as not found or gone) left the cache with their evidence: ${[...withdrawn].slice(0, 12).join(", ")}${withdrawn.size > 12 ? ", …" : ""}`] : []),
       ...(heldOnly.length && !withdrawn.size ? [`events.json: ${heldOnly.length} held past event(s) had their one-event read refused as not found or gone, but no read was answered this build or the list was not served, so none was taken down`] : []),
