@@ -188,8 +188,18 @@ jobs:
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           # -r without -l: a link would be skipped, never copied. --delete reaches
           # only the one folder named here; dev's webroot is never touched.
-          rsync -rz --delete --chmod=D755,F644 -e "ssh -i ~/.ssh/deploy_key" "$SRC/" "$USER@$HOST:/var/www/postmark-dev-pr/$PR/"
-          echo "published $(du -sh "$SRC" | cut -f1) to $HOST:/var/www/postmark-dev-pr/$PR/"
+          # Files byte-identical to dev's own build are hard-linked from dev's webroot
+          # on the box (link-dest resolves there), not copied: a preview adds only
+          # what differs. --checksum because the runner's fresh mtimes would defeat the
+          # size-and-mtime match. dev's deploy replaces files by temp-and-rename, so a
+          # linked preview keeps the old inode; nothing in dev's webroot is written.
+          rsync -rz --delete --checksum --stats --chmod=D755,F644 \
+            --link-dest=/var/www/postmark-dev-site/ \
+            -e "ssh -i ~/.ssh/deploy_key" "$SRC/" "$USER@$HOST:/var/www/postmark-dev-pr/$PR/"
+          echo "published to $HOST:/var/www/postmark-dev-pr/$PR/ (build size $(du -sh "$SRC" | cut -f1))"
+          # du counts a shared inode once, so the second line is the disk this preview
+          # adds beyond dev's webroot.
+          ssh -i ~/.ssh/deploy_key "$USER@$HOST" "du -sh /var/www/postmark-dev-site /var/www/postmark-dev-pr/$PR"
 
   remove:
     if: ${{ github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
