@@ -194,3 +194,31 @@ test("both slots are private in the component, so the public CSS hides them too"
   const needsBox = src.indexOf("data-hd-needs-box");
   assert.ok(feed > 0 && feed < boat && boat < needsBox, "the next boat is under the feed, before Needs you");
 });
+
+// UI-40 (postmark#4679, the FIX at 0e0b1983): the stance count's uncertainty note is an `.hd-empty` line INSIDE the paper card. The inherited `.hd-empty`
+// inks are built for the dark page, so on the cream they were a ghost (~1.3:1), and in the all-unavailable scene that note is the card's only content.
+// Both real consumers give it the card's own ink, as the card's meta line: the default Hearth (hearth-host.css) and the dashboard (HouseDashboard.astro).
+test("the notice inside Needs you reads on the card's paper, in both consumers (4.5:1 from the stylesheets' own values; the old inks fail)", () => {
+  const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
+  const hearth = read("../src/components/hearth/hearth-host.css"), dash = read("../src/components/household-dashboard/HouseDashboard.astro"), pm = read("../src/styles/postmark.css");
+  const token = (src, name) => new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`).exec(src)?.[1];
+  const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const L = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  const ratio = (a, b) => { const [x, y] = [L(a), L(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+  const over = (fg, bg, alpha) => fg.map((c, i) => alpha * c + (1 - alpha) * bg[i]);
+  // the default Hearth: the note takes the card's ink (inherit = --hx-paper-ink) at the meta line's 0.75, on --hx-paper
+  assert.match(hearth, /^\.hearth-stage \.hd-needs \.hd-empty \{ color: inherit; opacity: 0\.75; \}$/m, "the Hearth's paper card gives its note the card's ink");
+  const hxPaper = rgb(token(hearth, "--hx-paper")), hxInk = rgb(token(hearth, "--hx-paper-ink"));
+  assert.ok(ratio(over(hxInk, hxPaper, 0.75), hxPaper) >= 4.5, `the Hearth note is ${ratio(over(hxInk, hxPaper, 0.75), hxPaper).toFixed(2)}:1`);
+  // control: the inherited Hearth note (--hx-ink at 0.8) is what failed on this paper
+  assert.ok(ratio(over(rgb(token(hearth, "--hx-ink")), hxPaper, 0.8), hxPaper) < 2, "the old Hearth ink on the paper was a ghost");
+  // the dashboard: the card's soft ink, as its .hd-meta, on --pm-paper
+  assert.match(dash, /\.hd-needs :global\(\.hd-empty\) \{ color: var\(--pm-ink-soft\); \}/, "the dashboard's paper card gives its note the card's soft ink");
+  const paper = rgb(token(pm, "--pm-paper"));
+  assert.ok(ratio(rgb(token(pm, "--pm-ink-soft")), paper) >= 4.5, `the dashboard note is ${ratio(rgb(token(pm, "--pm-ink-soft")), paper).toFixed(2)}:1`);
+  assert.ok(ratio(over([205, 194, 171], paper, 0.7), paper) < 2, "control: the inherited rgba(205,194,171,.7) on this paper was a ghost");
+  // scoped to the card: the page-wide empty lines keep their own inks (the dark page's notes are unchanged)
+  assert.match(hearth, /^\.hearth-stage \.hd-empty \{ list-style: none; font-style: italic; color: var\(--hx-ink\); opacity: 0\.8;/m);
+  assert.match(dash, /\.hd :global\(\.hd-empty\) \{ list-style: none; font-style: italic; color: rgba\(205, 194, 171, 0\.7\);/);
+});

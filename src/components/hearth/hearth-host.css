@@ -120,6 +120,9 @@
 .hearth-stage .hd-needs { background: var(--hx-paper); color: var(--hx-paper-ink); border-radius: var(--hx-radius); padding: 1em 1.1em 0.9em; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
 .hearth-stage .hd-needs h2 { color: var(--hx-paper-ink); }
 .hearth-stage .hd-needs .hd-meta { color: inherit; opacity: 0.75; }
+/* a note inside the paper card (the stance count's uncertainty, "still reading"): the card's own ink, as its meta line, not --hx-ink, the dark glass's
+   light ink that `.hearth-stage .hd-empty` carries (unreadable on this paper; UI-40, postmark#4679) */
+.hearth-stage .hd-needs .hd-empty { color: inherit; opacity: 0.75; }
 .hearth-stage .hd-needs ul { list-style: none; margin: 0.6em 0 0; padding: 0; }
 .hearth-stage .hd-needs li { padding: 0.65em 0; border-top: 1px dashed rgba(42, 33, 24, 0.25); }
 .hearth-stage .hd-needs li:first-child { border-top: 0; }
