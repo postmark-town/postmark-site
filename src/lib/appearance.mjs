@@ -71,13 +71,45 @@ export function appearanceRows(appearance) {
   return { glance: appearance.body, value: appearance.value ?? "", details, more: Number(appearance.more?.predicates) || 0 };
 }
 
-/** GET /residents/{h}/sheet's answer, as what the page shows. */
+/**
+ * GET /residents/{h}/sheet's answer, as what the page shows. `name` is who the sheet shows (CORE-175, POS-1202's `sheets[].name`), null when
+ * the office answers it unnamed; a name the office could not look up never arrives here as null, because the office answers that read 503.
+ */
 export function sheetView(answer) {
   if (!answer || answer.read !== "sheet") return null;
   return {
     likeness: answer.likeness === "given" ? "given" : "not given",
-    sheets: (answer.sheets ?? []).map((s) => ({ url: s.url, own: s.own === true, made_by: s.made_by, made_at: s.made_at, townMade: s.made_by === "the-town" })),
+    sheets: (answer.sheets ?? []).map((s) => ({ id: s.id ?? null, url: s.url, own: s.own === true, made_by: s.made_by, made_at: s.made_at, townMade: s.made_by === "the-town",
+      name: typeof s.name === "string" && s.name !== "" ? s.name : null })),
     held: Number(answer.held_until_yes) || 0,
     template: typeof answer.template === "string" ? answer.template : "",
   };
+}
+
+// ── WHO A SHEET SHOWS (CORE-175; the office's rule is POS-1202's, office src/depictions.mjs § sheetNameOf) ───────────────────────────────
+// A courtesy check before the person waits on a network, in the office's own measure: trimmed, at most 80 code points (never a browser's
+// UTF-16 maxlength), and no control characters. The office stays the one judge; its own refusal is shown whole when it disagrees.
+
+/** The office's bound on a sheet's name, in code points. */
+export const SHEET_NAME_MAX = 80;
+// eslint-disable-next-line no-control-regex
+const NAME_CONTROLS = /[\u0000-\u001f\u007f-\u009f]/;
+
+/** Why this text can't be a sheet's name, or null when it can (blank is a clear, which is allowed). */
+export function sheetNameProblem(raw) {
+  const t = String(raw ?? "").trim();
+  const n = [...t].length;
+  if (n > SHEET_NAME_MAX) return `A sheet's name is at most ${SHEET_NAME_MAX} characters; this is ${n}. Shorten it to who the sheet shows.`;
+  if (NAME_CONTROLS.test(t)) return "A sheet's name is one line of plain text.";
+  return null;
+}
+
+/**
+ * What the page says when the sheet read did not answer: the office's own words when it gave them (a 503 is "the office's record cannot be
+ * reached"), never "no sheet yet" and never an unnamed sheet. `status` 0 is unreachable.
+ */
+export function sheetUnreadWords(status, data) {
+  const told = data && typeof data.defect === "string" ? data.defect + (typeof data.hint === "string" && data.hint ? ": " + data.hint : "") : null;
+  if (told) return `Couldn't read the reference sheets just now (${status}): ${told}.`;
+  return status ? `Couldn't read the reference sheets just now (${status}). Reload to try again.` : "Couldn't reach the office to read the reference sheets. Reload to try again.";
 }

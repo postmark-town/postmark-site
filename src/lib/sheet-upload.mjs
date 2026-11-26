@@ -82,16 +82,34 @@ export function uploadUrlRequest(base, handle, imageUrl, token) {
   };
 }
 
-/** Step 2: keep the returned media URL as the resident's sheet. */
-export function setSheetRequest(base, handle, mediaUrl, token) {
+/**
+ * Step 2: keep the returned media URL as the resident's sheet. `name` is who the sheet shows (CORE-175, POS-1202's `sheet_name`): sent ONLY
+ * when the caller gives one, so an untouched optional box adds nothing and a bare call stays exactly as it was (the office leaves an omitted
+ * name as it stands; an explicit "" would clear it, which only the kept-sheet edit below ever means).
+ */
+export function setSheetRequest(base, handle, mediaUrl, token, { name } = {}) {
   return {
     url: `${base}/profile/${encodeURIComponent(handle)}`,
     init: {
       method: "PATCH",
       headers: { ...bearer(token), accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({ sheet: mediaUrl }),
+      body: JSON.stringify(name === undefined ? { sheet: mediaUrl } : { sheet: mediaUrl, sheet_name: name }),
     },
   };
+}
+
+/**
+ * Name, correct or clear the name of a sheet the household already keeps, with no upload: the same PATCH /profile, naming the sheet by its
+ * kept URL (POS-1202: the URL says which sheet; the picture, its maker and the anchor never change). `name` "" is the EXPLICIT clear.
+ */
+export function nameSheetRequest(base, handle, keptUrl, name, token) {
+  return setSheetRequest(base, handle, keptUrl, token, { name: String(name ?? "") });
+}
+
+/** The name that now stands on the office's answer to a keep (`sheet.name`), or null when it answered the sheet unnamed. */
+export function keptNameOf(data) {
+  const n = data && data.sheet && typeof data.sheet === "object" ? data.sheet.name : undefined;
+  return typeof n === "string" && n !== "" ? n : null;
 }
 
 /** The media URL out of the upload's answer, or null. Only the town's own media door counts. */
@@ -106,7 +124,7 @@ export function mediaUrlOf(answer) {
  * The office's own `defect` and `hint` are shown whole whenever it gave them.
  */
 export function refusalWords(step, status, data) {
-  const doing = step === "set" ? "setting the sheet" : "uploading the image";
+  const doing = step === "set" ? "setting the sheet" : step === "name" ? "naming the sheet" : "uploading the image";
   if (status === 0) return `Couldn't reach the office. Check your connection and try again. Nothing was changed.`;
   if (status === 502 || status === 504)
     // a gateway page from the edge, not an answer from the office: the town is briefly out of reach
@@ -144,7 +162,7 @@ const okStatus = (n) => n >= 200 && n < 300;
  * the returned url as the sheet. `send(req)` answers { status, data } (status 0: unreachable,
  * data null: not JSON). An expired token sends nothing. Returns { ok, words }; `say` is told each step.
  */
-export async function setSheetFlow({ handle, base, tok, makeUpload, send, say = () => {}, now = Date.now() }) {
+export async function setSheetFlow({ handle, base, tok, makeUpload, send, say = () => {}, now = Date.now(), name }) {
   if (!tokenIsFresh(tok, now)) return { ok: false, words: refusalWords("upload", 401, null) };
   say("Handing the image to the town…");
   const up = await send(makeUpload(tok.access_token));
@@ -152,7 +170,25 @@ export async function setSheetFlow({ handle, base, tok, makeUpload, send, say = 
   const url = mediaUrlOf(up.data);
   if (!url) return { ok: false, words: "The town took the image but didn't hand back its address. Nothing was set; try again." };
   say("Setting it as the sheet…");
-  const set = await send(setSheetRequest(base, handle, url, tok.access_token));
+  // CORE-175: who it shows rides the same keep, only when the household gave one (`name` undefined: the bare call, as before)
+  const set = await send(setSheetRequest(base, handle, url, tok.access_token, name === undefined ? {} : { name }));
   if (!okStatus(set.status)) return { ok: false, words: refusalWords("set", set.status, set.data) };
-  return { ok: true, words: "Set. This page now shows it." };
+  return { ok: true, words: "Set. This page now shows it.", name: keptNameOf(set.data) };
+}
+
+/**
+ * CORE-175: name, correct or clear (name "") a sheet the household already keeps, with no upload. Returns { ok, words, name }: on success
+ * `name` is the office's answer (`sheet.name`, null when it now stands unnamed); on a refusal nothing is claimed and `name` is absent, so
+ * the page keeps what it showed and what the person typed.
+ */
+export async function nameSheetFlow({ handle, base, tok, url, name, send, now = Date.now() }) {
+  if (!tokenIsFresh(tok, now)) return { ok: false, words: refusalWords("name", 401, null) };
+  const r = await send(nameSheetRequest(base, handle, url, name, tok.access_token));
+  if (!okStatus(r.status)) return { ok: false, words: refusalWords("name", r.status, r.data) };
+  const now2 = keptNameOf(r.data);
+  // the office's answer is what stands: an answer that doesn't carry what was sent (an office without POS-1202) is never claimed as a save
+  const asked = String(name ?? "").trim();
+  if (asked ? now2 !== asked : now2 !== null)
+    return { ok: false, words: "The office answered, but its answer doesn't show that name as saved. Reload the page to see what stands." };
+  return { ok: true, name: now2, words: now2 ? "Saved." : "Name cleared." };
 }
