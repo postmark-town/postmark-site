@@ -18,9 +18,15 @@
 // re-minted, when the same send is tried again in this tab. A tab closed between the berth and the co-sign leaves the berth to sunset on the
 // office's own clock (fourteen crossings, seven days), and the co-sign link, which carries no key, still works until then.
 //
-// THE BERTH'S NAME IS THE HANDLE. The co-sign runs the declaration with `handle: <the berth's slug>`, so the handle must pass BOTH rules: the
-// berth's (Office src/oauth.mjs § BERTH_SLUG, 2–31 characters, starting with a letter or digit; no the- or berth- prefix; not one of the town's
-// own names) and the handle's (residency's, 2–40 characters, lowercase letters, digits and single hyphens). The narrower one is said out loud.
+// THE BERTH'S NAME IS THE HANDLE, FOR NOW. The co-sign on today's Office runs the declaration with `handle: <the berth's slug>`, so the handle
+// must pass BOTH rules: the berth's (Office src/oauth.mjs § BERTH_SLUG, 2–31 characters, starting with a letter or digit; no the- or berth-
+// prefix; not one of the town's own names) and the handle's (residency's, 2–40 characters, lowercase letters, digits and single hyphens). The
+// narrower one is said out loud. Wright (CORE-188, 2026-11-26): "keep the accepted 2–40 characters … co-sign declares the chosen handle, not
+// pending.slug". Rivet's receiver (Office #1237 candidate c1bd858b, NOT yet accepted or merged) parks begin's `handle` apart from the berth's slug,
+// answers `{ handle: <the resident it will declare>, berth: <the slug> }`, and the co-sign declares that handle. So this file already sends the
+// chosen handle on begin, reads the resident from the office's answer, and checks admission against THAT resident (residentOf, admittedBy); an
+// office before the receiver takes the field and ignores it (DECLARE_SCHEMA, the handle exempt) and answers the slug, which on this road is the
+// same name while the 31 rule stands. The rule widens to 40 only on the receiver's actual train merge.
 
 import { siteWriteHeaders } from "./office-write.mjs";
 
@@ -69,10 +75,29 @@ export function boardRefusal(status, data) {
   return told ?? `The office wouldn't give a berth (${status}). Nothing was sent.`;
 }
 
-/** Step 2: begin under the berth. The handle is the berth's own, so it is not sent; nothing else the card does not take ever is. */
+/**
+ * Step 2: begin under the berth, carrying the chosen resident's handle with what the card takes (and nothing it doesn't). The receiver parks it
+ * apart from the berth's slug; an office before it takes the field and ignores it, declaring the slug (the same name under the 31 rule).
+ */
 export function beginBody(args) {
-  const { handle: _h, ...rest } = args ?? {};
-  return { do: "begin", args: rest };
+  return { do: "begin", args: { ...(args ?? {}) } };
+}
+
+/**
+ * Who the co-sign will admit, by the office's own answer to begin: `{resident, berth, receiver}`. `resident` is the answer's `handle` when it is
+ * a handle, else the berth's slug (what an office before the receiver declares); `receiver` is whether the answer names the berth apart
+ * (`berth`, the receiver's mark), never a guess from the page's side.
+ */
+export function residentOf(answer, slug) {
+  const named = answer && typeof answer.handle === "string" && HANDLE_RULE.test(answer.handle.trim()) ? answer.handle.trim() : null;
+  return { resident: named ?? String(slug), berth: String(slug), receiver: Boolean(answer && typeof answer.berth === "string" && answer.berth === slug) };
+}
+
+/** What the co-sign screen says when the office will admit another name than the one asked for, in its terms; null when they agree. */
+export function residentWords(asked, resident) {
+  const a = String(asked ?? "").trim();
+  if (!a || a === resident) return null;
+  return `The office answered that your agent will be admitted as ${resident}, not ${a}. That's the name the co-sign declares.`;
 }
 
 /** The berth key as the shape the site's write helpers take (sheet-upload.mjs § tokenIsFresh reads `obtained` and `expires_in`). */
@@ -95,7 +120,10 @@ export function cosignOf(answer, slug, origins) {
   return u.href;
 }
 
-/** Whether the office has admitted the berth's resident: /me, asked with the berth key, names the handle (sheet-upload.mjs § ownsResident). */
-export function admittedBy(me, slug) {
-  return Boolean(me && Array.isArray(me.handles) && me.handles.includes(slug));
+/**
+ * Whether the office has admitted the berth's resident: /me, asked with the berth key, names THAT resident (residentOf's, the chosen handle on the
+ * receiver; the berth's slug before it) among its handles (sheet-upload.mjs § ownsResident). The finishing writes then target the same name.
+ */
+export function admittedBy(me, resident) {
+  return Boolean(me && Array.isArray(me.handles) && me.handles.includes(resident));
 }

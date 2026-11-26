@@ -382,7 +382,7 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     assert.equal(await p.js("location.hash"), "#review");
     // the finished page is the same page, filled, under the review
     assert.equal(await p.js(`!!document.querySelector('[data-review-page-slot] [data-blank-page]') && !document.querySelector("[data-blank-page]").hidden`), true);
-    assert.match(await p.js(text("[data-review-sends-words]")), /^7 fields, under the office's own names: household, agent, note, card, invited_by, heard, heard_note\. A box left blank is not sent\. The handle goes as your agent's berth\./);
+    assert.match(await p.js(text("[data-review-sends-words]")), /^8 fields, under the office's own names: household, agent, handle, note, card, invited_by, heard, heard_note\. A box left blank is not sent\. The handle also names your agent's berth\./);
     // what Send will do, said before it does it
     assert.equal(await p.js(`document.querySelector("[data-review-road]").hidden`), false);
     assert.match(await p.js(text("[data-review-road]")), /takes a berth for your agent under the handle quillon-fixture.*co-sign page.*asks your own profile and the likeness answer/s);
@@ -420,9 +420,15 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     assert.equal(office.auths.find((a) => a.at === "POST /api/household").auth, "Bearer fixture-berth-key-quillon-fixture", "begin went with something other than the berth's own key");
     assert.equal(office.sent.length, 0, "the visitor's own declare was called");
     assert.equal(office.begun.length, 1);
-    assert.deepEqual(Object.keys(office.begun[0]).sort(), ["agent", "card", "heard", "heard_note", "household", "invited_by", "note"], "begin carries what today's card takes, less the handle (the berth's own name)");
+    assert.deepEqual(Object.keys(office.begun[0]).sort(), ["agent", "card", "handle", "heard", "heard_note", "household", "invited_by", "note"], "begin carries what today's card takes, the chosen handle with it");
+    // the chosen resident rides begin (the receiver, Office #1237 candidate c1bd858b, parks it apart from the berth; this fixture is today's office,
+    // which answers the slug); under the 31 rule it is the berth's own name
+    assert.equal(office.begun[0].handle, "quillon-fixture");
     assert.equal(office.begun[0].card, "I'm Quillon, a fixture. Write to me plainly.");
-    for (const never of ["handle", "bio", "pronouns", "color", "color_name", "runtime", "town_name", "short_line", "human_pronouns", "likeness", "glance", "sign", "from_town"]) assert.equal(never in office.begun[0], false, `${never} rode begin on today's card`);
+    for (const never of ["bio", "pronouns", "color", "color_name", "runtime", "town_name", "short_line", "human_pronouns", "likeness", "glance", "sign", "from_town"]) assert.equal(never in office.begun[0], false, `${never} rode begin on today's card`);
+    // the co-sign screen names the resident the office answered; it agrees with what was asked, so no difference is said
+    assert.equal(await p.js(text("[data-cosign-handle]")), "quillon-fixture");
+    assert.equal(await p.js(`document.querySelector("[data-cosign-resident]").hidden`), true);
     // the handoff: the office's own co-sign link for THIS berth, in a new tab, carrying no key; the Registrar says what that page asks
     assert.equal(await p.js(`document.querySelector("[data-cosign-link]").getAttribute("href")`), `${base}/api/oauth/berth-cosign?slug=quillon-fixture&b=1764100000`);
     assert.equal(await p.js(`document.querySelector("[data-cosign-link]").target`), "_blank");

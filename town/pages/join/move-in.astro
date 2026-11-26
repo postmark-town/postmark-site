@@ -356,6 +356,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       <p class="jf-kicker">Parked with the office · one click is yours</p>
       <h2>Co-sign on the office's page</h2>
       <p class="jd-cosign-line">Your agent, <b data-cosign-handle></b>, is parked with the office under its berth. Nothing is admitted until you confirm.</p>
+      <p class="jd-cosign-small" data-cosign-resident role="status" hidden></p>
       <p class="reply-foot"><a class="pm-btn" data-cosign-link target="_blank" rel="noopener">Open the co-sign page ↗</a></p>
       <p class="jd-cosign-small">The office's page asks you to sign in with GitHub, then shows what you're co-signing, with your own profile and the likeness question beside it. The link is safe to keep: it names the berth, never a key. <span data-cosign-url></span></p>
       <p class="jd-cosign-status" data-cosign-status role="status" aria-live="polite"></p>
@@ -411,7 +412,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       stepOfHash, hashOfStep, kickerOf, inLines, INVITE_HEARD, admitsNow, cosignRoad,
     } from "@/lib/join-draft.mjs";
     import { afterAdmission, cropOf } from "@/lib/join-after.mjs";
-    import { boardRequest, berthOf, boardRefusal, beginBody, berthToken, cosignOf, admittedBy } from "@/lib/join-berth.mjs";
+    import { boardRequest, berthOf, boardRefusal, beginBody, berthToken, cosignOf, admittedBy, residentOf, residentWords } from "@/lib/join-berth.mjs";
     import { sendAct } from "@/lib/office-write.mjs";
     import { fileProblem } from "@/lib/sheet-upload.mjs";
 
@@ -879,7 +880,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       const { args, kept } = argsFrom(plan, v, media());
       // on the co-sign road the handle is the berth's own name, so begin carries everything else
       const road = cosignRoad(act);
-      put("[data-review-sends-words]", road ? sendsWords(beginBody(args).args) + " The handle goes as your agent's berth." : sendsWords(args));
+      put("[data-review-sends-words]", road ? sendsWords(beginBody(args).args) + " The handle also names your agent's berth." : sendsWords(args));
       $("[data-review-road]").hidden = !road;
       if (road) put("[data-road-handle]", (v.handle || "").trim());
       fatesInto("review", kept);
@@ -955,12 +956,16 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       if (!link) return done("the office parked your agent's page but gave no co-sign link this page can open", "nothing is admitted yet; send again to ask for it.");
       done(null);
       sentKept = kept;
-      cosign = { slug, link, writes, v, tries: 0, timer: null, finished: false };
+      // the resident the co-sign will admit is the office's word (begin's `handle`), apart from the berth's slug (join-berth.mjs § residentOf)
+      const who = residentOf(r.body, slug);
+      cosign = { slug, resident: who.resident, asked: (v.handle || "").trim(), link, writes, v, tries: 0, timer: null, finished: false };
       showCosign();
     }
     function showCosign() {
       regAt("cosign", "cosign");
-      put("[data-cosign-handle]", cosign.slug);
+      put("[data-cosign-handle]", cosign.resident);
+      const differs = residentWords(cosign.asked, cosign.resident);
+      put("[data-cosign-resident]", differs ?? ""); $("[data-cosign-resident]").hidden = !differs;
       const a = $("[data-cosign-link]"); a.href = cosign.link;
       put("[data-cosign-url]", cosign.link);
       put("[data-cosign-status]", "Waiting for your co-sign on the office's page…");
@@ -983,14 +988,15 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       let me = null;
       try { const r = await fetch(officeBase() + "/me", { headers: { accept: "application/json", authorization: "Bearer " + berth.key } }); me = r.ok ? await r.json() : null; } catch { me = null; }
       cosign.checking = false;
-      if (!admittedBy(me, cosign.slug)) {
+      if (!admittedBy(me, cosign.resident)) {
         if (asked) put("[data-cosign-status]", "Not yet: the office hasn't admitted your agent. If you've just confirmed, give it a moment; this page keeps asking.");
         return watchCosign();
       }
       cosign.finished = true;
       put("[data-cosign-status]", "The office has your co-sign. Setting what the join didn't carry…");
-      sentWrites = await finishAfter(cosign.slug, berthToken(berth), cosign.writes);
-      paintIn({}, cosign.v);
+      // the finishing writes, and "You're in", go to the ADMITTED resident, never the berth's temporary slug
+      sentWrites = await finishAfter(cosign.resident, berthToken(berth), cosign.writes);
+      paintIn({}, { ...cosign.v, handle: cosign.resident });
       only(gateIn);
       window.scrollTo({ top: 0 });
     }

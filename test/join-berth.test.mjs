@@ -15,7 +15,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { BERTH_SLUG, BERTH_SLUG_MAX, berthSlugProblem, boardRequest, berthOf, boardRefusal, beginBody, berthToken, cosignOf, admittedBy } from "../src/lib/join-berth.mjs";
+import { BERTH_SLUG, BERTH_SLUG_MAX, berthSlugProblem, boardRequest, berthOf, boardRefusal, beginBody, berthToken, cosignOf, admittedBy, residentOf, residentWords } from "../src/lib/join-berth.mjs";
 
 const plain = (v) => JSON.parse(JSON.stringify(v));
 
@@ -36,9 +36,28 @@ test("the berth is read off the board's answer for this slug only, and a refusal
   assert.match(boardRefusal(0, null), /Couldn't reach the office/);
 });
 
-test("begin carries the act's fields and never the handle, which is the berth's own name", () => {
+test("begin carries the act's fields AND the chosen handle (the receiver parks it apart from the berth; an office before it ignores it)", () => {
+  // Office #1237 candidate c1bd858b (not accepted or merged): doBegin judges `handle` as declare does and parks it; the train's begin validates against
+  // DECLARE_SCHEMA with the handle exempt and drops it, declaring the slug (the same name under the 31 rule)
   assert.deepEqual(plain(beginBody({ household: "Hollow Oak", handle: "quillon", full_address: "I'm Quillon.", note: "A line." })),
-    { do: "begin", args: { household: "Hollow Oak", full_address: "I'm Quillon.", note: "A line." } });
+    { do: "begin", args: { household: "Hollow Oak", handle: "quillon", full_address: "I'm Quillon.", note: "A line." } });
+  assert.deepEqual(plain(beginBody({ household: "Hollow Oak", full_address: "x" })), { do: "begin", args: { household: "Hollow Oak", full_address: "x" } }, "no handle is invented");
+});
+
+test("THE RESIDENT IS THE OFFICE'S WORD, apart from the berth: begin's answer names it; before the receiver it is the slug", () => {
+  // the train's answer (no receiver): { declared, handle: <slug>, cosign_url, … }
+  assert.deepEqual(plain(residentOf({ declared: "Hollow Oak", handle: "quillon", cosign_url: "x" }, "quillon")), { resident: "quillon", berth: "quillon", receiver: false });
+  // the candidate's answer: { handle: <the chosen resident>, berth: <the slug> }; a chosen name apart from the slug is read as the resident
+  assert.deepEqual(plain(residentOf({ handle: "quillon-of-hollow-oak-the-long-name", berth: "quillon" }, "quillon")),
+    { resident: "quillon-of-hollow-oak-the-long-name", berth: "quillon", receiver: true });
+  // nothing readable: the slug, which is what an office without the receiver declares; never a page-side guess
+  for (const odd of [null, {}, { handle: 7 }, { handle: "Not A Handle" }, { handle: "" }])
+    assert.equal(residentOf(odd, "quillon").resident, "quillon", JSON.stringify(odd));
+  assert.equal(residentOf({ handle: "quillon", berth: "elsewhere" }, "quillon").receiver, false, "another berth's mark is not this berth's receiver");
+  // the words only when the office will admit another name than the one asked
+  assert.equal(residentWords("quillon", "quillon"), null);
+  assert.equal(residentWords("", "quillon"), null);
+  assert.match(residentWords("quillon-fixture", "quillon"), /admitted as quillon, not quillon-fixture\. That's the name the co-sign declares\./);
 });
 
 test("the handle passes the berth's rule and the handle's; the narrower is said in words, never a silent cap", () => {
@@ -71,6 +90,26 @@ test("admission is the berth key's /me naming the handle; the berth's own standi
   assert.equal(admittedBy({ berth: "quillon", handles: [] }, "quillon"), false, "a berth that has not been co-signed");
   assert.equal(admittedBy({ handles: ["someone-else"] }, "quillon"), false);
   assert.equal(admittedBy(null, "quillon"), false);
+  // on the receiver, the berth key's /me names the CHOSEN resident (householdFor resolves the human's pins, not the berth's slug): admission is
+  // checked against the resident the office answered, so a /me naming only the berth's slug is not that resident's admission
+  const who = residentOf({ handle: "quillon-of-hollow-oak", berth: "quillon" }, "quillon");
+  assert.equal(admittedBy({ handles: ["quillon-of-hollow-oak"] }, who.resident), true);
+  assert.equal(admittedBy({ handles: ["quillon"] }, who.resident), false);
+});
+
+test("the page binds the co-sign to the office's resident: shown, checked for admission, and the finishing writes' target", () => {
+  const page = readFileSync(new URL("../town/pages/join/move-in.astro", import.meta.url), "utf8");
+  const script = page.slice(page.indexOf("<script>"), page.indexOf("</script>", page.indexOf("<script>")));
+  assert.match(script, /const who = residentOf\(r\.body, slug\);\s*cosign = \{ slug, resident: who\.resident, asked: \(v\.handle \|\| ""\)\.trim\(\)/);
+  assert.match(script, /put\("\[data-cosign-handle\]", cosign\.resident\)/);
+  assert.match(script, /residentWords\(cosign\.asked, cosign\.resident\)/);
+  assert.match(script, /if \(!admittedBy\(me, cosign\.resident\)\)/);
+  assert.match(script, /sentWrites = await finishAfter\(cosign\.resident, berthToken\(berth\), cosign\.writes\);/);
+  assert.match(script, /paintIn\(\{\}, \{ \.\.\.cosign\.v, handle: cosign\.resident \}\)/, "You're in links the admitted resident's page");
+  assert.doesNotMatch(script, /finishAfter\(cosign\.slug|admittedBy\(me, cosign\.slug/, "a finishing write or the admission still keyed to the berth's slug");
+  // the 31 rule still stands until the receiver's train merge (Facet 05:20Z): the berth is still boarded under the handle
+  assert.match(script, /boardRequest\(officeBase\(\), slug\)/);
+  assert.equal(BERTH_SLUG_MAX, 31);
 });
 
 test("the berth key, shaped for the site's write helpers, lives as long as the berth", () => {

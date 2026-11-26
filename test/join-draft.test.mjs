@@ -385,7 +385,7 @@ test("(6) the page writes after admission only through join-after, and never to 
   const script = page.slice(page.indexOf("<script>"), page.indexOf("</script>", page.indexOf("<script>")));
   // the two places a resident write may start: add-resident's answer, and the co-sign the berth key's /me confirms (join-berth.mjs § admittedBy)
   assert.match(script, /if \(admitsNow\(act\)\) \{[\s\S]*?sentWrites = await finishAfter\(/, "add-resident's writes run outside its admission");
-  assert.match(script, /if \(!admittedBy\(me, cosign\.slug\)\) \{[\s\S]*?return watchCosign\(\);\s*\}\s*cosign\.finished = true;[\s\S]*?sentWrites = await finishAfter\(cosign\.slug, berthToken\(berth\), cosign\.writes\);/,
+  assert.match(script, /if \(!admittedBy\(me, cosign\.resident\)\) \{[\s\S]*?return watchCosign\(\);\s*\}\s*cosign\.finished = true;[\s\S]*?sentWrites = await finishAfter\(cosign\.resident, berthToken\(berth\), cosign\.writes\);/,
     "a new house's writes run before the office has admitted it");
   assert.equal((script.match(/afterAdmission\(\{/g) ?? []).length, 1, "a second way to write to the resident");
   assert.equal((script.match(/finishAfter\(/g) ?? []).length, 3, "finishAfter is called from somewhere new");
