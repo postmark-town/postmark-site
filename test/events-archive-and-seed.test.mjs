@@ -61,14 +61,50 @@ test("BOTH HOMES: the archive's row and the seed's rows behind the stop all surv
   assert.deepEqual(saved(path), ["h/e0", "h/e1", "h/e5", "h/e8"], "and the archive file was saved with every row");
 });
 
-test("DURABLE EVIDENCE: a transient failure (503) on the archive's event keeps the evidence it held, with its OWN read time; the seed's event, held rows only, is `unavailable`", async () => {
+const HELD_E8 = () => ({ read: "ok", read_at: SEEN_AT, event: sparky(8) });
+const storedEvidence = (path, id) => readEventsArchive(path).events.evidence[id];
+const DEGRADED_E8 = { id: "h/e8", evidence: { rooms: null, room_history: "unavailable", gallery: null, present: null } };
+const FRESH_E8 = { id: "h/e8", evidence: { rooms: [], room_history: "complete", present: ["new-presentation"], gallery: { rooms: ["r"], sparks: [{ id: "spark-8-new" }] }, complete: true } };
+
+test("DURABLE STORAGE, FRESH PUBLICATION (CORE-174 F1): repeated transient failures and a degraded 200 keep the archive's stored read and its own read_at across passes while events.json says `unavailable`; a good answer then updates both, presentation included", async () => {
   const path = archiveFile();
-  const r = await run({ eventsArchivePath: path, seed: seed(), fetchImpl: office({ reads: SOME_ANSWER, status: { "h/e8": 503, "h/e5": 503 } }) });
-  assert.deepEqual(ids(r), ["h/e0", "h/e1", "h/e5", "h/e8"], "a failure is not a withdrawal");
-  assert.equal(r.events.evidence["h/e8"].read, "ok", "the archive HELD this read: it stands on a failed read");
-  assert.equal(r.events.evidence["h/e8"].read_at, SEEN_AT, "labelled by its own time, never this pass's");
-  assert.deepEqual(r.events.evidence["h/e5"], { read: "unavailable" }, "a seed's evidence is never read: a failed read with no archive entry is `unavailable`, as on main (CORE-180 F1)");
-  assert.ok(r.gaps.some((g) => /2 of \d+ one-event reads were not served, so 1 of those events' pages say their evidence couldn't be read and 1 kept/.test(g)), JSON.stringify(r.gaps));
+  const passes = [
+    ["503", { status: { "h/e8": 503, "h/e5": 503 } }],
+    ["503 again", { status: { "h/e8": 503, "h/e5": 503 } }],
+    ["degraded 200", { status: { "h/e5": 503 }, extra: { "h/e8": DEGRADED_E8 } }],
+    ["503 after it", { status: { "h/e8": 503, "h/e5": 503 } }],
+  ];
+  for (const [name, o] of passes) {
+    const r = await run({ eventsArchivePath: path, seed: seed(), fetchImpl: office({ reads: { ...SOME_ANSWER, ...(o.extra ?? {}) }, status: o.status }) });
+    assert.deepEqual(ids(r), ["h/e0", "h/e1", "h/e5", "h/e8"], `${name}: a failure is not a withdrawal`);
+    assert.deepEqual(r.events.evidence["h/e8"], { read: "unavailable" }, `${name}: PUBLISHED unavailable, not the stored read under an old label`);
+    assert.deepEqual(storedEvidence(path, "h/e8"), HELD_E8(), `${name}: the STORED read keeps its bytes and its own read_at`);
+    assert.deepEqual(r.events.evidence["h/e5"], { read: "unavailable" }, `${name}: a seed's evidence is never read: unavailable, as on main (CORE-180 F1)`);
+    assert.ok(r.gaps.some((g) => /of \d+ one-event reads (were not served|answered with less)/.test(g)) && r.gaps.some((g) => /the archive still stores the earlier read of 1 of them/.test(g)), `${name}: ${JSON.stringify(r.gaps)}`);
+  }
+  // a good, non-degraded answer publishes fresh and replaces the stored entry whole
+  const good = await run({ eventsArchivePath: path, seed: seed(), fetchImpl: office({ reads: { ...SOME_ANSWER, "h/e8": FRESH_E8 }, status: { "h/e5": 503 } }) });
+  assert.deepEqual(good.events.evidence["h/e8"], { read: "ok", event: FRESH_E8, read_at: AS_OF }, "published fresh, with the current presentation");
+  assert.deepEqual(storedEvidence(path, "h/e8"), good.events.evidence["h/e8"], "and the stored entry is replaced whole: nothing of the old read mixed in");
+});
+
+test("UNKNOWN HELD TIME stays unknown and is never published as a read: a stored read with no stamp keeps no stamp through failed passes, and the published view carries no `ok`", async () => {
+  const path = archiveFile();
+  writeFileSync(path, JSON.stringify({ version: 1, past: { events: [ev(8)], next: null, note: null, read: "office" }, evidence: { "h/e8": { read: "ok", event: sparky(8) } } }));
+  for (let pass = 1; pass <= 2; pass++) {
+    const r = await run({ eventsArchivePath: path, seed: seed(), fetchImpl: office({ reads: SOME_ANSWER, status: { "h/e8": 503, "h/e5": 503 } }) });
+    assert.equal(storedEvidence(path, "h/e8").read_at, undefined, `pass ${pass}: no time invented`);
+    assert.equal(storedEvidence(path, "h/e8").read, "ok");
+    assert.equal(r.events.evidence["h/e8"].read, "unavailable");
+  }
+});
+
+test("UNASKED within the budget: a stored read the pass did not ask is not published as a current read, and stays stored untouched (no extra call, no new budget)", async () => {
+  const path = archiveFile();
+  const r = await run({ eventsArchivePath: path, seed: seed(), evidenceMax: 1, fetchImpl: office({ reads: SOME_ANSWER }) });
+  assert.equal(Object.keys(r.events.evidence).length, 1, "one read asked, one published");
+  assert.equal(r.events.evidence["h/e8"], undefined, "e8 was not asked: no published read");
+  assert.deepEqual(storedEvidence(path, "h/e8"), HELD_E8(), "and the stored one is untouched");
 });
 
 test("WITHDRAWAL reaches both homes: a definitive 404/410 of a held-only event (archive's or seed's) while the office answers others removes row and evidence, and the saved archive forgets it", async () => {
@@ -85,7 +121,7 @@ test("WITHDRAWAL reaches both homes: a definitive 404/410 of a held-only event (
   const path = archiveFile();
   const none = await run({ eventsArchivePath: path, seed: seed(), fetchImpl: office({ reads: {} }) });
   assert.deepEqual(ids(none), ["h/e0", "h/e1", "h/e5", "h/e8"], "no read was answered: nothing is taken down");
-  assert.equal(none.events.evidence["h/e8"].read, "ok");
+  assert.deepEqual(storedEvidence(path, "h/e8"), HELD_E8(), "the stored evidence stands");
   assert.ok(none.gaps.some((g) => /none was taken down/.test(g)));
 });
 

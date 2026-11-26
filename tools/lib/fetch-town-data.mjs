@@ -1409,24 +1409,27 @@ export async function fetchEvents({ apiBase, fetchImpl = fetch, retries = 3, gat
   const heldIds = new Set(heldRows.map((e) => e.id));
   const heldOnly = [...refused].filter((id) => !served.has(id) && heldIds.has(id));
   const withdrawn = new Set(!unavailable && answering ? heldOnly : []);
-  const published = pastEvents.filter((e) => !withdrawn.has(e?.id));
+  const rows = pastEvents.filter((e) => !withdrawn.has(e?.id));
   const merged = mergeEvidence({ previous, fresh, asOf });
-  for (const id of withdrawn) delete merged.evidence[id];
+  // withdrawal removes the event from BOTH views, so the saved archive does not bring it back next pass
+  for (const id of withdrawn) { delete merged.evidence[id]; delete merged.published[id]; }
   const asked = Object.keys(fresh).length;
-  const failed = merged.kept + merged.failed;
+  const notServed = merged.failed, degraded = merged.degraded;
   const next = unavailable ? null : past.stopped ? (seed?.past?.next ?? null) : past.next;
+  const past_ = { events: rows, next, note: past.note, read: past.read };
   return {
-    events: {
-      as_of: asOf,
-      past: { events: published, next, note: past.note, read: past.read },
-      evidence: merged.evidence,
-    },
+    // what THIS pass publishes (events.json): fresh reads, `unavailable` where this pass's read did not answer well; never a stored read passed off as current (CORE-174 F1)
+    events: { as_of: asOf, past: past_, evidence: merged.published },
+    // what the archive STORES between passes (written to the archive file by fetchEventsArchived): the same rows, the durable evidence with each read's own `read_at`
+    archive: { as_of: asOf, past: past_, evidence: merged.evidence },
     gaps: [
       ...(seed ? [`events.json built from the last published file (${seedRows.length} past events held): the list was read in ${past.pages} page(s)${past.stopped ? ", stopping at the first page whose oldest event it already held" : ""}; ${asked} one-event read(s), every wanted event as ever`] : []),
       ...(unavailable ? [EVENTS_GAP] : []),
       ...(withdrawn.size ? [`events.json: ${withdrawn.size} held past event(s) the office no longer serves (the list did not return them and their one-event read was refused as not found or gone) left the cache with their evidence: ${[...withdrawn].slice(0, 12).join(", ")}${withdrawn.size > 12 ? ", …" : ""}`] : []),
       ...(heldOnly.length && !withdrawn.size ? [`events.json: ${heldOnly.length} held past event(s) had their one-event read refused as not found or gone, but no read was answered this build or the list was not served, so none was taken down`] : []),
-      ...(failed ? [`events.json: ${failed} of ${asked} one-event reads were not served, so ${merged.failed} of those events' pages say their evidence couldn't be read and ${merged.kept} kept the evidence they already held (refused, or answered with less than the page already holds)`] : []),
+      ...(notServed ? [`events.json: ${notServed} of ${asked} one-event reads were not served, so those events' pages say their evidence couldn't be read this pass`] : []),
+      ...(degraded ? [`events.json: ${degraded} of ${asked} one-event reads answered with less than the archive's stored read holds, so those events' pages say their evidence couldn't be read this pass`] : []),
+      ...(merged.kept ? [`events.json: the archive still stores the earlier read of ${merged.kept} of them, with its own read time, for the next good read; it is not published as current`] : []),
     ],
   };
 }
@@ -1454,7 +1457,7 @@ export async function fetchEventsArchived({ eventsArchivePath = null, trackedSna
   const snapshot = archive.state === "ok" ? joinSnapshots(archive.versioned ? archive.events : held(archive.events), held(trackedSnapshot)) : held(trackedSnapshot);
   const result = await fetchEvents({ ...rest, snapshot });
   if (archive.state !== "unset") {
-    const wrote = writeEventsArchive(eventsArchivePath, result.events);
+    const wrote = writeEventsArchive(eventsArchivePath, result.archive ?? result.events);
     if (!wrote.ok) {
       throw new Error(`events archive ${eventsArchivePath} could not be written (${wrote.reason}): refusing to publish event pages the next reset could forget`);
     }

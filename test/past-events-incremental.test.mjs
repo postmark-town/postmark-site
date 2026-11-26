@@ -171,7 +171,7 @@ test("WITHDRAWAL vs FAILURE: a held event the office stops serving leaves the ca
     assert.equal(r.events.past.events.some((e) => e.id === "h/e41"), true, `${status}: a failure is not a withdrawal: the row stays`);
     assert.deepEqual(r.events.evidence["h/e41"], { read: "unavailable" }, `${status}: the evidence is "couldn't be read" as on main, NEVER the held read republished under this pass's time`);
     assert.notEqual(r.events.evidence["h/e41"].read, "ok");
-    assert.ok(r.gaps.some((g) => /1 of 45 one-event reads were not served, so 1 of those events' pages say their evidence couldn't be read and 0 kept/.test(g)), `${status}: said`);
+    assert.ok(r.gaps.some((g) => /1 of 45 one-event reads were not served, so those events' pages say their evidence couldn't be read/.test(g)), `${status}: said`);
     assert.equal(r.gaps.some((g) => /keep the good read/.test(g)), false, `${status}: there is no keep-the-held-read fallback to name`);
   }
   // REPEATED failure, through the actual consumer: the same transient failure pass after pass never turns into a read the office did not just give
@@ -210,7 +210,7 @@ test("a failed read with none held is `unavailable` (as on main), never an empty
   const reads = { ...READS, "h/e60": evidenceOf(60) };
   const r = await run({ seed, fetchImpl: office({ events: grown, reads, fail: { "read h/e60": 503 } }) });
   assert.deepEqual(r.events.evidence["h/e60"], { read: "unavailable" });
-  assert.ok(r.gaps.some((g) => /1 of 46 one-event reads were not served, so 1 of those events' pages say their evidence couldn't be read and 0 kept/.test(g)), JSON.stringify(r.gaps));
+  assert.ok(r.gaps.some((g) => /1 of 46 one-event reads were not served, so those events' pages say their evidence couldn't be read/.test(g)), JSON.stringify(r.gaps));
   const again = [];
   const r2 = await run({ seed: r.events, fetchImpl: office({ events: grown, reads, asked: again }) });
   assert.ok(readsOf(again).includes("h/e60"));

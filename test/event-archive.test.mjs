@@ -95,18 +95,30 @@ test("FALSIFIER: evidence held is not made a false none by a read that is refuse
   assert.deepEqual(ev0.event.evidence.gallery.sparks.map((s) => s.id), ["fresh-0"], "the answered read replaced the stale gallery");
   assert.equal("present" in ev0.event.evidence, false, "whole replacement: nothing of the old read is mixed into the new one's window");
   assert.equal(ev0.read_at, AS_OF, "and it is stamped with when it was read");
-  assert.deepEqual(r.events.evidence["h/e1"], snapshot.evidence["h/e1"], "a refused read leaves the evidence held exactly as it was read (its own read_at)");
-  assert.deepEqual(r.events.evidence["h/e2"], snapshot.evidence["h/e2"], "an unasked read leaves it too");
-  assert.deepEqual(r.events.evidence["h/e3"], snapshot.evidence["h/e3"]);
-  // the page reads the kept evidence as what it was read: the held gallery, not none and not unavailable
+  // CORE-174 F1 (#507): the STORED archive keeps the held evidence exactly as it was read; the PUBLISHED events.json says only what this pass read
+  assert.deepEqual(r.archive.evidence["h/e1"], snapshot.evidence["h/e1"], "a refused read leaves the STORED evidence exactly as it was read (its own read_at)");
+  assert.deepEqual(r.archive.evidence["h/e2"], snapshot.evidence["h/e2"], "an unasked read leaves it too");
+  assert.deepEqual(r.archive.evidence["h/e3"], snapshot.evidence["h/e3"]);
+  assert.deepEqual(r.archive.evidence["h/e0"], ev0, "the answered read replaced the stored entry whole");
+  assert.deepEqual(r.events.evidence["h/e1"], { read: "unavailable" }, "a refused read is published `unavailable` as on main, not the held read under an old label");
+  assert.equal(r.events.evidence["h/e2"], undefined, "an unasked one has no published read: the file holding it is not a read made now");
+  assert.equal(r.events.evidence["h/e3"], undefined);
+  // the page does not draw a held gallery as this pass's read
   for (const id of ["h/e1", "h/e2", "h/e3"]) {
     const event = allEventViews(EMPTY_CALENDAR, r.events).find((e) => e.id === id);
-    assert.equal(evidenceRead(event, r.events), "ok");
-    const s = eventSections(eventForPage(event, r.events));
-    assert.equal(s.gallery.state, "known");
-    assert.equal(s.gallery.sparks[0].id, `old-${id.slice(3)}`, `${id}: the held gallery still stands`);
+    assert.notEqual(evidenceRead(event, r.events), "ok");
+    assert.equal(eventSections(eventForPage(event, r.events)).gallery.state, "unknown", `${id}: no held gallery is published as current`);
   }
-  assert.ok(r.gaps.some((g) => /1 of 2 one-event reads were not served/.test(g) && /1 kept the evidence they already held/.test(g)), `the gap says what happened: ${JSON.stringify(r.gaps)}`);
+  // the NEXT pass, reading the stored archive back: an answer publishes fresh and replaces the stored entry whole
+  const r2 = await fetchEvents({
+    apiBase: OFFICE, retries: 1, calendar: EMPTY_CALENDAR, snapshot: r.archive, evidenceMax: 2, maxPages: 1,
+    fetchImpl: stubOffice({ pages: listPages(1), events: { "h/e1": { id: "h/e1", evidence: { rooms: [], room_history: "complete", gallery: gallery({ id: "fresh-1" }), complete: true } }, "h/e2": { id: "h/e2", evidence: { rooms: [], room_history: "complete", gallery: gallery({ id: "fresh-2" }), complete: true } } } }),
+  });
+  assert.equal(r2.events.evidence["h/e1"].read, "ok");
+  assert.deepEqual(r2.events.evidence["h/e1"], r2.archive.evidence["h/e1"], "a good answer updates the published and the stored view alike");
+  assert.deepEqual(r2.archive.evidence["h/e1"].event.evidence.gallery.sparks.map((s) => s.id), ["fresh-1"]);
+  assert.deepEqual(r2.archive.evidence["h/e3"], snapshot.evidence["h/e3"], "e3 was not asked this pass (the budget): its stored read is untouched");
+  assert.ok(r.gaps.some((g) => /1 of 2 one-event reads were not served, so those events' pages say their evidence couldn't be read this pass/.test(g)) && r.gaps.some((g) => /the archive still stores the earlier read of 1 of them/.test(g)), `the gap says what happened: ${JSON.stringify(r.gaps)}`);
 });
 
 test("an event with NO evidence held that is not asked stays 'absent' (never asked), and one that is asked and refused with none held is 'unavailable': neither is an empty answer", async () => {
@@ -160,7 +172,10 @@ test("mergeEvidence never drops a held entry, stamps only an answered read, and 
   assert.deepEqual(m.evidence.b, { read: "ok", event: { id: "b" }, read_at: "t1" });
   assert.deepEqual(m.evidence.c, { read: "unavailable" });
   assert.deepEqual(m.evidence.z, previous.z, "not asked: held stands");
-  assert.deepEqual([m.refreshed, m.kept, m.failed], [1, 1, 1]);
+  assert.deepEqual([m.refreshed, m.kept, m.failed], [1, 1, 2], "answered 1; of the 2 not answered, 1 has a stored read kept");
+  // the PUBLISHED view (F1): what this pass read, else `unavailable`; nothing for an event not asked; never an alias of a stored entry that gets demoted
+  assert.deepEqual(m.published, { a: { read: "unavailable" }, b: m.evidence.b, c: { read: "unavailable" } });
+  assert.deepEqual(m.evidence.a, previous.a, "demoting the published entry did not touch the stored one");
   assert.deepEqual(mergeEvidence({ previous, fresh: { b: { read: "ok", event: { id: "b" } } } }).evidence.b, { read: "ok", event: { id: "b" } }, "no as_of, no stamp invented");
 });
 
@@ -169,7 +184,8 @@ test("FALSIFIER: a read the office answers 200 but with LESS than the page holds
   const degraded = { read: "ok", event: { id: "a", evidence: { rooms: null, room_history: "unavailable", gallery: null, present: null } } };
   const one = mergeEvidence({ previous: { a: held }, fresh: { a: degraded }, asOf: "t1" });
   assert.deepEqual(one.evidence.a, held, "the held read stands, with its own read_at");
-  assert.deepEqual([one.refreshed, one.kept, one.failed], [0, 1, 0]);
+  assert.deepEqual([one.refreshed, one.kept, one.failed, one.degraded], [0, 1, 0, 1]);
+  assert.deepEqual(one.published, { a: { read: "unavailable" } }, "published: unavailable this pass (not the whole held entry, its participants or presentation, as current)");
   assert.equal(knowsLess(degraded.event, held.event), true);
   // only the gallery lost, or only the rooms lost: still less
   assert.equal(knowsLess({ evidence: evidenceOf({ gallery: null }) }, held.event), true);
@@ -214,10 +230,15 @@ test("RESET BOUNDARY, through the production caller: the archive file is carried
   assert.deepEqual(ids, ["h/e0", "h/e1", "h/e2", "h/e3"], "the older pages the capped batch no longer reaches are still there");
   const routes = allEventViews(EMPTY_CALENDAR, second.events).map((e) => e.id);
   for (let n = 0; n < 4; n++) assert.ok(routes.includes(`h/e${n}`), `h/e${n}: page and forward still built`);
-  for (let n = 0; n < 4; n++) assert.equal(second.events.evidence[`h/e${n}`].event.evidence.gallery.sparks[0].id, `spark-${n}`, `h/e${n}: the held gallery stands (the degraded 200 for e0 did not erase it; e1-e3 were not asked)`);
-  assert.equal(second.events.evidence["h/e0"].read_at, first.events.evidence["h/e0"].read_at, "e0 keeps the stamp of the read that actually held its gallery");
+  // STORED (the file): the held gallery stands for all four (the degraded 200 for e0 did not erase it; e1-e3 were not asked), each with the stamp of the read that held it
+  const stored = readEventsArchive(file).events;
+  for (let n = 0; n < 4; n++) assert.equal(stored.evidence[`h/e${n}`].event.evidence.gallery.sparks[0].id, `spark-${n}`, `h/e${n}: the stored gallery stands`);
+  assert.equal(stored.evidence["h/e0"].read_at, first.events.evidence["h/e0"].read_at, "e0 keeps the stamp of the read that actually held its gallery");
+  // PUBLISHED (events.json): this pass read only e0, and the office answered with less; nothing stored is published as a current read (CORE-174 F1)
+  assert.deepEqual(second.events.evidence["h/e0"], { read: "unavailable" });
+  for (const n of [1, 2, 3]) assert.equal(second.events.evidence[`h/e${n}`], undefined, `h/e${n}: not asked this pass, no published read`);
   // and the file now on disk is the merged result, ready for a third run
-  assert.deepEqual(readEventsArchive(file).events, second.events);
+  assert.deepEqual(readEventsArchive(file).events, second.archive);
 
   // CONTROL: the same two runs with no archive path (the old bare call, the tracked snapshot reset each time) lose the older pages and the held gallery
   const bare1 = await fetchEventsArchived({ apiBase: OFFICE, retries: 1, calendar: EMPTY_CALENDAR, trackedSnapshot: EMPTY_EVENTS, maxPages: 2, fetchImpl: stubOffice({ pages: listPages(2), events: everyRead }) });
@@ -263,23 +284,25 @@ test("FAILURE FAILS THE PASS, NEVER A FALSE EMPTY: an unreadable archive and a f
   assert.equal(readEventsArchive(seeded).state, "ok");
   const s = await run(seeded);
   assert.deepEqual(s.events.past.events.map((e) => e.id), ["h/e0", "h/e1", "h/e8", "h/e9"], "the seed's events join the batch");
-  assert.equal(s.events.evidence["h/e9"].event.evidence.gallery.sparks[0].id, "spark-9", "and its evidence is held");
-  assert.equal(s.events.evidence["h/e9"].read_at, SEED_AT, "a seed read with no stamp carries the SEED'S OWN time, not this pass's");
+  assert.equal(s.archive.evidence["h/e9"].event.evidence.gallery.sparks[0].id, "spark-9", "and its evidence is STORED");
+  assert.equal(s.archive.evidence["h/e9"].read_at, SEED_AT, "a seed read with no stamp carries the SEED'S OWN time, not this pass's");
+  assert.deepEqual(s.events.evidence["h/e9"], { read: "unavailable" }, "its read failed this pass (503): published unavailable, not the stored read as current (F1)");
   assert.equal(JSON.parse(readFile(seeded, "utf8")).version, 1, "rewritten as a versioned archive");
 
   // a seed with NO as_of: the time stays unknown, never this pass's
   const noTime = join(home, "notime.json");
   writeFileSync(noTime, JSON.stringify({ past: { events: [E(8)], next: null, note: null, read: "office" }, evidence: { "h/e8": { read: "ok", event: SPARKY(8) } } }));
   const n = await run(noTime);
-  assert.equal(n.events.evidence["h/e8"].read_at, undefined, "no seed time: no stamp invented");
-  assert.equal(eventReadAt({ id: "h/e8" }, null, n.events, false), null, "so the page says nothing about when");
+  assert.equal(n.archive.evidence["h/e8"].read_at, undefined, "no seed time: no stamp invented");
+  assert.equal(eventReadAt({ id: "h/e8" }, null, n.archive, false), null, "so the stored read says nothing about when");
   // THE SAVED SECOND PASS: the file now on disk is a versioned archive whose as_of is the first pass's; reading it again must not stamp the unknown read with that later time
   assert.equal(readEventsArchive(noTime).versioned, true);
   const n2 = await run(noTime);
-  assert.equal(n2.events.evidence["h/e8"].read_at, undefined, "still unknown after the archive was saved and read again");
+  assert.equal(n2.archive.evidence["h/e8"].read_at, undefined, "still unknown after the archive was saved and read again");
   const n3 = await run(noTime);
-  assert.equal(n3.events.evidence["h/e8"].read_at, undefined, "and after a third pass");
-  assert.equal(eventReadAt({ id: "h/e8" }, "2026-11-30T00:00:00.000Z", n3.events, true), null, "listed in a fresh calendar: still no date for the held unknown read");
+  assert.equal(n3.archive.evidence["h/e8"].read_at, undefined, "and after a third pass");
+  assert.equal(eventReadAt({ id: "h/e8" }, "2026-11-30T00:00:00.000Z", n3.archive, true), null, "listed in a fresh calendar: still no date for the held unknown read");
+  assert.deepEqual(n3.events.evidence["h/e8"], { read: "unavailable" }, "and the published file never carried it as a read");
   assert.equal(readEventsArchive(seeded).versioned, true);
 
   assert.equal(readEventsArchive(join(home, "missing.json")).state, "none");
