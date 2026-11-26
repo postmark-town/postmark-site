@@ -574,9 +574,11 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         li.appendChild(who);
         li.appendChild(el("span", "c-said", v.said));       // textContent, always; and never cut
         var iso = isoOf(v);
-        // UI-42: how long ago, in words (the minute tick keeps it true); the exact UTC time is the datetime and the hover title
+        // UI-42: how long ago, in words (the minute tick keeps it true); the exact UTC time is the datetime and the hover title. The tick's rewording is
+        // QUIET: aria-live="off" on the <time> itself, so "4 minutes ago" becoming "5 minutes ago" inside the polite live region is not read aloud. A newly
+        // arrived message is a new row, and is announced as before.
         var when = el("time", "c-ago", agoOf(iso, Date.now()));
-        if (iso) { when.setAttribute("datetime", iso); when.setAttribute("data-ago", ""); when.title = dateTimeOf(iso); }
+        if (iso) { when.setAttribute("datetime", iso); when.setAttribute("data-ago", ""); when.setAttribute("aria-live", "off"); when.title = dateTimeOf(iso); }
         li.appendChild(when);
         var acts = el("span", "c-acts");
         if (reply && node.id !== null) {

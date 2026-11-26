@@ -99,7 +99,8 @@ const inline = code(between("<script is:inline>", "</script>"));
 test("text pins: a message's time is drawn from agoOf and marked for the tick; the tick runs every minute over both lists; the room card keeps its UTC clock", () => {
   assert.ok(inline.length > 20000 && inline.length < between("<script is:inline>", "</script>").length, "control: the strip took comments and left code");
   assert.match(inline, /el\("time", "c-ago", agoOf\(iso, Date\.now\(\)\)\)/, "a message's time is its age when drawn");
-  assert.match(inline, /when\.setAttribute\("datetime", iso\); when\.setAttribute\("data-ago", ""\); when\.title = dateTimeOf\(iso\);/, "the exact UTC time stays in datetime and the hover title");
+  assert.match(inline, /when\.setAttribute\("datetime", iso\); when\.setAttribute\("data-ago", ""\); when\.setAttribute\("aria-live", "off"\); when\.title = dateTimeOf\(iso\);/,
+    "the exact UTC time stays in datetime and the hover title, and the tick's rewording is quiet (aria-live off on the <time>; the drawn attribute is asserted in conversations-circles' UI-42 · AGO)");
   assert.equal(/\bclockOf\b/.test(inline), false, "the message clock is gone");
   assert.match(inline, /window\.setInterval\(agoTick, AGO_MINUTE\)/, "the tick runs every minute");
   assert.match(inline, /refreshAgo\(liveBox, Date\.now\(\)\); refreshAgo\(closedBox, Date\.now\(\)\);/, "over both lists");

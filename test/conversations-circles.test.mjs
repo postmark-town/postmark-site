@@ -335,12 +335,13 @@ test("UI-42 · AGO: each message says how long ago it was said (its exact UTC ti
   const p = await openPage(b, base, { office: makeOffice(state) });
   try {
     await p.until(ROOM_SHOWN, "the room");
-    const TIMES = `Object.fromEntries([50101, 50107, 50114].map((id) => { const t = ${CARD}.querySelector('.c-voice[data-say="' + id + '"] > time.c-ago'); return [id, { text: t.textContent, iso: t.getAttribute("datetime"), title: t.title, ago: t.hasAttribute("data-ago") }]; }))`;
+    const TIMES = `Object.fromEntries([50101, 50107, 50114].map((id) => { const t = ${CARD}.querySelector('.c-voice[data-say="' + id + '"] > time.c-ago'); return [id, { text: t.textContent, iso: t.getAttribute("datetime"), title: t.title, ago: t.hasAttribute("data-ago"), live: t.getAttribute("aria-live"), region: t.closest("[aria-live]:not(time)")?.getAttribute("aria-live") ?? null }]; }))`;
     const drawn = await p.evalJs(TIMES);
     const now = Date.now();
     for (const id of [50101, 50107, 50114]) {
       const iso = new Date(at[id]).toISOString();
-      assert.deepEqual(drawn[id], { text: agoOf(iso, now), iso, title: iso.slice(0, 10) + " " + iso.slice(11, 16) + "Z", ago: true }, `say ${id}: its age in words; the exact time stays in datetime and the title`);
+      // the tick's rewording is quiet: the <time> says aria-live="off" inside the polite region that announces new rows (the control: the region is still polite)
+      assert.deepEqual(drawn[id], { text: agoOf(iso, now), iso, title: iso.slice(0, 10) + " " + iso.slice(11, 16) + "Z", ago: true, live: "off", region: "polite" }, `say ${id}: its age in words; the exact time stays in datetime and the title; its rewording is not read aloud`);
     }
     assert.equal(drawn[50114].text, "5 minutes ago", "a message five minutes old");
     assert.equal(drawn[50107].text, "2 days ago", "two days old");
