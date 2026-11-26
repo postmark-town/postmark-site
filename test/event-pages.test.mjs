@@ -469,7 +469,10 @@ test("BUILT: each state is its own sentence: known none, unknown, a claim not ac
   // public faces and renames on the circles section (CORE-178's live mentions read the same); an ended event with a named roster carries none
   for (const h of [c, live]) assert.match(h, /data-ev-attend\b[^>]*data-state="unknown"[^>]*data-ev-attend-refresh[^>]*\shidden\b/);
   assert.match(live, /data-ev-circles[^>]*data-faces="[^"]*"[^>]*data-aliases="/);
-  assert.equal(/data-ev-circles[^>]*data-faces=/.test(eventHtml(SUPPER)), false);
+  // (the union of #491 into #488: the faces and renames ride WHENEVER the section can mount a reader, #491's accepted F1, so an ended event's room
+  // speakers wear the one mention too; its named roster is still the bake's and is never repainted, which the data-ev-attend-refresh pin above holds)
+  assert.match(eventHtml(SUPPER), /data-ev-circles[^>]*data-faces="[^"]*"[^>]*data-aliases="/, "an ended event's rooms carry the speakers' faces (F1)");
+  assert.equal(/data-ev-attend[^>]*data-ev-attend-refresh/.test(eventHtml(SUPPER)), false, "and its named roster is still not repainted");
   // a room whose id is the NUMBER 0 is a room: drawn, linked, and mounted by its id, never lost to a truthiness check
   const circ = section(live, "data-ev-circles");
   assert.deepEqual([...circ.matchAll(/data-ev-room="([^"]+)"/g)].map((m) => m[1]), ["t1794686460000-walker-test", "0"], "both rooms, the numeric one included, in the office's order");
