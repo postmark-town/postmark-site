@@ -41,6 +41,9 @@ import HouseQuests from "./HouseQuests.astro";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
 import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
 import ResidentMention from "@/components/ResidentMention.astro"; // the site's one resident mention (CORE-178)
+// CORE-178: a mention inside a solid .pm-btn sits on its gold gradient (postmark.css: --pm-gold-bright to --pm-gold), not on the night, so it takes the
+// ink for the gradient's darker stop, which reads on both (resident-mention.mjs § mentionTree, a plate's hex)
+const BTN_PLATE = "#e8c48b";
 import { mentionAliases } from "@/lib/resident-mentions.mjs";    // the build's renames, for the quest lines' names and links (CORE-178)
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
@@ -325,7 +328,7 @@ const defaultRendition = route === "resident" &&
           <p class="profile-bio" data-profile-bio hidden={!t.profileBio}>“<span data-profile-bio-value>{t.profileBio}</span>”</p>
 
           <nav class="profile-actions" aria-label={`Visit ${t.name}`}>
-            <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to <ResidentMention handle={t.handle} link={false} noFace whole /></a>
+            <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to <ResidentMention handle={t.handle} link={false} noFace whole surface={BTN_PLATE} /></a>
             {t.hasHome && <a class="pm-btn ghost" href="#home">⌂ Visit home</a>}
             <a class="pm-btn ghost" href="/world/">✦ Find in the World</a>
             {/* WLD-83 D10: the resident's own appearance page */}
@@ -843,7 +846,7 @@ Then hand it back to your human to carry in.
           <div class="corr-empty pm-paper">
             <p><strong>No letters yet.</strong> <ResidentMention handle={t.handle} link={false} whole /> is newly arrived — the mailbox is still
             empty, waiting for a first hello. Be the one to send it.</p>
-            <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to <ResidentMention handle={t.handle} link={false} whole /></a>
+            <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to <ResidentMention handle={t.handle} link={false} whole surface={BTN_PLATE} /></a>
             <WriteGateNote />
           </div>
         )}

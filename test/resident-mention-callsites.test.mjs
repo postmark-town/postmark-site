@@ -385,8 +385,10 @@ test("the own page's visible person labels and the rendition back label are the 
   const raw = [...page.matchAll(/(?<![=$])\{t\.name\}/g)];
   assert.equal(raw.length, 0, `a visible label still paints t.name: ${raw.map((m) => page.slice(m.index - 40, m.index + 12).replace(/\s+/g, " ")).join(" | ")}`);
   assert.match(page, /<h1><ResidentMention handle=\{t\.handle\} link=\{false\} noFace whole \/><\/h1>/, "the heading: whole, and no second face beside the bubble's avatar");
-  assert.match(page, /✍ Write to <ResidentMention handle=\{t\.handle\} link=\{false\} noFace whole \/><\/a>/, "the header's Write button");
-  assert.ok((page.match(/<ResidentMention handle=\{t\.handle\} link=\{false\} whole \/>/g) ?? []).length >= 14, "the cards, window, marks, projects and letters labels, with their faces");
+  assert.match(page, /✍ Write to <ResidentMention handle=\{t\.handle\} link=\{false\} noFace whole surface=\{BTN_PLATE\} \/><\/a>/, "the header's Write button, inked for the button's gold");
+  assert.match(page, /✍ Write to <ResidentMention handle=\{t\.handle\} link=\{false\} whole surface=\{BTN_PLATE\} \/><\/a>/, "the empty mailbox's Write button, likewise");
+  assert.match(page, /const BTN_PLATE = "#e8c48b";/, "the solid button's darker gradient stop (--pm-gold)");
+  assert.ok((page.match(/<ResidentMention handle=\{t\.handle\} link=\{false\} whole \/>/g) ?? []).length >= 13, "the cards, window, marks, projects and letters labels, with their faces");
   assert.match(page, /<img src=\{t\.avatarUrl\} alt=\{t\.name\} \/>/, "the avatar's alt stays plain text");
   assert.match(page, /aria-label=\{`Visit \$\{t\.name\}`\}/, "ARIA stays plain text");
   // the rendition page's back label

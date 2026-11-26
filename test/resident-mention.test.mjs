@@ -269,6 +269,10 @@ test("a mention on a solid plate of the page's own takes the ink for that plate 
   assert.doesNotMatch(mentionTree(m, { surface: "not a colour" })[0].attrs.class, /on-ink/, "an unreadable surface is no plate");
   const neutral = mentionModel({ handle: "y", face: { name: "Y", accent: null }, href: "/residents/y/" });
   assert.doesNotMatch(mentionTree(neutral, { surface: PLATE })[0].attrs.class, /on-ink/, "no colour chosen: no invented ink");
+  // the plate is recorded on the element either way, so an in-place colour repaint inks it for the same plate (profile-edit.mjs § inkMentions)
+  assert.equal(mentionTree(neutral, { surface: PLATE })[0].attrs["data-rm-plate"], PLATE);
+  assert.equal(mentionTree(mentionModel({ handle: "x", face: { name: "X", accent: "#629da8" }, href: "/residents/x/" }), { surface: PLATE })[0].attrs["data-rm-plate"], PLATE);
+  assert.equal(mentionTree(neutral, { surface: "paper" })[0].attrs["data-rm-plate"], undefined, "a named surface is no plate");
   // the bulletin names its plate, and it is the plate its CSS draws
   const bulletin = readFileSync(new URL("../town/pages/bulletin/index.astro", import.meta.url), "utf8");
   assert.match(bulletin, /const HAND_PLATE = "#2f3a56";/);

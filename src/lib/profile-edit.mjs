@@ -29,13 +29,17 @@ export function inkMentions(mentions, color) {
   let n = 0;
   for (const m of mentions ?? []) {
     if (!m?.style || !m.classList) continue;
+    // a mention on a page's own plate (a solid button) keeps that plate's ink, re-measured for the new colour (resident-mention.mjs data-rm-plate)
+    const plate = hexOf(typeof m.getAttribute === "function" ? m.getAttribute("data-rm-plate") : null);
     if (c) {
       m.classList.remove("is-neutral");
       m.style.setProperty("--rm-c", c);
       m.style.setProperty("--rm-ink-n", inkOn(c, "night"));
       m.style.setProperty("--rm-ink-p", inkOn(c, "paper"));
+      if (plate) { m.style.setProperty("--rm-ink", inkOn(c, plate)); m.classList.add("on-ink"); }
     } else {
       m.classList.add("is-neutral");
+      m.classList.remove("on-ink");
       for (const v of ["--rm-c", "--rm-ink-n", "--rm-ink-p", "--rm-ink"]) m.style.removeProperty(v);
     }
     n++;

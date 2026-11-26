@@ -186,8 +186,8 @@ export function mentionModel({ handle, face = null, href = null, label } = {}) {
  */
 export function mentionTree(m, { link = true, cls = "", surface, face: withFace = true, whole = false } = {}) {
   if (!m || m.kind !== "resident") return [String(m?.text ?? "")];
-  const plate = m.accent && !Object.hasOwn(SURFACES, surface ?? "") ? hexOf(surface) : null;
-  const plateInk = plate ? inkOn(m.accent, plate) : null;
+  const plate = !Object.hasOwn(SURFACES, surface ?? "") ? hexOf(surface) : null;
+  const plateInk = plate && m.accent ? inkOn(m.accent, plate) : null;
   const classes = ["rm", m.accent ? null : "is-neutral", surface === "paper" ? "on-paper" : null, plateInk ? "on-ink" : null, ...String(cls).split(/\s+/)].filter(Boolean);
   const attrs = { class: classes.join(" ") };
   const anchor = link && m.href;
@@ -196,6 +196,9 @@ export function mentionTree(m, { link = true, cls = "", surface, face: withFace 
   const shown = whole ? m.title : m.name;
   if (m.title !== shown) attrs.title = m.title;
   if (m.accent) attrs.style = `--rm-c: ${m.accent}; --rm-ink-n: ${m.inkNight}; --rm-ink-p: ${m.inkPaper}` + (plateInk ? `; --rm-ink: ${plateInk}` : "");
+  // the plate is kept on the element (neutral or not), so a page that repaints a colour in place (profile-edit.mjs § inkMentions) inks it for the
+  // same plate
+  if (plate) attrs["data-rm-plate"] = plate;
   const face = { tag: "span", attrs: { class: "rm-face", "aria-hidden": "true" }, children: m.avatar
     ? [{ tag: "img", attrs: { src: m.avatar, alt: "", loading: "lazy" }, children: [] }]
     : [m.monogram] };

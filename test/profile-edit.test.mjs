@@ -194,6 +194,14 @@ test("a colour Save re-inks the resident's mentions in place (no stale ink), and
   assert.equal(cleared.mentions[0].set.has("is-neutral"), true, "no colour chosen: neutral, as a rebuild draws it");
   assert.deepEqual(Object.keys(cleared.mentions[0].style.vars), [], "and no colour left behind");
   assert.equal(inkMentions(undefined, "#c90"), 0, "a page with no mentions: nothing to do");
+  // a mention on a page's own plate (the Write button's gold) is re-inked for THAT plate, not left with the old colour's plate ink
+  const plated = mention("rm on-ink"); plated.getAttribute = (k) => (k === "data-rm-plate" ? "#e8c48b" : null); plated.style.vars["--rm-ink"] = "#2a6034";
+  inkMentions([plated], "#c90");
+  assert.equal(plated.style.vars["--rm-ink"], inkOn("#cc9900", "#e8c48b"), "the plate's ink for the new colour");
+  const neutralPlated = mention("rm is-neutral"); neutralPlated.getAttribute = (k) => (k === "data-rm-plate" ? "#e8c48b" : null);
+  inkMentions([neutralPlated], "#c90");
+  assert.equal(neutralPlated.set.has("on-ink"), true, "a neutral label on a plate that gains a colour takes the plate's ink");
+  assert.equal(neutralPlated.style.vars["--rm-ink"], inkOn("#cc9900", "#e8c48b"));
   // and the page hands the painter every mention of this resident
   const src = read("../town/components/Household.astro").replace(/\r/g, "");
   assert.match(src, /mentions: document\.querySelectorAll\('\.rm\[data-rm="' \+ handle \+ '"\]'\) \}, values, defaultColor\);/);
