@@ -4,7 +4,8 @@
 // (data-profile-avatar-*, data-profile-pronouns-clear, data-profile-bio-count, the named boxes) are the ones that controller has always read. The
 // words, placeholders and limits are src/lib/resident-fields.mjs; the styles src/styles/resident-page.css.
 //
-// `picture` false leaves the picture row out; `fields` names which of the editor's fields to draw (all of them, in their order, by default).
+// `picture` false leaves the picture row out; `fields` names which of the editor's fields to draw (all of them, in their order, by default; none
+// draws the picture row alone, as the join's "more" drawer does, its fields being the blank page's own boxes).
 // `piece` (the join's blank instance) puts the join's own hook on each box (data-piece) and a live count on every field with a limit
 // (data-count-for), the approved join's "a live count on every field"; without it the editor is drawn exactly as the resident page has it.
 import ResidentField from "./ResidentField.astro";
@@ -48,6 +49,7 @@ const countOf = (name: string) => piece
     </div>
   </div>
 )}
+{fields.length > 0 && (
 <div class="profile-edit-grid">
   {fields.map((name) => (
     <ResidentField
@@ -60,3 +62,4 @@ const countOf = (name: string) => piece
     />
   ))}
 </div>
+)}

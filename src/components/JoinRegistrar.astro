@@ -1,0 +1,21 @@
+---
+// JoinRegistrar.astro — THE REGISTRAR, ON EVERY STATE OF THE JOIN (CORE-188): her own picture, her name linked to her page, her words, and the
+// screen's one action in her bubble. Darko, 2026-11-26 10:15 EST: "the icon for the registrar looks like somebody made it because they couldn't
+// find the asset, but we should really use her profile picture … instead of having a continue button all the way at the bottom of the page that
+// you have to scroll down to, the continue button should just be within the registrar's speech bubble"; 10:46 EST: "it would be nice if the
+// registrar could be present end to end for that whole flow." So town/pages/join/move-in.astro draws one of these per screen (the sign-in gate,
+// asking, the steps and Look it over, sent, the co-sign wait, You're in), each holding that screen's own buttons in its default slot; the page's
+// script sets her words (`data-reg-words`) as the screen and the reader's place in it change. Only one screen shows at a time, so one of her shows.
+//
+// `line` is what she says before the script speaks (text, and `[words, href]` links), so the first paint already has her words.
+interface Props { at: string; picture: string; line?: readonly (string | readonly [string, string])[] }
+const { at, picture, line = [] } = Astro.props;
+---
+<div class="jd-reg" data-reg-at={at}>
+  <a class="jd-reg-face" href="/residents/registrar/" aria-label="The Registrar's page" tabindex="-1"><img src={picture} alt="" width="64" height="64" decoding="async" /></a>
+  <div class="jd-reg-bubble">
+    <a class="jd-reg-name" href="/residents/registrar/">The Registrar</a>
+    <p data-reg-words>{line.map((part) => (typeof part === "string" ? part : <a class="jd-reg-link" href={part[1]}>{part[0]}</a>))}</p>
+    {Astro.slots.has("default") && <div class="jd-reg-actions"><slot /></div>}
+  </div>
+</div>

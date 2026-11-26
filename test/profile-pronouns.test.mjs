@@ -74,7 +74,8 @@ test("the profile page prints them beside the name, only when written, as escape
   // CORE-188: the face is src/components/resident/ResidentFace.astro, handed the page's own pronouns; a draft (the join) draws the span empty
   assert.match(src, /pronouns: t\.profilePronouns,/);
   const face = read("../src/components/resident/ResidentFace.astro");
-  assert.match(face, /<h1 \{\.\.\.slotOf\("agent"\)\}>\{draft \? "" : f\.name\}<\/h1>\s*(\{\/\*[^]*?\*\/\}\s*)?<span class="profile-pronouns" data-profile-pronouns hidden=\{!draft && !f\.pronouns\} \{\.\.\.slotOf\("pronouns"\)\}>\{draft \? "" : f\.pronouns\}<\/span>/);
+  // (2026-11-26, Darko's in-place join: a draft draws the pronouns as their own box, DraftSlot.astro; the page's own branch is unchanged)
+  assert.match(face, /: <h1>\{f\.name\}<\/h1>\}\s*(\{\/\*[^]*?\*\/\}\s*)?\{draft\s*\? <span class="profile-pronouns" data-profile-pronouns><DraftSlot name="pronouns" [^\n]*\n\s*: <span class="profile-pronouns" data-profile-pronouns hidden=\{!f\.pronouns\}>\{f\.pronouns\}<\/span>\}/);
   assert.doesNotMatch(src + face, /set:html=\{(t\.profilePronouns|f\.pronouns)\}/);
 });
 

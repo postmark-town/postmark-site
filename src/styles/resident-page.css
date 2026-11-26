@@ -332,18 +332,61 @@
   .rpage .res-paper { padding: 1.2em 1.5em; font-size: 0.96rem; line-height: 1.65; margin: 0; }
   .rpage .res-paper > :first-child { margin-top: 0; }
 
-/* ── A BLANK INSTANCE OF THE PAGE (CORE-188): the join fills these same pieces in ────────────────────────────────────────────────────────────
-   Drawn only where a piece carries data-ghost (ResidentFace.astro's and AddressCardFace.astro's draft): what the piece will hold, until it is
-   filled; and is-lit on the pieces the reader is filling right now. The resident page never carries either, so none of this reaches it. */
+/* ── A BLANK INSTANCE OF THE PAGE (CORE-188): the join types into these same pieces ───────────────────────────────────────────────────────
+   Drawn only in a draft (ResidentFace.astro's and AddressCardFace.astro's `draft`), so the resident page never carries any of it. Each piece the
+   reader writes is its own box where it stands (DraftSlot.astro: .draft-slot holding .draft-in), in the spot's own type, its ghost the
+   placeholder; is-lit marks the pieces of the step being filled (the dotted outline: "type here"); a spot that only shows a piece typed
+   elsewhere carries data-show and its ghost as data-ghost. Darko, 2026-11-26: "we should just allow form filling directly in the preview shape
+   of the resident form itself, especially because the dotted lines currently look like you can click them to like fill them in." */
 /* opacity 0.68: the lowest that keeps every ghost a reader needs at 4.5:1 or better on its own backdrop (0.5 measured 2.4–3.8:1 on the chips,
    the handle, the card's line and the full-address paper; CORE-188's contrast readout). The pronouns slot already wears its own 0.72, so its
-   ghost takes 0.86 to land in the same place. Italic still tells a ghost from a filled piece. */
+   ghost takes 0.86 to land in the same place. Italic still tells a ghost from a filled piece. A box's placeholder is the same ghost. */
 .rpage [data-ghost]:empty::before { content: attr(data-ghost); opacity: 0.68; font-style: italic; font-weight: 400; }
-.rpage .profile-pronouns[data-ghost]:empty::before { opacity: 0.86; }
-.rpage .profile-handle[data-ghost]:empty::before, .rpage .profile-chip [data-ghost]:empty::before { font-style: normal; }
+.rpage .draft-in::placeholder { color: inherit; opacity: 0.68; font-style: italic; font-weight: 400; }
+.rpage .profile-pronouns .draft-in::placeholder { opacity: 0.86; }
+.rpage .profile-handle .draft-in::placeholder, .rpage .profile-chip .draft-in::placeholder,
+.rpage .profile-handle[data-ghost]:empty::before, .rpage .profile-chip [data-ghost]:empty::before, .rpage .profile-chip[data-ghost]:empty::before { font-style: normal; }
 .rpage [data-fill].is-lit {
   outline: 1.5px dashed color-mix(in srgb, var(--profile-color, #e8c48b) 75%, transparent); outline-offset: 3px; border-radius: 6px;
   box-shadow: 0 0 18px color-mix(in srgb, var(--profile-color, #e8c48b) 22%, transparent);
 }
 .rpage .profile-avatar[data-fill] > img { transform-origin: center; }
-.rpage .res-paper[data-ghost] { white-space: pre-wrap; overflow-wrap: anywhere; }
+.rpage .profile-avatar[data-fill].is-lit { cursor: pointer; }
+
+/* the box: the page's own words, with nothing of a form about it but the caret (and, while lit, the dotted outline around it) */
+.rpage .draft-slot { position: relative; display: inline-block; max-width: 100%; vertical-align: baseline; }
+.rpage .draft-in {
+  box-sizing: content-box; max-width: 100%; min-width: 1ch; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent;
+  font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; text-shadow: inherit; line-height: inherit;
+  caret-color: var(--profile-color, #e8c48b); field-sizing: content; outline: none; box-shadow: none; appearance: none;
+}
+.rpage .draft-in[readonly] { cursor: default; }
+.rpage .draft-slot.is-lit .draft-in { cursor: text; }
+.rpage .draft-slot.is-lit:focus-within { outline-style: solid; outline-color: var(--profile-color, #e8c48b); }
+.rpage .draft-slot.is-long { display: block; width: 100%; }
+.rpage .draft-slot.is-long .draft-in { display: block; box-sizing: border-box; width: 100%; resize: none; overflow: hidden; min-height: 1.5em; }
+.rpage .draft-in[aria-invalid="true"] { text-decoration: underline wavy rgba(245, 179, 160, 0.85); text-underline-offset: 3px; }
+/* the count (while the box has focus, or always once it's over) and the problem (as soon as there is one), just under the piece: one small
+   label each, on night so they read on any backdrop, the parchment's included */
+.rpage .draft-tips {
+  position: absolute; left: 0; top: calc(100% + 5px); z-index: 6; display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  pointer-events: none; font: 400 0.66rem/1.4 var(--pm-mono); letter-spacing: 0.04em; text-transform: none; text-shadow: none; font-style: normal;
+}
+.rpage .draft-count, .rpage .draft-problem {
+  display: none; padding: 2px 7px; border-radius: 6px; white-space: nowrap;
+  background: rgba(7, 11, 21, 0.94); border: 1px solid rgba(232, 196, 139, 0.32); color: #e8d9b8;
+}
+.rpage .draft-slot:focus-within .draft-count:not(:empty), .rpage .draft-count[data-over="1"] { display: block; }
+.rpage .draft-count[data-over="1"] { color: var(--pm-gold-bright); }
+.rpage .draft-problem:not(:empty) { display: block; white-space: normal; width: max-content; max-width: min(34ch, 78vw); color: #f5b3a0; border-color: rgba(214, 120, 96, 0.6); }
+/* the colour's own hex box shows only while its step is lit; read as the page, the chip is the swatch and its name, as on the resident page */
+.rpage .color-chip .draft-slot[data-slot="color"] { margin-right: 0.45em; }
+.rpage .color-chip .draft-slot[data-slot="color"]:not(.is-lit) { display: none; }
+/* how they persist: a line of its own under the chips (the draft's one line the resident page doesn't draw) */
+.rpage .profile-persist { margin: 0.45em 0 0; font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.05em; color: #aabef9; }
+.rpage .profile-bio .draft-slot.is-long .draft-in { min-height: 1.55em; }
+/* the Address card, drawn as a picture of the card: nothing to open */
+.rpage .bcard[data-draft] { cursor: default; }
+.rpage .bcard[data-draft]:hover { transform: none; border-color: rgba(232, 196, 139, 0.2); }
+.rpage .bcard[data-draft] .bcard-line .draft-slot { display: block; width: 100%; }
+.rpage .bcard[data-draft] .bcard-line .draft-in { width: 100%; box-sizing: border-box; }
