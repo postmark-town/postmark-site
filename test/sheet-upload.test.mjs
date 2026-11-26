@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import {
   SHEET_MAX_BYTES, ownsResident, fileProblem, urlProblem,
   uploadFileRequest, uploadUrlRequest, setSheetRequest, mediaUrlOf, refusalWords, ownerGate, setSheetFlow,
-  nameSheetRequest, nameSheetFlow, keptNameOf,
+  nameSheetRequest, nameSheetFlow, keptNameOf, keptSheetOf,
 } from "../src/lib/sheet-upload.mjs";
 
 const BASE = "/api";
@@ -270,6 +270,30 @@ test("CORE-175: a refusal or a 503 claims nothing: never saved, never unnamed or
   assert.equal(out.ok, false);
   out = await flow(200, keepAnswer(SHEET_A, "Vex").data, "  Vex  ");
   assert.equal(out.ok, true, "the office trims; so does the comparison");
+});
+
+test("CORE-175 FIX: a clear is confirmed only by the office's acknowledgement of THAT kept sheet; a 2xx that carries none clears nothing", async () => {
+  const clear = (status, data) => nameSheetFlow({ handle: "qa-many", base: BASE, tok: fresh, now: NOW, url: SHEET_A, name: "", send: async () => ({ status, data }) });
+  // the falsifier: on a named sheet, Clear answered 2xx with no readable sheet is not a success and returns no name to paint
+  for (const [what, data] of [["a null (or non-JSON) body", null], ["no sheet", { updated: ["sheet"] }], ["a sheet with no url", { updated: ["sheet"], sheet: {} }],
+    ["another sheet's url", keepAnswer(SHEET_B).data], ["a sheet that isn't an object", { sheet: "cleared" }]]) {
+    for (const status of [200, 204]) {
+      const out = await clear(status, data);
+      assert.equal(out.ok, false, `${what} (${status}) was taken as a clear`);
+      assert.equal("name" in out, false, `${what}: nothing comes back to paint`);
+      assert.equal(out.words, "The office answered, but its answer doesn't show that name as saved. Reload the page to see what stands.");
+      assert.doesNotMatch(out.words, /cleared|nothing was changed/i, "no new claim either way");
+    }
+  }
+  // a valid acknowledgement of the cleared kept sheet still clears, its name absent or empty
+  assert.deepEqual(await clear(200, keepAnswer(SHEET_A).data), { ok: true, name: null, words: "Name cleared." });
+  assert.deepEqual(await clear(200, { updated: ["sheet"], sheet: { id: "s1", url: SHEET_A, name: "" } }), { ok: true, name: null, words: "Name cleared." });
+  // and a set or correction needs the same acknowledgement
+  const set = (data) => nameSheetFlow({ handle: "qa-many", base: BASE, tok: fresh, now: NOW, url: SHEET_A, name: "Vex", send: async () => ({ status: 200, data }) });
+  assert.equal((await set(keepAnswer(SHEET_B, "Vex").data)).ok, false, "another sheet's answer is not this one's save");
+  assert.deepEqual(await set(keepAnswer(SHEET_A, "Vex").data), { ok: true, name: "Vex", words: "Saved." });
+  assert.equal(keptSheetOf(keepAnswer(SHEET_A).data, SHEET_A).url, SHEET_A);
+  assert.equal(keptSheetOf(null, SHEET_A), null);
 });
 
 test("CORE-175: an expired sign-in names nothing and says sign in again", async () => {

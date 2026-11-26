@@ -412,6 +412,35 @@ test("REFUSALS KEEP WHAT WAS TYPED: 81 code points stop before the network, 80 e
   } finally { await p.close(); }
 });
 
+test("A CLEAR THE OFFICE DIDN'T ACKNOWLEDGE: 2xx with no body, or no sheet, keeps the name, the alt, the box and Clear; a real acknowledgement still clears", { skip: SKIP }, async () => {
+  await setup();
+  const office = officeFor();
+  office.sheets[0].name = "Julian";
+  const p = await openPage(browser, base, PAGE(MANY), { office });
+  try {
+    await p.until(`${painted(2)} && !${figs}[0].querySelector("[data-ap-name-edit]").hidden`, "the owner's boxes");
+    const before = (await p.js(sheetsNow))[0];
+    for (const [what, answer] of [["a 200 with no body", { status: 200, body: null }], ["a 200 with no sheet", { status: 200, body: { updated: ["sheet"] } }]]) {
+      office.refuseNext = answer;
+      await p.js(`${figs}[0].querySelector("[data-ap-name-status]").textContent = "", ${figs}[0].querySelector("[data-ap-name-clear]").click(), true`);
+      await p.until(`${figs}[0].querySelector("[data-ap-name-status]").textContent !== "" && !/Saving/.test(${figs}[0].querySelector("[data-ap-name-status]").textContent)`, `the answer to ${what}`);
+      const s = (await p.js(sheetsNow))[0];
+      assert.equal(s.status, "The office answered, but its answer doesn't show that name as saved. Reload the page to see what stands.", what);
+      assert.equal(s.name, "Julian", `${what}: the shown name was erased`); assert.equal(s.cap, before.cap); assert.equal(s.alt, before.alt);
+      assert.equal(s.input, "Julian", `${what}: the box was emptied`);
+      assert.equal(await p.js(`getComputedStyle(${figs}[0].querySelector("[data-ap-name-clear]")).display !== "none"`), true, `${what}: Clear went away`);
+      assert.equal(await p.js(`${figs}[0].querySelector("[data-ap-name-status]").classList.contains("ap-name-status-warn")`), true);
+    }
+    // the invented office's real acknowledgement of the cleared sheet: cleared, as before
+    await p.js(`${figs}[0].querySelector("[data-ap-name-clear]").click(), true`);
+    await p.until(`!${figs}[0].querySelector("[data-ap-sheet-name]")`, "the acknowledged clear");
+    const s = (await p.js(sheetsNow))[0];
+    assert.equal(s.status, "Name cleared."); assert.equal(s.cap, "the household's own"); assert.equal(s.input, "");
+    assert.deepEqual(sheetPatches(office).map((b) => b.sheet_name), ["", "", ""], "three clears sent, each the explicit \"\"");
+    assert.deepEqual(p.faults, []);
+  } finally { await p.close(); }
+});
+
 test("BOTH UPLOAD PATHS: a name rides the link path's keep; the file path untouched sends the bare keep; a re-kept named URL keeps its name; a refused keep keeps the typed name", { skip: SKIP }, async () => {
   await setup();
   picDir = mkdtempSync(join(tmpdir(), "core175-pic-"));

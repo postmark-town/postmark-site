@@ -106,6 +106,15 @@ export function nameSheetRequest(base, handle, keptUrl, name, token) {
   return setSheetRequest(base, handle, keptUrl, token, { name: String(name ?? "") });
 }
 
+/**
+ * The office's acknowledgement of the kept sheet a keep named: the answer's `sheet` object, for that URL (POS-1202's keep answers the sheet it
+ * kept, `{ updated, sheet: { id, url, …, name? } }`). Null when the answer carries none (a null or non-JSON body, no `sheet`, another URL).
+ */
+export function keptSheetOf(data, url) {
+  const s = data && typeof data === "object" && data.sheet && typeof data.sheet === "object" ? data.sheet : null;
+  return s && typeof s.url === "string" && s.url === url ? s : null;
+}
+
 /** The name that now stands on the office's answer to a keep (`sheet.name`), or null when it answered the sheet unnamed. */
 export function keptNameOf(data) {
   const n = data && data.sheet && typeof data.sheet === "object" ? data.sheet.name : undefined;
@@ -186,14 +195,18 @@ export async function setSheetFlow({ handle, base, tok, makeUpload, send, say = 
  * `name` is the office's answer (`sheet.name`, null when it now stands unnamed); on a refusal nothing is claimed and `name` is absent, so
  * the page keeps what it showed and what the person typed.
  */
+const UNCONFIRMED = "The office answered, but its answer doesn't show that name as saved. Reload the page to see what stands.";
+
 export async function nameSheetFlow({ handle, base, tok, url, name, send, now = Date.now() }) {
   if (!tokenIsFresh(tok, now)) return { ok: false, words: refusalWords("name", 401, null) };
   const r = await send(nameSheetRequest(base, handle, url, name, tok.access_token));
   if (!okStatus(r.status)) return { ok: false, words: refusalWords("name", r.status, r.data) };
-  const now2 = keptNameOf(r.data);
-  // the office's answer is what stands: an answer that doesn't carry what was sent (an office without POS-1202) is never claimed as a save
+  // the office's answer is what stands, and only a recognisable acknowledgement of THIS kept sheet is one: a 2xx with a null or malformed body
+  // carries no sheet, so it confirms nothing (a missing name there is not "unnamed", and a clear is never claimed on it)
+  const kept = keptSheetOf(r.data, url);
+  const now2 = kept ? keptNameOf(r.data) : null;
+  // an answer that doesn't carry what was sent (an office without POS-1202) is never claimed as a save
   const asked = String(name ?? "").trim();
-  if (asked ? now2 !== asked : now2 !== null)
-    return { ok: false, words: "The office answered, but its answer doesn't show that name as saved. Reload the page to see what stands." };
+  if (!kept || (asked ? now2 !== asked : now2 !== null)) return { ok: false, words: UNCONFIRMED };
   return { ok: true, name: now2, words: now2 ? "Saved." : "Name cleared." };
 }
