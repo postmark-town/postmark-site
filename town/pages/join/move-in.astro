@@ -858,6 +858,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       nextBtn.hidden = last; submitBtn.hidden = !last;
       nextBtn.textContent = returnTo ? "Back to Look it over" : "Continue";
       skipBtn.hidden = last || returnTo != null || !SKIPPABLE.has(id);
+      // Enter continues a step; on the look-over Send is pressed, never Entered, so the hint doesn't promise it
+      $(".jf-hint", gateAct).hidden = last;
       if (last) paintReview();
       formError.hidden = true;
       // the step's first box: its first lit piece on the page, else the first box of its own
