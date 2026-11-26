@@ -1,0 +1,7 @@
+refused-390         name refusal (#ff9d8f)                         text rgb(255,157,143) on rgb(11,17,33) = 9.38:1
+toolong-1440        length refusal (#ff9d8f)                       text rgb(255,157,143) on rgb(9,14,26) = 9.61:1
+upload-refused-390  upload refusal (.ap-note, #ff9d8f at .85)      text rgb(218,135,125) on rgb(7,11,21) = 7.25:1
+refused-390         caption 'the household's own' (inherited, .8)  text rgb(189,182,169) on rgb(8,12,23) = 9.70:1 (glyph estimate)
+refused-390         caption name 'Julian' (inherited, 600, .8)     text rgb(190,184,173) on rgb(14,21,40) = 9.21:1 (glyph estimate)
+refused-390         label 'Who this sheet shows'                   text rgb(236,225,207) on rgb(7,11,21) = 15.21:1 (glyph estimate)
+upload-refused-390  label 'Who this sheet shows (optional)'        text rgb(236,225,207) on rgb(15,23,43) = 13.79:1 (glyph estimate)

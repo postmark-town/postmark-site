@@ -1,0 +1,4 @@
+residents-qa-fixture-solo-core175-appearance-shot-solo-390.png 390x844 vs 390x844 0 differing channel values
+residents-qa-fixture-solo-core175-appearance-shot-solo-1440.png 1440x900 vs 1440x900 0 differing channel values
+residents-qa-fixture-solo-core175-appearance-shot-solo-390-full.png 390x1586 vs 390x1586 0 differing channel values
+residents-qa-fixture-solo-core175-appearance-shot-solo-1440-full.png 1440x1347 vs 1440x1347 0 differing channel values
