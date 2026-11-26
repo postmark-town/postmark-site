@@ -467,6 +467,8 @@ const BUGCATCHER = [
 // figure on the quay's shelf like Ferry: her dark hair up in a bun tied with a navy ribbon, the silver streak falling over her brow, warm brown
 // skin, a navy shirt with red at the collar and cuffs, a brown apron on gold buckles with her warm pendant on its cord, a gold earring, and her
 // paintbrush raised, its tip wet with lamp gold. The crayon background (the lantern, the framed fire, the sparkles) stays in the portrait.
+// Her eyes are open, each a 2×2 of the doorway dark with one paper pixel at its top as the catchlight, as Darko's token lights his: Darko's look,
+// relayed by Wright 2026-11-26, found the first drawing's one-row bars "read as like potentially like exasperated or tired".
 const IRIS = [
   "..........wwww..........",
   ".......nu.wWWwww........",
@@ -475,7 +477,7 @@ const IRIS = [
   "......wwWwwwwwwwWw......",
   ".....wWwiiWwwwwwwww.....",
   ".....wwiiweeeeeeeWw.....",
-  ".....wWiweeeeeeeeew.y...",
+  ".....wWiwepdeepdeew.y...",
   ".....wiweeddeeddeew.t...",
   ".....wiweceeeeeecew.t...",
   ".....wgwEeeecceeeEwee...",
@@ -497,7 +499,7 @@ const IRIS = [
 // THE REGISTRAR — from her portrait, her town profile picture since 2026-11-25 (the-town/40b8c76c…9e5169.jpg). Darko, 2026-11-25 (CORE-185):
 // "add registrar's too". Her tousled brown bob with its silver forelock, a fair face with rosy cheeks, a black T-shirt, a green jumper tied at
 // her waist with a tag hanging from it, and her clipboard held up in both hands, its clip in her own copper and its paper lined. The door
-// behind her, the sprigs and the other tags stay in the portrait.
+// behind her, the sprigs and the other tags stay in the portrait. Her eyes are open and lit the same way as Iris's (2×2, a paper catchlight).
 const REGISTRAR = [
   "........................",
   ".........mmmmmm.........",
@@ -505,7 +507,7 @@ const REGISTRAR = [
   "......mmaaiiiammmm......",
   ".....mmmaiIeeeeammm.....",
   ".....mmaieeeeeeemma.....",
-  "....mmmeeeeeeeeeemmm....",
+  "....mmmeepdeepdeemmm....",
   "....mmaeeddeeddeeamm....",
   "....mmaeceeeeeeceamm....",
   "....mmmeeeeEEeeeemmm....",
