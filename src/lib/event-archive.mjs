@@ -7,7 +7,8 @@
 //   the INVENTORY   every event the lasting list ever gave this site keeps its page (and its /calendar/<host>/<slug>/ forward) after a capped batch that no longer reaches
 //                   it. The batch's own view of an event is the newer word and wins; an event only the committed snapshot holds is kept as it stands.
 //   the EVIDENCE    the one-event reads the build already holds. A read that is REFUSED, FAILED or NOT ASKED this run is not a fresh empty answer: the evidence already held
-//                   stands, exactly as it was read (its own `read_at`), and a read that answers REPLACES it whole (never merged field by field, so one window's talk is never
+//                   stands in the ARCHIVE'S STORE, exactly as it was read (its own `read_at`; events.json publishes only what this pass read: `unavailable` for a failed or
+//                   degraded read, nothing for one not asked: see mergeEvidence), and a read that answers REPLACES it whole (never merged field by field, so one window's talk is never
 //                   mixed into another read's). Work is ordered so a page that has never been read comes first and the rest rotate oldest-read first, so a gallery baked
 //                   before an event's sparks were made is refreshed, not left to stand forever.
 //
@@ -116,27 +117,40 @@ export const knowsLess = (fresh, held) => (galleryKnown(held) && !galleryKnown(f
 /**
  * The evidence map for the next events.json. `previous` is what the committed file held; `fresh` is this run's reads (`{ <id>: { read: "ok", event } | { read: "unavailable" } }`,
  * only for the events actually asked). `asOf` stamps a fresh good read.
+ * STORED (`evidence`):
  *   fresh ok                     replaces the held entry whole, stamped `read_at` ... unless it KNOWS LESS than the held one (knowsLess: the rooms or the gallery
  *                                went from known to unknown), then the held entry stands, as for a refusal
  *   fresh unavailable, held ok   the held entry stands untouched (a failed refresh is not a new answer, and not an empty one)
  *   fresh unavailable, none held `{ read: "unavailable" }`
- *   not asked this run           the held entry stands; with none held there is no entry (the page reads that as "never asked")
- * Nothing held is ever dropped.
+ *   not asked this run           the held entry stands; with none held there is no entry
+ * Nothing held is ever dropped. PUBLISHED (`published`, only the events asked this run): the fresh good read, else `{ read: "unavailable" }`; nothing for an event not asked.
  */
 export function mergeEvidence({ previous = {}, fresh = {}, asOf = null } = {}) {
   const out = { ...(isObj(previous) ? previous : {}) };
-  let refreshed = 0, kept = 0, failed = 0;
+  // TWO VIEWS, never aliased (CORE-174 F1 on #507): `evidence` is what the archive STORES (durable, the table above); `published` is what THIS pass's events.json says. Durable storage is
+  // not permission to publish a stale read as current (Wright, CORE-180: changeable evidence stays as fresh as main's, one publishing pass at most): an asked read that failed, or answered
+  // with less than the stored one holds, is published `unavailable` as on main while the stored entry keeps its bytes and its own `read_at` for the next good read. An event not asked this
+  // pass has no published entry (the page's "never asked"): the file holding it is not a read made now.
+  const published = {};
+  let refreshed = 0, kept = 0, failed = 0, degraded = 0;
   for (const [id, got] of Object.entries(isObj(fresh) ? fresh : {})) {
     if (got?.read === "ok" && isObj(got.event)) {
-      if (out[id]?.read === "ok" && knowsLess(got.event, out[id].event)) { kept++; continue; }
+      if (out[id]?.read === "ok" && knowsLess(got.event, out[id].event)) {
+        kept++; degraded++;                     // answered, but with less: the stored read stands, whole, and is NOT published as current
+        published[id] = { read: "unavailable" };
+        continue;
+      }
       out[id] = { read: "ok", event: got.event, ...(typeof asOf === "string" && asOf ? { read_at: asOf } : {}) };
+      published[id] = out[id];                  // never mutated after this: a demotion replaces the published entry, it does not edit the stored one
       refreshed++;
     } else if (out[id]?.read === "ok") {
-      kept++;                                   // the read we hold stands exactly as it was read
+      kept++; failed++;                         // the stored read stands exactly as it was read; this pass publishes `unavailable`
+      published[id] = { read: "unavailable" };
     } else {
       out[id] = { read: "unavailable" };
+      published[id] = { read: "unavailable" };
       failed++;
     }
   }
-  return { evidence: out, refreshed, kept, failed };
+  return { evidence: out, published, refreshed, kept, failed, degraded };
 }
