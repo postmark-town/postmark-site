@@ -317,6 +317,10 @@ jobs:
           POSTMARK_API: https://postmark.town/api
           BUILD_CODE_REF: ${{ steps.pin.outputs.tag || github.ref_name }}
           PUBLIC_CHANNEL: ${{ steps.lane.outputs.channel }}
+          # CORE-180 (Wright's settle, 2026-11-25 15:13/15:16 EST): the release lane's fetch gets 420 s. Its letters inventory
+          # pages are bulk-priced against the keyless bucket and did not finish inside the 180 s default. Empty elsewhere,
+          # which keeps the 180 s default (tools/lib/fetch-town-data.mjs DEFAULT_FETCH_TOWN_DEADLINE_MS).
+          FETCH_TOWN_DEADLINE_MS: ${{ steps.lane.outputs.channel == 'release' && '420000' || '' }}
         run: node tools/fetch-town.mjs
 
       # The town-seam job's fold, over the train's committed copy (see that
