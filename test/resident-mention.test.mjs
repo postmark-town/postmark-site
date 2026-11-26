@@ -246,6 +246,35 @@ test("link:false draws a span (inside another link); extra classes are kept as h
   assert.match(mentionHtml(m, { surface: "paper" }), /^<a class="rm on-paper" href=/);
 });
 
+// CORE-178 FIX (Facet, on the frames: the bulletin's meep names read 3.69-3.97:1 on their #2f3a56 name plate, lighter than the night the night ink is
+// measured on). A page that puts its own solid plate under a mention names the plate's colour, and the mention takes the ink for THAT colour through
+// the contract the browser-measured surfaces already use (`--rm-ink` with `on-ink`), so it reads with no script.
+test("a mention on a solid plate of the page's own takes the ink for that plate (on-ink), and the named surfaces are unchanged", () => {
+  const PLATE = "#2f3a56";
+  for (const accent of ["#629da8", "#b89450", "#6fa144", "#2f6b3a", "#e6ac52"]) {
+    const m = mentionModel({ handle: "x", face: { name: "X", accent }, href: "/residents/x/" });
+    const [root] = mentionTree(m, { surface: PLATE });
+    assert.match(root.attrs.class, /(^| )on-ink( |$)/, `${accent}: marked on-ink`);
+    const ink = /--rm-ink: (#[0-9a-f]{6})/.exec(root.attrs.style)?.[1];
+    assert.equal(ink, inkOn(accent, PLATE), `${accent}: the ink is the one for the plate`);
+    assert.ok(contrast(ink, PLATE) >= MIN_CONTRAST, `${accent}: ${ink} reads at ${MIN_CONTRAST}:1 on ${PLATE}`);
+    assert.match(root.attrs.style, /--rm-ink-n: #[0-9a-f]{6}; --rm-ink-p: #[0-9a-f]{6}/, "the night and paper inks stay");
+  }
+  // the three names the frames measured: each was short of the ruled contrast on the plate with the night ink, and is not with the plate's
+  for (const accent of ["#629da8", "#b89450", "#6fa144"]) {
+    assert.ok(contrast(inkOn(accent, "night"), PLATE) < MIN_CONTRAST, `control: ${accent}'s night ink is short on the plate`);
+  }
+  const m = mentionModel({ handle: "x", face: { name: "X", accent: "#629da8" }, href: "/residents/x/" });
+  for (const named of ["night", "paper", undefined]) assert.doesNotMatch(mentionTree(m, { surface: named })[0].attrs.style, /--rm-ink:/, `${named}: no plate ink`);
+  assert.doesNotMatch(mentionTree(m, { surface: "not a colour" })[0].attrs.class, /on-ink/, "an unreadable surface is no plate");
+  const neutral = mentionModel({ handle: "y", face: { name: "Y", accent: null }, href: "/residents/y/" });
+  assert.doesNotMatch(mentionTree(neutral, { surface: PLATE })[0].attrs.class, /on-ink/, "no colour chosen: no invented ink");
+  // the bulletin names its plate, and it is the plate its CSS draws
+  const bulletin = readFileSync(new URL("../town/pages/bulletin/index.astro", import.meta.url), "utf8");
+  assert.match(bulletin, /const HAND_PLATE = "#2f3a56";/);
+  assert.match(bulletin, /\.hand-name \{[^}]*background: #2f3a56;/, "the plate the roster's CSS draws is the one the ink is measured on");
+});
+
 test("a dark favourite colour is lifted on the night and kept on the paper", () => {
   const m = roll.mentionOf("dusk");
   assert.equal(m.inkPaper, "#101020");

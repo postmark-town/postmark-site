@@ -7,6 +7,7 @@
 // <ResidentMention handle={h} face={f} />              with a face the page already holds (faces.mjs residentFace), instead of the build's
 // <ResidentMention handle={h} cls="hx-who" />          keeping a surface's own hook class (the Hearth's styles name it)
 // <ResidentMention handle={h} surface="paper" />       on the letter paper outside a `.pm-paper` box
+// <ResidentMention handle={h} surface="#2f3a56" />     on a solid plate of the page's own, known at build time: the ink for that colour
 //
 // It decides the model (the build's roll, resident-mentions.mjs, which follows renames and wears faces.mjs's face) and draws it with
 // ResidentMentionModel.astro. A page that builds incrementally can't import this file (the roll reads the residents file): it gets its
@@ -27,7 +28,8 @@ interface Props {
   face?: any;
   /** extra classes, kept as a surface's hooks */
   cls?: string;
-  surface?: "night" | "paper";
+  /** "paper" off a `.pm-paper` box, or the hex of a solid plate the page puts under the mention */
+  surface?: "night" | "paper" | string;
   /** the name's styling only, for a card or chip whose own portrait is the picture (Darko b, 2026-11-24 12:25 EST) */
   noFace?: boolean;
 }

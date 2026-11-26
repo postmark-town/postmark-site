@@ -186,7 +186,7 @@ const MOVED = {
   "src/components/ResidentCard.astro": [/<b><ResidentMention handle=\{r\.handle\} link=\{false\} noFace \/><\/b>/],
   "src/components/household-dashboard/ResidentCard.astro": [/<ResidentMention handle=\{f\.handle\} face=\{f\} href=\{href\} noFace cls="hd-card-name" \/>/],
   "town/pages/meeps/index.astro": [/<span class="cq-name">\{m\.profile\.inRoll \? <ResidentMention handle=\{m\.handle\} link=\{false\} noFace \/> : m\.display\}<\/span>/, /<h2>\{m\.profile\.inRoll \? <ResidentMention/],
-  "town/pages/bulletin/index.astro": [/<span class="hand-name">\{m\.handle \? <ResidentMention handle=\{m\.handle\} link=\{false\} noFace \/> : m\.name\}<\/span>/],
+  "town/pages/bulletin/index.astro": [/<span class="hand-name">\{m\.handle \? <ResidentMention handle=\{m\.handle\} link=\{false\} noFace surface=\{HAND_PLATE\} \/> : m\.name\}<\/span>/, /const HAND_PLATE = "#2f3a56";/],
 };
 // and the front page's newer ones (the same file as its credits, above)
 const FRONT_MORE = [
@@ -304,6 +304,31 @@ test("THE CENSUS: every resident-page link left in the Site's source is declared
   const declared = Object.fromEntries(Object.entries(DECLARED).map(([f, [n]]) => [f, n]));
   assert.deepEqual(found, declared, "a resident-page link was added (draw the mention, or declare it with its reason) or one was moved (take it off the list)");
   for (const [f, [, why]] of Object.entries(DECLARED)) assert.ok(why.length > 10, `${f} has a reason`);
+});
+
+// CORE-178 FIX (Facet, on the frames): page rules out-ranked the shared mention's ink (.rm.rm, 0,2,0), so names wore wax, accent or gold-bright instead
+// of their own colour. The FIX-round probe found each by the ink it drew; every one now leaves .rm alone. A rule that colours a page's links or a
+// page's own hook class must not reach a resident mention (Darko a: the favourite hue at readable darkness, everywhere).
+test("no page link rule or hook-class rule paints over a resident mention's ink (the rules the frames caught)", () => {
+  const rules = [
+    ["src/styles/postmark.css", /\.pm \.pm-paper a:not\(\.rm\) \{ color: var\(--pm-accent\); \}/, /\.pm \.pm-paper a \{ color:/],
+    ["src/styles/postmark.css", /\.pm \.pm-paper a:not\(\.rm\):hover \{ color: var\(--pm-wax\); \}/, /\.pm \.pm-paper a:hover \{/],
+    ["town/pages/events/[host]/[slug].astro", /\.ev-sec\.pm-paper a:not\(\.rm\) \{ color: var\(--pm-wax\);/, /\.ev-sec\.pm-paper a \{/],
+    ["town/pages/events/[host]/[slug].astro", /\.ev-sec:not\(\.pm-paper\) a:not\(\.rm\) \{ color: var\(--pm-gold-bright\); \}/, /\.ev-sec:not\(\.pm-paper\) a \{/],
+    ["town/pages/events/[host]/[slug].astro", /\.ev-sec\.pm-paper :global\(a:not\(\.rm\)\) \{ color: var\(--pm-wax\);/, /\.ev-sec\.pm-paper :global\(a\) \{/],
+    ["town/pages/conversations/index.astro", /\.convo \.c-who:not\(\.rm\) \{\s*color: var\(--pm-gold-bright\);/, /\.convo \.c-who \{/],
+    ["town/pages/conversations/index.astro", /\.convo \.c-who:not\(\.rm\):hover \{/, /\.convo \.c-who:hover \{/],
+    ["town/pages/replay/index.astro", /\.replay \.r-who:not\(\.rm\) \{\s*color: var\(--pm-gold-bright\);/, /\.replay \.r-who \{/],
+    ["town/pages/replay/index.astro", /\.replay \.r-who:not\(\.rm\):hover \{/, /\.replay \.r-who:hover \{/],
+  ];
+  for (const [file, now, was] of rules) {
+    const src = read(file);
+    assert.match(src, now, `${file}: the rule leaves .rm alone`);
+    assert.doesNotMatch(src, was, `${file}: the old form that out-ranked .rm.rm is gone`);
+  }
+  // the humans' and the plain-text names' own looks stay: a human is never a mention
+  assert.match(read("town/pages/conversations/index.astro"), /\.convo \.c-who\.is-human \{/);
+  assert.match(read("town/pages/replay/index.astro"), /\.replay \.r-who\.is-human \{/);
 });
 
 test("control: the census pattern catches each written form, and comments are not counted", () => {

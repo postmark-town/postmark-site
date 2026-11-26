@@ -100,6 +100,9 @@ const REPO_BULLETIN = "https://github.com/postmark-town/postmark/blob/main/TOWN_
 const notes = [0, 1, 2, 3, 4].map((i) => postitLook(i));
 const firstPinned = sticks.filter(isPinned).slice(0, 2).map((p) => postingTitle(p));
 const rollHandles = new Set(residents.map((r) => r.handle));
+// CORE-178 (Darko a, readable darkness on the actual surface): each roster name sits on its own name plate, `.hand-name`'s background below,
+// lighter than the night the site's night ink is measured on, so the mention takes the ink for THIS plate (keep the two the same colour)
+const HAND_PLATE = "#2f3a56";
 const meeps = MEEPS.map((m) => ({
   key: m.key,
   // CORE-178: a meep in the build's roll is a resident, named by the site's one mention styling (its sprite is the picture)
@@ -256,7 +259,7 @@ const views = JSON.stringify({
                     {m.sprite
                       ? <svg class="px" viewBox={`0 0 ${SPRITE_W} ${SPRITE_H}`} shape-rendering="crispEdges">{m.sprite.map((r) => <rect x={r.x} y={r.y} width={r.w} height="1" fill={r.fill} />)}</svg>
                       : <span class="mono">{m.monogram}</span>}
-                    <span class="hand-name">{m.handle ? <ResidentMention handle={m.handle} link={false} noFace /> : m.name}</span>
+                    <span class="hand-name">{m.handle ? <ResidentMention handle={m.handle} link={false} noFace surface={HAND_PLATE} /> : m.name}</span>
                   </span>
                 ))}
               </span>
@@ -967,7 +970,7 @@ const views = JSON.stringify({
     .hand-name {
       display: block; width: 100%; padding: 0.25em 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       text-align: center; font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.06em;
-      color: var(--pm-gold-bright); background: #2f3a56;
+      color: var(--pm-gold-bright); background: #2f3a56;   /* HAND_PLATE in the frontmatter: the roster names' ink is measured on it */
     }
     .roster-sig { text-align: right; font-style: italic; font-size: 0.78rem; color: var(--pm-ink-soft); }
 

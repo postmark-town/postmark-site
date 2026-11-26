@@ -18,7 +18,8 @@ interface Props {
   link?: boolean;
   /** extra classes, kept as a surface's hooks */
   cls?: string;
-  surface?: "night" | "paper";
+  /** "paper" off a `.pm-paper` box, or the hex of a solid plate the page puts under the mention */
+  surface?: "night" | "paper" | string;
   /** the name's styling only, for a card or chip whose own portrait is the picture (Darko b, 2026-11-24 12:25 EST) */
   noFace?: boolean;
   /** internal: one node of the tree, when this component draws a child of itself */

@@ -117,6 +117,31 @@ test("the household card's other coloured parts (data-rm-accent → --hd-c) are 
   assert.equal(bare.attrs.style, undefined);
 });
 
+// CORE-178 FIX (Facet, on the FIX-round frames): on the Hearth's compact card Ferry's name measured 4.14-4.3:1 in the frame's own pixels. The card's
+// glass is translucent, the body under it is #070b15 AND paints a radial gradient up to rgb(28, 44, 79): the pass inked for the colour alone. These
+// are the computed styles the frame read (scratch surface-read.json), verbatim.
+test("a gradient's stops are shades the name sits on: the ink reads on every one (the Hearth card over the page's night)", async () => {
+  const { gradientStops, surfacesUnder } = await import("../src/lib/resident-mention-surface.mjs");
+  const FERRY = { name: "Ferry (the Postmaster)", accent: "#3f6a72" };
+  const body = el("body", "rgb(7, 11, 21)");
+  body.image = "radial-gradient(120% 90% at 50% -10%, rgb(28, 44, 79) 0%, rgb(13, 20, 38) 48%, rgb(7, 11, 21) 100%)";
+  const card = body.appendChild(el("article", "rgba(13, 20, 38, 0.62)"));
+  card.image = "linear-gradient(135deg, color(srgb 0.309804 0.521569 0.564706 / 0.12), rgba(0, 0, 0, 0) 60%)";
+  const m = card.appendChild(el("div")).appendChild(mention(FERRY, "postmaster"));
+  const styled = (n) => ({ backgroundColor: n.bg ?? "rgba(0, 0, 0, 0)", backgroundImage: n.image ?? "none" });
+  assert.equal(gradientStops(body.image).length, 3, "a radial gradient's three stops");
+  assert.equal(gradientStops(card.image).length, 1, "a resolved color-mix() stop is read; a transparent one is no shade");
+  assert.deepEqual(gradientStops("url(/media/glass.jpg)"), [], "a picture is not a colour");
+  const shades = surfacesUnder(m, styled);
+  assert.equal(shades[0], surfaceUnder(m, styled), "the colours' composite comes first");
+  assert.ok(shades.length > 1, "and the gradients add shades");
+  assert.equal(inkOnActualSurface(body, { getStyle: styled }), 1);
+  for (const s of shades) assert.ok(contrast(inkOf(m), s) >= MIN_CONTRAST, `the ink ${inkOf(m)} reads on ${s}`);
+  // control: the ink for the colours alone (the old pass) falls short on the lightest shade the gradient draws
+  const old = inkOn(FERRY.accent, surfaceUnder(m, styled));
+  assert.ok(Math.min(...shades.map((s) => contrast(old, s))) < MIN_CONTRAST, `control: ${old} is short somewhere on the gradient`);
+});
+
 test("a getStyle that throws on one layer skips it, and the pass still inks", () => {
   const stage = el("div", "rgb(255, 255, 255)");
   const m = stage.appendChild(el("span")).appendChild(mention(GOLD));

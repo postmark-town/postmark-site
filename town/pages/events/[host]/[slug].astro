@@ -558,15 +558,16 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     .ev-basis { margin: 0.5em 0 0; font-size: 0.84rem; }
     .ev-present { margin: 0.3em 0; padding-left: 1.2em; columns: 2 12rem; }
     .ev-present li { margin: 0 0 0.3em; break-inside: avoid; overflow-wrap: anywhere; }
-    .ev-sec.pm-paper a { color: var(--pm-wax); text-decoration: underline; }
-    .ev-sec:not(.pm-paper) a { color: var(--pm-gold-bright); }
+    /* the section's links, never a resident mention: `.rm` keeps the speaker's own ink and underline (CORE-178, Darko a; these out-ranked .rm.rm) */
+    .ev-sec.pm-paper a:not(.rm) { color: var(--pm-wax); text-decoration: underline; }
+    .ev-sec:not(.pm-paper) a:not(.rm) { color: var(--pm-gold-bright); }
     /* the rooms' boxes are also made by the island, so they carry no scope attribute: :global */
     .ev-sec :global(.ev-room) { margin: 0 0 1em; }
     .ev-sec :global(.ev-room-h) { margin: 0 0 0.4em; font-size: 0.95em; font-family: var(--pm-mono); overflow-wrap: anywhere; }
     .ev-sec :global(.ev-room-id) { font-size: 0.8em; }
     .ev-sec :global(.ev-note) { margin: 0.4em 0; line-height: 1.55; }
     .ev-sec.pm-paper :global(.soft) { color: var(--pm-ink-soft); }
-    .ev-sec.pm-paper :global(a) { color: var(--pm-wax); text-decoration: underline; }
+    .ev-sec.pm-paper :global(a:not(.rm)) { color: var(--pm-wax); text-decoration: underline; }
     .ev-gallery { display: grid; gap: 0.2em; }
     .ev-onward { margin: 0.8em 0 0; font-weight: 700; }
     .cal-how h2 { margin: 0 0 0.5em; font-size: 1.1em; }

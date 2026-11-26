@@ -257,8 +257,9 @@
 .pm .pm-paper strong, .pm .pm-paper b { color: var(--pm-wax); }
 .pm .pm-paper p, .pm .pm-paper li { color: var(--pm-ink); }
 .pm .pm-paper .soft { color: var(--pm-ink-soft); }
-.pm .pm-paper a { color: var(--pm-accent); }
-.pm .pm-paper a:hover { color: var(--pm-wax); }
+/* a resident mention keeps its own ink on the paper (resident-mention.css, --rm-ink-p; CORE-178, Darko a): these out-ranked .rm.rm */
+.pm .pm-paper a:not(.rm) { color: var(--pm-accent); }
+.pm .pm-paper a:not(.rm):hover { color: var(--pm-wax); }
 
 /* ── scroll-to-top — site chrome (lives in the layout); the resident pages'
    ✧ egg keeps right/bottom 18/16, this stacks directly above it ── */
