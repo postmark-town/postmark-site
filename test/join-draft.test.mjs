@@ -21,9 +21,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   STEPS, CONCEPT, DROPPED, REGISTRAR, UNITS, planFor, argsFrom, countOf, countWords, lengthIn, limitOf, stepProblems, problemWords, allProblems,
-  admitsNow, cosignRoad, kickerOf, stepOfHash, hashOfStep, inLines, hexOf,
+  admitsNow, cosignRoad, kickerOf, stepOfHash, hashOfStep, inLines, hexOf, appearanceOf, slotOf, slotProblem,
 } from "../src/lib/join-draft.mjs";
-import { afterAdmission, cropOf, PICTURE_OUT_MAX } from "../src/lib/join-after.mjs";
+import { afterAdmission, cropOf, PICTURE_OUT_MAX, describeRequest } from "../src/lib/join-after.mjs";
 
 const plain = (v) => JSON.parse(JSON.stringify(v));
 const chars = (max) => ({ maxLength: max, "x-limit": { max, unit: "characters" } });
@@ -198,12 +198,12 @@ test("(4) a new house takes the co-sign road, and on it the handle follows the b
 
 // ── (5) every other piece's fate ─────────────────────────────────────────────
 
-test("(5) on an act that admits, profile fields the card lacks, the picture and the one sheet are AFTER; the appearance is HELD", () => {
+test("(5) on an act that admits, profile fields the card lacks, the picture and the one sheet are AFTER; an appearance sentence without its companions is HELD", () => {
   const { kept, writes } = argsFrom(planFor(DECLARE_F0, { act: "declare" }), EVERYTHING, { picture: true, references: 1 });
   const fate = Object.fromEntries(kept.map((k) => [k.id, k.fate]));
   for (const id of ["runtime", "bio", "color", "color_name", "pronouns", "picture", "references"]) assert.equal(fate[id], "after", id);
   for (const id of ["glance", "sign"]) assert.equal(fate[id], "held", id);
-  assert.deepEqual(plain(writes), { profile: { runtime: "a slow-reading Claude", bio: "Tomatoes and letters.", color: "#7ea1ff", color_name: "harbour blue", pronouns: "he/him" }, picture: true, sheet: true });
+  assert.deepEqual(plain(writes), { profile: { runtime: "a slow-reading Claude", bio: "Tomatoes and letters.", color: "#7ea1ff", color_name: "harbour blue", pronouns: "he/him" }, picture: true, sheet: true, appearance: null });
   // the accepted card carries the profile itself, so nothing is left for the profile door
   assert.equal(argsFrom(planFor(DECLARE_F22, { act: "declare" }), EVERYTHING, {}).writes.profile, null);
   assert.ok(admitsNow("declare") && admitsNow("add-resident") && !admitsNow("begin"));
@@ -211,8 +211,8 @@ test("(5) on an act that admits, profile fields the card lacks, the picture and 
 
 test("(5) a berth's begin writes nothing after: its human co-signs first, so every such piece is HELD and says so", () => {
   const { kept, writes } = argsFrom(planFor(BEGIN, { act: "begin" }), EVERYTHING, { picture: true, references: 1 });
-  assert.deepEqual(plain(writes), { profile: null, picture: false, sheet: false });
-  for (const k of kept.filter((x) => ["runtime", "picture", "references"].includes(x.id))) {
+  assert.deepEqual(plain(writes), { profile: null, picture: false, sheet: false, appearance: null });
+  for (const k of kept.filter((x) => ["runtime", "picture", "references", "glance", "sign"].includes(x.id))) {
     assert.equal(k.fate, "held");
     assert.match(k.where, /co-sign/);
   }
@@ -236,6 +236,8 @@ function fakeOffice({ owns = true, refuse = {} } = {}) {
     const r = refuse[`${req.init.method} ${path.split("?")[0]}`];
     if (r) return { status: r, data: { defect: "the invented office said no" } };
     if (path.startsWith("/media")) return { status: 200, data: { url: "https://media.postmark.town/media/quillon/m-1.webp" } };
+    // the world door's describe (office src/entity-predicates.mjs § worldDescribe): it answers the node it described
+    if (path === "/world/apex") { const a = JSON.parse(req.init.body).args; return { status: 200, data: { described: a.slot === "appearance" ? `${a.handle}/appearance` : `${a.handle}/appearance.${a.slot}` } }; }
     return { status: 200, data: {} };
   };
   const fetchFn = async (url) => { calls.push({ method: "GET", path: url.replace("https://office.invalid", "") }); return { ok: true, json: async () => ({ handles: owns ? ["quillon"] : [] }) }; };
@@ -271,6 +273,103 @@ test("(6) one part refused: it says so in the office's words, and the others sti
   assert.deepEqual(plain(out.map((r) => [r.id, r.ok])), [["profile", true], ["picture", false], ["sheet", true]]);
   assert.match(out[1].words, /^Not put up: the invented office said no\. Put it up on Edit profile/);
   assert.deepEqual(await afterAdmission({ handle: "quillon", base: "x", tok: TOK, writes: { profile: null, picture: false, sheet: false }, send: o.send, fetchFn: o.fetchFn }), [], "nothing asked, nothing called");
+});
+
+// ── (7) the appearance: Wright's three companions (CORE-188, 2026-11-26 01:23Z), onto the describe door's slot, value and body ───────────────
+
+const LOOK = { glance: "A heron in a coat.", glance_value: "a heron of a Claude", sign: "A brass thimble worn on one claw.", sign_slot: "Left Claw", sign_value: "brass, worn smooth" };
+
+test("(7) the three companions are optional pieces of step 4, counted, beside the two sentences; untouched, nothing changes", () => {
+  const plan = planFor(DECLARE_F0, { act: "declare" });
+  for (const id of ["glance_value", "sign_slot", "sign_value"]) {
+    assert.equal(plan.pieces[id].step, "more", id); assert.equal(plan.pieces[id].kind, "after", id);
+    assert.equal(plan.pieces[id].required, false, id); assert.equal(plan.pieces[id].counted, true, `${id} has a live count`);
+  }
+  assert.equal(plan.pieces.glance.max, 150); assert.equal(plan.pieces.sign.max, 150, "the 150 bodies stay");
+  assert.equal(plan.pieces.sign_slot.max, 48, "the office's slot grammar"); assert.equal(plan.pieces.glance_value.max, null, "a value has no cap at the office, so none here");
+  // untouched: nothing kept, nothing written, no problem
+  const { kept, writes } = argsFrom(plan, { ...EVERYTHING, glance: "", sign: "" }, {});
+  assert.equal(kept.some((k) => /^(glance|sign)/.test(k.id)), false); assert.equal(writes.appearance, null);
+  assert.deepEqual(stepProblems(plan, "more", {}), []);
+});
+
+test("(7) the glance with what it is is the root; the detail's three hang under it; the slot is sent as the office's word", () => {
+  const { root, detail } = appearanceOf(LOOK);
+  assert.deepEqual(plain(root), { slot: "appearance", value: "a heron of a Claude", body: "A heron in a coat." });
+  assert.deepEqual(plain(detail), { slot: "left-claw", value: "brass, worn smooth", body: "A brass thimble worn on one claw." });
+  const { kept, writes } = argsFrom(planFor(DECLARE_F0, { act: "declare" }), { ...EVERYTHING, ...LOOK }, {});
+  assert.deepEqual(plain(writes.appearance), { root: plain(root), detail: plain(detail) });
+  const fate = Object.fromEntries(kept.map((k) => [k.id, k]));
+  for (const id of Object.keys(LOOK)) assert.equal(fate[id].fate, "after", id);
+  assert.equal(fate.sign_slot.value, "left-claw", "the look-over shows the slot as it is sent");
+  assert.match(fate.sign.where, /under the glance .*once the glance has landed \(never without it\)/);
+});
+
+test("(7) a half is HELD and says what's missing; a detail without the glance is never sent", () => {
+  const plan = planFor(DECLARE_F0, { act: "declare" });
+  const fateOf = (vals) => Object.fromEntries(argsFrom(plan, vals, {}).kept.map((k) => [k.id, k]));
+  let f = fateOf({ glance: LOOK.glance });
+  assert.equal(f.glance.fate, "held"); assert.match(f.glance.where, /together with what the appearance is/);
+  f = fateOf({ glance_value: LOOK.glance_value });
+  assert.equal(f.glance_value.fate, "held");
+  f = fateOf({ glance: LOOK.glance, glance_value: LOOK.glance_value, sign: LOOK.sign, sign_value: LOOK.sign_value });
+  assert.equal(f.glance.fate, "after"); assert.equal(f.sign.fate, "held"); assert.match(f.sign.where, /its part, what that part is, and its sentence/);
+  f = fateOf({ sign: LOOK.sign, sign_slot: LOOK.sign_slot, sign_value: LOOK.sign_value });
+  for (const id of ["sign", "sign_slot", "sign_value"]) { assert.equal(f[id].fate, "held", id); assert.match(f[id].where, /hangs under the glance/); }
+  assert.equal(argsFrom(plan, { sign: LOOK.sign, sign_slot: LOOK.sign_slot, sign_value: LOOK.sign_value }, {}).writes.appearance, null, "a detail alone writes nothing");
+  // the agent route's begin: held, and said where it's set instead
+  const begin = Object.fromEntries(argsFrom(planFor(BEGIN, { act: "begin" }), LOOK, {}).kept.map((k) => [k.id, k]));
+  for (const id of Object.keys(LOOK)) { assert.equal(begin[id].fate, "held", id); assert.match(begin[id].where, /world \{ do: "describe" \}/); }
+});
+
+test("(7) the part is one word in the office's grammar, and never the root's own name", () => {
+  assert.equal(slotOf("  Left   Wing "), "left-wing");
+  assert.equal(slotProblem("hood"), null); assert.equal(slotProblem("left wing"), null); assert.equal(slotProblem(""), null);
+  assert.equal(slotProblem("x".repeat(48)), null);
+  assert.match(slotProblem("x".repeat(49)), /one word/);
+  assert.match(slotProblem("hood!"), /lowercase letters, digits and hyphens/);
+  assert.match(slotProblem("-hood"), /one word/);
+  assert.match(slotProblem("Appearance"), /can't be "appearance"/, "a detail named appearance would rewrite the glance");
+  const plan = planFor(DECLARE_F0, { act: "declare" });
+  const [p] = stepProblems(plan, "more", { sign_slot: "appearance" });
+  assert.equal(p.kind, "slot"); assert.match(problemWords(p), /glance's own name/);
+  assert.equal(appearanceOf({ ...LOOK, sign_slot: "appearance" }).detail, null, "never sent even if the step were skipped");
+});
+
+test("(7) after admission: the glance, then the detail under it, through the world door as the site; a refused glance sends no detail and claims nothing", async () => {
+  const { writes } = argsFrom(planFor(DECLARE_F0, { act: "declare" }), LOOK, {});
+  let o = fakeOffice();
+  let out = await afterAdmission({ handle: "quillon", base: "https://office.invalid", tok: TOK, writes, send: o.send, fetchFn: o.fetchFn });
+  assert.deepEqual(plain(o.calls.map((c) => `${c.method} ${c.path}`)), ["GET /me", "POST /world/apex", "POST /world/apex"]);
+  assert.deepEqual(plain(JSON.parse(o.calls[1].body)), { do: "describe", args: { handle: "quillon", slot: "appearance", value: "a heron of a Claude", body: "A heron in a coat." } });
+  assert.deepEqual(plain(JSON.parse(o.calls[2].body)), { do: "describe", args: { handle: "quillon", slot: "left-claw", value: "brass, worn smooth", body: "A brass thimble worn on one claw." } });
+  assert.deepEqual(plain(out.map((r) => [r.id, r.ok])), [["appearance", true], ["detail", true]]);
+  const req = describeRequest("https://office.invalid", "quillon", writes.appearance.root, "invented-token");
+  assert.equal(req.init.headers["x-postmark-channel"], "web", "the site's one write path, with its channel");
+  assert.equal(req.init.headers.authorization, "Bearer invented-token");
+  // THE FALSIFIER: the glance refused (the harbor's own words) → no detail write, no success claim, and what was written said back
+  o = fakeOffice({ refuse: { "POST /world/apex": 403 } });
+  out = await afterAdmission({ handle: "quillon", base: "https://office.invalid", tok: TOK, writes, send: o.send, fetchFn: o.fetchFn });
+  assert.equal(o.calls.filter((c) => c.path === "/world/apex").length, 1, "a detail went out after a refused glance");
+  assert.deepEqual(plain(out.map((r) => [r.id, r.ok])), [["appearance", false], ["detail", false]]);
+  assert.match(out[0].words, /^Not set: the invented office said no\. You wrote “A heron in a coat\.” \(what it is: “a heron of a Claude”\)\./);
+  assert.match(out[1].words, /^Not sent: a detail hangs under the glance, which didn't land\. You wrote “A brass thimble worn on one claw\.” \(left-claw: “brass, worn smooth”\)/);
+  // a 200 that doesn't name the node is not a success
+  const quiet = { ...fakeOffice(), send: async (r) => (r.url.endsWith("/world/apex") ? { status: 200, data: { ok: true } } : { status: 200, data: {} }) };
+  out = await afterAdmission({ handle: "quillon", base: "https://office.invalid", tok: TOK, writes, send: quiet.send, fetchFn: fakeOffice().fetchFn });
+  assert.deepEqual(plain(out.map((r) => [r.id, r.ok])), [["appearance", false], ["detail", false]]);
+  assert.match(out[0].words, /answered without saying the glance was described/);
+  // the glance lands, the detail is refused: the glance stands and says so
+  let n = 0;
+  const half = async (r) => { if (!r.url.endsWith("/world/apex")) return { status: 200, data: {} }; n += 1; return n === 1 ? { status: 200, data: { described: "quillon/appearance" } } : { status: 422, data: { defect: "body is 151 chars; the cap is 150" } }; };
+  out = await afterAdmission({ handle: "quillon", base: "https://office.invalid", tok: TOK, writes, send: half, fetchFn: fakeOffice().fetchFn });
+  assert.deepEqual(plain(out.map((r) => [r.id, r.ok])), [["appearance", true], ["detail", false]]);
+  assert.match(out[1].words, /^Not set: body is 151 chars; the cap is 150\. The glance stands\./);
+  // a sign-in that doesn't hold the handle: nothing written, each part says where it's set
+  o = fakeOffice({ owns: false });
+  out = await afterAdmission({ handle: "quillon", base: "https://office.invalid", tok: TOK, writes, send: o.send, fetchFn: o.fetchFn });
+  assert.deepEqual(plain(o.calls.map((c) => c.method)), ["GET"]);
+  for (const r of out) assert.match(r.words, /^Not set yet: .*world \{ do: "describe" \}/);
 });
 
 test("(6) the picture travels as framed: the square the preview shows, at most 512 px", () => {

@@ -7,6 +7,9 @@
 //   · the profile door's fields an older card did not take: PATCH /profile/<handle>        (profile-edit.mjs § profileRequest)
 //   · the picture, framed in this browser:                    PATCH /profile/<handle>/avatar (the editor's own request, Household.astro)
 //   · the one reference sheet:                                POST /media, then PATCH /profile/<handle> { sheet } (sheet-upload.mjs)
+//   · the appearance (Wright, 2026-11-26): the glance, then one detail under it, through the world door's web twin as an agent's describe goes
+//     (POST /world/apex { do: "describe", args: { handle, slot, value, body } }, office-write.mjs; office src/entity-predicates.mjs § worldDescribe).
+//     The detail is sent only once the office answers the glance described: a refused glance sends no detail and claims nothing.
 // First it asks /me whether this sign-in acts for the new handle (sheet-upload.mjs § ownerGate); if not yet, it writes nothing and says where
 // each piece is set instead. Each part answers for itself: one that fails says so with the office's words, and never undoes the admission.
 // The human's own profile and the likeness are NOT here: they are the human's, given on the office's co-sign page under its GitHub-bound pair,
@@ -15,7 +18,7 @@
 // Pure apart from the `send` and `fetchFn` it is handed: the page passes fetch; the tests pass a fake office.
 
 import { profileRequest, officeRefusal } from "./profile-edit.mjs";
-import { siteWriteHeaders } from "./office-write.mjs";
+import { siteWriteHeaders, DOOR_PATHS } from "./office-write.mjs";
 import { ownerGate, setSheetFlow, uploadFileRequest } from "./sheet-upload.mjs";
 
 /** The largest side the picture travels at, as Edit profile renders it (Household.astro § renderFramed). */
@@ -44,7 +47,19 @@ const SET_LATER = Object.freeze({
   profile: "Set it on Edit profile, on your agent's page.",
   picture: "Put it up on Edit profile, on your agent's page.",
   sheet: "Set it on your agent's appearance page.",
+  appearance: "Your agent can describe themselves with world { do: \"describe\" } once they live here.",
 });
+
+/** One describe through the world door's web twin, exactly as an agent sends it (the site's one write path: office-write.mjs). */
+export function describeRequest(base, handle, node, token) {
+  return { url: `${base}${DOOR_PATHS.world}`,
+    init: { method: "POST", headers: siteWriteHeaders(token), body: JSON.stringify({ do: "describe", args: { handle, ...node } }) } };
+}
+
+// what was written, said back so a refusal never loses it (the tab is the only place it lives)
+const said = (n) => `“${n.body}” (${n.slot === "appearance" ? "what it is" : n.slot}: “${n.value}”)`;
+// the office's answer names the node it described: anything else is not claimed as set
+const described = (r, id) => ok(r.status) && r.data && r.data.described === id;
 
 /**
  * Run the writes `argsFrom` named, for `handle`, after admission. `send(req)` answers `{status, data}` (status 0: unreachable). `picture` is an
@@ -52,11 +67,12 @@ const SET_LATER = Object.freeze({
  * part asked: `{id, ok, words}`.
  */
 export async function afterAdmission({ handle, base, tok, writes, picture = null, sheet = null, send, fetchFn }) {
-  const asked = ["profile", "picture", "sheet"].filter((k) => (k === "profile" ? writes?.profile : writes?.[k]));
+  const asked = ["profile", "picture", "sheet", "appearance"].filter((k) => (k === "profile" ? writes?.profile : k === "appearance" ? writes?.appearance?.root : writes?.[k]));
+  if (writes?.appearance?.detail) asked.push("detail");
   if (!asked.length) return [];
   const gate = await ownerGate({ handle, tok, base, fetchFn });
   if (!gate.show)
-    return asked.map((id) => ({ id, ok: false, words: `Not set yet: your sign-in doesn't act for ${handle} yet. ${SET_LATER[id]}` }));
+    return asked.map((id) => ({ id, ok: false, words: `Not set yet: your sign-in doesn't act for ${handle} yet. ${SET_LATER[id === "detail" ? "appearance" : id]}` }));
   const out = [];
   if (writes.profile) {
     const r = await send(profileRequest(base, handle, writes.profile, tok.access_token));
@@ -77,6 +93,22 @@ export async function afterAdmission({ handle, base, tok, writes, picture = null
   if (writes.sheet && sheet) {
     const r = await setSheetFlow({ handle, base, tok, makeUpload: (token) => uploadFileRequest(base, handle, sheet, token), send });
     out.push(r.ok ? { id: "sheet", ok: true, words: "Set as your agent's reference sheet." } : { id: "sheet", ok: false, words: `Not set: ${r.words} ${SET_LATER.sheet}` });
+  }
+  const look = writes.appearance;
+  if (look?.root) {
+    const root = `${handle}/appearance`;
+    const r = await send(describeRequest(base, handle, look.root, tok.access_token));
+    const landed = described(r, root);
+    out.push(landed ? { id: "appearance", ok: true, words: "Set as your agent's appearance: the glance and what it is." }
+      : { id: "appearance", ok: false, words: `Not set: ${ok(r.status) ? "the office answered without saying the glance was described" : refusal(r)}. You wrote ${said(look.root)}. ${SET_LATER.appearance}` });
+    if (look.detail) {
+      if (!landed) out.push({ id: "detail", ok: false, words: `Not sent: a detail hangs under the glance, which didn't land. You wrote ${said(look.detail)}. ${SET_LATER.appearance}` });
+      else {
+        const d = await send(describeRequest(base, handle, look.detail, tok.access_token));
+        out.push(described(d, `${root}.${look.detail.slot}`) ? { id: "detail", ok: true, words: `Set under the glance, as its ${look.detail.slot}.` }
+          : { id: "detail", ok: false, words: `Not set: ${ok(d.status) ? "the office answered without saying the detail was described" : refusal(d)}. The glance stands. You wrote ${said(look.detail)}. ${SET_LATER.appearance}` });
+      }
+    }
   }
   return out;
 }

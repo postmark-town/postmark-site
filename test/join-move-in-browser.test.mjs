@@ -147,8 +147,8 @@ const BEGIN = { household: { type: "string", required: true, "x-group": "househo
 // THE BERTH ROAD (Office f22c069a): POST /berth mints a key for a free slug (409 for a held one); POST /household { do: "begin" } with that key
 // parks the args and answers the co-sign link; /me with that key is the berth until `o.cosign()` plays the human's click on the office's page,
 // and the household's (naming the handle) after it. The writes after admission are allowed only for a credential /me says holds the handle.
-function officeFor({ tier = "visitor", act = "declare", fields = TODAY, me = { handles: [], households: {} }, held = [] } = {}) {
-  const o = { asked: [], sent: [], me, writes: [], bodies: [], events: [], auths: [], boarded: [], begun: [], berths: {}, cosigned: false, held };
+function officeFor({ tier = "visitor", act = "declare", fields = TODAY, me = { handles: [], households: {} }, held = [], refuseDescribe = null } = {}) {
+  const o = { asked: [], sent: [], me, writes: [], bodies: [], events: [], auths: [], boarded: [], begun: [], berths: {}, cosigned: false, held, refuseDescribe };
   o.cosign = () => { o.cosigned = true; o.events.push("cosign"); };
   o.meFor = (auth) => {
     const slug = Object.keys(o.berths).find((s) => auth === `Bearer ${o.berths[s]}`);
@@ -220,6 +220,15 @@ async function openPage(b, base, path, { width, height = 900, office }) {
     if (local && request.method === "PATCH" && prof) {
       office.writes.push({ path: u.pathname.slice(4), body: request.postData ?? "", auth }); office.events.push("write");
       return own(prof[1]) ? reply(200, { saved: true }) : reply(403, { defect: "fixture: not yours" });
+    }
+    // the appearance (CORE-188, Wright 2026-11-26): the world door's web twin, describe as an agent's goes (office entity-predicates.mjs § worldDescribe):
+    // the resident's own household only; it answers the node it described; `refuseDescribe` plays a refusal (the harbor's, below)
+    if (local && request.method === "POST" && u.pathname === "/api/world/apex") {
+      const a = JSON.parse(request.postData || "{}").args ?? {};
+      office.writes.push({ path: "/world/apex", body: request.postData ?? "", auth }); office.events.push("write");
+      if (office.refuseDescribe) return reply(office.refuseDescribe.status, office.refuseDescribe.body);
+      if (!own(a.handle ?? "")) return reply(403, { defect: `"${a.handle}" is not one of your residents` });
+      return reply(200, { described: a.slot === "appearance" ? `${a.handle}/appearance` : `${a.handle}/appearance.${a.slot}`, canon: "live" });
     }
     if (local && request.method === "POST" && u.pathname === "/api/media") {
       office.writes.push({ path: "/media" + u.search, body: "(bytes)", auth }); office.events.push("write");
@@ -354,6 +363,14 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     await p.js(`(() => { const z = document.querySelector("[data-profile-avatar-zoom]"); z.value = "2"; z.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
     const framed = await p.js(`document.querySelector('[data-blank-page] [data-fill="picture"] img').style.transform`);
     assert.match(framed, /scale\(2\)/);
+    // THE APPEARANCE: the two sentences and Wright's three companions, each with a live count
+    await p.type("#jd-glance", "A fixture heron in a moss-green coat.");
+    await p.type("#jd-glance_value", "a fixture heron");
+    assert.equal(await p.js(text('[data-count-for="glance_value"]')), "15 characters", "a value has no cap at the office, so the count names none");
+    await p.type("#jd-sign", "A brass thimble on one claw.");
+    await p.type("#jd-sign_slot", "Left Claw");
+    assert.equal(await p.js(text('[data-count-for="sign_slot"]')), "9 / 48", "the office's slot grammar, counted");
+    await p.type("#jd-sign_value", "brass, worn smooth");
     await p.click("[data-jf-next]");
     await p.until(STEP("found"), "step 5");
     await p.type("#jd-invited_by", "fixture-friend");
@@ -373,7 +390,9 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     // every other piece, by its fate: what this page sets once the co-sign admits the agent, and what is not sent
     const names = (sel) => p.js(`[...document.querySelectorAll(${JSON.stringify(sel)})].map((b) => b.textContent).join("|")`);
     const after = (await names("[data-review-after-list] li > b")).split("|");
-    for (const k of ["Runtime", "Bio", "Favorite color", "Pronouns", "Profile picture"]) assert.ok(after.includes(k), `${k} is listed as set after admission (${after})`);
+    for (const k of ["Runtime", "Bio", "Favorite color", "Pronouns", "Profile picture", "Your appearance", "What the appearance is", "The detail people know you by", "Its part", "What that part is"]) assert.ok(after.includes(k), `${k} is listed as set after admission (${after})`);
+    assert.match(await p.js(text("[data-review-after-list]")), /Its part left-claw/, "the part is shown as the word it is sent as");
+    assert.match(await p.js(text("[data-review-after-list]")), /under the glance .*once the glance has landed \(never without it\)/);
     assert.match(await p.js(text("[data-review-after-list]")), /once you've co-signed on the office's page/);
     assert.equal(await p.js(`document.querySelectorAll(".jd-tag.is-wip").length`), 0, "work-in-progress words are left over from the held human transfer");
     assert.equal(await p.js(`getComputedStyle(document.querySelector("[data-review-after-list] li > b")).color === getComputedStyle(document.querySelector("[data-review-after-list] li")).color`), true, "a piece's name is in ink, not the paper's refusal red");
@@ -421,14 +440,17 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     await p.until(`!document.querySelector("[data-gate-in]").hidden`, "you're in, after the co-sign");
     assert.deepEqual(office.events.filter((e) => e !== "write").slice(0, 3), ["board", "begin", "cosign"]);
     assert.ok(office.events.indexOf("write") > office.events.indexOf("cosign"), "a resident write went before the co-sign");
-    assert.deepEqual(office.writes.map((w) => w.path), ["/profile/quillon-fixture", "/profile/quillon-fixture/avatar"]);
+    assert.deepEqual(office.writes.map((w) => w.path), ["/profile/quillon-fixture", "/profile/quillon-fixture/avatar", "/world/apex", "/world/apex"]);
     assert.ok(office.writes.every((w) => w.auth === "Bearer fixture-berth-key-quillon-fixture"), "the after-admission writes went with another credential");
+    // the glance, then the detail under it, as the describe door takes them: the author's own values, the slot as its word
+    assert.deepEqual(JSON.parse(office.writes[2].body), { do: "describe", args: { handle: "quillon-fixture", slot: "appearance", value: "a fixture heron", body: "A fixture heron in a moss-green coat." } });
+    assert.deepEqual(JSON.parse(office.writes[3].body), { do: "describe", args: { handle: "quillon-fixture", slot: "left-claw", value: "brass, worn smooth", body: "A brass thimble on one claw." } });
     assert.deepEqual(Object.keys(JSON.parse(office.writes[0].body)).sort(), ["bio", "color", "pronouns", "runtime"]);
     assert.equal(JSON.parse(office.writes[0].body).color, "#7ea1ff");
     const pic = JSON.parse(office.writes[1].body);
     assert.equal(pic.type, "image/jpeg", "the framed picture is re-encoded, as Edit profile does");
     assert.ok(pic.image.length > 100, "the picture travels");
-    assert.equal(office.asked.filter((a) => !/^(POST \/api\/mcp|GET \/api\/me|POST \/api\/berth|POST \/api\/household|PATCH \/api\/profile\/quillon-fixture(\/avatar)?)$/.test(a)).length, 0, `no other office call: ${office.asked.join(", ")}`);
+    assert.equal(office.asked.filter((a) => !/^(POST \/api\/mcp|GET \/api\/me|POST \/api\/berth|POST \/api\/household|PATCH \/api\/profile\/quillon-fixture(\/avatar)?|POST \/api\/world\/apex)$/.test(a)).length, 0, `no other office call: ${office.asked.join(", ")}`);
     // THE HUMAN'S OWN, IN NO REQUEST THIS PAGE MADE (the office's co-sign page asks them)
     for (const f of ["town_name", "short_line", "human_pronouns", "likeness"]) assert.ok(!office.bodies.some((b) => b.includes(`"${f}"`)), `a request carried ${f}`);
     assert.ok(!office.asked.some((a) => /oauth\/(consent|human|likeness)/.test(a)), "the page posted to a human-only door");
@@ -436,7 +458,7 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     assert.match(await p.js(text("[data-in-page]")), /about half an hour/);
     assert.match(await p.js(text("[data-in-letters]")), /about 15 minutes.*7 AM and 7 PM Eastern/);
     assert.equal(await p.js(`document.querySelector("[data-in-page-link]").getAttribute("href")`), "/residents/quillon-fixture/");
-    assert.equal(await p.js(`[...document.querySelectorAll("[data-in-after-list] li")].map((li) => li.querySelector("b").textContent + ":" + li.querySelector(".jd-kept-value").textContent).join("|")`), "Profile:set|Picture:set");
+    assert.equal(await p.js(`[...document.querySelectorAll("[data-in-after-list] li")].map((li) => li.querySelector("b").textContent + ":" + li.querySelector(".jd-kept-value").textContent).join("|")`), "Profile:set|Picture:set|Appearance:set|Appearance detail:set");
   } finally { await p.close(); }
 });
 
@@ -508,6 +530,47 @@ test("AN EXISTING HOUSE (add-resident): no house to name, no human profile, and 
     await p.until(`!document.querySelector("[data-gate-reply]").hidden`, "the sent screen");
     assert.equal("household" in office.sent[0], false, "a keeper is not asked for a house");
     assert.equal(office.sent[0].card, "Added to a fixture house.");
+  } finally { await p.close(); }
+});
+
+test("THE APPEARANCE REFUSED: the part can't be the root's name; a glance the office refuses sends no detail, claims nothing, and says back what was written", { skip: SKIP }, async () => {
+  await setup();
+  // the harbor's own refusal (office harbor-gate.mjs § HARBOR_BOUNCE): what a house still at the harbor gets for any durable act, describe included
+  const harbor = { status: 403, body: { defect: "the harbor is read + ephemeral", hint: "durable acts come ashore with settlement" } };
+  const office = officeFor({ tier: "resident", act: "add-resident", fields: ADD, me: { handles: ["keeper-fixture"], households: { "keeper-fixture": { slug: "fixture-keep" } } }, refuseDescribe: harbor });
+  const p = await openPage(browser, base, "/join/move-in/", { width: 1440, office });
+  try {
+    await p.until(STEP("who"), "who's moving in");
+    await p.type("#jd-handle", "looked-fixture");
+    await p.click("[data-jf-next]");
+    await p.until(STEP("describe"), "describe");
+    await p.type("#jd-full_address", "A fixture who describes itself.");
+    await p.click("[data-jf-next]");
+    await p.until(STEP("more"), "more about you");
+    await p.type("#jd-glance", "A fixture lantern with a cracked pane.");
+    await p.type("#jd-glance_value", "a fixture lantern");
+    await p.type("#jd-sign", "The crack runs corner to corner.");
+    await p.type("#jd-sign_value", "a hairline crack");
+    // the root's own name as a part: refused before anything is sent, in the one alert slot
+    await p.type("#jd-sign_slot", "appearance");
+    await p.click("[data-jf-next]");
+    assert.equal(await p.js(STEP("more")), true, "a part named appearance went on");
+    assert.match(await p.js(text("[data-form-error]")), /can't be "appearance": that's the glance's own name/);
+    await p.type("#jd-sign_slot", "pane");
+    await p.click("[data-jf-next]");
+    await p.until(STEP("review"), "the look-over");
+    await p.click("[data-submit]");
+    await p.until(`!document.querySelector("[data-gate-reply]").hidden`, "the sent screen");
+    await p.click("[data-show-in]");
+    await p.until(`!document.querySelector("[data-gate-in]").hidden`, "you're in");
+    // THE FALSIFIER: one describe (the glance), refused; no detail write; neither part claimed
+    assert.deepEqual(office.writes.map((w) => w.path), ["/world/apex"], "a detail went out after a refused glance");
+    assert.equal(JSON.parse(office.writes[0].body).args.slot, "appearance");
+    const rows = await p.js(`[...document.querySelectorAll("[data-in-after-list] li")].map((li) => [li.querySelector("b").textContent, li.querySelector(".jd-kept-value").textContent, li.querySelector(".jd-kept-where").textContent])`);
+    assert.deepEqual(rows.map((r) => r.slice(0, 2)), [["Appearance", "not set"], ["Appearance detail", "not set"]]);
+    assert.match(rows[0][2], /^Not set: the harbor is read \+ ephemeral — durable acts come ashore with settlement\. You wrote “A fixture lantern with a cracked pane\.” \(what it is: “a fixture lantern”\)\. Your agent can describe themselves/);
+    assert.match(rows[1][2], /^Not sent: a detail hangs under the glance, which didn't land\. You wrote “The crack runs corner to corner\.” \(pane: “a hairline crack”\)/);
+    assert.doesNotMatch(await p.js(text("[data-in-after-list]")), /:\s*set\b|Set as your agent's appearance/, "a refused part was claimed");
   } finally { await p.close(); }
 });
 

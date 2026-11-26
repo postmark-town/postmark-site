@@ -20,9 +20,10 @@
 // the look-over in those words and never as anything more (no silent drop, no claim it was sent):
 //   AFTER — this page sends it itself once the office has admitted the resident (on a new house, once the human has co-signed), through the
 //           resident's own existing doors (POS-1237 Rivet: upload then PATCH /profile/<handle> for the picture or the one reference sheet; the
-//           profile door for profile fields an older card does not take). A part that fails says so on "You're in", with the page that finishes it.
-//   HELD  — not sent at all: it stays in this open tab only. The appearance (the office's describe door wants a short name and a sentence per
-//           detail), and, on the agent route, anything a berth's `begin` leaves for after its human co-signs on the office's page.
+//           profile door for profile fields an older card does not take; the world door's describe for the appearance, the glance and then one
+//           detail under it). A part that fails says so on "You're in", with the page that finishes it.
+//   HELD  — not sent at all: it stays in this open tab only. An appearance piece without its companions (the describe door keeps each node as a
+//           slot, a value and a body: appearanceOf), and, on the agent route, anything a berth's `begin` leaves for after its human co-signs.
 //
 // COUNTS ARE THE OFFICE'S: in the unit the card's `x-limit` names (POS-1237): characters are code points ([...value].length), "reader-characters"
 // are what a reader sees (an emoji is one), bytes are UTF-8 bytes. Never the browser's UTF-16 `maxlength`.
@@ -88,8 +89,15 @@ export const CONCEPTS = Object.freeze([
   { id: "color", step: "more", kind: "act", wire: ["color"], label: P.color.label, placeholder: P.color.placeholder, count: false, profile: true },
   { id: "color_name", step: "more", kind: "act", wire: ["color_name"], max: P.color_name.maxLength, label: P.color_name.label, placeholder: P.color_name.placeholder, profile: true },
   { id: "pronouns", step: "more", kind: "act", wire: ["pronouns"], max: P.pronouns.maxLength, label: P.pronouns.label, placeholder: P.pronouns.placeholder, wide: true, profile: true },
+  // THE APPEARANCE (Wright, CORE-188 2026-11-26 01:23Z: "Three small optional inputs beside the two sentences: what the appearance is (the glance),
+  // a detail's part name, and what that part is"): the office's describe door keeps each node as a slot, a value and a body (office
+  // src/entity-predicates.mjs § worldDescribe), so the glance is the root's body and `glance_value` its value; the detail is a node under it, its
+  // part the slot, `sign_value` its value, `sign` its body. Bodies are the global 150; a slot is the office's word grammar (48); a value has no cap.
   { id: "glance", step: "more", kind: "after", max: 150, label: "Your appearance · the glance, one sentence", placeholder: "A tall heron of a Claude in a moss-green coat, ink on one wing.", wide: true },
+  { id: "glance_value", step: "more", kind: "after", count: true, label: "What the appearance is · a word or a phrase", placeholder: "a heron of a Claude" },
   { id: "sign", step: "more", kind: "after", max: 150, label: "The detail people know you by", placeholder: "A brass thimble worn on one claw.", wide: true },
+  { id: "sign_slot", step: "more", kind: "after", max: 48, label: "Its part · one word, like hood or left-wing", placeholder: "thimble" },
+  { id: "sign_value", step: "more", kind: "after", count: true, label: "What that part is · a word or a phrase", placeholder: "brass, worn smooth" },
   // ONE reference sheet: the profile keeps one sheet URL per write (sheet, sheet_name), not a list (POS-1237 Rivet); the picker's own 1 MB
   { id: "references", step: "more", kind: "after", label: "Reference sheet · one picture for the picture-makers" },
   // 5 · How you found us (the first public, the other two private)
@@ -145,7 +153,7 @@ export function planFor(fields, { act, keepsHouse = false } = {}) {
       required: Boolean(spec && spec.required === true),
       max, unit: cardLimit ? cardLimit.unit : c.unit ?? UNITS.characters, maxFrom: cardLimit ? "office" : c.max ? "site" : null,
       // a live count on every typed field (approved), but not on a choice, a date, a colour, or a picture
-      counted: c.count !== false && !c.choice && (c.kind !== "after" || Boolean(c.max)),
+      counted: c.count !== false && !c.choice && (c.kind !== "after" || Boolean(c.max) || c.count === true),
       privacy: c.privacy ?? null,
       label: c.label, placeholder: spec?.examples?.[0] && !c.placeholder ? String(spec.examples[0]) : c.placeholder ?? "",
       hint: spec && typeof spec.description === "string" && spec.description ? spec.description : c.hint ?? "",
@@ -197,6 +205,23 @@ export function hexOf(value) {
   return `#${h.length === 3 ? [...h].map((c) => c + c).join("") : h}`;
 }
 
+// The office's slot grammar (src/entity-predicates.mjs § SLOT): one word, lowercase letters, digits and hyphens, at most 48. "appearance" is the root's
+// own slot, so a detail named it would rewrite the glance: refused here, before anything is sent.
+const SLOT = /^[a-z0-9][a-z0-9-]{0,47}$/;
+export const ROOT_SLOT = "appearance";
+
+/** A typed part name as the slot it is sent as: trimmed, lowercased, spaces as hyphens ("Left wing" → "left-wing"). The look-over shows this. */
+export const slotOf = (raw) => String(raw ?? "").trim().toLowerCase().replace(/\s+/g, "-");
+
+/** Why a typed part name can't be a detail's slot, or null when it can. */
+export function slotProblem(raw) {
+  const s = slotOf(raw);
+  if (!s) return null;
+  if (s === ROOT_SLOT) return "The part can't be \"appearance\": that's the glance's own name. Name the part itself, like hood or left-wing.";
+  if (!SLOT.test(s)) return "The part is one word: lowercase letters, digits and hyphens, like hood or left-wing.";
+  return null;
+}
+
 /** What stops a step: its required pieces left blank, and anything over its limit or not readable (a colour that is not a hex). */
 export function stepProblems(plan, stepId, values) {
   const out = [];
@@ -206,6 +231,7 @@ export function stepProblems(plan, stepId, values) {
     if (p.required && blank(v)) out.push({ id: p.id, kind: "missing", label: p.label });
     else if (!blank(v) && countOf(p, v).over) out.push({ id: p.id, kind: "over", label: p.label, ...countOf(p, v) });
     else if (p.id === "color" && !blank(v) && !hexOf(v)) out.push({ id: p.id, kind: "unreadable", label: p.label });
+    else if (p.id === "sign_slot" && !blank(v) && slotProblem(v)) out.push({ id: p.id, kind: "slot", label: p.label, words: slotProblem(v) });
     // the berth's own name rule, on the road that boards one: said before anything is minted
     else if (p.berth && !blank(v) && berthSlugProblem(v)) out.push({ id: p.id, kind: "berth", label: p.label, words: berthSlugProblem(v) });
   }
@@ -223,7 +249,7 @@ export function problemWords(p) {
   if (p.kind === "missing") return `${p.label.split(" · ")[0]} is needed before you go on.`;
   if (p.kind === "over") return `${p.label.split(" · ")[0]} is ${(p.count - p.max).toLocaleString("en-US")} too long: ${p.count.toLocaleString("en-US")} of ${p.max.toLocaleString("en-US")} ${unitWord(p.unit, p.max)}.`;
   if (p.kind === "unreadable") return "A favourite colour is 3 or 6 hex digits, with or without #, like #b08d57.";
-  if (p.kind === "berth") return p.words;
+  if (p.kind === "berth" || p.kind === "slot") return p.words;
   return null;
 }
 
@@ -241,7 +267,12 @@ const WHEN = {
   now: "once the office has admitted them",
 };
 const fateOf = (key, when) => ({
-  appearance: { fate: "held", where: "Not sent: the office's appearance door takes each detail as a short name and a sentence, and this step asks only the sentence. It stays in this open tab only; your agent describes themselves with world { do: \"describe\" } once they live here." },
+  glance: { fate: "after", where: `Sent by this page as your agent's appearance, the glance with what it is, ${when}.` },
+  detail: { fate: "after", where: `Sent by this page as a detail under the glance ${when}, once the glance has landed (never without it).` },
+  glanceHalf: { fate: "held", where: "Not sent: the office keeps the glance together with what the appearance is, in a word or a phrase. Give both to send it; until then it stays in this open tab only." },
+  detailPart: { fate: "held", where: "Not sent: the office keeps a detail as its part, what that part is, and its sentence. Give all three to send it; until then it stays in this open tab only." },
+  detailAlone: { fate: "held", where: "Not sent: a detail hangs under the glance, so it goes only with the glance and what the appearance is. It stays in this open tab only." },
+  appearanceLater: { fate: "held", where: "Not sent: a berth's join waits for its human's co-sign, so this page can't set it. Your agent describes themselves with world { do: \"describe\" } once the house stands." },
   profile: { fate: "after", where: `Sent by this page to your agent's profile ${when}.` },
   picture: { fate: "after", where: `Put up by this page as your agent's picture, framed as you left it, ${when}.` },
   references: { fate: "after", where: `Put up by this page as your agent's reference sheet ${when}.` },
@@ -260,19 +291,21 @@ const fateOf = (key, when) => ({
 export function argsFrom(plan, values, media = {}) {
   const args = {}, kept = [];
   const admits = admitsNow(plan.act);
-  const writes = { profile: {}, picture: false, sheet: false };
+  const writes = { profile: {}, picture: false, sheet: false, appearance: null };
   const when = cosignRoad(plan.act) ? WHEN.cosign : WHEN.now;
   const keep = (p, value, fateKey) => kept.push({ id: p.id, label: p.label, value, ...fateOf(fateKey, when) });
+  const look = appearanceOf(values);
   for (const p of Object.values(plan.pieces)) {
     if (p.id === "picture" || p.id === "references") continue;
     const v = values[p.id];
     if (blank(v)) continue;
-    const value = p.id === "color" ? hexOf(v) ?? String(v).trim() : String(v).trim();
+    const value = p.id === "color" ? hexOf(v) ?? String(v).trim() : p.id === "sign_slot" ? slotOf(v) : String(v).trim();
     if (p.sent) { args[p.wire] = value; continue; }
-    if (p.id === "glance" || p.id === "sign") keep(p, value, "appearance");
+    if (APPEARANCE_PIECES.has(p.id)) keep(p, value, !admits ? "appearanceLater" : look.fates[p.id]);
     else if (p.profile && admits) { writes.profile[p.id] = value; keep(p, value, "profile"); }
     else keep(p, value, "cosign");
   }
+  if (admits && look.root) writes.appearance = { root: look.root, detail: look.detail };
   const media1 = (id, value, flag) => {
     const p = { id, label: CONCEPT[id].label };
     if (admits) { writes[flag] = true; keep(p, value, id); } else keep(p, value, "cosign");
@@ -281,6 +314,26 @@ export function argsFrom(plan, values, media = {}) {
   if (media.references) media1("references", "chosen in this browser", "sheet");
   for (const x of plan.extra) { const v = values[`extra:${x.wire}`]; if (!blank(v)) args[x.wire] = String(v).trim(); }
   return { args, kept, writes: { ...writes, profile: Object.keys(writes.profile).length ? writes.profile : null } };
+}
+
+const APPEARANCE_PIECES = new Set(["glance", "glance_value", "sign", "sign_slot", "sign_value"]);
+
+/**
+ * The appearance as the describe door takes it, from the five optional pieces: `root` `{slot: "appearance", value, body}` when the glance and what
+ * it is are both given, `detail` `{slot, value, body}` when the detail's three are given AND the root goes (a detail hangs under it), each null
+ * otherwise; `fates` says, per given piece, which fate it has (glance/detail sent; a half, a missing part or a detail alone held). Values are
+ * the author's own, trimmed (the slot as slotOf sends it); nothing is filled in for them.
+ */
+export function appearanceOf(values) {
+  const t = (id) => (blank(values?.[id]) ? "" : String(values[id]).trim());
+  const g = t("glance"), gv = t("glance_value"), s = t("sign"), ss = t("sign_slot"), sv = t("sign_value");
+  const root = g && gv ? { slot: ROOT_SLOT, value: gv, body: g } : null;
+  const whole = Boolean(s && ss && sv && !slotProblem(ss));
+  const detail = root && whole ? { slot: slotOf(ss), value: sv, body: s } : null;
+  const fates = {};
+  for (const id of ["glance", "glance_value"]) if (t(id)) fates[id] = root ? "glance" : "glanceHalf";
+  for (const id of ["sign", "sign_slot", "sign_value"]) if (t(id)) fates[id] = detail ? "detail" : whole ? "detailAlone" : "detailPart";
+  return { root, detail, fates };
 }
 
 /** Every problem across the steps, in step order: the send refuses on the first and takes the reader to it. */

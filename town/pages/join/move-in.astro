@@ -200,7 +200,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         <div class="jd-step profile-edit-form jd-form" data-step="more" hidden>
           <ProfileEditorFields handle="join" piece fields={["color", "color_name", "pronouns"]} />
           <div class="profile-edit-grid jd-more">
-            {["glance", "sign"].map((id) => (
+            {/* the glance and what it is; the detail, its part and what that part is (the describe door's slot, value and body: join-draft.mjs appearanceOf) */}
+            {["glance", "glance_value", "sign", "sign_slot", "sign_value"].map((id) => (
               <ResidentField name={id} spec={fieldSpec(id)} {...pieceAttrs(id)} />
             ))}
             <div class="profile-edit-wide jd-refs" data-piece-field="references">
@@ -214,7 +215,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
               <p class="profile-edit-avatar-status" data-ref-status role="status" aria-live="polite"></p>
             </div>
           </div>
-          <p class="jd-kept-note" data-more-kept>Nothing here leaves your browser before the office admits your agent. Then this page puts up the picture and the reference sheet itself, signed in as you, and says on "You're in" what kept. The appearance isn't sent with the join; Look it over says why.</p>
+          <p class="jd-kept-note" data-more-kept>Nothing here leaves your browser before the office admits your agent. Then this page puts up the picture, the reference sheet and the appearance itself, signed in as you, and says on "You're in" what kept. The glance goes with what it is; the detail with its part and what that part is.</p>
         </div>
       </div>
 
@@ -1034,7 +1035,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       put("[data-in-letters]", lines.letters);
       $("[data-in-from]").hidden = !lines.fromOffice;
       // what this page set after the admission, part by part, in what actually happened; then what was never sent
-      const NAMES = { profile: "Profile", picture: "Picture", sheet: "Reference sheet", after: "The rest" };
+      const NAMES = { profile: "Profile", picture: "Picture", sheet: "Reference sheet", appearance: "Appearance", detail: "Appearance detail", after: "The rest" };
       const done = (sentWrites || []).map((r) => ({ label: NAMES[r.id] || r.id, value: r.ok ? "set" : "not set", where: r.words }));
       keptInto($("[data-in-after-list]"), done); $("[data-in-after]").hidden = done.length === 0;
       const held = sentKept.filter((k) => k.fate !== "after");
