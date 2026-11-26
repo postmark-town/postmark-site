@@ -1,0 +1,5 @@
+pre 2026-11-26T03:31:12Z head 9fb54125f5e60a1545c6285cebfcb16992d92ce3
+run-heavy: 3 slots, the Artis at most 2
+  slot 1: free
+  slot 2: free
+  slot 3: free
