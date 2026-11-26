@@ -314,7 +314,7 @@ test("§ 4 an empty feed while residents are out says it is reading; once every 
   assert.equal(p.feed.textContent, "Nothing on the house’s record in the last day.");
   assert.equal(p.reading.hidden, true, "the line goes once all have answered");
   assert.equal(p.reading.textContent, "");
-  assert.match(p.needs.textContent, /Nothing needs you right now\./);
+  assert.match(p.needs.textContent, /stance count is unavailable or uncertain/);
   assert.equal(p.cards.b.last.textContent, "nothing on the record lately", "a resident whose reads FAILED is read, and shows nothing: not 'still reading'");
 });
 
@@ -327,7 +327,7 @@ test("§ 4 house-wide reads only still out: the line names the town's record, an
 
 test("§ 4 a page awaited whole (the dashboard) paints exactly as before: no reading line, the calm line", () => {
   const p = page();
-  const reads = { doorsteps: { a: {}, b: {} }, outboxes: { a: [], b: [] }, quests: {} };
+  const reads = { doorsteps: { a: { stances: { stances_awaiting: 0 } }, b: { stances: { stances_awaiting: 0 } } }, outboxes: { a: [], b: [] }, quests: {} };
   paintHouse(p.root, reads, { ...base });
   assert.equal(p.reading.hidden, true);
   assert.match(p.needs.textContent, /Nothing needs you right now\./);
@@ -414,4 +414,28 @@ test("§ 5 (text pin) the stage asks for progress on the first read and draws th
   assert.ok(page.indexOf("<HouseRail ") < page.indexOf("<!--hearth-entry-->"), "above, and outside, the entry's region");
   assert.match(readFileSync(resolve(ROOT, "src/components/HouseRail.astro"), "utf8"), /\{reading && <span class="pm-subrail-reading" data-hd-reading-mark role="status" hidden>/, "the mark ships hidden");
   assert.match(stage, /if \(bar\) paintReadingMark\(bar, ctx\.reading\);/, "the stage paints it, from the same reading state");
+});
+
+
+test("#4679: both views disclose missing and uncertain stances, but keep a verified all-clear", () => {
+  const row = (n) => ({ stances: { stances_awaiting: n, stances_awaiting_ground: "household", awaiting: [], complete: false } });
+  const cases = [
+    [{ a: {}, b: {} }, /stance count is unavailable or uncertain/, false],
+    [{ a: row(0), b: row(0) }, /stance count is unavailable or uncertain/, false],
+    [{ a: row(5), b: row(5) }, /at least 5/i, false],
+    [{ a: row(3), b: row(5) }, /at least 5/i, false],
+    [{ a: { stances: { stances_awaiting: 0 } }, b: { stances: { stances_awaiting: 0 } } }, /Nothing/, true],
+  ];
+  for (const [doorsteps, expected, calm] of cases) {
+    const p = page();
+    paintHouse(p.root, { doorsteps }, { ...base, reading: NOT_READING });
+    assert.match(p.needs.textContent, expected);
+    assert.equal(/Nothing needs you/.test(p.needs.textContent), calm);
+    const root = node("div");
+    const box = root.appendChild(node("section", { "data-hx-mail": "", hidden: "" }));
+    box.appendChild(node("ul", { "data-hx-mail-list": "" }));
+    paintMail(root, { doorsteps }, { ...base, reading: NOT_READING });
+    assert.match(box.textContent, expected);
+    assert.equal(/Nothing is new/.test(box.textContent), calm);
+  }
 });

@@ -66,15 +66,17 @@ export function marksOf(items, shown = POSTS_SHOWN) {
 export function mailOf(handles, doorsteps) {
   const answered = handles.filter((h) => doorsteps?.[h]);
   if (!answered.length) return null;
-  let newInbound = 0, awaitingStance = 0, waiting = 0;
+  let newInbound = 0, waiting = 0;
   for (const h of answered) {
     const n = cardNumbersOf(doorsteps[h]);
     newInbound += n?.newInbound ?? 0;
-    awaitingStance += n?.awaitingStance ?? 0;
     waiting += n?.pending ?? 0;
   }
   const needs = needsOf(handles, doorsteps);
-  return { newInbound, awaitingStance, waiting, bounced: needs.bounces.length, complete: answered.length === handles.length };
+  const stanceCounts = needs.stances;
+  return { newInbound, awaitingStance: stanceCounts.total, waiting, bounced: needs.bounces.length,
+    stanceComplete: stanceCounts.complete, stanceUncertain: stanceCounts.uncertain,
+    complete: answered.length === handles.length && stanceCounts.complete && !stanceCounts.uncertain };
 }
 
 /** Around town: the next events on the town's calendar, from every house. Null when the calendar did not answer. */
