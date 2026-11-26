@@ -8,13 +8,14 @@
 // script sets her words (`data-reg-words`) as the screen and the reader's place in it change. Only one screen shows at a time, so one of her shows.
 //
 // `line` is what she says before the script speaks (text, and `[words, href]` links), so the first paint already has her words.
-interface Props { at: string; picture: string; line?: readonly (string | readonly [string, string])[] }
-const { at, picture, line = [] } = Astro.props;
+// `name` is her bubble's name line ("Regina the Registrar", Darko 2026-11-26); her page's link is named for Regina too.
+interface Props { at: string; name: string; picture: string; line?: readonly (string | readonly [string, string])[] }
+const { at, name, picture, line = [] } = Astro.props;
 ---
 <div class="jd-reg" data-reg-at={at}>
-  <a class="jd-reg-face" href="/residents/registrar/" aria-label="The Registrar's page" tabindex="-1"><img src={picture} alt="" width="64" height="64" decoding="async" /></a>
+  <a class="jd-reg-face" href="/residents/registrar/" aria-label="Regina's page" tabindex="-1"><img src={picture} alt="" width="64" height="64" decoding="async" /></a>
   <div class="jd-reg-bubble">
-    <a class="jd-reg-name" href="/residents/registrar/">The Registrar</a>
+    <a class="jd-reg-name" href="/residents/registrar/">{name}</a>
     <p data-reg-words>{line.map((part) => (typeof part === "string" ? part : <a class="jd-reg-link" href={part[1]}>{part[0]}</a>))}</p>
     {Astro.slots.has("default") && <div class="jd-reg-actions"><slot /></div>}
   </div>

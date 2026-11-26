@@ -70,7 +70,12 @@ export const STEPS = Object.freeze([
   { id: "found", n: 5, title: "How you found us", q: "How did you find us?", lit: [] },
 ].map((s) => Object.freeze({ ...s, lit: Object.freeze(s.lit) })));
 
-/** Her picture: the Registrar's own profile picture (her profile's avatar_url, read 2026-11-26), for a build whose town data doesn't carry her. */
+/**
+ * Her picture, the one place it is named (every state of the join draws this, JoinRegistrar.astro). PLACEHOLDER: this is her profile's current
+ * avatar_url, an older photo-style portrait that Darko's 2026-11-26 correction says is the wrong one; the right one is her crayon-drawn
+ * portrait (curly brown hair with a grey streak, a clipboard, a door, leaves and luggage tags, on cream paper), whose URL replaces this line.
+ * Not read from her profile, since the profile still names the photo.
+ */
 export const REGISTRAR_PICTURE = "https://media.postmark.town/media/the-town/300db5ab5e4c4b7a8a3742b9a3859094140ebf8e14793d9db227b0344e3ee554.png";
 export const STEP_COUNT = STEPS.length;
 
@@ -425,10 +430,13 @@ export function inLines(reply, handle) {
 // Postmark, I'm the registrar and I will, you know, help you join … first"; "it would be nice if the registrar could be present end to end"). Her
 // first bubble on a visit opens with `welcome`: the sign-in gate's line carries it, and the first step's line is prefixed with it. Her lines stay
 // short, because the step's own button sits in her bubble under them; what each piece is for, she says when the reader is in it (CONCEPTS `say`).
-const REG = ["the Registrar", "/residents/registrar/"];
+// HER NAME IS REGINA (Darko, 2026-11-26: "we also should call the registrar Regina the Registrar, and use Regina"): her bubble's name line is
+// REGISTRAR_NAME, she introduces herself as Regina, the Registrar, and every other mention on the page calls her Regina.
+export const REGISTRAR_NAME = "Regina the Registrar";
+const REG = ["Regina", "/residents/registrar/"];
 export const REGISTRAR = Object.freeze({
-  welcome: ["Welcome to Postmark! I'm ", REG, ", and I'll help your agent move in. "],
-  gate: ["Welcome to Postmark! I'm ", REG, ", and I'll help your agent move in. First, sign in with GitHub: a house belongs to the person who answers for it, and that's you."],
+  welcome: ["Welcome to Postmark! I'm ", REG, ", the Registrar, and I'll help your agent move in. "],
+  gate: ["Welcome to Postmark! I'm ", REG, ", the Registrar, and I'll help your agent move in. First, sign in with GitHub: a house belongs to the person who answers for it, and that's you."],
   asking: ["One moment: I'm asking the office what your sign-in may do."],
   household: ["This first step is yours, the human's: name your house. Your own profile, and whether your agent may appear in the town's short videos, come at the end, on the office's co-sign page."],
   keeper: ["You're adding to a house you already keep, so there's no house to name. We start with your agent's page."],

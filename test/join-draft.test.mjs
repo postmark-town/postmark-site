@@ -20,7 +20,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  STEPS, CONCEPT, DROPPED, REGISTRAR, UNITS, planFor, argsFrom, countOf, countWords, lengthIn, limitOf, stepProblems, problemWords, allProblems,
+  STEPS, CONCEPT, DROPPED, REGISTRAR, REGISTRAR_NAME, UNITS, planFor, argsFrom, countOf, countWords, lengthIn, limitOf, stepProblems, problemWords, allProblems,
   admitsNow, cosignRoad, kickerOf, stepOfHash, hashOfStep, dotsOf, pieceProblem, inLines, hexOf, appearanceOf, slotOf, slotProblem,
 } from "../src/lib/join-draft.mjs";
 import { afterAdmission, cropOf, PICTURE_OUT_MAX, describeRequest } from "../src/lib/join-after.mjs";
@@ -72,7 +72,7 @@ test("(1) the approved steps, in order, and the Registrar has words for each, he
   // the approved "Being shown" step went to the office's co-sign page with the human profile (Darko's ruled fallback, applied 2026-11-25)
   assert.deepEqual(STEPS.map((s) => s.title), ["Your household", "Who's moving in", "Describe yourself", "More about you", "How you found us"]);
   for (const k of ["gate", ...STEPS.map((s) => s.id), "keeper", "review", "reviewCosign", "cosign", "sent", "in"]) assert.ok(Array.isArray(REGISTRAR[k]) && REGISTRAR[k].length, `no Registrar line for ${k}`);
-  assert.deepEqual(REGISTRAR.gate.find((p) => Array.isArray(p)), ["the Registrar", "/residents/registrar/"]);
+  assert.deepEqual(REGISTRAR.gate.find((p) => Array.isArray(p)), ["Regina", "/residents/registrar/"]);
   // she says where the human's own part went, on step 1, before Send and when the link is handed over: the handoff is legible
   for (const k of ["household", "reviewCosign", "cosign"]) assert.match(REGISTRAR[k].join(" "), /co-sign page/, `${k} doesn't say the office's co-sign page asks the human's part`);
   assert.match(REGISTRAR.household.join(" "), /profile.*short videos|short videos.*profile/);
@@ -86,8 +86,12 @@ test("(1) the approved steps, in order, and the Registrar has words for each, he
 test("(1) she speaks first: her first bubble opens with a welcome, and her lines on the steps stay short", () => {
   // Darko, 2026-11-26 10:15 EST: "we should have the registrar say, like, welcome to Postmark, I'm the registrar and I will, you know, help you
   // join, or some kind of like intro sentence first". CAN FAIL: drop the welcome from the gate's line or the prefix the first step wears.
-  assert.match(REGISTRAR.gate.filter((p) => typeof p === "string").join(""), /^Welcome to Postmark! I'm , and I'll help your agent move in\./);
-  assert.deepEqual(REGISTRAR.welcome.find((p) => Array.isArray(p)), ["the Registrar", "/residents/registrar/"]);
+  // her name is Regina (Darko, 2026-11-26: "we also should call the registrar Regina the Registrar, and use Regina")
+  const said = (k) => REGISTRAR[k].map((p) => (typeof p === "string" ? p : p[0])).join("");
+  assert.match(said("gate"), /^Welcome to Postmark! I'm Regina, the Registrar, and I'll help your agent move in\./);
+  assert.match(said("welcome"), /^Welcome to Postmark! I'm Regina, the Registrar, /);
+  assert.equal(REGISTRAR_NAME, "Regina the Registrar");
+  assert.deepEqual(REGISTRAR.welcome.find((p) => Array.isArray(p)), ["Regina", "/residents/registrar/"]);
   // the step 3 line keeps the tokens to one sentence (Darko's lane brief: "trim the current step 2 text (the tokens explanation) to a sentence")
   const describe = REGISTRAR.describe.map((p) => (typeof p === "string" ? p : p[0])).join("");
   assert.equal((describe.match(/token/g) ?? []).length, 1, describe);

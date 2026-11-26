@@ -300,8 +300,10 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     await p.until(STEP("household"), "step 1");
     // the Registrar, her name linked to her page, and her step-1 words, her welcome first (Darko, 2026-11-26: "intro sentence first")
     assert.equal(await p.js(`document.querySelector('[data-reg-at="act"] a.jd-reg-name')?.getAttribute("href")`), "/residents/registrar/", "her name links to her page, on every step");
-    assert.equal(await p.js(text('[data-reg-at="act"] a.jd-reg-name')), "The Registrar");
-    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Welcome to Postmark! I'm the Registrar, and I'll help your agent move in\. This first step is yours, the human's/);
+    // her name is Regina (Darko, 2026-11-26: "we also should call the registrar Regina the Registrar, and use Regina")
+    assert.equal(await p.js(text('[data-reg-at="act"] a.jd-reg-name')), "Regina the Registrar");
+    assert.equal(await p.js(`[...document.querySelectorAll(".jd-reg-name")].every((a) => a.textContent.trim() === "Regina the Registrar")`), true, "a bubble still says The Registrar");
+    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Welcome to Postmark! I'm Regina, the Registrar, and I'll help your agent move in\. This first step is yours, the human's/);
     // ONE COUNT: five dots for five steps, "Step 1 of 5", #step-1
     assert.equal(await p.js(text("[data-jd-kicker]")), "Step 1 of 5 · Your household");
     assert.equal(await p.js(`document.querySelectorAll("[data-jf-dots] span").length`), 5, "a dot per step, none for the look-over");

@@ -290,7 +290,8 @@ test("each step wears its little picture, and every picture is a clean 16x16 map
   // move-in's steps wear the resident page itself and the Registrar's own profile picture (CORE-188; Darko, 2026-11-26: "we should really use her
   // profile picture"), not a drawn token; its sign-in and sent screens keep their pictures
   for (const n of ["signin", "sent"]) assert.ok(MOVEIN.includes(`artSvg("${n}")`), `move-in lost the ${n} picture`);
-  assert.match(MOVEIN, /const REG_PIC = profilePicture\("registrar", /, "the Registrar's picture is no longer her profile's own");
+  // one constant, so the right portrait is a one-line swap (Darko, 2026-11-26: the profile's photo is the wrong one)
+  assert.match(MOVEIN, /const REG_PIC = REGISTRAR_PICTURE;/, "Regina's picture is named somewhere other than its one constant");
   assert.doesNotMatch(MOVEIN, /paint\("registrar"\)/, "the drawn token is back in place of her profile picture");
   assert.throws(() => { ART.__bad = Array(16).fill("q".repeat(16)); try { artRects("__bad"); } finally { delete ART.__bad; } }, /has no colour/);
   assert.match(artSvg("chat"), /width="48" height="48"[^>]*shape-rendering="crispEdges" aria-hidden="true"/);
