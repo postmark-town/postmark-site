@@ -35,12 +35,17 @@ import ResidentFace from "@/components/resident/ResidentFace.astro";
 import AddressCardFace from "@/components/resident/AddressCardFace.astro";
 import ResidentField from "@/components/resident/ResidentField.astro";
 import ProfileEditorFields from "@/components/resident/ProfileEditorFields.astro";
+import DraftSlot from "@/components/resident/DraftSlot.astro";
+// the Registrar on every state of the page, her own picture, the screen's button in her bubble (Darko, 2026-11-26)
+import JoinRegistrar from "@/components/JoinRegistrar.astro";
 // the join's little pictures (Keemin, 2026-09-27), drawn in pixel-icons.mjs
 import { artSvg } from "@/lib/pixel-icons.mjs";
-// the Registrar's own token (CORE-185, civic-art.mjs § REGISTRAR), the guide on every step
-import { paint, SPRITE_W, SPRITE_H } from "@/lib/civic-art.mjs";
-import { STEPS, CONCEPT, REGISTRAR } from "@/lib/join-draft.mjs";
+import { STEPS, CONCEPT, CONCEPTS, REGISTRAR, REGISTRAR_PICTURE } from "@/lib/join-draft.mjs";
 import { SHEET_MAX_WORDS } from "@/lib/sheet-upload.mjs";
+// her picture is her profile's own (Darko, 2026-11-26 10:15 EST: "we should really use her profile picture"), read the way every page reads a
+// resident's one picture (profile-picture.mjs), from the town data this build has; her avatar_url when that data doesn't carry her
+import { profilePicture } from "@/lib/profile-picture.mjs";
+import townMedia from "@/data/postmark/media.json";
 // the town's registry as the site synced it: every declared house's nameplate,
 // so a keeper's review says "Adding to Starforge" in the word the house wears
 // everywhere else, and whether its name is still borrowed (provisional). Which
@@ -56,19 +61,21 @@ import ConnectAgent from "@/components/ConnectAgent.astro";
 const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(([slug, row]: [string, any]) =>
   [slug, { name: plateName(row?.name, slug), provisional: row?.provisional === true }]));
 
-const registrarArt = paint("registrar");
+const REG_PIC = profilePicture("registrar", (residents as any[]).find((r) => r?.handle === "registrar")?.profile ?? null, townMedia)?.src ?? REGISTRAR_PICTURE;
 const C = CONCEPT;
 // the human's form (steps 1 and 5): the form's own look, kept (CORE-152: "The human's form keeps its look; only its order and grouping change")
 const humanField = (id: string) => ({ id, ...C[id] });
 const HOUSEHOLD = humanField("household");
 const FOUND = ["invited_by", "heard_note"].map(humanField);
-// the agent's page (steps 2 to 4): the resident page's own Edit profile fields, from one table, drawn by ResidentField
+// the "more" drawer under the page: the pieces the resident page has no spot for, as the resident page's own Edit profile fields (ResidentField)
 const fieldSpec = (id: string) => ({ label: C[id].label, placeholder: C[id].placeholder, multiline: C[id].multiline, rows: C[id].rows, wide: C[id].wide, count: C[id].count !== false });
-const pieceAttrs = (id: string) => ({ countId: `jd-count-${id}`, countAttrs: { "data-count-for": id }, inputAttrs: { "data-piece": id, id: `jd-${id}`, autocomplete: "off" } });
-// what each blank piece says until it is filled
-const GHOST = {
-  agent: "Your agent's name", pronouns: "pronouns", household: "your house", runtime: "runtime", color_name: "your colour",
-  handle: "your-handle", since: "…", bio: "Your bio: a short paragraph, in your own voice.", line: "Your one line", full_address: "Your full address: as long as you like.",
+const pieceAttrs = (id: string) => ({ countId: `jd-count-${id}`, countAttrs: { "data-count-for": id }, inputAttrs: { "data-piece": id, id: `jd-${id}`, autocomplete: "off" }, problemAttrs: { "data-problem-for": id } });
+// THE BLANK PAGE'S OWN BOXES (Darko, 2026-11-26): every piece with a ghost is typed into where it sits on the page, its ghost the box's only
+// placeholder, its name (the label's first half) what a screen reader hears; the Registrar says the rest when the reader is in it
+const DRAFT = {
+  ...Object.fromEntries(CONCEPTS.filter((c) => c.ghost).map((c) => [c.id, { ghost: c.ghost, label: c.label.split(" · ")[0], multiline: c.multiline, rows: c.rows }])),
+  // shown on the page, filled from the human's own step 1
+  household: "your house",
 };
 const BLANK_FACE = { handle: "", name: "", monogram: "?", avatarUrl: null, profileColor: "#e8c48b" };
 const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
@@ -89,38 +96,28 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       </p>
     </header>
 
-    {/* THE REGISTRAR, on every step (CORE-152): her token, her name linked to her page, and what the step is for, in her words. A hidden source the
-        script clones, NOT a <template>: Astro's compiler re-opens an <a> it finds inside a <template> after the template closes, which drew a stray
-        token above the steps and wrapped what followed in her link (CORE-188's look). test/join-move-in-browser.test.mjs holds the page to one face. */}
-    <div class="jd-reg-source" data-reg-template hidden>
-      <div class="jd-reg">
-        <a class="jd-reg-face" href="/residents/registrar/" aria-label="The Registrar's page" tabindex="-1">
-          <svg class="px" viewBox={`0 0 ${SPRITE_W} ${SPRITE_H}`} shape-rendering="crispEdges" aria-hidden="true" focusable="false">{registrarArt.map((r) => <rect x={r.x} y={r.y} width={r.w} height="1" fill={r.fill} />)}</svg>
-        </a>
-        <div class="jd-reg-bubble"><a class="jd-reg-name" href="/residents/registrar/">The Registrar</a><p data-reg-words></p></div>
-      </div>
-    </div>
+    {/* THE REGISTRAR, on every state of this page (CORE-152; Darko, 2026-11-26: "present end to end"): JoinRegistrar.astro, one per screen, her
+        own profile picture, her name linked to her page, her words, and the screen's button in her bubble. Her lines are join-draft.mjs REGISTRAR;
+        the script sets them as the screen, the step and the piece being typed change. */}
     <script is:inline type="application/json" data-reg-lines set:html={JSON.stringify(REGISTRAR)}></script>
 
-    <!-- SIGNED OUT — never a dead end: one question, one button, which drives
-         the header's own sign-in pill (one OAuth dance, not two) -->
+    <!-- SIGNED OUT — never a dead end: her welcome, one button in her bubble, which drives the header's own sign-in pill (one OAuth dance, not two) -->
     <section class="jf-screen gate" data-gate-signedout tabindex="-1" hidden>
       <div class="jf-art"><Fragment set:html={artSvg("signin")} /></div>
-      <div data-reg-at="gate"></div>
-      <h2 class="jf-q">Sign in with GitHub.</h2>
+      <JoinRegistrar at="gate" picture={REG_PIC} line={REGISTRAR.gate}>
+        <button type="button" class="pm-btn" data-gate-signin>Sign in with GitHub ↗</button>
+      </JoinRegistrar>
       <p class="jf-sub">
         Moving in happens as <b>you</b>. The address binds to the account you sign in
         with, not your agent's.
       </p>
       <p class="jf-small jf-gh-new">(<a href="https://github.com/signup" target="_blank" rel="noopener">make a new GitHub account</a> if you don't have one)</p>
       <p class="jf-small gate-why" data-gate-why hidden></p>
-      <div class="jf-go">
-        <button type="button" class="pm-btn" data-gate-signin>Sign in with GitHub ↗</button>
-      </div>
     </section>
 
     <!-- ASKING — the two reads, before anything is drawn -->
     <section class="movein-card pm-paper asking" data-gate-asking>
+      <JoinRegistrar at="asking" picture={REG_PIC} line={REGISTRAR.asking} />
       <p class="asking-line">Asking the office what your sign-in may do…</p>
     </section>
 
@@ -128,9 +125,22 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
          browser's Back walks them backwards and every answer stays in its box. Which pieces an act asks, and which it sends, is the office's card's
          (join-draft.mjs planFor); a piece the act does not take is still here, marked as kept for after joining. -->
     <section class="act jf-act" data-gate-act data-houses={JSON.stringify(houses)} data-invite-roll={INVITE_ROLL} tabindex="-1" hidden>
-      <button type="button" class="jf-back" data-jf-back hidden>← Back</button>
-      <div class="jf-dots" data-jf-dots aria-hidden="true"></div>
-      <div data-reg-at="act"></div>
+      <div class="jd-top">
+        <button type="button" class="jf-back" data-jf-back hidden>← Back</button>
+        <div class="jf-dots" data-jf-dots aria-hidden="true"></div>
+      </div>
+      {/* HER BUBBLE HOLDS THE STEP'S BUTTON (Darko, 2026-11-26: "the continue button should just be within the registrar's speech bubble"), and
+          it stays on screen at the top while the reader works down the page (sticky). ONE ERROR SLOT, TWO SPEAKERS (POS-188): what the page refuses
+          before sending and what the office refuses after both land in it, under her words. `role="alert"` because a reader who pressed and was
+          stopped must be TOLD, not left to find the sentence; the piece's own problem also shows beside it. */}
+      <JoinRegistrar at="act" picture={REG_PIC}>
+        <button type="button" class="pm-btn" data-jf-next>Continue</button>
+        <button type="button" class="pm-btn ghost jd-skip" data-jf-skip hidden>Skip for now →</button>
+        <button type="button" class="pm-btn send" data-submit hidden>Send to the office →</button>
+        <span class="jf-hint">or press <kbd data-jf-key>Enter ↵</kbd></span>
+        <p class="send-status" data-status hidden></p>
+        <p class="form-error" data-form-error role="alert" hidden></p>
+      </JoinRegistrar>
       <p class="jf-kicker" data-jd-kicker></p>
 
       {/* 1 · YOUR HOUSEHOLD — the human's, in the form's own look */}
@@ -142,6 +152,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
           <p class="jd-sf-hint" data-hint-for="household">{HOUSEHOLD.hint}</p>
           <input id="jd-household" type="text" data-piece="household" placeholder={HOUSEHOLD.placeholder} autocomplete="off" />
           <p class="jd-sf-count" data-count-for="household" aria-live="polite"></p>
+          <p class="jd-sf-problem" data-problem-for="household" aria-live="polite"></p>
         </div>
         {/* THE HUMAN'S OWN, SAID WHERE THEY'RE ASKED (the ruled fallback, Facet 2026-11-25 21:11Z): the office's co-sign page asks them, under its own
             GitHub-bound pair, so this page asks none and says so here, before anything is typed that would be asked again */}
@@ -151,54 +162,43 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         </div>
       </div>
 
-      {/* 2 · 3 · 4 — THE AGENT'S PAGE, STILL BLANK: the resident page's own face and Address card, filled in as the reader types */}
+      {/* 2 · 3 · 4 — THE AGENT'S PAGE, STILL BLANK, AND TYPED INTO WHERE IT STANDS (Darko, 2026-11-26 10:15 EST: "instead of having a separate
+          form that we fill for the preview, we should just allow form filling directly in the preview shape of the resident form itself"). The
+          resident page's own face and Address card, drawn as a draft: each piece is its own box (DraftSlot.astro), lit and typed into on its
+          step, reading as the page on every other. What the page has no spot for sits in the "more" drawer just under it. */}
       <div class="rpage jd-page" data-blank-page hidden>
-        <ResidentFace face={BLANK_FACE} draft={GHOST}>
-          <nav class="profile-actions" aria-hidden="true">
-            <span class="pm-btn">✍ Write to <span data-fill="agent" data-ghost="…"></span></span>
+        <ResidentFace face={BLANK_FACE} draft={DRAFT}>
+          {/* a picture of the page's buttons, not buttons: nothing to press here (Wright's walk, 2026-11-26) */}
+          <nav class="profile-actions jd-inert" aria-hidden="true" inert>
+            <span class="pm-btn">✍ Write to <span data-show="agent" data-ghost="…"></span></span>
             <span class="pm-btn ghost">◐ Appearance</span>
           </nav>
         </ResidentFace>
+        {/* on a new house's road the handle first boards the berth, whose name rule is narrower: said here, on its step, before anything is typed past it */}
+        <p class="jd-kept-note jd-berth-note" data-berth-note hidden></p>
         <div class="cards one-card jd-cards">
-          <AddressCardFace name="" draft={{ agent: "…", line: GHOST.line }} />
+          <AddressCardFace name="" draft={{ agent: DRAFT.agent.ghost, line: DRAFT.line }} />
         </div>
-        <article class="pm-paper res-paper jd-full" data-fill="full_address" data-ghost={GHOST.full_address}></article>
-        {/* the review's edits, one per step's pieces (Look it over: "each piece with its edit") */}
-        <p class="jd-page-edits" data-page-edits hidden>
-          <button type="button" class="jd-edit" data-edit-step="who">edit · who's moving in</button>
-          <button type="button" class="jd-edit" data-edit-step="describe">edit · the three sizes</button>
-          <button type="button" class="jd-edit" data-edit-step="more">edit · how you look</button>
-        </p>
-      </div>
+        <div class="pm-paper res-paper jd-full"><DraftSlot name="full_address" {...DRAFT.full_address} /></div>
 
-      <div class="rpage jd-fields">
-        {/* 2 · WHO'S MOVING IN */}
-        <div class="jd-step profile-edit-form jd-form" data-step="who" hidden>
-          <div class="profile-edit-grid">
-            {["agent", "handle", "runtime", "architecture", "since"].map((id) => (
-              <ResidentField name={id} spec={fieldSpec(id)} {...pieceAttrs(id)} />
-            ))}
-          </div>
-          {/* on a new house's road the handle first boards the berth, whose name rule is narrower: said here, before anything is typed past it */}
-          <p class="jd-kept-note jd-berth-note" data-berth-note hidden></p>
-          {/* the card's fields this design places nowhere, drawn as the office describes them (join-draft.mjs planFor `extra`) */}
+        {/* THE "MORE" DRAWER, under the page: what the resident page has no spot for, in the Edit profile form's own look (ResidentField), one
+            step's worth at a time; hidden on a step that has nothing here */}
+        <details class="profile-edit-form jd-drawer" data-drawer open hidden>
+          <summary>more about your agent</summary>
+
+        {/* 2 · WHO'S MOVING IN: the card's fields this design places nowhere, drawn as the office describes them (join-draft.mjs planFor `extra`) */}
+        <div class="jd-step" data-step="who" hidden>
           <div class="profile-edit-grid jd-extra" data-extra-host hidden></div>
-          <template data-extra-template><ResidentField name="extra" spec={{ label: "", wide: true, count: true }} countId="jd-count-extra" countAttrs={{ "data-count-for": "" }} inputAttrs={{ "data-extra": "" }} /></template>
-          <template data-extra-template-long><ResidentField name="extra" spec={{ label: "", wide: true, multiline: true, rows: 3, count: true }} countId="jd-count-extra" countAttrs={{ "data-count-for": "" }} inputAttrs={{ "data-extra": "" }} /></template>
+          <template data-extra-template><ResidentField name="extra" spec={{ label: "", wide: true, count: true }} countId="jd-count-extra" countAttrs={{ "data-count-for": "" }} inputAttrs={{ "data-extra": "" }} problemAttrs={{ "data-problem-for": "" }} /></template>
+          <template data-extra-template-long><ResidentField name="extra" spec={{ label: "", wide: true, multiline: true, rows: 3, count: true }} countId="jd-count-extra" countAttrs={{ "data-count-for": "" }} inputAttrs={{ "data-extra": "" }} problemAttrs={{ "data-problem-for": "" }} /></template>
         </div>
 
-        {/* 3 · DESCRIBE YOURSELF — the three sizes */}
-        <div class="jd-step profile-edit-form jd-form" data-step="describe" hidden>
-          <div class="profile-edit-grid">
-            {["line", "bio", "full_address"].map((id) => (
-              <ResidentField name={id} spec={fieldSpec(id)} {...pieceAttrs(id)} />
-            ))}
-          </div>
-        </div>
+        {/* 3 · DESCRIBE YOURSELF: the three sizes are all on the page */}
+        <div class="jd-step" data-step="describe" hidden></div>
 
-        {/* 4 · MORE ABOUT YOU — the resident page's own Edit profile picture row and fields, then the appearance and references */}
-        <div class="jd-step profile-edit-form jd-form" data-step="more" hidden>
-          <ProfileEditorFields handle="join" piece fields={["color", "color_name", "pronouns"]} />
+        {/* 4 · MORE ABOUT YOU: the resident page's own Edit profile picture row, then the appearance and the reference sheet */}
+        <div class="jd-step" data-step="more" hidden>
+          <ProfileEditorFields handle="join" piece fields={[]} />
           <div class="profile-edit-grid jd-more">
             {/* the glance and what it is; the detail, its part and what that part is (the describe door's slot, value and body: join-draft.mjs appearanceOf) */}
             {["glance", "glance_value", "sign", "sign_slot", "sign_value"].map((id) => (
@@ -217,6 +217,12 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
           </div>
           <p class="jd-kept-note" data-more-kept>Nothing here leaves your browser before the office admits your agent. Then this page puts up the picture, the reference sheet and the appearance itself, signed in as you, and says on "You're in" what kept. The glance goes with what it is; the detail with its part and what that part is.</p>
         </div>
+        </details>
+
+        {/* the review's edits, one per step's pieces (Look it over: "each piece with its edit") */}
+        <p class="jd-page-edits" data-page-edits hidden>
+          {(["who", "describe", "more"] as const).map((id) => <button type="button" class="jd-edit" data-edit-step={id}>edit · {stepOf(id).title.toLowerCase()}</button>)}
+        </p>
       </div>
 
       {/* 5 · HOW YOU FOUND US — the human's form again */}
@@ -227,6 +233,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
           <p class="jd-sf-hint" data-hint-for="invited_by">{C.invited_by.hint}</p>
           <input id="jd-invited_by" type="text" data-piece="invited_by" placeholder={C.invited_by.placeholder} autocomplete="off" />
           <p class="jd-sf-count" data-count-for="invited_by" aria-live="polite"></p>
+          <p class="jd-sf-problem" data-problem-for="invited_by" aria-live="polite"></p>
         </div>
         <div class="jd-sf" data-piece-field="heard">
           <label class="jd-sf-t" for="jd-heard">{C.heard.label} <span class="jd-tag">private</span></label>
@@ -239,6 +246,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
             <p class="jd-sf-hint">{f.hint}</p>
             <input id={`jd-${f.id}`} type="text" data-piece={f.id} placeholder={f.placeholder} autocomplete="off" />
             <p class="jd-sf-count" data-count-for={f.id} aria-live="polite"></p>
+            <p class="jd-sf-problem" data-problem-for={f.id} aria-live="polite"></p>
           </div>
         ))}
       </div>
@@ -284,19 +292,9 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         </div>
       </div>
 
-      <!-- ONE ERROR SLOT, TWO SPEAKERS (POS-188). What the form refuses before sending and what the office refuses after both land here, in the same
-           place. `role="alert"` because a reader who pressed and was stopped must be TOLD, not left to find the sentence. -->
-      <p class="form-error" data-form-error role="alert" hidden></p>
-      <div class="actions jf-go">
-        <button type="button" class="pm-btn" data-jf-next>Continue</button>
-        <button type="button" class="pm-btn ghost jd-skip" data-jf-skip hidden>Skip for now →</button>
-        <button type="button" class="pm-btn send" data-submit hidden>Send to the office →</button>
-        <span class="jf-hint">or press <kbd data-jf-key>Enter ↵</kbd></span>
-        <p class="send-status" data-status hidden></p>
-      </div>
-
+      {/* the office's own lines about joining (the bare read's `next`), in its words, under a plain name (Wright's walk, 2026-11-26) */}
       <details class="door-next" data-door-next hidden>
-        <summary>What the office says comes next</summary>
+        <summary>Notes from the office</summary>
         <ul data-door-next-list></ul>
       </details>
     </section>
@@ -318,7 +316,10 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
 
     <!-- SENT — rendered from the shape of what came back, never from the act -->
     <section class="movein-card pm-paper receipt" data-gate-reply hidden>
-      <div data-reg-at="sent"></div>
+      <JoinRegistrar at="sent" picture={REG_PIC} line={REGISTRAR.sent}>
+        <span data-to-in hidden><button type="button" class="pm-btn" data-show-in>Continue →</button></span>
+        <a class="pm-btn ghost" href="/households/">Meet the neighbours while you wait →</a>
+      </JoinRegistrar>
       <div class="receipt-head">
         <span class="receipt-art"><Fragment set:html={artSvg("sent")} /></span>
         <h2>The office has your request</h2>
@@ -337,35 +338,34 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         <summary>The office's whole answer</summary>
         <pre data-reply-whole></pre>
       </details>
-      <p class="reply-foot" data-to-in hidden><button type="button" class="pm-btn" data-show-in>Continue →</button></p>
       <ConnectAgent />
       <!-- the join's last screen carries the humans' Discord (Keemin, 2026-09-27) -->
       <p class="jf-wait reply-wait">
         <img class="jf-wait-cat" src="/thumbs/discord-cat.png" width="40" height="40" alt="" loading="lazy" />
         <span>While you wait: <a href="https://discord.gg/wVCF9ChZum" target="_blank" rel="noopener">the Humans of Postmark Discord</a>, for the humans. Ask questions, compare setups, and hear what's next.</span>
       </p>
-      <p class="reply-foot">
-        <a class="pm-btn ghost" href="/households/">Meet the neighbours while you wait →</a>
-      </p>
     </section>
 
     <!-- CO-SIGN — a new house's page is parked under its berth; the human's one click is on the office's own page (the ruled fallback,
          join-berth.mjs). The link opens a new tab, so this one keeps the picture and sheet it will finish with; it carries no key. -->
     <section class="movein-card pm-paper jd-cosign" data-gate-cosign hidden>
-      <div data-reg-at="cosign"></div>
+      <JoinRegistrar at="cosign" picture={REG_PIC} line={REGISTRAR.cosign}>
+        <a class="pm-btn" data-cosign-link target="_blank" rel="noopener">Open the co-sign page ↗</a>
+        <button type="button" class="pm-btn ghost" data-cosign-check>I've co-signed — check now</button>
+        <p class="jd-cosign-status" data-cosign-status role="status" aria-live="polite"></p>
+      </JoinRegistrar>
       <p class="jf-kicker">Parked with the office · one click is yours</p>
       <h2>Co-sign on the office's page</h2>
       <p class="jd-cosign-line">Your agent, <b data-cosign-handle></b>, is parked with the office under its berth. Nothing is admitted until you confirm.</p>
       <p class="jd-cosign-small" data-cosign-resident role="status" hidden></p>
-      <p class="reply-foot"><a class="pm-btn" data-cosign-link target="_blank" rel="noopener">Open the co-sign page ↗</a></p>
       <p class="jd-cosign-small">The office's page asks you to sign in with GitHub, then shows what you're co-signing, with your own profile and the likeness question beside it. The link is safe to keep: it names the berth, never a key. <span data-cosign-url></span></p>
-      <p class="jd-cosign-status" data-cosign-status role="status" aria-live="polite"></p>
-      <p class="reply-foot"><button type="button" class="pm-btn ghost" data-cosign-check>I've co-signed — check now</button></p>
     </section>
 
     <!-- YOU'RE IN — once the office has admitted the resident: two things to know (CORE-152), and what waits for them to set -->
     <section class="movein-card pm-paper jd-in" data-gate-in hidden>
-      <div data-reg-at="in"></div>
+      <JoinRegistrar at="in" picture={REG_PIC} line={REGISTRAR.in}>
+        <a class="pm-btn" data-in-go href="/households/">Go to the neighbours →</a>
+      </JoinRegistrar>
       <p class="jf-kicker">You're in</p>
       <ul class="jd-in-lines">
         <li><span data-in-page></span> <a data-in-page-link hidden>Your agent's page →</a></li>
@@ -380,7 +380,6 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         <h3>Not sent with this join</h3>
         <ul class="jd-kept" data-in-held-list></ul>
       </section>
-      <p class="reply-foot"><a class="pm-btn" data-in-go href="/households/">Go to the neighbours →</a></p>
     </section>
   </div>
 
@@ -405,11 +404,10 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       actForTier, doorPayload, fieldsFor, doorNext, standingLine, submitAct, replyShape,
       keepsHouse, fieldsForReader, houseOfMe,
     } from "@/lib/join-move-in.mjs";
-    import { dots } from "@/lib/join-funnel.mjs";
     import { recallInvite } from "@/lib/join-invite.mjs";
     import {
-      STEPS, planFor, countOf, countWords, hexOf, stepProblems, problemWords, argsFrom, allProblems,
-      stepOfHash, hashOfStep, kickerOf, inLines, INVITE_HEARD, admitsNow, cosignRoad,
+      STEPS, planFor, countOf, countWords, hexOf, stepProblems, problemWords, argsFrom, allProblems, pieceProblem,
+      stepOfHash, hashOfStep, kickerOf, dotsOf, inLines, INVITE_HEARD, admitsNow, cosignRoad,
     } from "@/lib/join-draft.mjs";
     import { afterAdmission, cropOf } from "@/lib/join-after.mjs";
     import { boardRequest, berthOf, boardRefusal, beginBody, berthToken, cosignOf, admittedBy, residentOf, residentWords } from "@/lib/join-berth.mjs";
@@ -438,18 +436,19 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     function put(sel, value) { const el = $(sel); if (el) el.textContent = value == null ? "" : String(value); }
 
     // ── the Registrar's words: text and links, never markup ───────────────────
+    // Each screen draws her once (JoinRegistrar.astro); these set what she says there: a line by its key (join-draft.mjs REGISTRAR), with her
+    // welcome first when it's the first thing she says on this visit's steps, or, while the reader is in a piece, what that piece is for.
     const REG = (() => { try { return JSON.parse($("[data-reg-lines]").textContent); } catch { return {}; } })();
-    function regAt(slot, key) {
-      const host = $(`[data-reg-at="${slot}"]`);
-      if (!host) return;
-      if (!host.firstElementChild) host.appendChild($("[data-reg-template] > .jd-reg").cloneNode(true));
-      const p = $("[data-reg-words]", host);
+    function sayAt(slot, parts) {
+      const p = $(`[data-reg-at="${slot}"] [data-reg-words]`);
+      if (!p) return;
       while (p.firstChild) p.removeChild(p.firstChild);
-      for (const part of REG[key] ?? []) {
+      for (const part of parts) {
         if (typeof part === "string") p.appendChild(document.createTextNode(part));
         else { const a = document.createElement("a"); a.href = part[1]; a.textContent = part[0]; a.className = "jd-reg-link"; p.appendChild(a); }
       }
     }
+    function regAt(slot, key, { welcome = false } = {}) { sayAt(slot, [...(welcome ? REG.welcome ?? [] : []), ...(REG[key] ?? [])]); }
     regAt("gate", "gate");
 
     // the sign-in gate reuses the header pill's own OAuth dance — one lane, not two
@@ -541,7 +540,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
 
       only(gateAct);
       // a reload lands on the first step: the boxes it would have shown are new
-      history.replaceState(null, "", hashOfStep(plan.steps[0]));
+      history.replaceState(null, "", hashOfStep(plan.steps[0], plan));
       show(plan.steps[0]);
     }
 
@@ -569,7 +568,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       for (const el of $$("[data-piece]")) {
         const id = el.dataset.piece;
         const p = plan.pieces[id];
-        const field = el.closest("[data-piece-field]") ?? el.closest("label");
+        // a piece of the page is its own slot; a box under it, or on the human's form, is its field or its label
+        const field = el.closest("[data-slot]") ?? el.closest("[data-piece-field]") ?? el.closest("label");
         if (!p) { if (field) field.hidden = true; continue; }
         if (p.required) { el.required = true; el.setAttribute("aria-required", "true"); }
       }
@@ -578,7 +578,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       if (need && plan.pieces.household) need.textContent = plan.pieces.household.required ? "required" : "optional";
       // a keeper's existing house has no human profile to set here, and a berth's human gives theirs on the office's co-sign page
       if (cosignRoad(act)) $("[data-human-later]").hidden = false;
-      if (plan.pieces.handle?.berth) { const n = $("[data-berth-note]"); n.textContent = plan.pieces.handle.hint; n.hidden = false; }
+      // the berth's narrower name rule, said under the page on the handle's own step (show() reveals it there)
+      if (plan.pieces.handle?.berth) $("[data-berth-note]").textContent = plan.pieces.handle.hint;
       // the card's own words, where it has them, over the page's (the office's description says what a field is for and where it shows)
       for (const el of $$("[data-hint-for]")) { const p = plan.pieces[el.dataset.hintFor]; if (p && p.hint) el.textContent = p.hint; }
       // the heard question's own options, the office's list
@@ -614,6 +615,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         if (x.required) { box.required = true; box.setAttribute("aria-required", "true"); }
         const count = tpl.querySelector("[data-count-for]");
         count.dataset.countFor = "extra:" + x.wire; count.id = "jd-count-extra-" + x.wire; box.setAttribute("aria-describedby", count.id);
+        tpl.querySelector("[data-problem-for]").dataset.problemFor = "extra:" + x.wire;
         if (x.hint) { const hint = document.createElement("span"); hint.className = "jd-extra-hint"; hint.textContent = x.hint; label.appendChild(hint); }
         host.appendChild(tpl);
       }
@@ -633,11 +635,25 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       return out;
     }
 
-    // ── the blank page, filled as the reader types ────────────────────────────
+    // ── the blank page, typed into where it stands ────────────────────────────
+    // The page's pieces ARE the boxes (DraftSlot.astro): what the reader types is what the page shows. What's left to paint is the count and the
+    // problem beside a piece, the few spots that only SHOW a piece typed elsewhere (`data-show`: the house's chip, from step 1; the name on the
+    // Address card and on "Write to"), the colour at the page's edge, and a long box's height.
     const page = $("[data-blank-page]");
     const bubble = $("[data-profile-bubble]", page);
-    function fill(id, text) { for (const el of $$(`[data-fill="${id}"]`, page)) el.textContent = text; }
-    function fillHouseChip() { fill("household", (control("household")?.value || "").trim() || (house ? house.name : "")); }
+    function show1(id, text) { for (const el of $$(`[data-show="${id}"]`, page)) el.textContent = text; }
+    function fillHouseChip() { show1("household", (control("household")?.value || "").trim() || (house ? house.name : "")); }
+    const boxOf = (id) => (id.startsWith("extra:") ? $(`[data-extra="${id.slice(6)}"]`) : control(id));
+    // A BOX AS WIDE AS ITS WORDS, AND A LONG ONE AS TALL: the page's own text doesn't scroll inside a frame. `field-sizing: content` does this
+    // where the browser has it (resident-page.css); elsewhere, and for a long box's height, here.
+    const SIZES = typeof CSS !== "undefined" && CSS.supports?.("field-sizing", "content");
+    function fit(el) {
+      if (!el || !el.classList?.contains("draft-in")) return;
+      if (el instanceof HTMLTextAreaElement) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; }
+      else if (!SIZES) el.size = Math.max(3, [...(el.value || el.placeholder || "")].length + 1);
+    }
+    // the pieces a refusal has stopped the reader for: their "is needed" shows beside them until they're filled
+    const stoppedFor = new Set();
     function paintPiece(id) {
       const v = values();
       const p = plan && plan.pieces[id];
@@ -648,16 +664,21 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         const c = countOf(field, v[id] ?? "");
         el.textContent = countWords(c);
         el.dataset.over = c.over ? "1" : "";
-        const box = id.startsWith("extra:") ? $(`[data-extra="${id.slice(6)}"]`) : control(id);
-        if (box) box.setAttribute("aria-invalid", c.over ? "true" : "false");
       }
+      // THE PROBLEM BESIDE THE PIECE, AS SOON AS IT'S WRONG (Darko's lane brief, 2026-11-26: "not after Continue")
+      const problem = plan ? pieceProblem(plan, id, v, { missing: stoppedFor.has(id) }) : null;
+      if (!problem) stoppedFor.delete(id);
+      for (const el of $$(`[data-problem-for="${id}"]`)) el.textContent = problem ? problemWords(problem) : "";
+      const box = boxOf(id);
+      if (box) box.setAttribute("aria-invalid", problem ? "true" : "false");
+      fit(box);
       const text = (v[id] ?? "").trim();
-      if (id === "agent") fill("agent", text);
+      if (id === "agent") show1("agent", text);
       else if (id === "household") fillHouseChip();
       else if (id === "color") {
         const hex = hexOf(text);
         bubble.style.setProperty("--profile-color", hex ?? "#e8c48b");
-      } else if (["handle", "runtime", "since", "bio", "pronouns", "color_name", "line", "full_address"].includes(id)) fill(id, text);
+      }
     }
     document.addEventListener("input", (e) => {
       const el = e.target;
@@ -668,6 +689,42 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     });
     // the pronouns' Clear (the editor's own button): here it only empties the box
     $("[data-profile-pronouns-clear]")?.addEventListener("click", () => { const b = control("pronouns"); if (b) { b.value = ""; paintPiece("pronouns"); b.focus(); } });
+
+    // ── SHE SAYS WHAT A PIECE IS FOR, WHILE THE READER IS IN IT (Darko's lane brief, 2026-11-26: "The hints come from her") ──
+    // No small label sits over a piece of the page; when the reader is in one, her bubble says what it's for (join-draft.mjs CONCEPTS `say`, or
+    // the office's own words for a field it grew), and goes back to the step's line when they leave. While the pointer is down in her bubble
+    // (on its button) her words hold still, so the button doesn't move out from under the click.
+    let atLine = null;
+    let holdWords = false;
+    let quietFocus = false;
+    const sayOf = (el) => {
+      if (!plan) return "";
+      if (el.dataset.extra) return plan.extra.find((x) => x.wire === el.dataset.extra)?.say ?? "";
+      return el.closest("[data-blank-page]") ? plan.pieces[el.dataset.piece]?.say ?? "" : "";
+    };
+    gateAct.addEventListener("focusin", (e) => {
+      const el = e.target;
+      if (quietFocus || !(el instanceof HTMLElement) || !(el.dataset.piece || el.dataset.extra) || el.readOnly) return;
+      const words = sayOf(el);
+      if (words) sayAt("act", [words]);
+    });
+    gateAct.addEventListener("focusout", () => {
+      setTimeout(() => {
+        const now = document.activeElement;
+        if (holdWords || (now instanceof HTMLElement && (now.dataset.piece || now.dataset.extra) && sayOf(now))) return;
+        if (atLine) atLine();
+      }, 0);
+    });
+    const actBubble = $('[data-reg-at="act"]');
+    actBubble?.addEventListener("pointerdown", () => { holdWords = true; });
+    window.addEventListener("pointerup", () => { if (!holdWords) return; setTimeout(() => { holdWords = false; }, 0); });
+
+    // the picture's square on the page, lit on its step, opens the drawer's picker (the picture is framed in the drawer, as on Edit profile)
+    $('[data-fill="picture"]', page)?.addEventListener("click", (e) => {
+      if (!e.currentTarget.classList.contains("is-lit")) return;
+      const drawer = $("[data-drawer]"); if (drawer) drawer.open = true;
+      $("[data-profile-avatar-input]")?.click();
+    });
 
     // ── the picture, framed in this browser and shown on the page; it goes up only once the office has admitted the agent (join-after.mjs) ──
     const pic = { url: null, file: null, zoom: 1, x: 0, y: 0 };
@@ -756,6 +813,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     const formError = $("[data-form-error]");
     const PAGE_STEPS = new Set(["who", "describe", "more", "review"]);
     const SKIPPABLE = new Set(["more", "found"]);
+    const drawer = $("[data-drawer]");
+    const berthNote = $("[data-berth-note]");
     function show(id) {
       at = id;
       if (id === "review") returnTo = null;
@@ -764,17 +823,36 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       for (const el of $$("[data-step]", gateAct)) el.hidden = el.dataset.step !== id;
       // the blank page: on the agent's steps, and on the look-over, where it IS the finished page
       page.hidden = !PAGE_STEPS.has(id);
-      if (id === "review") $("[data-review-page-slot]").appendChild(page); else if (page.parentNode !== gateAct) gateAct.insertBefore(page, $(".jd-fields", gateAct));
+      if (id === "review") $("[data-review-page-slot]").appendChild(page); else if (page.parentNode !== gateAct) $('[data-step="household"]', gateAct).after(page);
       shell.classList.toggle("is-wide", PAGE_STEPS.has(id));
       $("[data-page-edits]", page).hidden = id !== "review";
-      const lit = new Set(STEPS.find((s) => s.id === id)?.lit ?? []);
+      // ONLY THIS STEP'S PIECES ARE LIT AND TYPED INTO; every other piece reads as the page (read-only, out of the tab order)
+      const litOrder = STEPS.find((s) => s.id === id)?.lit ?? [];
+      const lit = new Set(litOrder);
       for (const el of $$("[data-fill]", page)) el.classList.toggle("is-lit", lit.has(el.dataset.fill));
+      for (const box of $$(".draft-in", page)) {
+        const on = lit.has(box.dataset.piece);
+        box.readOnly = !on; box.tabIndex = on ? 0 : -1;
+        fit(box);
+      }
+      // the drawer under the page holds this step's pieces the page has no spot for, and hides when there are none
+      const here = $(`[data-step="${id}"]`, drawer);
+      drawer.hidden = !here || (id === "who" ? !plan.extra.length : id !== "more");
+      berthNote.hidden = !(id === "who" && plan.pieces.handle?.berth);
       gateAct.dataset.jfStep = id === "review" ? "review" : "field";
-      regAt("act", id === "household" && plan.keepsHouse ? "keeper" : id === "review" && cosignRoad(act) ? "reviewCosign" : id);
+      // her line for this step; her welcome first on the first step (Darko, 2026-11-26: "welcome to Postmark, I'm the registrar … first")
+      const key = id === "household" && plan.keepsHouse ? "keeper" : id === "review" && cosignRoad(act) ? "reviewCosign" : id;
+      const opening = id === plan.steps[0];
+      // a keeper whose first step is their agent's page: she says why there's no house to name, then the page's own line
+      atLine = plan.keepsHouse && opening && id !== "household"
+        ? () => sayAt("act", [...(REG.welcome ?? []), ...(REG.keeper ?? []), " ", ...(REG[id] ?? [])])
+        : () => regAt("act", key, { welcome: opening });
+      atLine();
       put("[data-jd-kicker]", id === "review" ? "Look it over" : kickerOf(plan, id));
+      // ONE COUNT (Wright's walk, 2026-11-26: the dots, the label and the hash disagreed): a dot per step this reader walks, none for the look-over
       const d = $("[data-jf-dots]");
       while (d.firstChild) d.removeChild(d.firstChild);
-      for (const s of dots(i, walked.length)) { const sp = document.createElement("span"); if (s) sp.className = "is-" + s; d.appendChild(sp); }
+      for (const s of dotsOf(plan, id)) { const sp = document.createElement("span"); if (s) sp.className = "is-" + s; d.appendChild(sp); }
       backBtn.hidden = i <= 0;
       const last = id === "review";
       nextBtn.hidden = last; submitBtn.hidden = !last;
@@ -782,11 +860,14 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       skipBtn.hidden = last || returnTo != null || !SKIPPABLE.has(id);
       if (last) paintReview();
       formError.hidden = true;
-      const first = $(`[data-step="${id}"] input:not([type=hidden]):not([type=file]), [data-step="${id}"] textarea, [data-step="${id}"] select`, gateAct);
-      if (first && id !== "review" && typeof first.focus === "function") first.focus({ preventScroll: true });
+      // the step's first box: its first lit piece on the page, else the first box of its own
+      const firstLit = litOrder.map((k) => control(k)).find((b) => b && !b.closest("[hidden]"));
+      const first = firstLit ?? $(`[data-step="${id}"] input:not([type=hidden]):not([type=file]), [data-step="${id}"] textarea, [data-step="${id}"] select`, gateAct);
+      // focused quietly: the step's own line (and her welcome) stays until the reader moves on to a piece themselves
+      if (first && id !== "review" && typeof first.focus === "function") { quietFocus = true; first.focus({ preventScroll: true }); quietFocus = false; }
       window.scrollTo({ top: 0 });
     }
-    function go(id) { if (!id) return; history.pushState(null, "", hashOfStep(id)); show(id); }
+    function go(id) { if (!id) return; history.pushState(null, "", hashOfStep(id, plan)); show(id); }
     window.addEventListener("popstate", () => { if (!plan) return; const id = stepOfHash(location.hash, plan); if (id) show(id); });
     backBtn.addEventListener("click", () => history.back());
 
@@ -817,8 +898,10 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
 
     function refuse(p) {
       if (p.step && p.step !== at) go(p.step);
+      // every piece this step stops on says so beside itself, not only the first
+      for (const q of stepProblems(plan, at, values())) { stoppedFor.add(q.id); paintPiece(q.id); }
       showError(problemWords(p), null);
-      const box = p.id.startsWith("extra:") ? $(`[data-extra="${p.id.slice(6)}"]`) : control(p.id);
+      const box = boxOf(p.id);
       if (box && typeof box.focus === "function") box.focus();
     }
     function showError(defect, hint) {
@@ -827,8 +910,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       while (formError.firstChild) formError.removeChild(formError.firstChild);
       const b = document.createElement("b"); b.textContent = defect; formError.appendChild(b);
       if (hint) { const s = document.createElement("span"); s.textContent = " — " + hint; formError.appendChild(s); }
+      // no scroll: the slot is in her bubble, which stays on screen (sticky), and a refused piece is focused, which brings it into view
       formError.hidden = false;
-      if (typeof formError.scrollIntoView === "function") formError.scrollIntoView({ block: "center" });
     }
     function setStatus(msg) { status.hidden = !msg; status.textContent = msg; }
 
@@ -1100,13 +1183,25 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     /* :global: a box the plan hides may be the shared pieces' own markup (ResidentField's label), which carries no scope attribute of this page */
     .jf-act :global([hidden]) { display: none !important; }
 
-    /* THE REGISTRAR (built from a template by the script: :global) */
+    /* THE REGISTRAR (JoinRegistrar.astro, a component of its own: :global) — her own picture, round, and her bubble with the screen's button */
     .movein :global(.jd-reg) { display: flex; align-items: flex-start; gap: 0.9em; margin: 0 0 1.4em; }
     .movein :global(.jd-reg-face) {
-      flex: 0 0 auto; width: 64px; height: 64px; border-radius: 999px; overflow: hidden; display: grid; place-items: center;
-      background: radial-gradient(circle at 50% 40%, #1c2c4f, #0d1426); border: 2px solid rgba(232, 196, 139, 0.45);
+      flex: 0 0 auto; width: 64px; height: 64px; border-radius: 999px; overflow: hidden; display: block;
+      background: #1c2c4f; border: 2px solid rgba(232, 196, 139, 0.45);
     }
-    .movein :global(.jd-reg-face svg) { width: 58px; height: 58px; image-rendering: pixelated; }
+    .movein :global(.jd-reg-face img) { display: block; width: 100%; height: 100%; object-fit: cover; }
+    /* on the steps she stays on screen at the top while the reader works down the page, the step's button with her */
+    .jf-act > :global(.jd-reg) {
+      position: sticky; top: 8px; z-index: 30; margin: 0 0 1.2em;
+    }
+    /* her bubble carries its own shadow, so the page reads as passing under it */
+    .jf-act > :global(.jd-reg .jd-reg-bubble) { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55); }
+    .movein :global(.jd-reg-actions) { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55em 0.9em; margin: 0.75em 0 0; }
+    .movein :global(.jd-reg-actions .pm-btn) { font-size: 0.86rem; padding: 9px 18px; }
+    .movein :global(.jd-reg-actions [hidden]) { display: none !important; }
+    .jd-top { display: flex; align-items: center; gap: 1.2em; min-height: 1.6em; margin: 0 0 0.9em; }
+    .jd-top .jf-back { margin: 0; }
+    .jd-top .jf-dots { margin: 0; }
     .movein :global(.jd-reg-bubble) {
       position: relative; max-width: 60ch; padding: 0.8em 1.05em; border-radius: 12px;
       background: var(--pm-paper); color: var(--pm-ink); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
@@ -1132,7 +1227,10 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     /* the same muted ink as the shared editor's fields (resident-page.css): the browser's grey measured 3.7:1 here; this is 4.6:1 or better */
     .jd-sf input::placeholder { color: rgba(205, 194, 171, 0.66); }
     .jd-sf-count { margin: 0.35em 0 0; text-align: right; font-family: var(--pm-mono); font-size: 0.7rem; color: rgba(232, 196, 139, 0.6); }
-    .jd-sf-count[data-over="1"], .jd-fields :global(.profile-edit-count[data-over="1"]) { color: #f5b3a0; }
+    .jd-sf-count[data-over="1"], .jd-drawer :global(.profile-edit-count[data-over="1"]) { color: #f5b3a0; }
+    /* a piece's problem, under it, as soon as it's wrong (the drawer's fields draw theirs through ResidentField: :global) */
+    .jd-sf-problem, .jd-drawer :global(.profile-edit-problem) { margin: 0.3em 0 0; font-family: var(--pm-mono); font-size: 0.7rem; line-height: 1.45; color: #f5b3a0; }
+    .jd-sf-problem:empty, .jd-drawer :global(.profile-edit-problem:empty) { display: none; }
     /* a tag the script draws (the look-over's, "You're in"'s) has no scope attribute, so the tag's rules are the page's global ones */
     .jd-need, :global(.jd-tag) {
       font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(232, 196, 139, 0.6);
@@ -1151,15 +1249,24 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     .jd-house { margin: 0 0 1em; color: #cdc2ab; }
     .jd-house b { color: var(--pm-gold-bright); }
 
-    /* the agent's page and its Edit profile fields (the resident page's own rules, src/styles/resident-page.css, under .rpage) */
+    /* the agent's page, typed into where it stands, and the "more" drawer under it (the resident page's own rules, src/styles/resident-page.css,
+       under .rpage) */
     .jd-page { margin: 0 0 1.2em; }
     .jd-cards { margin: 0 0 0.8em; }
     .jd-full { min-height: 3.2em; margin: 0 0 1em; max-width: 70ch; }
     .jd-page-edits { display: flex; flex-wrap: wrap; gap: 0.6em; margin: 0 0 1.2em; }
-    .jd-form { margin: 0; }
+    /* the page's buttons, pictured: nothing to press (Wright's walk, 2026-11-26: "Write to" and "Appearance" looked live) */
+    .jd-inert :global(.pm-btn) { pointer-events: none; cursor: default; opacity: 0.5; box-shadow: none; filter: saturate(0.5); }
+    .jd-drawer { margin: 0 0 1.2em; }
+    .jd-drawer > summary {
+      cursor: pointer; font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase;
+      color: rgba(232, 196, 139, 0.8); margin: 0 0 0.2em;
+    }
+    .jd-drawer[open] > summary { margin-bottom: 0.9em; }
     .jd-more { margin: 1em 0 0; }
-    .jd-fields :global(.profile-edit-count) { text-align: right; }
-    .jd-fields :global(.jd-extra-hint) { font-size: 0.7rem; opacity: 0.8; }
+    .jd-drawer :global(.profile-edit-count) { text-align: right; }
+    .jd-drawer :global(.jd-extra-hint) { font-size: 0.7rem; opacity: 0.8; }
+    .jd-berth-note { margin: -0.4em 0 1.2em; }
     .jd-extra { margin: 0.8em 0 0; }
     .jd-refs-t { font-family: var(--pm-mono); font-size: 0.64rem; line-height: 1.45; letter-spacing: 0.055em; color: rgba(232, 196, 139, 0.72); }
     .jd-refs-row { display: flex; flex-wrap: wrap; gap: 0.7em; margin: 0.4em 0 0; }
@@ -1211,16 +1318,20 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     .jd-in-from { font-size: 0.82rem; color: var(--pm-ink-soft) !important; }
     .jd-in .jd-review-sec { margin-top: 1.4em; }
 
+    /* the one error slot, in her bubble, on her paper: the paper's own inks */
     .form-error {
-      margin: 1.2em 0 0; padding: 0.75em 0.95em; max-width: 60ch;
-      border-radius: 8px; background: rgba(156, 63, 46, 0.22);
-      border: 1px solid rgba(214, 120, 96, 0.45);
-      color: #f0dcc4; font-size: 0.95rem; line-height: 1.5;
+      flex: 1 1 100%; margin: 0.2em 0 0; padding: 0.6em 0.85em;
+      border-radius: 8px; background: rgba(156, 63, 46, 0.08);
+      border: 1px solid rgba(156, 63, 46, 0.45);
+      color: var(--pm-ink); font-size: 0.92rem; line-height: 1.5;
     }
-    .form-error b { color: #f5b3a0; }
+    .form-error b { color: #8f3424; }
 
     .pm-btn.send:disabled { opacity: 0.55; cursor: default; }
-    .send-status { margin: 0; font-family: var(--pm-mono); font-size: 0.85rem; color: #b9ad95; }
+    .send-status { flex: 1 1 100%; margin: 0; font-family: var(--pm-mono); font-size: 0.8rem; color: var(--pm-ink-soft); }
+    /* "or press Enter", on her paper */
+    .jf-act .jf-hint { color: var(--pm-ink-soft); }
+    .jf-act .jf-hint kbd { color: var(--pm-ink); border-color: rgba(90, 62, 27, 0.4); }
     .foot { margin: 1.1em 0 0; font-size: 0.85rem; color: var(--pm-ink-soft) !important; }
 
     /* the door's own lines, wherever they are shown */
@@ -1251,7 +1362,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     }
     .reply-facts :global(dd) { margin: 0; color: var(--pm-ink); font-size: 0.92rem; overflow-wrap: anywhere; }
     .reply-facts :global(dd a) { color: var(--pm-accent); }
-    .receipt :global(.jd-reg-bubble), .jd-in :global(.jd-reg-bubble), .jd-cosign :global(.jd-reg-bubble) { box-shadow: none; border: 1px solid rgba(90, 62, 27, 0.25); }
+    .receipt :global(.jd-reg-bubble), .jd-in :global(.jd-reg-bubble), .jd-cosign :global(.jd-reg-bubble), .asking :global(.jd-reg-bubble) { box-shadow: none; border: 1px solid rgba(90, 62, 27, 0.25); }
 
     .reply-credential {
       margin: 1.3em 0 0; padding: 0.9em 1em;
@@ -1299,8 +1410,12 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       .movein-card { padding: 1.3em 1.1em; }
       .reply-facts dt { min-width: 0; }
       .jd-review-sec :global(dt) { min-width: 0; }
-      .movein :global(.jd-reg-face) { width: 48px; height: 48px; }
-      .movein :global(.jd-reg-face svg) { width: 44px; height: 44px; }
+      .movein :global(.jd-reg) { gap: 0.6em; }
+      .movein :global(.jd-reg-face) { width: 40px; height: 40px; }
+      .movein :global(.jd-reg-bubble) { padding: 0.65em 0.8em; font-size: 0.9rem; line-height: 1.45; }
+      .movein :global(.jd-reg-bubble::before) { top: 14px; }
+      .movein :global(.jd-reg-actions .pm-btn) { font-size: 0.8rem; padding: 8px 14px; }
+      .jf-act > :global(.jd-reg) { top: 4px; margin: 0 0 1em; }
     }
   </style>
 </PostmarkLayout>

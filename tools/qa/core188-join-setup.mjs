@@ -103,7 +103,9 @@ export async function after({ page, path }) {
   const visible = (sel) => page.locator(sel).first().waitFor({ state: "visible", timeout: 20000 });
   if (shot === "first") { await page.waitForTimeout(2500); return; }
   const fill = async (id) => { if (FIX[id] != null) await page.fill(`#jd-${id}`, FIX[id]); };
-  const next = async (step) => { await page.click("[data-jf-next]"); await visible(`[data-step="${step}"]`); };
+  // a step is "on" when its own block is unhidden: the page steps' blocks sit in the drawer under the page, empty when it has nothing for them
+  const on = (step) => page.waitForFunction((s) => document.querySelector(`[data-step="${s}"]`)?.hidden === false, step, { timeout: 20000 });
+  const next = async (step) => { await page.click("[data-jf-next]"); await on(step); };
   const order = ["household", "who", "describe", "more", "found", "review", "cosign", "in"];
   const stopAt = order.indexOf(shot);
   await visible('[data-step="household"]');

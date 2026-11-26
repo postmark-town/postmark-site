@@ -298,11 +298,18 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
   const p = await openPage(browser, base, "/join/move-in/", { width: 1440, office });
   try {
     await p.until(STEP("household"), "step 1");
-    // the Registrar, her name linked to her page, and her step-1 words
+    // the Registrar, her name linked to her page, and her step-1 words, her welcome first (Darko, 2026-11-26: "intro sentence first")
     assert.equal(await p.js(`document.querySelector('[data-reg-at="act"] a.jd-reg-name')?.getAttribute("href")`), "/residents/registrar/", "her name links to her page, on every step");
     assert.equal(await p.js(text('[data-reg-at="act"] a.jd-reg-name')), "The Registrar");
-    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /This first step is yours, the human's/);
+    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Welcome to Postmark! I'm the Registrar, and I'll help your agent move in\. This first step is yours, the human's/);
+    // ONE COUNT: five dots for five steps, "Step 1 of 5", #step-1
     assert.equal(await p.js(text("[data-jd-kicker]")), "Step 1 of 5 · Your household");
+    assert.equal(await p.js(`document.querySelectorAll("[data-jf-dots] span").length`), 5, "a dot per step, none for the look-over");
+    assert.equal(await p.js("location.hash"), "#step-1");
+    // CONTINUE LIVES IN HER BUBBLE (Darko, 2026-11-26), on screen at the top of the step, and nothing of it is left at the bottom of the page
+    assert.equal(await p.js(`!!document.querySelector('[data-reg-at="act"] .jd-reg-bubble [data-jf-next]') && !!document.querySelector('[data-reg-at="act"] .jd-reg-bubble [data-form-error]')`), true, "Continue or the error slot left her bubble");
+    assert.equal(await p.js(`(() => { const r = document.querySelector("[data-jf-next]").getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })()`), true, "Continue is not on screen");
+    assert.equal(await p.js(`document.querySelectorAll("[data-jf-next], [data-submit]").length`), 2, "a second Continue or Send is on the page");
     assert.equal(await p.js(`document.getElementById("jd-household").getAttribute("aria-required")`), "true", "the card's required flag reaches the box");
     // a required piece stops Continue, in the one alert slot
     await p.click("[data-jf-next]");
@@ -315,49 +322,82 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     assert.equal(await p.js(`document.querySelector("[data-human-later]").hidden`), false);
     assert.match(await p.js(text("[data-human-later]")), /You give both at the end, on the office's co-sign page/);
     assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /office's co-sign page/);
-    // ONE Registrar token on the page, and nothing of the page inside her link (Astro once re-opened her <a> after a <template>, CORE-188)
-    assert.equal(await p.js(`[...document.querySelectorAll("a.jd-reg-face")].filter((a) => a.offsetParent !== null).length`), 1, "one Registrar token shows");
-    assert.equal(await p.js(`[...document.querySelectorAll("a.jd-reg-face")].every((a) => a.children.length === 1 && a.firstElementChild.tagName.toLowerCase() === "svg")`), true, "her link holds her picture and nothing else");
+    // ONE Registrar on the page, her own profile picture (Darko, 2026-11-26: "we should really use her profile picture"), and nothing of the page
+    // inside her link (Astro once re-opened her <a> after a <template>, CORE-188)
+    assert.equal(await p.js(`[...document.querySelectorAll("a.jd-reg-face")].filter((a) => a.offsetParent !== null).length`), 1, "one Registrar shows");
+    assert.equal(await p.js(`[...document.querySelectorAll("a.jd-reg-face")].every((a) => a.children.length === 1 && a.firstElementChild.tagName.toLowerCase() === "img")`), true, "her link holds her picture and nothing else");
+    assert.match(await p.js(`document.querySelector('[data-reg-at="act"] a.jd-reg-face img').getAttribute("src")`), /^https:\/\/media\.postmark\.town\/media\//, "her picture is not her profile's own");
+    assert.equal(await p.js(`!!document.querySelector("svg.px")`), false, "the drawn token is back");
     await p.key("Enter");
     await p.until(STEP("who"), "step 2, by Enter");
     assert.equal(await p.js("location.hash"), "#step-2");
-    // the page steps show the resident page's own pieces, its top lit
-    assert.equal(await p.js(`!document.querySelector("[data-blank-page]").hidden && !!document.querySelector("[data-blank-page] .profile-bubble[data-profile-bubble]") && !!document.querySelector("[data-blank-page] .bcard[data-card-open=address]")`), true);
-    assert.equal(await p.js(`document.querySelector('[data-blank-page] h1[data-fill="agent"]').classList.contains("is-lit")`), true);
-    assert.equal(await p.js(text('[data-blank-page] [data-fill="household"]')), "Fixture Hollow", "the house's chip carries the house typed on step 1");
+    // the step's line, without the welcome now
+    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Here's your agent's page, still blank\./);
+    // the page steps show the resident page's own pieces, its top lit; THE PIECES ARE THE BOXES: no form of their own under the page
+    assert.equal(await p.js(`!document.querySelector("[data-blank-page]").hidden && !!document.querySelector("[data-blank-page] .profile-bubble[data-profile-bubble]") && !!document.querySelector("[data-blank-page] .bcard[data-kind=Address]")`), true);
+    for (const id of ["agent", "handle", "runtime", "architecture", "since", "line", "bio", "full_address", "pronouns", "color", "color_name"])
+      assert.equal(await p.js(`!!document.querySelector('[data-blank-page] [data-fill="${id}"] #jd-${id}') && !document.querySelector('[data-drawer] #jd-${id}')`), true, `${id} is not typed into on the page itself`);
+    assert.equal(await p.js(`document.querySelector('[data-blank-page] [data-fill="agent"]').classList.contains("is-lit")`), true);
+    // only the step's pieces are lit and typed into; the rest read as the page
+    assert.equal(await p.js(`document.getElementById("jd-agent").readOnly`), false);
+    assert.equal(await p.js(`document.getElementById("jd-bio").readOnly && document.getElementById("jd-bio").tabIndex === -1 && !document.querySelector('[data-fill="bio"]').classList.contains("is-lit")`), true, "a later step's piece is open on step 2");
+    // the box says what the page says: one name for the blank piece
+    assert.equal(await p.js(`document.getElementById("jd-agent").placeholder`), "Your agent's name");
+    // the page's buttons are a picture of them
+    assert.equal(await p.js(`getComputedStyle(document.querySelector("[data-blank-page] .profile-actions .pm-btn")).pointerEvents`), "none", "Write to looks live");
+    assert.equal(await p.js(text('[data-blank-page] [data-show="household"]')), "Fixture Hollow", "the house's chip carries the house typed on step 1");
     await p.type("#jd-agent", "Quillon");
-    assert.equal(await p.js(text('[data-blank-page] h1[data-fill="agent"]')), "Quillon", "the name lands in the page's title as it is typed");
-    assert.equal(await p.js(text('[data-blank-page] .bcard-title')), "Quillon", "and on the Address card");
+    assert.equal(await p.js(`document.querySelector('[data-blank-page] h1 #jd-agent').value`), "Quillon", "the name is typed into the page's title");
+    assert.equal(await p.js(text('[data-blank-page] .bcard-title')), "Quillon", "and shows on the Address card");
+    // she says what a piece is for when the reader moves into it (the hints come from her), and the step's line comes back when they leave
+    await p.js(`document.getElementById("jd-handle").focus(), true`);
+    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Where letters find them.*2–31/, "she says nothing about the handle");
     await p.type("#jd-handle", "quillon-fixture");
-    assert.equal(await p.js(text('[data-blank-page] .profile-handle')), "quillon-fixture");
-    // Tab walks the fields in order
+    assert.equal(await p.js(`document.querySelector('[data-blank-page] .profile-handle #jd-handle').value`), "quillon-fixture");
+    // the count shows beside the piece while it has focus
+    assert.equal(await p.js(`getComputedStyle(document.querySelector('[data-count-for="handle"]')).display`), "block");
+    assert.equal(await p.js(text('[data-count-for="handle"]')), "15 / 31");
+    // Tab walks the lit pieces in the page's own reading order
     await p.js(`document.getElementById("jd-agent").focus(), true`);
     await p.key("Tab");
-    assert.equal(await p.js("document.activeElement.id"), "jd-handle", "Tab from the name goes to the handle");
+    assert.equal(await p.js("document.activeElement.id"), "jd-runtime", "Tab from the name goes to the next lit piece on the page (its chip)");
+    await p.js(`document.activeElement.blur(), true`);
+    await p.until(`/^Here's your agent's page/.test(${text('[data-reg-at="act"] [data-reg-words]')})`, "her step line back after the reader leaves the pieces");
     await p.type("#jd-runtime", "a fixture runtime");
-    assert.equal(await p.js(text('[data-blank-page] [data-profile-runtime-value]')), "a fixture runtime");
+    assert.equal(await p.js(`document.querySelector('[data-blank-page] [data-profile-runtime] #jd-runtime').value`), "a fixture runtime");
     // the dropped field is not on the form
     assert.equal(await p.js(`[...document.querySelectorAll("[data-extra]")].map((e) => e.dataset.extra).join(",")`), "", "from_town is off the form, and nothing else is unplaced");
     await p.click("[data-jf-next]");
     await p.until(STEP("describe"), "step 3");
     await p.type("#jd-line", "A fixture who answers every letter.");
-    assert.equal(await p.js(text('[data-blank-page] .bcard-line')), "A fixture who answers every letter.");
+    assert.equal(await p.js(`document.querySelector('[data-blank-page] .bcard-line #jd-line').value`), "A fixture who answers every letter.");
     await p.type("#jd-bio", "🌊".repeat(401));
     assert.equal(await p.js(text('[data-count-for="bio"]')), "401 / 400 — 1 too many", "an emoji is one character, the office's measure");
+    // THE PROBLEM SHOWS BESIDE THE PIECE AS SOON AS IT'S WRONG, before any Continue
+    assert.equal(await p.js(text('[data-problem-for="bio"]')), "Bio is 1 too long: 401 of 400 characters.");
+    assert.equal(await p.js(`getComputedStyle(document.querySelector('[data-problem-for="bio"]')).display`), "block", "the bio's problem is written but not shown");
+    assert.equal(await p.js(`document.querySelector("[data-form-error]").hidden`), true, "the alert spoke before anyone pressed Continue");
     await p.click("[data-jf-next]");
     assert.match(await p.js(text("[data-form-error]")), /Bio is 1 too long: 401 of 400 characters/);
     assert.equal(await p.js(STEP("describe")), true, "an over-long bio stops Continue");
+    // a required piece says it's needed beside itself only once the reader has been stopped for it
+    assert.equal(await p.js(text('[data-problem-for="full_address"]')), "Full address is needed before you go on.", "the stop didn't mark every piece it stopped on");
     await p.type("#jd-bio", "I keep a fixture garden of notes.");
+    assert.equal(await p.js(text('[data-problem-for="bio"]')), "", "a fixed piece still says it's wrong");
     await p.type("#jd-full_address", "I'm Quillon, a fixture. Write to me plainly.");
-    assert.equal(await p.js(text('[data-blank-page] .jd-full')), "I'm Quillon, a fixture. Write to me plainly.");
+    assert.equal(await p.js(`document.querySelector('[data-blank-page] .jd-full #jd-full_address').value`), "I'm Quillon, a fixture. Write to me plainly.");
+    assert.equal(await p.js(text('[data-problem-for="full_address"]')), "");
     await p.click("[data-jf-next]");
     await p.until(STEP("more"), "step 4");
-    // the Edit profile layout: the editor's own picture row and fields
-    assert.equal(await p.js(`!!document.querySelector('[data-step="more"] .profile-edit-avatar-row [data-profile-avatar-input]') && !!document.querySelector('[data-step="more"] .profile-edit-grid input[name="color"]')`), true);
+    // the drawer under the page: the Edit profile form's own picture row; the colour and pronouns are the page's own boxes
+    assert.equal(await p.js(`!document.querySelector("[data-drawer]").hidden && !!document.querySelector('[data-drawer] [data-step="more"] .profile-edit-avatar-row [data-profile-avatar-input]')`), true);
     await p.type("#jd-color", "#7ea1ff");
     assert.equal(await p.js(`document.querySelector("[data-blank-page] [data-profile-bubble]").style.getPropertyValue("--profile-color")`), "#7ea1ff", "the colour reaches the page's edge");
+    await p.type("#jd-color", "blue");
+    assert.match(await p.js(text('[data-problem-for="color"]')), /3 or 6 hex digits/, "a colour that isn't one isn't said beside it");
+    await p.type("#jd-color", "#7ea1ff");
     await p.type("#jd-pronouns", "they/them");
-    assert.equal(await p.js(text('[data-blank-page] [data-profile-pronouns]')), "they/them");
+    assert.equal(await p.js(`document.querySelector('[data-blank-page] [data-profile-pronouns] #jd-pronouns').value`), "they/them");
     await p.setFile("[data-profile-avatar-input]", pngFile());
     await p.until(`!!document.querySelector('[data-blank-page] [data-fill="picture"] img')`, "the picture on the page");
     await p.js(`(() => { const z = document.querySelector("[data-profile-avatar-zoom]"); z.value = "2"; z.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
@@ -432,6 +472,8 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     // the handoff: the office's own co-sign link for THIS berth, in a new tab, carrying no key; the Registrar says what that page asks
     assert.equal(await p.js(`document.querySelector("[data-cosign-link]").getAttribute("href")`), `${base}/api/oauth/berth-cosign?slug=quillon-fixture&b=1764100000`);
     assert.equal(await p.js(`document.querySelector("[data-cosign-link]").target`), "_blank");
+    // she's there end to end: the co-sign's link and its check sit in her bubble
+    assert.equal(await p.js(`!!document.querySelector('[data-reg-at="cosign"] .jd-reg-bubble [data-cosign-link]') && !!document.querySelector('[data-reg-at="cosign"] .jd-reg-bubble [data-cosign-check]')`), true);
     assert.match(await p.js(text('[data-reg-at="cosign"] [data-reg-words]')), /co-sign page.*sign in with GitHub.*your own profile.*short videos.*Keep this tab open/s);
     assert.equal(await p.js(`document.querySelector("[data-gate-cosign]").textContent.includes("fixture-berth-key")`), false, "the berth key is on the page");
     assert.equal(await p.js(`JSON.stringify({ ...localStorage }).includes("fixture-berth-key") || JSON.stringify({ ...sessionStorage }).includes("fixture-berth-key")`), false, "the berth key was stored");
@@ -461,6 +503,8 @@ test("TODAY'S CARD: the steps fill the real page, count and refuse in the office
     for (const f of ["town_name", "short_line", "human_pronouns", "likeness"]) assert.ok(!office.bodies.some((b) => b.includes(`"${f}"`)), `a request carried ${f}`);
     assert.ok(!office.asked.some((a) => /oauth\/(consent|human|likeness)/.test(a)), "the page posted to a human-only door");
     // you're in: two lines, the page's link, and what the page set
+    assert.match(await p.js(text('[data-reg-at="in"] [data-reg-words]')), /^Welcome in!/);
+    assert.equal(await p.js(`!!document.querySelector('[data-reg-at="in"] .jd-reg-bubble [data-in-go]')`), true, "You're in's button left her bubble");
     assert.match(await p.js(text("[data-in-page]")), /about half an hour/);
     assert.match(await p.js(text("[data-in-letters]")), /about 15 minutes.*7 AM and 7 PM Eastern/);
     assert.equal(await p.js(`document.querySelector("[data-in-page-link]").getAttribute("href")`), "/residents/quillon-fixture/");
@@ -496,7 +540,9 @@ test("THE ACCEPTED CARD (POS-1237, f22c069a): its limits count in their own unit
     await p.until(STEP("describe"), "step 3");
     await p.type("#jd-line", "A line");
     assert.equal(await p.js(text('[data-count-for="line"]')), "6 / 120", "the card's own limit, in characters");
-    assert.match(await p.js(`document.getElementById("jd-line").closest("label").textContent`), /One line/);
+    // no small label over a piece of the page: the box is named for a screen reader, and she says what it's for
+    assert.equal(await p.js(`document.getElementById("jd-line").getAttribute("aria-label")`), "One line");
+    assert.equal(await p.js(`!!document.getElementById("jd-line").closest("label")`), false, "a label is back over the page's own piece");
     await p.type("#jd-bio", "A bio.");
     await p.type("#jd-full_address", "The whole of mé.");
     assert.equal(await p.js(text('[data-count-for="full_address"]')), "17 / 50,000 bytes", "the full address counts UTF-8 bytes, as the office does");
@@ -528,6 +574,11 @@ test("AN EXISTING HOUSE (add-resident): no house to name, no human profile, and 
   try {
     await p.until(STEP("who"), "the first step is who's moving in");
     assert.equal(await p.js(text("[data-jd-kicker]")), "Step 1 of 3 · Who's moving in", "the steps counted are this reader's: no house, and no found-us on an act that takes neither answer");
+    // ONE COUNT (Wright's walk, 2026-11-26: four dots, "Step 1 of 3", #step-2): three dots, the first lit, and #step-1
+    assert.equal(await p.js("location.hash"), "#step-1");
+    assert.equal(await p.js(`[...document.querySelectorAll("[data-jf-dots] span")].map((s) => s.className || "-").join(",")`), "is-now,-,-");
+    // a keeper's first bubble: her welcome, why there's no house to name, then the page's own line
+    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Welcome to Postmark! .*no house to name.*Here's your agent's page/);
     await p.type("#jd-handle", "added-fixture");
     await p.click("[data-jf-next]");
     await p.until(STEP("describe"), "step 2 of 5");
@@ -642,15 +693,38 @@ test("A HELD NAME: the board's refusal is said in the office's words, nothing is
   } finally { await p.close(); }
 });
 
-test("A PHONE FRAME: the page steps fit 390 wide with no sideways scroll", { skip: SKIP }, async () => {
+test("A PHONE FRAME: every step fits 375 wide with no sideways scroll, her button on screen", { skip: SKIP }, async () => {
   await setup();
   const office = officeFor();
-  const p = await openPage(browser, base, "/join/move-in/", { width: 390, height: 844, office });
+  const p = await openPage(browser, base, "/join/move-in/", { width: 375, height: 812, office });
+  const fits = async (where) => {
+    assert.ok(await p.js("document.documentElement.scrollWidth <= window.innerWidth + 1"), `sideways scroll at 375 on ${where} (${await p.js("document.documentElement.scrollWidth")})`);
+    assert.equal(await p.js(`(() => { const b = [...document.querySelectorAll('[data-reg-at="act"] [data-jf-next], [data-reg-at="act"] [data-submit]')].find((e) => !e.hidden); const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && r.right <= innerWidth; })()`), true, `her button is off screen on ${where}`);
+  };
   try {
     await p.until(STEP("household"), "step 1");
+    await fits("step 1");
     await p.type("#jd-household", "Fixture Phone");
     await p.click("[data-jf-next]");
     await p.until(STEP("who"), "step 2");
-    assert.ok(await p.js("document.documentElement.scrollWidth <= window.innerWidth + 1"), `no sideways scroll at 390 (${await p.js("document.documentElement.scrollWidth")})`);
+    await p.type("#jd-agent", "A rather long fixture name");
+    await p.type("#jd-handle", "fixture-phone");
+    await fits("step 2");
+    // scrolled down the page, she and her button are still there (sticky)
+    await p.js("window.scrollTo(0, document.body.scrollHeight), true");
+    await new Promise((r) => setTimeout(r, 150));
+    await fits("step 2, scrolled");
+    await p.click("[data-jf-next]");
+    await p.until(STEP("describe"), "step 3");
+    await p.type("#jd-full_address", "A fixture's whole self, long enough to wrap onto a second line on a phone.");
+    await fits("step 3");
+    await p.click("[data-jf-next]");
+    await p.until(STEP("more"), "step 4");
+    await fits("step 4");
+    await p.click("[data-jf-skip]");
+    await p.until(STEP("found"), "step 5");
+    await p.click("[data-jf-skip]");
+    await p.until(STEP("review"), "the look-over");
+    await fits("the look-over");
   } finally { await p.close(); }
 });
