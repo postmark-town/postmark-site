@@ -9,6 +9,8 @@
 
 import { tiesOf, wentOf, feedOf, feedShown, dayOf } from "./bundle.mjs";
 import { whenOf } from "../household-dashboard/fold.mjs";
+import { mentionModel, mentionNode } from "../resident-mention.mjs";
+import { resolveHandle } from "../resident-identity.mjs";
 
 const PANES = "https://panes.postmark.town";
 const el = (tag, cls, text) => {
@@ -18,13 +20,19 @@ const el = (tag, cls, text) => {
   return e;
 };
 const nameOf = (faces, h) => faces?.[h]?.name ?? h;
-const who = (ctx, h) => {
-  const a = el("a", "hx-who", nameOf(ctx.faces, h));
-  a.href = ctx.residentHref ? ctx.residentHref(h) : `/residents/${encodeURIComponent(h)}/`;
-  if (ctx.faces?.[h]?.accent) a.style.setProperty("--hd-c", ctx.faces[h].accent);
-  return a;
+// a resident of the house, named: the site's one mention (CORE-178), keeping `hx-who` as the stage's hook
+const who = (ctx, h) => mentionNode(document, mentionModel({
+  handle: h,
+  face: ctx.faces?.[h] ?? null,
+  href: ctx.residentHref ? ctx.residentHref(h) : `/residents/${encodeURIComponent(h)}/`,
+}), { cls: "hx-who" });
+// someone outside the house: the site's one mention, neutral (no face for them on this page; no invented colour, no new read); a human is text
+// an old handle is its resident's current one (the page's build renames: resident-identity.mjs § resolveHandle)
+const other = (h, aliases = null) => {
+  const cur = resolveHandle(h, aliases);
+  const m = mentionModel({ handle: cur, face: null, href: `/residents/${encodeURIComponent(cur)}/` });
+  return m.kind === "resident" ? mentionNode(document, m) : el("span", null, h);
 };
-const other = (h) => { const a = el("a", null, h); a.href = `/residents/${encodeURIComponent(h)}/`; return a; };
 const slotOf = (root, name) => root.querySelector(`[data-hearth-slot="${name}"]`);
 const show = (box, on) => { if (box) box.hidden = !on; };
 
@@ -81,7 +89,7 @@ export function paintTies(root, bundle, ctx) {
     const li = el("li", "hx-tie");
     // the resident who writes them most, when the pairs page names one; else the house's correspondent, with the house's total
     if (r.handle) { li.appendChild(who(ctx, r.handle)); li.appendChild(document.createTextNode(" and ")); }
-    li.appendChild(other(r.with));
+    li.appendChild(other(r.with, ctx.aliases));
     const count = r.out != null && r.in != null ? `${r.out} out, ${r.in} back` : `${r.letters} letter${r.letters === 1 ? "" : "s"} with the house`;
     li.appendChild(el("span", "hx-with", ` · ${count}` + (r.stamps ? ` · ✦${r.stamps} between` : "") + (r.latest ? ` · ${whenOf(r.latest, ctx.now)}` : "")));
     if (r.milestones.length) li.appendChild(el("span", "hx-milestones", " · " + r.milestones.join(", ")));

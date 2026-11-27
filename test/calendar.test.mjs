@@ -282,6 +282,54 @@ test("an empty month says so plainly", () => {
   assert.deepEqual([g.prev, g.next], ["2026-09", null]);
 });
 
+// PAST EVENTS LIVE ON THE CALENDAR (CORE-177, Darko 2026-11-24 08:43 EST: "We just need to make sure that the past events are findable on
+// the calendar"). Every event below is INVENTED: an event in the office's lasting list (events.json) that ended outside the calendar's
+// seven days is on its month, on its day, marked past by the office's word, never by the clock.
+test("a retained past event, outside the calendar's seven days, has its month and its day on the calendar, marked past", () => {
+  const ref = "2026-11-24T00:00:00.000Z";
+  const cal = { as_of: ref, now: [], ended: [{ id: "lately-test/last-week", title: "Last week (invented)", starts: "2026-11-20T18:00:00.000Z", phase: "ended" }],
+    coming: [{ id: "coming-test/next-week", title: "Next week (invented)", starts: "2026-11-30T18:00:00.000Z", phase: "announced" }] };
+  const events = { past: { events: [
+    { id: "archive-test/august-supper", title: "An August supper (invented)", starts: "2026-08-02T18:00:00.000Z", phase: "ended" },
+    { id: "lately-test/last-week", title: "the lasting list's older copy", starts: "2026-11-20T18:00:00.000Z", phase: "ended" },
+  ] } };
+  // without the lasting list (today's callers before CORE-177) the August event had no month at all: the falsifier
+  assert.deepEqual(monthsOf(cal, ref), ["2026-11", "2026-12"]);
+  assert.deepEqual(monthsOf(cal, ref, events), ["2026-08", "2026-09", "2026-10", "2026-11", "2026-12"], "its month gets a page");
+  const aug = monthGrid(cal, "2026-08", ref, undefined, events);
+  const day = aug.weeks.flat().find((d) => d.date === "2026-08-02");
+  assert.deepEqual(day.events.map((e) => [e.id, e.past]), [["archive-test/august-supper", true]], "on its day, past");
+  assert.equal(eventHref(day.events[0].id), "/events/archive-test/august-supper/", "and its link is its page");
+  assert.deepEqual([aug.prev, aug.next], [null, "2026-09"], "the months walk back to it");
+  const nov = monthGrid(cal, "2026-11", ref, undefined, events);
+  assert.deepEqual(nov.events.map((e) => [e.id, e.title, e.past]),
+    [["lately-test/last-week", "Last week (invented)", true], ["coming-test/next-week", "Next week (invented)", false]],
+    "once each, the calendar's own copy first, and a coming event is not past");
+});
+
+test("PAST is the office's word, never the clock: phase 'ended', or listed as ended; an event dated in the past that the office still calls coming is not marked", () => {
+  const ref = "2026-11-24T00:00:00.000Z";
+  const cal = { as_of: ref, now: [{ id: "now-test/late-start", title: "x", starts: "2026-11-01T18:00:00.000Z", phase: "underway" }], coming: [], ended: [
+    { id: "ended-test/no-phase", title: "y", starts: "2026-11-02T18:00:00.000Z" }] };
+  const events = { past: { events: [{ id: "past-test/no-phase", title: "z", starts: "2026-11-03T18:00:00.000Z" }] } };
+  const past = Object.fromEntries(monthGrid(cal, "2026-11", ref, undefined, events).events.map((e) => [e.id, e.past]));
+  assert.deepEqual(past, { "now-test/late-start": false, "ended-test/no-phase": true, "past-test/no-phase": true });
+  assert.equal(SAMPLE.now.every((e) => !monthGrid(SAMPLE, monthKey(e.starts), referenceInstant(SAMPLE)).events.find((x) => x.id === e.id)?.past), true, "the office sample's open events are not past");
+});
+
+test("PIN the month draws a past event greyed and still a link, saying 'ended' in words, and both calendar pages read the lasting list", () => {
+  const month = readFileSync(join(ROOT, "src/components/CalendarMonth.astro"), "utf8");
+  assert.match(month, /<li class:list=\{\["cal-item", \{ "is-cancelled": e\.cancelled, "is-past": e\.past \}\]\}[^>]*data-past=/);
+  assert.match(month, /<li class:list=\{\["cal-agenda-item", \{ "is-cancelled": e\.cancelled, "is-past": e\.past \}\]\}/);
+  assert.match(month, /\{e\.past && <span class="cal-sr">, ended<\/span>\}/, "a screen reader hears it ended, not only a grey");
+  assert.match(month, /\{e\.past && <span class="cal-item-past" data-past-word> · ended<\/span>\}/, "the agenda says it in words");
+  assert.match(month, /\.cal-item\.is-past a, \.cal-item\.is-past > span \{ opacity: 0\.55;/, "greyed, as calendars do");
+  assert.doesNotMatch(month, /is-past[^}]*pointer-events: none/, "and never made unclickable");
+  assert.match(readFileSync(join(ROOT, "src/components/CalendarPanel.astro"), "utf8"), /monthGrid\(calendar, monthKey\(ref\), ref, undefined, eventsData\)/);
+  const page = readFileSync(join(ROOT, "town/pages/calendar/[month].astro"), "utf8");
+  assert.match(page, /monthsOf\(calendar, ref, eventsData\)/); assert.match(page, /monthGrid\(calendar, key, ref, undefined, eventsData\)/);
+});
+
 // Built arms: guarded on the page each reads (POS-177).
 const builtPage = (...segs) => (existsSync(pageFile(...segs)) ? readFileSync(pageFile(...segs), "utf8") : null);
 const cellOf = (html, date) => {

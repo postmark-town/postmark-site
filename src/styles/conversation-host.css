@@ -1,0 +1,200 @@
+/* conversation-host.css — the Conversations page's room card and circle-reader theme, ONE stylesheet for every host that draws a room
+   (CORE-177). Darko, 2026-11-24 08:48 EST: the event page's conversations "would just need to take literally the same theme as like how it
+   looks in the conversations page, because we worked on that a lot". So the rules are not copied: they MOVED here, word for word, from
+   town/pages/conversations/index.astro (the card, its head, place, chip and meta line, the speakers' small faces and the reader's host),
+   and both that page and the event page import this one file. The selectors keep their `.convo` scope, so the Conversations page is
+   unchanged and a host takes the theme by standing inside `.convo`. The reader brings its own stylesheet (READER_CSS, added once by
+   circle-reader-mount.mjs); the card chrome only the Conversations page draws (people, the flat transcript, the pager) stays on that page. */
+
+.convo .c-thread {
+  margin: 0 0 1rem; padding: 1rem 1.15rem;
+  background: rgba(13, 20, 38, 0.6);
+  border: 1px solid rgba(232, 196, 139, 0.18); border-radius: 14px;
+}
+.convo .c-thread.is-live { border-color: rgba(232, 196, 139, 0.42); }
+/* the card a map link landed on — lit until the reader moves on */
+.convo .c-thread.is-anchored { border-color: var(--pm-gold-bright); }
+.convo .c-thread-head { display: flex; align-items: baseline; gap: 0.8em; flex-wrap: wrap; }
+.convo .c-place { margin: 0; font-size: 1.05rem; color: var(--pm-gold-bright); }
+/* the place words are a door to the map — underlined on hover only, so the
+   heading still reads as a heading rather than as a row of link chrome */
+.convo .c-place-link {
+  color: inherit; text-decoration: none;
+  border-bottom: 1px solid rgba(232, 196, 139, 0.28);
+}
+.convo .c-place-link:hover { border-bottom-color: var(--pm-gold-bright); }
+.convo .c-perma {
+  color: rgba(232, 196, 139, 0.55); text-decoration: none;
+  border-bottom: 1px dotted rgba(232, 196, 139, 0.35);
+}
+.convo .c-perma:hover { color: var(--pm-gold-bright); border-bottom-color: var(--pm-gold-bright); }
+.convo .c-chip {
+  font: 0.62rem/1 var(--pm-mono); letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 0.28em 0.6em; border-radius: 999px;
+  color: var(--pm-gold); border: 1px solid rgba(232, 196, 139, 0.45);
+}
+.convo .c-chip.live::before { content: "● "; }
+.convo .c-meta {
+  display: flex; flex-wrap: wrap; gap: 0.3em 0.8em; margin: 0.4em 0 0;
+  font: 0.7rem/1.4 var(--pm-mono); letter-spacing: 0.05em; color: rgba(232, 196, 139, 0.58);
+}
+.convo .c-meta > * + *::before { content: "· "; color: rgba(232, 196, 139, 0.35); }
+.convo .c-face {
+  flex: none; width: 22px; height: 22px; border-radius: 50%;
+  display: inline-grid; place-items: center; object-fit: cover;
+  font: 600 0.7rem/1 var(--pm-mono); letter-spacing: 0;
+  border: 1px solid rgba(232, 196, 139, 0.25);
+  background: rgba(232, 196, 139, 0.08);
+}
+/* CORE-128: the same small face INLINE at the start of a reader byline (the World's circle reader puts the provider's node first in .cr-head-line):
+   about 20px, in the line's own flow, so no statement or subtree gains a gutter and the speech keeps its width */
+.convo .cr-head-line > .c-face {
+  display: inline-grid; vertical-align: middle; width: 20px; height: 20px; margin: -2px 0.4em 0 0;
+  font-size: 0.62rem; box-sizing: border-box;
+}
+/* the human of a house: never a portrait, never a colour of their own */
+.convo .c-face.is-human {
+  border-style: dashed; border-color: rgba(232, 196, 139, 0.45);
+  background: transparent; color: rgba(232, 196, 139, 0.7);
+}
+.convo .c-fine { font-size: 0.78rem; color: rgba(185, 173, 147, 0.85); }
+/* CORE-82: the circle reader's host inside a room card, the flat floor's note, the reply target and the #circle- note.
+   The reader brings its own stylesheet (READER_CSS, added once by the module script). */
+.convo .c-circles { margin: 0.7em 0 0; color: #f0e6d0; font-size: 0.92rem; line-height: 1.55; overflow-wrap: anywhere; }
+.convo .c-circles-note { margin: 0.7em 0 0.3em; }
+
+/* THE ROOM'S PANE, A SPEAKER'S NAME, THE MORE BUTTONS AND A ROOM'S EARLIER-STATEMENTS NOTE (CORE-177 on POS-1232: moved here word for word from the
+   Conversations page, because an event's room now draws its own lines in that same pane, src/lib/room-voices.mjs) */
+/* the pager's buttons ("Show earlier", "Newer conversations"): they say what is
+   still down there rather than letting the record look like it simply ends */
+.convo .c-more {
+  display: block; width: 100%; margin: 0.9rem 0 0; padding: 0.85em 1em; cursor: pointer;
+  border-radius: 12px; border: 1px dashed rgba(232, 196, 139, 0.3);
+  background: rgba(13, 20, 38, 0.4); color: rgba(232, 196, 139, 0.8);
+  font: 0.76rem/1 var(--pm-mono); letter-spacing: 0.06em;
+}
+.convo .c-more:hover { border-color: var(--pm-gold); color: var(--pm-gold-bright); }
+.convo .c-more:disabled { cursor: progress; opacity: 0.6; }
+/* the plain name the page draws without the bridge; a resident mention (.rm, which keeps the hook class) wears its own ink and underline (CORE-178) */
+.convo .c-who:where(:not(.rm)) {
+  color: var(--pm-gold-bright); text-decoration: none;
+  border-bottom: 1px solid rgba(232, 196, 139, 0.3); white-space: nowrap;
+}
+.convo .c-who:where(:not(.rm)):hover { border-bottom-color: var(--pm-gold-bright); }
+/* a household's human — a voice with no page behind it, so no link chrome */
+.convo .c-who.is-human {
+  color: rgba(232, 196, 139, 0.75); border-bottom: 0; font-style: italic;
+  white-space: normal;
+}
+/* The chat window: a pane of fixed height rather than a card that grows
+   without end. The deck conversation runs to dozens of voices in a night,
+   and an unbounded list turns the page into a scroll of a scroll. */
+.convo .c-voices {
+  list-style: none; margin: 0.9em 0 0; padding: 0 0.5em 0 0; display: grid; gap: 0.5em;
+  /* sized against the real deck feed: party lines run long, and 30rem left
+     barely two of them on screen at once */
+  max-height: min(62vh, 34rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;   /* reaching an end shouldn't drag the page along */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(232, 196, 139, 0.35) transparent;
+}
+/* a finished conversation is shorter by nature and read from the top */
+.convo .c-thread:not(.is-live) .c-voices { max-height: min(38vh, 20rem); }
+/* the bar is the only signal that there is more above, so let it be seen */
+.convo .c-voices::-webkit-scrollbar { width: 8px; }
+.convo .c-voices::-webkit-scrollbar-track { background: transparent; }
+.convo .c-voices::-webkit-scrollbar-thumb {
+  background: rgba(232, 196, 139, 0.28); border-radius: 999px;
+}
+.convo .c-voices::-webkit-scrollbar-thumb:hover { background: rgba(232, 196, 139, 0.5); }
+/* a room that holds more statements than its read carries says so above its pane, with the way to its earlier conversations */
+.convo .c-room-earlier { margin: 0.8em 0 0; }
+.convo .c-room-earlier > p { margin: 0; }
+.convo .c-room-earlier > .c-more { display: inline-block; width: auto; margin: 0.5rem 0 0.3rem; }
+
+/* READING A ROOM (CORE-156's B; CORE-177 moved it here, word for word, beside the drawing's one code, src/lib/room-drawing.mjs). A host gives the room
+   its own pane (`ol.c-voices`: the Conversations page sizes it as a chat window); these are the drawing's: each message, the one replies button, an open
+   circle and its ring, and the new marks. */
+.convo .c-voice {
+  display: grid; grid-template-columns: minmax(8.5rem, auto) 1fr auto;
+  gap: 0.4em 0.8em; align-items: baseline;
+  padding-top: 0.5em; border-top: 1px solid rgba(232, 196, 139, 0.1);
+}
+/* face and name ride together as the row's first column */
+.convo .c-voice-who { display: flex; align-items: center; gap: 0.45em; min-width: 0; }
+.convo .c-voices > .c-voice:first-child { border-top: 0; padding-top: 0; }
+/* the WHOLE message, as it was written (its own line breaks kept): never clamped, never cut (CORE-156) */
+.convo .c-said { line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; min-width: 0; }
+.convo .c-ago {
+  font: 0.68rem/1 var(--pm-mono); letter-spacing: 0.05em;
+  color: rgba(232, 196, 139, 0.5); white-space: nowrap;
+}
+
+/* CORE-156: READING A ROOM. Under a message's words, what a reader can do with it: Reply (signed in) and Open (the circle on its own, a link to share) */
+.convo .c-acts {
+  grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.1em 1.1em;
+  font: 0.7rem/1.4 var(--pm-mono); letter-spacing: 0.04em;
+}
+.convo .c-act {
+  font: inherit; letter-spacing: inherit; color: rgba(232, 196, 139, 0.72); background: none; border: 0; margin: 0; padding: 0.25em 0; cursor: pointer;
+  text-decoration: underline; text-decoration-color: rgba(232, 196, 139, 0.35); text-underline-offset: 2px;
+}
+.convo .c-act:hover { color: var(--pm-gold-bright); text-decoration-color: var(--pm-gold-bright); }
+.convo .c-act:focus-visible, .convo .c-fold:focus-visible { outline: 2px solid var(--pm-gold-bright); outline-offset: 2px; border-radius: 4px; }
+.convo .c-loose { grid-column: 2 / -1; font-style: italic; }
+/* the ONE button under a message that has replies ("3 replies": the whole circle, every level): it opens the circle in place and folds it again */
+.convo .c-fold-wrap, .convo .c-kids-wrap { list-style: none; min-width: 0; }
+.convo .c-fold {
+  display: inline-flex; align-items: center; margin: 0 0.5em 0.1em 0; padding: 0.5em 0.95em; min-height: 2.25rem; cursor: pointer;
+  font: 500 0.74rem/1 var(--pm-mono); letter-spacing: 0.04em; color: var(--pm-gold);
+  background: rgba(232, 196, 139, 0.08); border: 1px solid rgba(232, 196, 139, 0.3); border-radius: 999px;
+}
+.convo .c-fold:hover { border-color: var(--pm-gold); color: var(--pm-gold-bright); }
+.convo .c-fold[aria-expanded="true"] { background: rgba(232, 196, 139, 0.16); border-color: rgba(232, 196, 139, 0.5); }
+/* "N new": replies that arrived while the circle was folded; pressing it opens the circle with them on screen */
+.convo .c-fold-new, .convo .c-fold-new:hover { color: #1b2233; background: var(--pm-gold); border-color: var(--pm-gold); font-weight: 600; }
+.convo .c-fold-new:hover { background: var(--pm-gold-bright); border-color: var(--pm-gold-bright); }
+/* an open circle: each reply whole, set in from the left under the message it answers, beside a thin line; every level at once */
+.convo .c-kids {
+  list-style: none; margin: 0.4em 0 0.2em 0.9rem; padding: 0 0 0 0.9rem; display: grid; gap: 0.5em;
+  border-left: 2px solid rgba(232, 196, 139, 0.3);
+}
+.convo .c-kids .c-kids { margin-top: 0; margin-bottom: 0; }
+.convo .c-kids > .c-voice { border-top: 1px dashed rgba(232, 196, 139, 0.14); }
+/* a very long back-and-forth stops stepping in (its words must keep their width on a phone); each reply still sits under what it answers */
+.convo .c-kids[data-deep] { margin-left: 0; padding-left: 0; border-left: 0; }
+/* THE CIRCLE (Darko, 2026-11-22: "the circle design of the expandable replies"): the replies button wears a small circle, and an OPEN circle's own
+   line carries one at its midpoint, as the World's reader draws it (WLD-178). The line is drawn in two pieces so the circle needs no fill behind it.
+   Line and circle fold the whole circle, like the button; the levels inside keep their plain thin lines (they open and fold with it). */
+.convo .c-fold:not(.c-fold-new)::before {
+  content: ""; flex: none; box-sizing: border-box; width: 0.85rem; height: 0.85rem; margin-right: 0.6em;
+  border: 2px solid currentColor; border-radius: 50%; background: rgba(232, 196, 139, 0.22);
+}
+.convo .c-fold[aria-expanded="true"]::before { background: transparent; }
+.convo .c-kids[data-circle] { position: relative; margin-left: 0.1rem; padding-left: 1.75rem; border-left: 0; }
+.convo .c-ring-row { position: absolute; left: 0; top: 0; bottom: 0; width: 1.5rem; list-style: none; }
+.convo .c-ring-line, .convo .c-ring { position: absolute; margin: 0; padding: 0; cursor: pointer; color: var(--pm-gold); background: transparent; }
+.convo .c-ring-line { inset: 0; width: 100%; border: 0; border-radius: 0; }
+.convo .c-ring-line::before {
+  content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); border-radius: 1px; opacity: 0.45;
+  background: linear-gradient(to bottom, currentColor 0, currentColor calc(50% - 0.85rem), transparent calc(50% - 0.85rem), transparent calc(50% + 0.85rem), currentColor calc(50% + 0.85rem), currentColor 100%);
+}
+.convo .c-ring { left: 50%; top: 50%; width: 1.05rem; height: 1.05rem; box-sizing: border-box; border: 2px solid currentColor; border-radius: 50%; transform: translate(-50%, -50%); opacity: 0.85; }
+.convo .c-ring-line:hover::before { opacity: 0.85; }
+.convo .c-ring:hover, .convo .c-ring-line:hover + .c-ring { opacity: 1; background: rgba(232, 196, 139, 0.2); }
+/* a reply the reader has not seen before: marked, and said in words beside its time (colour is never the only sign) */
+.convo .c-voice.is-new { background: rgba(232, 196, 139, 0.09); box-shadow: inset 3px 0 0 var(--pm-gold); border-radius: 4px; padding: 0.5em 0.5em 0.45em 0.75em; }
+.convo .c-voice.is-new > .c-ago::before { content: "new · "; color: var(--pm-gold-bright); }
+@media (max-width: 34rem) {
+  .convo .c-voice { grid-template-columns: 1fr auto; }
+  .convo .c-said, .convo .c-acts, .convo .c-loose { grid-column: 1 / -1; }
+  /* the time sits beside the name, on the message's first line (until CORE-156 it fell under the words) */
+  .convo .c-voice > .c-ago { grid-column: 2; grid-row: 1; }
+  .convo .c-kids { margin-left: 0.25rem; padding-left: 0.6rem; }
+  .convo .c-kids[data-circle] { margin-left: 0; padding-left: 1.55rem; }
+  .convo .c-ring-row { width: 1.4rem; }
+  /* a finger's target: the links under a message stand taller, the replies button taller still */
+  .convo .c-act { padding: 0.55em 0; }
+  .convo .c-fold { min-height: 2.6rem; padding: 0.5em 1.05em; }
+}

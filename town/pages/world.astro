@@ -32,6 +32,13 @@ import SettlementNotice from '@/components/SettlementNotice.astro';
 import HalloweenWorldFrame from '@/components/HalloweenWorldFrame.astro';
 import HalloweenMotif from '@/components/HalloweenMotif.astro';
 import { sectionCard, LARGE } from '@/lib/og-image.mjs';
+// CORE-178 / WLD-249: the site's one resident mention for the viewer's speakers (world-identity.mjs), its look, and the build's own faces it draws from
+import '@/styles/resident-mention.css';
+import residents from '@/data/postmark/residents.json';
+import { mentionAliases, publicFaces } from '@/lib/resident-mentions.mjs';
+// every current resident's public face, and the build's renames, so a speaker recorded under an old handle wears the current face, name and page
+const worldFaces = publicFaces(residents.map((r) => r.handle));
+const worldAliases = mentionAliases;
 
 // Early identity bridge: adopt the site's OAuth session into the viewer's Bearer
 // slot (localStorage['pm_key']) BEFORE the viewer boots, so a signed-in visitor's
@@ -109,6 +116,24 @@ const html = rawHtml.replace(/<head>/i,
   `<head>\n<meta name="robots" content="noindex,nofollow">\n${SHARE}\n${BRIDGE}\n${LANDING}`);
 ---
 <Fragment set:html={html} />
+{/* CORE-178: the build's faces for the viewer's speakers, read by the identity script below (no new read) */}
+<div hidden data-world-faces={JSON.stringify(worldFaces)} data-world-aliases={JSON.stringify(worldAliases)}></div>
+<script>
+  // THE VIEWER'S SPEAKER IDENTITY (CORE-178; World WLD-249's agreed entry): the site's one resident mention, handed to the viewer the shell above
+  // mounted, through `setViewerIdentityForSpeaker` on the SAME module instance (the same URL the shell imports). Until the installed World exports it,
+  // nothing changes: the viewer keeps its own face and name (world-identity.mjs says why). No second viewer, no remount, no read beyond this page.
+  import { attachViewerIdentity, VIEWER_URL } from "@/lib/world-identity.mjs";
+  const facesEl = document.querySelector("[data-world-faces]");
+  let worldFaces = null;
+  try { worldFaces = JSON.parse(facesEl?.getAttribute("data-world-faces") || "null"); } catch { worldFaces = null; }
+  let worldAliases = null;
+  try { worldAliases = JSON.parse(facesEl?.getAttribute("data-world-aliases") || "null"); } catch { worldAliases = null; }
+  const viewerUrl: string = VIEWER_URL;
+  attachViewerIdentity({
+    doc: document, app: document.getElementById("app"), faces: worldFaces, toFace: (f: any) => f, aliases: worldAliases,
+    importViewer: () => import(/* @vite-ignore */ viewerUrl),
+  });
+</script>
 <WorldSignIn />
 {/* THE LATE-SETTLEMENT NOTICE (POS-1004): below the viewer's top controls, above the view; hidden unless the sentinel says the settlement is DOWN */}
 <SettlementNotice variant="over" />

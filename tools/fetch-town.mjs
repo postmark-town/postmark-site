@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildOfficeData, fetchBlueprints, fetchRollcall, fetchCrossings, jsonText, shortFetchPlan } from "./lib/fetch-town-data.mjs";
+import { buildOfficeData, eventRefreshPlan, fetchBlueprints, fetchEventFiles, fetchRollcall, fetchCrossings, jsonText, shortFetchPlan } from "./lib/fetch-town-data.mjs";
 import { defaultEventsSeedUrl } from "./lib/past-events-cache.mjs";
 import { defaultLettersSeedUrl } from "./lib/letters-seed.mjs";
 import { worldPin } from "./lib/world-pin-publish.mjs";
@@ -273,6 +273,21 @@ try {
     }
   } catch (e) {
     console.warn(`WARN fetch-town: could not measure the kept snapshot (${e.message})`);
+  }
+  // THE EVENTS DO NOT WAIT ON THE LETTERS (CORE-177; Wright, 2026-11-27, option b). When the pass failed on the letters refusal alone and this is not
+  // the release channel, the calendar and the lasting events are read again through their own readers (fetchEventFiles, the same path
+  // buildOfficeData takes, with a budget of its own) and only those two files are written, so the event pages are baked; every other file stays
+  // the committed snapshot. If that read fails too, the committed calendar and events stand, and the log says so.
+  if (eventRefreshPlan({ channel: process.env.PUBLIC_CHANNEL ?? null, error }).refresh) {
+    try {
+      const fresh = await fetchEventFiles({ apiBase: API, dataDir: DATA_DIR, eventsArchivePath: EVENTS_ARCHIVE, eventsSeedUrl: EVENTS_SEED_URL });
+      writeDataFile("calendar.json", fresh.calendar);
+      writeDataFile("events.json", fresh.events);
+      for (const gap of fresh.gaps) console.warn(`WARN endpoint gap: ${gap}`);
+      console.log(`fetch-town: the letters were refused, so only the calendar (as of ${fresh.calendar?.as_of ?? "unknown"}) and the lasting events (${fresh.events?.past?.events?.length ?? 0} past, read ${fresh.events?.past?.read ?? "unknown"}) were refreshed from ${API}; every other file is the committed snapshot`);
+    } catch (e) {
+      console.warn(`WARN fetch-town: the calendar and the lasting events could not be refreshed either; keeping their committed snapshot (${e.message})`);
+    }
   }
   // A SHORT FETCH MUST NOT PUBLISH (2026-09-17, postmark#2884). The two lines
   // above are the measurement and stay exactly as they were -- they are what a

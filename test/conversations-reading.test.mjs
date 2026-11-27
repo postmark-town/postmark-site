@@ -5,8 +5,8 @@
 // messages displayed similarly"; 17:47 EST, of three versions: "Let's go with B". B, in the mock-up's words: "Every opening message in full. Its replies
 // wait behind one button, and that button opens the whole circle in place, every level at once."
 //
-// The rule is in the page's own inline script (town/pages/conversations/index.astro, between ROOM-SHAPE:BEGIN and ROOM-SHAPE:END). This suite reads that
-// block out of the page, the way conversations-poll.test.mjs reads its scheduler, and runs THAT text over invented lines (test/fixtures/circles.sample.json,
+// The rule is the site's shared room drawing (src/lib/room-drawing.mjs § roomShape; until CORE-177 it was the page's own inline ROOM-SHAPE block). This suite
+// imports that module, the one the page draws every room through, and runs it over invented lines (test/fixtures/circles.sample.json,
 // "invented speech", in the shape the office serves a thread's `voices`). No browser, no network, one process. What the page DRAWS from it, in a real
 // browser, is test/conversations-circles.test.mjs ("B ·").
 //
@@ -25,9 +25,13 @@ const PAGE = process.env.CORE156_PAGE || new URL("../town/pages/conversations/in
 const page = readFileSync(PAGE, "utf8").replace(/\r\n/g, "\n");
 const FX = JSON.parse(readFileSync(new URL("./fixtures/circles.sample.json", import.meta.url), "utf8"));
 const between = (a, b) => { const i = page.indexOf(a), j = page.indexOf(b); assert.ok(i > -1 && j > i, `the page still carries ${a} … ${b}`); return page.slice(i + a.length, j); };
-const shapeSrc = between("// ROOM-SHAPE:BEGIN", "// ROOM-SHAPE:END");
-const drawSrc = between("// ROOM-DRAW:BEGIN", "// ROOM-DRAW:END");
-const { roomShape, repliesWords } = new Function(`${shapeSrc}\nreturn { roomShape: roomShape, repliesWords: repliesWords };`)();
+// CORE-177: the room's drawing (the shape and everything that draws it) is the site's shared module, src/lib/room-drawing.mjs, which the page draws every
+// room through; the page keeps its host glue and the long room's "earlier" fallback between ROOM-DRAW:BEGIN and :END. This suite runs the MODULE itself.
+const MODULE_SRC = readFileSync(new URL("../src/lib/room-drawing.mjs", import.meta.url), "utf8");
+const HOST_CSS = readFileSync(new URL("../src/styles/conversation-host.css", import.meta.url), "utf8");
+const glueSrc = between("// ROOM-DRAW:BEGIN", "// ROOM-DRAW:END");
+const drawSrc = MODULE_SRC + "\n" + glueSrc;
+const { roomShape, repliesWords } = await import("../src/lib/room-drawing.mjs");
 
 // a thread's `voices` as the office serves them (office src/circles.mjs `sayLine`): the flat line, plus each line's own id, the reply_to it answers, its circle
 const FLAT = FX.views.flat_lines;
@@ -104,7 +108,8 @@ test("a broken record places nothing wrongly and never hangs: a reply to a later
 // ── labelled TEXT PINS (the weakest instrument: they read the page's source, not its behaviour; the behaviour is the browser file's "B ·" tests) ──
 
 test("text pins: a message's words are never clamped or cut; the room's drawing asks the office nothing; the per-card reader mount is gone", () => {
-  const css = page.match(/\.convo \.c-said \{([^}]*)\}/)?.[1] ?? "";
+  const css = HOST_CSS.match(/\.convo \.c-said \{([^}]*)\}/)?.[1] ?? "";
+  assert.equal(/\.convo \.c-said \{/.test(page), false, "one rule for the words, in the drawing's own stylesheet");
   assert.match(css, /white-space: pre-wrap/, "the words wrap and keep their own line breaks");
   assert.equal(/nowrap|text-overflow|line-clamp|max-height|overflow:\s*hidden/.test(css), false, "no clamp, no ellipsis, no cut on the words");
   assert.match(drawSrc, /el\("span", "c-said", v\.said\)/, "the whole of what was said goes on the page");
@@ -112,6 +117,7 @@ test("text pins: a message's words are never clamped or cut; the room's drawing 
   assert.ok(code(drawSrc).length > 2000 && code(drawSrc).length < drawSrc.length, "control: the strip took comments and left code");
   assert.equal(/\bfetch\s*\(|XMLHttpRequest/.test(code(drawSrc)), false, "drawing, opening and folding a room make no request of their own");
   assert.equal((code(drawSrc).match(/ensureReader\(/g) ?? []).length, 1, "the World's reader is reached from ONE place in the room's drawing: the long room's 'earlier' press");
+  assert.equal(/ensureReader\(|fetch\s*\(/.test(code(MODULE_SRC)), false, "and that place is the page's, never the shared drawing's");
   for (const gone of [["wire", "Readers"], ["Intersection", "Observer"], ["fill", "Voices"], ["show", "Flat"]]) {
     assert.equal(page.includes(gone.join("")), false, `${gone.join("")} is gone (every card mounted the reader with it until CORE-156)`);
   }

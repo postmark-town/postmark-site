@@ -110,13 +110,19 @@ test("mountRoom hands `hostOwnsHeader` on ONLY when it is strictly true; every o
 // "B ·" and CORE-128 hold that in a browser); `ensureReader` is now only the long room's fallback mount, and it still hands the reader these options.
 test("the page's mount door forwards the provider the same way, and the inline poller gives it on every mount (a card's fallback mount, and the one conversation)", () => {
   // CORE-117 integration: the one mount door also carries the selected view's `circle` and the card's `onNavigate`; the CORE-128 options keep their defaults after them
-  // CORE-156: the door also takes the one-conversation view's `primed` answer and `onCircleRead` (one ask for a circle on arrival, none repeated); defaults after the rest
-  assert.match(page, /async mount\(host, roomId, \{ onState = null, onNavigate = null, circle = null, faceForSpeaker = null, hostOwnsHeader = false, primed = null, onCircleRead = null \} = \{\}\)/);
-  assert.match(page, /\.\.\.\(typeof faceForSpeaker === "function" \? \{ faceForSpeaker \} : \{\}\)/, "only when the page gave one");
-  assert.match(page, /\.\.\.\(hostOwnsHeader === true \? \{ hostOwnsHeader: true \} : \{\}\)/, "the header option goes on only when strictly true");
-  assert.match(page, /rec\.ready = h\.mount\(host, String\(t\.id\), \{[\s\S]*?\},\s*faceForSpeaker: faceForSpeaker,\s*hostOwnsHeader: true,/, "ensureReader is a card's one mount, and the page says it owns the header (after the card's own onNavigate)");
+  // CORE-156: the door also takes the one-conversation view's `primed` answer and `onCircleRead` (one ask for a circle on arrival, none repeated); defaults after the rest.
+  // CORE-178: and the poller's faces getter, from which it builds each speaker's identity (test/resident-identity.test.mjs holds that)
+  assert.match(page, /async mount\(host, roomId, \{ onState = null, onNavigate = null, circle = null, faceForSpeaker = null, hostOwnsHeader = false, primed = null, onCircleRead = null, speakerFaces = null \} = \{\}\)/);
+  // CORE-177: the door mounts through the site's ONE reader setup (mountRoom), with its own CORE-156 source, handing on what it was given; mountRoom is where
+  // the provider goes on only when given and the header option only when strictly true (the MOUNT pins below), the same rule for every host.
+  // CORE-178 (the union of #491 into #488): the speaker identity is built from the faces getter in the door, and handed to that same setup (null without one)
+  assert.match(page, /const m = await mountRoom\(\{\s*doc: document, host, roomId, source,[\s\S]*?faceForSpeaker, hostOwnsHeader,[\s\S]*?identityForSpeaker: typeof speakerFaces === "function" \? identityProvider\(document, speakerFaces, \{ aliases: residentAliasesOf\(document\) \}\) : null,\s*\}\);/,
+    "the door hands its source, both options and the speaker identity to the one setup, as given");
+  assert.match(MOUNT, /\.\.\.\(hostOwnsHeader === true \? \{ hostOwnsHeader: true \} : \{\}\)/, "the header option goes on only when strictly true");
+  assert.match(MOUNT, /\.\.\.\(typeof identityForSpeaker === "function" \? \{ identityForSpeaker \} : \{\}\)/, "the identity goes on only when it is a provider");
+  assert.match(page, /rec\.ready = h\.mount\(host, String\(t\.id\), \{[\s\S]*?\},\s*faceForSpeaker: faceForSpeaker,\s*speakerFaces: function \(\) \{ return faces; \},[^\n]*\n\s*hostOwnsHeader: true,/, "ensureReader is a card's one mount, and the page says it owns the header (after the card's own onNavigate)");
   // the ONE conversation (CORE-117) wears the SAME provider, so the lists' and the selected view's bylines have one renderer; it does not claim the room header (its own header is the place and the live chip)
-  assert.match(page, /h\.mount\(sel\.host, String\(sel\.room\), \{\s*circle: sel\.cid, faceForSpeaker: faceForSpeaker,\s*onState: function \(st\) \{ if \(selected === sel\) \{ sel\.step = st; sel\.card\.classList\.toggle\("is-room-step", st === "room"\); offerSelected\(sel\); \} \},\s*onNavigate: function \(n\) \{ followSelected\(sel, n\); \},\s*primed: primed,\s*onCircleRead: function \(id, first, body\) \{ selectedWasRead\(sel, id, first, body\); \},\s*\}\)/, "the selected view hands on the page's one face provider, follows the reader's own navigation and room step, and hands the reader the one answer the page already asked for (CORE-156)");
+  assert.match(page, /h\.mount\(sel\.host, String\(sel\.room\), \{\s*circle: sel\.cid, faceForSpeaker: faceForSpeaker,\s*speakerFaces: function \(\) \{ return faces; \},[^\n]*\n\s*onState: function \(st\) \{ if \(selected === sel\) \{ sel\.step = st; sel\.card\.classList\.toggle\("is-room-step", st === "room"\); offerSelected\(sel\); \} \},\s*onNavigate: function \(n\) \{ followSelected\(sel, n\); \},\s*primed: primed,\s*onCircleRead: function \(id, first, body\) \{ selectedWasRead\(sel, id, first, body\); \},\s*\}\)/, "the selected view hands on the page's one face provider, follows the reader's own navigation and room step, and hands the reader the one answer the page already asked for (CORE-156)");
   assert.doesNotMatch(page.slice(page.indexOf("function mountSelected"), page.indexOf("function loadSelected")), /hostOwnsHeader/, "and does not pass hostOwnsHeader");
   assert.match(MOUNT, /\.\.\.\(typeof faceForSpeaker === "function" \? \{ faceForSpeaker \} : \{\}\)/);
   // CORE-158 moved that callback into `facesReady` (the POLL-FACES block) and then `.then(facesReady)`; it still asks both lists' readers to redraw
@@ -124,9 +130,12 @@ test("the page's mount door forwards the provider the same way, and the inline p
 });
 
 test("the face sits in the byline's own flow (about 20px, no gutter), and the human chip keeps the page's dashed style", () => {
-  const css = page.match(/\.convo \.cr-head-line > \.c-face \{([^}]*)\}/)?.[1] ?? "";
+  // CORE-177: the faces' rules moved, word for word, to the stylesheet the Conversations page and the event page both import
+  const HOST_CSS = readFileSync(new URL("../src/styles/conversation-host.css", import.meta.url), "utf8");
+  assert.match(page, /^import "@\/styles\/conversation-host\.css";$/m, "the Conversations page wears it");
+  const css = HOST_CSS.match(/\.convo \.cr-head-line > \.c-face \{([^}]*)\}/)?.[1] ?? "";
   assert.match(css, /width: 20px; height: 20px/);
   assert.match(css, /display: inline-grid/);
   assert.ok(!/position:\s*absolute|padding-left|margin-left/.test(css), "no gutter on the statement");
-  assert.match(page, /\.convo \.c-face\.is-human \{/);
+  assert.match(HOST_CSS, /\.convo \.c-face\.is-human \{/);
 });

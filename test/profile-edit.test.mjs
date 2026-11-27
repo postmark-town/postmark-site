@@ -171,6 +171,42 @@ test("the in-place repaint after Save runs to the end: pronouns AND colour, runt
   assert.equal(fifty.pronounsEl.textContent, v, "50 characters render whole, as on reload");
 });
 
+// CORE-178 (Facet's profile-label FIX): the resident's labels on their own page are the site's one mention, built with the favourite colour's inks.
+// A Save repaints the page in place, so the same repaint must re-ink those mentions, or a new colour leaves every label in the old ink.
+test("a colour Save re-inks the resident's mentions in place (no stale ink), and a cleared colour turns them neutral", async () => {
+  const { paintProfile, inkMentions } = await import("../src/lib/profile-edit.mjs");
+  const { inkOn } = await import("../src/lib/resident-mention.mjs");
+  const mention = (cls = "rm") => {
+    const set = new Set(cls.split(" "));
+    return { style: { vars: { "--rm-c": "#2f6b3a", "--rm-ink-n": "#4e9a5c", "--rm-ink-p": "#2f6b3a" }, setProperty(k, v) { this.vars[k] = v; }, removeProperty(k) { delete this.vars[k]; } },
+      classList: { add: (c) => set.add(c), remove: (c) => set.delete(c), contains: (c) => set.has(c) }, set };
+  };
+  const els = { ...stubEls(), mentions: [mention(), mention("rm is-neutral")] };
+  paintProfile(els, { color: "#c90", color_name: "old brass" }, "#e8c48b");
+  for (const m of els.mentions) {
+    assert.equal(m.style.vars["--rm-c"], "#cc9900", "the new colour");
+    assert.equal(m.style.vars["--rm-ink-n"], inkOn("#cc9900", "night"), "its night ink, as a rebuild writes it");
+    assert.equal(m.style.vars["--rm-ink-p"], inkOn("#cc9900", "paper"), "its paper ink");
+    assert.equal(m.set.has("is-neutral"), false, "no longer neutral");
+  }
+  const cleared = { ...stubEls(), mentions: [mention()] };
+  paintProfile(cleared, { color: "" }, "#e8c48b");
+  assert.equal(cleared.mentions[0].set.has("is-neutral"), true, "no colour chosen: neutral, as a rebuild draws it");
+  assert.deepEqual(Object.keys(cleared.mentions[0].style.vars), [], "and no colour left behind");
+  assert.equal(inkMentions(undefined, "#c90"), 0, "a page with no mentions: nothing to do");
+  // a mention on a page's own plate (the Write button's gold) is re-inked for THAT plate, not left with the old colour's plate ink
+  const plated = mention("rm on-ink"); plated.getAttribute = (k) => (k === "data-rm-plate" ? "#e8c48b" : null); plated.style.vars["--rm-ink"] = "#2a6034";
+  inkMentions([plated], "#c90");
+  assert.equal(plated.style.vars["--rm-ink"], inkOn("#cc9900", "#e8c48b"), "the plate's ink for the new colour");
+  const neutralPlated = mention("rm is-neutral"); neutralPlated.getAttribute = (k) => (k === "data-rm-plate" ? "#e8c48b" : null);
+  inkMentions([neutralPlated], "#c90");
+  assert.equal(neutralPlated.set.has("on-ink"), true, "a neutral label on a plate that gains a colour takes the plate's ink");
+  assert.equal(neutralPlated.style.vars["--rm-ink"], inkOn("#cc9900", "#e8c48b"));
+  // and the page hands the painter every mention of this resident
+  const src = read("../town/components/Household.astro").replace(/\r/g, "");
+  assert.match(src, /mentions: document\.querySelectorAll\('\.rm\[data-rm="' \+ handle \+ '"\]'\) \}, values, defaultColor\);/);
+});
+
 test("the page script never redeclares a name it imports (the shadow that broke paint in 98d28f0)", () => {
   const src = read("../town/components/Household.astro").replace(/\r/g, "");
   const script = src.slice(src.indexOf("import { KEYS, officeBase, tokenIsFresh }"));

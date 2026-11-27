@@ -43,7 +43,9 @@ const between = (s, a, b, from = 0) => { const i = s.indexOf(a, from); const j =
 const MAIN = between(PAGE_SRC, '<main class="pm-wrap convo">', "</main>");
 const INLINE = between(PAGE_SRC, "<script is:inline>", "</script>");
 const MODULE = between(PAGE_SRC, "\n  <script>\n", "</script>", PAGE_SRC.indexOf("</script>", PAGE_SRC.indexOf("<script is:inline>")));
-const STYLE = between(PAGE_SRC, "<style is:global>", "</style>");     // CORE-156: the page's own stylesheet, for the tests that measure the drawing (openPage's `styled`)
+// CORE-156: the page's own stylesheet, for the tests that measure the drawing (openPage's `styled`); CORE-177: with the shared stylesheet the page imports,
+// which now holds the room drawing's own rules (READING A ROOM) and the card/face/host rules, so the harness wears what the page wears
+const STYLE = readFileSync(join(ROOT, "src/styles/conversation-host.css"), "utf8") + "\n" + between(PAGE_SRC, "<style is:global>", "</style>");
 const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>harness</title></head><body class="pm convo">
 <main class="pm-wrap convo">${MAIN}</main>
 <script>${INLINE}</script>
@@ -55,6 +57,9 @@ const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8"><tit
 const READER_FILE = [process.env.CORE82_WORLD_READER, join(ROOT, "node_modules/postmark-world/spectator/circle-reader.mjs")].filter(Boolean).find((p) => existsSync(p)) ?? null;
 const HAS_READER = READER_FILE !== null;
 const readerNote = HAS_READER ? `the real reader (${READER_FILE.includes("node_modules") ? "the pinned World" : "CORE82_WORLD_READER"})` : "NO reader (the pinned World predates it)";
+// WLD-248 (World S192 45ec53ea on, CORE-177): the reader draws a host's `identityForSpeaker` node as the WHOLE byline (the site's one mention, face then
+// name) in place of its own face + `.cr-who`; a World before it ignores the hook and keeps the old byline
+const HAS_IDENTITY = HAS_READER && /\bidentityForSpeaker\b/.test(readFileSync(READER_FILE, "utf8"));
 
 // CORE-128: the public residents list the page reads for its faces (/world-engine/residents-meta.json): null = not served (names only), set per test, optionally late
 let RESIDENTS_META = null, RESIDENTS_META_DELAY_MS = 0;
@@ -1268,10 +1273,16 @@ test(`CORE-128 (${readerNote}): the host owns the room's header (none repeated i
     }
     // the lists' card keeps its ONE room header (the host's group), unchanged by opening a circle elsewhere; the one view's own header is the place and the live chip
     assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-thread-head").length`), 1, "the host's one room header, unchanged by opening a circle");
-    assert.equal(await p.evalJs(`${picked}.length > 1 && ${picked}.every((l) => l.firstElementChild?.classList.contains("c-face"))`), true, "every statement of the opened circle, replies included, has its face first in the byline");
+    // a byline is the host's face then the reader's `.cr-who` (the old path), or, under WLD-248, the site's one mention (`.rm.rm-speaker`: `.rm-face` then `.rm-name`)
+    const oldLine = `((l) => l.firstElementChild?.classList.contains("c-face") && (l.querySelector(".cr-who")?.textContent ?? "").trim().length > 0)`;
+    const idLine = `((l) => { const m = l.firstElementChild; return !!m && m.matches(".rm.rm-speaker") && m.firstElementChild?.classList.contains("rm-face") && (m.querySelector(".rm-name")?.textContent ?? "").trim().length > 0; })`;
+    assert.equal(await p.evalJs(`${picked}.length > 1 && ${picked}.every((l) => ${oldLine}(l) || ${idLine}(l))`), true, "every statement of the opened circle, replies included, has its face first in the byline, and its name after (the names stay)");
     assert.equal(await p.evalJs(`new Set(${picked}.map((l) => l.firstElementChild)).size === ${picked}.length`), true, "a fresh node per line: no repeated speaker took an earlier line's face");
-    // the names stay: each byline keeps its speaker's name after the face (in the one view the names are the reader's own `.cr-who`; the host's `.c-who` links belong to the lists' speakers line)
-    assert.equal(await p.evalJs(`${picked}.every((l) => (l.querySelector(".cr-who")?.textContent ?? "").trim().length > 0)`), true, "the names stay");
+    // a World with WLD-248 draws the site's identity for every speaker the page knows (Pica and Noe here, avatar or monogram), never the reader's own byline for them
+    if (HAS_IDENTITY) {
+      assert.equal(await p.evalJs(`${picked}.some(${idLine})`), true, "the opened circle wears the site's one mention (WLD-248 identityForSpeaker)");
+      assert.equal(await p.evalJs(`${picked}.filter((l) => ["pica", "noe"].includes((l.querySelector(".cr-who")?.textContent ?? "").trim())).length`), 0, "no known speaker falls back to the reader's own name");
+    }
   } finally { RESIDENTS_META = null; await p.close(); }
 });
 

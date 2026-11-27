@@ -10,16 +10,18 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import PageFreshness from "@/components/PageFreshness.astro";
 import CalendarMonth from "@/components/CalendarMonth.astro";
 import calendar from "@/data/postmark/calendar.json";
+import eventsData from "@/data/postmark/events.json";
 import { monthGrid, monthLabel, monthsOf, referenceInstant } from "@/lib/calendar.mjs";
 
+// The lasting list (events.json) is read with the calendar, so a past event has its month and its day (CORE-177, calendar.mjs).
 export function getStaticPaths() {
   const ref = referenceInstant(calendar);
-  return monthsOf(calendar, ref).map((month) => ({ params: { month } }));
+  return monthsOf(calendar, ref, eventsData).map((month) => ({ params: { month } }));
 }
 
 const { month: key } = Astro.params;
 const ref = referenceInstant(calendar);
-const month = monthGrid(calendar, key, ref);
+const month = monthGrid(calendar, key, ref, undefined, eventsData);
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "calendar" }', get: "/api/calendar" }}

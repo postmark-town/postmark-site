@@ -368,8 +368,13 @@ test("PAGE: the historical page keeps its presentation and gains the stable #gal
   assert.deepEqual([...GALLERY_PHASES].sort(), ["doors-open", "ended", "underway"], "the gallery is drawn once the doors are open, not while announced");
   assert.match(src, /const showGallery = !sections\.cancelled && GALLERY_PHASES\.has\(sections\.phase\);/);
   assert.match(src, /\{showGallery && \(\s*<section class="ev-sec" aria-label="The gallery" id="gallery"/, "the same section, only its visibility changed");
-  assert.match(src, /import \{ mountRoom \} from "@\/lib\/circle-reader-mount\.mjs";/, "the World's one reader through the unchanged adapter");
-  assert.equal((src.match(/mountRoom\(/g) ?? []).length, 1, "no second reader");
+  // CORE-177 on POS-1232: a room's own lines through the site's one room drawing (room-voices.mjs), and otherwise the World's one reader through the
+  // unchanged adapter, mounted once, there
+  assert.match(src, /import \{ drawRoomVoices, sayRoomFailed \} from "@\/lib\/room-voices\.mjs";/, "the room is drawn through room-voices.mjs");
+  assert.equal(/mountRoom\(|createCircleReader\(/.test(src), false, "the page mounts no reader of its own");
+  const voices = readFileSync(new URL("../src/lib/room-voices.mjs", import.meta.url), "utf8");
+  assert.match(voices, /import \{ mountRoom, officeSource, readBody, roomUrl \} from "\.\/circle-reader-mount\.mjs";/, "the World's one reader through the unchanged adapter");
+  assert.equal((voices.match(/mountRoom\(/g) ?? []).length, 1, "no second reader");
   assert.equal(/new SparkCard|sparkCardHtml|innerHTML\s*=/.test(src), false, "no second card renderer: the baked gallery is still SparkCard's");
   assert.match(src, /<SparkCard spark=\{s\} roll=\{roll\} \/>/, "the gallery still draws SparkCard as before");
 });

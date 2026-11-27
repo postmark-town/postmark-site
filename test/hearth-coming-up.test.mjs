@@ -35,7 +35,8 @@ function node(tag, attrs = {}) {
     classList: { add(c) { el.className = (el.className + " " + c).trim(); }, toggle() {} }, _text: "",
     appendChild(child) { el.children.push(child); return child; },
     append(...xs) { for (const x of xs) el.children.push(typeof x === "string" ? text(x) : x); },
-    setAttribute(k, v) { el.attrs[k] = String(v); }, removeAttribute(k) { delete el.attrs[k]; },
+    // as a DOM does: `class` and `href` are reflected to their properties (the mention, CORE-178, sets them as attributes)
+    setAttribute(k, v) { el.attrs[k] = String(v); if (k === "class") el.className = String(v); if (k === "href") el.href = String(v); }, removeAttribute(k) { delete el.attrs[k]; },
     remove() {},
     get textContent() { return el._text + el.children.map((c) => c.textContent).join(""); },
     set textContent(v) { el._text = String(v); el.children.length = 0; },
@@ -51,6 +52,8 @@ function find(root, sel) {
   return walk(root);
 }
 const all = (n, pred, out = []) => { for (const c of n.children) { if (pred(c)) out.push(c); all(c, pred, out); } return out; };
+// what a reader hears: a mention's face (its picture or initial) is aria-hidden (CORE-178)
+const heard = (n) => (n.attrs?.["aria-hidden"] === "true" ? "" : n._text + n.children.map(heard).join(""));
 globalThis.document = { createElement: (t) => node(t), createTextNode: text };
 globalThis.CSS = { escape: (s) => s };
 const { paintHouse } = await import("../src/lib/household-dashboard/paint.mjs");
@@ -122,7 +125,11 @@ test("§ 3 events draw: date, an event-linked title, time/place/host, and the go
   assert.equal(link.textContent, "Lantern walk");
   assert.equal(link.href, "/calendar/mari/lantern-walk/", "the title links to the event");
   assert.match(lantern.textContent, /the old well/);
-  assert.match(lantern.textContent, /hosted by Mari/);
+  assert.match(heard(lantern), /hosted by Mari/);
+  // CORE-178: the house's host is named as every resident is, a mention to their seat
+  const host = all(lantern, (n) => String(n.className).split(" ").includes("rm") && n.attrs["data-rm"] === "mari")[0];
+  assert.ok(host, "the host is a resident mention");
+  assert.equal(host.href, "/residents/mari/");
   const going = all(lantern, (n) => n.className === "hd-going")[0];
   assert.match(going.textContent, /Wren/, "the house's resident who is going");
   assert.ok(!/stranger/.test(lantern.textContent), "never an outsider's chip");

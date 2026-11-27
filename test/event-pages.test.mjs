@@ -24,7 +24,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  EVENT_WORDS, allEventViews, eventForPage, eventHref, eventSections, evidenceRead, isRoomId, legacyEventHref, pictureOf, roomHref, roomIdOf,
+  EVENT_WORDS, allEventViews, eventForPage, eventHref, eventSections, evidenceRead, isRoomId, legacyEventHref, pictureOf, roomHref, roomIdOf, roomPermalink,
 } from "../src/lib/calendar.mjs";
 import { EMPTY_EVENTS, EMPTY_CALENDAR, fetchEvents, fetchPastEvents, fetchEventEvidence, DATA_FILES, EVENTS_GAP, EMPTY_SPARKS, SPARKS_GAP, fetchSparks, sparkViewOfMark } from "../tools/lib/fetch-town-data.mjs";
 import { READER_MODULE, circleUrl, loadReader, mountRoom, mountRooms, officeSource, roomUrl } from "../src/lib/circle-reader-mount.mjs";
@@ -140,6 +140,10 @@ test("room ids are opaque string-or-number values: a positive number and zero su
   assert.equal(roomHref(0), "/conversations/#0"); assert.equal(roomHref(42), "/conversations/#42");
   // a room id is never a circle: no #circle- anchor is made from it
   assert.equal(roomHref(42).includes("circle-"), false);
+  // CORE-177: the room's whole-talk permalink, the id as written (opaque, encoded, never rewritten)
+  assert.equal(roomPermalink(0), "/conversations/?room=0"); assert.equal(roomPermalink("t1-a b"), "/conversations/?room=t1-a%20b");
+  assert.equal(roomPermalink("t1793057576000-corrie"), "/conversations/?room=t1793057576000-corrie");
+  assert.equal(roomPermalink("room-abc").includes("#"), false, "a query, never the card anchor's fragment");
 });
 
 test("an ABSENT completion flag on a served gallery is unknown, never complete; true and false stay literal", () => {
@@ -347,27 +351,31 @@ test("BUILT FALSIFIER: the ended event outside the seven-day list has its page a
   assert.match(html, /data-event-page[^>]*data-after/);
   const t = textOf(html);
   assert.ok(t.includes("Harvest Supper (invented; ended outside the seven-day list)"));
-  // the sparks: EVERY public completion spark, in the producer's order, each with headline, recounting and credit; then the public reference and the note
-  const spark = section(html, "data-ev-sparks");
-  // the PICTURED one is the picture and one caption (CORE-121, Darko 13:14 EST): its recounting is on its own page, not on the card
-  assert.equal(/A long table, too many dishes, and one very serious argument about pie\./.test(textOf(spark)), false, "an image card carries no recounting");
-  assert.match(textOf(built("sparks", "supperkeeper-test", "harvest-supper-test")), /A long table, too many dishes, and one very serious argument about pie\./, "the bigger view has every served word");
-  assert.match(textOf(spark), /The second room kept talking about pie until the lamps went out\./);
-  assert.deepEqual([...spark.matchAll(/data-spark="([^"]*)"/g)].map((m) => m[1]), ["supperkeeper-test/harvest-supper-test", "supperkeeper-test/harvest-supper-guests-test"], "both completion sparks, none chosen as the default");
-  assert.equal((spark.match(/data-spark-picture/g) ?? []).length, 1, "only the spark that has a picture draws a picture tile");
-  assert.match(spark, /data-spark-credit/);
-  assert.match(spark, /data-spark-ref="supperkeeper-test\/harvest-supper-pending-test"/); assert.match(textOf(spark), /the office says: pending/);
-  assert.match(spark, /data-ev-spark-note/); assert.match(textOf(spark), /a cap may leave some rooms without one/);
-  // the gallery: both accepted child sparks, no completion spark among them
+  // ONE GALLERY (CORE-177 ruling 5): the page draws no separate completion-Sparks group. The completion sparks keep their own pages (the bigger view has every
+  // served word); on the event page the gallery is the one place sparks show
+  assert.equal(html.includes("data-ev-sparks"), false, "no separate completion-Sparks section");
+  for (const id of ["supperkeeper-test/harvest-supper-test", "supperkeeper-test/harvest-supper-guests-test"]) assert.equal(html.includes(`data-spark="${id}"`), false, `${id}: a completion spark is not redrawn on the event page`);
+  assert.equal(html.includes("data-spark-ref="), false, "nor its public references");
+  assert.match(textOf(built("sparks", "supperkeeper-test", "harvest-supper-test")), /A long table, too many dishes, and one very serious argument about pie\./, "a completion spark's own page still has every served word");
+  // the gallery: both accepted child sparks
   const gal = section(html, "data-ev-gallery");
   assert.equal((gal.match(/data-spark="/g) ?? []).length, 2);
   assert.ok(gal.includes("The pie argument") && gal.includes("The last slice"));
-  assert.equal(gal.includes('data-spark="supperkeeper-test/harvest-supper-test"') || gal.includes("harvest-supper-guests-test"), false, "no completion spark is repeated in the gallery");
-  // both rooms, in the office's order, each with the no-JS floor and a link to its whole talk
+  // THE GALLERY ABOVE THE CONVERSATION (CORE-177, Darko 08:48 EST)
+  assert.ok(html.indexOf("data-ev-gallery") > 0 && html.indexOf("data-ev-gallery") < html.indexOf("data-ev-circles"), "the gallery sits above the conversation");
+  // both rooms, in the office's order, each SHUT (a disclosure with no `open`), with the no-JS floor and a link to its whole talk
   const circ = section(html, "data-ev-circles");
   const roomsAt = [...circ.matchAll(/data-ev-room="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(roomsAt, ["t1792519260000-supperkeeper-test", "t1792520400000-guest-test"]);
-  for (const r of roomsAt) assert.ok(circ.includes(`href="/conversations/#${r}"`), `${r}: no link to its whole talk`);
+  // CORE-177: the whole talk is the room's permalink (?room=), which the conversations page opens through the office's named room read
+  for (const r of roomsAt) assert.ok(circ.includes(`href="/conversations/?room=${r}"`), `${r}: no link to its whole talk`);
+  const rooms = [...circ.matchAll(/<details\b[^>]*data-ev-room="[^"]+"[^>]*>/g)].map((m) => m[0]);
+  assert.equal(rooms.length, 2, "each room is a disclosure");
+  for (const tag of rooms) assert.doesNotMatch(tag, /\sopen[\s>=]/, "and shut until the reader opens it");
+  assert.equal((circ.match(/<summary\b[^>]*class="c-thread-head ev-room-h"/g) ?? []).length, 2, "its place is the summary a reader opens it by, the Conversations card's head");
+  for (const tag of rooms) assert.match(tag, /class="c-thread ev-room"/, "each room is a Conversations card (conversation-host.css)");
+  assert.match(circ, /<div class="convo ev-rooms"/, "inside `.convo`, where that theme applies");
+  assert.match(html, /<section class="ev-sec" aria-label="The conversation"/, "the section is the page's dark ground, as on the Conversations page, not cream paper");
   assert.match(circ, /data-ev-floor/);
   assert.match(circ, /data-live=|data-event=/);
 });
@@ -383,12 +391,25 @@ test("BUILT: a spark with no picture still shows its headline, recounting and cr
   assert.ok(t.includes("The last slice") && t.includes("Nobody would take it, so it went to the dog.") && t.includes("by supperkeeper-test"));
 });
 
-test("BUILT FALSIFIER: who was there lists only the households the office served as public-act evidence; the RSVP-only resident appears only as an RSVP", () => {
+test("BUILT FALSIFIER: who was there is the card's, under its RSVPs, naming only the actors the office served (participants); never a household, a member or an RSVP", () => {
   const html = eventHtml(SUPPER);
-  const present = section(html, "data-ev-present");
-  assert.match(present, /hh:supper-test-house/); assert.match(present, /solo:guest-test/);
-  assert.equal(present.includes("rsvponly-test"), false, "an RSVP is not a public act");
-  assert.match(textOf(present), /Saying you will come \(an RSVP\) does not count\./);
+  // CORE-177 ruling 2: the compact roster sits in the top card, after its RSVPs row; the households' section that stood below is retired
+  assert.equal(html.includes("data-ev-present"), false, "no households' who-was-there section");
+  const at = html.indexOf('<article class="cal-card');
+  assert.ok(at > -1, "the top card");
+  const card = html.slice(at, html.indexOf("</article>", at));
+  assert.ok(card.includes("data-ev-attend"), "the roster is inside the top card");
+  assert.ok(card.indexOf("cal-rsvps") < card.indexOf("data-ev-attend"), "under the RSVPs");
+  const roster = section(html, "data-ev-attend");
+  const t = textOf(roster);
+  assert.ok(t.includes(EVENT_WORDS.attendance.title) && t.includes(EVENT_WORDS.attendance.lead), "its title and its bounded lead");
+  assert.equal(/\bhidden\b/.test(roster.slice(0, roster.indexOf(">"))), false, "shown on an ended event");
+  const names = [...roster.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/g)].map((m) => textOf(m[1]).trim());
+  assert.deepEqual(names, ["guest-test", "Marla Test (invented)", "human-of-unshown-test", "supperkeeper-test"], "each actor once, in the office's order; a human by its public name, else its exact handle");
+  assert.equal(/<img/.test(roster), false, "no invented portrait: none of these handles is a resident the build has");
+  for (const not of ["hh:supper-test-house", "solo:guest-test", "rsvponly-test"]) assert.equal(t.includes(not), false, `${not} is not an attendee`);
+  assert.match(t, /2 public says could not be placed at the event, so they are not counted here\./, "the unplaced disclosure stays");
+  assert.equal(t.includes(EVENT_WORDS.attendance.none) || t.includes(EVENT_WORDS.attendance.unknown), false, "a named roster says neither none nor unknown");
   // the approved past layout (CORE-121) draws no RSVP list on an ended page at all, so an RSVP-only resident is nowhere on it; the CONTROL that the page could
   // have listed them is the same fixture's RSVP row, which on a RUNNING event's page still carries its RSVP list
   assert.equal(textOf(html).includes("rsvponly-test"), false, "an ended page lists no RSVP names, so none can be mistaken for who was there");
@@ -405,16 +426,17 @@ test("BUILT: an empty completion collection beside a populated gallery: the gall
   assert.equal(s.circles.state, "rooms"); assert.deepEqual(s.circles.rooms.map(roomIdOf), ["t1790856000000-lawn-test"]);
   assert.deepEqual(s.gallery.rooms, ["t1790856000000-lawn-test"]); assert.deepEqual(s.gallery.sparks[0].rooms, ["t1790856000000-lawn-test"]);
   assert.deepEqual(s.present.households, ["hh:legacy-test-house"]);
-  assert.ok(section(html, "data-ev-circles").includes('data-ev-room="t1790856000000-lawn-test"'), "the room's circles are on the page, above the gallery");
+  assert.ok(section(html, "data-ev-circles").includes('data-ev-room="t1790856000000-lawn-test"'), "the room's circles are on the page, below the gallery");
   assert.equal(textOf(section(html, "data-ev-circles")).includes("No conversation formed"), false, "so the page does not say no conversation formed");
   const t = (marker) => textOf(section(html, marker));
-  assert.ok(t("data-ev-sparks").includes("No public completion sparks are listed here."), "the empty collection says exactly that");
-  assert.equal(EVENT_WORDS.sparks.none, "No public completion sparks are listed here.");
+  // CORE-177 ruling 5 (Darko: "Yeah, the no public completion sparks is a bit confusing because there are literal sparks … that link to this event"): the empty
+  // completion collection is no longer said at all beside the gallery; the gallery is the one place this event's sparks show
+  assert.equal(html.includes("data-ev-sparks"), false, "no completion-Sparks section, empty or not");
+  assert.equal(textOf(html).includes(EVENT_WORDS.sparks.none), false, "so no 'no public completion sparks' beside a populated gallery");
   assert.ok(section(html, "data-ev-gallery").includes('data-spark="legacy-gallery-spark-test"'), "the ordinary accepted Spark still stands in the gallery");
   assert.ok(t("data-ev-gallery").includes("A lawn spark (invented; an ordinary accepted Spark in the gallery)"));
   // the old sentence is the falsifier: it claimed no spark had been made from the event, which the gallery card contradicts
   assert.equal(html.includes("No public spark has been made from this event yet"), false, "the denying sentence is gone");
-  assert.doesNotMatch(t("data-ev-sparks"), /No (public )?spark has been made/);
   assert.equal(t("data-ev-gallery").includes(EVENT_WORDS.gallery.none), false, "and the gallery is not drawn as none");
 });
 
@@ -422,27 +444,39 @@ test("BUILT: each state is its own sentence: known none, unknown, a claim not ac
   const q = eventHtml(QUIET);
   const say = (html, marker) => textOf(section(html, marker));     // text, so an escaped apostrophe is the apostrophe a reader sees
   assert.equal(say(q, "data-ev-circles").includes(EVENT_WORDS.circles.none), true);
-  assert.ok(say(q, "data-ev-present").includes(EVENT_WORDS.present.none));
-  assert.ok(say(q, "data-ev-sparks").includes(EVENT_WORDS.sparks.none));
+  // who was there (CORE-177): the office's empty actor list is its own sentence, never the households' "no public act" wording
+  assert.ok(say(q, "data-ev-attend").includes(EVENT_WORDS.attendance.none));
+  assert.equal(say(q, "data-ev-attend").includes(EVENT_WORDS.present.none), false);
   assert.ok(say(q, "data-ev-gallery").includes(EVENT_WORDS.gallery.none));
   const l = eventHtml(LOST);
-  for (const [marker, words] of [["data-ev-circles", EVENT_WORDS.circles.unavailable], ["data-ev-present", EVENT_WORDS.present.unknown], ["data-ev-sparks", EVENT_WORDS.sparks.unknown], ["data-ev-gallery", EVENT_WORDS.gallery.unknown]]) {
+  for (const [marker, words] of [["data-ev-circles", EVENT_WORDS.circles.unavailable], ["data-ev-attend", EVENT_WORDS.attendance.unknown], ["data-ev-gallery", EVENT_WORDS.gallery.unknown]]) {
     assert.ok(say(l, marker).includes(words), `${marker}: unavailable is said as unavailable`);
-    assert.equal(say(l, marker).includes(EVENT_WORDS.circles.none) || say(l, marker).includes(EVENT_WORDS.gallery.none), false, `${marker}: and never as none`);
+    assert.equal(say(l, marker).includes(EVENT_WORDS.circles.none) || say(l, marker).includes(EVENT_WORDS.gallery.none) || say(l, marker).includes(EVENT_WORDS.attendance.none), false, `${marker}: and never as none`);
   }
+  // an unknown roster at bake (the read failed; the old record served none) is said as unknown and asks the office's existing read again; a known one does not
+  for (const h of [l, eventHtml(OLD)]) { assert.ok(say(h, "data-ev-attend").includes(EVENT_WORDS.attendance.unknown)); assert.match(h, /data-ev-attend[^>]*data-ev-attend-refresh/); }
+  assert.equal(/data-ev-attend[^>]*data-ev-attend-refresh/.test(eventHtml(SUPPER)), false, "an ended event's named roster is the bake's");
+  // CORE-177 ruling 5: no event page draws the separate completion-Sparks group, in any state (none, unknown, a claim not accepted)
+  for (const [name, h] of [["quiet", q], ["lost", l], ["old", eventHtml(OLD)]]) assert.equal(h.includes("data-ev-sparks"), false, `${name}: no completion-Sparks section`);
   const o = eventHtml(OLD);
-  assert.match(textOf(section(o, "data-ev-sparks")), /claim awaiting acceptance/); assert.match(textOf(section(o, "data-ev-sparks")), /withdrawn/);
-  assert.equal((section(o, "data-ev-sparks").match(/data-spark-ref=/g) ?? []).length, 2, "every public reference, none chosen");
   assert.match(textOf(section(o, "data-ev-circles")), /oldest settlement/);
   const c = eventHtml(COMING);
   assert.ok(say(c, "data-ev-circles").includes(EVENT_WORDS.circles.before));
   assert.equal(c.includes("data-ev-sparks"), false, "no sparks section before the event");
   const live = eventHtml(LIVE);
   assert.match(live, /data-ev-circles[^>]*data-live/, "a running event refreshes its rooms from the office");
+  // who was there before the event has run: not shown (as before), but the block is there for the office's existing read to fill, with the build's
+  // public faces and renames on the circles section (CORE-178's live mentions read the same); an ended event with a named roster carries none
+  for (const h of [c, live]) assert.match(h, /data-ev-attend\b[^>]*data-state="unknown"[^>]*data-ev-attend-refresh[^>]*\shidden\b/);
+  assert.match(live, /data-ev-circles[^>]*data-faces="[^"]*"[^>]*data-aliases="/);
+  // (the union of #491 into #488: the faces and renames ride WHENEVER the section can mount a reader, #491's accepted F1, so an ended event's room
+  // speakers wear the one mention too; its named roster is still the bake's and is never repainted, which the data-ev-attend-refresh pin above holds)
+  assert.match(eventHtml(SUPPER), /data-ev-circles[^>]*data-faces="[^"]*"[^>]*data-aliases="/, "an ended event's rooms carry the speakers' faces (F1)");
+  assert.equal(/data-ev-attend[^>]*data-ev-attend-refresh/.test(eventHtml(SUPPER)), false, "and its named roster is still not repainted");
   // a room whose id is the NUMBER 0 is a room: drawn, linked, and mounted by its id, never lost to a truthiness check
   const circ = section(live, "data-ev-circles");
   assert.deepEqual([...circ.matchAll(/data-ev-room="([^"]+)"/g)].map((m) => m[1]), ["t1794686460000-walker-test", "0"], "both rooms, the numeric one included, in the office's order");
-  assert.ok(circ.includes('href="/conversations/#0"'), "the numeric room links to its own anchor");
+  assert.ok(circ.includes('href="/conversations/?room=0"'), "the numeric room links to its own whole talk");
   // the SAME gallery section as the ended page, once the doors are open (CORE-174 FIX): the so-far note and the known none; never before the event
   assert.match(live, /<section[^>]*id="gallery"[^>]*data-ev-gallery|<section[^>]*data-ev-gallery[^>]*id="gallery"/, "a running event has the gallery at its #gallery anchor");
   assert.ok(say(live, "data-ev-gallery").includes(EVENT_WORDS.gallery.none), "an empty gallery of a running event is said as none");
@@ -546,10 +580,10 @@ test("the drawn filters are predicates over what the producer served: events, wi
 // the cards of a page's HTML
 const cardsOf = (html) => html.split("<article").slice(1).map((c) => "<article" + c.split("</article>")[0] + "</article>").filter((c) => /class="[^"]*spark-card/.test(c));
 
-test("BUILT: every Spark card, in both event sections, is ONE real link to its canonical page: the headline anchor is stretched over the whole card, nothing nests, the other links stay", () => {
+test("BUILT: every Spark card on the event page (the one gallery) is ONE real link to its canonical page: the headline anchor is stretched over the whole card, nothing nests, the other links stay", () => {
   const html = eventHtml(SUPPER);
   const cards = cardsOf(html);
-  assert.equal(cards.length, 4, "two completion Sparks + two gallery Sparks (the pending reference is not a card)");
+  assert.equal(cards.length, 2, "the two gallery Sparks: the page draws no separate completion-Sparks group (CORE-177 ruling 5)");
   for (const card of cards) {
     const id = /data-spark="([^"]*)"/.exec(card)[1];
     const opens = [...card.matchAll(/<a\b[^>]*data-spark-open[^>]*>/g)];
@@ -581,8 +615,9 @@ test("image-first CSS contract (pinned from the card's source): the pictured car
 test("BUILT: a Spark's headline is dark on its cream card (an own colour, never the page's pale heading) and a no-picture Spark still has no empty tile", () => {
   const css = readFileSync(join(ROOT, "src/components/SparkCard.astro"), "utf8");
   assert.match(css, /\.spark-head \{[^}]*color: var\(--pm-ink\)/);
-  const guests = cardsOf(eventHtml(SUPPER)).find((c) => c.includes("harvest-supper-guests-test"));
-  assert.ok(guests && !guests.includes("data-spark-picture"), "no picture, no tile");
+  // the gallery's no-picture Spark (the completion spark that used to stand here is no longer on the event page, CORE-177 ruling 5)
+  const slice = cardsOf(eventHtml(SUPPER)).find((c) => c.includes('data-spark="supperkeeper-test/the-last-slice"'));
+  assert.ok(slice && !slice.includes("data-spark-picture"), "no picture, no tile");
 });
 
 test("BUILT: /sparks/ (register read OK) lists ONLY the register's Sparks, once each, with a whole-card link, the filters and the empty Flares place; event-carried Sparks are not relisted as global discovery; unaccepted references are absent", () => {
@@ -667,7 +702,7 @@ test("BUILT: the approved PAST layout: an ended event draws no future-tense 'Who
   assert.equal(ended.includes("data-rsvp"), false, "no RSVP section, form or closed line");
   assert.equal(t.includes("RSVPs closed"), false);
   assert.match(t, /RSVPs\s+3 residents/, "the recorded RSVP count stays in the card, as history");
-  assert.ok(ended.includes("data-ev-present"), "who was THERE is its own section (public acts), never the RSVP list");
+  assert.ok(ended.includes("data-ev-attend"), "who was THERE is the card's own roster (public acts), never the RSVP list");
   assert.match(section(ended, "data-ev-gallery"), /data-ev-onward[^>]*>\s*<a href="\/sparks\/"[^>]*>/, "the event's gallery keeps its onward row to the full /sparks/ gallery (approved mockup)");
   const live = eventHtml(LIVE);
   assert.ok(textOf(live).includes("Who is coming") && live.includes("data-rsvp"), "while it runs the page keeps its RSVP block");

@@ -22,6 +22,7 @@ import residents from "@/data/postmark/residents.json";
 import { houseOf, nameplate } from "@/lib/household.mjs";
 import { fmtDate, displayName } from "@/lib/pm.mjs";
 import { projectCards } from "@/lib/projects-page.mjs";
+import ResidentMention from "@/components/ResidentMention.astro";
 
 const TOWN_PROJECTS = "https://github.com/postmark-town/postmark/tree/main/PROJECTS";
 
@@ -61,7 +62,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
               {p.named.map((h, i) => (
                 <>
                   {i > 0 && " · "}
-                  {h.href ? <a href={h.href}>{h.label}</a> : h.label}
+                  {h.handle ? <ResidentMention handle={h.handle} /> : h.href ? <a href={h.href}>{h.label}</a> : h.label}
                   <span class="n"> ({h.commits})</span>
                 </>
               ))}

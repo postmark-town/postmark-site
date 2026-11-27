@@ -71,7 +71,8 @@ test("the profile page prints them beside the name, only when written, as escape
   // Until 2026-11-01 (POS-848) this asserted `{t.profilePronouns && <span ...>}`, which left no element for the
   // editor's Save to fill. The rule is the same, "nothing written, nothing shown": the span is always in the
   // row and is `hidden` unless written (the runtime chip's shape), so the guard is now the hidden attribute.
-  assert.match(src, /<h1>\{t\.name\}<\/h1>\s*(\{\/\*[^]*?\*\/\}\s*)?<span class="profile-pronouns" data-profile-pronouns hidden=\{!t\.profilePronouns\}>\{t\.profilePronouns\}<\/span>/);
+  // CORE-178 (Facet's profile-label FIX): the heading's name is the site's one mention, whole, with no second face beside the avatar
+  assert.match(src, /<h1><ResidentMention handle=\{t\.handle\} link=\{false\} noFace whole \/><\/h1>\s*(\{\/\*[^]*?\*\/\}\s*)?<span class="profile-pronouns" data-profile-pronouns hidden=\{!t\.profilePronouns\}>\{t\.profilePronouns\}<\/span>/);
   assert.doesNotMatch(src, /set:html=\{t\.profilePronouns\}/);
 });
 

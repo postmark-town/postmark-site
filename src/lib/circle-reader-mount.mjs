@@ -37,7 +37,8 @@ export function circleUrl(base, circleId, after) {
   return `${String(base ?? "/api").replace(/\/+$/, "")}${CONVERSATIONS}?circle=${id}${a !== null ? `&after=${a}` : ""}`;
 }
 
-async function readBody(fetchImpl, url) {
+/** One keyless read: the office's whole answer body, or a rejection for anything that is not a 200 conversations read (the reader's rule, above). */
+export async function readBody(fetchImpl, url) {
   if (!url) throw new Error("not an address the office issues");
   const res = await fetchImpl(url, { headers: { accept: "application/json" }, cache: "no-store" });
   let body = null;
@@ -81,7 +82,7 @@ export async function loadReader({ url = READER_MODULE, importImpl = (u) => impo
  * @returns {Promise<{ ok: true, reader: object, module: object } | { ok: false, why: string }>}
  *   ok:false means the reader is not here: the host keeps its floor (the caller says which, it is never an empty room).
  */
-export async function mountRoom({ doc, host, roomId, base = "/api", fetchImpl, importImpl, canReply = false, onReply = null, onNavigate = null, hrefForCircle = null, faceForSpeaker = null, hostOwnsHeader = false } = {}) {
+export async function mountRoom({ doc, host, roomId, base = "/api", fetchImpl, importImpl, canReply = false, onReply = null, onNavigate = null, hrefForCircle = null, faceForSpeaker = null, hostOwnsHeader = false, identityForSpeaker = null, onState = null, circle = null, source: given = null } = {}) {
   if (!host || !roomId) return { ok: false, why: "no room to draw" };
   const module = await loadReader({ importImpl });
   if (!module) return { ok: false, why: "the circle reader is not on this site's pinned World yet" };
@@ -91,12 +92,20 @@ export async function mountRoom({ doc, host, roomId, base = "/api", fetchImpl, i
     style.textContent = module.READER_CSS;
     (doc.head ?? doc.documentElement).append(style);
   }
-  const source = officeSource({ base, fetchImpl });
+  // the reader's reads: the keyless office reads, unless the caller hands its own (the Conversations page's door, CORE-156: one answer the page already
+  // holds is spent on the reader's first read, and the page is told each circle read), which must answer both reads
+  const source = given && typeof given.room === "function" && typeof given.circle === "function" ? given : officeSource({ base, fetchImpl });
   // CORE-128: the optional speaker-face provider (`faceForSpeaker(handle) -> a fresh decorative DOM node | null`) is handed on ONLY when the caller gave one,
   // so every caller without it (the event page, the gallery) builds the reader with exactly the options it built it with before
   // `hostOwnsHeader` (WLD-215, strictly `true`): the host already shows this room's title/live/counts/began/latest itself, so the reader leaves its own `.cr-head` out; same rule, only when given
-  const reader = module.createCircleReader({ doc, host, source, roomId, canReply, onReply, onNavigate, hrefForCircle, ...(typeof faceForSpeaker === "function" ? { faceForSpeaker } : {}), ...(hostOwnsHeader === true ? { hostOwnsHeader: true } : {}) });
-  await reader.showRoom(roomId);
+  // `onState` (the reader's room/circle/unavailable signal) is handed on only when given, as the face provider is (CORE-177: the conversations page's door
+  // mounts through here now, and it is the one caller that listens)
+  // CORE-178 / WLD-248: the optional speaker identity (`identityForSpeaker(handle) -> a fresh accessible Element | null`, the site's one resident mention,
+  // resident-identity.mjs) replaces a byline's face and name; same rule, handed on only when the caller gave one
+  const reader = module.createCircleReader({ doc, host, source, roomId, canReply, onReply, onNavigate, hrefForCircle, ...(typeof onState === "function" ? { onState } : {}), ...(typeof faceForSpeaker === "function" ? { faceForSpeaker } : {}), ...(typeof identityForSpeaker === "function" ? { identityForSpeaker } : {}), ...(hostOwnsHeader === true ? { hostOwnsHeader: true } : {}) });
+  // a selected conversation (CORE-117) opens on its circle, with its room one named step back; otherwise the reader opens on its room
+  if (circle !== null && circle !== undefined) await reader.showCircle(circle);
+  else await reader.showRoom(roomId);
   return { ok: true, reader, module };
 }
 

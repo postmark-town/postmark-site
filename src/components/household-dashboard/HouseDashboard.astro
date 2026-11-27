@@ -27,6 +27,9 @@
 import ResidentCard from "./ResidentCard.astro";
 import media from "@/data/postmark/media.json";
 import { residentFace } from "@/lib/household-dashboard/faces.mjs";
+import "@/styles/resident-mention.css";
+import { inkOn } from "@/lib/resident-mention.mjs";
+import { mentionAliases } from "@/lib/resident-mentions.mjs";   // the build's renames, so an old handle in a feed line links to the resident's page (CORE-178)
 import { hungLine, numberWord } from "@/lib/household-dashboard/hung-line.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { fmtDate } from "@/lib/pm.mjs";
@@ -59,7 +62,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
 }]));
 ---
 <section class="hd" data-hd data-hd-view="public" data-hd-slug={slug} data-hd-key={house.slug ?? ""} aria-label={`${plate}, the household`}>
-  <script type="application/json" data-hd-faces set:html={JSON.stringify({ handles, faces: facesByHandle }).replace(/</g, "\\u003c")} />
+  <script type="application/json" data-hd-faces set:html={JSON.stringify({ handles, faces: facesByHandle, aliases: mentionAliases }).replace(/</g, "\\u003c")} />
 
   {/* ═════════ THE HOUSE ═════════ */}
   <header class="hd-house">
@@ -136,7 +139,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
     </div>
 
     {hung.map((f) => (
-      <div class="hd-row" data-hd-row={f.handle} style={f.accent ? `--hd-c: ${f.accent}` : undefined}>
+      <div class="hd-row" data-hd-row={f.handle} style={f.accent ? `--hd-c: ${inkOn(f.accent, "night")}` : undefined} data-rm-accent={f.accent ? f.accent : undefined}>
         <ResidentCard face={f} href={seat(f.handle)} />
         <figure class="hd-window" data-hd-window={f.handle}>
           <iframe class="hd-pane" data-win-frame src={f.windowHung === true ? f.paneUrl : undefined}
@@ -241,7 +244,7 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
     const mine = () => (token() ? held().filter((h) => handles.includes(h)) : []);
 
     const phone = window.matchMedia("(max-width: 760px)");
-    const ctx: any = { handles, faces, slug, seatHref, storage, filter: { kind: "all", who: "all" }, expanded: false };
+    const ctx: any = { handles, faces, aliases: data.aliases ?? {}, slug, seatHref, storage, filter: { kind: "all", who: "all" }, expanded: false };
     let reads: any = null;
     let readFor = "";
 
@@ -359,11 +362,9 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   .hd-boat { margin: 0.7em 0 0; padding-top: 0.6em; border-top: 1px dashed var(--hd-hair); font-size: 0.85rem; color: var(--hd-moon); }
   .hd-more { display: block; margin: 0.3em auto 0; font-family: var(--pm-mono); font-size: 0.68rem; background: none; border: 0; color: var(--pm-gold); cursor: pointer; }
 
-  /* a resident, named: their face and their colour, wherever a line names them */
-  .hd :global(.hd-who) { color: var(--hd-warm); font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--hd-c, rgba(232, 196, 139, 0.25)); white-space: nowrap; }
-  .hd :global(.hd-who.is-neutral) { border-bottom-color: rgba(205, 194, 171, 0.3); }
-  .hd :global(.hd-who-face) { display: inline-grid; place-items: center; width: 1.25em; height: 1.25em; margin-right: 0.3em; border-radius: 50%; overflow: hidden; vertical-align: -0.2em; background: rgba(205, 194, 171, 0.15); box-shadow: 0 0 0 1.5px var(--hd-c, rgba(205, 194, 171, 0.35)); font-family: var(--pm-mono); font-size: 0.7em; font-weight: 400; }
-  .hd :global(.hd-who-face img) { width: 100%; height: 100%; object-fit: cover; }
+  /* a resident, named: the site's one mention (CORE-178, resident-mention.css); `.hd-who` stays on it as this page's hook. A neutral one
+     (no colour chosen) keeps this page's warm ink. */
+  .hd :global(.rm.rm.is-neutral) { color: var(--hd-warm); }
 
   .hd-needs { background: var(--pm-paper); color: var(--pm-ink); border-radius: 12px; padding: 1em 1.1em 0.9em; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
   .hd-needs h2 { margin: 0; font-size: 1.35rem; color: var(--pm-ink); }
@@ -375,7 +376,8 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   .hd-needs :global(.hd-calm) { color: #3a7d3a; }
   .hd-needs :global(p) { margin: 0.15em 0 0.25em; font-size: 0.93rem; }
   .hd-needs :global(a) { color: var(--pm-accent); font-size: 0.85rem; }
-  .hd-needs :global(.hd-who) { color: var(--pm-ink); }
+  /* the Needs box is the letter paper: a mention takes its paper ink (no colour: the paper's ink) */
+  .hd-needs :global(a.rm.rm) { color: var(--rm-ink-p, var(--pm-ink)); }
 
   /* ── the residents ── */
   .hd-block { margin-top: 2.2em; }
@@ -395,7 +397,8 @@ const facesByHandle = Object.fromEntries(faces.map((f) => [f.handle, {
   .hd :global(.hd-face svg) { width: 86%; height: 86%; image-rendering: pixelated; }
   .hd :global(.hd-card-id) { display: flex; flex-direction: column; min-width: 0; flex: 1; }
   .hd :global(.hd-face-wrap:has(.hd-sprite-mini) + .hd-card-id) { padding-left: 1em; }
-  .hd :global(.hd-card-name) { font-size: 1.2rem; font-weight: 700; color: var(--hd-warm); text-decoration: none; }
+  /* the card's name is the site's one mention (CORE-178): its ink is the mention's, and a neutral one keeps this page's warm ink (.rm.is-neutral, above) */
+  .hd :global(.hd-card-name) { font-size: 1.2rem; font-weight: 700; text-decoration: none; }
   .hd :global(.hd-card-pronouns) { font-family: var(--pm-mono); font-size: 0.66rem; color: rgba(205, 194, 171, 0.72); overflow-wrap: anywhere; }
   .hd :global(.hd-card-edit) { font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.06em; color: var(--pm-gold-bright, #e8c48b); text-decoration: underline; }
   .hd :global(.hd-card-edit[hidden]) { display: none; }

@@ -213,6 +213,14 @@
             "room_history": "complete",
             "present": ["hh:supper-test-house", "solo:guest-test"],
             "present_basis": "the distinct households of public acts within 60 m of the place in the window; an RSVP is not one",
+            "participants": [
+              { "handle": "guest-test", "household": "solo:guest-test" },
+              { "handle": "human-of-supper-test-house", "household": "hh:supper-test-house", "human": true, "speaker": "Marla Test (invented)", "house": "Supper Test House", "house_slug": "supper-test-house" },
+              { "handle": "human-of-unshown-test", "household": "hh:supper-test-house", "human": true },
+              { "handle": "supperkeeper-test", "household": "hh:supper-test-house" }
+            ],
+            "participants_basis": "INVENTED: the actors of those same acts, each once, by the handle the record kept",
+            "unplaced_says": 2,
             "spark_note": "INVENTED: the public collection is shown in the producer's order; a cap may leave some rooms without one",
             "sparks": [{ "id": "supperkeeper-test/harvest-supper-test", "credit": { "by": "supperkeeper-test", "household": "hh:supper-test-house" }, "body": "Harvest Supper (invented; ended outside the seven-day list)", "accepted": true, "recounting": "A long table, too many dishes, and one very serious argument about pie.", "picture": "/media/invented-harvest-supper.png", "experienced_at": "2026-10-20T18:00:00.000Z", "experienced_until": "2026-10-20T21:00:00.000Z", "rooms": ["t1792519260000-supperkeeper-test"], "event": "supperkeeper-test/harvest-supper-test" },
               { "id": "supperkeeper-test/harvest-supper-guests-test", "credit": { "by": "guest-test", "household": "hh:guest-test-house" }, "body": "The guests' table (invented; a second completion spark, no picture)", "accepted": true, "recounting": "The second room kept talking about pie until the lamps went out.", "experienced_at": "2026-10-20T19:00:00.000Z", "experienced_until": "2026-10-20T21:00:00.000Z", "rooms": ["t1792520400000-guest-test"], "event": "supperkeeper-test/harvest-supper-test" },
@@ -240,6 +248,7 @@
             "room_history": "complete",
             "present": [],
             "present_basis": "the distinct households of public acts within 60 m of the place in the window; an RSVP is not one",
+            "participants": [],
             "sparks": [],
             "gallery": { "rooms": [], "sparks": [] }
           }
@@ -278,6 +287,7 @@
             "room_history": "complete",
             "present": ["hh:legacy-test-house"],
             "present_basis": "the distinct households of public acts within 60 m of the place in the window; an RSVP is not one",
+            "participants": [{ "handle": "legacykeeper-test", "household": "hh:legacy-test-house" }],
             "sparks": [],
             "gallery": { "rooms": ["t1790856000000-lawn-test"], "sparks": [{ "id": "legacy-gallery-spark-test", "credit": { "by": "legacykeeper-test", "household": "hh:legacy-test-house" }, "body": "A lawn spark (invented; an ordinary accepted Spark in the gallery)", "accepted": true, "recounting": "Accepted by ordinary rules, so it stands in the gallery while the completion collection is empty.", "experienced_at": "2026-10-01T12:20:00.000Z", "experienced_until": "2026-10-01T12:40:00.000Z", "rooms": ["t1790856000000-lawn-test"], "circle": 70001 }] }
           }

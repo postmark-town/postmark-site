@@ -117,11 +117,39 @@ export function evidenceRead(event, events) {
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
+// what a human's own hand may carry beside its handle (the public presentation a conversation's line carries); a resident carries none of it
+const HUMAN_FIELDS = ["speaker", "house", "house_slug", "town_name", "pronouns"];
+
+/**
+ * WHO WAS THERE, BY NAME (CORE-177; office POS-1217): the evidence's `participants`, the actors of the public acts at the event, each
+ * `{ handle, household, human? }`. A DISTINCT state, never read from `present` (households) or the RSVPs: an array is KNOWN (maybe empty),
+ * anything else is UNKNOWN. Each person once, in the office's order (it sorts by handle); a resident keeps its handle and household only (how
+ * a resident is drawn is the site's one mention), a human (`human: true`, a human's own hand) also its public presentation. Pure.
+ */
+export function participantsOf(ev) {
+  const basis = typeof ev?.participants_basis === "string" && ev.participants_basis.trim() ? ev.participants_basis.trim() : null;
+  if (!Array.isArray(ev?.participants)) return { state: "unknown", basis };
+  const seen = new Set();
+  const people = [];
+  for (const p of ev.participants) {
+    if (!isObj(p) || typeof p.handle !== "string" || p.handle === "" || seen.has(p.handle)) continue;
+    seen.add(p.handle);
+    const person = { handle: p.handle, household: typeof p.household === "string" ? p.household : null };
+    if (p.human === true) {
+      person.human = true;
+      for (const k of HUMAN_FIELDS) if (typeof p[k] === "string" && p[k].trim()) person[k] = p[k].trim();
+    }
+    people.push(person);
+  }
+  return { state: "known", people, basis, unplaced: Number(ev.unplaced_says) > 0 ? Number(ev.unplaced_says) : 0 };
+}
+
 /**
  * The states of one event page, from the office's own fields and nothing else. Pure.
  *
  *   circles   before | rooms | none | unavailable | cancelled
  *   present   unknown | known (list, maybe empty)
+ *   participants  unknown | known (people, maybe empty): participantsOf
  *   sparks    none | known (items: spark | reference, in the producer's order) | unavailable | unknown
  *   gallery   unknown | known (sparks, maybe empty)
  *
@@ -136,12 +164,12 @@ export function eventSections(event) {
   const out = { after, cancelled, phase };
   if (cancelled) {
     // "never on a cancelled event": the office serves no evidence, so there is nothing to say and nothing is claimed.
-    return { ...out, circles: { state: "cancelled" }, present: { state: "unknown" }, sparks: { state: "unknown", items: [] }, gallery: { state: "unknown" } };
+    return { ...out, circles: { state: "cancelled" }, present: { state: "unknown" }, participants: { state: "unknown", basis: null }, sparks: { state: "unknown", items: [] }, gallery: { state: "unknown" } };
   }
   if (!ev) {
     const before = phase === "announced";
     const gone = { state: before ? "before" : "unavailable" };
-    return { ...out, circles: gone, present: { state: "unknown", before }, sparks: { state: before ? "none" : "unknown", before, items: [] }, gallery: { state: "unknown", before } };
+    return { ...out, circles: gone, present: { state: "unknown", before }, participants: { state: "unknown", basis: null, before }, sparks: { state: before ? "none" : "unknown", before, items: [] }, gallery: { state: "unknown", before } };
   }
   // circles: every qualifying room, in the office's start order, never ranked or chosen
   const rooms = Array.isArray(ev.rooms) ? ev.rooms : null;
@@ -175,7 +203,7 @@ export function eventSections(event) {
     // `complete` is the producer's own flag: true is complete, false is "so far", and an ABSENT or non-boolean flag is UNKNOWN (null), never complete
     gallery = { state: "known", rooms: Array.isArray(ev.gallery.rooms) ? ev.gallery.rooms : [], sparks: ev.gallery.sparks, complete: typeof ev.complete === "boolean" ? ev.complete : null, note: typeof ev.gallery_note === "string" ? ev.gallery_note : null };
   } else gallery = { state: "unknown", note: typeof ev.gallery_note === "string" ? ev.gallery_note : null };
-  return { ...out, circles, present, sparks, gallery, window: isObj(ev.window) ? ev.window : null, complete: ev.complete === true };
+  return { ...out, circles, present, participants: participantsOf(ev), sparks, gallery, window: isObj(ev.window) ? ev.window : null, complete: ev.complete === true };
 }
 
 /**
@@ -194,6 +222,14 @@ export function pictureOf(spark) {
 
 /** A room's anchor on the conversations page: the one place the whole transcript lives. */
 export const roomHref = (id) => `/conversations/#${encodeURIComponent(String(id ?? ""))}`;
+
+/**
+ * A room's WHOLE conversation on the conversations page (CORE-177): `?room=<id>` opens that room in the page's one-conversation view through the
+ * office's named room read, which resolves the id as the record wrote it (a historical room too) and answers with the room's own header. Unlike the
+ * card anchor above it needs no list page to hold the room, and as a query it never shares the anchor's fragment namespace. The id is passed as
+ * written, never rewritten.
+ */
+export const roomPermalink = (id) => `/conversations/?room=${encodeURIComponent(String(id ?? ""))}`;
 
 /**
  * A room id is OPAQUE: a non-empty string or a finite number (`room.id` may be numeric, and 0 is a number, not an absence). Tested by type, never by
@@ -221,6 +257,8 @@ export const EVENT_WORDS = Object.freeze({
     noReader: "The circles show here once the page can load the town's reader; the whole talk is on the conversations page.",
     noJs: "The circles load with JavaScript. Without it, each room's whole talk is on the conversations page:",
     loadFailed: "This room's circles couldn't be loaded.",
+    // CORE-177: inside a shut room, the way to the room's whole talk on the Conversations page
+    whole: "The whole conversation, on the conversations page",
   },
   present: {
     title: "Who was there",
@@ -228,6 +266,13 @@ export const EVENT_WORDS = Object.freeze({
     none: "No public act at the place during the event is on record.",
     unknown: "Who was there couldn't be read, so this page cannot say. That is not the same as no one.",
     before: "Who was there is shown once the event has run.",
+  },
+  // CORE-177: the card's compact who-was-there, by name (participantsOf). Its own words: the household wording above is not valid for an actor list
+  attendance: {
+    title: "Who was there",
+    lead: "Recorded attendees, from public acts at the event. An RSVP alone does not count.",
+    none: "No individual attendees are recorded.",
+    unknown: "Individual attendance isn't available here.",
   },
   sparks: {
     title: "The sparks",
@@ -430,10 +475,29 @@ export function referenceInstant(calendar, now = new Date()) {
   return now.toISOString();
 }
 
-/** Every month that gets a page, oldest first. */
-export function monthsOf(calendar, ref) {
+// PAST EVENTS LIVE ON THE CALENDAR (CORE-177, Darko 2026-11-24 08:43 EST: "Calendar should be where the past events live. That should be
+// where you can click them … We just need to make sure that the past events are findable on the calendar."). The months and their grids
+// read the same events the event pages are built from, allEventViews: the calendar's three lists and the office's lasting list
+// (events.json), so an event that ended past the calendar's seven days is still on its day, linking to its page. That is the inventory
+// the build actually holds, nothing fetched or dated here, and no claim that it is every event there ever was.
+//
+// AN EVENT IS PAST BY THE OFFICE'S WORD, never by the clock (which group an event is in is the office's, above): its phase is "ended", or
+// the office lists it as ended (the calendar's `ended` group, or the lasting list, which holds only ended events). A grid entry carries it
+// as `past`, and the month draws it greyed, as calendars do.
+
+/** The events a month is drawn from: allEventViews over the calendar and the lasting list, each marked `past` by the office's word. */
+export function calendarEvents(calendar, events) {
+  const ended = new Set([
+    ...(Array.isArray(calendar?.ended) ? calendar.ended : []),
+    ...(Array.isArray(events?.past?.events) ? events.past.events : []),
+  ].map((e) => e?.id));
+  return allEventViews(calendar, events).map((e) => ({ ...e, past: e.phase === "ended" || ended.has(e.id) }));
+}
+
+/** Every month that gets a page, oldest first. `events` is the lasting list (events.json): its months get pages too. */
+export function monthsOf(calendar, ref, events) {
   const refMonth = monthKey(ref);
-  const starts = eventsOf(calendar).map((e) => monthKey(e.starts)).filter(Boolean).sort();
+  const starts = calendarEvents(calendar, events).map((e) => monthKey(e.starts)).filter(Boolean).sort();
   let first = refMonth;
   let last = shiftMonth(refMonth, 1);
   if (starts.length && starts[0] < first) first = starts[0];
@@ -447,13 +511,16 @@ export function monthsOf(calendar, ref) {
  * One month as the page draws it: whole weeks, Sunday first, with the days of
  * the months on either side filling the first and last rows (marked out of the
  * month, and carrying their events too, so a reader at a month's edge sees the
- * week whole). Each day holds the events that start on it, earliest first.
- * `prev` and `next` are null past the first and last month that has a page.
+ * week whole). Each day holds the events that start on it, earliest first,
+ * each marked `past` by the office's word (calendarEvents). `events` is the
+ * lasting list (events.json). `prev` and `next` are null past the first and
+ * last month that has a page.
  */
-export function monthGrid(calendar, key, ref, months = monthsOf(calendar, ref)) {
+export function monthGrid(calendar, key, ref, months, events) {
   if (!isMonthKey(key)) throw new Error(`monthGrid: "${key}" is not a YYYY-MM month`);
+  months = months ?? monthsOf(calendar, ref, events);
   const byDay = new Map();
-  for (const e of eventsOf(calendar)) {
+  for (const e of calendarEvents(calendar, events)) {
     const k = dayKey(e.starts);
     if (!k) continue;
     if (!byDay.has(k)) byDay.set(k, []);

@@ -14,6 +14,8 @@
 
 import { marksOf, mailOf, postsOf, townEventsOf, placesOf, chartOf, countdownOf, leftWords } from "./fold.mjs";
 import { feedOf, whenOf, dayWordOf, NOT_READING } from "../household-dashboard/fold.mjs";
+import { inkOn, mentionModel, mentionNode } from "../resident-mention.mjs";
+import { resolveHandle } from "../resident-identity.mjs";
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -25,11 +27,15 @@ const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const clip = (s, max) => (s.length > max ? s.slice(0, max - 1).trimEnd() + "…" : s);
 const nameOf = (faces, h) => faces[h]?.name ?? h;
 
+/** A resident of the house, named: the site's one mention (CORE-178), keeping `hx-who` as the stage's hook. */
 function resident(faces, handle, seatHref) {
-  const a = el("a", "hx-who", nameOf(faces, handle));
-  a.href = seatHref(handle);
-  if (faces[handle]?.accent) a.style.setProperty("--hd-c", faces[handle].accent);
-  return a;
+  return mentionNode(document, mentionModel({ handle, face: faces[handle] ?? null, href: seatHref(handle) }), { cls: "hx-who" });
+}
+/** Someone outside the house: the neutral mention to their page (no face for them here); a house's human is text. */
+function outsider(handle, aliases = null) {
+  const cur = resolveHandle(handle, aliases);   // an old handle is its resident's current one (the page's build renames)
+  const m = mentionModel({ handle: cur, face: null, href: `/residents/${encodeURIComponent(cur)}/` });
+  return m.kind === "resident" ? mentionNode(document, m) : document.createTextNode(handle);
 }
 
 /** One list slot: its `<ul>`, emptied, with a line for "could not read" or "nothing". */
@@ -115,7 +121,11 @@ export function paintTown(root, reads, ctx) {
     a.href = "/calendar/" + e.id.split("/").map(encodeURIComponent).join("/") + "/";
     li.appendChild(a);
     const when = e.starts != null ? dayWordOf(e.starts, ctx.now) + ", " + new Date(e.starts).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null;
-    li.appendChild(el("span", "hx-when", " · " + [when, e.place, e.host && "hosted by " + nameOf(ctx.faces, e.host)].filter(Boolean).join(" · ")));
+    const meta = el("span", "hx-when", " · " + [when, e.place, e.host && "hosted by "].filter(Boolean).join(" · "));
+    // CORE-178: the host named as the site names a resident: the house's face for a host of this house, else the honest neutral one (no face on
+    // this page for another house's resident; no new read)
+    if (e.host) meta.appendChild(ctx.faces[e.host] ? resident(ctx.faces, e.host, ctx.seatHref) : outsider(e.host, ctx.aliases));
+    li.appendChild(meta);
     ul.appendChild(li);
   }
 }
@@ -155,7 +165,13 @@ export function paintChart(root, reads, ctx) {
     track.setAttribute("aria-label", `${nameOf(ctx.faces, r.handle)}: ${label}`);
     const fill = el("i");
     fill.style.width = r.held == null ? "0%" : Math.max(r.held > 0 ? 2 : 0, Math.round(r.share * 100)) + "%";
-    if (ctx.faces[r.handle]?.accent) fill.style.background = ctx.faces[r.handle].accent;
+    // the bar wears the resident's colour at readable darkness (CORE-178, Darko a), re-inked for a design's own glass by the stage (data-rm-accent)
+    const accent = ctx.faces[r.handle]?.accent;
+    if (accent && inkOn(accent, "night")) {
+      fill.style.setProperty("--hd-c", inkOn(accent, "night"));
+      fill.style.background = "var(--hd-c)";
+      fill.setAttribute("data-rm-accent", accent);
+    }
     track.appendChild(fill);
     row.appendChild(track);
     row.appendChild(el("span", "hx-bar-n", r.held == null ? "—" : String(r.held)));

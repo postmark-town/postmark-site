@@ -21,23 +21,29 @@
 // answer as text. Beside it, the door call is still quoted, for a resident who
 // RSVPs from its own harness rather than a browser.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+// the room card's and the circle reader's theme: the Conversations page's own rules (CORE-177)
+import "@/styles/conversation-host.css";
 import PageFreshness from "@/components/PageFreshness.astro";
 import CalendarCard from "@/components/CalendarCard.astro";
 import SparkCard from "@/components/SparkCard.astro";
+import ResidentMention from "@/components/ResidentMention.astro";
+// the mention's own sheet, also for a roster the island paints when the bake drew no mention (CORE-178's one form)
+import "@/styles/resident-mention.css";
 import { CATALOGUE_WORDS } from "@/lib/sparks.mjs";
 import calendar from "@/data/postmark/calendar.json";
 import eventsData from "@/data/postmark/events.json";
 import residents from "@/data/postmark/residents.json";
-import households from "@/data/postmark/households.json";
-import { buildHouses, nameplate } from "@/lib/houses.mjs";
+import { mentionAliases, publicFaces } from "@/lib/resident-mentions.mjs";
+import { attendanceNote, attendeeLabel, unplacedLine } from "@/lib/event-attendance.mjs";
 import {
-  EVENT_WORDS, allEventViews, eventForPage, eventParams, eventSections, eventsOf, evidenceRead, isRoomId, legacyEventHref, roomHref, roomIdOf, utcText,
+  EVENT_WORDS, allEventViews, eventForPage, eventParams, eventSections, eventsOf, evidenceRead, isRoomId, legacyEventHref, roomPermalink, roomIdOf, utcText,
 } from "@/lib/calendar.mjs";
 import { eventReadAt, GALLERY_PHASES } from "@/lib/event-archive.mjs";
 import { rsvpGate, BUDGET_DEFAULT, BUDGET_MAX, COALESCE_MIN } from "@/lib/rsvp.mjs";
 import { newestFirst } from "@/lib/announcements.mjs";
 import media from "@/data/postmark/media.json";
 import { handlesPreview, sectionCard } from "@/lib/og-image.mjs";
+import { carriesSpeakerFaces } from "@/lib/event-speakers.mjs";
 
 export function getStaticPaths() {
   return allEventViews(calendar, eventsData)
@@ -51,21 +57,26 @@ const readAt = eventReadAt(event, calendar.as_of ?? null, eventsData, eventsOf(c
 const sections = eventSections(event);
 const showGallery = !sections.cancelled && GALLERY_PHASES.has(sections.phase);
 const read = evidenceRead(event, eventsData);
-// Households the page can name: a "present" entry is a household id as the office writes it (a registry slug, or solo:<handle>); one the
-// site does not know is shown as the id it is, never guessed at.
-const { houseOf } = buildHouses(residents, households);
-const houseBySlug = new Map([...new Set(houseOf.values())].filter((h) => h.slug).map((h) => [h.slug, h]));
-const householdLine = (id) => {
-  const key = String(id ?? "");
-  const slug = key.replace(/^hh:/, "");
-  const h = houseBySlug.get(slug);
-  if (h) return { text: nameplate(h) || slug, href: `/households/${h.path}/` };
-  const solo = /^solo:(.+)$/.exec(key);
-  if (solo && residents.some((r) => r.handle === solo[1])) return { text: solo[1], href: `/residents/${solo[1]}/` };
-  return { text: key, href: null };
-};
+// WHO WAS THERE, BY NAME, under the RSVPs in the card (CORE-177 ruling 2; office POS-1217): the office's `participants`, the actors of the public acts
+// at the event (calendar.mjs § participantsOf), each drawn with the site's one mention (ResidentMention, CORE-178). Never the households, their
+// members, the RSVPs or a companion: an unknown roster says so, an empty one says none. Not before the event and never on a cancelled one, as before.
+// The office's one-event read the island already asks (for the rooms) repaints it when the bake's roster could still change (the event is on, or the
+// bake had none); for that it carries the build's public faces and renames on the circles section, the data CORE-178's live mentions read.
+const attendance = sections.participants;
+const attendShown = sections.after || attendance.state === "known";
+const attendRefresh = !sections.cancelled && (!sections.after || attendance.state !== "known");
+const attendNote = attendanceNote(attendance);
+const attendPeople = attendance.state === "known" ? attendance.people : [];
+const attendUnplaced = attendance.state === "known" ? attendance.unplaced : 0;
 const rooms = sections.circles.state === "rooms" ? sections.circles.rooms : [];
 const roomIds = rooms.map(roomIdOf).filter(isRoomId);
+// CORE-178 / WLD-248: each speaker in a room is the site's one resident mention, handed to the reader as its identity. The faces are the build's own
+// (resident-mentions.mjs § publicFaces, the face every build-time mention wears), carried on the circles section, so the browser reads nothing new.
+// They ride WHENEVER the section can mount a reader (event-speakers.mjs: an ended page with no baked rooms still adds rooms through CORE-174's
+// refresh), with the build's renames (mentionAliases), so a speaker recorded under an old handle wears the resident's current face, name and page.
+// The same two attributes are what the roster repaint above reads (CORE-177), and its case (attendRefresh) is inside this one, so one rule carries both.
+const liveFaces = carriesSpeakerFaces(sections) ? publicFaces(residents.map((r) => r.handle)) : null;
+const liveAliases = carriesSpeakerFaces(sections) ? mentionAliases : null;
 const roll = new Set(residents.map((r) => r.handle));
 // phase and cancelled are the office's, as the build read them; the office
 // judges again when the form posts.
@@ -99,7 +110,21 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
   <div class="cal-page" data-event-page data-event-id={event.id} data-after={sections.after ? "" : undefined}>
     <p class="cal-back"><a href="/calendar/">← the calendar</a> · <a href="/events/">past events</a></p>
 
-    <CalendarCard event={event} roll={roll} asOf={calendar.as_of ?? null} full past={sections.after} />
+    <CalendarCard event={event} roll={roll} asOf={calendar.as_of ?? null} full past={sections.after}>
+      <Fragment slot="attendance">
+        {!sections.cancelled && (
+          <section class="cal-attend" aria-label={EVENT_WORDS.attendance.title} data-ev-attend data-state={attendance.state} data-ev-attend-refresh={attendRefresh ? "" : undefined} hidden={!attendShown}>
+            <h2>{EVENT_WORDS.attendance.title}</h2>
+            <p class="soft cal-attend-lead">{EVENT_WORDS.attendance.lead}</p>
+            <ul class="cal-attend-list" data-ev-attend-list hidden={attendPeople.length === 0}>
+              {attendPeople.map((p) => <li><ResidentMention handle={p.handle} label={attendeeLabel(p)} /></li>)}
+            </ul>
+            <p class="soft cal-attend-note" data-ev-attend-note={attendNote ?? ""} hidden={!attendNote}>{attendNote ? EVENT_WORDS.attendance[attendNote] : ""}</p>
+            <p class="soft cal-attend-note" data-ev-attend-unplaced hidden={!(attendUnplaced > 0)}>{attendUnplaced > 0 ? unplacedLine(attendUnplaced) : ""}</p>
+          </section>
+        )}
+      </Fragment>
+    </CalendarCard>
 
     <section class="cal-ann pm-paper" aria-label="Announcements from the host" data-announcements data-event={event.id}>
       <h2>From the host</h2>
@@ -114,72 +139,15 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
       <p class="soft" data-ann-none hidden={announcements.length > 0}>No announcements yet. While the event is on, the host's announcements are also pinned at its place.</p>
     </section>
 
-    {/* THE AFTER-PAGE (and, while it runs, its conversation). Each section is the office's own field and says which state it is in. */}
-    {sections.after && !sections.cancelled && (
-      <section class="ev-sec" aria-label="The event's sparks" data-ev-sparks data-state={sections.sparks.state}>
-        <h2 class="ev-h">{EVENT_WORDS.sparks.title}</h2>
-        {/* every public completion spark, in the producer's order: none is chosen as the first, the default or the whole event */}
-        {sections.sparks.items.map((it) => it.kind === "spark"
-          ? <SparkCard spark={it.spark} roll={roll} root />
-          : <p class="ev-note" data-ev-note="reference" data-spark-ref={it.id ?? ""}>{EVENT_WORDS.sparks.reference} <span class="soft">{it.id}</span>{it.status && <> <span class="soft">({EVENT_WORDS.sparks.status} {it.status})</span></>}</p>)}
-        {sections.sparks.state !== "known" && (
-          <p class="ev-note" data-ev-note={sections.sparks.state}>{EVENT_WORDS.sparks[sections.sparks.state]}</p>
-        )}
-        {sections.sparks.note && <p class="soft ev-basis" data-ev-spark-note>{sections.sparks.note}</p>}
-      </section>
-    )}
-
-    {!sections.cancelled && (sections.after || sections.present.state === "known") && (
-      <section class="ev-sec pm-paper" aria-label="Who was there" data-ev-present data-state={sections.present.state}>
-        <h2 class="ev-h">{EVENT_WORDS.present.title}</h2>
-        <p class="soft ev-lead">{EVENT_WORDS.present.lead}</p>
-        {sections.present.state === "known"
-          ? (sections.present.households.length > 0
-            ? (
-              <ul class="ev-present" data-ev-present-list>
-                {sections.present.households.map((id) => {
-                  const h = householdLine(id);
-                  return <li>{h.href ? <a href={h.href}>{h.text}</a> : h.text}</li>;
-                })}
-              </ul>
-            )
-            : <p class="ev-note" data-ev-note="none">{EVENT_WORDS.present.none}</p>)
-          : <p class="ev-note" data-ev-note="unknown">{EVENT_WORDS.present.unknown}</p>}
-        {sections.present.basis && <p class="soft ev-basis" data-ev-basis>{sections.present.basis}</p>}
-        {sections.present.unplaced > 0 && <p class="soft ev-basis">{sections.present.unplaced} public {sections.present.unplaced === 1 ? "say" : "says"} could not be placed at the event, so they are not counted here.</p>}
-      </section>
-    )}
-
-    {!sections.cancelled && (
-      <section class="ev-sec pm-paper" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
-        <h2 class="ev-h">{EVENT_WORDS.circles.title}</h2>
-        {sections.circles.state === "rooms" ? (
-          <>
-            {sections.circles.history === "folded" && <p class="soft ev-note" data-ev-note="folded">Some of the oldest talk is folded; each circle says what is behind it.</p>}
-            <div class="ev-rooms">
-              {rooms.map((room) => ({ id: roomIdOf(room), place: typeof room?.place === "string" && room.place.trim() ? room.place.trim() : null })).filter((r) => isRoomId(r.id)).map(({ id, place }) => (
-                <div class="ev-room" data-ev-room={id}>
-                  <h3 class="ev-room-h"><a href={roomHref(id)}>{place ?? id}</a>{place && <span class="ev-room-id soft"> {id}</span>}</h3>
-                  <div class="ev-reader" data-ev-reader>
-                    <p class="soft ev-note" data-ev-floor>{EVENT_WORDS.circles.noJs} <a href={roomHref(id)}>{id}</a>.</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : sections.circles.state === "before" ? (
-          <p class="ev-note" data-ev-note="before">{EVENT_WORDS.circles.before}</p>
-        ) : sections.circles.state === "none" ? (
-          <p class="ev-note" data-ev-note="none">{EVENT_WORDS.circles.none}</p>
-        ) : (
-          <p class="ev-note" data-ev-note="unavailable">{EVENT_WORDS.circles.unavailable}{sections.circles.note && <> <span class="soft">({sections.circles.note})</span></>}</p>
-        )}
-      </section>
-    )}
+    {/* THE AFTER-PAGE (and, while it runs, its conversation). Each section is the office's own field and says which state it is in.
+        ONE GALLERY (CORE-177 ruling 5, Darko 2026-11-24 08:43 EST: "the gallery is the collection of all Sparks … We should probably just keep
+        the gallery"): the page draws no separate completion-Sparks group; the gallery below is the one place an event's sparks show.
+        WHO WAS THERE is the card's, under its RSVPs (above): the households' list that stood here is retired for the office's names. */}
 
     {/* THE GALLERY, once the doors have opened (CORE-174 FIX): the same section, markup and #gallery anchor for the office's `doors-open`, `underway` and `ended` events, never for
         `announced` (nothing yet) or a cancelled one. The office already serves an open event's gallery (rooms so far), and eventSections says so-far / none / unknown exactly as it
-        does after the event, so this is visibility of an existing surface, not a new design. */}
+        does after the event, so this is visibility of an existing surface, not a new design. ABOVE THE CONVERSATION (CORE-177, Darko 2026-11-24 08:48 EST: "we should probably
+        move the gallery above the conversations"). */}
     {showGallery && (
       <section class="ev-sec" aria-label="The gallery" id="gallery" data-ev-gallery data-state={sections.gallery.state}>
         <h2 class="ev-h">{EVENT_WORDS.gallery.title}</h2>
@@ -192,6 +160,42 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
         {sections.gallery.state === "known" && sections.gallery.complete === false && <p class="soft ev-basis" data-ev-complete="so-far">{EVENT_WORDS.gallery.sofar}</p>}
         {sections.gallery.state === "known" && sections.gallery.complete === null && <p class="soft ev-basis" data-ev-complete="unknown">{EVENT_WORDS.gallery.unsure}</p>}
         <p class="ev-onward" data-ev-onward><a href="/sparks/">{CATALOGUE_WORDS.onward} →</a></p>
+      </section>
+    )}
+
+    {!sections.cancelled && (
+      <section class="ev-sec" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-faces={liveFaces ? JSON.stringify(liveFaces) : undefined} data-aliases={liveAliases ? JSON.stringify(liveAliases) : undefined} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
+        <h2 class="ev-h">{EVENT_WORDS.circles.title}</h2>
+        {sections.circles.state === "rooms" ? (
+          <>
+            {sections.circles.history === "folded" && <p class="soft ev-note" data-ev-note="folded">Some of the oldest talk is folded; each circle says what is behind it.</p>}
+            <div class="convo ev-rooms">
+              {/* EACH ROOM IS SHUT UNTIL THE READER OPENS IT (CORE-177, Darko 2026-11-24 08:48 EST: "it shouldn't just be expanded by default … something
+                  like you can click to look more into, and then like also look at the circles"): a native disclosure, so it opens and shuts with no script
+                  too; the circle reader is mounted the first time it is opened, never for a room nobody opened. */}
+              {/* EACH ROOM IS A CONVERSATIONS CARD (CORE-177, Darko 08:48 EST: "literally the same theme as like how it looks in the conversations page"): the
+                  card, its head and the reader's host wear src/styles/conversation-host.css, the rules the Conversations page wears, inside `.convo`; the reader
+                  is mounted through the site's one setup with that page's host options (conversation-host.mjs: its faces, its own header). The card's head is
+                  its place; its meta line is the room's id and the way to its whole talk on the Conversations page: `?room=<id>` (calendar.mjs § roomPermalink),
+                  which that page opens through the office's named room read, so a historical room past its retained list still opens, under its own header. */}
+              {rooms.map((room) => ({ id: roomIdOf(room), place: typeof room?.place === "string" && room.place.trim() ? room.place.trim() : null })).filter((r) => isRoomId(r.id)).map(({ id, place }) => (
+                <details class="c-thread ev-room" data-ev-room={id}>
+                  <summary class="c-thread-head ev-room-h"><h3 class="c-place">{place ?? id}</h3><span class="ev-room-toggle" aria-hidden="true"></span></summary>
+                  <p class="c-meta ev-room-whole"><span>{id}</span><a class="c-perma" href={roomPermalink(id)}>{EVENT_WORDS.circles.whole} →</a></p>
+                  <div class="c-circles ev-reader" data-ev-reader>
+                    <p class="c-fine ev-note" data-ev-floor>{EVENT_WORDS.circles.noJs} <a href={roomPermalink(id)}>{id}</a>.</p>
+                  </div>
+                </details>
+              ))}
+            </div>
+          </>
+        ) : sections.circles.state === "before" ? (
+          <p class="ev-note" data-ev-note="before">{EVENT_WORDS.circles.before}</p>
+        ) : sections.circles.state === "none" ? (
+          <p class="ev-note" data-ev-note="none">{EVENT_WORDS.circles.none}</p>
+        ) : (
+          <p class="ev-note" data-ev-note="unavailable">{EVENT_WORDS.circles.unavailable}{sections.circles.note && <> <span class="soft">({sections.circles.note})</span></>}</p>
+        )}
       </section>
     )}
 
@@ -287,36 +291,69 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     import { AS, KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import { handleChoice, rsvpBody, submitRsvp, SECRET_LINE } from "@/lib/rsvp.mjs";
     import { fetchAnnouncements, eventReadUrl } from "@/lib/announcements.mjs";
-    import { EVENT_WORDS, LOCAL_FORMAT, eventSections, isRoomId, roomHref, roomIdOf } from "@/lib/calendar.mjs";
-    import { mountRoom } from "@/lib/circle-reader-mount.mjs";
+    import { EVENT_WORDS, LOCAL_FORMAT, eventSections, isRoomId, roomPermalink, roomIdOf } from "@/lib/calendar.mjs";
+    import { drawRoomVoices, sayRoomFailed } from "@/lib/room-voices.mjs";
+    import { hostFaces, hostReaderOptions } from "@/lib/conversation-host.mjs";
+    import { paintAttendance } from "@/lib/event-attendance.mjs";
+    import { identityProvider } from "@/lib/resident-identity.mjs";
 
     // THE CIRCLES ISLAND (CORE-82). The page's rooms are the office's, in its start order. For each, the World's one circle reader is
     // mounted (the site's adapter hands it the keyless reads); without it the room keeps a link to its whole talk, and the page SAYS
     // the reader is not here. While the event is on, the office's one-event read is asked again first, because a room can begin after
     // the build; an answer that cannot be had keeps the build's rooms. Every word the reader draws is text, never markup.
     const circ = document.querySelector("[data-ev-circles]");
+    // the build's faces for this page's speakers (an unreadable attribute is no faces: the reader keeps its own face and name path)
+    const evFaces = (() => { try { return JSON.parse(circ?.getAttribute("data-faces") || "null"); } catch { return null; } })();
+    const evAliases = (() => { try { return JSON.parse(circ?.getAttribute("data-aliases") || "null"); } catch { return null; } })();
+    const speakerIdentity = identityProvider(document, () => evFaces, { toFace: (f) => f, aliases: evAliases });
     if (circ) {
-      const drawRoom = (box, id) => {
+      // the speakers' faces (the Conversations page reads the same file): ONE read for the page, started on the first room opened, and a BOUNDED
+      // wait on it (conversation-host.mjs § hostFaces). A slow or stuck read never holds a room on its floor: past the deadline the reader mounts
+      // with letters, and faces that land later reach every byline it draws from then on. No second read, no remount.
+      const faces = hostFaces({ fetchImpl: (u, o) => fetch(u, o) });
+      const drawRoom = async (box, id) => {
         const reader = box.querySelector("[data-ev-reader]");
-        const floor = reader.querySelector("[data-ev-floor]");
-        // a circle's own link is the Conversations page's one-conversation view (CORE-117: `/conversations/#circle-<id>`)
-        mountRoom({ doc: document, host: reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o), hrefForCircle: (c) => `/conversations/#circle-${encodeURIComponent(c)}` }).then((m) => {
-          if (m.ok) { floor?.remove(); return; }
-          if (floor) floor.textContent = EVENT_WORDS.circles.noReader;
-        });
+        const floor = reader?.querySelector("[data-ev-floor]");
+        if (!reader) return;
+        await faces.ready();
+        // THE ROOM'S OWN LINES, DRAWN AS THE CONVERSATIONS PAGE DRAWS A ROOM (CORE-177 on POS-1232, room-voices.mjs): ONE opt-in read of this room, its
+        // lines through the site's one room drawing (CORE-156's B) in that page's pane. An office that answers without the lines keeps the room as it was:
+        // the site's one reader setup with the Conversations page's host options (conversation-host.mjs: its faces, its own header), a circle's own link
+        // the Conversations page's one-conversation view (CORE-117: `/conversations/#circle-<id>`). A read that fails says so, and can be asked again.
+        // CORE-178 / WLD-248: each speaker is the site's one resident mention, as on the Conversations page: in the drawn lines by the build's renames
+        // (`aliases`), and in the reader by its identity, from the build's faces on this section (no new read)
+        const m = await drawRoomVoices({ doc: document, card: box, reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o), getFaces: faces.get, aliases: evAliases,
+          readerOptions: { hrefForCircle: (c) => `/conversations/#circle-${encodeURIComponent(c)}`, ...hostReaderOptions(document, faces.get), identityForSpeaker: speakerIdentity } });
+        if (m.ok) { floor?.remove(); return; }
+        if (m.failed) { sayRoomFailed(document, floor, () => drawRoom(box, id)); return; }
+        if (floor) floor.textContent = EVENT_WORDS.circles.noReader;
       };
+      // A room added after the build is drawn as the baked ones are: a shut Conversations card, its id as its head, the way to its whole talk inside.
       const build = (ids) => {
         const wrap = circ.querySelector(".ev-rooms");
         if (!wrap) return;
         for (const id of ids) {
           if (wrap.querySelector(`[data-ev-room="${CSS.escape(id)}"]`)) continue;
-          const box = document.createElement("div"); box.className = "ev-room"; box.dataset.evRoom = id;
-          const h = document.createElement("h3"); h.className = "ev-room-h";
-          const a = document.createElement("a"); a.href = roomHref(id); a.textContent = id; h.append(a);
-          const reader = document.createElement("div"); reader.className = "ev-reader"; reader.dataset.evReader = "";
-          const note = document.createElement("p"); note.className = "soft ev-note"; note.dataset.evFloor = ""; note.textContent = EVENT_WORDS.circles.noReader;
-          reader.append(note); box.append(h, reader); wrap.append(box);
+          const box = document.createElement("details"); box.className = "c-thread ev-room"; box.dataset.evRoom = id;
+          const h = document.createElement("summary"); h.className = "c-thread-head ev-room-h";
+          const name = document.createElement("h3"); name.className = "c-place"; name.textContent = id;
+          const toggle = document.createElement("span"); toggle.className = "ev-room-toggle"; toggle.setAttribute("aria-hidden", "true");
+          h.append(name, toggle);
+          const whole = document.createElement("p"); whole.className = "c-meta ev-room-whole";
+          const idSpan = document.createElement("span"); idSpan.textContent = id;
+          const a = document.createElement("a"); a.className = "c-perma"; a.href = roomPermalink(id); a.textContent = `${EVENT_WORDS.circles.whole} →`; whole.append(idSpan, a);
+          const reader = document.createElement("div"); reader.className = "c-circles ev-reader"; reader.dataset.evReader = "";
+          const note = document.createElement("p"); note.className = "c-fine ev-note"; note.dataset.evFloor = ""; note.textContent = EVENT_WORDS.circles.noReader;
+          reader.append(note); box.append(h, whole, reader); wrap.append(box);
         }
+      };
+      // CORE-177: a room's reader is mounted the first time the room is opened (one read for a room someone looks into, none for the rest)
+      const arm = (box) => {
+        if (box.dataset.evArmed !== undefined) return;
+        box.dataset.evArmed = "";
+        const mount = () => { if (box.open && box.dataset.evMounted === undefined) { box.dataset.evMounted = ""; drawRoom(box, box.dataset.evRoom); } };
+        box.addEventListener("toggle", mount);
+        mount();
       };
       const start = async () => {
         // WHILE IT RUNS (data-live) and AFTER IT (data-refresh, CORE-174): a historical page's baked rooms are the build's, and the office's durable record may hold
@@ -328,13 +365,20 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
             const res = url ? await fetch(url, { headers: { accept: "application/json" } }) : null;
             const body = res && res.ok ? await res.json() : null;
             const s = body?.event ? eventSections(body.event) : null;
+            // WHO WAS THERE (CORE-177): the same answer repaints the card's roster when the bake's could still change, with the faces and renames
+            // the build carried (event-attendance.mjs, the one mention). Only a KNOWN roster is painted: an unknown answer keeps what the bake said.
+            const attend = document.querySelector("[data-ev-attend][data-ev-attend-refresh]");
+            if (attend && s?.participants.state === "known") {
+              const json = (k) => { try { return JSON.parse(circ.getAttribute(k) || "null"); } catch { return null; } };
+              if (paintAttendance(attend, s.participants, { doc: document, faces: json("data-faces"), aliases: json("data-aliases") })) attend.hidden = false;
+            }
             if (s?.circles.state === "rooms") {
-              if (!circ.querySelector(".ev-rooms")) { circ.querySelector("[data-ev-note]")?.remove(); const w = document.createElement("div"); w.className = "ev-rooms"; circ.append(w); circ.dataset.state = "rooms"; }
+              if (!circ.querySelector(".ev-rooms")) { circ.querySelector("[data-ev-note]")?.remove(); const w = document.createElement("div"); w.className = "convo ev-rooms"; circ.append(w); circ.dataset.state = "rooms"; }
               build(s.circles.rooms.map(roomIdOf).filter(isRoomId).map(String));
             }
           } catch { /* the build's rooms stand */ }
         }
-        for (const box of circ.querySelectorAll("[data-ev-room]")) drawRoom(box, box.dataset.evRoom);
+        for (const box of circ.querySelectorAll("[data-ev-room]")) arm(box);
       };
       start();
     }
@@ -539,20 +583,37 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     .ev-sec:not(.pm-paper) .ev-h { color: var(--pm-gold-bright); }
     .ev-lead { margin: 0 0 0.6em; font-size: 0.9rem; line-height: 1.5; }
     .ev-note { margin: 0.4em 0; line-height: 1.55; }
-    .ev-sec:not(.pm-paper) .ev-note, .ev-sec:not(.pm-paper) .soft { color: var(--pm-paper); }
+    /* the page's fallbacks stop at the room card's chrome: a room's fine print (.c-fine) and its whole-talk link (.c-perma) wear the shared theme
+       (conversation-host.css) on a baked card exactly as on one the island builds, which carries no scope attribute (CORE-177) */
+    .ev-sec:not(.pm-paper) .ev-note:not(.c-fine), .ev-sec:not(.pm-paper) .soft { color: var(--pm-paper); }
     .ev-sec.pm-paper .soft { color: var(--pm-ink-soft); }
     .ev-basis { margin: 0.5em 0 0; font-size: 0.84rem; }
-    .ev-present { margin: 0.3em 0; padding-left: 1.2em; columns: 2 12rem; }
-    .ev-present li { margin: 0 0 0.3em; break-inside: avoid; overflow-wrap: anywhere; }
-    .ev-sec.pm-paper a { color: var(--pm-wax); text-decoration: underline; }
-    .ev-sec:not(.pm-paper) a { color: var(--pm-gold-bright); }
+    /* who was there, in the card under its RSVPs (CORE-177): a compact run of the site's one mention, which brings its own look (resident-mention.css);
+       the island may repaint the list, so its items carry no scope attribute: :global */
+    .cal-attend h2 { font-size: 1.05em; margin: 1.2em 0 0.4em; }
+    .cal-attend-lead { margin: 0 0 0.4em; font-size: 0.86rem; line-height: 1.5; }
+    .cal-attend-list { display: flex; flex-wrap: wrap; gap: 0.35em 1em; margin: 0.3em 0; padding: 0; list-style: none; }
+    .cal-attend-list :global(li) { overflow-wrap: anywhere; }
+    .cal-attend-list[hidden], .cal-attend[hidden] { display: none; }
+    .cal-attend-note { margin: 0.3em 0 0; font-size: 0.86rem; line-height: 1.5; }
+    /* the section's links, never a resident mention: `.rm` keeps the speaker's own ink and underline (CORE-178, Darko a; these out-ranked .rm.rm) */
+    .ev-sec.pm-paper a:where(:not(.rm)) { color: var(--pm-wax); text-decoration: underline; }
+    .ev-sec:not(.pm-paper) a:where(:not(.rm)):not(.c-perma) { color: var(--pm-gold-bright); }
     /* the rooms' boxes are also made by the island, so they carry no scope attribute: :global */
-    .ev-sec :global(.ev-room) { margin: 0 0 1em; }
-    .ev-sec :global(.ev-room-h) { margin: 0 0 0.4em; font-size: 0.95em; font-family: var(--pm-mono); overflow-wrap: anywhere; }
-    .ev-sec :global(.ev-room-id) { font-size: 0.8em; }
+    /* A ROOM is a Conversations card (conversation-host.css: .c-thread, .c-thread-head, .c-place, .c-meta, .c-perma, .c-circles); this page adds
+       only what a card that opens and shuts needs: its head is the disclosure's summary, with a chevron that turns as it opens, and its meta
+       line and reader show once it is open (the browser hides them while it is shut) */
+    .ev-sec :global(.ev-room > .ev-room-h) { list-style: none; cursor: pointer; overflow-wrap: anywhere; }
+    .ev-sec :global(.ev-room > .ev-room-h::-webkit-details-marker) { display: none; }
+    .ev-sec :global(.ev-room > .ev-room-h:focus-visible) { outline: 2px solid var(--pm-gold); outline-offset: 4px; border-radius: 6px; }
+    .ev-sec :global(.ev-room-toggle) { margin-left: auto; width: 0.55em; height: 0.55em; border-right: 2px solid var(--pm-gold); border-bottom: 2px solid var(--pm-gold); transform: rotate(-45deg); transition: transform 0.15s ease; align-self: center; }
+    .ev-sec :global(.ev-room[open] .ev-room-toggle) { transform: rotate(45deg); }
+    .ev-sec :global(.ev-room:not([open]) > .ev-room-h:hover .c-place) { text-decoration: underline; text-decoration-color: rgba(232, 196, 139, 0.4); text-underline-offset: 3px; }
+    .ev-sec :global(.ev-room-whole) { margin: 0.5em 0 0; }
+    @media (prefers-reduced-motion: reduce) { .ev-sec :global(.ev-room-toggle) { transition: none; } }
     .ev-sec :global(.ev-note) { margin: 0.4em 0; line-height: 1.55; }
     .ev-sec.pm-paper :global(.soft) { color: var(--pm-ink-soft); }
-    .ev-sec.pm-paper :global(a) { color: var(--pm-wax); text-decoration: underline; }
+    .ev-sec.pm-paper :global(a:where(:not(.rm))) { color: var(--pm-wax); text-decoration: underline; }
     .ev-gallery { display: grid; gap: 0.2em; }
     .ev-onward { margin: 0.8em 0 0; font-weight: 700; }
     .cal-how h2 { margin: 0 0 0.5em; font-size: 1.1em; }

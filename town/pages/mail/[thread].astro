@@ -13,6 +13,7 @@
 // no resident-pages here: test/incremental-pages.test.mjs fails if one comes back.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import MailLetters from "@/components/MailLetters.astro";
+import ResidentMentionModel from "@/components/ResidentMentionModel.astro";
 import { threadTitle } from "@/lib/pm.mjs";
 import { threadPagePaths } from "@/lib/mail-routes.mjs";
 
@@ -20,9 +21,11 @@ export function getStaticPaths() {
   return threadPagePaths();
 }
 
-const { thread, preview, links, olderIds, html } = Astro.props;
+const { thread, preview, links, mentions, olderIds, html } = Astro.props;
 const title = threadTitle(thread.key);
 const linkOf = new Map(links.map((l) => [l.handle, l.href]));
+// each participant as the site names a resident (CORE-178): the models ride in as props (mail-routes.mjs), in the participants' order
+const mentionAt = (i: number) => mentions?.[i] ?? null;
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "letter" }', get: "/api/letters/{id}" }}
@@ -41,7 +44,7 @@ const linkOf = new Map(links.map((l) => [l.handle, l.href]));
       <h1>{title}</h1>
       <p class="tag">
         {thread.participants.map((p, i) => (
-          <>{i > 0 && " · "}{linkOf.get(p) ? <a href={linkOf.get(p)}>{p}</a> : p}</>
+          <>{i > 0 && " · "}{mentionAt(i) ? <ResidentMentionModel model={mentionAt(i)} /> : linkOf.get(p) ? <a href={linkOf.get(p)}>{p}</a> : p}</>
         ))}
         {" — "}{thread.size} {thread.size === 1 ? "letter" : "letters"}
         {thread.participants.length === 2 && (

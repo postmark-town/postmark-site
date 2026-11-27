@@ -35,5 +35,7 @@ export function tickerDeliveries(latestDeliveries, { letterHref, fmtDate, thread
   return spreadDeliveries(latestDeliveries, { size, perSender }).map((d) => ({
     href: letterHref(d.id, book),
     text: `${fmtDate(d.date)} · ${d.from} → ${d.to} — “${threadTitle(d.id)}”`,
+    // the same words in their parts, so the page can name the sender and the recipient as the site names a resident (CORE-178); `text` is the plain floor
+    parts: { date: fmtDate(d.date), from: d.from, to: d.to, title: threadTitle(d.id) },
   }));
 }

@@ -15,6 +15,8 @@ import ledger from "@/data/postmark/ledger.json";
 import friendships from "@/data/postmark/friendships.json";
 import { pairViews, pairLettersHtml, deliveredOnOf, threadViews, threadLettersHtml } from "./mail-letter.mjs";
 import { residentHref } from "./resident-pages.mjs";
+// the site's one resident mention (CORE-178), decided here so it rides in as props: a converted page reads nothing outside them
+import { mentionOf } from "./resident-mentions.mjs";
 import { handlesPreview, openerFirst, sectionCard } from "./og-image.mjs";
 import { letterAddresses } from "./mail.mjs";
 import { MOVED } from "./nav.mjs";
@@ -37,21 +39,24 @@ function threadsBook() {
       preview: { image, card },
       // each participant's own page, or null where none stands (resident-pages.mjs)
       links: thread.participants.map((handle) => ({ handle, href: residentHref(handle) ?? null })),
+      // each participant as the site names a resident (plain data: the model resident-mention.mjs draws)
+      mentions: thread.participants.map((handle) => mentionOf(handle)),
     };
   });
   return threadBook;
 }
 
-const lettersHtml = (ls, thread) => threadLettersHtml(ls, { media, hrefOf: residentHref, threadKey: thread.key });
+const lettersHtml = (ls, thread) => threadLettersHtml(ls, { media, hrefOf: residentHref, mentionOf, threadKey: thread.key });
 
 // mail/[thread]/index.html
 export function threadPagePaths() {
-  const routes = threadsBook().map(({ thread, parts, preview, links }) => ({
+  const routes = threadsBook().map(({ thread, parts, preview, links, mentions }) => ({
     params: { thread: thread.key },
     props: {
       thread,
       preview,
       links,
+      mentions,
       olderIds: parts.slice(1).map((part) => part.map((l) => l.id)),
       html: lettersHtml(parts[0], thread),
     },
@@ -107,6 +112,8 @@ function pairsBook() {
       key, a, b, parts, view, deliveredOn,
       preview: { image, card },
       links: { a: residentHref(a) ?? null, b: residentHref(b) ?? null },
+      // the two, as the site names a resident (plain data: the models resident-mention.mjs draws)
+      mentions: { a: mentionOf(a), b: mentionOf(b) },
       // the milestone the page may show: the pair's own entry, or null (qualifies is the page's law, read as data)
       friendship: entry && entry.qualifies ? entry : null,
       friendStart: friendships?.startDate ?? null,
@@ -118,7 +125,7 @@ function pairsBook() {
   return pairBook;
 }
 
-const pairHtml = (p, ls) => pairLettersHtml(p.view, ls, { media, deliveredOn: p.deliveredOn, hrefOf: residentHref });
+const pairHtml = (p, ls) => pairLettersHtml(p.view, ls, { media, deliveredOn: p.deliveredOn, hrefOf: residentHref, mentionOf });
 
 // mail/with/[pair]/index.html. `today` is the one clock the page reads (its
 // heatmap runs to today and it counts days known), so it is a prop: the key of
@@ -129,7 +136,7 @@ export function pairPagePaths() {
     params: { pair: p.key },
     props: {
       key: p.key, a: p.a, b: p.b, rows: p.rows, threadOrder: p.threadOrder, today,
-      preview: p.preview, links: p.links, friendship: p.friendship, friendStart: p.friendStart,
+      preview: p.preview, links: p.links, mentions: p.mentions, friendship: p.friendship, friendStart: p.friendStart,
       olderIds: p.parts.slice(1).map((part) => part.map((l) => l.id)),
       html: pairHtml(p, p.parts[0]),
     },
