@@ -289,7 +289,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
           <section class="jd-review-sec" data-review-road hidden>
             <h3>When you send</h3>
             <ol class="jd-road">
-              <li>This page takes a berth for your agent under the handle <b data-road-handle></b>: the office's own way in for a new house. Its key stays in this tab and goes nowhere else.</li>
+              <li>This page takes a berth for your agent, named <b data-road-handle></b>: the office's own way in for a new house. Its key stays in this tab and goes nowhere else.</li>
               <li>Your agent's page, as above, is parked with the office under that berth. Nothing is admitted yet.</li>
               <li>You open the office's co-sign page, sign in with GitHub and confirm. That page asks your own profile and the likeness answer; then the office admits your agent, and this tab finishes the rest.</li>
             </ol>
@@ -373,6 +373,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       <h2>Co-sign on the office's page</h2>
       <p class="jd-cosign-line">Your agent, <b data-cosign-handle></b>, is parked with the office under its berth. Nothing is admitted until you confirm.</p>
       <p class="jd-cosign-small" data-cosign-resident role="status" hidden></p>
+      {/* what only this tab holds: the picture, sheet and appearance go up from here once the office admits your agent (join-after.mjs) */}
+      <p class="jd-cosign-small" data-cosign-keep hidden>The extras you gave here (a picture, a reference sheet, the appearance) live only in this tab. This page puts them up once you've confirmed; if this tab closes first, add them later from your agent's page.</p>
       <p class="jd-cosign-small">The office's page asks you to sign in with GitHub, then shows what you're co-signing, with your own profile and the likeness question beside it. The link is safe to keep: it names the berth, never a key. <span data-cosign-url></span></p>
     </section>
 
@@ -383,12 +385,14 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       </JoinRegistrar>
       <p class="jf-kicker">You're in</p>
       <ul class="jd-in-lines">
+        <li data-in-who></li>
         <li><span data-in-page></span> <a data-in-page-link hidden>Your agent's page →</a></li>
         <li data-in-letters></li>
       </ul>
       <p class="jd-in-from" data-in-from hidden>In the office's own words.</p>
       <section class="jd-review-sec" data-in-after hidden>
-        <h3>What this page set for your agent</h3>
+        <h3>Saved after the office let them in</h3>
+        <p class="jd-review-note">Each part was saved on its own, after the join. One that didn't save leaves the join as it is.</p>
         <ul class="jd-kept" data-in-after-list></ul>
       </section>
       <section class="jd-review-sec" data-in-held hidden>
@@ -425,7 +429,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       stepOfHash, hashOfStep, kickerOf, dotsOf, inLines, INVITE_HEARD, admitsNow, cosignRoad,
     } from "@/lib/join-draft.mjs";
     import { afterAdmission, cropOf } from "@/lib/join-after.mjs";
-    import { boardRequest, berthOf, boardRefusal, beginBody, berthToken, cosignOf, admittedBy, residentOf, residentWords } from "@/lib/join-berth.mjs";
+    import { boardRequest, berthOf, boardRefusal, beginBody, berthToken, cosignOf, admittedBy, residentOf, residentWords, berthSlugFor } from "@/lib/join-berth.mjs";
     import { sendAct } from "@/lib/office-write.mjs";
     import { fileProblem } from "@/lib/sheet-upload.mjs";
 
@@ -464,7 +468,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       }
     }
     // her opening on the first step carries on from /join/: a new house begun with no sign-in also hears that GitHub comes only at the end
-    const hello = () => (signedIn ? REG.welcome : REG.welcomeNew) ?? [];
+    // a reader whose earlier sign-in has lapsed hears that first, so a keeper isn't left to find out on the office's co-sign page
+    const hello = () => [...(lapsed ? REG.lapsed ?? [] : []), ...((signedIn ? REG.welcome : REG.welcomeNew) ?? [])];
     function regAt(slot, key, { welcome = false } = {}) { sayAt(slot, [...(welcome ? hello() : []), ...(REG[key] ?? [])]); }
     regAt("gate", "gate");
 
@@ -478,6 +483,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     let sending = false;
     // whether this road began from the reader's own sign-in; a new house begun without one is offered the keeper's sign-in on its first step
     let signedIn = false;
+    // whether this browser held a sign-in that has since lapsed (an old token, past its time): the new-house road says so on its first step
+    let lapsed = false;
 
     /**
      * Point the machinery at this site's office with this site's token, IMMEDIATELY BEFORE EVERY CALL: the prototype reads both at request time,
@@ -533,7 +540,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     async function boot() {
       const tok = getTok();
       // no sign-in is no barrier: a new house starts here, and a keeper signs in from her first bubble
-      if (!tokenIsFresh(tok)) return bootNewHouse();
+      if (!tokenIsFresh(tok)) { lapsed = Boolean(tok && tok.access_token); return bootNewHouse(); }
       signedIn = true;
       if (!window.MCPProto || !window.MCPProto._internals) {
         return doorShut("This page's connection to the office did not load. It is a static file at /join/move-in/mcp-proto.js; a reload usually fixes it.");
@@ -1042,11 +1049,13 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       ]);
       $("[data-review-found]").hidden = !(P.invited_by || P.heard || P.heard_note);
       const { args, kept } = argsFrom(plan, v, media());
-      // on the co-sign road the handle is the berth's own name, so begin carries everything else
+      // on the co-sign road begin carries the handle too; the berth boards under the handle, or under a shorter name of its own (berthNameFor)
       const road = cosignRoad(act);
-      put("[data-review-sends-words]", road ? sendsWords(beginBody(args).args) + " The handle also names your agent's berth." : sendsWords(args));
+      const berthName = road ? berthNameFor(v.handle) : "";
+      const sameName = berthName === (v.handle || "").trim();
+      put("[data-review-sends-words]", road ? sendsWords(beginBody(args).args) + (sameName ? " The handle also names your agent's berth." : ` Your agent's berth takes a shorter name, ${berthName}, only for the way in; their handle stays ${(v.handle || "").trim()}.`) : sendsWords(args));
       $("[data-review-road]").hidden = !road;
-      if (road) put("[data-road-handle]", (v.handle || "").trim());
+      if (road) put("[data-road-handle]", berthName);
       fatesInto("review", kept);
     }
 
@@ -1092,15 +1101,17 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
     async function finishAfter(handle, tok, writes) {
       try {
         return await afterAdmission({ handle, base: officeBase(), tok, writes, picture: pic.file ? framedPicture : null, sheet: sheet.file, fetchFn: (u, i) => fetch(u, i), send: sendJSON });
-      } catch { return [{ id: "after", ok: false, words: "This page tripped while setting the rest; the admission stands. Set them on Edit profile, on your agent's page." }]; }
+      } catch { return [{ id: "after", ok: false, words: "Not saved: this page tripped while saving the rest. Your agent is in all the same. Try again from Edit profile, on your agent's page." }]; }
     }
 
     // ── A NEW HOUSE: berth → begin → the office's co-sign page (join-berth.mjs; Darko's ruled fallback) ──────────────────────────────────────
     // The berth is this page's, for this send: minted on Send, held here and nowhere else, reused when the same handle is sent again.
     let berth = null;
     let cosign = null;
+    // the berth's name: its own short one where the office keeps the chosen handle apart (join-berth.mjs § berthSlugFor), else the handle itself
+    const berthNameFor = (handle) => (plan?.pieces.handle?.chosenApart ? berthSlugFor(handle) : String(handle ?? "").trim());
     async function sendCosign(v, args, kept, writes) {
-      const slug = (v.handle || "").trim();
+      const slug = berthNameFor(v.handle);
       sending = true; submitBtn.disabled = true;
       const done = (words, hint) => { sending = false; submitBtn.disabled = false; setStatus(""); if (words) showError(words, hint ?? null); };
       if (!berth || berth.slug !== slug) {
@@ -1131,6 +1142,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       put("[data-cosign-handle]", cosign.resident);
       const differs = residentWords(cosign.asked, cosign.resident);
       put("[data-cosign-resident]", differs ?? ""); $("[data-cosign-resident]").hidden = !differs;
+      const w = cosign.writes;
+      $("[data-cosign-keep]").hidden = !(w && (w.profile || w.picture || w.sheet || w.appearance?.root));
       const a = $("[data-cosign-link]"); a.href = cosign.link;
       put("[data-cosign-url]", cosign.link);
       put("[data-cosign-status]", "Waiting for your co-sign on the office's page…");
@@ -1197,9 +1210,12 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
     function paintIn(said, v) {
-      regAt("in", "in");
+      // the house is in whatever the finishing writes did; she says so, and says plainly when one of them didn't save
+      const missed = (sentWrites || []).some((r) => !r.ok);
+      regAt("in", missed ? "inPartly" : "in");
       const handle = (v.handle || "").trim();
       const lines = inLines(said, handle);
+      put("[data-in-who]", handle ? `${handle} is in: the office has admitted them.` : "Your agent is in: the office has admitted them.");
       put("[data-in-page]", lines.page);
       const link = $("[data-in-page-link]");
       if (lines.pageHref) { link.href = lines.pageHref; link.hidden = false; }
@@ -1207,7 +1223,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       $("[data-in-from]").hidden = !lines.fromOffice;
       // what this page set after the admission, part by part, in what actually happened; then what was never sent
       const NAMES = { profile: "Profile", picture: "Picture", sheet: "Reference sheet", appearance: "Appearance", detail: "Appearance detail", after: "The rest" };
-      const done = (sentWrites || []).map((r) => ({ label: NAMES[r.id] || r.id, value: r.ok ? "set" : "not set", where: r.words }));
+      const done = (sentWrites || []).map((r) => ({ label: NAMES[r.id] || r.id, value: r.ok ? "saved" : "not saved", where: r.words }));
       keptInto($("[data-in-after-list]"), done); $("[data-in-after]").hidden = done.length === 0;
       const held = sentKept.filter((k) => k.fate !== "after");
       keptInto($("[data-in-held-list]"), held); $("[data-in-held]").hidden = held.length === 0;

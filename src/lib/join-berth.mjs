@@ -18,15 +18,18 @@
 // re-minted, when the same send is tried again in this tab. A tab closed between the berth and the co-sign leaves the berth to sunset on the
 // office's own clock (fourteen crossings, seven days), and the co-sign link, which carries no key, still works until then.
 //
-// THE BERTH'S NAME IS THE HANDLE, FOR NOW. The co-sign on today's Office runs the declaration with `handle: <the berth's slug>`, so the handle
-// must pass BOTH rules: the berth's (Office src/oauth.mjs § BERTH_SLUG, 2–31 characters, starting with a letter or digit; no the- or berth-
-// prefix; not one of the town's own names) and the handle's (residency's, 2–40 characters, lowercase letters, digits and single hyphens). The
-// narrower one is said out loud. Wright (CORE-188, 2026-11-26): "keep the accepted 2–40 characters … co-sign declares the chosen handle, not
-// pending.slug". Rivet's receiver (Office #1237 candidate c1bd858b, NOT yet accepted or merged) parks begin's `handle` apart from the berth's slug,
-// answers `{ handle: <the resident it will declare>, berth: <the slug> }`, and the co-sign declares that handle. So this file already sends the
-// chosen handle on begin, reads the resident from the office's answer, and checks admission against THAT resident (residentOf, admittedBy); an
-// office before the receiver takes the field and ignores it (DECLARE_SCHEMA, the handle exempt) and answers the slug, which on this road is the
-// same name while the 31 rule stands. The rule widens to 40 only on the receiver's actual train merge.
+// THE CHOSEN HANDLE TRAVELS APART FROM THE BERTH'S NAME (Wright, CORE-188, 2026-11-26: "keep the accepted 2–40 characters … co-sign declares
+// the chosen handle, not pending.slug"). Office #1237 (POS-1237, head 65881c76) is that receiver: `begin` takes declare's own `handle`, 2–40,
+// judged as every road that founds a house judges it, and parks it apart from the berth's slug; begin answers `{ handle: <the resident it will
+// declare>, berth: <the slug> }`; the co-sign declares that handle; `/me` names it as `declaration.handle`. The same office serves the handle's
+// limit on its public form (DECLARE_SCHEMA `handle`: maxLength 40, `x-limit` {max 40}). An office before it served no limit there, and its
+// co-sign declared the berth's slug. So:
+//   · the card declares the handle's limit (the receiver): the handle is the office's 2–40, and the berth boards under a name of its own
+//     (berthSlugFor: the handle itself when it fits the berth's rule, else its first 31 characters), only for the way in;
+//   · the card declares none (an office before the receiver): the berth's name becomes the handle, so the handle also passes the berth's rule
+//     (Office src/oauth.mjs § BERTH_SLUG, 2–31), said out loud (BERTH_HANDLE_WORDS).
+// Either way begin carries the chosen handle, the resident is read from the office's own answer (residentOf), admission is checked against THAT
+// resident (admittedBy), and residentWords says so if the office answers another name than the one asked for.
 
 import { siteWriteHeaders } from "./office-write.mjs";
 
@@ -38,20 +41,38 @@ export const HANDLE_RULE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 /** The town's own names, which neither a berth nor a handle may wear (Office src/residency.mjs § RESERVED, as declare's bounce list names them). */
 export const TOWN_NAMES = Object.freeze(["template", "index", "office", "postmaster", "ferry", "the-town"]);
 
-/** What the handle box says on this road, where the berth's name becomes the handle. */
+/** What the handle box says on this road when the berth's name becomes the handle (an office before the receiver). */
 export const BERTH_HANDLE_WORDS = "Where letters find them, and their page's address. On the way in a new house takes, this name first boards your agent's berth, so it follows the berth's rule too: 2–31 lowercase letters, digits and single hyphens, not starting with the- or berth-.";
 
-/** Why a handle can't board and become the handle, in words, or null when it can. */
-export function berthSlugProblem(raw) {
+/** What the handle box says on this road when the office keeps the chosen handle apart from the berth (the receiver), with the office's limit. */
+export function chosenHandleWords(max) {
+  return `Where letters find them, and their page's address: ${max ? `2–${max}` : "at least 2"} lowercase letters, digits and single hyphens, not starting with the- or berth-.`;
+}
+
+/**
+ * Why a handle can't be used on this road, in words, or null when it can. `berthLength` (an office before the receiver) adds the berth's 31 rule,
+ * since the berth's name becomes the handle there; on the receiver the length is the office's own limit, counted by the plan like any other.
+ */
+export function berthSlugProblem(raw, { berthLength = true } = {}) {
   const s = String(raw ?? "").trim();
   if (!s) return null;
   if (s !== s.toLowerCase()) return "A handle is lowercase: letters, digits and single hyphens.";
   if (!HANDLE_RULE.test(s)) return "A handle is lowercase letters, digits and single hyphens, with no hyphen at either end.";
   if ([...s].length < 2) return "A handle is at least 2 characters.";
-  if (!BERTH_SLUG.test(s)) return `A handle on this way in is at most ${BERTH_SLUG_MAX} characters: it first boards your agent's berth, and a berth's name is ${BERTH_SLUG_MAX} at most.`;
+  if (berthLength && !BERTH_SLUG.test(s)) return `A handle on this way in is at most ${BERTH_SLUG_MAX} characters: it first boards your agent's berth, and a berth's name is ${BERTH_SLUG_MAX} at most.`;
   if (s.startsWith("the-") || s.startsWith("berth-")) return "A handle can't start with the- or berth-: those are the town's own prefixes.";
   if (TOWN_NAMES.includes(s)) return `"${s}" is one of the town's own names. Pick another.`;
   return null;
+}
+
+/**
+ * The name the berth boards under, for a handle that has passed berthSlugProblem: the handle itself when it fits the berth's rule, else its first
+ * 31 characters with no hyphen at the end (a berth's name is only for the way in; the co-sign declares the chosen handle, on the receiver).
+ */
+export function berthSlugFor(handle) {
+  const h = String(handle ?? "").trim();
+  if (BERTH_SLUG.test(h)) return h;
+  return h.slice(0, BERTH_SLUG_MAX).replace(/-+$/, "");
 }
 
 /** Step 1: board. Keyless: the reader's own sign-in never rides it. */

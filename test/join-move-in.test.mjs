@@ -909,7 +909,8 @@ test("an answer without the declaration's schema draws no form: the page says th
   const loose = fieldsOfArrival({ join: { schema: { properties: { household: { type: "string" } } } } });
   assert.deepEqual(loose.fields, { household: { type: "string" } });
   // the page reads the front door, and only when there is no sign-in: a signed-in reader still reads the household door's card
-  assert.match(PAGE, /if \(!tokenIsFresh\(tok\)\) return bootNewHouse\(\);/);
+  // (a lapsed token is noted first, so her first line can say it: until 2026-11-27 this pinned the bare `return bootNewHouse();`)
+  assert.match(PAGE, /if \(!tokenIsFresh\(tok\)\) \{ lapsed = Boolean\(tok && tok\.access_token\); return bootNewHouse\(\); \}/);
   assert.match(PAGE, /fetch\(officeBase\(\) \+ "\/join", \{ headers: \{ accept: "application\/json" \} \}\)/);
 });
 

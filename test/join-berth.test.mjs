@@ -15,7 +15,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { BERTH_SLUG, BERTH_SLUG_MAX, berthSlugProblem, boardRequest, berthOf, boardRefusal, beginBody, berthToken, cosignOf, admittedBy, residentOf, residentWords } from "../src/lib/join-berth.mjs";
+import { BERTH_SLUG, BERTH_SLUG_MAX, berthSlugProblem, berthSlugFor, chosenHandleWords, boardRequest, berthOf, boardRefusal, beginBody, berthToken, cosignOf, admittedBy, residentOf, residentWords } from "../src/lib/join-berth.mjs";
 
 const plain = (v) => JSON.parse(JSON.stringify(v));
 
@@ -76,6 +76,30 @@ test("the handle passes the berth's rule and the handle's; the narrower is said 
   assert.equal(berthSlugProblem(""), null, "blank is the required check's, not this one's");
 });
 
+// LAW (Wright, CORE-188, 2026-11-26): "keep the accepted 2–40 characters … co-sign declares the chosen handle, not pending.slug". On the receiver
+// (Office #1237) the handle's length is the office's, and the berth boards under a name of its own; the grammar, the prefixes and the town's
+// names still hold.
+test("on the receiver the handle is 2–40 and the berth takes a short name of its own; the- and berth- are still refused in words", () => {
+  const apart = (h) => berthSlugProblem(h, { berthLength: false });
+  const forty = "a".repeat(18) + "-of-the-" + "b".repeat(14);
+  assert.equal([...forty].length, 40);
+  for (const ok of ["quillon", "a".repeat(32), forty]) assert.equal(apart(ok), null, ok);
+  // and the control: the same 32-character handle IS refused where the berth's name becomes the handle
+  assert.match(berthSlugProblem("a".repeat(32)) ?? "", /at most 31 characters/);
+  assert.match(apart("the-heron") ?? "", /can't start with the- or berth-: those are the town's own prefixes/);
+  assert.match(apart("berth-heron") ?? "", /can't start with the- or berth-/);
+  assert.match(apart("a--b") ?? "", /single hyphens/);
+  assert.match(apart("postmaster") ?? "", /town's own names/);
+  // the berth's own name: the handle itself when it fits, else its first 31 characters, never ending in a hyphen
+  assert.equal(berthSlugFor("quillon"), "quillon");
+  assert.equal(berthSlugFor("a".repeat(31)), "a".repeat(31));
+  assert.equal(berthSlugFor("a".repeat(40)), "a".repeat(31));
+  const cut = "a".repeat(30) + "-bcdefghi";
+  assert.equal(berthSlugFor(cut), "a".repeat(30), "a cut landing on a hyphen drops it");
+  for (const h of ["a".repeat(40), forty, cut]) assert.match(berthSlugFor(h), BERTH_SLUG, `the berth's name for ${h} passes the office's berth rule`);
+  assert.match(chosenHandleWords(40), /2–40 lowercase letters, digits and single hyphens, not starting with the- or berth-/);
+});
+
 test("only the office's own co-sign door for THIS berth is followed", () => {
   const O = ["https://postmark.town", "http://127.0.0.1:4321"];
   assert.equal(cosignOf({ cosign_url: "https://postmark.town/api/oauth/berth-cosign?slug=quillon&b=1764100000" }, "quillon", O), "https://postmark.town/api/oauth/berth-cosign?slug=quillon&b=1764100000");
@@ -107,8 +131,10 @@ test("the page binds the co-sign to the office's resident: shown, checked for ad
   assert.match(script, /sentWrites = await finishAfter\(cosign\.resident, berthToken\(berth\), cosign\.writes\);/);
   assert.match(script, /paintIn\(\{\}, \{ \.\.\.cosign\.v, handle: cosign\.resident \}\)/, "You're in links the admitted resident's page");
   assert.doesNotMatch(script, /finishAfter\(cosign\.slug|admittedBy\(me, cosign\.slug/, "a finishing write or the admission still keyed to the berth's slug");
-  // the 31 rule still stands until the receiver's train merge (Facet 05:20Z): the berth is still boarded under the handle
+  // the berth boards under its own name: the handle where the office declares none (the 31 rule), its short name where it keeps them apart
   assert.match(script, /boardRequest\(officeBase\(\), slug\)/);
+  assert.match(script, /const slug = berthNameFor\(v\.handle\);/);
+  assert.match(script, /plan\?\.pieces\.handle\?\.chosenApart \? berthSlugFor\(handle\)/);
   assert.equal(BERTH_SLUG_MAX, 31);
 });
 

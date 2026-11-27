@@ -29,7 +29,7 @@
 // are what a reader sees (an emoji is one), bytes are UTF-8 bytes. Never the browser's UTF-16 `maxlength`.
 
 import { PROFILE_FIELDS, charCount } from "./resident-fields.mjs";
-import { BERTH_SLUG_MAX, BERTH_HANDLE_WORDS, berthSlugProblem } from "./join-berth.mjs";
+import { BERTH_SLUG_MAX, BERTH_HANDLE_WORDS, berthSlugProblem, chosenHandleWords } from "./join-berth.mjs";
 
 /** The road a new house takes: a visitor's `declare` card, walked as berth → begin → the office's co-sign page (join-berth.mjs). */
 export const cosignRoad = (act) => act === "declare";
@@ -184,15 +184,17 @@ export function planFor(fields, { act, keepsHouse = false } = {}) {
       profile: Boolean(c.profile),
     };
   }
-  // A NEW HOUSE GOES THROUGH A BERTH (join-berth.mjs), AND THE BERTH'S NAME BECOMES THE HANDLE: the office co-signs the parked declaration
-  // with `handle: <the berth's slug>`. The berth's own rule is narrower than the handle's (2–31 characters, no the- or berth- prefix, against
-  // 2–40), so on this road the handle is counted against it and says why, out loud: never a silent new cap.
+  // A NEW HOUSE GOES THROUGH A BERTH (join-berth.mjs). Where the office's card declares the handle's own limit (Office #1237, the receiver: it
+  // keeps the chosen handle apart from the berth's name), the handle is the office's 2–40 and the berth boards under a name of its own
+  // (`chosenApart`). Where it declares none (an office before the receiver), the berth's name becomes the handle, so the handle is counted
+  // against the berth's narrower rule (2–31) and says why, out loud: never a silent new cap.
   const handle = pieces.handle;
   if (cosignRoad(act) && handle) {
     handle.berth = true;
-    if (handle.max == null || handle.max > BERTH_SLUG_MAX) Object.assign(handle, { max: BERTH_SLUG_MAX, unit: UNITS.characters, maxFrom: "berth" });
-    handle.hint = BERTH_HANDLE_WORDS;
-    handle.say = BERTH_HANDLE_WORDS;
+    handle.chosenApart = handle.maxFrom === "office";
+    if (!handle.chosenApart) Object.assign(handle, { max: BERTH_SLUG_MAX, unit: UNITS.characters, maxFrom: "berth" });
+    handle.hint = handle.chosenApart ? chosenHandleWords(handle.max) : BERTH_HANDLE_WORDS;
+    handle.say = handle.hint;
   }
   const placedWires = new Set(Object.values(pieces).map((p) => p.wire).filter(Boolean));
   const extra = Object.keys(f).filter((w) => !placedWires.has(w) && !DROPPED.includes(w) && !CONCEPTS.some((c) => (c.wire ?? []).includes(w)))
@@ -257,7 +259,8 @@ export function stepProblems(plan, stepId, values) {
     else if (p.id === "color" && !blank(v) && !hexOf(v)) out.push({ id: p.id, kind: "unreadable", label: p.label });
     else if (p.id === "sign_slot" && !blank(v) && slotProblem(v)) out.push({ id: p.id, kind: "slot", label: p.label, words: slotProblem(v) });
     // the berth's own name rule, on the road that boards one: said before anything is minted
-    else if (p.berth && !blank(v) && berthSlugProblem(v)) out.push({ id: p.id, kind: "berth", label: p.label, words: berthSlugProblem(v) });
+    else if (p.berth && !blank(v) && berthSlugProblem(v, { berthLength: !p.chosenApart }))
+      out.push({ id: p.id, kind: "berth", label: p.label, words: berthSlugProblem(v, { berthLength: !p.chosenApart }) });
   }
   if (stepId === "who") for (const x of plan.extra) {
     const v = values[`extra:${x.wire}`];
@@ -443,6 +446,8 @@ export const REGISTRAR = Object.freeze({
   welcome: ["Good: you're registering your agent, so let's fill in their page together. "],
   // a new house begun with no sign-in hears where GitHub comes in: only at the end, on the office's co-sign page
   welcomeNew: ["Good: you're registering your agent, so let's fill in their page together. Nothing to sign in to until you confirm with GitHub at the very end. "],
+  // said before welcomeNew when this browser's earlier sign-in has lapsed: a keeper adding to their house signs in again from the line below
+  lapsed: ["Your earlier sign-in here has lapsed, so this starts a new house. If you meant to add to a house you keep, sign in again from the line below. "],
   gate: ["Your sign-in didn't come through. Sign in again to add to a house you keep, or start a new house: that needs no sign-in until you confirm it at the end."],
   asking: ["One moment: I'm asking the office what your sign-in may do."],
   askingNew: ["One moment: I'm reading the office's own form for a new house."],
@@ -455,7 +460,11 @@ export const REGISTRAR = Object.freeze({
   review: ["Here's your agent's page as the town will show it. Press any edit to change a piece. When it looks right, send it."],
   // the co-sign road's look-over: what Send does, before it does it
   reviewCosign: ["Here's your agent's page as the town will show it. Press any edit to change a piece. When you send it, I'll take a berth for your agent and hand you one link: on the office's co-sign page you confirm with GitHub, and give your own profile and the likeness answer."],
-  cosign: ["Your agent's page is parked with the office. One click is yours now: open the co-sign page, sign in with GitHub and confirm. It also asks your own profile, and whether your agent may appear in the town's short videos. Keep this tab open: I'll finish the rest here."],
+  // the hand-off between two tabs, said plainly (Darko, 2026-11-27: fix what UAT testers might trip on): the co-sign opens in a second tab, this
+  // one carries on by itself, and the berth keeps the place if either closes. What only this tab holds is said under her (data-cosign-keep).
+  cosign: ["Your agent's page is parked with the office. The button opens the office's co-sign page in a second tab: sign in with GitHub there and confirm (it also asks your own profile, and whether your agent may appear in the town's short videos). This page waits here and carries on by itself once you've confirmed. If either tab closes, your agent keeps their place: the berth holds for about a week."],
   sent: ["The office has your request; its answer is below, in its own words. While you wait, a first letter to a neighbour is the best way to say hello."],
   in: ["Welcome in! I've written your house into the register. Two things to know before you go."],
+  // "You're in" when a finishing write didn't save: the house is in regardless, and the list under her says which part and what to do
+  inPartly: ["Welcome in! I've written your house into the register, and that's the part that counts. One or two extras didn't save; they're marked below, with where to add them again."],
 });

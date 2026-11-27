@@ -17,14 +17,17 @@
 //   · A NEW HOUSE TAKES THE OFFICE'S OWN WAY IN (Darko's ruled fallback, CORE-188): on Send, and not before, one KEYLESS berth under the handle,
 //     then begin under THAT berth's key, carrying only what the card takes less the handle (today's card: household/agent/note/card/invited_by/
 //     heard/heard_note; the accepted card, POS-1237 f22c069a: full_address, note, the bio and the profile under its own names); never the
-//     visitor's own declare; the handle is held to the berth's narrower rule out loud; a held name is refused in the office's words;
+//     visitor's own declare; on today's card the handle is held to the berth's narrower rule out loud, and on the receiver's (Office #1237,
+//     the card declares the handle's 40) the handle is 2–40 and the berth boards under a short name of its own; a held name is refused in
+//     the office's words; the co-sign screen says the two tabs plainly, and a lapsed sign-in is said on the first step;
 //   · the co-sign link is the office's own for that berth, opens in a new tab, carries no key; the berth key is never stored, shown or swapped
 //     for the reader's own sign-in;
 //   · NOTHING IS WRITTEN TO A RESIDENT BEFORE THE OFFICE ADMITS ONE (the co-sign, read from /me with the berth key; add-resident's answer), and
 //     after it only through the resident's own doors (the profile fields the card lacked, the picture); the agent route's begin writes nothing;
 //   · THE HUMAN'S PROFILE AND THE LIKENESS ARE THE OFFICE CO-SIGN PAGE'S: no box for them here, in no request this page makes, and the page says
 //     where they are asked; an existing house and the agent route are not told of a co-sign they don't take;
-//   · "You're in" shows its two lines, the agent's page link, and what the page set;
+//   · "You're in" says who is in, shows its two lines, the admitted resident's page link, and what the page saved, each part saved or not
+//     saved with the office's reason, never as a failed join;
 //   · Enter continues from a one-line box; Tab walks the fields in order; a phone frame does not scroll sideways;
 //   · A NEW HOUSE NEEDS NO SIGN-IN (Darko, 2026-11-26): with no token the form comes from the office's public front door (GET /join) and the road
 //     runs berth → begin → co-sign link with no household-door call; a keeper still signs in first, and that road is unchanged;
@@ -151,12 +154,15 @@ const BEGIN = { household: { type: "string", required: true, "x-group": "househo
 // parks the args and answers the co-sign link; /me with that key is the berth until `o.cosign()` plays the human's click on the office's page,
 // and the household's (naming the handle) after it. The writes after admission are allowed only for a credential /me says holds the handle.
 function officeFor({ tier = "visitor", act = "declare", fields = TODAY, me = { handles: [], households: {} }, held = [], refuseDescribe = null } = {}) {
-  const o = { asked: [], sent: [], me, writes: [], bodies: [], events: [], auths: [], boarded: [], begun: [], berths: {}, cosigned: false, held, refuseDescribe, fields };
+  // `receiver`: the office keeps the chosen handle apart from the berth (Office #1237), as a card that declares the handle's limit does
+  const receiver = Boolean(fields?.handle?.["x-limit"]);
+  const o = { asked: [], sent: [], me, writes: [], bodies: [], events: [], auths: [], boarded: [], begun: [], berths: {}, chosen: {}, receiver, cosigned: false, held, refuseDescribe, fields };
   o.cosign = () => { o.cosigned = true; o.events.push("cosign"); };
   o.meFor = (auth) => {
     const slug = Object.keys(o.berths).find((s) => auth === `Bearer ${o.berths[s]}`);
     if (!slug) return o.me;
-    return o.cosigned ? { handles: [slug], household: "fixture-house", households: { [slug]: { slug: "fixture-house" } } } : { berth: slug, handles: [] };
+    const resident = o.chosen[slug] ?? slug;   // the co-sign declares the chosen handle on the receiver, the slug before it
+    return o.cosigned ? { handles: [resident], household: "fixture-house", households: { [resident]: { slug: "fixture-house" } } } : { berth: slug, handles: [] };
   };
   o.answer = (msg) => {
     if (msg.method === "initialize") return { jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "fixture-office", version: "0" } } };
@@ -193,7 +199,9 @@ async function openPage(b, base, path, { width, height = 900, office, signedIn =
     if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error") faults.push(m.params.args?.map((a) => a.value ?? a.description).join(" "));
   });
   await S("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: width < 600 });
-  const seed = signedIn ? `localStorage.setItem("pm.oauth.token", JSON.stringify({ access_token: "invented-token", obtained: Date.now(), expires_in: 3600 }));` : `localStorage.removeItem("pm.oauth.token");`;
+  // `signedIn: "lapsed"` seeds a sign-in this browser once held, past its time (an invented token, obtained two hours ago for one)
+  const seed = signedIn === "lapsed" ? `localStorage.setItem("pm.oauth.token", JSON.stringify({ access_token: "invented-old-token", obtained: Date.now() - 7200e3, expires_in: 3600 }));`
+    : signedIn ? `localStorage.setItem("pm.oauth.token", JSON.stringify({ access_token: "invented-token", obtained: Date.now(), expires_in: 3600 }));` : `localStorage.removeItem("pm.oauth.token");`;
   await S("Page.addScriptToEvaluateOnNewDocument", { source: `try { ${seed} localStorage.removeItem("pm.invite"); localStorage.removeItem("mcp-proto.history"); } catch {}` });
   await S("Fetch.enable", { patterns: [{ urlPattern: "*/api/*", requestStage: "Request" }] });
   b.listeners.push((m) => {
@@ -224,6 +232,9 @@ async function openPage(b, base, path, { width, height = 900, office, signedIn =
       const slug = Object.keys(office.berths).find((s) => auth === `Bearer ${office.berths[s]}`);
       if (body.do !== "begin" || !slug) return reply(403, { defect: "begin is a berth's act", hint: "board first" });
       office.begun.push(body.args); office.events.push("begin");
+      // the receiver (Office #1237 § doBegin): a card that declares the handle's limit parks the chosen handle apart from the berth's slug and
+      // answers both; today's office answers the slug, and its co-sign declares it
+      if (office.receiver && body.args.handle) { office.chosen[slug] = body.args.handle; return reply(200, { declared: body.args.household, handle: body.args.handle, berth: slug, cosign_url: `${base}/api/oauth/berth-cosign?slug=${slug}&b=1764100000` }); }
       return reply(200, { declared: body.args.household, handle: slug, cosign_url: `${base}/api/oauth/berth-cosign?slug=${slug}&b=1764100000`, note: "Calling begin again replaces the parked declaration." });
     }
     // the resident's own doors, after an admission (src/lib/join-after.mjs): only for a credential /me says holds the handle
@@ -467,7 +478,7 @@ test("TODAY'S CARD, WITH NO SIGN-IN: a new house goes straight into her steps, f
     assert.match(await p.js(text("[data-review-sends-words]")), /^8 fields, under the office's own names: household, agent, handle, note, card, invited_by, heard, heard_note\. A box left blank is not sent\. The handle also names your agent's berth\./);
     // what Send will do, said before it does it
     assert.equal(await p.js(`document.querySelector("[data-review-road]").hidden`), false);
-    assert.match(await p.js(text("[data-review-road]")), /takes a berth for your agent under the handle quillon-fixture.*co-sign page.*asks your own profile and the likeness answer/s);
+    assert.match(await p.js(text("[data-review-road]")), /takes a berth for your agent, named quillon-fixture.*co-sign page.*asks your own profile and the likeness answer/s);
     assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /office's co-sign page/);
     // every other piece, by its fate: what this page sets once the co-sign admits the agent, and what is not sent
     const names = (sel) => p.js(`[...document.querySelectorAll(${JSON.stringify(sel)})].map((b) => b.textContent).join("|")`);
@@ -516,7 +527,12 @@ test("TODAY'S CARD, WITH NO SIGN-IN: a new house goes straight into her steps, f
     assert.equal(await p.js(`document.querySelector("[data-cosign-link]").target`), "_blank");
     // she's there end to end: the co-sign's link and its check sit in her bubble
     assert.equal(await p.js(`!!document.querySelector('[data-reg-at="cosign"] .jd-reg-bubble [data-cosign-link]') && !!document.querySelector('[data-reg-at="cosign"] .jd-reg-bubble [data-cosign-check]')`), true);
-    assert.match(await p.js(text('[data-reg-at="cosign"] [data-reg-words]')), /co-sign page.*sign in with GitHub.*your own profile.*short videos.*Keep this tab open/s);
+    // the two tabs, explained (Darko, 2026-11-27: what UAT testers might trip on): a second tab, this one carrying on, and the berth keeping the
+    // place if either closes; until 2026-11-27 this pinned "Keep this tab open"
+    assert.match(await p.js(text('[data-reg-at="cosign"] [data-reg-words]')), /co-sign page in a second tab.*sign in with GitHub.*your own profile.*short videos.*This page waits here and carries on by itself.*If either tab closes, your agent keeps their place: the berth holds for about a week\./s);
+    // and what only this tab holds, since this send gave a picture and an appearance
+    assert.equal(await p.js(`document.querySelector("[data-cosign-keep]").hidden`), false, "the extras that live only in this tab went unsaid");
+    assert.match(await p.js(text("[data-cosign-keep]")), /live only in this tab.*if this tab closes first, add them later from your agent's page/);
     assert.equal(await p.js(`document.querySelector("[data-gate-cosign]").textContent.includes("fixture-berth-key")`), false, "the berth key is on the page");
     assert.equal(await p.js(`JSON.stringify({ ...localStorage }).includes("fixture-berth-key") || JSON.stringify({ ...sessionStorage }).includes("fixture-berth-key")`), false, "the berth key was stored");
     assert.equal(await p.js(`localStorage.getItem("pm.oauth.token")`), null, "the berth key, or any sign-in, was stored as the reader's own");
@@ -552,7 +568,8 @@ test("TODAY'S CARD, WITH NO SIGN-IN: a new house goes straight into her steps, f
     assert.match(await p.js(text("[data-in-page]")), /about half an hour/);
     assert.match(await p.js(text("[data-in-letters]")), /about 15 minutes.*7 AM and 7 PM Eastern/);
     assert.equal(await p.js(`document.querySelector("[data-in-page-link]").getAttribute("href")`), "/residents/quillon-fixture/");
-    assert.equal(await p.js(`[...document.querySelectorAll("[data-in-after-list] li")].map((li) => li.querySelector("b").textContent + ":" + li.querySelector(".jd-kept-value").textContent).join("|")`), "Profile:set|Picture:set|Appearance:set|Appearance detail:set");
+    assert.equal(await p.js(`[...document.querySelectorAll("[data-in-after-list] li")].map((li) => li.querySelector("b").textContent + ":" + li.querySelector(".jd-kept-value").textContent).join("|")`), "Profile:saved|Picture:saved|Appearance:saved|Appearance detail:saved");
+    assert.equal(await p.js(text("[data-in-who]")), "quillon-fixture is in: the office has admitted them.");
   } finally { await p.close(); }
 });
 
@@ -565,18 +582,25 @@ test("THE ACCEPTED CARD (POS-1237, f22c069a): its limits count in their own unit
     await p.type("#jd-household", "Fixture Two");
     await p.click("[data-jf-next]");
     await p.until(STEP("who"), "step 2");
-    // ON THE CO-SIGN ROAD THE HANDLE BOARDS THE BERTH FIRST: the card's 40 is counted against the berth's 31, out loud, and refused before any mint
-    await p.type("#jd-handle", "a-fixture-handle-that-runs-too-long");
-    assert.equal(await p.js(text('[data-count-for="handle"]')), "35 / 31 — 4 too many");
+    // LAW (Wright, CORE-188, 2026-11-26): "keep the accepted 2–40 characters … co-sign declares the chosen handle, not pending.slug". This card is
+    // the receiver's (Office #1237: it declares the handle's limit), so the handle counts against the office's 40, not the berth's 31. Until
+    // 2026-11-27 this asserted "35 / 31 — 4 too many" here; the 31 rule now holds only on a card that declares no limit (TODAY'S CARD).
+    await p.type("#jd-handle", "a-fixture-handle-that-runs-past-the-forty");
+    assert.equal(await p.js(text('[data-count-for="handle"]')), "41 / 40 — 1 too many", "the handle isn't counted against the office's own 40");
     await p.click("[data-jf-next]");
-    assert.match(await p.js(text("[data-form-error]")), /Handle is 4 too long: 35 of 31 characters/);
-    assert.match(await p.js(text("[data-berth-note]")), /first boards your agent's berth.*2–31 lowercase letters/, "the berth's narrower rule is said on the step, not only in a refusal");
+    assert.match(await p.js(text("[data-form-error]")), /Handle is 1 too long: 41 of 40 characters/);
+    assert.match(await p.js(text("[data-berth-note]")), /2–40 lowercase letters, digits and single hyphens, not starting with the- or berth-/, "the office's rule is said on the step");
+    assert.doesNotMatch(await p.js(text("[data-berth-note]")), /31/, "the receiver's handle still says the berth's 31");
     assert.equal(await p.js(STEP("who")), true, "an over-long handle went on");
     await p.type("#jd-handle", "the-fixture");
     await p.click("[data-jf-next]");
     assert.match(await p.js(text("[data-form-error]")), /can't start with the- or berth-/);
     assert.deepEqual(office.boarded, [], "a berth was taken for a handle that could never be the handle");
-    await p.type("#jd-handle", "fixture-two");
+    // forty characters, the longest the town accepts: past the berth's 31, and fine
+    const forty = "fixture-two-of-the-long-name-handle-ok-x";
+    assert.equal(forty.length, 40);
+    await p.type("#jd-handle", forty);
+    assert.equal(await p.js(text('[data-count-for="handle"]')), "40 / 40");
     assert.equal(await p.js(`[...document.querySelectorAll("[data-extra]")].map((e) => e.dataset.extra).join(",")`), "motto", "the office's unplaced field is drawn");
     await p.type("#jd-extra-motto", "Slow and true.");
     assert.equal(await p.js(text('[data-count-for="extra:motto"]')), "14 / 30");
@@ -601,14 +625,19 @@ test("THE ACCEPTED CARD (POS-1237, f22c069a): its limits count in their own unit
     assert.equal(office.begun[0].bio, "A bio.", "a card that takes the bio gets it");
     assert.equal(office.begun[0].motto, "Slow and true.");
     assert.equal("card" in office.begun[0], false, "never the old name beside the new one");
-    // the chosen resident rides begin beside the berth (Office #1237 candidate c1bd858b parks it apart; under the 31 rule it is the berth's name)
-    assert.equal(office.begun[0].handle, "fixture-two");
-    assert.deepEqual(office.boarded, ["fixture-two"], "the berth is still boarded under the handle while the 31 rule stands");
+    // the chosen resident rides begin; the berth boards under a short name of its own, only for the way in (Office #1237 parks them apart)
+    assert.equal(office.begun[0].handle, forty);
+    assert.deepEqual(office.boarded, ["fixture-two-of-the-long-name-ha"], "the berth's own name: the handle's first 31 characters");
+    assert.equal(await p.js(text("[data-cosign-handle]")), forty, "the co-sign screen names someone other than the chosen resident");
+    assert.equal(await p.js(`document.querySelector("[data-cosign-resident]").hidden`), true, "the office answered the chosen handle, yet the page says it differs");
     office.cosign();
     await p.click("[data-cosign-check]");
     await p.until(`!document.querySelector("[data-gate-in]").hidden`, "you're in");
     assert.equal(office.writes.length, 0, "the card carried the profile itself: nothing left for the resident's doors");
     assert.equal(await p.js(`document.querySelector("[data-in-after]").hidden`), true, "You're in claims a part the page never set");
+    // the final page link is the admitted resident's, never the berth's short name
+    assert.equal(await p.js(`document.querySelector("[data-in-page-link]").getAttribute("href")`), `/residents/${forty}/`);
+    assert.equal(await p.js(text("[data-in-who]")), `${forty} is in: the office has admitted them.`);
   } finally { await p.close(); }
 });
 
@@ -676,10 +705,15 @@ test("THE APPEARANCE REFUSED: the part can't be the root's name; a glance the of
     assert.deepEqual(office.writes.map((w) => w.path), ["/world/apex"], "a detail went out after a refused glance");
     assert.equal(JSON.parse(office.writes[0].body).args.slot, "appearance");
     const rows = await p.js(`[...document.querySelectorAll("[data-in-after-list] li")].map((li) => [li.querySelector("b").textContent, li.querySelector(".jd-kept-value").textContent, li.querySelector(".jd-kept-where").textContent])`);
-    assert.deepEqual(rows.map((r) => r.slice(0, 2)), [["Appearance", "not set"], ["Appearance detail", "not set"]]);
-    assert.match(rows[0][2], /^Not set: the harbor is read \+ ephemeral — durable acts come ashore with settlement\. You wrote “A fixture lantern with a cracked pane\.” \(what it is: “a fixture lantern”\)\. Your agent can describe themselves/);
+    // a part that didn't save never reads as a failed join (Darko, 2026-11-27: what UAT testers might trip on): "not saved", the office's own
+    // reason, that the agent is in, and where to try again; she says the house is in. Until 2026-11-27 the rows read "not set".
+    assert.deepEqual(rows.map((r) => r.slice(0, 2)), [["Appearance", "not saved"], ["Appearance detail", "not saved"]]);
+    assert.match(rows[0][2], /^Not saved: the harbor is read \+ ephemeral — durable acts come ashore with settlement\. You wrote “A fixture lantern with a cracked pane\.” \(what it is: “a fixture lantern”\)\. Your agent is in all the same, and can describe themselves/);
     assert.match(rows[1][2], /^Not sent: a detail hangs under the glance, which didn't land\. You wrote “The crack runs corner to corner\.” \(pane: “a hairline crack”\)/);
-    assert.doesNotMatch(await p.js(text("[data-in-after-list]")), /:\s*set\b|Set as your agent's appearance/, "a refused part was claimed");
+    assert.doesNotMatch(await p.js(text("[data-in-after-list]")), /:\s*saved\b|Set as your agent's appearance/, "a refused part was claimed");
+    assert.match(await p.js(text('[data-reg-at="in"] [data-reg-words]')), /^Welcome in! I've written your house into the register, and that's the part that counts\..*didn't save/, "a failed extra reads as a failed join");
+    assert.equal(await p.js(text("[data-in-who]")), "looked-fixture is in: the office has admitted them.");
+    assert.match(await p.js(text("[data-in-after]")), /One that didn't save leaves the join as it is\./);
   } finally { await p.close(); }
 });
 
@@ -739,6 +773,20 @@ test("A HELD NAME: the board's refusal is said in the office's words, nothing is
     await p.click("[data-submit]");
     await new Promise((r) => setTimeout(r, 400));
     assert.deepEqual(office.boarded, ["held-fixture", "held-fixture"], "a second Send asked again, and nothing else");
+  } finally { await p.close(); }
+});
+
+// The review of 8d8b6802: "A lapsed sign-in now lands quietly on the new-house road … When a stale token is present, a few words in welcomeNew
+// would cover it." TODAY'S CARD, with no token at all, is the control: her first line there starts "Good:" with no word of a lapse.
+test("A LAPSED SIGN-IN: the new-house road says so on its first step, and points a keeper at the sign-in line", { skip: SKIP }, async () => {
+  await setup();
+  const office = officeFor();
+  const p = await openPage(browser, base, "/join/move-in/", { width: 1440, office, signedIn: "lapsed" });
+  try {
+    await p.until(STEP("household"), "step 1, a new house, after a lapsed sign-in");
+    assert.equal(office.asked.filter((a) => a === "POST /api/mcp").length, 0, "the lapsed token was taken to the household door");
+    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Your earlier sign-in here has lapsed, so this starts a new house\. If you meant to add to a house you keep, sign in again from the line below\. Good: you're registering your agent/);
+    assert.equal(await p.js(`document.querySelector('[data-reg-at="act"] [data-keeper-signin]').hidden`), false, "the line she points to isn't there");
   } finally { await p.close(); }
 });
 

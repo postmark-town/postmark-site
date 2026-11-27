@@ -9,7 +9,8 @@
 //       directory line as note), with the card's required flags and limits; a field the design places nowhere is still asked; from_town is not;
 //   (3) counts are the office's units (POS-1237 x-limit): code points, what a reader sees, UTF-8 bytes; never an inferred cap;
 //   (4) the human's own profile and the likeness are the office co-sign page's (Darko's ruled fallback): no site step asks them and no act
-//       carries them; a new house takes the co-sign road, where the handle follows the berth's narrower rule, said out loud;
+//       carries them; a new house takes the co-sign road, where the handle is the office's 2–40 where its card declares it (the receiver),
+//       and the berth's narrower rule, said out loud, where it doesn't;
 //   (5) every other piece has an honest fate: AFTER (this page writes it through the resident's own doors once admitted) or HELD (not sent);
 //   (6) after admission, writes go only through the resident's existing doors, only for a handle this sign-in holds, never to a human door, and
 //       a part that fails says so without undoing the rest.
@@ -83,6 +84,19 @@ test("(1) the approved steps, in order, and the Registrar has words for each, he
   assert.equal(stepOfHash("#step-99", plan), null);
 });
 
+// Darko, 2026-11-27: "let's fix everything the lane said the uat testers might trip on and then freeze w49". Three of those are her words: the
+// co-sign's two tabs, a "You're in" where an extra didn't save, and a sign-in that has lapsed. CAN FAIL: drop any of the sentences pinned here.
+test("(1) she explains the co-sign's two tabs, says the house is in when an extra didn't save, and says a lapsed sign-in out loud", () => {
+  const said = (k) => REGISTRAR[k].map((p) => (typeof p === "string" ? p : p[0])).join("");
+  assert.match(said("cosign"), /opens the office's co-sign page in a second tab/);
+  assert.match(said("cosign"), /This page waits here and carries on by itself once you've confirmed\./);
+  assert.match(said("cosign"), /If either tab closes, your agent keeps their place: the berth holds for about a week\./);
+  assert.match(said("inPartly"), /I've written your house into the register, and that's the part that counts\./);
+  assert.match(said("inPartly"), /didn't save/);
+  assert.match(said("lapsed"), /Your earlier sign-in here has lapsed, so this starts a new house\. If you meant to add to a house you keep, sign in again/);
+  assert.doesNotMatch(said("lapsed"), /Welcome to Postmark|I'm Regina/, "the lapsed line introduces her again");
+});
+
 test("(1) she speaks first, on /join/, the moment you press Join; the move-in page carries her conversation on, and her lines on the steps stay short", () => {
   // Darko, 2026-11-26 10:15 EST: "we should have the registrar say, like, welcome to Postmark, I'm the registrar and I will, you know, help you
   // join, or some kind of like intro sentence first"; later that day: "I'm also wanting the Registrar's introduction/first bubble to be from the
@@ -147,8 +161,8 @@ test("(1) the page's own pieces are its boxes: one ghost per piece, a word from 
   assert.equal(CONCEPT.agent.ghost, "Your agent's name");
   // every lit piece is a slot of its step (or the picture, filled from the drawer)
   for (const s of STEPS) for (const id of s.lit) assert.ok(id === "picture" || (slots.includes(id) && CONCEPT[id].step === s.id), `${s.id} lights ${id}`);
-  // on the berth's road she says the berth's rule when the reader is in the handle
-  assert.match(plan.pieces.handle.say, /2–31/);
+  // on the berth's road she says the handle's rule when the reader is in it: the office's 2–40 on this card (the receiver's, test 4)
+  assert.match(plan.pieces.handle.say, /2–40/);
   // the problem beside a piece: too long at once; "needed" only once the reader has been stopped for it
   assert.equal(pieceProblem(plan, "handle", { handle: "" }), null);
   assert.equal(pieceProblem(plan, "handle", { handle: "" }, { missing: true }).kind, "missing");
@@ -264,16 +278,30 @@ test("(4) the human's profile and the likeness: no act asks them here, and none 
   assert.ok(!Object.keys(CONCEPT).some((id) => HUMAN.includes(id)), "a human piece is back in the site's table");
 });
 
-test("(4) a new house takes the co-sign road, and on it the handle follows the berth's rule out loud: 31 at most, said in the box's own words", () => {
-  const plan = planFor(DECLARE_F22, { act: "declare" });
+// LAW (Wright, CORE-188, 2026-11-26): "keep the accepted 2–40 characters. The new join must not reject names the town already accepts. The office
+// carries the chosen final handle separately from the temporary berth slug … PR #503 goes back to 40 once it lands." Office #1237 is that
+// receiver, and its card declares the handle's limit (DECLARE_SCHEMA handle: maxLength 40, x-limit 40); today's office declares none.
+// Until 2026-11-27 this test asserted 31 on the accepted card too; that card is now the receiver's, and 31 holds only where no limit is declared.
+test("(4) a new house takes the co-sign road: the handle is the office's 2–40 where its card declares it, and the berth's 31, said out loud, where it doesn't", () => {
   assert.equal(cosignRoad("declare"), true);
   assert.ok(!cosignRoad("add-resident") && !cosignRoad("begin"), "an existing house, or the agent route, was sent down the berth road");
-  assert.deepEqual([plan.pieces.handle.max, plan.pieces.handle.maxFrom, plan.pieces.handle.berth], [31, "berth", true]);
-  assert.match(plan.pieces.handle.hint, /boards your agent's berth.*2–31/);
-  assert.equal(planFor(ADD, { act: "add-resident", keepsHouse: true }).pieces.handle.max, 40, "add-resident's handle was narrowed by a road it doesn't take");
+  // the receiver's card: the office's own limit, its own words
+  const plan = planFor(DECLARE_F22, { act: "declare" });
+  assert.deepEqual([plan.pieces.handle.max, plan.pieces.handle.maxFrom, plan.pieces.handle.berth, plan.pieces.handle.chosenApart], [40, "office", true, true]);
+  assert.match(plan.pieces.handle.hint, /2–40 lowercase letters, digits and single hyphens, not starting with the- or berth-/);
+  assert.doesNotMatch(plan.pieces.handle.hint, /31/, "the receiver's handle still says the berth's 31");
+  const forty = "a".repeat(18) + "-of-the-" + "b".repeat(14);
+  assert.deepEqual(stepProblems(plan, "who", { handle: forty }), [], "a 40-character handle the town accepts was refused by the join");
+  assert.equal(stepProblems(plan, "who", { handle: "x".repeat(41) })[0].kind, "over", "41 is over the office's 40");
   assert.equal(problemWords(stepProblems(plan, "who", { handle: "the-heron" })[0]), "A handle can't start with the- or berth-: those are the town's own prefixes.");
-  assert.equal(stepProblems(plan, "who", { handle: "x".repeat(32) })[0].kind, "over", "32 characters is over the berth's 31");
+  assert.equal(problemWords(stepProblems(plan, "who", { handle: "berth-heron" })[0]), "A handle can't start with the- or berth-: those are the town's own prefixes.");
   assert.deepEqual(stepProblems(plan, "who", { handle: "quillon" }), []);
+  // the control: today's card declares no handle limit, so the berth's name becomes the handle and its 31 rule is said out loud
+  const old = planFor(DECLARE_F0, { act: "declare" });
+  assert.deepEqual([old.pieces.handle.max, old.pieces.handle.maxFrom, old.pieces.handle.chosenApart], [31, "berth", false]);
+  assert.match(old.pieces.handle.hint, /boards your agent's berth.*2–31/);
+  assert.equal(stepProblems(old, "who", { handle: "x".repeat(32) })[0].kind, "over", "32 characters is over the berth's 31");
+  assert.equal(planFor(ADD, { act: "add-resident", keepsHouse: true }).pieces.handle.max, 40, "add-resident's handle was narrowed by a road it doesn't take");
 });
 
 // ── (5) every other piece's fate ─────────────────────────────────────────────
@@ -344,14 +372,16 @@ test("(6) a sign-in that doesn't hold the new handle writes nothing, and each pa
   const out = await afterAdmission({ handle: "quillon", base: "https://office.invalid", tok: TOK, writes: { profile: { bio: "b" }, picture: true, sheet: true }, picture: PICTURE, sheet: SHEET, send: o.send, fetchFn: o.fetchFn });
   assert.deepEqual(plain(o.calls.map((c) => c.method)), ["GET"], "a write went out for a handle this sign-in does not hold");
   assert.deepEqual(plain(out.map((r) => [r.id, r.ok])), [["profile", false], ["picture", false], ["sheet", false]]);
-  for (const r of out) assert.match(r.words, /^Not set yet: your sign-in doesn't act for quillon yet\./);
+  for (const r of out) assert.match(r.words, /^Not saved yet: your sign-in doesn't act for quillon yet\. Your agent is in all the same\./);
 });
 
 test("(6) one part refused: it says so in the office's words, and the others still go", async () => {
   const o = fakeOffice({ refuse: { "PATCH /profile/quillon/avatar": 413 } });
   const out = await afterAdmission({ handle: "quillon", base: "https://office.invalid", tok: TOK, writes: { profile: { bio: "b" }, picture: true, sheet: true }, picture: PICTURE, sheet: SHEET, send: o.send, fetchFn: o.fetchFn });
   assert.deepEqual(plain(out.map((r) => [r.id, r.ok])), [["profile", true], ["picture", false], ["sheet", true]]);
-  assert.match(out[1].words, /^Not put up: the invented office said no\. Put it up on Edit profile/);
+  // a part that didn't save never reads as a failed join: the office's reason, that the agent is in, and where to try that part again
+  // (until 2026-11-27 this asserted "Not put up: … Put it up on Edit profile")
+  assert.match(out[1].words, /^Not saved: the invented office said no\. Your agent is in all the same\. Try again from Edit profile, on your agent's page\.$/);
   assert.deepEqual(await afterAdmission({ handle: "quillon", base: "x", tok: TOK, writes: { profile: null, picture: false, sheet: false }, send: o.send, fetchFn: o.fetchFn }), [], "nothing asked, nothing called");
 });
 
@@ -432,7 +462,7 @@ test("(7) after admission: the glance, then the detail under it, through the wor
   out = await afterAdmission({ handle: "quillon", base: "https://office.invalid", tok: TOK, writes, send: o.send, fetchFn: o.fetchFn });
   assert.equal(o.calls.filter((c) => c.path === "/world/apex").length, 1, "a detail went out after a refused glance");
   assert.deepEqual(plain(out.map((r) => [r.id, r.ok])), [["appearance", false], ["detail", false]]);
-  assert.match(out[0].words, /^Not set: the invented office said no\. You wrote “A heron in a coat\.” \(what it is: “a heron of a Claude”\)\./);
+  assert.match(out[0].words, /^Not saved: the invented office said no\. You wrote “A heron in a coat\.” \(what it is: “a heron of a Claude”\)\./);
   assert.match(out[1].words, /^Not sent: a detail hangs under the glance, which didn't land\. You wrote “A brass thimble worn on one claw\.” \(left-claw: “brass, worn smooth”\)/);
   // a 200 that doesn't name the node is not a success
   const quiet = { ...fakeOffice(), send: async (r) => (r.url.endsWith("/world/apex") ? { status: 200, data: { ok: true } } : { status: 200, data: {} }) };
@@ -444,12 +474,12 @@ test("(7) after admission: the glance, then the detail under it, through the wor
   const half = async (r) => { if (!r.url.endsWith("/world/apex")) return { status: 200, data: {} }; n += 1; return n === 1 ? { status: 200, data: { described: "quillon/appearance" } } : { status: 422, data: { defect: "body is 151 chars; the cap is 150" } }; };
   out = await afterAdmission({ handle: "quillon", base: "https://office.invalid", tok: TOK, writes, send: half, fetchFn: fakeOffice().fetchFn });
   assert.deepEqual(plain(out.map((r) => [r.id, r.ok])), [["appearance", true], ["detail", false]]);
-  assert.match(out[1].words, /^Not set: body is 151 chars; the cap is 150\. The glance stands\./);
+  assert.match(out[1].words, /^Not saved: body is 151 chars; the cap is 150\. The glance stands\./);
   // a sign-in that doesn't hold the handle: nothing written, each part says where it's set
   o = fakeOffice({ owns: false });
   out = await afterAdmission({ handle: "quillon", base: "https://office.invalid", tok: TOK, writes, send: o.send, fetchFn: o.fetchFn });
   assert.deepEqual(plain(o.calls.map((c) => c.method)), ["GET"]);
-  for (const r of out) assert.match(r.words, /^Not set yet: .*world \{ do: "describe" \}/);
+  for (const r of out) assert.match(r.words, /^Not saved yet: .*world \{ do: "describe" \}/);
 });
 
 test("(6) the picture travels as framed: the square the preview shows, at most 512 px", () => {

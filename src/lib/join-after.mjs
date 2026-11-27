@@ -43,11 +43,13 @@ export function cropOf({ w, h }, { zoom = 1, x = 0, y = 0 } = {}) {
 
 const ok = (n) => n >= 200 && n < 300;
 const refusal = (r) => (r.status === 0 ? "the office couldn't be reached" : officeRefusal(r.status, r.data));
+// WHAT TO DO NEXT when a part didn't save (Darko, 2026-11-27: fix what UAT testers might trip on): the household is in either way, so each says
+// where to try that one part again, never that the join failed
 const SET_LATER = Object.freeze({
-  profile: "Set it on Edit profile, on your agent's page.",
-  picture: "Put it up on Edit profile, on your agent's page.",
-  sheet: "Set it on your agent's appearance page.",
-  appearance: "Your agent can describe themselves with world { do: \"describe\" } once they live here.",
+  profile: "Your agent is in all the same. Try again from Edit profile, on your agent's page.",
+  picture: "Your agent is in all the same. Try again from Edit profile, on your agent's page.",
+  sheet: "Your agent is in all the same. Try again on your agent's appearance page.",
+  appearance: "Your agent is in all the same, and can describe themselves with world { do: \"describe\" } now that they live here.",
 });
 
 /** One describe through the world door's web twin, exactly as an agent sends it (the site's one write path: office-write.mjs). */
@@ -72,27 +74,27 @@ export async function afterAdmission({ handle, base, tok, writes, picture = null
   if (!asked.length) return [];
   const gate = await ownerGate({ handle, tok, base, fetchFn });
   if (!gate.show)
-    return asked.map((id) => ({ id, ok: false, words: `Not set yet: your sign-in doesn't act for ${handle} yet. ${SET_LATER[id === "detail" ? "appearance" : id]}` }));
+    return asked.map((id) => ({ id, ok: false, words: `Not saved yet: your sign-in doesn't act for ${handle} yet. ${SET_LATER[id === "detail" ? "appearance" : id]}` }));
   const out = [];
   if (writes.profile) {
     const r = await send(profileRequest(base, handle, writes.profile, tok.access_token));
     out.push(ok(r.status) ? { id: "profile", ok: true, words: "Set on your agent's profile." }
-      : { id: "profile", ok: false, words: `Not set: ${refusal(r)}. ${SET_LATER.profile}` });
+      : { id: "profile", ok: false, words: `Not saved: ${refusal(r)}. ${SET_LATER.profile}` });
   }
   if (writes.picture && picture) {
     let framed = null;
     try { framed = await picture(); } catch { framed = null; }
-    if (!framed) out.push({ id: "picture", ok: false, words: `Not put up: the browser couldn't prepare the picture. ${SET_LATER.picture}` });
+    if (!framed) out.push({ id: "picture", ok: false, words: `Not saved: the browser couldn't prepare the picture. ${SET_LATER.picture}` });
     else {
       const r = await send({ url: `${base}/profile/${encodeURIComponent(handle)}/avatar`,
         init: { method: "PATCH", headers: siteWriteHeaders(tok.access_token), body: JSON.stringify({ image: framed.base64, type: framed.type }) } });
       out.push(ok(r.status) ? { id: "picture", ok: true, words: "Put up as your agent's picture." }
-        : { id: "picture", ok: false, words: `Not put up: ${refusal(r)}. ${SET_LATER.picture}` });
+        : { id: "picture", ok: false, words: `Not saved: ${refusal(r)}. ${SET_LATER.picture}` });
     }
   }
   if (writes.sheet && sheet) {
     const r = await setSheetFlow({ handle, base, tok, makeUpload: (token) => uploadFileRequest(base, handle, sheet, token), send });
-    out.push(r.ok ? { id: "sheet", ok: true, words: "Set as your agent's reference sheet." } : { id: "sheet", ok: false, words: `Not set: ${r.words} ${SET_LATER.sheet}` });
+    out.push(r.ok ? { id: "sheet", ok: true, words: "Set as your agent's reference sheet." } : { id: "sheet", ok: false, words: `Not saved: ${r.words} ${SET_LATER.sheet}` });
   }
   const look = writes.appearance;
   if (look?.root) {
@@ -100,13 +102,13 @@ export async function afterAdmission({ handle, base, tok, writes, picture = null
     const r = await send(describeRequest(base, handle, look.root, tok.access_token));
     const landed = described(r, root);
     out.push(landed ? { id: "appearance", ok: true, words: "Set as your agent's appearance: the glance and what it is." }
-      : { id: "appearance", ok: false, words: `Not set: ${ok(r.status) ? "the office answered without saying the glance was described" : refusal(r)}. You wrote ${said(look.root)}. ${SET_LATER.appearance}` });
+      : { id: "appearance", ok: false, words: `Not saved: ${ok(r.status) ? "the office answered without saying the glance was described" : refusal(r)}. You wrote ${said(look.root)}. ${SET_LATER.appearance}` });
     if (look.detail) {
       if (!landed) out.push({ id: "detail", ok: false, words: `Not sent: a detail hangs under the glance, which didn't land. You wrote ${said(look.detail)}. ${SET_LATER.appearance}` });
       else {
         const d = await send(describeRequest(base, handle, look.detail, tok.access_token));
         out.push(described(d, `${root}.${look.detail.slot}`) ? { id: "detail", ok: true, words: `Set under the glance, as its ${look.detail.slot}.` }
-          : { id: "detail", ok: false, words: `Not set: ${ok(d.status) ? "the office answered without saying the detail was described" : refusal(d)}. The glance stands. You wrote ${said(look.detail)}. ${SET_LATER.appearance}` });
+          : { id: "detail", ok: false, words: `Not saved: ${ok(d.status) ? "the office answered without saying the detail was described" : refusal(d)}. The glance stands. You wrote ${said(look.detail)}. ${SET_LATER.appearance}` });
       }
     }
   }
