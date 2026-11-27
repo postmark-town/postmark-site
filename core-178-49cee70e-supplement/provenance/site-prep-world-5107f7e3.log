@@ -1,0 +1,18 @@
+site-prep world: /home/seat/trees-interfaces/pool/site-3 at 39b752afe159; manifest pins 50fbbaf75bf2, installed 50fbbaf75bf2; installing 5107f7e36bed through run-heavy
+npm warn skipping integrity check for git dependency ssh://git@github.com/postmark-town/postmark-world.git
+
+changed 1 package in 4m
+npm notice
+npm notice New major version of npm available! 10.9.9 -> 12.2.3
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+npm notice To update run: npm install -g npm@12.2.3
+npm notice
+
+Receipt (site-prep world, 2026-11-27T22:40Z)
+- terminal outcome: run-heavy npm install exit 0
+- actually installed: postmark-world #5107f7e36bed96ea9369734d3b50496d051e0ce1 (node_modules/.package-lock.json)
+- head: 39b752afe159215cda00edd5b6365d26e613e7a0 before, 39b752afe159215cda00edd5b6365d26e613e7a0 after (unchanged)
+- overrides: package-lock.json, package.json (test overrides of the pin, uncommitted); lock left as npm wrote it
+- writers left in the tree: none
+- run-heavy: slot 1: free, slot 2: free, slot 3: free
+- verdict: prepared
