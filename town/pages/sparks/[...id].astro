@@ -11,6 +11,7 @@ import sparksData from "@/data/postmark/sparks.json";
 import residents from "@/data/postmark/residents.json";
 import { CATALOGUE_WORDS, collectSparks, eventOfSpark, sparkParam } from "@/lib/sparks.mjs";
 import { isRoomId, pictureOf, placeOf, residentHref, roomHref, roomIdOf } from "@/lib/calendar.mjs";
+import { sparkPreview } from "@/lib/og-image.mjs";
 
 export function getStaticPaths() {
   // the register's Sparks (read as served) and every Spark the event reads carry: an event card always has its page, listed in the register or not
@@ -28,12 +29,17 @@ const place = ev || seen ? placeOf((ev ?? seen).event.place) : null;
 const rooms = Array.isArray(s.rooms) ? s.rooms.map(roomIdOf).filter(isRoomId) : [];
 const by = typeof s?.credit?.by === "string" ? s.credit.by : null;
 const makerHref = by ? residentHref(by, roll) : null;
-const pictured = pictureOf(s) !== null;
+const pic = pictureOf(s);
+const pictured = pic !== null;
 const title = typeof s.body === "string" && s.body.trim() ? s.body.trim() : "A Spark";
+// A shared link previews with THIS Spark's own picture when it has a usable still (CORE-190, Darko 2026-11-25), else the Sparks section's card: see og-image.mjs sparkPreview.
+const preview = sparkPreview(pic);
 ---
 <PostmarkLayout
   door={{ get: "/api/world2/marks?all=true&full=true" }}
   title={`${title} — Postmark Sparks`}
+  image={preview.image}
+  card={preview.card}
   description={typeof s.recounting === "string" && s.recounting.trim() ? s.recounting.trim().slice(0, 200) : "A moment the town kept."}
   active="sparks"
 >
