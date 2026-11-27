@@ -602,8 +602,16 @@ test("BUILT: /sparks/ (register read OK) lists ONLY the register's Sparks, once 
       assert.match(c, /is-image-card/); assert.match(c, /data-spark-caption/);
       for (const gone of ["data-spark-recounting", "data-spark-when", "data-spark-rooms", "data-spark-flares", "data-spark-credit", "hh:", " by "]) assert.equal(c.includes(gone), false, `a pictured card carries no ${gone}`);
       assert.ok(c.indexOf("data-spark-picture") < c.indexOf("data-spark-caption"), "the caption is below the picture");
-    } else assert.match(c, /data-spark-flares/, "an unpictured card is as before, empty Flares place and all");
+    } else {
+      // UI-43 (Darko 2026-11-26): an unpictured card here is the COMPACT summary: its title (the whole-card link), a short excerpt and its credit; the dates,
+      // the room and the Flares place are on its own page
+      assert.match(c, /is-compact/); assert.match(c, /data-spark-compact/); assert.match(c, /data-spark-credit/);
+      for (const gone of ["data-spark-when", "data-spark-rooms", "data-spark-flares", "data-spark-picture"]) assert.equal(c.includes(gone), false, `a compact card carries no ${gone}`);
+    }
   }
+  const lamp = cards.find((c) => c.includes('data-spark="eventless-test/lamp"'));
+  assert.match(lamp, /data-spark-recounting[^>]*>Left burning for the ferry that never came\.</, "the excerpt is the served recounting (clamped by style, not cut)");
+  assert.ok(lamp.includes("by ") && lamp.includes("eventless-test"), "the credit stays on the compact card");
   const cells = html.split("data-spark-cell ").slice(1);
   assert.ok(cells.some((c) => c.includes('data-has-picture="1"')), "the fixture has a pictured card");
   assert.equal(html.includes("spk-tag"), false, "the old sibling tag row is gone");
@@ -621,7 +629,12 @@ test("BUILT: /sparks/ (register read OK) lists ONLY the register's Sparks, once 
   assert.doesNotMatch(gallery.match(/\.spk-grid \{[^}]*\}/)[0], /align-items:\s*start/, "the grid no longer pins cards to the top of a taller row");
   assert.match(gallery, /\.spk-cell \{[^}]*display: flex;/);
   assert.match(gallery, /\.spk-cell > :global\(\.spark-card\) \{[^}]*flex: 1 1 auto;[^}]*margin: 0;/, "a card fills its cell and has no margin of its own");
-  assert.match(gallery, /\.spk-cell > :global\(\.spark-card:not\(\.has-picture\) \.spark-recounting\) \{[^}]*line-clamp: 6;[^}]*overflow: hidden;/, "an unpictured card's recounting is clamped in the gallery, so it cannot stretch its row past its pictured neighbours");
+  // #513's gallery clamp (6 lines) is superseded by the compact card (UI-43): the gallery asks for it, and the card clamps its excerpt to three lines
+  assert.match(gallery, /<SparkCard spark=\{entry\.spark\} roll=\{roll\} compact\b/, "the gallery asks for the compact card");
+  assert.doesNotMatch(gallery, /line-clamp: 6/, "the old gallery-only clamp is not left beside it");
+  const cardSrc = readFileSync(join(ROOT, "src/components/SparkCard.astro"), "utf8");
+  assert.match(cardSrc, /const brief = compact && !pic && !!href;/, "compact applies only to an unpictured card that opens its page");
+  assert.match(cardSrc, /\.spark-card\.is-compact \.spark-recounting \{[^}]*line-clamp: 3;[^}]*overflow: hidden;/, "the excerpt is clamped by style on the compact card only, so it cannot stretch its row past its pictured neighbours");
   assert.doesNotMatch(html, /harvest-supper-pending-test|withdrawn-one-test|before-the-record-test/, "a pending/withdrawn reference is not a Spark here");
   assert.match(html, /data-spark-filters/); for (const f of SPARK_FILTERS) assert.ok(html.includes(`data-filter="${f.key}"`), f.key);
   assert.equal((html.match(/data-has-event="0"/g) ?? []).length, 2, "the register's eventless Sparks are drawn, the lamp among them");
@@ -634,7 +647,28 @@ test("BUILT: /sparks/ (register read OK) lists ONLY the register's Sparks, once 
   const src = readFileSync(join(ROOT, "town/pages/sparks/index.astro"), "utf8");
   assert.match(src, /registerOk \? CATALOGUE_WORDS\.register : CATALOGUE_WORDS\.unavailable/);
   assert.match(src, /: registerOk && <p[^>]*data-spark-none>/, "'none' is said only when the register was read");
-  assert.ok(textOf(html).includes(CATALOGUE_WORDS.flares) && textOf(html).includes(CATALOGUE_WORDS.flaresNone));
+  assert.equal(textOf(html).includes(CATALOGUE_WORDS.flaresNone), false, "the Flares place is on each Spark's own page, not in the gallery (UI-43)");
+});
+
+test("UI-43: the compact card is the /sparks/ gallery's only: the event page's cards and each Spark's own page keep every word, dates, room and Flares", () => {
+  // the flag is the gallery's alone: no other caller passes it (a gallery-only flag on every linked unpictured card would falsify the scope)
+  for (const rel of ["town/pages/events/[host]/[slug].astro", "town/pages/sparks/[...id].astro"]) {
+    assert.doesNotMatch(readFileSync(join(ROOT, rel), "utf8"), /<SparkCard[^>]*\bcompact\b/, `${rel} does not ask for the compact card`);
+  }
+  // each Spark's own page: the whole card, its dates and the Flares place, never the excerpt
+  const lampPage = built("sparks", "eventless-test", "lamp");
+  assert.ok(lampPage, "the lamp has its page");
+  const big = cardsOf(lampPage)[0];
+  assert.equal(big.includes("is-compact") || big.includes("data-spark-compact"), false, "the detail's own card is never compact");
+  for (const kept of ["data-spark-recounting", "data-spark-credit", "data-spark-when"]) assert.ok(big.includes(kept), `the Spark's page keeps ${kept}`);
+  assert.ok(textOf(lampPage).includes(CATALOGUE_WORDS.flaresNone), "and its Flares place");
+  // the event page's unpictured cards (its root and its gallery) are as before, Flares place and all
+  const evCards = cardsOf(eventHtml("supperkeeper-test/harvest-supper-test") ?? "").filter((c) => !/data-spark-picture/.test(c));
+  assert.ok(evCards.length > 0, "control: the event page has an unpictured Spark card");
+  for (const c of evCards) {
+    assert.equal(c.includes("is-compact") || c.includes("data-spark-compact"), false, "an event page's card is never compact");
+    assert.match(c, /data-spark-flares/, "an event page's unpictured card keeps its Flares place");
+  }
 });
 
 test("BUILT: every Spark has its page at its canonical address: its card in full (no card-wide link on itself), where it came from, the maker, and the empty Flares place", () => {
