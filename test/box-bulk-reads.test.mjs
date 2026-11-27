@@ -18,7 +18,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
-import { buildOfficeData, fetchLettersSince, fetchLetterCorpus, jsonText, readLetterCache, shortFetchPlan } from "../tools/lib/fetch-town-data.mjs";
+import { buildOfficeData, fetchLettersSince, fetchLetterCorpus, jsonText, readLetterCache, shortFetchPlan, eventRefreshPlan, fetchEventFiles, LETTERS_REFUSED, EMPTY_CALENDAR, EMPTY_EVENTS } from "../tools/lib/fetch-town-data.mjs";
+import { allEventViews } from "../src/lib/calendar.mjs";
 import { readLettersSeed } from "../tools/lib/letters-seed.mjs";
 import { readDoorsteps } from "../tools/lib/doorstep-reads.mjs";
 
@@ -369,6 +370,56 @@ test("LETTERS, A GOOD SEED IN HAND IS NEVER REPLACED BY A CARD-BUILT CORPUS: any
   const entry = readFileSync(new URL("../tools/fetch-town.mjs", import.meta.url), "utf8");
   assert.ok(entry.indexOf("await buildOfficeData(") < entry.indexOf("Object.entries(result.files)"), "the files are written only after the build returned");
   assert.match(entry, /const plan = shortFetchPlan\(\{ channel: process\.env\.PUBLIC_CHANNEL \?\? null \}\);\n  console\.warn\(plan\.line\);\n  process\.exit\(plan\.exitCode\);/);
+});
+
+test("CORE-177 (Wright, option b): a letters refusal off the release channel still refreshes the calendar and the lasting events, so event pages bake; the release channel still refuses; any other failure keeps everything", async () => {
+  // the pass's refusal is named, so the catch can tell it from an office that is down
+  const t = town();
+  const seed = await publishedOf(t);
+  const err = await build(breaking(office(t), (u) => u.includes("digests=1"), () => served(seed)), { lettersSeedUrl: SEED_URL, retries: 1 }).then(() => null, (e) => e);
+  assert.match(String(err?.message), REFUSED);
+  assert.equal(err.code, LETTERS_REFUSED, "the letters refusal carries its name");
+  // which failures refresh the events, on which channel (null: a local build with no channel named)
+  assert.equal(eventRefreshPlan({ channel: "snapshot", error: err }).refresh, true, "a preview (snapshot channel) refreshes the events after a letters refusal");
+  assert.equal(eventRefreshPlan({ channel: null, error: err }).refresh, true);
+  assert.equal(eventRefreshPlan({ channel: "release", error: err }).refresh, false, "the release channel still refuses to publish anything from a short fetch");
+  assert.equal(shortFetchPlan({ channel: "release" }).exitCode, 1);
+  assert.equal(eventRefreshPlan({ channel: "snapshot", error: new Error("GET /town -> 503") }).refresh, false, "an office that is down keeps the whole committed snapshot, as ever");
+  assert.equal(eventRefreshPlan({ channel: "snapshot", error: null }).refresh, false);
+
+  // the committed snapshot as #488's preview held it (ac7edcfb): an empty calendar and an absent lasting list, which bake no event page
+  const dir = mkdtempSync(join(tmpdir(), "postmark-core177-events-"));
+  writeFileSync(join(dir, "calendar.json"), jsonText(EMPTY_CALENDAR));
+  writeFileSync(join(dir, "events.json"), jsonText(EMPTY_EVENTS));
+  assert.equal(allEventViews(EMPTY_CALENDAR, EMPTY_EVENTS).length, 0, "control: the committed snapshot bakes no event page");
+  // an office whose event reads answer (the letters are not asked here at all): the calendar, the lasting list and the one-event read
+  const ENDED = { id: "vermillion/a-lantern-supper-test", title: "A lantern supper (invented)", host: "vermillion", phase: "ended", starts: "2026-11-20T18:00:00.000Z", ends: "2026-11-20T20:00:00.000Z" };
+  const asked = [];
+  const eventsOffice = (listStatus = 200) => async (url) => {
+    const u = new URL(url);
+    asked.push(u.pathname + u.search);
+    if (u.pathname === "/letters") throw new Error("the event refresh must not read letters");
+    if (u.pathname === "/calendar") return served({ as_of: "2026-11-27T03:00:00.000Z", now: [], coming: [], ended: [ENDED], total: 1 });
+    if (u.pathname === "/town/apex" && u.searchParams.get("read") === "calendar") return listStatus === 200 ? served({ as_of: "2026-11-27T03:00:00.000Z", past: [ENDED], next: null, note: null }) : served({ error: "refused" }, listStatus);
+    if (u.pathname === `/calendar/${ENDED.id}`) return served({ event: { ...ENDED, evidence: { rooms: ["t1795000000000-vermillion"], room_history: "complete", present: [], gallery: null } } });
+    return served({ error: "bounce" }, 404);
+  };
+  const fresh = await fetchEventFiles({ apiBase: OFFICE, dataDir: dir, fetchImpl: eventsOffice(), retries: 1 });
+  assert.equal(fresh.calendar.as_of, "2026-11-27T03:00:00.000Z", "the calendar is the office's fresh answer, not the committed empty one");
+  assert.equal(fresh.events.past.read, "office", "the lasting list is read from the office, not left `absent`");
+  assert.deepEqual(fresh.events.past.events.map((e) => e.id), [ENDED.id]);
+  assert.equal(fresh.events.evidence[ENDED.id]?.read, "ok", "its one-event read (rooms) is held");
+  assert.deepEqual(allEventViews(fresh.calendar, fresh.events).map((e) => e.id), [ENDED.id], "and the event page's getStaticPaths source now carries the event: its page is baked");
+  assert.equal(asked.some((p) => p.startsWith("/letters")), false);
+  // a lasting list that fails fails the refresh (the catch then keeps the committed calendar and events), never an empty claim over them
+  await assert.rejects(fetchEventFiles({ apiBase: OFFICE, dataDir: dir, fetchImpl: eventsOffice(500), retries: 1 }));
+
+  // the CLI: the refresh is the catch's, guarded by the plan, writes only those two files, and sits before the unchanged short-fetch verdict
+  const entry = readFileSync(new URL("../tools/fetch-town.mjs", import.meta.url), "utf8");
+  const katch = entry.slice(entry.lastIndexOf("} catch (error) {"));   // the outer catch (the per-file catches above it name `error` too)
+  assert.match(katch, /if \(eventRefreshPlan\(\{ channel: process\.env\.PUBLIC_CHANNEL \?\? null, error \}\)\.refresh\) \{/);
+  assert.deepEqual([...katch.matchAll(/writeDataFile\("([^"]+)"/g)].map((m) => m[1]), ["calendar.json", "events.json"], "only the calendar and the events are written from the catch");
+  assert.ok(katch.indexOf("eventRefreshPlan(") < katch.indexOf("const plan = shortFetchPlan("), "the refresh comes before the verdict, which is unchanged");
 });
 
 test("LETTERS, THE FAILED PASS DOES NOT POISON THE NEXT: the last good seed stays, the next pass reads over it and keeps the complete bodies; a legacy caller keeps its card fallback", async () => {

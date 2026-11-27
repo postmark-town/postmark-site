@@ -103,6 +103,18 @@ export function shortFetchPlan({ channel = null } = {}) {
   };
 }
 
+// ── THE LETTERS REFUSAL LEAVES THE EVENTS FRESH OFF THE RELEASE CHANNEL (CORE-177; Wright, 2026-11-27, option b) ──
+// A preview whose letters read is refused (the pass's LETTERS_REFUSED throw: a good published letters.json in hand and a letters door that did not
+// answer a complete corpus, e.g. throttled past the run's budget) keeps the committed snapshot as ever, but still refreshes the calendar and the lasting
+// events through their own readers (fetchEventFiles), because the event pages do not need letters. Only that refusal, and never on the release channel,
+// which still refuses to publish anything from a short fetch (shortFetchPlan). An office that is down, or any other failure, keeps everything as it was.
+export const LETTERS_REFUSED = "LETTERS_REFUSED";
+
+/** Whether fetch-town.mjs's catch refreshes the calendar and events after `error`. Pure, so a falsifier drives every branch without a build. */
+export function eventRefreshPlan({ channel = null, error = null } = {}) {
+  return { refresh: channel !== RELEASE_CHANNEL && error?.code === LETTERS_REFUSED };
+}
+
 export function jsonText(value) {
   return JSON.stringify(value, null, 1) + "\n";
 }
@@ -936,7 +948,8 @@ export async function buildOfficeData({
   // corpus, or carries no complete corpus FAILS THE PASS: fetch-town.mjs's catch and the release channel's short-fetch refusal then publish nothing, and the last good release, and
   // with it the last good seed, keeps serving. Every other mode (no seed feature, a cold or unreadable seed, a letter cache) and the success path are exactly as they were.
   const refuseCardsAsSeed = (why) => {
-    if (lettersSeed.state === "ok") throw new Error(`letters: ${why}; refusing to publish a corpus built from the resident cards over the last published letters.json, whose excerpts the next build would take as its seed (the last published file stays)`);
+    // named (LETTERS_REFUSED), so fetch-town.mjs's catch can tell this refusal from an office that is down (eventRefreshPlan, CORE-177)
+    if (lettersSeed.state === "ok") throw Object.assign(new Error(`letters: ${why}; refusing to publish a corpus built from the resident cards over the last published letters.json, whose excerpts the next build would take as its seed (the last published file stays)`), { code: LETTERS_REFUSED });
   };
   if (lettersSeed.state === "unreadable") endpointGaps.push(`letters.json: the last published file (${lettersSeedUrl}) could not be read (${lettersSeed.reason}), so the whole letter corpus is read this build`);
   if (lettersSeed.state === "none") endpointGaps.push(`letters.json: no published file at ${lettersSeedUrl} yet (a first build), so the whole letter corpus is read this build`);
@@ -1137,21 +1150,9 @@ export async function buildOfficeData({
   const docs = docsRead.missing ? readSnapshot("docs.json", {}) : docsRead.docs;
   if (docsRead.missing) endpointGaps.push(DOCS_GAP);
 
-  const calendarRead = await fetchCalendar({ apiBase, fetchImpl, retries, gate });
-  const calendar = calendarRead.missing ? readSnapshot("calendar.json", EMPTY_CALENDAR) : calendarRead.calendar;
-  if (calendarRead.missing) endpointGaps.push(CALENDAR_GAP);
-
-  // THE LASTING EVENTS (CORE-82): the past-events list and each event's evidence, kept beside the calendar. A door that
-  // is not live (400/404/405/422: it does not know `past`) says "unavailable" in the file and a gap here, and the committed snapshot's events
-  // stand. Any other failure of the LIST (a 5xx, a timeout, a body that is not the list) fails the build, exactly as the calendar's own read does; one event's own read that fails is "unavailable" for that event.
-  // THE SEED (CORE-180): the last published events.json, one static GET that is not the office's keyless API. Absent (a first build) or unreadable (said here), the whole
-  // list is read, exactly as before; a seed never stands in for a read, and a failed list read still fails the build below. It is the lasting list's held ROWS only: the durable
-  // archive (CORE-174, below) is the held state of events AND evidence, and a seed's evidence is never read as an answer.
-  const seedRead = await readEventsSeed({ url: eventsSeedUrl, fetchImpl });
-  if (seedRead.state === "unreadable") endpointGaps.push(`events.json: the last published file (${eventsSeedUrl}) could not be read (${seedRead.reason}), so the whole lasting list and every one-event read are made this build`);
-  if (seedRead.state === "none") endpointGaps.push(`events.json: no published file at ${eventsSeedUrl} yet (a first build), so the whole lasting list and every one-event read are made this build`);
-  const eventsRead = await fetchEventsArchived({ apiBase, fetchImpl, retries, gate, calendar, trackedSnapshot: readSnapshot("events.json", EMPTY_EVENTS), eventsArchivePath, seed: seedRead.state === "ok" ? seedRead.events : null });
-  endpointGaps.push(...eventsRead.gaps);
+  const eventFiles = await fetchEventFiles({ apiBase, dataDir, fetchImpl, retries, gate, eventsArchivePath, eventsSeedUrl });
+  const calendar = eventFiles.calendar;
+  endpointGaps.push(...eventFiles.gaps);
 
   // THE SPARK REGISTER (CORE-121): the public standing-mark register's Sparks; any failure is "unavailable" in the file and a gap, never an empty catalogue.
   const sparksRead = await fetchSparks({ apiBase, fetchImpl, retries, gate });
@@ -1196,7 +1197,7 @@ export async function buildOfficeData({
       "docs.json": docs,
       "stats.json": buildStats({ town, metrics, residents, letters, ledger, snapshotStats }),
       "calendar.json": calendar,
-      "events.json": eventsRead.events,
+      "events.json": eventFiles.events,
       "sparks.json": sparksRead.sparks,
       "quest-posts.json": questPosts,
       "idea-posts.json": ideaPosts,
@@ -1204,6 +1205,32 @@ export async function buildOfficeData({
       "households.json": households,
     },
   };
+}
+
+/**
+ * The calendar and the lasting events, as buildOfficeData reads them and as fetch-town.mjs's catch re-reads them after a letters refusal
+ * (eventRefreshPlan, CORE-177): one path, so the two cannot drift. Returns { calendar, events, gaps }; a failure of the lasting list (or of
+ * the calendar beyond its 404) throws, exactly as it fails a whole pass, and the caller keeps what it held.
+ */
+export async function fetchEventFiles({ apiBase, dataDir, fetchImpl = fetch, retries = 3, gate = createRateGate(), eventsArchivePath = null, eventsSeedUrl = null } = {}) {
+  const readSnapshot = snapshotReader(dataDir);
+  const gaps = [];
+  const calendarRead = await fetchCalendar({ apiBase, fetchImpl, retries, gate });
+  const calendar = calendarRead.missing ? readSnapshot("calendar.json", EMPTY_CALENDAR) : calendarRead.calendar;
+  if (calendarRead.missing) gaps.push(CALENDAR_GAP);
+
+  // THE LASTING EVENTS (CORE-82): the past-events list and each event's evidence, kept beside the calendar. A door that
+  // is not live (400/404/405/422: it does not know `past`) says "unavailable" in the file and a gap here, and the committed snapshot's events
+  // stand. Any other failure of the LIST (a 5xx, a timeout, a body that is not the list) fails the build, exactly as the calendar's own read does; one event's own read that fails is "unavailable" for that event.
+  // THE SEED (CORE-180): the last published events.json, one static GET that is not the office's keyless API. Absent (a first build) or unreadable (said here), the whole
+  // list is read, exactly as before; a seed never stands in for a read, and a failed list read still fails the build below. It is the lasting list's held ROWS only: the durable
+  // archive (CORE-174, below) is the held state of events AND evidence, and a seed's evidence is never read as an answer.
+  const seedRead = await readEventsSeed({ url: eventsSeedUrl, fetchImpl });
+  if (seedRead.state === "unreadable") gaps.push(`events.json: the last published file (${eventsSeedUrl}) could not be read (${seedRead.reason}), so the whole lasting list and every one-event read are made this build`);
+  if (seedRead.state === "none") gaps.push(`events.json: no published file at ${eventsSeedUrl} yet (a first build), so the whole lasting list and every one-event read are made this build`);
+  const eventsRead = await fetchEventsArchived({ apiBase, fetchImpl, retries, gate, calendar, trackedSnapshot: readSnapshot("events.json", EMPTY_EVENTS), eventsArchivePath, seed: seedRead.state === "ok" ? seedRead.events : null });
+  gaps.push(...eventsRead.gaps);
+  return { calendar, events: eventsRead.events, gaps };
 }
 
 // ── THE LEDGER AND THE DOCS (POS-351, 2026-10-04) ───────────────────────────
