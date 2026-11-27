@@ -9,6 +9,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildOfficeData, fetchBlueprints, fetchRollcall, fetchCrossings, jsonText, shortFetchPlan } from "./lib/fetch-town-data.mjs";
+import { defaultEventsSeedUrl } from "./lib/past-events-cache.mjs";
+import { defaultLettersSeedUrl } from "./lib/letters-seed.mjs";
 import { worldPin } from "./lib/world-pin-publish.mjs";
 import { readProjectsFromCheckout } from "./lib/town-projects.mjs";
 import { readQuestRegistryFromCheckout } from "./lib/town-quest-registry.mjs";
@@ -43,6 +45,16 @@ const LETTER_CACHE = process.env.POSTMARK_LETTER_CACHE || null;
 // Where the event archive is kept between builds (CORE-174): a file OUTSIDE the tree, because the box's refresh force-checks-out and cleans the tree before this runs, so the
 // tracked events.json is the empty committed file on every pass (tools/lib/events-archive-state.mjs). Unset, the committed snapshot is all there is, as it always was.
 const EVENTS_ARCHIVE = process.env.POSTMARK_EVENTS_ARCHIVE || null;
+// Where the past calendar is kept between builds (CORE-180, tools/lib/past-events-cache.mjs): the site's own last PUBLISHED events.json. Every pass writes it to
+// public/atelier/postmark/data, so it survives a clean Actions checkout and the box refresh's reset and clean, which the tracked src/data/postmark/events.json does not.
+// It is one static GET, not the office's keyless API; with it a build reads the newest list page(s) of the lasting list only until it meets an event it already holds (every
+// event's one-event read is still made every pass). It is the DEFAULT ONLY when this run reads the production API (the default, or POSTMARK_API / --api naming the same
+// address): a build of another office is never seeded with production's events. Set POSTMARK_EVENTS_SEED_URL to opt another build in, or to the empty string for none.
+const EVENTS_SEED_URL = defaultEventsSeedUrl({ env: process.env, api: API, defaultApi: DEFAULT_API, townBase: TOWN_BASE });
+// The same for the letter corpus (CORE-180, tools/lib/letters-seed.mjs): the site's own last PUBLISHED letters.json, used only where there is no letter cache above (the Actions
+// release lane's clean checkout), so the build reads the office's inventory and only the letters it does not hold or that are still in transit, not the whole corpus. Default on
+// for the production API only; POSTMARK_LETTERS_SEED_URL opts another build in, the empty string is none.
+const LETTERS_SEED_URL = defaultLettersSeedUrl({ env: process.env, api: API, defaultApi: DEFAULT_API, townBase: TOWN_BASE });
 const TOWN_ARG = arg("--town", null);
 const TOWN = TOWN_ARG ? resolve(TOWN_ARG) : null;
 if (TOWN) refuseLinkedCheckout(TOWN);
@@ -145,7 +157,7 @@ try {
   if (TOWN && !existsSync(join(TOWN, "MEEPS"))) {
     console.warn(`WARN: supplied --town has no MEEPS directory; meeps.json will use the committed snapshot: ${TOWN}`);
   }
-  const result = await buildOfficeData({ apiBase: API, dataDir: DATA_DIR, townRoot: TOWN, letterCachePath: LETTER_CACHE, eventsArchivePath: EVENTS_ARCHIVE });
+  const result = await buildOfficeData({ apiBase: API, dataDir: DATA_DIR, townRoot: TOWN, letterCachePath: LETTER_CACHE, eventsArchivePath: EVENTS_ARCHIVE, eventsSeedUrl: EVENTS_SEED_URL, lettersSeedUrl: LETTERS_SEED_URL });
   for (const [name, value] of Object.entries(result.files)) writeDataFile(name, value);
   // ── WHETHER THE INVITATION ROLL IS LIVE (POS-576) ─────────────────────────
   // A build input, not a public file: the join carries an invite only for a

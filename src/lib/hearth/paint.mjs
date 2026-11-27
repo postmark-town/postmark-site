@@ -99,12 +99,14 @@ export function paintMail(root, reads, ctx) {
   if (!m) { said(ul, "The house’s mail could not be read just now."); box.hidden = false; return; }
   const line = (n, text) => { if (n > 0) ul.appendChild(el("li", null, text)); };
   line(m.newInbound, plural(m.newInbound, "new inbound letter"));
-  line(m.awaitingStance, plural(m.awaitingStance, "mark") + " awaiting the house’s word");
+  const stancePartial = !m.stanceComplete || m.stanceUncertain;
+  line(m.awaitingStance, (stancePartial ? "At least " : "") + plural(m.awaitingStance, "mark") + " awaiting the house’s word");
+  if (stancePartial) said(ul, m.awaitingStance > 0 ? "The exact stance count is uncertain." : "The stance count is unavailable or uncertain.");
   line(m.bounced, plural(m.bounced, "letter") + " that never arrived");
   line(m.waiting, plural(m.waiting, "letter") + " waiting for the crossing");
-  if (!ul.children.length) ul.appendChild(el("li", "hd-calm", "Nothing is new, and nothing waits on a word."));
+  if (!ul.children.length && m.complete && !stillOut) ul.appendChild(el("li", "hd-calm", "Nothing is new, and nothing waits on a word."));
   if (stillOut) said(ul, `Still reading ${plural(stillOut, "resident")}, so these counts may be short.`);
-  else if (!m.complete) said(ul, "Not every resident’s doorstep answered, so these counts may be short.");
+  else if (ctx.handles.some((h) => !reads.doorsteps?.[h])) said(ul, "Not every resident’s doorstep answered, so these counts may be short.");
   box.hidden = false;
 }
 

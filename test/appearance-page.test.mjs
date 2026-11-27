@@ -11,7 +11,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { likenessOf, likenessLink, likenessWords, liveLikenessLine, appearanceRows, appearanceUnread, sheetView } from "../src/lib/appearance.mjs";
+import { likenessOf, likenessLink, likenessWords, liveLikenessLine, appearanceRows, appearanceUnread, sheetView,
+  SHEET_NAME_MAX, sheetNameProblem, nameEditIntent, sheetUnreadWords, sheetAlt, sheetWhose } from "../src/lib/appearance.mjs";
 import { buildHouses } from "../src/lib/houses.mjs";
 
 test("the likeness answer: given only on yes; no and unanswered both read as not given, each in its own words", () => {
@@ -124,4 +125,72 @@ test("a failed close look is told apart from nothing described", () => {
   assert.equal(appearanceUnread({ appearance: { unavailable: "the appearance could not be read from the record just now" } }), true);
   assert.equal(appearanceUnread({ handle: "wick" }), false, "a card with no appearance is nothing described");
   assert.equal(appearanceUnread({ appearance: { body: "A small figure." } }), false);
+});
+
+// ── CORE-175: who a sheet shows (POS-1202's sheets[].name). Invented handles and media only. ─────────────────────────────────────────
+
+test("CORE-175: the sheet view keeps each sheet's name, and an absent or empty one is unnamed (null), never invented", () => {
+  const view = sheetView({ read: "sheet", likeness: "given", sheets: [
+    { id: "s1", url: "https://media.postmark.town/media/qa-many/a.webp", own: true, made_by: "qa-many", name: "Julian" },
+    { id: "s2", url: "https://media.postmark.town/media/qa-many/b.webp", own: true, made_by: "qa-many" },
+    { id: "s3", url: "https://media.postmark.town/media/the-town/c.webp", own: false, made_by: "the-town", name: "" }] });
+  assert.deepEqual(view.sheets.map((s) => s.name), ["Julian", null, null]);
+  assert.deepEqual(view.sheets.map((s) => s.id), ["s1", "s2", "s3"]);
+  assert.deepEqual(view.sheets.map((s) => [s.own, s.townMade]), [[true, false], [true, false], [false, true]], "maker and source stay whole");
+});
+
+test("CORE-175: the caption and alt: a name before whose it is; an unnamed sheet's words are exactly today's", () => {
+  assert.equal(sheetWhose({ own: true }), "the household's own");
+  assert.equal(sheetWhose({ own: false }), "the town's");
+  assert.equal(sheetAlt("qa-many", null), "qa-many's reference sheet");
+  assert.equal(sheetAlt("qa-many", "Vex"), "qa-many's reference sheet: Vex");
+});
+
+test("CORE-175: the name check is the office's measure: trimmed, 80 code points (not UTF-16 units), one line, no controls", () => {
+  assert.equal(SHEET_NAME_MAX, 80);
+  assert.equal(sheetNameProblem(""), null, "blank is a clear, allowed");
+  assert.equal(sheetNameProblem("   "), null);
+  assert.equal(sheetNameProblem("a".repeat(80)), null);
+  assert.equal(sheetNameProblem("  " + "a".repeat(80) + "  "), null, "trimmed first");
+  assert.match(sheetNameProblem("a".repeat(81)), /at most 80 characters; this is 81/);
+  // 80 astral characters are 160 UTF-16 units: a browser's maxlength would refuse what the office takes
+  assert.equal(sheetNameProblem("🐦".repeat(80)), null);
+  assert.match(sheetNameProblem("🐦".repeat(81)), /this is 81/);
+  for (const c of ["\n", "\t", "\u0000", "\u001f", "\u007f", "\u0085", "\u009f"])
+    assert.match(sheetNameProblem(`Vex${c}Alaric`), /one line of plain text/, JSON.stringify(c));
+  assert.equal(sheetNameProblem("Vex\n"), null, "a trailing newline is trimmed away, as the office trims");
+  assert.equal(sheetNameProblem('<img src=x onerror="alert(1)">'), null, "markup-looking text is just text: the office takes it, the page sets it as text");
+});
+
+test("CORE-175: a Save under a kept sheet: blank on an unnamed sheet sends nothing; blank on a named one is the explicit clear", () => {
+  assert.deepEqual(nameEditIntent("", null), { send: false, words: "Type who this sheet shows, then save." });
+  assert.deepEqual(nameEditIntent("  ", null).send, false);
+  assert.deepEqual(nameEditIntent("", "Vex"), { send: true, name: "" });
+  assert.deepEqual(nameEditIntent("  Julian ", null), { send: true, name: "Julian" });
+  assert.deepEqual(nameEditIntent("Julian", "Vex"), { send: true, name: "Julian" });
+  assert.equal(nameEditIntent("🐦".repeat(81), "Vex").send, false, "too long is said before the network, and nothing is cleared");
+});
+
+test("CORE-175: a sheet read that didn't answer is said in the office's words, never as no sheet or unnamed", () => {
+  const w = sheetUnreadWords(503, { defect: "the sheet names can't be read just now", hint: "try again shortly" });
+  assert.match(w, /\(503\): the sheet names can't be read just now: try again shortly/);
+  for (const words of [w, sheetUnreadWords(500, null), sheetUnreadWords(0, null)])
+    assert.doesNotMatch(words, /no sheet|unnamed|nothing/i);
+  assert.match(sheetUnreadWords(0, null), /Couldn't reach the office/);
+  assert.match(sheetUnreadWords(500, null), /\(500\)\. Reload to try again\./);
+});
+
+test("CORE-175: the page sets names as text, gates the boxes by /me (never the sheet's own flag), and adds no UTF-16 maxlength", () => {
+  const page = readFileSync(new URL("../town/pages/residents/[handle]/appearance.astro", import.meta.url), "utf8");
+  assert.doesNotMatch(page, /innerHTML|insertAdjacentHTML|outerHTML/);
+  assert.match(page, /who\.textContent = name/, "the name is text");
+  assert.doesNotMatch(page, /maxlength/i, "the office's 80 is code points; the page checks with sheetNameProblem instead");
+  assert.match(page, /owner = gate\.show; showNameBoxes\(\)/, "the boxes follow the same ownerGate as the upload");
+  assert.doesNotMatch(page, /s\.own[^\n]*nameBox|nameBox[^\n]*s\.own/, "no box is offered or withheld by the sheet's own/maker flag");
+  assert.match(page, /form\.hidden = !owner/, "built hidden until the gate says owner");
+  assert.match(page, /const name = newName\.value\.trim\(\) \|\| undefined/, "an untouched upload box sends the bare keep");
+  assert.match(page, /data-ap-sheets-unread/);
+  assert.match(page, /sheetUnreadWords\(status, data\)/, "a failed sheet read is said, not painted empty");
+  assert.match(page, /<label for="ap-sheet-name">Who this sheet shows \(optional\)<\/label>/);
+  assert.match(page, /\.ap-sheets :global\(\.ap-name-edit\)/, "the painted boxes are styled through :global, as the sheets are");
 });

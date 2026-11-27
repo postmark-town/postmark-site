@@ -212,11 +212,48 @@ export function clocksOf(handles, doorsteps) {
 
 // ── needs you (the house's own sign-in only) ────────────────────────────────
 
+/** Pending stances belong to their reported scope, not to the doorstep that carried them.
+ * Household-scoped rows are repeated for every resident; only resident-scoped totals add.
+ * A truncated mark list is not a complete answer: use the reported scalar as a lower
+ * bound rather than treating the visible subset as the entire household.
+ */
+export function stancesOf(handles, doorsteps) {
+  const by = [];
+  const shared = [];
+  let complete = true;
+  for (const handle of handles) {
+    const doorstep = doorsteps?.[handle];
+    if (!doorstep) { complete = false; continue; }
+    const stances = doorstep.stances;
+    const count = num(stances?.stances_awaiting);
+    if (count == null) { complete = false; continue; }
+    if (stances.stances_awaiting_ground === "household") {
+      const ids = asArray(stances.awaiting)
+        .map((row) => typeof row?.mark === "string" ? row.mark : null)
+        .filter(Boolean);
+      shared.push({ handle, count, ids, full: stances.complete === true && ids.length === count });
+    } else if (count > 0) {
+      // Legacy and explicitly resident-scoped decisions are independent.
+      by.push({ handle, n: count });
+    }
+  }
+
+  let uncertain = !complete;
+  if (shared.length) {
+    const ids = new Set(shared.flatMap((entry) => entry.ids));
+    const allFull = shared.every((entry) => entry.full);
+    // Full pages provide canonical mark identities; short pages provide at
+    // least the office's household-wide count, never count × residents.
+    const n = allFull ? ids.size : Math.max(ids.size, ...shared.map((entry) => entry.count));
+    if (!allFull) uncertain = true;
+    if (n > 0) by.push({ handle: shared[0].handle, n, household: true });
+  }
+  by.sort((a, b) => b.n - a.n);
+  return { total: by.reduce((sum, row) => sum + row.n, 0), by, complete, uncertain };
+}
+
 export function needsOf(handles, doorsteps) {
-  const stances = handles
-    .map((h) => ({ handle: h, n: num(doorsteps?.[h]?.stances?.stances_awaiting) ?? 0 }))
-    .filter((x) => x.n > 0)
-    .sort((a, b) => b.n - a.n);
+  const stances = stancesOf(handles, doorsteps);
   const bounces = handles.flatMap((h) => asArray(doorsteps?.[h]?.awaiting?.unplaced_bounces).map((b) => ({
     handle: h, date: str(b.date), path: str(b.path), reason: str(b.reason), ageDays: num(b.age_days),
   })));
@@ -225,7 +262,7 @@ export function needsOf(handles, doorsteps) {
   })));
   const atRisk = handles.reduce((n, h) => n + (num(doorsteps?.[h]?.stakes?.at_risk) ?? 0), 0);
   return {
-    stances: { total: stances.reduce((n, x) => n + x.n, 0), by: stances },
+    stances,
     bounces,
     pending,
     atRisk,

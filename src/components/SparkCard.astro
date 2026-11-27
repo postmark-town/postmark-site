@@ -27,8 +27,10 @@ interface Props {
   flares?: boolean;
   /** the gallery's event / "no event named" line, drawn INSIDE an unpictured card (a pictured card is the picture and its one caption, and takes none) */
   eventLine?: string | null;
+  /** the /sparks/ gallery's COMPACT summary of an unpictured Spark (UI-43): its title, a short excerpt and its credit; off for every other caller */
+  compact?: boolean;
 }
-const { spark: s, roll = new Set(), root = false, link = true, flares = true, eventLine = null } = Astro.props;
+const { spark: s, roll = new Set(), root = false, link = true, flares = true, eventLine = null, compact = false } = Astro.props;
 const pic = pictureOf(s);
 const by = typeof s?.credit?.by === "string" ? s.credit.by : null;
 const household = typeof s?.credit?.household === "string" ? s.credit.household : null;
@@ -42,6 +44,11 @@ const href = link ? sparkHref(s?.id) : null;
 // served word below it. A card with no picture is exactly as before.
 const listed = !!pic && link;
 const big = !!pic && !link;
+// COMPACT (UI-43, Darko 2026-11-26: "Yes" to a compact /sparks/ card with title, short excerpt and author credit; dates and Flares on its own page; every word
+// stays on the Spark). Only where the gallery asks for it, and only for an UNPICTURED card that opens its page (a summary needs the page it summarises): its
+// recounting is drawn as a short excerpt and the dates, the room and the Flares place are left to the page, which keeps every word. The event page's cards, the
+// detail's own card and a pictured card are untouched.
+const brief = compact && !pic && !!href;
 ---
 {listed ? (
 <article class:list={["spark-card", "pm-paper", "has-picture", "is-image-card", { "is-root": root, "is-link": !!href }]} data-spark={s?.id ?? ""} data-spark-root={root ? "" : undefined}>
@@ -57,7 +64,7 @@ const big = !!pic && !link;
   </div>
 </article>
 ) : (
-<article class:list={["spark-card", "pm-paper", { "is-root": root, "has-picture": !!pic, "is-link": !!href, "is-big": big }]} data-spark={s?.id ?? ""} data-spark-root={root ? "" : undefined}>
+<article class:list={["spark-card", "pm-paper", { "is-root": root, "has-picture": !!pic, "is-link": !!href, "is-big": big, "is-compact": brief }]} data-spark={s?.id ?? ""} data-spark-root={root ? "" : undefined} data-spark-compact={brief ? "" : undefined}>
   {pic && (
     <figure class="spark-pic" data-spark-picture>
       <img src={pic.src} alt={pic.alt ?? (headline ?? "")} loading={big ? "eager" : "lazy"} decoding="async" />
@@ -75,19 +82,19 @@ const big = !!pic && !link;
         ? <>by <ResidentMention handle={by} />{household && <span class="soft"> of {household}</span>}</>
         : <span class="soft">credit not served</span>}
     </p>
-    {s?.experienced_at && (
+    {!brief && s?.experienced_at && (
       <p class="spark-when soft" data-spark-when>
         <time datetime={s.experienced_at} title={`${s.experienced_at} (UTC)`}>{utcText(s.experienced_at)}</time>
         {s.experienced_until && <> to <time datetime={s.experienced_until} title={`${s.experienced_until} (UTC)`}>{utcText(s.experienced_until)}</time></>}
       </p>
     )}
-    {rooms.length > 0 && (
+    {!brief && rooms.length > 0 && (
       <p class="spark-rooms soft" data-spark-rooms>
         From the talk in{" "}
         {rooms.map((r, i) => <>{i > 0 && ", "}<a href={roomHref(r)}>{r}</a></>)}
       </p>
     )}
-    {flares && (
+    {!brief && flares && (
       <p class="spark-flares" data-spark-flares>
         <b>{CATALOGUE_WORDS.flares}</b><br />
         {CATALOGUE_WORDS.flaresNone}
@@ -111,6 +118,8 @@ const big = !!pic && !link;
   .spark-flares { margin: 0.55em 0 0; padding: 0.4em 0.6em; border: 1px dashed var(--pm-line); border-radius: 6px; font-size: 0.88rem; color: var(--pm-ink-soft); }
   .spark-flares b { color: var(--pm-ink); }
   .spark-eventline { margin: 0.55em 0 0; font-size: 0.85rem; overflow-wrap: anywhere; }
+  /* the gallery's compact unpictured card (UI-43): the recounting as a short excerpt, three lines run together; its page draws it whole, as served */
+  .spark-card.is-compact .spark-recounting { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; white-space: normal; }
   .spark-card .soft { color: var(--pm-ink-soft); }
   .spark-card a { color: var(--pm-wax); text-decoration: underline; }
   /* the whole-card link: the headline anchor's ::after covers the card (picture, background, text); the other links are lifted above it */
