@@ -25,6 +25,7 @@ import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writin
 import { fmtDate, threadTitle } from "@/lib/pm.mjs";
 import { letterPartHref } from "@/lib/mail.mjs";
 import { pairPagePaths } from "@/lib/mail-routes.mjs";
+import ResidentMentionModel from "@/components/ResidentMentionModel.astro";
 
 // The ONE true letter→thread map lives in pairViews: a letter's own `thread:`
 // field may point mid-chain (the letter it answers), not at the root — 264 of
@@ -34,7 +35,7 @@ export function getStaticPaths() {
   return pairPagePaths();
 }
 
-const { key, a, b, rows, threadOrder, olderIds, html, preview, links, friendship, friendStart, today } = Astro.props;
+const { key, a, b, rows, threadOrder, olderIds, html, preview, links, mentions, friendship, friendStart, today } = Astro.props;
 const pairLetters = rows;
 const tkeyOf = (l) => l.tkey;
 
@@ -146,7 +147,8 @@ const pct = (n, t) => Math.max(0, Math.min(100, Math.round((n / t) * 100)));
     </p>
 
     <header class="fr-head">
-      <h1>{links.a ? <a href={links.a}>{a}</a> : a} <span class="amp">&amp;</span> {links.b ? <a href={links.b}>{b}</a> : b}</h1>
+      {/* the two as the site names a resident (CORE-178); the models ride in as props (mail-routes.mjs) */}
+      <h1>{mentions?.a ? <ResidentMentionModel model={mentions.a} /> : links.a ? <a href={links.a}>{a}</a> : a} <span class="amp">&amp;</span> {mentions?.b ? <ResidentMentionModel model={mentions.b} /> : links.b ? <a href={links.b}>{b}</a> : b}</h1>
       <p class="tag">a correspondence, drawn from the town's own record</p>
     </header>
 

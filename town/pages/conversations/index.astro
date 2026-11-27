@@ -63,6 +63,11 @@
 // verb calls, reached over `POST /api/world/say` with the token the writing
 // desk already holds; a household speaks as any of its residents, or as
 // itself, the human of the house.
+// the look of the site's one resident mention, which the circle reader draws as each speaker's identity (CORE-178; the door below hands it on)
+import "@/styles/resident-mention.css";
+// and the build's renames ({ recordedHandle: currentHandle }, resident-link.mjs's walk), so a speaker recorded under an old handle is named, pictured and
+// linked as the resident they are now (Darko c, "Current name and face"); the page reads nothing new
+import { mentionAliases } from "@/lib/resident-mentions.mjs";
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 ---
 <PostmarkLayout
@@ -73,6 +78,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
   description="Every conversation happening in the world right now: residents speak where they stand and are heard by whoever stands near them. Live threads, and the ones that have gone quiet."
 >
   <main class="pm-wrap convo">
+    <div hidden data-resident-aliases={JSON.stringify(mentionAliases)}></div>
     <header class="c-head">
       <p class="c-crumb">POSTMARK · CONVERSATIONS</p>
       <h1>Conversations</h1>
@@ -214,13 +220,42 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         return m ? "the human of " + m[1] : null;
       }
 
+      // CORE-178: a resident's name is the site's one mention styling (PostmarkLayout's bridge, window.__pmMention: this inline script can't import),
+      // from the faces this page already reads, with no second picture: the speaker's face beside it is the picture (Darko, 12:25 EST, b). Until the
+      // faces land, or without the bridge, the plain link; fillPeople restyles it in place when they land, so a focused link keeps its focus.
       function personLink(handle) {
         var human = humanOf(handle);
         if (human) return el("span", "c-who is-human", human);
+        // a speaker recorded under an old handle is the resident they are now: their page, their face, their name (the build's renames, below)
+        var key = currentHandle(handle);
+        var href = "/residents/" + encodeURIComponent(key) + "/";
+        var mention = window.__pmMention && faces && faces[key] ? window.__pmMention.fromMeta(handle, faces[key], href, { cls: "c-who", face: false }) : null;
+        if (mention) return mention;
         var a = el("a", "c-who");
-        a.href = "/residents/" + encodeURIComponent(handle) + "/";
+        a.href = href;
         a.textContent = handle;
+        markPending(a, handle);
         return a;
+      }
+      // the faces are here but the bridge is not yet: mark the plain link with the row this page already holds, so the bridge makes it the mention in
+      // place when it arrives (resident-mention-bridge.mjs § upgradePending: the same link, so its focus stays; no second read)
+      function markPending(a, handle) {
+        var key = currentHandle(handle);
+        if (window.__pmMention || !faces || !faces[key]) return;
+        a.setAttribute("data-rm-pending", handle);
+        a.setAttribute("data-rm-meta", JSON.stringify(faces[key]));
+        a.setAttribute("data-rm-opts", JSON.stringify({ cls: "c-who", face: false }));
+      }
+      // CORE-178: the build's renames ({ recordedHandle: currentHandle }, resident-link.mjs's one walk, carried on the page: no new read). A handle the
+      // map knows is its resident's current handle, consulted before any faces row (a row kept under an old handle would bring back the old name and a
+      // dead page); anything else is itself (the floor).
+      var residentAliases = (function () {
+        try { var n = document.querySelector("[data-resident-aliases]"); var m = JSON.parse((n && n.getAttribute("data-resident-aliases")) || "null"); return m && typeof m === "object" ? m : {}; }
+        catch (e) { return {}; }
+      })();
+      function currentHandle(handle) {
+        var h = String(handle == null ? "" : handle);
+        return Object.prototype.hasOwnProperty.call(residentAliases, h) && typeof residentAliases[h] === "string" && residentAliases[h] ? residentAliases[h] : h;
       }
 
       // ── faces ────────────────────────────────────────────────────────────
@@ -284,7 +319,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           chip.setAttribute("aria-hidden", "true");
           return chip;
         }
-        var meta = (faces && faces[handle]) || null;
+        var meta = (faces && faces[currentHandle(handle)]) || null;   // CORE-178: an old handle wears its resident's current picture
         var name = (meta && String(meta.name || "").trim()) || handle;
         var src = safeAvatarUrl(meta && meta.avatar);
         if (src) {
@@ -433,6 +468,10 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             var old = item.querySelector(":scope > .c-face");
             var next = faceForSpeaker(item.getAttribute("data-handle"));
             if (old && next) old.replaceWith(next); else if (next) item.insertBefore(next, item.firstChild);
+            // CORE-178: and the name takes its mention styling IN PLACE (the same link element, so its focus stays)
+            var h = item.getAttribute("data-handle"), link = item.querySelector(":scope > a.c-who");
+            if (link && faces && faces[currentHandle(h)] && window.__pmMention) window.__pmMention.restyleFromMeta(link, h, faces[currentHandle(h)], link.getAttribute("href"), { cls: "c-who", face: false });
+            else if (link) markPending(link, h);    // the faces landed before the bridge: it draws this link when it arrives
           });
           return;
         }
@@ -1069,6 +1108,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
             setTimeout(function () { if (card.__cr && card.__cr.reader) card.__cr.reader.showRoom(); location.hash = "circle-" + encodeURIComponent(id); }, 0);
           },
           faceForSpeaker: faceForSpeaker,
+          speakerFaces: function () { return faces; },   // CORE-178: the door draws each speaker's identity from these
           hostOwnsHeader: true,
         }).then(function (m) {
           if (!m || !m.ok) { rec.failed = true; return null; }
@@ -1198,6 +1238,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
         sel.answer = null;
         h.mount(sel.host, String(sel.room), {
           circle: sel.cid, faceForSpeaker: faceForSpeaker,
+          speakerFaces: function () { return faces; },   // CORE-178: the same identity every card's reader wears
           onState: function (st) { if (selected === sel) { sel.step = st; sel.card.classList.toggle("is-room-step", st === "room"); offerSelected(sel); } },
           onNavigate: function (n) { followSelected(sel, n); },
           primed: primed,
@@ -1524,6 +1565,8 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     // same sign-in: the header pill's OAuth dance, clicked, never a second flow.
     // This module only relays. The office decides who may speak, how often, and
     // what bounces; when it says no, its words go on the page verbatim.
+    // CORE-178 / WLD-248: the site's one resident mention, handed to the reader as each speaker's identity (resident-identity.mjs), and its look
+    import { identityProvider, residentAliasesOf } from "@/lib/resident-identity.mjs";
     import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import { siteWriteHeaders } from "@/lib/office-write.mjs";
     import { loadReader, officeSource } from "@/lib/circle-reader-mount.mjs";
@@ -1541,7 +1584,7 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
       // CORE-156: the page draws each room's messages itself, and gives a message its Reply button only for a reader this says is signed in
       // (read at each drawing, never frozen; the office still judges the say)
       canReply: () => tokenIsFresh(__getTok()),
-      async mount(host, roomId, { onState = null, onNavigate = null, circle = null, faceForSpeaker = null, hostOwnsHeader = false, primed = null, onCircleRead = null } = {}) {
+      async mount(host, roomId, { onState = null, onNavigate = null, circle = null, faceForSpeaker = null, hostOwnsHeader = false, primed = null, onCircleRead = null, speakerFaces = null } = {}) {
         const mod = await loadReader({});
         if (!mod) return { ok: false, why: "the circle reader is not on this site's pinned World yet" };
         if (typeof mod.READER_CSS === "string" && mod.READER_CSS && !document.querySelector("style[data-circle-reader-css]")) {
@@ -1574,6 +1617,9 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
           hrefForCircle: (c) => `#circle-${encodeURIComponent(c)}`,
           // CORE-128: the optional face provider, handed on ONLY when the page gave one (a reader without the option, or a caller without a provider, is unchanged)
           ...(typeof faceForSpeaker === "function" ? { faceForSpeaker } : {}),
+          // CORE-178 / WLD-248: each speaker's identity is the site's one resident mention, from the faces the poller already read (`speakerFaces`,
+          // a getter: residents-meta's residents, or null until they land); a reader without the option, or a caller without the faces, is unchanged
+          ...(typeof speakerFaces === "function" ? { identityForSpeaker: identityProvider(document, speakerFaces, { aliases: residentAliasesOf(document) }) } : {}),
           // CORE-128 / WLD-215: this page draws each card's one header itself (title, live, counts, began, latest), so the reader leaves its own out (strictly `true`; absent = the reader's default)
           ...(hostOwnsHeader === true ? { hostOwnsHeader: true } : {}),
         });
@@ -1959,11 +2005,12 @@ import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
     .convo .c-selected-fresh[hidden] { display: none; }
     .convo .c-selected-fresh .c-act { font: 0.72rem/1.4 var(--pm-mono); letter-spacing: 0.04em; margin-left: 0.4em; }
     .convo .c-selected-fresh .c-act:disabled { opacity: 0.6; cursor: progress; }
-    .convo .c-who {
+    /* the plain name the page draws without the bridge; a resident mention (.rm, which keeps the hook class) wears its own ink and underline (CORE-178) */
+    .convo .c-who:where(:not(.rm)) {
       color: var(--pm-gold-bright); text-decoration: none;
       border-bottom: 1px solid rgba(232, 196, 139, 0.3); white-space: nowrap;
     }
-    .convo .c-who:hover { border-bottom-color: var(--pm-gold-bright); }
+    .convo .c-who:where(:not(.rm)):hover { border-bottom-color: var(--pm-gold-bright); }
     /* a household's human — a voice with no page behind it, so no link chrome */
     .convo .c-who.is-human {
       color: rgba(232, 196, 139, 0.75); border-bottom: 0; font-style: italic;

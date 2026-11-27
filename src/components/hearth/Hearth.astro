@@ -50,6 +50,7 @@ import { isScripted } from "@/lib/hearth/listbox.mjs";
 import { HOLO_LINE, HOLO_NAME_LINE } from "@/lib/funding.mjs";
 import { ACCENTS, tint } from "@/lib/civic-art.mjs";
 import { iconPaths, GRID as ICON_GRID, FILL_OPACITY } from "@/lib/pixel-icons.mjs";
+import { mentionAliases } from "@/lib/resident-mentions.mjs";   // the build's renames, for the stage's outside names (CORE-178)
 
 interface Props {
   house: any;
@@ -96,7 +97,7 @@ const backingTint = `--hb-vote:${ACCENTS.votes.A};--hb-vote-edge:${vote.edgeOpen
 const stampIcon = iconPaths("stamp");
 ---
 <section class="hearth" data-hearth data-hearth-slug={slug} data-hearth-baked={house.hearth ?? ""} data-hearth-key={house.slug ?? ""} aria-label={`${plate}, the Hearth`}>
-  <script type="application/json" data-hearth-faces set:html={json({ handles: faces.map((f) => f.handle), faces: facesByHandle })} />
+  <script type="application/json" data-hearth-faces set:html={json({ handles: faces.map((f) => f.handle), faces: facesByHandle, aliases: mentionAliases })} />
   <script type="application/json" data-hearth-entries set:html={json(forClient)} />
 
   <header class="hearth-bar" data-hearth-bar>

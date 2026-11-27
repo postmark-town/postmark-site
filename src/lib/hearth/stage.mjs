@@ -31,6 +31,7 @@
 import { KEYS, tokenIsFresh } from "../auth.mjs";
 import { readHouse, readHearthExtras, readHearthBundle, readHungWindows, officeOrigin } from "../household-dashboard/reads.mjs";
 import { paintV2 } from "./paint-v2.mjs";
+import { inkOnActualSurface } from "../resident-mention-surface.mjs";
 import { hearthApi, runEntryScript, emit } from "./script.mjs";
 import { paintHouse, paintReadingMark, writeLook } from "../household-dashboard/paint.mjs";
 import { readingOf } from "../household-dashboard/fold.mjs";
@@ -81,8 +82,12 @@ export function mountHearth(root, { loadScript } = {}) {
   };
   const mine = () => (token() ? held().filter((h) => handles.includes(h)) : []);
 
+  // CORE-178 (Darko, 12:25 EST, a: "get everything to readable darkness"): a design's template sets this stage's glass and paper to any colour, so
+  // each resident mention is re-inked for the background actually under it, after every paint (resident-mention-surface.mjs); never a throw
+  const inkStage = () => { try { inkOnActualSurface(stage, { getStyle: (el) => window.getComputedStyle(el) }); } catch { /* a mention keeps its night or paper ink */ } };
+  inkStage();
   const phone = window.matchMedia("(max-width: 760px)");
-  const ctx = { handles, faces, slug, seatHref, residentHref: seatHref, storage, filter: { kind: "all", who: "all" }, expanded: false, feedSort: "newest" };
+  const ctx = { handles, faces, aliases: data.aliases ?? {}, slug, seatHref, residentHref: seatHref, storage, filter: { kind: "all", who: "all" }, expanded: false, feedSort: "newest" };
 
   // v2: THE PUBLIC BUNDLE, THE HUNG WINDOWS AND THE HOUSE'S OWN SCRIPT. The bundle is read once, signed out (reads.mjs § readHearthBundle), and the
   // same answer paints the site's v2 slots and is handed to the entry's script. `scriptState` is what the script's getters read (hearthApi).
@@ -103,6 +108,7 @@ export function mountHearth(root, { loadScript } = {}) {
     ctx.owner = owner;
     stage.dataset.hearthView = owner ? "owner" : "public";
     paintV2(stage, { bundle, hung }, ctx);
+    inkStage();
     if (scriptState.owner !== owner) { scriptState.owner = owner; emit(listeners, "view", owner ? "owner" : "public"); }
   }
   function startScript(entry) {
@@ -158,6 +164,7 @@ export function mountHearth(root, { loadScript } = {}) {
     // the page's one holo expansion shows when the stamps slot shows a holo count
     const wrap = stage.querySelector("[data-hd-n-holo-wrap]");
     if (holoNote) holoNote.hidden = !wrap || wrap.hidden;
+    inkStage();
   }
 
   // THE FIRST READ PAINTS AS IT ARRIVES (POS-984). The reads are one per resident, and on a busy box the slowest decides when a page that waits for all of them

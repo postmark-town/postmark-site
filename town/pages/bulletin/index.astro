@@ -40,6 +40,7 @@
 // as #board, one card per posting, the panels over the cork) are in this
 // file's git history.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import ResidentMention from "@/components/ResidentMention.astro";
 import CalendarPanel from "@/components/CalendarPanel.astro";
 import bulletin from "@/data/postmark/bulletin.json";
 import calendar from "@/data/postmark/calendar.json";
@@ -52,7 +53,8 @@ import NoticeBody from "@/components/NoticeBody.astro";
 import { BOARD_PIECES, BOARD_PINS, HALLOWEEN_PIN_KEYS, boardPins, FRAMED, NOSCRIPT_NOTICES, dailyFront, pinLink, pinnedMonth, postitLook, tendedText } from "@/lib/bulletin-board.mjs";
 import { WEEKDAYS, utcText } from "@/lib/calendar.mjs";
 import { LANES } from "@/lib/civic.mjs";
-import { MEEPS, displayName } from "@/lib/meeps-quarter.mjs";
+import { MEEPS, displayName, profileOf } from "@/lib/meeps-quarter.mjs";
+import media from "@/data/postmark/media.json";
 import { SPRITES, paint, paintArt, SPRITE_W, SPRITE_H } from "@/lib/civic-art.mjs";
 import { iconSvg } from "@/lib/pixel-icons.mjs";
 import { SOCIALS } from "@/lib/door-line.mjs";
@@ -98,12 +100,27 @@ const REPO_BULLETIN = "https://github.com/postmark-town/postmark/blob/main/TOWN_
 // always worn; the top one names the pinned notices and the count
 const notes = [0, 1, 2, 3, 4].map((i) => postitLook(i));
 const firstPinned = sticks.filter(isPinned).slice(0, 2).map((p) => postingTitle(p));
-const meeps = MEEPS.map((m) => ({
-  key: m.key,
-  name: m.name ?? displayName(m).replace(/^the /i, ""),
-  sprite: SPRITES[m.key] ? paint(m.key) : null,
-  monogram: displayName(m).replace(/^The /, "").charAt(0).toUpperCase(),
-}));
+const rollHandles = new Set(residents.map((r) => r.handle));
+// CORE-178 (Darko a, readable darkness on the actual surface): each roster name sits on its own name plate, `.hand-name`'s background below,
+// lighter than the night the site's night ink is measured on, so the mention takes the ink for THIS plate (keep the two the same colour)
+const HAND_PLATE = "#2f3a56";
+const byHandle = new Map(residents.map((r) => [r.handle, r]));
+const meeps = MEEPS.map((m) => {
+  const sprite = SPRITES[m.key] ? paint(m.key) : null;
+  // the quay's own picture (meeps/index.astro): the sprite, else the meep's portrait (meeps-quarter.mjs § profileOf), else the monogram
+  // (CORE-178: a sprite-less meep with a portrait, Iris, stood here as an initial while the quay showed her face)
+  const portrait = profileOf(m, byHandle.get(m.handle), media).portrait ?? null;
+  return {
+    key: m.key,
+    // CORE-178: a meep in the build's roll is a resident, named by the site's one mention styling (its picture above is the face, so no second one)
+    handle: m.handle && rollHandles.has(m.handle) ? m.handle : null,
+    name: m.name ?? displayName(m).replace(/^the /i, ""),
+    sprite,
+    portrait,
+    face: sprite ? "sprite" : portrait ? "portrait" : "monogram",
+    monogram: displayName(m).replace(/^The /, "").charAt(0).toUpperCase(),
+  };
+});
 // Ferry's sticker on his Daily: his own sprite, the one the meeps wear
 const ferry = SPRITES.postmaster ? paint("postmaster") : null;
 // the postcard's buildings as a cluster (Keemin: "arrange the buildings in a
@@ -249,10 +266,12 @@ const views = JSON.stringify({
               <span class="roster" aria-hidden="true">
                 {meeps.map((m) => (
                   <span class="hand">
-                    {m.sprite
+                    {m.face === "sprite"
                       ? <svg class="px" viewBox={`0 0 ${SPRITE_W} ${SPRITE_H}`} shape-rendering="crispEdges">{m.sprite.map((r) => <rect x={r.x} y={r.y} width={r.w} height="1" fill={r.fill} />)}</svg>
-                      : <span class="mono">{m.monogram}</span>}
-                    <span class="hand-name">{m.name}</span>
+                      : m.face === "portrait"
+                        ? <img class="portrait" src={m.portrait} alt="" loading="lazy" />
+                        : <span class="mono">{m.monogram}</span>}
+                    <span class="hand-name">{m.handle ? <ResidentMention handle={m.handle} link={false} noFace surface={HAND_PLATE} /> : m.name}</span>
                   </span>
                 ))}
               </span>
@@ -960,10 +979,12 @@ const views = JSON.stringify({
       display: grid; place-items: center; width: 52px; height: 52px; margin: 14px 0;
       border-radius: 50%; border: 1px solid var(--pm-gold); color: var(--pm-gold); font-weight: 700; font-size: 0.9rem;
     }
+    /* a sprite-less meep's own portrait, in the monogram's place and size (the quay's .cq-portrait, at the roster's scale) */
+    .hand .portrait { display: block; width: 52px; height: 52px; margin: 14px 0; object-fit: cover; border-radius: 50%; border: 1px solid var(--pm-gold); }
     .hand-name {
       display: block; width: 100%; padding: 0.25em 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       text-align: center; font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.06em;
-      color: var(--pm-gold-bright); background: #2f3a56;
+      color: var(--pm-gold-bright); background: #2f3a56;   /* HAND_PLATE in the frontmatter: the roster names' ink is measured on it */
     }
     .roster-sig { text-align: right; font-style: italic; font-size: 0.78rem; color: var(--pm-ink-soft); }
 
@@ -1304,7 +1325,7 @@ const views = JSON.stringify({
       .piece, .piece:hover, .piece:focus-visible { transform: none; }
       .notes { height: 15em; }
       .hand-name { font-size: 0.5rem; }
-      .mono { width: 36px; height: 36px; margin: 8px 0; }
+      .mono, .hand .portrait { width: 36px; height: 36px; margin: 8px 0; }
       .news { padding-bottom: 5em; }
       .news .franked { bottom: 0.9em; width: 150px; height: 64px; }
       .news .franked .cancel { width: 60px; height: 60px; }

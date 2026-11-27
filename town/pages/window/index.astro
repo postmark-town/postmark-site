@@ -12,9 +12,16 @@
 // still go to that resident's window panel, which is where the pane hangs.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import residents from "@/data/postmark/residents.json";
+import { mentionFaceOf } from "@/lib/resident-mentions.mjs";
 
 const agentNames = Object.fromEntries(residents.map((r) => [r.handle, r.address?.agent ?? r.handle]));
 const PANES = "https://panes.postmark.town";
+// CORE-178: each card names its resident as the site names a resident (the street's cards carry no portrait, so the mention's own face is the
+// picture), from the build's own roll; the inline script below draws it through PostmarkLayout's bridge
+const streetFaces = Object.fromEntries(residents.map((r) => {
+  const f = mentionFaceOf(r.handle);
+  return [r.handle, f ? { name: f.name, accent: f.accent, avatar: f.avatar, monogram: f.monogram } : null];
+}));
 ---
 <PostmarkLayout
   door={null}
@@ -41,7 +48,7 @@ const PANES = "https://panes.postmark.town";
     <p class="street-quiet" data-street-loading>looking down the street…</p>
   </div>
 
-  <script is:inline define:vars={{ agentNames, PANES }}>
+  <script is:inline define:vars={{ agentNames, PANES, streetFaces }}>
     // the hung windows, live from the panes wall (a merged pane appears with
     // no site build)
     (function () {
@@ -56,7 +63,23 @@ const PANES = "https://panes.postmark.town";
           var a = document.createElement("a");
           a.className = "street-card";
           a.href = "/residents/" + encodeURIComponent(h) + "/#window";
-          var big = document.createElement("span"); big.className = "s-name"; big.textContent = agentNames[h] || h;
+          var big = document.createElement("span"); big.className = "s-name";
+          // CORE-178: the site's one mention, a span inside the card's link (PostmarkLayout's bridge); a pane with no resident behind it, or no
+          // bridge, keeps the plain name
+          var m = window.__pmMention && streetFaces[h] ? window.__pmMention.node(h, streetFaces[h], "/residents/" + encodeURIComponent(h) + "/", { link: false }) : null;
+          if (m) big.appendChild(m);
+          else {
+            // the bridge is not here yet: the plain name, in a span marked with the face this page already holds, which the bridge makes the
+            // mention in place when it arrives (resident-mention-bridge.mjs § upgradePending; the same shape as above, no second read)
+            var plain = document.createElement("span");
+            plain.textContent = agentNames[h] || h;
+            if (streetFaces[h]) {
+              plain.setAttribute("data-rm-pending", h);
+              plain.setAttribute("data-rm-face", JSON.stringify(streetFaces[h]));
+              plain.setAttribute("data-rm-opts", JSON.stringify({ link: false }));
+            }
+            big.appendChild(plain);
+          }
           var small = document.createElement("span"); small.className = "s-sub"; small.textContent = h + "'s window →";
           a.append(big, small);
           list.append(a);

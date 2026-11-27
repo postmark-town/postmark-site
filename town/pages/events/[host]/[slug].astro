@@ -38,6 +38,8 @@ import { rsvpGate, BUDGET_DEFAULT, BUDGET_MAX, COALESCE_MIN } from "@/lib/rsvp.m
 import { newestFirst } from "@/lib/announcements.mjs";
 import media from "@/data/postmark/media.json";
 import { handlesPreview, sectionCard } from "@/lib/og-image.mjs";
+import { mentionAliases, publicFaces } from "@/lib/resident-mentions.mjs";
+import { carriesSpeakerFaces } from "@/lib/event-speakers.mjs";
 
 export function getStaticPaths() {
   return allEventViews(calendar, eventsData)
@@ -66,6 +68,12 @@ const householdLine = (id) => {
 };
 const rooms = sections.circles.state === "rooms" ? sections.circles.rooms : [];
 const roomIds = rooms.map(roomIdOf).filter(isRoomId);
+// CORE-178 / WLD-248: each speaker in a room is the site's one resident mention, handed to the reader as its identity. The faces are the build's own
+// (resident-mentions.mjs § publicFaces, the face every build-time mention wears), carried on the circles section, so the browser reads nothing new.
+// They ride WHENEVER the section can mount a reader (event-speakers.mjs: an ended page with no baked rooms still adds rooms through CORE-174's
+// refresh), with the build's renames (mentionAliases), so a speaker recorded under an old handle wears the resident's current face, name and page.
+const speakerFaces = carriesSpeakerFaces(sections) ? publicFaces(residents.map((r) => r.handle)) : {};
+const speakerAliases = carriesSpeakerFaces(sections) ? mentionAliases : {};
 const roll = new Set(residents.map((r) => r.handle));
 // phase and cancelled are the office's, as the build read them; the office
 // judges again when the form posts.
@@ -151,7 +159,7 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     )}
 
     {!sections.cancelled && (
-      <section class="ev-sec pm-paper" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
+      <section class="ev-sec pm-paper" aria-label="The conversation" id="conversation" data-ev-circles data-state={sections.circles.state} data-rooms={JSON.stringify(roomIds)} data-faces={JSON.stringify(speakerFaces)} data-aliases={JSON.stringify(speakerAliases)} data-live={!sections.after ? "" : undefined} data-refresh={sections.after ? "" : undefined} data-event={event.id}>
         <h2 class="ev-h">{EVENT_WORDS.circles.title}</h2>
         {sections.circles.state === "rooms" ? (
           <>
@@ -289,18 +297,24 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     import { fetchAnnouncements, eventReadUrl } from "@/lib/announcements.mjs";
     import { EVENT_WORDS, LOCAL_FORMAT, eventSections, isRoomId, roomHref, roomIdOf } from "@/lib/calendar.mjs";
     import { mountRoom } from "@/lib/circle-reader-mount.mjs";
+    import { identityProvider } from "@/lib/resident-identity.mjs";
 
     // THE CIRCLES ISLAND (CORE-82). The page's rooms are the office's, in its start order. For each, the World's one circle reader is
     // mounted (the site's adapter hands it the keyless reads); without it the room keeps a link to its whole talk, and the page SAYS
     // the reader is not here. While the event is on, the office's one-event read is asked again first, because a room can begin after
     // the build; an answer that cannot be had keeps the build's rooms. Every word the reader draws is text, never markup.
     const circ = document.querySelector("[data-ev-circles]");
+    // the build's faces for this page's speakers (an unreadable attribute is no faces: the reader keeps its own face and name path)
+    const evFaces = (() => { try { return JSON.parse(circ?.getAttribute("data-faces") || "null"); } catch { return null; } })();
+    const evAliases = (() => { try { return JSON.parse(circ?.getAttribute("data-aliases") || "null"); } catch { return null; } })();
+    const speakerIdentity = identityProvider(document, () => evFaces, { toFace: (f) => f, aliases: evAliases });
     if (circ) {
       const drawRoom = (box, id) => {
         const reader = box.querySelector("[data-ev-reader]");
         const floor = reader.querySelector("[data-ev-floor]");
         // a circle's own link is the Conversations page's one-conversation view (CORE-117: `/conversations/#circle-<id>`)
-        mountRoom({ doc: document, host: reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o), hrefForCircle: (c) => `/conversations/#circle-${encodeURIComponent(c)}` }).then((m) => {
+        // CORE-178 / WLD-248: each speaker's identity is the site's one resident mention, from the build's faces on this section (no new read)
+        mountRoom({ doc: document, host: reader, roomId: id, base: officeBase(), fetchImpl: (u, o) => fetch(u, o), hrefForCircle: (c) => `/conversations/#circle-${encodeURIComponent(c)}`, identityForSpeaker: speakerIdentity }).then((m) => {
           if (m.ok) { floor?.remove(); return; }
           if (floor) floor.textContent = EVENT_WORDS.circles.noReader;
         });
@@ -544,15 +558,16 @@ const preview = handlesPreview([event.host], new Map(residents.map((r) => [r.han
     .ev-basis { margin: 0.5em 0 0; font-size: 0.84rem; }
     .ev-present { margin: 0.3em 0; padding-left: 1.2em; columns: 2 12rem; }
     .ev-present li { margin: 0 0 0.3em; break-inside: avoid; overflow-wrap: anywhere; }
-    .ev-sec.pm-paper a { color: var(--pm-wax); text-decoration: underline; }
-    .ev-sec:not(.pm-paper) a { color: var(--pm-gold-bright); }
+    /* the section's links, never a resident mention: `.rm` keeps the speaker's own ink and underline (CORE-178, Darko a; these out-ranked .rm.rm) */
+    .ev-sec.pm-paper a:where(:not(.rm)) { color: var(--pm-wax); text-decoration: underline; }
+    .ev-sec:not(.pm-paper) a:where(:not(.rm)) { color: var(--pm-gold-bright); }
     /* the rooms' boxes are also made by the island, so they carry no scope attribute: :global */
     .ev-sec :global(.ev-room) { margin: 0 0 1em; }
     .ev-sec :global(.ev-room-h) { margin: 0 0 0.4em; font-size: 0.95em; font-family: var(--pm-mono); overflow-wrap: anywhere; }
     .ev-sec :global(.ev-room-id) { font-size: 0.8em; }
     .ev-sec :global(.ev-note) { margin: 0.4em 0; line-height: 1.55; }
     .ev-sec.pm-paper :global(.soft) { color: var(--pm-ink-soft); }
-    .ev-sec.pm-paper :global(a) { color: var(--pm-wax); text-decoration: underline; }
+    .ev-sec.pm-paper :global(a:where(:not(.rm))) { color: var(--pm-wax); text-decoration: underline; }
     .ev-gallery { display: grid; gap: 0.2em; }
     .ev-onward { margin: 0.8em 0 0; font-weight: 700; }
     .cal-how h2 { margin: 0 0 0.5em; font-size: 1.1em; }

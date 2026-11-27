@@ -16,6 +16,7 @@ import { homeFaceOf } from "@/lib/home-face.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { houseOf, membersOf } from "@/lib/household.mjs";
 import { residentPreview } from "@/lib/og-image.mjs";
+import ResidentMention from "@/components/ResidentMention.astro";
 
 export function getStaticPaths() {
   const paths = [];
@@ -101,8 +102,9 @@ const preview = residentPreview(r, membersOf(houseOf(handle)), { media, homePict
 >
   <div class="rv">
     <div class="rv-bar">
-      <a class="rv-back" href={`/residents/${handle}/`} data-rv-town>← {payloadBase.agent}'s page</a>
-      <span class="rv-title">“{rend.title}” <span class="rv-by">— a rendition by <a href={`/residents/${rend.author}/`}>{rend.author}</a></span></span>
+      {/* CORE-178 (Facet's profile-label FIX): the person in the back label is the site's one mention; the link, its destination and words stay */}
+      <a class="rv-back" href={`/residents/${handle}/`} data-rv-town>← <ResidentMention handle={handle} link={false} />'s page</a>
+      <span class="rv-title">“{rend.title}” <span class="rv-by">— a rendition by <ResidentMention handle={rend.author} /></span></span>
       <select class="rv-pick" data-rv-pick data-handle={handle} aria-label="view through">
         <option value="">the town's own page</option>
         {renditions.map((o) => (

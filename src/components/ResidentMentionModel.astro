@@ -1,0 +1,34 @@
+---
+// ResidentMentionModel — draws one resident mention from a model already decided (CORE-178; resident-mention.mjs § mentionModel). Most pages
+// use ResidentMention.astro, which looks the handle up in the build's roll and hands the model here. A page that builds incrementally (the mail
+// pages, POS-1085) reads nothing outside its props, so its models are decided in getStaticPaths (mail-routes.mjs) and ride in as props, and
+// it draws them with this component directly: this file imports no data, so it hides no read from the route key
+// (test/incremental-pages.test.mjs walks the import graph).
+//
+// It draws resident-mention.mjs § mentionTree, the same tree the live half builds with mentionNode, by walking it generically (it renders
+// itself for each child, `node`), so the build's mention and the browser's cannot become two formats. Every string and attribute goes through
+// Astro's own escaping: resident words are TEXT here, never set:html (the house rule CalendarCard and ResidentCard state).
+import "@/styles/resident-mention.css";
+import { mentionTree } from "@/lib/resident-mention.mjs";
+
+interface Props {
+  /** resident-mention.mjs § mentionModel's answer (plain data) */
+  model?: any;
+  /** false: a span, for a mention inside another link */
+  link?: boolean;
+  /** extra classes, kept as a surface's hooks */
+  cls?: string;
+  /** "paper" off a `.pm-paper` box, or the hex of a solid plate the page puts under the mention */
+  surface?: "night" | "paper" | string;
+  /** the name's styling only, for a card or chip whose own portrait is the picture (Darko b, 2026-11-24 12:25 EST) */
+  noFace?: boolean;
+  /** the whole name, never shortened (the resident's own page) */
+  whole?: boolean;
+  /** internal: one node of the tree, when this component draws a child of itself */
+  node?: any;
+}
+const { model, link = true, cls = "", surface, noFace = false, whole = false, node } = Astro.props;
+const n = node !== undefined ? node : mentionTree(model, { link, cls, surface, face: !noFace, whole })[0];
+const Tag = typeof n === "string" ? null : n.tag;
+---
+{Tag === null ? n : Tag === "img" ? <Tag {...n.attrs} /> : <Tag {...n.attrs}>{n.children.map((c: any) => <Astro.self node={c} />)}</Tag>}

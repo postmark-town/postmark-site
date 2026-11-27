@@ -536,8 +536,11 @@ test("the built page: the Postmaster by that name, nothing behind \"more\", noth
   // The site's own naming (the quay's names and offices, each card's title and
   // role line) never says Post Office. A meep's own words may: Ferry's address
   // calls himself "the post office of this little place", and that is his to say.
-  const naming = [...body.matchAll(/<(?:span|p|h2)\b[^>]*class="(?:cq-name|cq-office|mc-role)"[^>]*>([^<]*)<|<h2\b[^>]*>([^<]*)</g)]
-    .map((m) => m[1] ?? m[2]);
+  // CORE-178: a meep in the roll is named by the site's one mention, nested inside the line, so a line's words are read through its tags
+  // (until 2026-11-24 this read only a line's bare text, `([^<]*)`)
+  const words = (s) => String(s ?? "").replace(/<[^>]+>/g, "");
+  const naming = [...body.matchAll(/<(span|p|h2)\b[^>]*class="(?:cq-name|cq-office|mc-role)"[^>]*>([\s\S]*?)<\/\1>|<h2\b[^>]*>([\s\S]*?)<\/h2>/g)]
+    .map((m) => words(m[2] ?? m[3]));
   assert.ok(naming.length >= MEEPS.length * 3, `only ${naming.length} naming lines were read`);
   assert.equal(naming.filter((t) => /post office/i.test(t)).length, 0, "the site still calls a meep the Post Office");
   assert.ok(naming.some((t) => t.includes("the Postmaster")), "the Postmaster is not named on the page");

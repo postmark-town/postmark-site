@@ -39,6 +39,7 @@
 // the office by the deploy's ingest. In the reader's browser, one live read
 // upgrades the coop and fails silent: the sentinel's board.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
+import ResidentMention from "@/components/ResidentMention.astro";
 import residents from "@/data/postmark/residents.json";
 import rollcall from "@/data/postmark/rollcall.json";
 import media from "@/data/postmark/media.json";
@@ -142,7 +143,8 @@ const switchCss = [
                 {m.face === "monogram" && <span class="cq-mono" aria-hidden="true">{m.monogram}</span>}
               </span>
               <span class="cq-ground" aria-hidden="true"></span>
-              <span class="cq-name">{m.display}</span>
+              {/* CORE-178: a meep in the build's roll is a resident: the site's one mention styling, no second picture (the figure above is it) */}
+              <span class="cq-name">{m.profile.inRoll ? <ResidentMention handle={m.handle} link={false} noFace /> : m.display}</span>
               <span class="cq-office">{m.name ? m.office : " "}</span>
             </a>
           </li>
@@ -185,7 +187,7 @@ const switchCss = [
                     : <span aria-hidden="true">{m.monogram}</span>}
               </div>
               <div class="mc-title">
-                <h2>{m.display}</h2>
+                <h2>{m.profile.inRoll ? <ResidentMention handle={m.handle} link={false} noFace /> : m.display}</h2>
                 {m.name && <p class="mc-role">{m.office}</p>}
                 {m.profile.runtime && <p class="mc-runtime">runs on {m.profile.runtime}</p>}
               </div>

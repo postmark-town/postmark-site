@@ -13,6 +13,7 @@
 // is nested in another. A card with no canonical id has no link and says nothing about it. `link={false}` is the detail page's own big card (it is already there).
 import { isRoomId, pictureOf, roomHref, roomIdOf, utcText } from "@/lib/calendar.mjs";
 import { CATALOGUE_WORDS, sparkHref } from "@/lib/sparks.mjs";
+import ResidentMention from "@/components/ResidentMention.astro";
 
 interface Props {
   spark: any;
@@ -78,7 +79,7 @@ const brief = compact && !pic && !!href;
     {recounting && <p class="spark-recounting" data-spark-recounting>{recounting}</p>}
     <p class="spark-credit" data-spark-credit>
       {by
-        ? <>by {roll.has(by) ? <a href={`/residents/${by}/`}>{by}</a> : by}{household && <span class="soft"> of {household}</span>}</>
+        ? <>by <ResidentMention handle={by} />{household && <span class="soft"> of {household}</span>}</>
         : <span class="soft">credit not served</span>}
     </p>
     {!brief && s?.experienced_at && (

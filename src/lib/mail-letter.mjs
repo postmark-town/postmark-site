@@ -7,13 +7,19 @@
 // style these classes with :global.
 import { md, fmtDate, townFile, threadTitle } from "./pm.mjs";
 import { lettersByPair, letterParts, pairThreadMarks } from "./mail.mjs";
+import { mentionHtml } from "./resident-mention.mjs";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 // A handle links only where `hrefOf` names a page (resident-link.mjs): through
 // a rename to the page the resident has now, and as plain text where no page
 // stands (POS-530). Without `hrefOf` nothing is linked, never a guessed href.
-const resident = (h, hrefOf) => {
+// With `mentionOf` (the build's roll, resident-mentions.mjs, which links the same
+// way), a resident on the route is the site's one mention (CORE-178): their
+// picture, then their name in their colour, underlined; a handle with no page is
+// still plain text.
+const resident = (h, hrefOf, mentionOf) => {
+  if (mentionOf) return mentionHtml(mentionOf(h));
   const href = hrefOf?.(h);
   return href ? `<a href="${esc(href)}">${esc(h)}</a>` : esc(h);
 };
@@ -24,7 +30,7 @@ const resident = (h, hrefOf) => {
 // is the build's resident links (resident-pages.mjs § residentHref); `subject`
 // heads the paper with the letter's own subject, threadTitle(l.id), the label
 // the pair page's rail derives for it, unchanged.
-export function letterHtml(l, { media = {}, thread = null, delivered = null, hrefOf = null, subject = false } = {}) {
+export function letterHtml(l, { media = {}, thread = null, delivered = null, hrefOf = null, mentionOf = null, subject = false } = {}) {
   const tos = (l.toList && l.toList.length ? l.toList : [l.to]).filter(Boolean);
   const shown = (l.attachments ?? []).filter((at) => media[at]);
   const hue = thread ? ` style="--h:${thread.hue}"` : "";
@@ -34,7 +40,7 @@ export function letterHtml(l, { media = {}, thread = null, delivered = null, hre
     `<article class="pm-letter pm-paper${thread ? " fr-letter" : ""}" id="${esc(l.id)}"${hue}${thread ? ` data-tkey="${esc(thread.tkey)}"` : ""}>`,
     thread ? `<div class="fr-threadline">${esc(threadTitle(thread.tkey))}</div>` : "",
     subject ? `<div class="fr-subject">${esc(threadTitle(l.id))}</div>` : "",
-    `<div class="pm-letterhead"><span class="route">${resident(l.from, hrefOf)} → ${tos.map((h) => resident(h, hrefOf)).join(", ")}</span>`,
+    `<div class="pm-letterhead"><span class="route">${resident(l.from, hrefOf, mentionOf)} → ${tos.map((h) => resident(h, hrefOf, mentionOf)).join(", ")}</span>`,
     `<span class="when">${esc(fmtDate(l.date))}`,
     delivered ? `<span class="fr-sailed" title="carried by the ferry, sealed in the town ledger">✓ delivered ${esc(fmtDate(delivered))}</span>` : "",
     `</span></div>`,
@@ -81,15 +87,15 @@ export function deliveredOnOf(ledger) {
   return new Map((ledger ?? []).filter((e) => e.kind === "delivery").map((e) => [e.id, e.date]));
 }
 
-export function pairLettersHtml(view, ls, { media, deliveredOn, hrefOf = null }) {
-  return ls.map((l) => letterHtml(l, { media, thread: view.markOf.get(l.id), delivered: deliveredOn.get(l.id), hrefOf })).join("");
+export function pairLettersHtml(view, ls, { media, deliveredOn, hrefOf = null, mentionOf = null }) {
+  return ls.map((l) => letterHtml(l, { media, thread: view.markOf.get(l.id), delivered: deliveredOn.get(l.id), hrefOf, mentionOf })).join("");
 }
 
 // A thread page, its older parts and their chunks: each letter wears its own
 // subject (the page's <h1> is the thread's), except a letter whose subject is
 // the thread's own title, which would only repeat the <h1> above it. `threadKey`
 // is the thread's key; without it every letter wears its subject.
-export function threadLettersHtml(ls, { media, hrefOf = null, threadKey = null }) {
+export function threadLettersHtml(ls, { media, hrefOf = null, mentionOf = null, threadKey = null }) {
   const title = threadKey == null ? null : threadTitle(threadKey);
-  return ls.map((l) => letterHtml(l, { media, hrefOf, subject: threadTitle(l.id) !== title })).join("");
+  return ls.map((l) => letterHtml(l, { media, hrefOf, mentionOf, subject: threadTitle(l.id) !== title })).join("");
 }

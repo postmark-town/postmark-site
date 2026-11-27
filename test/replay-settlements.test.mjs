@@ -143,7 +143,10 @@ function whoOnCard(card, who, n) {
   const name = esc(residents.find((r) => r.handle === who)?.address?.agent || who);
   if (href) {
     assert.ok(existsSync(join(DIST, href, "index.html")), `S${n} links ${who} to ${href}, and no page stands there`);
-    assert.ok(card.includes(`<a class="r-who" href="${esc(href)}">${name}</a>`), `S${n} does not link ${who}, whose page stands`);
+    // CORE-178: a resident is the site's one mention, keeping `r-who`: the link, then the picture, then the name (until 2026-11-24 this read a
+    // bare `<a class="r-who">name</a>`)
+    const mention = new RegExp(`<a class="rm(?: is-neutral)? r-who" href="${esc(href).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" data-rm="${esc(who)}"[^>]*><span class="rm-face" aria-hidden="true">[\\s\\S]*?</span><span class="rm-name">${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</span></a>`);
+    assert.match(card, mention, `S${n} does not name ${who}, whose page stands, as a resident mention`);
   } else {
     // the build is asked, not only the helper the page asks: a page standing for them is a missed link
     assert.ok(!existsSync(join(DIST, "residents", who, "index.html")), `S${n} prints ${who} as text, and their page stands`);

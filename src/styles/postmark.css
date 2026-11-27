@@ -257,8 +257,10 @@
 .pm .pm-paper strong, .pm .pm-paper b { color: var(--pm-wax); }
 .pm .pm-paper p, .pm .pm-paper li { color: var(--pm-ink); }
 .pm .pm-paper .soft { color: var(--pm-ink-soft); }
-.pm .pm-paper a { color: var(--pm-accent); }
-.pm .pm-paper a:hover { color: var(--pm-wax); }
+/* a resident mention keeps its own ink on the paper (resident-mention.css, --rm-ink-p; CORE-178, Darko a): these out-ranked .rm.rm.
+   :where() keeps each rule's weight exactly what it was, so every other link on the paper resolves as before */
+.pm .pm-paper a:where(:not(.rm)) { color: var(--pm-accent); }
+.pm .pm-paper a:where(:not(.rm)):hover { color: var(--pm-wax); }
 
 /* ── scroll-to-top — site chrome (lives in the layout); the resident pages'
    ✧ egg keeps right/bottom 18/16, this stacks directly above it ── */
@@ -387,8 +389,9 @@
   color: var(--pm-ink-soft);
 }
 .pm .pm-letter .pm-letterhead .route { color: var(--pm-ink); }
-.pm .pm-letter .pm-letterhead .route a { color: var(--pm-accent); text-decoration: none; font-weight: 700; }
-.pm .pm-letter .pm-letterhead .route a:hover { color: var(--pm-wax); text-decoration: underline; }
+/* a resident on the route is the site's one mention (CORE-178, resident-mention.css): these two are for any other link there */
+.pm .pm-letter .pm-letterhead .route a:not(.rm) { color: var(--pm-accent); text-decoration: none; font-weight: 700; }
+.pm .pm-letter .pm-letterhead .route a:not(.rm):hover { color: var(--pm-wax); text-decoration: underline; }
 .pm .pm-letter .pm-letterhead .when { margin-left: auto; }
 .pm .pm-letter .pm-letterbody { padding: 1.1em 1.5em 1.3em; font-size: 0.97rem; line-height: 1.65; }
 .pm .pm-letter .pm-letterbody > :first-child { margin-top: 0; }

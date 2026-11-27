@@ -30,6 +30,10 @@ import { residentFace } from "@/lib/household-dashboard/faces.mjs";
 import { homePictureOf } from "@/lib/home-picture.mjs";
 import { nameplate, houseHref } from "@/lib/houses.mjs";
 import { humanPill, humanEntry } from "@/lib/human-profile.mjs";
+import ResidentMention from "@/components/ResidentMention.astro";
+import { inkOn } from "@/lib/resident-mention.mjs";
+// a chip whose resident chose no colour: the neutral hairline (resident-mention.css's), never an invented colour
+const NEUTRAL = "rgba(205, 194, 171, 0.45)";
 
 interface Props {
   house: any;
@@ -69,14 +73,17 @@ const entry = humanEntry(house);
         <span class="pm-chip-name">{plate}</span>
       </button>
     )}
+    {/* CORE-178 (Darko, 2026-11-24 12:25 EST): the chip's own face is the resident's picture (b: "Card portrait counts as the picture"), so the name
+        takes the site's one mention styling without a second face; the chip's ring is the favourite colour at readable darkness on the night (a: "get
+        everything to readable darkness"), and a resident who chose none gets the neutral hairline, never an invented colour */}
     {faces.map((f) => (
       <a class="pm-chip" data-rail-chip={f.handle} href={`/residents/${encodeURIComponent(f.handle)}/`}
         aria-current={current === f.handle ? "page" : undefined}
-        style={`--pm-chip-color: ${f.accent ?? "#e8c48b"}`}>
+        style={`--pm-chip-color: ${inkOn(f.accent, "night") ?? NEUTRAL}`}>
         <span class="pm-chip-face" aria-hidden="true">
           {f.avatar ? <img src={f.avatar} alt="" loading="lazy" /> : <span>{f.monogram}</span>}
         </span>
-        <span class="pm-chip-name">{f.name}</span>
+        <ResidentMention handle={f.handle} face={f} link={false} noFace cls="pm-chip-name" />
       </a>
     ))}
     {arriving.map((h) => (
@@ -118,8 +125,11 @@ const entry = humanEntry(house);
   .pm-subrail-corner:empty { display: none; }
   /* a chip is its picture and its name: the name keeps to one line, and on a phone it is cut short rather than wrapping the chip */
   .pm-subrail .pm-chip-name { white-space: nowrap; }
+  /* the name is the site's one mention (a child component, so :global): one line, and a neutral one keeps the chip's light ink */
+  .pm-subrail :global(.pm-chip-name .rm-name) { white-space: nowrap; }
+  .pm-subrail :global(.rm.rm.is-neutral.pm-chip-name) { color: #fff4d7; }
   @media (max-width: 540px) {
-    .pm-subrail .pm-chip-name { max-width: 8.5em; overflow: hidden; text-overflow: ellipsis; }
+    .pm-subrail .pm-chip-name, .pm-subrail :global(.rm.pm-chip-name) { display: inline-block; max-width: 8.5em; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
   }
 
   /* a declared member whose pages have not landed: a chip you can see and cannot open */

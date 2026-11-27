@@ -71,21 +71,23 @@ test("the gate the note describes is still the gate: the desk's own words match"
 
 test("Household.astro imports the note and has both write buttons, each with the note beside it", () => {
   assert.match(household, /import WriteGateNote from "@\/components\/WriteGateNote\.astro"/);
-  const BTN = "✍ Write to {t.name}</a>";
+  // CORE-178 (Facet's profile-label FIX): the name in each button is the site's one mention now (the header's with no second face beside the avatar)
+  const BTN = "✍ Write to <ResidentMention handle={t.handle} link={false}";
   const at = [];
   for (let i = household.indexOf(BTN); i >= 0; i = household.indexOf(BTN, i + 1)) at.push(i);
   assert.equal(at.length, 2, "expected exactly two '✍ Write to' buttons on the household page");
 
   // 1. the resident's action row: the note follows the row's closing </nav>,
   //    before anything else on the page.
-  const first = household.slice(at[0] + BTN.length);
+  const after = (i) => household.indexOf("</a>", i) + "</a>".length;   // past the button, whose name is a mention tag now
+  const first = household.slice(after(at[0]));
   const nav = first.indexOf("</nav>");
   assert.ok(nav >= 0, "the action row never closes");
   assert.ok(!first.slice(0, nav).includes(NOTE), "the note is inside the button row, not beside it");
   assert.equal(first.slice(nav + "</nav>".length).trimStart().startsWith(NOTE), true, "the note is not right after the action row");
 
   // 2. the empty-mailbox card: the note follows the button directly.
-  const second = household.slice(at[1] + BTN.length);
+  const second = household.slice(after(at[1]));
   assert.equal(second.trimStart().startsWith(NOTE), true, "the note is not right after the empty-mailbox write button");
 });
 

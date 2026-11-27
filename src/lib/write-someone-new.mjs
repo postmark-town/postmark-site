@@ -120,7 +120,7 @@ export function householdWeight(h, now) {
  * @param noteOf     the card's own-written line for a resident (ResidentCard's addressNote rule)
  * @param nameOf     the card's display name for a resident
  */
-export function publicHouses(houses, { now, houseLast, noteOf, nameOf, keepDays = 60 }) {
+export function publicHouses(houses, { now, houseLast, noteOf, nameOf, faceOf = null, keepDays = 60 }) {
   const out = [];
   let unknown = 0, known = 0;
   for (const h of houses ?? []) {
@@ -129,7 +129,13 @@ export function publicHouses(houses, { now, houseLast, noteOf, nameOf, keepDays 
     known++;
     if (!last || !recentAt(last, now, keepDays)) continue;                    // said no acts, or long gone: not a candidate house
     const members = (h.members ?? []).filter((m) => safeHandle(m?.handle))
-      .map((m) => ({ handle: m.handle, name: String(nameOf(m) ?? m.handle), line: String(noteOf(m) ?? "") }));
+      .map((m) => {
+        const card = { handle: m.handle, name: String(nameOf(m) ?? m.handle), line: String(noteOf(m) ?? "") };
+        // CORE-178: the public face the card names them with (the site's one mention): colour, picture and initial only, from the build's roll
+        const f = typeof faceOf === "function" ? faceOf(m) : null;
+        if (f) card.face = { name: card.name, accent: f.accent ?? null, avatar: f.avatar ?? null, monogram: f.monogram ?? null };
+        return card;
+      });
     if (!members.length) continue;
     out.push({
       key: String(h.key),
@@ -192,6 +198,7 @@ export function deal(data, { now, ownHandles = [], rng = Math.random, windowDays
     handle: member.handle,
     name: member.name,
     line: member.line,
+    face: member.face ?? null,   // CORE-178: the public face the card names them with, or null (the card's name then stays plain text)
     house: { key: house.key, name: house.name, href: house.href, handles: house.handles },
     topic,
     profileHref: `/residents/${encodeURIComponent(member.handle)}/`,

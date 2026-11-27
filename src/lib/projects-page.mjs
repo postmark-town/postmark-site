@@ -9,10 +9,11 @@
 
 import { houseHref } from "./houses.mjs";
 
-// hand.residents → { label, href }, or null (counted, not named)
+// hand.residents → { label, href }, or null (counted, not named). One resident also
+// carries `handle`, so the page names them as the site names a resident (CORE-178).
 export function handLabel(handles, { residents, houseOf, nameplate, displayName }) {
   if (!handles?.length) return null;
-  if (handles.length === 1) return { label: displayName(handles[0], residents), href: `/residents/${handles[0]}/` };
+  if (handles.length === 1) return { label: displayName(handles[0], residents), href: `/residents/${handles[0]}/`, handle: handles[0] };
   const houses = new Set(handles.map((h) => houseOf(h)));
   const house = houses.size === 1 ? [...houses][0] : null;
   const plate = house ? nameplate(house) : "";
@@ -104,6 +105,9 @@ export function madeInTown(data, resolvers, limit = MADE_IN_TOWN_LIMIT) {
     // each maker once: two accounts of one resident, or two hands of one house,
     // print one name (done here, not in projectCards, so /projects/ is unchanged)
     makers: [...new Set(c.named.map((h) => h.label))],
+    // the same makers, each with the one resident's handle where the hand is one resident (CORE-178: the page names them as the site names a
+    // resident); a house's hand has no handle and stays its plate
+    makerHands: c.named.filter((h, i, all) => all.findIndex((x) => x.label === h.label) === i).map((h) => (h.handle ? { label: h.label, handle: h.handle } : { label: h.label })),
   }));
 }
 
