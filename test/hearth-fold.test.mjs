@@ -48,7 +48,7 @@ test("marksOf: the dashboard's mark lines only, newest first, bounded", () => {
 test("mailOf: sums what each doorstep says (an owner's), and says when a resident's did not answer", () => {
   const d = (n, extra = {}) => ({ awaiting: { summary: { new_inbound: n }, unplaced_bounces: [] }, stances: { stances_awaiting: 1 }, ...extra });
   const m = mailOf(HOUSE, { a1: d(2, { your_pending_letters: { standing: [{}, {}] } }), a2: d(3, { awaiting: { summary: { new_inbound: 3 }, unplaced_bounces: [{ date: "x" }] } }) });
-  assert.deepEqual(m, { newInbound: 5, awaitingStance: 2, waiting: 2, bounced: 1, complete: true });
+  assert.deepEqual(m, { newInbound: 5, awaitingStance: 2, waiting: 2, bounced: 1, stanceComplete: true, stanceUncertain: false, complete: true });
   assert.equal(mailOf(HOUSE, { a1: d(1) }).complete, false);
   assert.equal(mailOf(HOUSE, {}), null, "no doorstep answered: unavailable, not nothing-new");
   assert.equal(mailOf(HOUSE, { a1: null, a2: undefined }), null);
@@ -103,4 +103,33 @@ test("countdownOf and leftWords: the clocks' two moments, and what is left of th
   assert.equal(leftWords(t + 3 * 86400_000 + 5 * 3600_000, t), "3d 5h");
   assert.equal(leftWords(t, t), null, "once it has come there is nothing left to count");
   assert.equal(leftWords(t - 1, t), null);
+});
+
+// The Hearth must use the same house-wide stance count as the dashboard (issue #4679).
+test("#4679: the Hearth mail summary does not multiply household stance decisions", () => {
+  const five = ["a", "b", "c", "d", "e"];
+  const ids = ["m1", "m2", "m3", "m4", "m5"];
+  const ds = Object.fromEntries(five.map((h) => [h, {
+    stances: { stances_awaiting: 5, stances_awaiting_ground: "household", awaiting: ids.map((mark) => ({ mark })), complete: true },
+    awaiting: { summary: { new_inbound: 1 }, unplaced_bounces: [] },
+  }]));
+  const summary = mailOf(five, ds);
+  assert.equal(summary.awaitingStance, 5);
+  assert.equal(summary.newInbound, 5, "new inbound correspondence still adds per resident");
+});
+
+
+test("#4679: mail completeness reflects unavailable and conflicting stance counts", () => {
+  const row = (n) => ({ stances: { stances_awaiting: n, stances_awaiting_ground: "household", awaiting: [], complete: false } });
+  const uncertain = mailOf(HOUSE, { a1: row(3), a2: row(5) });
+  assert.equal(uncertain.awaitingStance, 5);
+  assert.equal(uncertain.stanceComplete, true);
+  assert.equal(uncertain.stanceUncertain, true);
+  assert.equal(uncertain.complete, false);
+  const missing = mailOf(HOUSE, { a1: {}, a2: {} });
+  assert.equal(missing.stanceComplete, false);
+  assert.equal(missing.complete, false);
+  const zero = mailOf(HOUSE, { a1: { stances: { stances_awaiting: 0 } }, a2: { stances: { stances_awaiting: 0 } } });
+  assert.equal(zero.complete, true);
+  assert.equal(zero.awaitingStance, 0);
 });
