@@ -1,0 +1,4 @@
+batch-00 files=60 exit 0 # tests 849 # pass 827 # fail 0 # cancelled 0 # skipped 22 
+batch-01 files=57 exit 0 # tests 738 # pass 716 # fail 0 # cancelled 0 # skipped 22 
+batch-02 files=56 exit 0 # tests 511 # pass 509 # fail 0 # cancelled 0 # skipped 2 
+batch-03 files=55 exit 0 # tests 744 # pass 743 # fail 0 # cancelled 0 # skipped 1 

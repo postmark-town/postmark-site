@@ -1,0 +1,4 @@
+WALK smooth; html scroll-behavior: smooth
+  -> not loaded after the walk: 4
+WALK instant; html scroll-behavior: smooth
+  -> not loaded after the walk: 0
