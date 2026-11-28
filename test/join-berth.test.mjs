@@ -144,6 +144,9 @@ test("the page binds the co-sign to the office's resident: shown, checked for ad
   assert.match(script, /const slug = berthNameFor\(v\.handle\);/);
   // a refused board says whether the berth's name was the cut one (Truey F1)
   assert.match(script, /boardRefusal\(r\.status, r\.data, \{ cut: slug !== \(v\.handle \|\| ""\)\.trim\(\) \}\)/);
+  // the keep line names a picture, a sheet and the appearance, so it shows only for those (Truey F3: never for a profile write alone). A text pin:
+  // the browser case TODAY'S CARD reads the line shown when a picture and an appearance were given
+  assert.match(script, /\$\("\[data-cosign-keep\]"\)\.hidden = !\(w && \(w\.picture \|\| w\.sheet \|\| w\.appearance\?\.root\)\);/);
   assert.match(script, /plan\?\.pieces\.handle\?\.chosenApart \? berthSlugFor\(handle\)/);
   assert.equal(BERTH_SLUG_MAX, 31);
 });

@@ -1143,7 +1143,8 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
       const differs = residentWords(cosign.asked, cosign.resident);
       put("[data-cosign-resident]", differs ?? ""); $("[data-cosign-resident]").hidden = !differs;
       const w = cosign.writes;
-      $("[data-cosign-keep]").hidden = !(w && (w.profile || w.picture || w.sheet || w.appearance?.root));
+      // shown only when one of the three it names is held here, so its words are always true (Truey F3 on 5c7decf9)
+      $("[data-cosign-keep]").hidden = !(w && (w.picture || w.sheet || w.appearance?.root));
       const a = $("[data-cosign-link]"); a.href = cosign.link;
       put("[data-cosign-url]", cosign.link);
       put("[data-cosign-status]", "Waiting for your co-sign on the office's page…");
