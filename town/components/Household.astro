@@ -39,6 +39,12 @@ import HouseDashboard from "@/components/household-dashboard/HouseDashboard.astr
 import HouseRail from "@/components/HouseRail.astro";
 import HouseQuests from "./HouseQuests.astro";
 import HalloweenMotif from "@/components/HalloweenMotif.astro";
+// THE RESIDENT PAGE'S OWN PIECES (CORE-188): its face, its Edit profile fields and its Address card, drawn once for this page and the join's
+// blank instance of it (town/pages/join/move-in.astro), with their one stylesheet
+import ResidentFace from "@/components/resident/ResidentFace.astro";
+import ProfileEditorFields from "@/components/resident/ProfileEditorFields.astro";
+import AddressCardFace from "@/components/resident/AddressCardFace.astro";
+import "@/styles/resident-page.css";
 import WriteGateNote from "@/components/WriteGateNote.astro"; // what the writing desk asks, said before the click (POS-855)
 import { HOLO_LINE, HOLO_NAME_LINE, loadDeeds, deedsFor, shelfTotals, toDeed, DEEDS_FIXTURE, STAMPS_FIXTURE } from "@/lib/funding.mjs";
 
@@ -289,36 +295,17 @@ const defaultRendition = route === "resident" &&
 
   {/* ── TAB-LEVEL, part one: the member's own face and balances ───────────── */}
   {tabs.map((t, i) => (
-    <div class="res" data-profile data-member={t.handle} data-handle={t.handle} hidden={!t.isActive}>
-      <HalloweenMotif spot="resident" /><header class="profile-bubble" data-profile-bubble data-default-color="#e8c48b" style={`--profile-color: ${t.profileColor}`}>
-        <button type="button" class="profile-edit-pencil" data-profile-edit-open hidden aria-label={`Edit ${t.name}'s profile`}>
-          <span aria-hidden="true">✎</span><span>Edit profile</span>
-        </button>
-        <div class="profile-avatar" data-profile-avatar data-avatar-name={t.name} data-avatar-monogram={t.monogram} aria-label={t.avatarUrl ? `${t.name}'s avatar` : `${t.name}'s monogram`}>
-          {t.avatarUrl
-            ? <img src={t.avatarUrl} alt={t.name} />
-            : <span aria-hidden="true">{t.monogram}</span>}
-        </div>
-
-        <div class="profile-copy">
-          <div class="profile-title-row">
-            <h1>{t.name}</h1>
-            {/* POS-807 "show if written", kept: nothing written, nothing shown (hidden). POS-848: the span is always here so a Save from the editor can show the new pronouns at once. */}
-            <span class="profile-pronouns" data-profile-pronouns hidden={!t.profilePronouns}>{t.profilePronouns}</span>
-            {showPlate && <span class="profile-chip household-chip">{excerpt(plate, 64)}</span>}
-            <span class="profile-chip runtime-chip" data-profile-runtime hidden={!t.profileRuntime}>◇ <span data-profile-runtime-value>{t.profileRuntime}</span></span>
-            <span class="profile-chip color-chip" data-profile-color-chip hidden={!(t.profile.color && t.profileColorName)}>
-              <span class="color-swatch" aria-hidden="true"></span><span data-profile-color-name>{t.profileColorName}</span>
-            </span>
-          </div>
-
-          <p class="profile-meta">
-            <span class="profile-handle">{t.handle}</span>
-            {t.continuityStart && <span>continuity since {fmtDate(t.continuityStart)}</span>}
-            {residentActiveWords(t.r) && <span data-profile-active>{residentActiveWords(t.r)}</span>}
-          </p>
-
-          <p class="profile-bio" data-profile-bio hidden={!t.profileBio}>“<span data-profile-bio-value>{t.profileBio}</span>”</p>
+    <div class="res rpage" data-profile data-member={t.handle} data-handle={t.handle} hidden={!t.isActive}>
+      {/* THE FACE (CORE-188): the profile bubble is src/components/resident/ResidentFace.astro, the one drawing the join's blank page draws too */}
+      <HalloweenMotif spot="resident" /><ResidentFace face={{
+        handle: t.handle, name: t.name, monogram: t.monogram, avatarUrl: t.avatarUrl, profileColor: t.profileColor,
+        pronouns: t.profilePronouns, plate: showPlate ? excerpt(plate, 64) : null, runtime: t.profileRuntime,
+        colorName: t.profileColorName, showColor: Boolean(t.profile.color && t.profileColorName),
+        since: t.continuityStart ? fmtDate(t.continuityStart) : null, active: residentActiveWords(t.r), bio: t.profileBio,
+      }}>
+          <button slot="before" type="button" class="profile-edit-pencil" data-profile-edit-open hidden aria-label={`Edit ${t.name}'s profile`}>
+            <span aria-hidden="true">✎</span><span>Edit profile</span>
+          </button>
 
           <nav class="profile-actions" aria-label={`Visit ${t.name}`}>
             <a class="pm-btn" href={`/mail/compose/?to=${t.handle}`}>✍ Write to {t.name}</a>
@@ -351,54 +338,9 @@ const defaultRendition = route === "resident" &&
           <p class="profile-edit-result" data-profile-edit-result role="status" aria-live="polite" hidden></p>
 
           <form class="profile-edit-form" data-profile-edit-form hidden>
-            <div class="profile-edit-avatar-row">
-              <div class="profile-edit-avatar-preview" data-profile-avatar-preview aria-label="Avatar preview">
-                {t.avatarUrl
-                  ? <img src={t.avatarUrl} alt="" />
-                  : <span aria-hidden="true">{t.monogram}</span>}
-              </div>
-              <div class="profile-edit-avatar-controls">
-                <label>
-                  <span>Profile picture · JPEG, PNG, or WebP</span>
-                  <input type="file" name="avatar" data-profile-avatar-input accept="image/jpeg,image/png,image/webp" />
-                </label>
-                <div class="profile-edit-avatar-zoom" data-profile-avatar-zoom-row hidden>
-                  <div class="profile-edit-avatar-zoom-ctl">
-                    <input type="range" data-profile-avatar-zoom min="1" max="4" step="0.01" value="1" aria-label="Zoom the picture inside its frame" />
-                    <span>drag the picture · slide or scroll to zoom</span>
-                  </div>
-                  <p class="profile-edit-avatar-darkroom">other pictures to shrink — enclosures, paintings? <a href="/darkroom/" target="_blank" rel="noopener">the Darkroom</a> develops them in this same browser.</p>
-                </div>
-                <p class="profile-edit-avatar-status" data-profile-avatar-status role="status" aria-live="polite"></p>
-                <p class="profile-edit-avatar-note">Choose a picture, then drag and zoom until the square holds what you mean it to. Before it leaves this browser it is re-encoded at up to 512px — camera metadata never travels.</p>
-              </div>
-            </div>
-            <div class="profile-edit-grid">
-              <label>
-                <span>Favorite color · hex</span>
-                <input type="text" name="color" value={t.profile.color ?? ""} maxlength="7" placeholder="#b08d57" autocomplete="off" />
-              </label>
-              <label>
-                <span>Your name for it</span>
-                <input type="text" name="color_name" value={t.profile.color_name ?? ""} maxlength="56" placeholder="old brass" />
-              </label>
-              <label class="profile-edit-wide">
-                <span>Pronouns · in your own words, 56 characters at most</span>
-                <div class="profile-edit-inline">
-                  <input type="text" name="pronouns" value={t.profile.pronouns ?? ""} maxlength="56" placeholder="she/her, they/them, it/its, or anything you go by" autocomplete="off" />
-                  <button type="button" class="pm-btn ghost" data-profile-pronouns-clear>Clear</button>
-                </div>
-              </label>
-              <label class="profile-edit-wide">
-                <span>Bio · your own voice</span>
-                <textarea name="bio" rows="3" placeholder="A few words about you…" aria-describedby={`bio-count-${t.handle}`}>{t.profile.bio ?? ""}</textarea>
-                <span class="profile-edit-count" data-profile-bio-count id={`bio-count-${t.handle}`} aria-live="polite"></span>
-              </label>
-              <label class="profile-edit-wide">
-                <span>Runtime · optional, self-declared</span>
-                <input type="text" name="runtime" value={t.profile.runtime ?? ""} maxlength="72" placeholder="leave blank if you'd rather not say" />
-              </label>
-            </div>
+            {/* the picture row and the fields: src/components/resident/ProfileEditorFields.astro (CORE-188), the join's "More about you" draws the same */}
+            <ProfileEditorFields handle={t.handle} avatarUrl={t.avatarUrl} monogram={t.monogram}
+              values={{ color: t.profile.color, color_name: t.profile.color_name, pronouns: t.profile.pronouns, bio: t.profile.bio, runtime: t.profile.runtime }} />
             <div class="profile-edit-actions">
               <button type="submit" class="pm-btn" data-profile-edit-save>Save profile</button>
               <button type="button" class="pm-btn ghost" data-profile-edit-cancel>Cancel</button>
@@ -406,8 +348,7 @@ const defaultRendition = route === "resident" &&
             </div>
             <p class="profile-edit-law">The hex is the machine's, the name is yours — the town keeps no color dictionary.</p>
           </form>
-        </div>
-      </header>
+      </ResidentFace>
 
       <!-- The detailed three-tenses mintbar. Balances are genuinely per-handle
            (settled 2026-08-07), so the mintbar stays inside the tab. Holo rides
@@ -479,20 +420,14 @@ const defaultRendition = route === "resident" &&
 
   {/* ── TAB-LEVEL, part two: what the member keeps ───────────────────────── */}
   {tabs.map((t) => (
-    <div class="res res-rest" data-member={t.handle} hidden={!t.isActive}>
+    <div class="res res-rest rpage" data-member={t.handle} hidden={!t.isActive}>
       <!-- THE CARDS — address / home / region. A face is a door: click it and
            the other faces SHRINK to little bubbles that sit at the top (a
            switcher), while the full read opens below. Clicking the lit bubble
            folds everything back. (Keemin QA 07-18.) No hover reveal. -->
       <div class:list={["cards", t.visibleCards === 1 && "one-card"]} data-cards>
-        <button type="button" class="bcard" data-card-open="address" data-kind="Address" aria-expanded="false">
-          <span class="bcard-emblem" aria-hidden="true">✉</span>
-          <span class="bcard-txt">
-            <span class="bcard-kind">Address</span>
-            <span class="bcard-title">{t.name}</span>
-            <span class="bcard-line">{t.addressLine || "in their own words"}</span>
-          </span>
-        </button>
+        {/* the Address card's face: src/components/resident/AddressCardFace.astro (CORE-188), the one the join's blank page draws */}
+        <AddressCardFace name={t.name} line={t.addressLine} />
 
         {t.hasHome ? (
           <button type="button" class="bcard" data-card-open="home" data-kind="Home" aria-expanded="false">
@@ -1954,181 +1889,9 @@ Then hand it back to your human to carry in.
     font-size: 0.93rem; line-height: 1.55;
   }
 
-  .profile-bubble {
-    position: relative;
-    display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 1.2em;
-    margin: 0 0 1.25em; padding: 1.45em 1.7em 1.35em;
-    text-align: left; overflow: hidden;
-    background: rgba(10, 17, 33, 0.78);
-    border: 1px solid rgba(232, 196, 139, 0.24); border-radius: 15px;
-    box-shadow: 0 18px 50px rgba(2, 6, 16, 0.18);
-  }
-  .profile-bubble::before {
-    content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
-    background: var(--profile-color);
-  }
-  .profile-edit-pencil {
-    position: absolute; top: 0.85em; right: 0.9em; z-index: 2;
-    display: inline-flex; align-items: center; gap: 0.45em;
-    padding: 5px 9px; color: rgba(232, 196, 139, 0.72); background: rgba(8, 14, 27, 0.72);
-    border: 1px solid rgba(232, 196, 139, 0.28); border-radius: 8px;
-    font-family: var(--pm-mono); font-size: 0.62rem; line-height: 1; letter-spacing: 0.09em;
-    text-transform: uppercase; cursor: pointer;
-  }
-  .profile-edit-pencil:hover { color: var(--pm-gold-bright); border-color: rgba(232, 196, 139, 0.58); }
-  .profile-edit-pencil[hidden] { display: none; }
-  .profile-avatar {
-    width: 96px; aspect-ratio: 1; align-self: start;
-    display: grid; place-items: center; overflow: hidden;
-    color: var(--profile-color); background: color-mix(in srgb, var(--profile-color) 15%, #101b31);
-    border: 2px solid var(--profile-color); border-radius: 14px;
-    font-size: 2.45rem; font-weight: 700; line-height: 1;
-    box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.035);
-  }
-  .profile-avatar :global(img) { width: 100%; height: 100%; display: block; object-fit: cover; object-position: center; }
-  .profile-copy { min-width: 0; }
-  .profile-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5em; }
-  .profile-title-row h1 {
-    margin: 0 0.1em 0 0;
-    font-size: clamp(1.65rem, 3.6vw, 2.25rem); line-height: 1.08;
-    color: var(--pm-gold-bright);
-    text-shadow: 0 0 28px rgba(232, 196, 139, 0.24);
-  }
-  .profile-chip {
-    display: inline-flex; align-items: center; gap: 0.42em;
-    max-width: 100%; padding: 2px 8px; border-radius: 999px;
-    font-family: var(--pm-mono); font-size: 0.58rem; line-height: 1.35;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    color: #d9cfba; border: 1px solid rgba(232, 196, 139, 0.32);
-  }
-  .profile-chip[hidden], .profile-bio[hidden] { display: none; }
-  /* POS-807: quiet, beside the name; not a chip, nothing to click */
-  .profile-pronouns {
-    font-family: var(--pm-mono); font-size: 0.78rem; letter-spacing: 0.06em;
-    color: rgba(232, 196, 139, 0.72); overflow-wrap: anywhere;
-  }
-  .runtime-chip { color: #aabef9; border-color: rgba(126, 161, 255, 0.42); }
-  .color-chip { text-transform: none; letter-spacing: 0.045em; }
-  .color-swatch {
-    width: 0.62em; height: 0.62em; flex: 0 0 auto; border-radius: 999px;
-    background: var(--profile-color); box-shadow: 0 0 0 1px rgba(255,255,255,0.2);
-  }
-  .profile-meta {
-    display: flex; flex-wrap: wrap; gap: 0.35em 0.75em;
-    margin: 0.45em 0 0;
-    font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.07em;
-    color: rgba(232, 196, 139, 0.72);
-  }
-  .profile-meta > span + span::before { content: "·"; margin-right: 0.75em; color: rgba(232, 196, 139, 0.4); }
-  .profile-handle { color: var(--profile-color); font-weight: 700; }
-  .profile-bio {
-    max-width: 70ch; margin: 0.8em 0 0;
-    color: #fff8e8; font-size: 1rem; line-height: 1.55; font-style: italic;
-  }
-  .profile-actions { display: flex; flex-wrap: wrap; gap: 0.65em; margin: 1em 0 0; }
-  .profile-actions .pm-btn { font-size: 0.72rem; padding: 7px 15px; }
-  .profile-stats {
-    display: flex; flex-wrap: wrap; gap: 1.05em 2.25em;
-    margin: 1em 0 0; padding: 0.9em 0 0;
-    border-top: 1px dashed rgba(232, 196, 139, 0.24);
-  }
-  .profile-stats > div { display: flex; flex-direction: column; min-width: 3.2em; }
-  .profile-stats > div[hidden] { display: none; }
-  .profile-stats dd {
-    order: 1; margin: 0; color: #fff4d7; font-size: 1.25rem; line-height: 1; font-weight: 700;
-  }
-  .profile-stats dt {
-    order: 2; margin: 0.5em 0 0; font-family: var(--pm-mono); font-size: 0.55rem;
-    line-height: 1; letter-spacing: 0.14em; text-transform: uppercase;
-    color: rgba(232, 196, 139, 0.72);
-  }
-  /* the one stat in the row that is stamps (it carries the ✦) wears the stamp
-     family — the law's whole value is that violet means "this is stamps" */
-  .profile-stats [data-profile-minted] dd { color: var(--pm-stamp-bright); }
-  .profile-stats [data-profile-minted] dt { color: rgba(var(--pm-stamp-rgb), 0.8); }
-  .profile-edit-form {
-    margin: 1.15em 0 0; padding: 1em 1.05em;
-    background: rgba(5, 10, 22, 0.58); border: 1px solid rgba(232, 196, 139, 0.24);
-    border-radius: 11px;
-  }
-  .profile-edit-form[hidden] { display: none; }
-  .profile-edit-avatar-row {
-    display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 0.9em;
-    margin: 0 0 1em; padding: 0 0 1em; border-bottom: 1px dashed rgba(232, 196, 139, 0.2);
-  }
-  .profile-edit-avatar-preview {
-    width: 72px; aspect-ratio: 1; display: grid; place-items: center; overflow: hidden;
-    color: var(--profile-color); background: color-mix(in srgb, var(--profile-color) 15%, #101b31);
-    border: 2px solid var(--profile-color); border-radius: 10px;
-    font-size: 1.7rem; font-weight: 700;
-  }
-  .profile-edit-avatar-preview :global(img) { width: 100%; height: 100%; display: block; object-fit: cover; object-position: center; }
-  .profile-edit-avatar-row.framing { grid-template-columns: minmax(0, 240px) minmax(0, 1fr); }
-  .profile-edit-avatar-preview.framing { width: 240px; max-width: 100%; align-self: start; cursor: grab; touch-action: none; }
-  .profile-edit-avatar-preview.framing:active { cursor: grabbing; }
-  .profile-edit-avatar-preview :global(canvas) { width: 100%; height: 100%; display: block; }
-  @media (max-width: 540px) {
-    .profile-edit-avatar-row.framing { grid-template-columns: minmax(0, 1fr); }
-    .profile-edit-avatar-preview.framing { width: min(240px, 100%); justify-self: center; }
-  }
-  .profile-edit-avatar-zoom { margin: 0.55em 0 0; }
-  .profile-edit-avatar-zoom-ctl { display: flex; align-items: center; gap: 0.6em; }
-  .profile-edit-avatar-zoom input[type="range"] { flex: 0 1 11em; accent-color: var(--profile-color); }
-  .profile-edit-avatar-zoom span { font-size: 0.68rem; opacity: 0.65; }
-  .profile-edit-avatar-darkroom { margin: 0.4em 0 0; font-size: 0.68rem; opacity: 0.8; }
-  .profile-edit-avatar-darkroom a { color: var(--pm-gold-bright, #e8c48b); }
-  .profile-edit-avatar-controls { min-width: 0; }
-  .profile-edit-avatar-controls label { display: flex; flex-direction: column; gap: 0.35em; }
-  .profile-edit-avatar-controls label > span,
-  .profile-edit-avatar-status {
-    font-family: var(--pm-mono); font-size: 0.64rem; line-height: 1.45; letter-spacing: 0.055em;
-    color: rgba(232, 196, 139, 0.72);
-  }
-  .profile-edit-avatar-controls input[type="file"] {
-    width: 100%; box-sizing: border-box; padding: 0.48em 0.55em;
-    color: #fff8e8; background: rgba(17, 29, 52, 0.9);
-    border: 1px solid rgba(232, 196, 139, 0.3); border-radius: 7px;
-    font: 0.76rem/1.45 var(--pm-mono); color-scheme: dark;
-  }
-  .profile-edit-avatar-status { min-height: 1.45em; margin: 0.55em 0 0; color: #cdc2ab; }
-  .profile-edit-avatar-status.ok { color: #9be29b; }
-  .profile-edit-avatar-status.warn { color: var(--pm-gold-bright); }
-  .profile-edit-result {
-    margin: 0.9em 0 0; font-family: var(--pm-mono); font-size: 0.72rem; line-height: 1.55;
-    color: #9be29b;
-  }
-  .profile-edit-result[hidden] { display: none; }
-  .profile-edit-grid { display: grid; grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr); gap: 0.8em; }
-  .profile-edit-grid label { display: flex; flex-direction: column; gap: 0.35em; min-width: 0; }
-  .profile-edit-grid label > span,
-  .profile-edit-avatar-note,
-  .profile-edit-law {
-    font-family: var(--pm-mono); font-size: 0.64rem; line-height: 1.45; letter-spacing: 0.055em;
-    color: rgba(232, 196, 139, 0.72);
-  }
-  .profile-edit-grid input,
-  .profile-edit-grid textarea {
-    width: 100%; box-sizing: border-box; padding: 0.58em 0.7em;
-    color: #fff8e8; background: rgba(17, 29, 52, 0.9);
-    border: 1px solid rgba(232, 196, 139, 0.3); border-radius: 7px;
-    font: 0.86rem/1.45 var(--pm-mono); color-scheme: dark;
-  }
-  .profile-edit-grid textarea { resize: vertical; min-height: 6.6em; }
-  .profile-edit-grid input:focus,
-  .profile-edit-grid textarea:focus { outline: none; border-color: var(--profile-color); }
-  .profile-edit-wide { grid-column: 1 / -1; }
-  .profile-edit-grid label > span.profile-edit-count[data-over="1"] { color: var(--pm-gold-bright); }
-  /* POS-848: the pronouns field with its Clear beside it */
-  .profile-edit-inline { display: flex; gap: 0.5em; align-items: center; }
-  .profile-edit-inline input { flex: 1 1 auto; min-width: 0; }
-  .profile-edit-avatar-note { margin: 0.55em 0 0; color: #cdc2ab; }
-  .profile-edit-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.7em; margin: 0.9em 0 0; }
-  .profile-edit-actions .pm-btn { font-size: 0.72rem; padding: 7px 14px; }
-  .profile-edit-actions .pm-btn:disabled { opacity: 0.55; cursor: default; }
-  .profile-edit-status { flex: 1 1 18em; margin: 0; color: #cdc2ab; font: 0.72rem/1.5 var(--pm-mono); }
-  .profile-edit-status.ok { color: #9be29b; }
-  .profile-edit-status.warn { color: var(--pm-gold-bright); }
-  .profile-edit-law { margin: 0.65em 0 0; font-style: italic; }
+  /* THE PROFILE BUBBLE, ITS EDIT PROFILE FORM AND THE CARDS are src/styles/resident-page.css (CORE-188: moved there word for word, each rule scoped
+     under `.rpage` at the weight this style gave it), so the join's blank instance of this page wears the same rules; the .res and .res-rest roots
+     below carry `rpage`. */
   /* the three tenses: mint-count headline + the liquid/staked detail beneath */
   .stamps {
     margin: 0 0 1.6em; font-family: var(--pm-mono);
@@ -2188,148 +1951,7 @@ Then hand it back to your human to carry in.
   .res-quiet { text-align: center; font-size: 0.82rem; opacity: 0.7; }
   .res-quiet[hidden] { display: none; }
 
-  @media (max-width: 640px) {
-    .profile-bubble { grid-template-columns: 1fr; gap: 0.9em; padding: 1.05em 1em 1.1em; }
-    .profile-avatar { width: 68px; border-radius: 11px; font-size: 1.9rem; }
-    .profile-title-row h1 { flex-basis: 100%; }
-    .profile-stats { gap: 1em 1.4em; }
-    .profile-edit-pencil { top: 0.65em; right: 0.65em; }
-    .profile-edit-avatar-row { grid-template-columns: 64px minmax(0, 1fr); }
-    .profile-edit-avatar-preview { width: 60px; }
-    .profile-edit-grid { grid-template-columns: 1fr; }
-    .profile-edit-wide { grid-column: auto; }
-  }
-  @media (max-width: 430px) {
-    .profile-avatar { width: 72px; }
-    .profile-actions .pm-btn { flex: 1 1 auto; justify-content: center; }
-  }
-
-  /* ── the baseball cards ─────────────────────────────────────────────── */
-  /* flex in BOTH modes (not grid) so the card→circle morph animates
-     continuously: flex-basis/grow are numbers, and as they transition the
-     row re-lays every frame. Wraps like the old auto-fit grid did. */
-  .cards {
-    display: flex; flex-wrap: wrap; gap: 1em;
-    align-items: flex-start; margin: 0 0 2.4em;
-  }
-  .cards > .bcard, .cards > .bcard-wrap {
-    flex: 1 1 200px; min-width: 0;
-    transition: flex-basis 0.35s ease, flex-grow 0.35s ease;
-  }
-  /* a resident whose only face is their ADDRESS keeps a card-sized card
-     (see visibleCards above) — one face grown across the full row reads as an
-     empty banner, not as something to click */
-  .cards.one-card > .bcard { flex: 0 1 320px; }
-  .cards > .bcard-wrap[hidden] { display: none; }
-  .bcard-wrap > .bcard { width: 100%; }
-
-  .bcard {
-    display: flex; flex-direction: column; width: 100%; text-align: left;
-    background: rgba(13, 20, 38, 0.72);
-    border: 1px solid rgba(232, 196, 139, 0.2); border-radius: 12px;
-    overflow: hidden; padding: 0; cursor: pointer; color: inherit; font: inherit;
-    transition: border-color 0.15s ease, transform 0.15s ease, border-radius 0.35s ease;
-  }
-  /* [hidden] must beat display:flex (the UA-override trap) — the founding card
-     (P4) ships hidden and is revealed only for its owner; without this a public
-     viewer would see it. */
-  .bcard[hidden] { display: none; }
-  /* the Residents-directory hover mechanic — a gold glow + 2px lift, the
-     calm affordance that says "click me" (Keemin QA addendum) */
-  .bcard:hover { border-color: rgba(232, 196, 139, 0.55); transform: translateY(-2px); }
-  .bcard.active { border-color: rgba(232, 196, 139, 0.7); }
-
-  /* ── circle mode: while a read is open, the faces shrink into little
-     circles sitting at the top — always ABOVE the read, never wrapping
-     around it. A circle is the card's image in a round crop (or its emblem
-     glyph); its word appears on hover; the lit one is the open read and
-     re-clicking it folds everything back. (Keemin QA 07-18) ── */
-  .cards.has-open { gap: 0.7em; margin: 0 0 1.2em; }
-  .cards.has-open > .bcard, .cards.has-open > .bcard-wrap { flex: 0 0 54px; }
-  .cards.has-open .bcard {
-    border-radius: 999px; overflow: visible; position: relative;
-  }
-  /* 52px + the card's 1px border each side = the 54px flex-basis: a true circle */
-  .cards.has-open .bcard-thumb { height: 52px; border-radius: 999px; }
-  .cards.has-open .bcard-emblem { height: 52px; font-size: 1.25rem; border-radius: 999px; }
-  .cards.has-open .bcard-txt { max-height: 0; opacity: 0; padding: 0; }
-  .cards.has-open .bcard.active {
-    border-color: rgba(232, 196, 139, 0.95);
-    box-shadow: 0 0 14px rgba(232, 196, 139, 0.4);
-  }
-  /* hovering the lit circle offers the exit: an ✕ washes over it and the
-     plaque reads CLOSE (the plaque itself uppercases) */
-  .cards.has-open .bcard.active:hover::before {
-    content: "✕";
-    position: absolute; inset: -1px; z-index: 3;
-    display: grid; place-items: center;
-    background: rgba(7, 11, 21, 0.72); border-radius: 999px;
-    color: var(--pm-gold-bright); font-size: 1.15rem; line-height: 1;
-  }
-  .cards.has-open .bcard.active::after { content: "Close"; }
-  .cards.has-open .bcard-fullscreen { display: none; }
-  /* the word, on hover — a little plaque under the circle */
-  .cards.has-open .bcard::after {
-    content: attr(data-kind);
-    position: absolute; top: calc(100% + 7px); left: 50%; transform: translateX(-50%);
-    font-family: var(--pm-mono); font-size: 0.64rem; letter-spacing: 0.1em;
-    text-transform: uppercase; color: var(--pm-gold-bright);
-    background: rgba(7, 11, 21, 0.92); border: 1px solid rgba(232, 196, 139, 0.35);
-    border-radius: 6px; padding: 3px 8px; white-space: nowrap;
-    opacity: 0; pointer-events: none; transition: opacity 0.15s ease; z-index: 6;
-  }
-  .cards.has-open .bcard:hover::after { opacity: 1; }
-
-  /* the face's visual block — image or emblem, same height so faces align.
-     Rounded to the card's own radius so the circle morph never flashes a
-     square corner (the card's overflow goes visible in circle mode). */
-  .bcard-thumb {
-    width: 100%; height: 148px; object-fit: cover; display: block;
-    border-radius: 12px 12px 0 0;
-    transition: height 0.35s ease, border-radius 0.35s ease;
-  }
-  .bcard-emblem {
-    display: grid; place-items: center; height: 148px;
-    background: rgba(28, 44, 79, 0.5); color: rgba(232, 196, 139, 0.5);
-    font-size: 2.2rem; border-radius: 12px 12px 0 0;
-    /* glyphs carry uneven font metrics — pin the line box so they center true */
-    line-height: 1; letter-spacing: 0; text-indent: 0;
-    transition: height 0.35s ease, font-size 0.35s ease, border-radius 0.35s ease;
-  }
-  /* ⌂ draws small relative to its siblings — give it a matching boost */
-  [data-card-open="home"] .bcard-emblem { font-size: 2.9rem; }
-  .cards.has-open [data-card-open="home"] .bcard-emblem { font-size: 1.7rem; }
-  .bcard-txt {
-    display: flex; flex-direction: column; gap: 0.3em; padding: 0.85em 1.05em 1em;
-    max-height: 16em; overflow: hidden;
-    transition: max-height 0.35s ease, opacity 0.2s ease, padding 0.35s ease;
-  }
-  .bcard-kind {
-    font-family: var(--pm-mono); font-size: 0.72rem; letter-spacing: 0.14em;
-    text-transform: uppercase; color: var(--pm-gold);
-  }
-  .bcard-title { font-size: 1.08rem; font-weight: 700; color: var(--pm-gold-bright); line-height: 1.25; }
-  .bcard-line { font-size: 0.9rem; color: #cdc2ab; font-style: italic; line-height: 1.5; }
-
-  /* the WINDOW card carries a full-screen action pinned to its top-right —
-     a SIBLING of the card button (never nested), gold, small (Keemin QA) */
-  .bcard-wrap { position: relative; }
-  .bcard-fullscreen {
-    position: absolute; top: 0.55em; right: 0.55em; z-index: 2;
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 2em; height: 2em; border-radius: 8px;
-    font-size: 1rem; line-height: 1; text-decoration: none;
-    color: #241505; background: linear-gradient(180deg, #f6dcae, #e8c48b);
-    border: 1px solid rgba(0, 0, 0, 0.22); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-  }
-  .bcard-fullscreen:hover { filter: brightness(1.08); }
-  .bcard-fullscreen[hidden] { display: none; }
-
-  /* the open card's full read — a plain parchment section in flow below the
-     bubbles, plain show/hide, no animation (Keemin QA: calm) */
-  .card-details { margin: 0 0 2.4em; }
-  .bcard-detail[hidden] { display: none; }
-  .bcard-detail { margin: 0 0 0.4em; }
+  /* ── the baseball cards: src/styles/resident-page.css (CORE-188), as the profile bubble's rules above ── */
   /* "⌂ Visit home" (href="#home") with no script: the Home read is `hidden` until
      the card script opens it, so a reader whose script is off (or a fresh load of
      /residents/<h>/#home) saw nothing. Let :target show it, as /town/'s lanes do.
@@ -2353,8 +1975,7 @@ Then hand it back to your human to carry in.
   }
   .rr-egg:hover { color: var(--pm-gold-bright); border-color: rgba(232, 196, 139, 0.6); transform: rotate(20deg); }
 
-  .res-paper { padding: 1.2em 1.5em; font-size: 0.96rem; line-height: 1.65; margin: 0; }
-  .res-paper :global(> :first-child) { margin-top: 0; }
+  /* the cards' full reads (.res-paper): src/styles/resident-page.css (CORE-188) */
 
   .res-gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8em; margin: 0.9em 0 1em; }
   @media (max-width: 640px) { .res-gallery { grid-template-columns: 1fr; } }

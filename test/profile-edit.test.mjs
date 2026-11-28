@@ -109,8 +109,12 @@ test("the link carries the ask, and the page opens the editor for the resident n
 // readers above beside them.
 test("PIN the form: a pronouns field, a Clear, escaped text, and the page builds its PATCH through the module", () => {
   const src = read("../town/components/Household.astro");
-  assert.match(src, /<input type="text" name="pronouns" value=\{t\.profile\.pronouns \?\? ""\} maxlength="56"/, "prefilled from profile.pronouns");
-  assert.match(src, /data-profile-pronouns-clear/);
+  // CORE-188: the field is drawn by src/components/resident/ResidentField.astro from the one table (src/lib/resident-fields.mjs)
+  assert.match(src, /pronouns: t\.profile\.pronouns,/, "prefilled from profile.pronouns");
+  const field = read("../src/components/resident/ResidentField.astro");
+  assert.match(field, /<input type="text" name=\{name\} value=\{value \?\? ""\} maxlength=\{spec\.maxLength\} [^\n]*\/>\s*<button type="button" class="pm-btn ghost" data-profile-pronouns-clear>Clear<\/button>/);
+  assert.match(read("../src/lib/resident-fields.mjs"), /pronouns: Object\.freeze\(\{ label: "Pronouns · in your own words, 56 characters at most", [^}]*maxLength: 56,/);
+  assert.match(read("../src/components/resident/ProfileEditorFields.astro"), /withClear=\{name === "pronouns"\}/);
   assert.match(src, /profilePayload\(/);
   assert.match(src, /profileRequest\(OFFICE_BASE, handle,/);
   assert.match(src, /wantsProfileEditor\(/);

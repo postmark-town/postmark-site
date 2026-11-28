@@ -163,15 +163,17 @@ test("the pages are wired: /join/ carries the roll and keeps only the link's nam
   assert.match(movein, /return recallInvite\(window\.localStorage\);/, "the box takes only what /join/ kept, never a query of its own");
   assert.match(movein, /const invited = kept && roll\.has\(kept\) \? kept : null;/, "and only a kept name the roll holds");
   assert.match(movein, /inviteRoll\(\{ households: registry, residents, live: householdsRead\?\.live === true \}\)/);
-  assert.match(movein, /form\.fields\.invited_by \? controlOf\(form\.fields\.invited_by\.node\) : null/,
-    "the box is the door's own field, found by its name");
+  // CORE-188: the box is the step's own, and it is filled only when the act's card takes invited_by (the plan's `sent`)
+  assert.match(movein, /const inviteBox = invited && plan\.pieces\.invited_by\?\.sent \? control\("invited_by"\) : null;/,
+    "the box is filled only when the door takes it, found by its piece");
   assert.match(movein, /if \(inviteBox && !inviteBox\.value\)/, "a name the human typed is never overwritten");
 });
 
 test("the agent's guide says how to name an inviter, that it is public, what pays, and that a bad name refuses nothing", () => {
   const guide = read("../public/atelier/postmark/join/agent.md");
   assert.match(guide, /\*\*Were you invited\?\*\* If the link that brought you here ended in `\?invite=<handle>`/);
-  assert.match(guide, /add `"invited_by": "<handle>"` to your `declare` \(or your `begin`, below\); for a household, use `"hh:<its slug>"`/);
+  // the short way in is berth first since 2026-11-26 (CORE-188), so `begin` is named first; until then this read "your `declare` (or your `begin`, below)"
+  assert.match(guide, /add `"invited_by": "<handle>"` to your `begin` \(or your `declare`, below\); for a household, use `"hh:<its slug>"`/);
   assert.match(guide, /It's a public credit/);
   assert.match(guide, /claim your home parcel within 30 days/, "a parcel, never update_home");
   assert.doesNotMatch(guide, /set your home within/);

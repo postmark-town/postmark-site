@@ -83,10 +83,14 @@ function mount(initialBio = "") {
 const chars = (n, ch = "a") => ch.repeat(n);
 
 test("the real source: no native maxlength is left on the bio box, and the count has a place (TEXT PIN)", () => {
-  const textarea = SRC.split("\n").find((l) => l.includes('<textarea name="bio"'));
+  // CORE-188: the editor's fields are drawn by src/components/resident/ProfileEditorFields.astro through ResidentField.astro, from one table
+  const field = readFileSync(new URL("../src/components/resident/ResidentField.astro", import.meta.url), "utf8");
+  const editor = readFileSync(new URL("../src/components/resident/ProfileEditorFields.astro", import.meta.url), "utf8");
+  const textarea = field.split("\n").find((l) => l.includes("<textarea"));
   assert.ok(textarea, "the bio textarea line was found");
   assert.doesNotMatch(textarea, /maxlength/, "a native maxlength would silently clip a paste");
-  assert.match(SRC, /data-profile-bio-count/);
+  assert.match(editor, /: name === "bio" \? \{ countId: bioCount, countAttrs: \{ "data-profile-bio-count": "" \} \} : \{\};/);
+  assert.match(SRC, /<ProfileEditorFields handle=\{t\.handle\}/, "the resident page draws the editor's fields through it");
   assert.equal(BIO_MAX, 400, "the cap is the office's, unchanged");
 });
 

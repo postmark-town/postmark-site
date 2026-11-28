@@ -194,6 +194,28 @@ export function fieldsFor(cardPayload, indexEntry) {
   return null;
 }
 
+/**
+ * A NEW HOUSE'S FORM WITH NO SIGN-IN (CORE-188; Darko, 2026-11-26: a new house starts without signing in). The household door answers no card
+ * without a key, but the office's public front door, `GET /join`, serves the declaration's schema as `join.schema`: the office's one
+ * DECLARE_SCHEMA, "one schema object and a test asserts both surfaces serve it" (office src/declare.mjs), the same object declare's card is made
+ * from. The card is that schema's properties with `required: true` on each name in its `required` list (office world-apex.mjs § actionFields,
+ * with the human hints kept, as a card read keeps them). So the fields come from the office's own words, never a copy kept in the site.
+ * @param {object|null} arrival  the answer to GET /join
+ * @returns {{fields: object, source: "arrival"} | null}
+ */
+export function fieldsOfArrival(arrival) {
+  const schema = arrival && typeof arrival === "object" && arrival.join && typeof arrival.join === "object" ? arrival.join.schema : null;
+  const props = schema && typeof schema === "object" ? schema.properties : null;
+  if (!props || typeof props !== "object" || Array.isArray(props) || !Object.keys(props).length) return null;
+  const required = new Set(Array.isArray(schema.required) ? schema.required : []);
+  const fields = {};
+  for (const [name, spec] of Object.entries(props)) {
+    if (!spec || typeof spec !== "object") continue;
+    fields[name] = { ...spec, ...(required.has(name) ? { required: true } : {}) };
+  }
+  return { fields, source: "arrival" };
+}
+
 /** The door's own sentence about an act — never the page's. */
 export function actSentence(cardPayload, indexEntry) {
   const card = cardPayload && typeof cardPayload === "object" ? cardPayload.card : null;

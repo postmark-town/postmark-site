@@ -1,0 +1,34 @@
+---
+// DraftSlot.astro — ONE PIECE OF A BLANK RESIDENT PAGE, TYPED INTO WHERE IT SITS (CORE-188). Darko, 2026-11-26 10:15 EST: "instead of having a
+// separate form that we fill for the preview, we should just allow form filling directly in the preview shape of the resident form itself,
+// especially because the dotted lines currently look like you can click them to like fill them in." So in a draft (the join's blank page), each
+// piece ResidentFace.astro and AddressCardFace.astro would print is this instead: the box itself, in the page's own type (it inherits the font,
+// size and colour of the spot it stands in), its ghost as the placeholder, the dotted outline as the "type here" cue while its step is lit, and
+// beside it the live count (shown while the box has focus) and the piece's problem (shown as soon as it's wrong). The resident page never draws
+// a draft, so none of this reaches it. Styles: src/styles/resident-page.css § A BLANK INSTANCE OF THE PAGE.
+//
+// A BOX WRAPS AS THE PAGE'S TEXT DOES (the review of 18bd5144: the Address card's line was cut mid-sentence at 375, since an input can't wrap).
+// So every piece is a textarea, a one-row one (`data-one-row`) for a one-line piece, that grows to fit its words (resident-page.css; the join's
+// fit() where the browser can't); Enter in a one-row box still continues the step, and a line break is never typed into one. Only a `short`
+// piece, a fixed short format (a date, a hex), stays a one-line input.
+//
+// WHAT A SCREEN READER HEARS (the same review): the box's name is the piece's whole label, "optional" included, and its description is what
+// Regina says about it (`say`, in a visually hidden span the join refreshes when the office's card changes it), then the count and the problem.
+//
+// The hooks are the join's (town/pages/join/move-in.astro): the box is `#jd-<name>` with `data-piece`, the count `data-count-for`, the problem
+// `data-problem-for`, her words `data-say-for`, and the wrapper `data-fill` (which piece it is; is-lit when its step is the one being filled). It
+// starts read-only: the join lights the current step's pieces and leaves the rest reading as the page.
+interface Props { name: string; ghost: string; label: string; say?: string; multiline?: boolean; rows?: number; short?: boolean }
+const { name, ghost, label, say = "", multiline = false, rows = 1, short = false } = Astro.props;
+const countId = `jd-count-${name}`;
+const problemId = `jd-problem-${name}`;
+const sayId = `jd-say-${name}`;
+const oneRow = !multiline && !short;
+const box = { id: `jd-${name}`, name, "data-piece": name, placeholder: ghost, "aria-label": label, "aria-describedby": `${sayId} ${countId} ${problemId}`, autocomplete: "off", readonly: true, tabindex: -1, class: `draft-in${oneRow ? " is-one-row" : ""}` };
+const width = Math.max(3, [...ghost].length);
+---
+<span class={`draft-slot${multiline ? " is-long" : ""}${oneRow ? " is-one-row" : ""}`} data-fill={name} data-slot={name}>{multiline
+  ? <textarea rows={rows} {...box}></textarea>
+  : oneRow
+    ? <textarea rows={1} cols={width} data-one-row {...box}></textarea>
+    : <input type="text" size={width} {...box} />}<span class="pm-sr" id={sayId} data-say-for={name}>{say}</span><span class="draft-tips"><span class="draft-count" id={countId} data-count-for={name} aria-live="polite"></span><span class="draft-problem" id={problemId} data-problem-for={name} aria-live="polite"></span></span></span>
