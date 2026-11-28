@@ -51,7 +51,9 @@ const eventTitle = (entry) => eventOfSpark(entry, calendar, eventsData)?.event?.
             <div class="spk-cell" data-spark-cell data-has-event={entry.eventId !== null ? "1" : "0"} data-has-picture={pictureOf(entry.spark) ? "1" : "0"}>
               {/* a PICTURED card is the picture and one caption (Darko 13:14 EST): no second metadata row on it, its event is on its page. An UNPICTURED card
                   carries its event / "no event named" line INSIDE the card (Darko 15:36 EST: "the line inside it"), never as a sibling under it. */}
-              <SparkCard spark={entry.spark} roll={roll}
+              {/* UI-43 (Darko 2026-11-26): an UNPICTURED card here is the compact summary (title, short excerpt, credit, this line); its dates, room and
+                  Flares are on its own page, which keeps every word. Only this gallery asks for it. */}
+              <SparkCard spark={entry.spark} roll={roll} compact
                 eventLine={pictureOf(entry.spark) ? null : (entry.eventId !== null ? `event: ${eventTitle(entry) ?? entry.eventId}` : "no event named")} />
             </div>
           ))}
@@ -106,6 +108,10 @@ const eventTitle = (entry) => eventOfSpark(entry, calendar, eventsData)?.event?.
     .spk-cell > :global(.spark-card.is-image-card) { display: flex; flex-direction: column; align-items: stretch; }
     .spk-cell > :global(.spark-card.is-image-card .spark-pic) { flex: 1 1 auto; display: flex; align-items: center; background: #11161d; }
     .spk-cell > :global(.spark-card.is-image-card .spark-pic img) { flex: 0 0 auto; }
+    /* AN UNPICTURED CARD DOES NOT SET THE ROW (bug: tidemark/sparks-page-a-spark-with-no-picture-stretches-its-row-and-le, Tidemark's fix #511/#513 clamped its
+       recounting here). UI-43 supersedes that clamp with the compact card above (SparkCard `compact`: title, a three-line excerpt, credit, the event line; no
+       dates, room or Flares place), so a long one cannot stretch its row and leave the pictured neighbours as a tall empty dark well with the picture lost in
+       it. The whole card opens the Spark, and its own page keeps every word (SparkCard with link off is untouched). */
     .spk-partial { margin: 1rem 0; max-width: 46rem; }
   </style>
 </PostmarkLayout>

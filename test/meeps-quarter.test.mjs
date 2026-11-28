@@ -120,6 +120,24 @@ test("CORE-185: Iris and the Registrar are drawn as the set is, from their portr
   assert.deepEqual(Object.keys(FIGURE_INK).sort(), ["bugcatcher", "darko", "illuminator", "meeplings", "postmaster", "registrar"]);
 });
 
+test("CORE-185: Iris's and the Registrar's eyes are open and lit, not flat bars (Darko's look, via Wright 2026-11-26)", () => {
+  // "Their eyes currently are just horizontal bars, which read as like potentially like exasperated or tired". An open eye is a 2×2 of the doorway
+  // dark (`d`) with one paper pixel (`p`) at its top as the catchlight, as Darko's own token lights his. The held drawing (3dca60a5) had each eye
+  // as one row of `dd` and fails this: no lit eye, and two bare bars.
+  for (const meep of ["illuminator", "registrar"]) {
+    const rows = SPRITES[meep];
+    const face = rows.slice(4, 13);
+    const eyes = [];
+    face.forEach((r, y) => { for (let x = 0; x < 23; x++) if (r.slice(x, x + 2) === "pd" && face[y + 1]?.slice(x, x + 2) === "dd") eyes.push({ x, y }); });
+    assert.equal(eyes.length, 2, `${meep} has two open, lit eyes`);
+    assert.equal(eyes[0].y, eyes[1].y, `${meep}'s eyes sit level`);
+    assert.equal(eyes[1].x - eyes[0].x, 4, `${meep}'s eyes keep their spacing`);
+    // every dark pair in the face is the lower half of a lit eye: no bare bar is left
+    const bars = face.reduce((n, r) => n + (r.match(/dd/g) ?? []).length, 0);
+    assert.equal(bars, eyes.length, `${meep}'s face has a flat dark bar that is not an open eye`);
+  }
+});
+
 test("the Bug Catcher's inks are the video kit's, so the page and the video draw the same frog", () => {
   // The one exception to the rule above (civic-art § A MEEP'S OWN INKS): his
   // inks are the shorts kit's, G:/content-creation/shorts/_kit/kit.js § BC2_INK
