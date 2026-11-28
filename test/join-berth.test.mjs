@@ -32,6 +32,14 @@ test("the berth is read off the board's answer for this slug only, and a refusal
   assert.equal(berthOf({ berth: "someone-else", key: "k" }, "quillon"), null, "a berth for another name was taken as this one");
   assert.equal(berthOf({ berth: "quillon" }, "quillon"), null);
   assert.match(boardRefusal(409, { defect: '"quillon" is already held — it is a live berth' }), /already held.*frees itself after seven days; pick another handle/);
+  // a cut berth name held (Truey F1 on 5c7decf9: the office keeps a co-signed berth's name for good): the advice is to change something within
+  // the first 31 characters, never "pick another handle", which a new tail can't satisfy; the control above, an uncut name, keeps its own words
+  const cut = boardRefusal(409, { defect: '"quillon-of-hollow-oak-the-slow" is already held — it is a live berth', hint: "names are single-occupancy across the whole town; pick another" }, { cut: true });
+  assert.match(cut, /^"quillon-of-hollow-oak-the-slow" is already held — it is a live berth\. /, "the office's own words lead");
+  assert.doesNotMatch(cut, /pick another/, "the office's 'pick another' hint, which a new tail can't satisfy, rides a cut name's refusal");
+  assert.match(cut, /Your agent's berth uses the first 31 characters of the handle, and that name is already in use, so changing anything after them won't help\. Change something within the first 31 characters to go on\./);
+  assert.doesNotMatch(cut, /pick another handle/, "a cut name's refusal still says to pick another handle");
+  assert.doesNotMatch(boardRefusal(409, null), /first 31 characters/, "an uncut name's refusal talks about a cut");
   assert.match(boardRefusal(429, null), /busy.*nothing was sent/i);
   assert.match(boardRefusal(0, null), /Couldn't reach the office/);
 });
@@ -134,6 +142,8 @@ test("the page binds the co-sign to the office's resident: shown, checked for ad
   // the berth boards under its own name: the handle where the office declares none (the 31 rule), its short name where it keeps them apart
   assert.match(script, /boardRequest\(officeBase\(\), slug\)/);
   assert.match(script, /const slug = berthNameFor\(v\.handle\);/);
+  // a refused board says whether the berth's name was the cut one (Truey F1)
+  assert.match(script, /boardRefusal\(r\.status, r\.data, \{ cut: slug !== \(v\.handle \|\| ""\)\.trim\(\) \}\)/);
   assert.match(script, /plan\?\.pieces\.handle\?\.chosenApart \? berthSlugFor\(handle\)/);
   assert.equal(BERTH_SLUG_MAX, 31);
 });

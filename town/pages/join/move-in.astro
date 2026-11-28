@@ -1118,7 +1118,7 @@ const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
         setStatus("taking a berth for your agent…");
         const r = await sendJSON(boardRequest(officeBase(), slug));
         const got = r.status === 201 || r.status === 200 ? berthOf(r.data, slug) : null;
-        if (!got) return done(boardRefusal(r.status, r.data));
+        if (!got) return done(boardRefusal(r.status, r.data, { cut: slug !== (v.handle || "").trim() }));
         berth = got;
       }
       setStatus("parking your agent's page with the office…");

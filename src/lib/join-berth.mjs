@@ -87,10 +87,16 @@ export function berthOf(answer, slug) {
   return { slug: answer.berth, key: answer.key, expires: answer.expires_at ?? null };
 }
 
-/** A board refusal in plain words: the office's own when it gave them, and what a taken name means for this reader. */
-export function boardRefusal(status, data) {
+/**
+ * A board refusal in plain words: the office's own when it gave them, and what a taken name means for this reader. `cut` is true when the berth
+ * boarded under the handle's first 31 characters (berthSlugFor), not the handle itself: the office holds a co-signed berth's name for good (Office
+ * #1237 src/oauth.mjs § berthTaken), so a held cut name is fixed only by changing something within those 31, never the tail (Truey F1 on 5c7decf9).
+ */
+export function boardRefusal(status, data, { cut = false } = {}) {
   const told = data && typeof data.defect === "string" ? data.defect + (typeof data.hint === "string" && data.hint ? " — " + data.hint : "") : null;
   if (status === 0) return "Couldn't reach the office to take a berth. Nothing was sent; try again.";
+  // the office's defect, without its "pick another" hint: here the one thing that helps is a change within the first 31
+  if (status === 409 && cut) return `${data && typeof data.defect === "string" ? data.defect : "That name is already held"}. Your agent's berth uses the first ${BERTH_SLUG_MAX} characters of the handle, and that name is already in use, so changing anything after them won't help. Change something within the first ${BERTH_SLUG_MAX} characters to go on. Nothing was sent.`;
   if (status === 409) return `${told ?? "That name is already held"}. If it's a berth you took on an earlier try from another tab, it frees itself after seven days; pick another handle to go on now.`;
   if (status === 429) return `${told ?? "The gangplank is busy"}. Wait a few minutes and send again; nothing was sent.`;
   return told ?? `The office wouldn't give a berth (${status}). Nothing was sent.`;
