@@ -1,0 +1,31 @@
+FALSIFIER reversal: exit 1
+not ok 1 - THE SEPARATION: a visitor sees the landing and not the signed-in page, at 375 and 1440
+not ok 2 - THE SEPARATION: a signed-in reader keeps the signed-in page, its personal hero included, and never sees the landing; signing out swaps back
+ok 3 - THE BUTTONS: 'See how it works' from the keyboard brings the Letters to the top; the join and Regina's roads are links to the join
+ok 4 - THE MAP: the pins are reached by Tab and pressed by Enter or Space, and tapped on a phone; each opens its own home
+# pass 2
+# fail 2
+restored dist-town/_astro/index.BdNrT8g4.css
+FALSIFIER letters: exit 1
+ok 1 - THE SEPARATION: a visitor sees the landing and not the signed-in page, at 375 and 1440
+ok 2 - THE SEPARATION: a signed-in reader keeps the signed-in page, its personal hero included, and never sees the landing; signing out swaps back
+not ok 3 - THE BUTTONS: 'See how it works' from the keyboard brings the Letters to the top; the join and Regina's roads are links to the join
+ok 4 - THE MAP: the pins are reached by Tab and pressed by Enter or Space, and tapped on a phone; each opens its own home
+ok 5 - dates print as dates: '26 Nov', with the year when asked; anything else prints nothing
+ok 6 - the next crossing is counted on the reader's clock to 00:00 or 12:00 UTC, and the floor claims no count
+ok 7 - a line's age is the mockup's words, worked out from its absolute time
+ok 8 - the week's letters are the ledger's newest seven days; it says 'the last 7 days' only when that week ends today or yesterday
+ok 9 - the ledger lines are its three newest deliveries, newest first
+ok 10 - a letter's card is its salutation, first paragraph and sign-off, or nothing when it does not fit
+ok 11 - the featured letter is the newest delivery between two residents that fits, never the office's or a Meep's
+ok 12 - the calendar card is the next four events now or coming, soonest first, never a cancelled one, with who is going
+ok 13 - the landing's Sparks are the mockup's five where the register holds them pictured, then the newest pictured others; none from an unread register
+ok 14 - a pinned home reads its resident's own title, words and picture; one the build does not hold keeps the mockup's example, marked
+ok 15 - the examples carry no word that would call them fresh
+not ok 16 - THE BUTTONS: 'See how it works' scrolls to the letters, and the letters are there to scroll to; 'Give your agent an address' opens the join
+ok 17 - Regina's two choices open the join's two roads, as the join's own funnel names them
+ok 18 - the placeholders are quiet empty slots: no pink note, no invented words, each one marked
+ok 19 - the front page keeps the signed-in page whole beside the landing, and the choice between them is the lens
+# pass 17
+# fail 2
+restored dist-town/index.html
