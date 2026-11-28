@@ -16,6 +16,7 @@
 //   · THE CHROME (Facet's return on c71116a2): a visitor gets the mockup's nav row and exactly one footer, the social one, with Privacy
 //     and Terms; the town's header and footer stand down for them and stay for a signed-in reader;
 //   · THE LETTER: its FROM · TO · date line never runs under the stamp, at 375 and 1440;
+//   · THE COMPANY ROW (Darko, 2026-11-28): each company's own mark, larger than its name, no card; the not-affiliated line is the footer's;
 //   · at 375 and 1440 nothing scrolls sideways.
 // WITHOUT dist-town the test SKIPS and says so; WITH built pages and no browser it FAILS (built-pages cannot turn a skip into a pass).
 
@@ -27,6 +28,7 @@ import http from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const DIST = join(ROOT, "dist-town");
@@ -202,6 +204,53 @@ test("THE LETTER: its FROM · TO · date line stays clear of the stamp, at 375 a
       return { stampLeft, stampBottom, textRight: Math.max(...words.map((w) => w.right)), metaTop: mb.top, transform: getComputedStyle(l).transform }; })()`);
     assert.ok(r.transform === "none" || width > 820, "measured unrotated (on a phone the card is not turned)");
     if (r.metaTop < r.stampBottom) assert.ok(r.textRight <= r.stampLeft + 0.5, `at ${width} the meta line runs to ${r.textRight.toFixed(1)}, under the stamp from ${r.stampLeft.toFixed(1)}`);
+    await p.close();
+  }
+});
+
+// THE COMPANY ROW (Darko, 2026-11-28): each company's own mark, drawn, in its own colours, larger than its name, with no card around it; a
+// company the manifest keeps as text is its name alone. The not-affiliated line is not in the hero: it is the footer's, small and readable.
+const MARKS = JSON.parse(readFileSync(join(ROOT, "src/assets/landing/marks/sources.json"), "utf8"));
+const AFF = "Postmark isn't affiliated with or endorsed by these companies; their marks belong to them.";
+const COMPANY_ROW = `(() => { const rgb = (s) => (s.match(/[\\d.]+/g) || []).map(Number);
+  const lum = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const bgOf = (el) => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c.length >= 3 && (c[3] ?? 1) === 1) return c; } return [10, 18, 34]; };
+  const items = [...document.querySelectorAll(".pm-landing .hero .logos > .logo")].map((l) => { const cs = getComputedStyle(l), img = l.querySelector("img"), name = l.querySelector("b");
+    const ib = img?.getBoundingClientRect(); const inset = img ? parseFloat(getComputedStyle(img).getPropertyValue("--inset")) || 0 : 0;
+    return { company: l.dataset.company ?? null, you: l.classList.contains("you"), name: name.textContent, bg: rgb(cs.backgroundColor)[3] ?? 1,
+      border: ["Top", "Right", "Bottom", "Left"].reduce((s, k) => s + parseFloat(cs["border" + k + "Width"]), 0), pad: ["Top", "Right", "Bottom", "Left"].reduce((s, k) => s + parseFloat(cs["padding" + k]), 0),
+      backdrop: cs.backdropFilter, shadow: cs.boxShadow, img: img ? { src: img.getAttribute("src"), ok: img.complete && img.naturalWidth > 0, mark: ib.height * (1 - 2 * inset), x: ib.left + ib.width * inset } : null,
+      nameSize: parseFloat(getComputedStyle(name).fontSize), nameX: name.getBoundingClientRect().left, shown: l.getClientRects().length > 0 }; });
+  const f = document.querySelector("[data-landing-footer] [data-landing-aff]"); const fs = f && getComputedStyle(f); const fc = f && rgb(fs.color), fb = f && bgOf(f);
+  const [a, b] = f ? [lum(fc), lum(fb)].sort((p, q) => q - p) : [0, 0];
+  return { items, cap: document.querySelector(".pm-landing .logos-cap").textContent, heroAff: document.querySelector(".pm-landing .hero").textContent.includes("affiliated"),
+    aff: f ? { text: f.textContent, shown: f.getClientRects().length > 0 && fs.visibility !== "hidden", size: parseFloat(fs.fontSize), footerSize: parseFloat(getComputedStyle(f.parentElement).fontSize), ratio: (a + 0.05) / (b + 0.05) } : null }; })()`;
+
+test("THE COMPANY ROW: each company's own mark, larger than its name, with no card; the not-affiliated line is the footer's, small, at 375 and 1440", { skip: SKIP }, async () => {
+  await setup();
+  for (const [width, touch] of [[375, true], [1440, false]]) {
+    const p = await openPage(browser, base, "/", { width, touch });
+    await p.until(`[...document.querySelectorAll(".pm-landing .logos img")].every((i) => i.complete)`, "the marks to load");
+    const r = await p.evalJs(COMPANY_ROW);
+    assert.deepEqual(r.items.filter((i) => !i.you).map((i) => i.company), MARKS.row.map((c) => c.name), "the companies, in their order");
+    assert.equal(r.items.at(-1).you && r.items.at(-1).name, "…and yours", "'…and yours' ends the row");
+    for (const i of r.items) {
+      assert.ok(i.shown, `${i.name} is drawn at ${width}`);
+      assert.ok(i.bg === 0 && i.border === 0 && i.pad === 0 && i.backdrop === "none" && i.shadow === "none", `${i.name} has no card at ${width}`);
+      const m = MARKS.row.find((c) => c.name === i.company);
+      if (!m?.file) { assert.equal(i.img, null, `${i.name} is its name alone`); continue; }
+      assert.ok(i.img?.ok, `${i.name}'s mark loads at ${width}`);
+      assert.match(i.img.src, /^\/_astro\/[^/]+\.(svg|png)$/, `${i.name}'s mark is bundled as its own file, so a branch preview draws it`);
+      assert.equal(createHash("sha256").update(readFileSync(join(DIST, i.img.src))).digest("hex"), m.sha256, `${i.name}'s mark is served as the recorded bytes`);
+      assert.ok(i.img.mark >= 1.8 * i.nameSize, `${i.name}'s mark (${i.img.mark.toFixed(1)}px) is the larger thing beside its ${i.nameSize}px name at ${width}`);
+      assert.ok(i.img.x < i.nameX, `${i.name}'s mark comes before its name`);
+    }
+    assert.equal(r.cap, "If it's an AI, it can join Postmark.", "under the row, only the invitation");
+    assert.equal(r.heroAff, false, "the not-affiliated line is not in the hero");
+    assert.ok(r.aff?.shown, `the not-affiliated line is in the footer at ${width}`);
+    assert.equal(r.aff.text, AFF);
+    assert.ok(r.aff.size < r.aff.footerSize, `it is small (${r.aff.size}px under the footer's ${r.aff.footerSize}px)`);
+    assert.ok(r.aff.ratio >= 4.5, `and readable, ${r.aff.ratio.toFixed(2)}:1 at ${width}`);
     await p.close();
   }
 });

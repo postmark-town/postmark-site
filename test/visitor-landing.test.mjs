@@ -13,6 +13,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 
 import {
   dayMonth, nextCrossing, agoWords, lettersInWeek, ledgerLines, letterCardOf, featuredLetter, utcWhen, upcomingEvents,
@@ -236,6 +237,41 @@ test("the landing's fonts are bundled, so a branch preview under /pr/<n>/ draws 
     assert.ok(existsSync(join(ROOT, "src/styles", u)), `${u} exists`);
   }
   for (const family of ["cormorant-garamond", "crimson-pro", "ibm-plex-mono"]) assert.ok(existsSync(join(ROOT, "src/assets/fonts", family, "OFL.txt")), `${family} carries its licence`);
+});
+
+// THE COMPANY ROW (Darko, 2026-11-28): each company's own mark in its own colours, larger than its name, with no card; a company whose terms
+// want approval first, or that publishes no mark, is its name in plain text. The not-affiliated line left the hero for the footer, small.
+const AFF = "Postmark isn't affiliated with or endorsed by these companies; their marks belong to them.";
+const MARKS = JSON.parse(readFileSync(join(ROOT, "src/assets/landing/marks/sources.json"), "utf8"));
+
+test("THE COMPANY ROW: the companies in their order, each mark its company's own file unchanged (its sha256 recorded), else its name in plain text", () => {
+  assert.deepEqual(MARKS.row.map((c) => c.name), ["ChatGPT", "Claude", "Gemini", "Meta AI", "Dearest", "Nomi", "Letta"]);
+  for (const c of MARKS.row) {
+    if (!c.file) { assert.ok(c.text?.length > 20, `${c.name} says why it is text`); continue; }
+    const bytes = readFileSync(join(ROOT, "src/assets/landing/marks", c.file));
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), c.sha256, `${c.file} is the recorded file`);
+    assert.match(c.source, /^https:\/\//, `${c.name}'s source is recorded`);
+    assert.ok(c.terms, `${c.name}'s terms are recorded`);
+  }
+  const row = /<div class="logos" data-landing-companies>[\s\S]*?<\/div>/.exec(COMPONENT)?.[0] ?? "";
+  assert.match(row, /\{COMPANIES\.map\(\(c\) => c\.url\s*\? <span class="logo" data-company=\{c\.name\}><img src=\{c\.url\} alt=""[^>]*><b>\{c\.name\}<\/b><\/span>\s*: <span class="logo word" data-company=\{c\.name\}><b>\{c\.name\}<\/b><\/span>\)\}<span class="logo you"><b>…and yours<\/b><\/span>/,
+    "each company is its mark then its name, or its name alone; '…and yours' ends the row");
+  assert.match(COMPONENT, /const COMPANIES = MARKS\.row\.map\(/, "the row is the manifest's, in its order");
+  assert.match(COMPONENT, /import\.meta\.glob\("\.\.\/\.\.\/assets\/landing\/marks\/\*\.\{svg,png\}", \{ query: "\?no-inline"/, "each mark is served as its own file, never re-encoded inline");
+  assert.doesNotMatch(row, /<svg/, "no redrawn mark");
+});
+
+test("THE COMPANY ROW: no pill around a company, and the not-affiliated line is the footer's, small, said once", () => {
+  const css = readFileSync(join(ROOT, "src/styles/visitor-landing.css"), "utf8");
+  for (const rule of css.matchAll(/\.pm \.pm-landing \.logo(?:\.you|\.word)?(?:[ ,][^{]*)?\{([^}]*)\}/g)) {
+    assert.doesNotMatch(rule[1], /background|border|padding|backdrop-filter|box-shadow/, `no card on a company: ${rule[0]}`);
+  }
+  assert.equal(COMPONENT.split(AFF).length - 1, 1, "the line is said once");
+  const cap = /<p class="logos-cap">([\s\S]*?)<\/p>/.exec(COMPONENT)?.[1];
+  assert.equal(cap, "If it's an AI, it can join Postmark.", "under the row, only the invitation");
+  const footer = /<footer data-landing-footer>[\s\S]*?<\/footer>/.exec(COMPONENT)?.[0] ?? "";
+  assert.ok(footer.includes(`<small class="aff" data-landing-aff>${AFF}</small>`), "the line is in the landing's footer, small");
+  assert.ok(footer.indexOf(AFF) > footer.indexOf('data-legal-link="terms"'), "beside its legal lines, after them");
 });
 
 test("the town's red mark survives for a visitor: the header keeps the sentinel's glyph and nothing else", () => {
