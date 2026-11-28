@@ -34,6 +34,16 @@ import { householdHref, YOUR_HOUSEHOLD } from "@/lib/home.mjs";
 import HalloweenHome from "@/components/HalloweenHome.astro";
 import SeasonLine from "@/components/SeasonLine.astro";
 import HeroFog from "@/components/HeroFog.astro";
+import VisitorLanding from "@/components/landing/VisitorLanding.astro";
+import ledger from "@/data/postmark/ledger.json";
+import calendar from "@/data/postmark/calendar.json";
+import sparksData from "@/data/postmark/sparks.json";
+import { officeHandles } from "@/lib/mail.mjs";
+import { houseDirectory } from "@/lib/households-directory.mjs";
+import { eventHref, pictureOf as sparkPictureOf } from "@/lib/calendar.mjs";
+import { sparkHref } from "@/lib/sparks.mjs";
+import { lettersInWeek, ledgerLines, featuredLetter, upcomingEvents, landingSparks, mapHomes } from "@/lib/visitor-landing.mjs";
+import { HOMES as EXAMPLE_HOMES } from "@/lib/visitor-landing-examples.mjs";
 
 // firefly letters over the hero — deterministic spread, no runtime JS
 const flies = [
@@ -124,6 +134,24 @@ const meet = meetResidents(residents, households, marksByAuthor(world), (r) => c
 // read, no section.
 const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayName });
 
+// THE VISITOR'S PAGE (UI-5): a reader the layout has not signed in sees the approved landing (src/components/landing/VisitorLanding.astro)
+// instead of everything below, which is the signed-in page exactly as it was. Its real parts come from what this page already loads, plus
+// the ledger, the calendar and the Spark register the site already bakes (no new read): src/lib/visitor-landing.mjs says how each is chosen,
+// and returns nothing for an input that is empty or unread, where the landing keeps the mockup's example. The households are counted the way
+// /households/ counts its houses. Which of the two pages shows is the CSS at the foot of this file, off the layout's `data-lens`.
+const landingSkip = new Set([...officeHandles(residents), ...meeps.map((m) => m.name)]);
+const landingLetter = featuredLetter(letters, ledger, { skip: landingSkip });
+const landing = {
+  households: houseDirectory(residents, households, marksByAuthor(world)).length,
+  week: lettersInWeek(ledger),
+  letter: landingLetter ? { ...landingLetter, href: letterHref(landingLetter.id, letterBook) } : null,
+  ledger: ledgerLines(ledger).map((l) => ({ ...l, href: letterHref(l.id, letterBook) })),
+  events: calendar?.as_of ? upcomingEvents(calendar, { href: eventHref }) : null,
+  eventsAsOf: calendar?.as_of ?? null,
+  sparks: landingSparks(sparksData, { pictureOf: sparkPictureOf }).map((s) => ({ ...s, href: sparkHref(s.id) ?? "/sparks/" })),
+  homes: mapHomes(residents, { imageOf: (r) => cardImageOf(r, media, homePictureOf), fallback: EXAMPLE_HOMES }).homes,
+};
+
 ---
 <PostmarkLayout
   door={{ mcp: 'town { read: "town" }', get: "/api/town" }}
@@ -132,6 +160,7 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
   active="postmark"
   image="/banner.png"
 ><HeroFog slot="head" />
+  <VisitorLanding landing={landing} />
   <div class="pm-index">
 
     <!-- ── LIVE TICKER — the tape above everything ──────────── -->
@@ -589,6 +618,28 @@ const made = madeInTown(projectsData, { residents, houseOf, nameplate, displayNa
   </div>
 
   <style is:global>
+    /* WHO SEES WHICH PAGE (UI-5; Darko, 2026-11-24: the landing replaces "the signed out landing page", signed-in residents keep the page they
+       have). The layout marks <html data-lens> for a signed-in reader before the first paint, and takes it off at sign-out (PostmarkLayout's
+       first-paint script and paint()): with it, the page below as it always was; without it, the visitor's landing. Both are in the document,
+       so a sign-in or a sign-out on this page swaps them with no reload, and the hidden one is out of the tab order and the accessibility tree. */
+    html:not([data-lens]) .pm-index { display: none; }
+    html[data-lens] .pm-landing { display: none; }
+    /* The visitor's chrome is the landing's own (Facet's return on c71116a2): its nav row and its one footer, which carries Privacy and Terms.
+       The town's header and footer stand down for a visitor on this page only, and stay for a signed-in reader. Hidden, not removed: the
+       layout's sign-in script still runs, and the footer's door line is still in the document for an agent reading the page. */
+    html:not([data-lens]):has(.pm-landing) .pm-doorfoot { display: none; }
+    /* ...but THE TOWN'S RED MARK STAYS (the sentinel's degraded-town glyph, PostmarkLayout's .pm-alert; Darko 2026-11-12: a settlement DOWN is
+       "lumped into the red exclamation point that already exists on the main site"). For a visitor the header keeps only the mark, a bare
+       holder at the page's top-left corner, clear of the mockup's centred brand. The mark is hidden while the town is well, so the visitor
+       sees the mockup alone; when the sentinel says DOWN it shows and opens as it does on every page (test/settlement-notice-browser.test.mjs). */
+    html:not([data-lens]):has(.pm-landing) .pm-townhead {
+      position: absolute; top: 14px; left: 16px; z-index: 60;
+      max-width: none; margin: 0; padding: 0; background: none; border: 0; box-shadow: none;
+    }
+    html:not([data-lens]):has(.pm-landing) .pm-townhead > :not(.pm-alert) { display: none; }
+    /* "See how it works" glides to the letters, for a visitor who has not asked for less motion */
+    @media (prefers-reduced-motion: no-preference) { html:not([data-lens]):has(.pm-landing) { scroll-behavior: smooth; } }
+
     /* carousel dots are JS-created — scoped styles never match injected nodes */
     .pm-index .c-dots {
       display: flex; gap: 0.5em; justify-content: center;

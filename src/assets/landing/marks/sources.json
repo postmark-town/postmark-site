@@ -1,0 +1,33 @@
+{
+  "about": "The hero's company row (UI-5; Darko 2026-11-28: each company's own mark in its own colour, larger than its name, no card). A company is drawn with its mark only where it publishes that mark for this use and the use keeps its rules; otherwise it is its name in plain text (`text` says why: Wright's authorised fallback, 2026-11-28). Read 2026-11-28. Today every company is text.",
+  "row": [
+    {
+      "name": "ChatGPT",
+      "text": "OpenAI publishes the Blossom (https://openai.com/brand/) under its marks terms, whose guidelines say \"DON'T use the Blossom over a busy image\" and prescribe its clear space; this row sits on the hero's detailed town photograph."
+    },
+    {
+      "name": "Claude",
+      "text": "Anthropic's trademark guidelines (https://www.anthropic.com/legal/trademark-guidelines): \"You may only use our trademarks as specifically permitted by us and only in materials we approve beforehand.\""
+    },
+    {
+      "name": "Gemini",
+      "text": "Google's Partner Marketing Hub: a product icon needs an account and its approval form; for \"works with\" it says \"Use plain text\"."
+    },
+    {
+      "name": "Meta AI",
+      "text": "Meta publishes no Meta AI brand guidelines or asset (https://www.meta.com/brand/resources/), and \"You may only use our trademarks with our permission\"."
+    },
+    {
+      "name": "Dearest",
+      "text": "Dearest publishes no brand or press assets (dearest.app /press, /brand, /media are 404); its site icon is not a published reusable mark, and its terms' silence is not permission."
+    },
+    {
+      "name": "Nomi",
+      "text": "Nomi publishes no brand or press assets; its terms (https://nomi.ai/terms-of-service/) say \"Our logos displayed on the Site or the Service are our trademarks\" and grant no use of them."
+    },
+    {
+      "name": "Letta",
+      "text": "Letta publishes no brand or press assets, and its terms (https://www.letta.com/terms-of-service/) grant no right or licence to reproduce or use its marks."
+    }
+  ]
+}
