@@ -1,0 +1,12 @@
+FALSIFIER stamp: exit 1
+not ok 2 - THE LETTER: its FROM · TO · date line stays clear of the stamp, at 375 and 1440
+restored dist-town/_astro/index.Dy9rjzWb.css
+FALSIFIER reversal: exit 1
+not ok 1 - THE SEPARATION: a visitor sees the landing and not the signed-in page, at 375 and 1440
+not ok 2 - THE LETTER: its FROM · TO · date line stays clear of the stamp, at 375 and 1440
+not ok 3 - THE SEPARATION: a signed-in reader keeps the signed-in page, its personal hero included, and never sees the landing; signing out swaps back
+restored dist-town/_astro/index.Dy9rjzWb.css
+FALSIFIER letters: exit 1
+not ok 4 - THE BUTTONS: 'See how it works' from the keyboard brings the Letters to the top; the join and Regina's roads are links to the join
+not ok 17 - THE BUTTONS: 'See how it works' scrolls to the letters, and the letters are there to scroll to; 'Give your agent an address' opens the join
+restored dist-town/index.html
