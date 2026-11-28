@@ -36,6 +36,10 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 // could not even load there); CORE156_PAGE points a run at a COPY of the page (a flip is made on a copy, never in the tree)
 const PAGE_SRC = readFileSync(process.env.CORE156_PAGE || join(ROOT, "town/pages/conversations/index.astro"), "utf8").replace(/\r\n/g, "\n");
 const FX = JSON.parse(readFileSync(join(ROOT, "test/fixtures/circles.sample.json"), "utf8"));
+// UI-42: the page's own words for a message's age (AGO:BEGIN … AGO:END, held to src/lib/page-freshness.mjs by test/conversations-ago.test.mjs), run here so
+// the browser's drawing is compared with the page's rule rather than with a second copy of it
+const AGO_SRC = (() => { const i = PAGE_SRC.indexOf("// AGO:BEGIN"), j = PAGE_SRC.indexOf("// AGO:END"); assert.ok(i > -1 && j > i, "the page still carries AGO:BEGIN … AGO:END"); return PAGE_SRC.slice(i, j); })();
+const agoOf = new Function(`${AGO_SRC}\nreturn agoOf;`)();
 
 // ── the harness page, read out of the real one ──────────────────────────────────────────────────────────────────────────
 
@@ -307,8 +311,10 @@ test("B · WHOLE: an opening message is drawn WHOLE (every word to its last, its
     assert.equal(drawn.lastInside, true, "its LAST word is laid out inside the message's own box");
     assert.deepEqual([drawn.wider, drawn.taller, drawn.pageWide], [false, false, false], "nothing of it is clipped, and the page does not scroll sideways on a phone");
     // drawn the way this page always drew a line: face and name, the words, the time
-    const parts = await p.evalJs(`(() => { const r = ${row}; return { cls: r.className, who: r.querySelector(".c-voice-who .c-who")?.textContent, face: !!r.querySelector(".c-voice-who .c-face"), time: r.querySelector("time.c-ago")?.textContent, iso: r.querySelector("time.c-ago")?.getAttribute("datetime"), order: [...r.children].slice(0, 3).map((e) => e.className.split(" ")[0]) }; })()`);
-    assert.deepEqual(parts, { cls: "c-voice", who: "pica", face: true, time: "20:01Z", iso: "2026-11-14T20:01:00.000Z", order: ["c-voice-who", "c-said", "c-ago"] }, "the old row: who, what they said, when");
+    const parts = await p.evalJs(`(() => { const r = ${row}; return { cls: r.className, who: r.querySelector(".c-voice-who .c-who")?.textContent, face: !!r.querySelector(".c-voice-who .c-face"), time: r.querySelector("time.c-ago")?.textContent, iso: r.querySelector("time.c-ago")?.getAttribute("datetime"), title: r.querySelector("time.c-ago")?.title, order: [...r.children].slice(0, 3).map((e) => e.className.split(" ")[0]) }; })()`);
+    // UI-42 (Darko, 2026-11-26): the time is how long ago, not a UTC clock (until UI-42 this asserted "20:01Z"); the exact time stays in datetime and the title
+    assert.deepEqual(parts, { cls: "c-voice", who: "pica", face: true, time: agoOf("2026-11-14T20:01:00.000Z", Date.now()), iso: "2026-11-14T20:01:00.000Z", title: "2026-11-14 20:01Z", order: ["c-voice-who", "c-said", "c-ago"] }, "the old row: who, what they said, when");
+    assert.doesNotMatch(parts.time, /\d{2}:\d{2}Z/, "and the time beside a message is NOT a clock");
     // every opening message is there, in the order they were said, and none of them is a reader's one-line stub
     assert.deepEqual(await p.evalJs(SAYS), OPENERS, "the room's opening messages, in the order they started");
     assert.equal(await p.evalJs(`${CARD}.querySelector("[data-circle-reader]")`), null, "no circle reader in the card, and none needed");
@@ -316,6 +322,38 @@ test("B · WHOLE: an opening message is drawn WHOLE (every word to its last, its
     // speech is the most user-authored text on the site: it is text, never markup
     assert.equal(await p.evalJs(`${CARD}.querySelectorAll(".c-said b, .c-said img").length`), 0, "no element was made from a say");
     assert.equal(await p.evalJs(`window.__pwned`), 0, "and nothing ran");
+  } finally { await p.close(); }
+});
+
+// UI-42 (Darko, 2026-11-26): "I'd also prefer if we could return the "ago" time instead of Z time for conversations/"; "For this, I specifically mean next to
+// individual messages. I think the Z timestamps for each room or conversation is totally [fine]".
+test("UI-42 · AGO: each message says how long ago it was said (its exact UTC time in datetime and the title), the room's own dates keep their clock, and the age is reworded in place without a redraw", async () => {
+  const { b, base } = await boot(false);
+  // the room's three opening messages, said twenty days, two days and five minutes before this run (their replies stay folded and keep the fixture's times)
+  const t0 = Date.now(), at = { 50101: t0 - 20 * 86_400_000, 50107: t0 - 2 * 86_400_000, 50114: t0 - 5 * 60_000 };
+  const state = { live: [thread({ voices: voicesOf().map((v) => (at[v.id] ? { ...v, at: new Date(at[v.id]).toISOString(), at_ms: at[v.id] } : v)) })] };
+  const p = await openPage(b, base, { office: makeOffice(state) });
+  try {
+    await p.until(ROOM_SHOWN, "the room");
+    const TIMES = `Object.fromEntries([50101, 50107, 50114].map((id) => { const t = ${CARD}.querySelector('.c-voice[data-say="' + id + '"] > time.c-ago'); return [id, { text: t.textContent, iso: t.getAttribute("datetime"), title: t.title, ago: t.hasAttribute("data-ago"), live: t.getAttribute("aria-live"), region: t.closest("[aria-live]:not(time)")?.getAttribute("aria-live") ?? null }]; }))`;
+    const drawn = await p.evalJs(TIMES);
+    const now = Date.now();
+    for (const id of [50101, 50107, 50114]) {
+      const iso = new Date(at[id]).toISOString();
+      // the tick's rewording is quiet: the <time> says aria-live="off" inside the polite region that announces new rows (the control: the region is still polite)
+      assert.deepEqual(drawn[id], { text: agoOf(iso, now), iso, title: iso.slice(0, 10) + " " + iso.slice(11, 16) + "Z", ago: true, live: "off", region: "polite" }, `say ${id}: its age in words; the exact time stays in datetime and the title; its rewording is not read aloud`);
+    }
+    assert.equal(drawn[50114].text, "5 minutes ago", "a message five minutes old");
+    assert.equal(drawn[50107].text, "2 days ago", "two days old");
+    assert.doesNotMatch(drawn[50101].text, /ago|\d{2}:\d{2}Z/, "twenty days old: its date, not an age and NOT a clock");
+    // Darko's narrowing: the room's began and latest keep their UTC clock
+    assert.match(await p.evalJs(`${CARD}.querySelector("[data-c-latest]").textContent`), /^latest 2026-11-14 20:14Z$/, "the card's latest is unchanged");
+    // THE TICK, in place: three minutes later by the page's clock, the same <time> element reads three minutes older, and the row is the same element too.
+    // The page's minute timer and a tab coming back both call the same agoTick; the tab coming back is the one a test can fire without waiting a minute.
+    await p.evalJs(`(() => { window.__row = ${CARD}.querySelector('.c-voice[data-say="50114"]'); window.__time = window.__row.querySelector("time.c-ago"); const real = Date.now.bind(Date); Date.now = () => real() + 3 * 60_000; document.dispatchEvent(new Event("visibilitychange")); return true; })()`);
+    await p.until(`window.__time.textContent === "8 minutes ago"`, "the age to be reworded");
+    assert.equal(await p.evalJs(`${CARD}.querySelector('.c-voice[data-say="50114"]') === window.__row && window.__row.querySelector("time.c-ago") === window.__time && window.__time.isConnected`), true,
+      "the same row and the same <time>: nothing was redrawn");
   } finally { await p.close(); }
 });
 
