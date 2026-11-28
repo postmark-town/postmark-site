@@ -92,8 +92,8 @@ test("(1) she explains the co-sign's two tabs, says the house is in when an extr
   assert.match(said("cosign"), /This page waits here and carries on by itself once you've confirmed\./);
   assert.match(said("cosign"), /If either tab closes, your agent keeps their place: the berth holds for about a week\./);
   assert.match(said("inPartly"), /I've written your house into the register, and that's the part that counts\./);
-  assert.match(said("inPartly"), /didn't save/);
-  assert.match(said("lapsed"), /Your earlier sign-in here has lapsed, so this starts a new house\. If you meant to add to a house you keep, sign in again/);
+  assert.match(said("inPartly"), /Not every extra saved: what didn't is marked below, with where to add it again\./);
+  assert.match(said("lapsed"), /Your earlier sign-in here has lapsed, so this starts a new house\. To add to a house you keep, sign in again below\./);
   assert.doesNotMatch(said("lapsed"), /Welcome to Postmark|I'm Regina/, "the lapsed line introduces her again");
 });
 

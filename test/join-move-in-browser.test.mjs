@@ -529,7 +529,7 @@ test("TODAY'S CARD, WITH NO SIGN-IN: a new house goes straight into her steps, f
     assert.equal(await p.js(`!!document.querySelector('[data-reg-at="cosign"] .jd-reg-bubble [data-cosign-link]') && !!document.querySelector('[data-reg-at="cosign"] .jd-reg-bubble [data-cosign-check]')`), true);
     // the two tabs, explained (Darko, 2026-11-27: what UAT testers might trip on): a second tab, this one carrying on, and the berth keeping the
     // place if either closes; until 2026-11-27 this pinned "Keep this tab open"
-    assert.match(await p.js(text('[data-reg-at="cosign"] [data-reg-words]')), /co-sign page in a second tab.*sign in with GitHub.*your own profile.*short videos.*This page waits here and carries on by itself.*If either tab closes, your agent keeps their place: the berth holds for about a week\./s);
+    assert.match(await p.js(text('[data-reg-at="cosign"] [data-reg-words]')), /^The button opens the office's co-sign page in a second tab.*sign in with GitHub.*your own profile.*short videos.*This page waits here and carries on by itself.*If either tab closes, your agent keeps their place: the berth holds for about a week\./s);
     // and what only this tab holds, since this send gave a picture and an appearance
     assert.equal(await p.js(`document.querySelector("[data-cosign-keep]").hidden`), false, "the extras that live only in this tab went unsaid");
     assert.match(await p.js(text("[data-cosign-keep]")), /live only in this tab.*if this tab closes first, add them later from your agent's page/);
@@ -711,7 +711,7 @@ test("THE APPEARANCE REFUSED: the part can't be the root's name; a glance the of
     assert.match(rows[0][2], /^Not saved: the harbor is read \+ ephemeral — durable acts come ashore with settlement\. You wrote “A fixture lantern with a cracked pane\.” \(what it is: “a fixture lantern”\)\. Your agent is in all the same, and can describe themselves/);
     assert.match(rows[1][2], /^Not sent: a detail hangs under the glance, which didn't land\. You wrote “The crack runs corner to corner\.” \(pane: “a hairline crack”\)/);
     assert.doesNotMatch(await p.js(text("[data-in-after-list]")), /:\s*saved\b|Set as your agent's appearance/, "a refused part was claimed");
-    assert.match(await p.js(text('[data-reg-at="in"] [data-reg-words]')), /^Welcome in! I've written your house into the register, and that's the part that counts\..*didn't save/, "a failed extra reads as a failed join");
+    assert.match(await p.js(text('[data-reg-at="in"] [data-reg-words]')), /^Welcome in! I've written your house into the register, and that's the part that counts\. Not every extra saved/, "a failed extra reads as a failed join");
     assert.equal(await p.js(text("[data-in-who]")), "looked-fixture is in: the office has admitted them.");
     assert.match(await p.js(text("[data-in-after]")), /One that didn't save leaves the join as it is\./);
   } finally { await p.close(); }
@@ -785,7 +785,7 @@ test("A LAPSED SIGN-IN: the new-house road says so on its first step, and points
   try {
     await p.until(STEP("household"), "step 1, a new house, after a lapsed sign-in");
     assert.equal(office.asked.filter((a) => a === "POST /api/mcp").length, 0, "the lapsed token was taken to the household door");
-    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Your earlier sign-in here has lapsed, so this starts a new house\. If you meant to add to a house you keep, sign in again from the line below\. Good: you're registering your agent/);
+    assert.match(await p.js(text('[data-reg-at="act"] [data-reg-words]')), /^Your earlier sign-in here has lapsed, so this starts a new house\. To add to a house you keep, sign in again below\. Good: you're registering your agent/);
     assert.equal(await p.js(`document.querySelector('[data-reg-at="act"] [data-keeper-signin]').hidden`), false, "the line she points to isn't there");
   } finally { await p.close(); }
 });

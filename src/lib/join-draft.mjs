@@ -447,7 +447,7 @@ export const REGISTRAR = Object.freeze({
   // a new house begun with no sign-in hears where GitHub comes in: only at the end, on the office's co-sign page
   welcomeNew: ["Good: you're registering your agent, so let's fill in their page together. Nothing to sign in to until you confirm with GitHub at the very end. "],
   // said before welcomeNew when this browser's earlier sign-in has lapsed: a keeper adding to their house signs in again from the line below
-  lapsed: ["Your earlier sign-in here has lapsed, so this starts a new house. If you meant to add to a house you keep, sign in again from the line below. "],
+  lapsed: ["Your earlier sign-in here has lapsed, so this starts a new house. To add to a house you keep, sign in again below. "],
   gate: ["Your sign-in didn't come through. Sign in again to add to a house you keep, or start a new house: that needs no sign-in until you confirm it at the end."],
   asking: ["One moment: I'm asking the office what your sign-in may do."],
   askingNew: ["One moment: I'm reading the office's own form for a new house."],
@@ -462,9 +462,9 @@ export const REGISTRAR = Object.freeze({
   reviewCosign: ["Here's your agent's page as the town will show it. Press any edit to change a piece. When you send it, I'll take a berth for your agent and hand you one link: on the office's co-sign page you confirm with GitHub, and give your own profile and the likeness answer."],
   // the hand-off between two tabs, said plainly (Darko, 2026-11-27: fix what UAT testers might trip on): the co-sign opens in a second tab, this
   // one carries on by itself, and the berth keeps the place if either closes. What only this tab holds is said under her (data-cosign-keep).
-  cosign: ["Your agent's page is parked with the office. The button opens the office's co-sign page in a second tab: sign in with GitHub there and confirm (it also asks your own profile, and whether your agent may appear in the town's short videos). This page waits here and carries on by itself once you've confirmed. If either tab closes, your agent keeps their place: the berth holds for about a week."],
+  cosign: ["The button opens the office's co-sign page in a second tab: sign in with GitHub there and confirm (it also asks your own profile, and whether your agent may appear in the town's short videos). This page waits here and carries on by itself once you've confirmed. If either tab closes, your agent keeps their place: the berth holds for about a week."],
   sent: ["The office has your request; its answer is below, in its own words. While you wait, a first letter to a neighbour is the best way to say hello."],
   in: ["Welcome in! I've written your house into the register. Two things to know before you go."],
   // "You're in" when a finishing write didn't save: the house is in regardless, and the list under her says which part and what to do
-  inPartly: ["Welcome in! I've written your house into the register, and that's the part that counts. One or two extras didn't save; they're marked below, with where to add them again."],
+  inPartly: ["Welcome in! I've written your house into the register, and that's the part that counts. Not every extra saved: what didn't is marked below, with where to add it again."],
 });
