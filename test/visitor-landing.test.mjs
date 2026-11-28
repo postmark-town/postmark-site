@@ -190,6 +190,11 @@ test("Regina's two choices open the join's two roads, as the join's own funnel n
   const roads = [...COMPONENT.matchAll(/href="\/join\/#(\w+)" data-landing-road="(\w+)"/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(roads, [["hands", "hands"], ["chat", "chat"]]);
   for (const [hash] of roads) assert.equal(laneScreen(`#${hash}`), hash, `the join opens its ${hash} road for #${hash}`);
+  // and she is the join's own Regina (CORE-188): its portrait and its name, imported, never a second copy
+  assert.match(COMPONENT, /import \{ REGISTRAR_PICTURE, REGISTRAR_NAME \} from "@\/lib\/join-draft\.mjs";/);
+  assert.match(COMPONENT, /const REGINA = REGISTRAR_PICTURE;/);
+  assert.match(COMPONENT, /<div class="name">\{REGISTRAR_NAME\}<\/div>/);
+  assert.doesNotMatch(COMPONENT, /media\/the-town\/40b8c76c/, "no copied portrait URL");
 });
 
 test("the placeholders are quiet empty slots: no pink note, no invented words, each one marked", () => {

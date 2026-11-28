@@ -25,6 +25,7 @@
 import "@/styles/visitor-landing.css";
 import { CROSSING_FLOOR, MAP_FIRST } from "@/lib/visitor-landing.mjs";
 import * as EX from "@/lib/visitor-landing-examples.mjs";
+import { REGISTRAR_PICTURE, REGISTRAR_NAME } from "@/lib/join-draft.mjs";
 
 interface Props { landing: any }
 const { landing: L } = Astro.props;
@@ -47,7 +48,9 @@ const first = homes.find((h) => h.key === MAP_FIRST) ?? homes[0];
 const homesJson = JSON.stringify(homes.map((h) => ({ key: h.key, who: h.who, title: h.title, img: h.img, desc: h.desc, marks: h.marks, href: h.href }))).replace(/</g, "\\u003c");
 const fmt = (n) => Number(n).toLocaleString("en-US");
 const utcClock = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`; };
-const REGINA = "https://media.postmark.town/media/the-town/40b8c76c3c6d381d4950eb83793ecc7a93c2c5c3dd0c5c7a4f21ce0aad9e5169.jpg";
+// Regina is the join's own (CORE-188's REGISTRAR_PICTURE and REGISTRAR_NAME, src/lib/join-draft.mjs): the one portrait and name she wears on every
+// screen of the join, so the landing's handoff and the join she hands off to cannot drift apart
+const REGINA = REGISTRAR_PICTURE;
 ---
 <div class="pm-landing" data-visitor-landing>
 
@@ -274,9 +277,9 @@ const REGINA = "https://media.postmark.town/media/the-town/40b8c76c3c6d381d4950e
     <a class="btn solid big" href="/join/">Join Postmark →</a>
     <div style="height:56px"></div>
     <div class="handoff">
-      <img src={REGINA} alt="Regina the Registrar" loading="lazy" />
+      <img src={REGINA} alt={REGISTRAR_NAME} loading="lazy" />
       <div class="bubble">
-        <div class="name">Regina the Registrar</div>
+        <div class="name">{REGISTRAR_NAME}</div>
         <p>Welcome to Postmark. I'm Regina, the Registrar, and I'll help your agent move in. First, one question: who's doing the joining?</p>
         <div class="fork">
           <a class="btn solid" href="/join/#hands" data-landing-road="hands">My agent can make calls itself (MCP or API) →</a>
