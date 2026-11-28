@@ -7,12 +7,15 @@
    of its stamp; and the quiet empty slots at the end are new. Selection
    (who sees this page) is town/pages/index.astro's, not this file's. */
 
-@font-face { font-family: "Cormorant Garamond"; font-style: normal; font-weight: 500 700; font-display: swap; src: url("/fonts/cormorant-garamond/cormorant-garamond-latin-roman.woff2") format("woff2"); }
-@font-face { font-family: "Cormorant Garamond"; font-style: italic; font-weight: 500 600; font-display: swap; src: url("/fonts/cormorant-garamond/cormorant-garamond-latin-italic.woff2") format("woff2"); }
-@font-face { font-family: "Crimson Pro"; font-style: normal; font-weight: 400 500; font-display: swap; src: url("/fonts/crimson-pro/crimson-pro-latin-roman.woff2") format("woff2"); }
-@font-face { font-family: "Crimson Pro"; font-style: italic; font-weight: 400; font-display: swap; src: url("/fonts/crimson-pro/crimson-pro-latin-italic.woff2") format("woff2"); }
-@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/ibm-plex-mono/ibm-plex-mono-latin-400.woff2") format("woff2"); }
-@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/ibm-plex-mono/ibm-plex-mono-latin-500.woff2") format("woff2"); }
+/* The fonts are BUNDLED (src/assets/fonts/<family>/, each with its OFL.txt), not served from public/: Vite emits them under /_astro/, which the
+   branch preview's build.assetsPrefix carries to /pr/<n>/ (astro.config.town.mjs). A root path (/fonts/…) would reach dev's root, the open
+   train, which does not hold these files until this lands, and the preview would draw in the fallback faces. */
+@font-face { font-family: "Cormorant Garamond"; font-style: normal; font-weight: 500 700; font-display: swap; src: url("../assets/fonts/cormorant-garamond/cormorant-garamond-latin-roman.woff2") format("woff2"); }
+@font-face { font-family: "Cormorant Garamond"; font-style: italic; font-weight: 500 600; font-display: swap; src: url("../assets/fonts/cormorant-garamond/cormorant-garamond-latin-italic.woff2") format("woff2"); }
+@font-face { font-family: "Crimson Pro"; font-style: normal; font-weight: 400 500; font-display: swap; src: url("../assets/fonts/crimson-pro/crimson-pro-latin-roman.woff2") format("woff2"); }
+@font-face { font-family: "Crimson Pro"; font-style: italic; font-weight: 400; font-display: swap; src: url("../assets/fonts/crimson-pro/crimson-pro-latin-italic.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("../assets/fonts/ibm-plex-mono/ibm-plex-mono-latin-400.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("../assets/fonts/ibm-plex-mono/ibm-plex-mono-latin-500.woff2") format("woff2"); }
 
 .pm .pm-landing{
   --night:#0a1222; --night-2:#101b31; --night-3:#16243f;

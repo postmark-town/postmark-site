@@ -149,7 +149,7 @@ const STATE = `({ lens: document.documentElement.getAttribute("data-lens"), land
   headline: (() => { const h = document.querySelector(".pm-landing h1"); return h && h.getClientRects().length ? h.innerText.replace(/\\s+/g, " ").trim() : null; })(),
   hero: (() => { const t = document.querySelector("[data-hero-title]"); return t && t.getClientRects().length ? t.textContent.trim() : null; })(),
   sideways: document.documentElement.scrollWidth > innerWidth,
-  townHeader: ${SHOWN(".pm-townhead")}, landingNav: ${SHOWN(".pm-landing nav")}, townFooter: ${SHOWN(".pm-doorfoot")},
+  townHeader: ${SHOWN(".pm-townhead .pm-townnav-links")} || ${SHOWN(".pm-townhead .pm-townmark")}, landingNav: ${SHOWN(".pm-landing nav")}, townFooter: ${SHOWN(".pm-doorfoot")},
   footers: [...document.querySelectorAll("footer")].filter((f) => getComputedStyle(f).display !== "none" && f.getClientRects().length > 0)
     .map((f) => ({ landing: f.hasAttribute("data-landing-footer"), legal: [...f.querySelectorAll("a[data-legal-link]")].filter((a) => a.getClientRects().length).map((a) => a.getAttribute("href")),
       socials: [...f.querySelectorAll("a")].filter((a) => /discord|youtube|bsky|reddit|tiktok|x\\.com/.test(a.href)).length })) })`;
@@ -178,7 +178,10 @@ test("THE SEPARATION: a visitor sees the landing and not the signed-in page, at 
     assert.equal(s.sideways, false, `nothing scrolls sideways at ${width}`);
     // the visitor's chrome is the mockup's: its nav row (its links fold away on a phone, as the mockup's do), one footer, the town's stood down
     assert.equal(s.landingNav, true, "the mockup's nav row is shown");
-    assert.equal(s.townHeader, false, "the town's header stands down for a visitor");
+    assert.equal(s.townHeader, false, "the town's header (its mark and its rail) stands down for a visitor");
+    // the header's red mark is all it keeps for a visitor: hidden while the town is well (settlement-notice-browser drives it DOWN)
+    assert.equal(await p.evalJs(`[...document.querySelectorAll(".pm-townhead > *")].filter((e) => getComputedStyle(e).display !== "none" && !e.hidden).map((e) => e.className)`).then((l) => l.length), 0,
+      "nothing of the header is drawn while the sentinel is quiet");
     assert.equal(s.townFooter, false, "the town's footer stands down for a visitor");
     assert.equal(s.footers.length, 1, `one footer for a visitor at ${width}, not two`);
     assert.equal(s.footers[0].landing, true);

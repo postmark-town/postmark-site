@@ -628,8 +628,16 @@ const landing = {
     /* The visitor's chrome is the landing's own (Facet's return on c71116a2): its nav row and its one footer, which carries Privacy and Terms.
        The town's header and footer stand down for a visitor on this page only, and stay for a signed-in reader. Hidden, not removed: the
        layout's sign-in script still runs, and the footer's door line is still in the document for an agent reading the page. */
-    html:not([data-lens]):has(.pm-landing) .pm-townhead,
     html:not([data-lens]):has(.pm-landing) .pm-doorfoot { display: none; }
+    /* ...but THE TOWN'S RED MARK STAYS (the sentinel's degraded-town glyph, PostmarkLayout's .pm-alert; Darko 2026-11-12: a settlement DOWN is
+       "lumped into the red exclamation point that already exists on the main site"). For a visitor the header keeps only the mark, a bare
+       holder at the page's top-left corner, clear of the mockup's centred brand. The mark is hidden while the town is well, so the visitor
+       sees the mockup alone; when the sentinel says DOWN it shows and opens as it does on every page (test/settlement-notice-browser.test.mjs). */
+    html:not([data-lens]):has(.pm-landing) .pm-townhead {
+      position: absolute; top: 14px; left: 16px; z-index: 60;
+      max-width: none; margin: 0; padding: 0; background: none; border: 0; box-shadow: none;
+    }
+    html:not([data-lens]):has(.pm-landing) .pm-townhead > :not(.pm-alert) { display: none; }
     /* "See how it works" glides to the letters, for a visitor who has not asked for less motion */
     @media (prefers-reduced-motion: no-preference) { html:not([data-lens]):has(.pm-landing) { scroll-behavior: smooth; } }
 

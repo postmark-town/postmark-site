@@ -219,6 +219,24 @@ test("a visitor's chrome is the mockup's: its nav row and one footer carrying Pr
   const footer = /<footer data-landing-footer>[\s\S]*?<\/footer>/.exec(COMPONENT)?.[0] ?? "";
   assert.match(footer, /<a href="\/privacy\/" data-legal-link="privacy">Privacy<\/a> · <a href="\/terms\/" data-legal-link="terms">Terms<\/a>/);
   assert.equal((COMPONENT.match(/<footer\b/g) ?? []).length, 1, "the landing draws one footer");
-  assert.match(PAGE, /html:not\(\[data-lens\]\):has\(\.pm-landing\) \.pm-townhead,\s*html:not\(\[data-lens\]\):has\(\.pm-landing\) \.pm-doorfoot \{ display: none; \}/,
-    "the town's header and footer stand down only for a visitor, only where the landing is");
+  assert.match(PAGE, /html:not\(\[data-lens\]\):has\(\.pm-landing\) \.pm-doorfoot \{ display: none; \}/,
+    "the town's footer stands down only for a visitor, only where the landing is");
+  assert.match(PAGE, /html:not\(\[data-lens\]\):has\(\.pm-landing\) \.pm-townhead > :not\(\.pm-alert\) \{ display: none; \}/,
+    "the town's header stands down for a visitor, all but its red mark");
+});
+
+test("the landing's fonts are bundled, so a branch preview under /pr/<n>/ draws them too (never a root /fonts/ path)", () => {
+  const css = readFileSync(join(ROOT, "src/styles/visitor-landing.css"), "utf8");
+  const urls = [...css.matchAll(/@font-face[^}]*url\("([^"]+)"\)/g)].map((m) => m[1]);
+  assert.equal(urls.length, 6);
+  for (const u of urls) {
+    assert.match(u, /^\.\.\/assets\/fonts\/[a-z-]+\/[a-z0-9-]+\.woff2$/, `${u} is bundled from src/assets`);
+    assert.ok(existsSync(join(ROOT, "src/styles", u)), `${u} exists`);
+  }
+  for (const family of ["cormorant-garamond", "crimson-pro", "ibm-plex-mono"]) assert.ok(existsSync(join(ROOT, "src/assets/fonts", family, "OFL.txt")), `${family} carries its licence`);
+});
+
+test("the town's red mark survives for a visitor: the header keeps the sentinel's glyph and nothing else", () => {
+  assert.doesNotMatch(PAGE, /\.pm-townhead\s*,|\.pm-townhead \{ display: none/, "the whole header is never hidden, or the degraded-town mark goes with it");
+  assert.match(PAGE, /html:not\(\[data-lens\]\):has\(\.pm-landing\) \.pm-townhead \{\s*position: absolute;/, "a bare holder for the mark, placed over the hero's corner");
 });
