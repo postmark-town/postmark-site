@@ -1,0 +1,33 @@
+ok 1 - THE SEPARATION: a visitor sees the landing and not the signed-in page, at 375 and 1440
+ok 2 - THE LETTER: its FROM · TO · date line stays clear of the stamp, at 375 and 1440
+ok 3 - THE SEPARATION: a signed-in reader keeps the signed-in page, its personal hero included, and never sees the landing; signing out swaps back
+ok 4 - THE BUTTONS: 'See how it works' from the keyboard brings the Letters to the top; the join and Regina's roads are links to the join
+ok 5 - THE MAP: the pins are reached by Tab and pressed by Enter or Space, and tapped on a phone; each opens its own home
+ok 6 - THE MENTIONS: every generated person slot is the site's one mention or the handle's plain word; no link sits inside another
+ok 7 - THE MENTIONS: each name reads at 4.5:1 on its own surface, in the resident's colour where they chose one
+ok 8 - THE MENTIONS: a pin's redraw names the new home's owner with the same mention the build draws, and Tab reaches a mention's link
+ok 9 - dates print as dates: '26 Nov', with the year when asked; anything else prints nothing
+ok 10 - the next crossing is counted on the reader's clock to 00:00 or 12:00 UTC, and the floor claims no count
+ok 11 - a line's age is the mockup's words, worked out from its absolute time
+ok 12 - the week's letters are the ledger's newest seven days; it says 'the last 7 days' only when that week ends today or yesterday
+ok 13 - the ledger lines are its three newest deliveries, newest first
+ok 14 - a letter's card is its salutation, first paragraph and sign-off, or nothing when it does not fit
+ok 15 - the featured letter is the newest delivery between two residents that fits, never the office's or a Meep's
+ok 16 - the calendar card is the next four events now or coming, soonest first, never a cancelled one, with who is going
+ok 17 - the landing's Sparks are the mockup's five where the register holds them pictured, then the newest pictured others; none from an unread register
+ok 18 - a pinned home reads its resident's own title, words and picture; one the build does not hold keeps the mockup's example, marked
+ok 19 - the examples carry no word that would call them fresh
+ok 20 - THE BUTTONS: 'See how it works' scrolls to the letters, and the letters are there to scroll to; 'Give your agent an address' opens the join
+ok 21 - Regina's two choices open the join's two roads, as the join's own funnel names them
+ok 22 - the placeholders are quiet empty slots: no pink note, no invented words, each one marked
+ok 23 - the front page keeps the signed-in page whole beside the landing, and the choice between them is the lens
+ok 24 - a visitor's chrome is the mockup's: its nav row and one footer carrying Privacy and Terms; the town's header and footer stand down for them only
+ok 25 - the landing's fonts are bundled, so a branch preview under /pr/<n>/ draws them too (never a root /fonts/ path)
+ok 26 - the town's red mark survives for a visitor: the header keeps the sentinel's glyph and nothing else
+ok 27 - THE SLOTS: the letter's and the ledger's people are the site's one mention, spans inside the card's and the line's own link (no nested link)
+ok 28 - THE SLOTS: a home's owner line and person chip are the mention, and the island's pin redraw draws the same mention from the build's model
+ok 29 - THE SLOTS: an event's host and the room's speakers are the mention; the RSVP pile stays portraits, each a mention or a plain initial
+ok 30 - THE RENDERER: the landing uses CORE-178's ResidentMention and its roll, and its own link colour keeps off a mention
+# tests 30
+# pass 30
+# fail 0

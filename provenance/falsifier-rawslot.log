@@ -1,0 +1,3 @@
+FALSIFIER rawslot: exit 1
+not ok 6 - THE MENTIONS: every generated person slot is the site's one mention or the handle's plain word; no link sits inside another
+restored dist-town/index.html
