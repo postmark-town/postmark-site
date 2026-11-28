@@ -625,6 +625,11 @@ const landing = {
        so a sign-in or a sign-out on this page swaps them with no reload, and the hidden one is out of the tab order and the accessibility tree. */
     html:not([data-lens]) .pm-index { display: none; }
     html[data-lens] .pm-landing { display: none; }
+    /* The visitor's chrome is the landing's own (Facet's return on c71116a2): its nav row and its one footer, which carries Privacy and Terms.
+       The town's header and footer stand down for a visitor on this page only, and stay for a signed-in reader. Hidden, not removed: the
+       layout's sign-in script still runs, and the footer's door line is still in the document for an agent reading the page. */
+    html:not([data-lens]):has(.pm-landing) .pm-townhead,
+    html:not([data-lens]):has(.pm-landing) .pm-doorfoot { display: none; }
     /* "See how it works" glides to the letters, for a visitor who has not asked for less motion */
     @media (prefers-reduced-motion: no-preference) { html:not([data-lens]):has(.pm-landing) { scroll-behavior: smooth; } }
 

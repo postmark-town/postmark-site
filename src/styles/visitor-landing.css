@@ -3,8 +3,8 @@
    so nothing reaches the signed-in page or any other (and `.pm` so it outweighs the town's `.pm h1` and the site's bare `a`). Changed from the
    mockup, and only these: its fonts are served from this site (SIL OFL 1.1, each folder's OFL.txt) instead of Google's; the hero's picture is
    the site's own copy; the page clips sideways instead of hiding (so the atlas's sticky side still sticks); the pink mockup notes, the mockup
-   bar and the mockup's own nav row are gone (the town's header is the nav here); the lede stays upright against the site's italic .lede;
-   the hero keeps its phone gutter; and the quiet empty slots at the end are new. Selection
+   bar are gone; the lede stays upright against the site's italic .lede; the hero keeps its phone gutter; the letter's meta line keeps clear
+   of its stamp; and the quiet empty slots at the end are new. Selection
    (who sees this page) is town/pages/index.astro's, not this file's. */
 
 @font-face { font-family: "Cormorant Garamond"; font-style: normal; font-weight: 500 700; font-display: swap; src: url("/fonts/cormorant-garamond/cormorant-garamond-latin-roman.woff2") format("woff2"); }
@@ -36,6 +36,11 @@
 .pm .pm-landing .btn.solid{background:linear-gradient(180deg,var(--gold-bright),var(--gold));color:#2a1d0c;border-color:transparent;box-shadow:0 6px 24px rgba(232,196,139,.25)}
 .pm .pm-landing .btn.ghost{color:var(--gold);background:transparent}
 .pm .pm-landing .btn.big{font-size:18px;padding:18px 38px}
+/* nav */
+.pm .pm-landing nav{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
+.pm .pm-landing .brand{font-family:"IBM Plex Mono",monospace;letter-spacing:.2em;font-size:14px;color:var(--gold-bright);display:flex;gap:10px;align-items:center}
+.pm .pm-landing .navlinks{display:flex;gap:18px;font-family:"IBM Plex Mono",monospace;font-size:13px}
+.pm .pm-landing .navlinks a{color:var(--muted);text-decoration:none}
 /* hero */
 .pm .pm-landing .hero{position:relative;min-height:92vh;display:flex;flex-direction:column;background:
   linear-gradient(180deg,rgba(10,18,34,.55) 0%,rgba(10,18,34,.35) 40%,rgba(10,18,34,.95) 100%),
@@ -163,6 +168,7 @@
 @media (max-width:820px){
   .pm .pm-landing .split,.pm .pm-landing .world-grid,.pm .pm-landing .flare{grid-template-columns:1fr;gap:34px}
   .pm .pm-landing .split.rev .copy{order:0}
+  .pm .pm-landing .navlinks{display:none}
   .pm .pm-landing .collage{grid-template-columns:1fr 1fr}
   .pm .pm-landing .tile.tall{grid-row:auto;aspect-ratio:1/1}
   .pm .pm-landing .sparks,.pm .pm-landing .reviews{grid-template-columns:1fr}
@@ -251,6 +257,10 @@
 /* the hero's words keep the page's 16px gutter on a phone: the mockup's .hero-body padding (40px 0 70px) zeroed .wrap's sides on the same
    element, which a desktop's centred column hides and a 375px screen does not */
 .pm .pm-landing .hero-body{padding-left:16px;padding-right:16px}
+/* the letter's FROM · TO · date line keeps clear of its decorative stamp (the mockup's ::after, 64px at right 26px; 46px at right 16px on a
+   phone), wrapping before it rather than running under it */
+.pm .pm-landing .letter .meta{padding-right:70px}
+@media (max-width:820px){.pm .pm-landing .letter .meta{padding-right:50px}}
 /* a link to a section lands with the section's top in view, under the town's header */
 .pm .pm-landing [id]{scroll-margin-top:12px}
 /* a baked line that is not today's says when it is from, quietly (never a pink note) */

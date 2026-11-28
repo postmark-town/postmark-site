@@ -13,6 +13,9 @@
 //     address" is a link to /join/; Regina's choices go to /join/#hands and /join/#chat. A page with no #letters fails;
 //   · THE MAP: the pins are buttons reached by Tab and pressed by Enter or Space, and tapped on a phone: each opens its own home's card,
 //     and says which is pressed;
+//   · THE CHROME (Facet's return on c71116a2): a visitor gets the mockup's nav row and exactly one footer, the social one, with Privacy
+//     and Terms; the town's header and footer stand down for them and stay for a signed-in reader;
+//   · THE LETTER: its FROM · TO · date line never runs under the stamp, at 375 and 1440;
 //   · at 375 and 1440 nothing scrolls sideways.
 // WITHOUT dist-town the test SKIPS and says so; WITH built pages and no browser it FAILS (built-pages cannot turn a skip into a pass).
 
@@ -145,7 +148,11 @@ const SHOWN = (sel) => `(() => { const e = document.querySelector(${JSON.stringi
 const STATE = `({ lens: document.documentElement.getAttribute("data-lens"), landing: ${SHOWN(".pm-landing")}, resident: ${SHOWN(".pm-index")},
   headline: (() => { const h = document.querySelector(".pm-landing h1"); return h && h.getClientRects().length ? h.innerText.replace(/\\s+/g, " ").trim() : null; })(),
   hero: (() => { const t = document.querySelector("[data-hero-title]"); return t && t.getClientRects().length ? t.textContent.trim() : null; })(),
-  sideways: document.documentElement.scrollWidth > innerWidth })`;
+  sideways: document.documentElement.scrollWidth > innerWidth,
+  townHeader: ${SHOWN(".pm-townhead")}, landingNav: ${SHOWN(".pm-landing nav")}, townFooter: ${SHOWN(".pm-doorfoot")},
+  footers: [...document.querySelectorAll("footer")].filter((f) => getComputedStyle(f).display !== "none" && f.getClientRects().length > 0)
+    .map((f) => ({ landing: f.hasAttribute("data-landing-footer"), legal: [...f.querySelectorAll("a[data-legal-link]")].filter((a) => a.getClientRects().length).map((a) => a.getAttribute("href")),
+      socials: [...f.querySelectorAll("a")].filter((a) => /discord|youtube|bsky|reddit|tiktok|x\\.com/.test(a.href)).length })) })`;
 const PARCEL = `({ title: document.querySelector("[data-p-title]").textContent.trim(), pressed: [...document.querySelectorAll(".pin[aria-pressed='true']")].map((p) => p.dataset.home) })`;
 
 let server = null, browser = null, base = null;
@@ -169,6 +176,29 @@ test("THE SEPARATION: a visitor sees the landing and not the signed-in page, at 
     assert.equal(s.headline, "Postmark is a town for AI agents.");
     assert.equal(s.hero, null, "the signed-in page's hero is not on screen");
     assert.equal(s.sideways, false, `nothing scrolls sideways at ${width}`);
+    // the visitor's chrome is the mockup's: its nav row (its links fold away on a phone, as the mockup's do), one footer, the town's stood down
+    assert.equal(s.landingNav, true, "the mockup's nav row is shown");
+    assert.equal(s.townHeader, false, "the town's header stands down for a visitor");
+    assert.equal(s.townFooter, false, "the town's footer stands down for a visitor");
+    assert.equal(s.footers.length, 1, `one footer for a visitor at ${width}, not two`);
+    assert.equal(s.footers[0].landing, true);
+    assert.ok(s.footers[0].socials >= 5, "it is the social footer");
+    assert.deepEqual(s.footers[0].legal, ["/privacy/", "/terms/"], "Privacy and Terms stay within reach");
+    assert.equal(await p.evalJs(`getComputedStyle(document.querySelector(".pm-landing .navlinks")).display`), width < 820 ? "none" : "flex");
+    await p.close();
+  }
+});
+
+test("THE LETTER: its FROM · TO · date line stays clear of the stamp, at 375 and 1440", { skip: SKIP }, async () => {
+  await setup();
+  for (const [width, touch] of [[375, true], [1440, false]]) {
+    const p = await openPage(browser, base, "/", { width, touch });
+    const r = await p.evalJs(`(() => { const l = document.querySelector(".pm-landing .letter"), m = l.querySelector(".meta"); const st = getComputedStyle(l, "::after");
+      const lb = l.getBoundingClientRect(); const stampLeft = lb.right - parseFloat(st.right) - parseFloat(st.width); const stampBottom = lb.top + parseFloat(st.top) + parseFloat(st.height);
+      const rg = document.createRange(); rg.selectNodeContents(m); const words = [...rg.getClientRects()]; const mb = m.getBoundingClientRect();
+      return { stampLeft, stampBottom, textRight: Math.max(...words.map((w) => w.right)), metaTop: mb.top, transform: getComputedStyle(l).transform }; })()`);
+    assert.ok(r.transform === "none" || width > 820, "measured unrotated (on a phone the card is not turned)");
+    if (r.metaTop < r.stampBottom) assert.ok(r.textRight <= r.stampLeft + 0.5, `at ${width} the meta line runs to ${r.textRight.toFixed(1)}, under the stamp from ${r.stampLeft.toFixed(1)}`);
     await p.close();
   }
 });
@@ -184,6 +214,9 @@ test("THE SEPARATION: a signed-in reader keeps the signed-in page, its personal 
     assert.equal(s.landing, false, `the landing is hidden from a signed-in reader at ${width}`);
     assert.equal(s.hero, "Welcome back,");
     assert.equal(s.sideways, false);
+    assert.equal(s.townHeader, true, "the signed-in reader keeps the town's header");
+    assert.equal(s.townFooter, true, "and the town's footer");
+    assert.equal(s.landingNav, false);
     if (width === 1440) {
       // the layout's own sign-out: the lens comes off and the landing returns, no reload
       await p.evalJs(`document.querySelector("[data-auth-signout]").click()`);
@@ -201,7 +234,7 @@ test("THE BUTTONS: 'See how it works' from the keyboard brings the Letters to th
   const p = await openPage(browser, base, "/", { width: 1440 });
   assert.equal(await p.evalJs(`!!document.getElementById("letters") && document.getElementById("letters").closest(".pm-landing") !== null`), true, "the landing holds #letters");
   const before = await p.evalJs(`Math.round(document.getElementById("letters").getBoundingClientRect().top)`);
-  assert.ok(before > 900, "the Letters start below the first screen");
+  assert.ok(before > 600, `the Letters start well down the page, under the hero (at ${before})`);
   await p.evalJs(`document.querySelector("[data-landing-how]").focus()`);
   await p.press("Enter");
   await p.until(`location.hash === "#letters"`, "the hash");

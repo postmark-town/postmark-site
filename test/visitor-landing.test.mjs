@@ -193,7 +193,7 @@ test("Regina's two choices open the join's two roads, as the join's own funnel n
 });
 
 test("the placeholders are quiet empty slots: no pink note, no invented words, each one marked", () => {
-  assert.doesNotMatch(COMPONENT, /class="note"|--note|mock-bar|MOCKUP/, "no mockup note or bar");
+  assert.doesNotMatch(COMPONENT, /class="note"|--note|mock-bar|<b>MOCKUP<\/b>/, "no mockup note or bar");
   assert.doesNotMatch(COMPONENT, /\[ (A resident|A human|An agent)/, "no review is written for anyone");
   assert.equal((COMPONENT.match(/data-placeholder="flare"/g) ?? []).length, 1);
   assert.match(COMPONENT, /\[0, 1, 2\]\.map\(\(\) => \(\s*<div class="review" data-placeholder="review" aria-hidden="true">/, "three empty review slots");
@@ -204,4 +204,16 @@ test("the front page keeps the signed-in page whole beside the landing, and the 
   assert.match(PAGE, /<VisitorLanding landing=\{landing\} \/>\s*<div class="pm-index">/, "the landing stands before the signed-in page, which is unchanged inside .pm-index");
   assert.match(PAGE, /html:not\(\[data-lens\]\) \.pm-index \{ display: none; \}/);
   assert.match(PAGE, /html\[data-lens\] \.pm-landing \{ display: none; \}/);
+});
+
+test("a visitor's chrome is the mockup's: its nav row and one footer carrying Privacy and Terms; the town's header and footer stand down for them only", () => {
+  assert.match(COMPONENT, /<nav aria-label="Postmark">\s*<div class="brand">✉ POSTMARK<\/div>/, "the mockup's nav row, in the hero");
+  for (const [href, label] of [["/world/", "The World"], ["/mail/", "The Mail"], ["/sparks/", "Sparks"], ["/households/", "Households"], ["/join/", "Join"]]) {
+    assert.ok(COMPONENT.includes(`<a href="${href}">${label}</a>`), `the nav row links ${label}`);
+  }
+  const footer = /<footer data-landing-footer>[\s\S]*?<\/footer>/.exec(COMPONENT)?.[0] ?? "";
+  assert.match(footer, /<a href="\/privacy\/" data-legal-link="privacy">Privacy<\/a> · <a href="\/terms\/" data-legal-link="terms">Terms<\/a>/);
+  assert.equal((COMPONENT.match(/<footer\b/g) ?? []).length, 1, "the landing draws one footer");
+  assert.match(PAGE, /html:not\(\[data-lens\]\):has\(\.pm-landing\) \.pm-townhead,\s*html:not\(\[data-lens\]\):has\(\.pm-landing\) \.pm-doorfoot \{ display: none; \}/,
+    "the town's header and footer stand down only for a visitor, only where the landing is");
 });
