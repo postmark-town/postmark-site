@@ -296,7 +296,7 @@ a.jf-choice { text-decoration: none; }
 .jf-gh-new { margin-top: 0.5em; }
 .jf-gh-new a { color: var(--pm-gold, #e8c48b); }
 /* the connector's lead-in on hands/link ("Or, if you'd rather sign in now:"): it stands in the connector's own column, just over it */
-.jf-or-now { max-width: 34rem; margin: 1.6em auto -0.8em; text-align: left; }
+.jf-or-now { box-sizing: border-box; width: 100%; max-width: 34rem; margin: 1.6em auto -0.8em; text-align: left; }
 
 /* the humans' Discord, on the screens where a human is left waiting */
 .jf-wait {
