@@ -71,8 +71,12 @@ test("the profile page prints them beside the name, only when written, as escape
   // Until 2026-11-01 (POS-848) this asserted `{t.profilePronouns && <span ...>}`, which left no element for the
   // editor's Save to fill. The rule is the same, "nothing written, nothing shown": the span is always in the
   // row and is `hidden` unless written (the runtime chip's shape), so the guard is now the hidden attribute.
-  assert.match(src, /<h1>\{t\.name\}<\/h1>\s*(\{\/\*[^]*?\*\/\}\s*)?<span class="profile-pronouns" data-profile-pronouns hidden=\{!t\.profilePronouns\}>\{t\.profilePronouns\}<\/span>/);
-  assert.doesNotMatch(src, /set:html=\{t\.profilePronouns\}/);
+  // CORE-188: the face is src/components/resident/ResidentFace.astro, handed the page's own pronouns; a draft (the join) draws the span empty
+  assert.match(src, /pronouns: t\.profilePronouns,/);
+  const face = read("../src/components/resident/ResidentFace.astro");
+  // (2026-11-26, Darko's in-place join: a draft draws the pronouns as their own box, DraftSlot.astro; the page's own branch is unchanged)
+  assert.match(face, /: <h1>\{f\.name\}<\/h1>\}\s*(\{\/\*[^]*?\*\/\}\s*)?\{draft\s*\? <span class="profile-pronouns" data-profile-pronouns><DraftSlot name="pronouns" [^\n]*\n\s*: <span class="profile-pronouns" data-profile-pronouns hidden=\{!f\.pronouns\}>\{f\.pronouns\}<\/span>\}/);
+  assert.doesNotMatch(src + face, /set:html=\{(t\.profilePronouns|f\.pronouns)\}/);
 });
 
 test("the household card prints them behind the same guard, as escaped text", () => {

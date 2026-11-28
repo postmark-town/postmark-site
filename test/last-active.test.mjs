@@ -83,6 +83,7 @@ test("the card, the directory's house line and the resident's tab print the word
   assert.match(dir, /activeWords\(houseLastActive\(h\.members\)\)/);
   assert.match(dir, /data-house-active/);
   const tab = src("town/components/Household.astro");
-  assert.match(tab, /residentActiveWords\(t\.r\)/);
-  assert.match(tab, /data-profile-active/);
+  assert.match(tab, /active: residentActiveWords\(t\.r\)/);
+  // CORE-188: the resident's face is drawn by src/components/resident/ResidentFace.astro, which prints the words it is handed
+  assert.match(src("src/components/resident/ResidentFace.astro"), /\{!draft && f\.active && <span data-profile-active>\{f\.active\}<\/span>\}/);
 });

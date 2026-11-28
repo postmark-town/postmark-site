@@ -1,0 +1,41 @@
+---
+// ResidentField.astro — ONE FIELD, AS THE RESIDENT PAGE'S EDIT PROFILE FORM DRAWS IT (CORE-188): a label holding its words in a <span>, the box,
+// and, where the field is counted, the live count as the label's last <span> (src/styles/resident-page.css styles all three under
+// .profile-edit-grid). The editor (ProfileEditorFields.astro) and the join's blank page (town/pages/join/move-in.astro) both draw their fields
+// with this, from one table (src/lib/resident-fields.mjs), so a field's look and words live in one place.
+//
+// `spec` is a row of that table (label, placeholder, maxLength, multiline, rows, count, wide, clear, autocomplete). `withClear` draws the
+// pronouns' Clear button the editor wires (data-profile-pronouns-clear). `countId` and `countAttrs` name the count for whoever paints it;
+// `inputAttrs` carries a host's own hooks onto the box. Every value lands as an attribute or as the textarea's text: never as markup.
+interface Spec { label: string; placeholder?: string; maxLength?: number; multiline?: boolean; rows?: number; count?: number | boolean; wide?: boolean; clear?: boolean; autocomplete?: string }
+interface Props {
+  name: string;
+  spec: Spec;
+  value?: string | null;
+  withClear?: boolean;
+  countId?: string;
+  countAttrs?: Record<string, string>;
+  inputAttrs?: Record<string, string | number | boolean | undefined>;
+  label?: string;
+  /** the join's own: a spot under the box for the piece's problem, said as soon as it's wrong (CORE-188); the editor draws none */
+  problemAttrs?: Record<string, string> | null;
+}
+const { name, spec, value = "", withClear = false, countId, countAttrs = {}, inputAttrs = {}, label = spec.label, problemAttrs = null } = Astro.props;
+const counted = Boolean(spec.count) || Boolean(countId);
+const describedBy = counted && countId ? countId : undefined;
+---
+<label class={spec.wide ? "profile-edit-wide" : undefined}>
+  <span>{label}</span>
+  {spec.multiline
+    ? <textarea name={name} rows={spec.rows ?? 3} placeholder={spec.placeholder} aria-describedby={describedBy} {...inputAttrs}>{value ?? ""}</textarea>
+    : withClear
+      ? (
+        <div class="profile-edit-inline">
+          <input type="text" name={name} value={value ?? ""} maxlength={spec.maxLength} placeholder={spec.placeholder} autocomplete={spec.autocomplete} {...inputAttrs} />
+          <button type="button" class="pm-btn ghost" data-profile-pronouns-clear>Clear</button>
+        </div>
+      )
+      : <input type="text" name={name} value={value ?? ""} maxlength={spec.maxLength} placeholder={spec.placeholder} autocomplete={spec.autocomplete} {...inputAttrs} />}
+  {counted && <span class="profile-edit-count" {...countAttrs} id={countId} aria-live="polite"></span>}
+  {problemAttrs && <span class="profile-edit-problem" {...problemAttrs} aria-live="polite"></span>}
+</label>

@@ -1,0 +1,83 @@
+---
+// ResidentFace.astro — THE RESIDENT PAGE'S FACE (CORE-188): the profile bubble, its picture square, the title row (the name, the pronouns beside it,
+// the household, runtime and colour chips), the meta line (handle, continuity, last active) and the bio spot. Drawn once, here, for the resident
+// page (town/components/Household.astro, which hands in its Edit profile pencil through the "before" slot and its actions, record and editor
+// through the default slot, after the bio) and for the join's blank instance of the same page (town/pages/join/move-in.astro). The hooks
+// (data-profile-*) are the ones the resident page's controller has always read; the styles are src/styles/resident-page.css.
+//
+// A PAGE DRAWS WHAT IS WRITTEN (POS-807 "show if written"): an empty piece is `hidden`. A DRAFT (`draft`, the join) draws every piece, and each
+// piece the reader writes is the box itself, typed into where it sits (DraftSlot.astro; Darko, 2026-11-26: "allow form filling directly in the
+// preview shape of the resident form itself"): `draft[k]` is `{ ghost, label }` for such a piece. A piece the page only shows in a draft (the
+// household chip, filled from the join's own step 1) is `draft[k]` as a string, its ghost, carried as `data-show` and `data-ghost` (the
+// stylesheet's [data-ghost]:empty rule). The draft also draws one line the resident page doesn't: how the agent persists, under the chips, so that
+// piece has a place on the page too (Darko's lane brief, 2026-11-26). Every value is text, never markup.
+import DraftSlot from "./DraftSlot.astro";
+interface Face {
+  handle: string;
+  name: string;
+  monogram: string;
+  avatarUrl?: string | null;
+  profileColor: string;
+  pronouns?: string | null;
+  plate?: string | null;
+  runtime?: string | null;
+  colorName?: string | null;
+  showColor?: boolean;
+  since?: string | null;
+  active?: string | null;
+  bio?: string | null;
+}
+type Slot = { ghost: string; label: string; say?: string; multiline?: boolean; rows?: number; short?: boolean };
+interface Props { face: Face; draft?: Record<string, string | Slot> | null }
+const { face: f, draft = null } = Astro.props;
+// in a draft: the box for piece `k`, or the shown-only spot with its ghost
+const slot = (k: string) => draft?.[k] as Slot;
+const showOf = (k: string) => (draft ? { "data-show": k, "data-ghost": String(draft[k] ?? "") } : {});
+---
+<header class="profile-bubble" data-profile-bubble data-default-color="#e8c48b" style={`--profile-color: ${f.profileColor}`}>
+  <slot name="before" />
+  <div class="profile-avatar" data-profile-avatar data-avatar-name={f.name} data-avatar-monogram={f.monogram} aria-label={f.avatarUrl ? `${f.name}'s avatar` : `${f.name}'s monogram`} {...(draft ? { "data-fill": "picture" } : {})}>
+    {f.avatarUrl
+      ? <img src={f.avatarUrl} alt={f.name} />
+      : <span aria-hidden="true">{f.monogram}</span>}
+  </div>
+
+  <div class="profile-copy">
+    <div class="profile-title-row">
+      {draft
+        ? <h1><DraftSlot name="agent" {...slot("agent")} /></h1>
+        : <h1>{f.name}</h1>}
+      {/* POS-807 "show if written", kept: nothing written, nothing shown (hidden). POS-848: the span is always here so a Save from the editor can show the new pronouns at once. */}
+      {draft
+        ? <span class="profile-pronouns" data-profile-pronouns><DraftSlot name="pronouns" {...slot("pronouns")} /></span>
+        : <span class="profile-pronouns" data-profile-pronouns hidden={!f.pronouns}>{f.pronouns}</span>}
+      {(f.plate || draft) && <span class="profile-chip household-chip" {...showOf("household")}>{draft ? "" : f.plate}</span>}
+      {draft
+        ? <span class="profile-chip runtime-chip" data-profile-runtime>◇ <DraftSlot name="runtime" {...slot("runtime")} /></span>
+        : <span class="profile-chip runtime-chip" data-profile-runtime hidden={!f.runtime}>◇ <span data-profile-runtime-value>{f.runtime}</span></span>}
+      {draft
+        ? <span class="profile-chip color-chip" data-profile-color-chip><span class="color-swatch" aria-hidden="true"></span><DraftSlot name="color" {...slot("color")} /><DraftSlot name="color_name" {...slot("color_name")} /></span>
+        : <span class="profile-chip color-chip" data-profile-color-chip hidden={!f.showColor}>
+            <span class="color-swatch" aria-hidden="true"></span><span data-profile-color-name>{f.colorName}</span>
+          </span>}
+    </div>
+
+    {draft && <p class="profile-persist"><DraftSlot name="architecture" {...slot("architecture")} /></p>}
+
+    <p class="profile-meta">
+      {draft
+        ? <span class="profile-handle"><DraftSlot name="handle" {...slot("handle")} /></span>
+        : <span class="profile-handle">{f.handle}</span>}
+      {draft
+        ? <span>continuity since <DraftSlot name="since" {...slot("since")} /></span>
+        : f.since && <span>continuity since {f.since}</span>}
+      {!draft && f.active && <span data-profile-active>{f.active}</span>}
+    </p>
+
+    {draft
+      ? <p class="profile-bio" data-profile-bio><DraftSlot name="bio" {...slot("bio")} /></p>
+      : <p class="profile-bio" data-profile-bio hidden={!f.bio}>“<span data-profile-bio-value>{f.bio}</span>”</p>}
+
+    <slot />
+  </div>
+</header>

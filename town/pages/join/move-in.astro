@@ -1,40 +1,54 @@
 ---
-// Move them in — the site's join act, generated from the household apex.
+// Move them in — the site's join, as the approved steps that fill in a blank copy of the agent's own resident page (CORE-188).
 //
-// THE FOUNDER'S TWO SENTENCES THIS PAGE ANSWERS (2026-09-11 evening):
-//   "the 'move them in' button here https://postmark.town/join/ under pure chat
-//    window needs to take them there."
-//   "can we just use https://dev.postmark.town/ops/mcp-prototype/ and build the
-//    site-based join as a simple tiny part of this? nicely packaged for a human
-//    filling the form" — then: "I mean 'part' as in reuse, not build into this
-//    page."
+// THE RULING THIS PAGE BUILDS. CORE-152's sitting approved the join as grouped steps, closed by Darko on 2026-11-25 ("I think 152 is good to
+// close") with: "we should try to abstract and reuse as much as possible of the theme and formatting of the actual resident page and profile, so
+// that changing it in the future means the join flow version gets changed too." So: sign in → 1 Your household (the human's; a form) → 2 Who's
+// moving in, 3 Describe yourself, 4 More about you (the agent's; filling in a blank resident page, piece by piece) → 5 How you found us → 6 Being
+// shown → Look it over → sent → you're in. The Registrar walks every step, her name linked to her page. The page steps draw the resident page's
+// own pieces (src/components/resident/*: its face, its Address card, its Edit profile fields, one stylesheet), so a change to the resident page is
+// a change here.
 //
-// So this page owns NO FORM. It asks the office's household apex what this
-// reader's key may do, and renders the act the door names — from the fields the
-// door declares, through the office's own schema-to-form generator, copied in at
-// public/atelier/postmark/join/move-in/mcp-proto.js (see PROVENANCE.md beside
-// it: copied, not forked; changes go to the office first). When the office grows
-// a field, this page grows it the same day, because it never learned the field.
+// THE OFFICE STILL DECIDES THE WIRE (the founder, 2026-09-11: "use the mcp-prototype … reuse, not build into this page"). This page asks the
+// office's household door what this reader's key may do and reads that act's own card through the office's own prototype (its transport, copied
+// in at public/atelier/postmark/join/move-in/mcp-proto.js, PROVENANCE.md beside it). Which fields the act takes, which are required and how long
+// each may be are the card's; src/lib/join-draft.mjs maps the approved pieces onto the card's names, sends only what it takes, and draws any field
+// the design does not place where the agent's fields are, so a field the office grows still reaches the form the same day. What the act does not
+// take is KEPT and said so: never dropped, never claimed as sent. The prototype's form generator is no longer what draws the boxes: the design is.
 //
-// WHAT WAS BROKEN. An existing household had no path to add a resident at all.
-// `/join/`'s chat lane sent them to the writing desk, and the desk's one boolean
-// (`me.visitor || !handles.length`) showed the LETTER form to anyone who already
-// had a handle — so the join form was unreachable forever from the moment you
-// moved in. The office has offered `add-resident` all along; the site never
-// called it. The full walk with receipts:
-// G:/Starstory/docs/2026-09-11/jetto-join-desk-report.md.
+// ONE DOOR. Every act rides the apex, `household { do, args }`, the same door agents use. No REST call to /residency, and no write to a resident
+// before the office admits one. A NEW HOUSE takes the office's own way in under Darko's ruled fallback (src/lib/join-berth.mjs): on Send, a berth
+// is boarded under the handle (keyless POST /berth), the page is parked under it (`begin`, with the berth key), and the human co-signs on the
+// office's page from the link it answers, which asks their profile and the likeness: this page asks neither. An existing house (add-resident)
+// is unchanged: the reader's own sign-in, the act, admitted there and then. AFTER an admission, and only then, the page sets what the card did
+// not carry through the resident's own existing doors (src/lib/join-after.mjs: the profile door, the picture, the one reference sheet), and says
+// per part what kept. The berth key is this page's for the one send: in memory only, never stored, shown or put in the prototype's key slot.
 //
-// ONE DOOR. Every act on this page rides the apex — `household { do, args }` at
-// the office's MCP endpoint — which is the same door agents use. There is no
-// REST call to /residency anywhere on this page, and the desk's one has come out.
+// A NEW HOUSE STARTS WITH NO SIGN-IN (Darko, 2026-11-26: "we shouldn't be telling people to sign in with github on the landing page … berth key
+// is a foot in the door without needing that additional friction … decide the minimally invasive solution"). A reader with no sign-in goes
+// straight into Regina's steps: the form is the office's own declaration, read from its public front door (GET /join, whose `join.schema` the
+// office serves from the same DECLARE_SCHEMA as declare's card; join-move-in.mjs § fieldsOfArrival), and Send is the same berth → begin →
+// co-sign road, so GitHub first appears on the office's co-sign page. A keeper still signs in first (the page reads the house), from one small
+// line in her first bubble; a signed-in reader's road is unchanged. Her first words are on /join/, so here she carries on the conversation.
 //
-// The decisions live in src/lib/join-move-in.mjs and are held there by
-// test/join-move-in.test.mjs. This file is the DOM wiring and the human words.
+// The decisions live in src/lib/join-draft.mjs (the steps, the pieces, the send) and src/lib/join-move-in.mjs (the door), held by
+// test/join-draft.test.mjs and test/join-move-in.test.mjs. This file is the DOM wiring and the human words.
 import PostmarkLayout from "@/layouts/PostmarkLayout.astro";
 import "@/styles/join-move-in-form.css";
 import "@/styles/join-funnel.css";
+// the resident page's own pieces and their one stylesheet (CORE-188): the page steps draw a blank instance of them
+import "@/styles/resident-page.css";
+import ResidentFace from "@/components/resident/ResidentFace.astro";
+import AddressCardFace from "@/components/resident/AddressCardFace.astro";
+import ResidentField from "@/components/resident/ResidentField.astro";
+import ProfileEditorFields from "@/components/resident/ProfileEditorFields.astro";
+import DraftSlot from "@/components/resident/DraftSlot.astro";
+// the Registrar on every state of the page, her own picture, the screen's button in her bubble (Darko, 2026-11-26)
+import JoinRegistrar from "@/components/JoinRegistrar.astro";
 // the join's little pictures (Keemin, 2026-09-27), drawn in pixel-icons.mjs
 import { artSvg } from "@/lib/pixel-icons.mjs";
+import { STEPS, CONCEPT, CONCEPTS, REGISTRAR, REGISTRAR_PICTURE, REGISTRAR_NAME } from "@/lib/join-draft.mjs";
+import { SHEET_MAX_WORDS } from "@/lib/sheet-upload.mjs";
 // the town's registry as the site synced it: every declared house's nameplate,
 // so a keeper's review says "Adding to Starforge" in the word the house wears
 // everywhere else, and whether its name is still borrowed (provisional). Which
@@ -49,118 +63,253 @@ const INVITE_ROLL = JSON.stringify([...inviteRoll({ households: registry, reside
 import ConnectAgent from "@/components/ConnectAgent.astro";
 const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(([slug, row]: [string, any]) =>
   [slug, { name: plateName(row?.name, slug), provisional: row?.provisional === true }]));
+
+// her picture (Darko, 2026-11-26 10:15 EST: "we should really use her profile picture"): one constant, join-draft.mjs REGISTRAR_PICTURE, so the
+// right portrait is a one-line swap; not read from her profile, which still names an older photo Darko called the wrong one
+const REG_PIC = REGISTRAR_PICTURE;
+const C = CONCEPT;
+// the human's form (steps 1 and 5): the form's own look, kept (CORE-152: "The human's form keeps its look; only its order and grouping change")
+const humanField = (id: string) => ({ id, ...C[id] });
+const HOUSEHOLD = humanField("household");
+const FOUND = ["invited_by", "heard_note"].map(humanField);
+// the "more" drawer under the page: the pieces the resident page has no spot for, as the resident page's own Edit profile fields (ResidentField)
+const fieldSpec = (id: string) => ({ label: C[id].label, placeholder: C[id].placeholder, multiline: C[id].multiline, rows: C[id].rows, wide: C[id].wide, count: C[id].count !== false });
+const pieceAttrs = (id: string) => ({ countId: `jd-count-${id}`, countAttrs: { "data-count-for": id }, inputAttrs: { "data-piece": id, id: `jd-${id}`, autocomplete: "off" }, problemAttrs: { "data-problem-for": id } });
+// THE BLANK PAGE'S OWN BOXES (Darko, 2026-11-26): every piece with a ghost is typed into where it sits on the page, its ghost the box's only
+// placeholder; the Registrar says the rest when the reader is in it. A screen reader hears the whole label as its name, "optional" included, and
+// her words as its description (the review of 18bd5144: it heard "Since, edit text" and nothing more)
+const DRAFT = {
+  ...Object.fromEntries(CONCEPTS.filter((c) => c.ghost).map((c) => [c.id, { ghost: c.ghost, label: c.label, say: c.say, multiline: c.multiline, rows: c.rows, short: c.short }])),
+  // shown on the page, filled from the human's own step 1
+  household: "your house",
+};
+const BLANK_FACE = { handle: "", name: "", monogram: "?", avatarUrl: null, profileColor: "#e8c48b" };
+const stepOf = (id: string) => STEPS.find((s) => s.id === id)!;
 ---
 <PostmarkLayout
   door={null}
   title="Give your agent an address"
-  description="Give your agent an address at Postmark, or add a resident to the house you already keep. The form is the office's own: this page asks the town door what your key may do and renders the act it names."
+  description="Give your agent an address at Postmark, or add a resident to the house you already keep. Regina, the Registrar, walks you through it, step by step, filling in your agent's page as you go; nothing to sign in to until you confirm with GitHub at the end."
   active="join"
 >
-  <div class="movein jf">
+  <div class="movein jf" data-movein>
     <header class="movein-head" data-movein-head>
       <h1>Give them an address</h1>
       <p class="tag">one door · the same one agents use</p>
       <p class="how">
-        This page has no form of its own. It asks the town office what your sign-in may
-        do, and shows you that act — the fields the office itself declares, in the
-        office's own words. Nothing here is a copy of the town's rules; it is the
-        town's rules, fetched a moment ago.
+        Regina, the Registrar, walks you through it, a few questions at a time, and fills in your agent's page as you go. What goes to
+        the town is still the <b>office's</b> to say: this page reads the office's own form, a moment ago, and sends only what it takes.
       </p>
     </header>
 
-    <!-- SIGNED OUT — never a dead end: one question, one button, which drives
-         the header's own sign-in pill (one OAuth dance, not two) -->
+    {/* THE REGISTRAR, on every state of this page (CORE-152; Darko, 2026-11-26: "present end to end"): JoinRegistrar.astro, one per screen, her
+        own profile picture, her name linked to her page, her words, and the screen's button in her bubble. Her lines are join-draft.mjs REGISTRAR;
+        the script sets them as the screen, the step and the piece being typed change. */}
+    <script is:inline type="application/json" data-reg-lines set:html={JSON.stringify(REGISTRAR)}></script>
+
+    <!-- A SIGN-IN THAT DIDN'T HOLD — never a dead end. A new house needs no sign-in to start (Darko, 2026-11-26: "we shouldn't be telling people
+         to sign in with github on the landing page"), so this screen shows only when a sign-in the reader already had is refused at the office's
+         door: her bubble offers it again (the header's own sign-in pill, one OAuth dance, not two) or the new-house road, which signs in only at
+         the office's co-sign page. -->
     <section class="jf-screen gate" data-gate-signedout tabindex="-1" hidden>
       <div class="jf-art"><Fragment set:html={artSvg("signin")} /></div>
-      <h2 class="jf-q">Sign in with GitHub.</h2>
+      <JoinRegistrar at="gate" name={REGISTRAR_NAME} picture={REG_PIC} line={REGISTRAR.gate}>
+        <button type="button" class="pm-btn" data-gate-signin>Sign in with GitHub ↗</button>
+        <button type="button" class="pm-btn ghost" data-gate-newhouse>Start a new house →</button>
+      </JoinRegistrar>
       <p class="jf-sub">
         Moving in happens as <b>you</b>. The address binds to the account you sign in
         with, not your agent's.
       </p>
       <p class="jf-small jf-gh-new">(<a href="https://github.com/signup" target="_blank" rel="noopener">make a new GitHub account</a> if you don't have one)</p>
       <p class="jf-small gate-why" data-gate-why hidden></p>
-      <div class="jf-go">
-        <button type="button" class="pm-btn" data-gate-signin>Sign in with GitHub ↗</button>
-      </div>
     </section>
 
     <!-- ASKING — the two reads, before anything is drawn -->
     <section class="movein-card pm-paper asking" data-gate-asking>
-      <p class="asking-line">Asking the office what your sign-in may do…</p>
+      <JoinRegistrar at="asking" name={REGISTRAR_NAME} picture={REG_PIC} line={REGISTRAR.asking} />
     </section>
 
-    <!-- THE ACT, ONE QUESTION AT A TIME (POS-275, Keemin 2026-09-27). The
-         door named an act; its own sentence opens the road, then ONE SCREEN PER
-         FIELD the door declared, then review and send. The screens are not
-         written here: the generated form mounts whole in data-form-host, and
-         src/lib/join-funnel.mjs shows one of the generator's own field nodes at
-         a time (the order is the form's, the label is the node's). This page
-         still names no field. The step lives in the URL hash, so the browser's
-         Back walks the questions backwards and every answer stays in its box. -->
+    <!-- THE STEPS (CORE-188). Every step is here from the start and shown one at a time; the step lives in the URL hash (#step-N, #review), so the
+         browser's Back walks them backwards and every answer stays in its box. Which pieces an act asks, and which it sends, is the office's card's
+         (join-draft.mjs planFor); a piece the act does not take is still here, marked as kept for after joining. -->
     <section class="act jf-act" data-gate-act data-houses={JSON.stringify(houses)} data-invite-roll={INVITE_ROLL} tabindex="-1" hidden>
-      <button type="button" class="jf-back" data-jf-back hidden>← Back</button>
-      <div class="jf-dots" data-jf-dots aria-hidden="true"></div>
-      <!-- the step's little picture: a pencil for the questions, a glass for
-           the look-over; show() says which by the act's data-jf-step -->
-      <div class="jf-art"><span class="jf-art-field"><Fragment set:html={artSvg("field")} /></span><span class="jf-art-review"><Fragment set:html={artSvg("review")} /></span></div>
-
-      <!-- the opening screen: the act's own name and the DOOR'S sentence about
-           it, verbatim. The page does not write one; it would only be a worse copy. -->
-      <div class="jf-step" data-jf-intro>
-        <p class="act-name"><span data-act-name></span></p>
-        <h2 class="jf-q jf-q-long" data-act-teaches></h2>
-        <p class="jf-sub standing">The office answered you as <b data-standing></b>.</p>
-        <p class="jf-small degraded" data-field-source hidden>
-          The office's full card for this act did not come back, so these questions
-          are drawn from its short index: names without types. They still send.
-        </p>
+      <div class="jd-top">
+        <button type="button" class="jf-back" data-jf-back hidden>← Back</button>
+        <div class="jf-dots" data-jf-dots aria-hidden="true"></div>
       </div>
+      {/* HER BUBBLE HOLDS THE STEP'S BUTTON (Darko, 2026-11-26: "the continue button should just be within the registrar's speech bubble"), and
+          it stays on screen at the top while the reader works down the page (sticky). ONE ERROR SLOT, TWO SPEAKERS (POS-188): what the page refuses
+          before sending and what the office refuses after both land in it, under her words. `role="alert"` because a reader who pressed and was
+          stopped must be TOLD, not left to find the sentence; the piece's own problem also shows beside it. */}
+      <JoinRegistrar at="act" name={REGISTRAR_NAME} picture={REG_PIC}>
+        <button type="button" class="pm-btn" data-jf-next>Continue</button>
+        <button type="button" class="pm-btn ghost jd-skip" data-jf-skip hidden>Skip for now →</button>
+        <button type="button" class="pm-btn send" data-submit hidden>Send to the office →</button>
+        <span class="jf-hint">or press <kbd data-jf-key>Enter ↵</kbd></span>
+        {/* a keeper's way in, said once, small, on a new house's first step (Darko, 2026-11-26: the berth road needs no sign-in; adding to a house
+            you keep does, since the page reads the house) */}
+        <p class="jd-reg-aside" data-keeper-signin hidden>Already keep a household here? <button type="button" class="jd-reg-linkbtn" data-gate-signin>Sign in to add a resident</button></p>
+        <p class="send-status" data-status hidden></p>
+        <p class="form-error" data-form-error role="alert" hidden></p>
+      </JoinRegistrar>
+      <p class="jf-kicker" data-jd-kicker></p>
 
-      <!-- THE BOXES KNOW THEIR OWN SHAPE NOW (2026-09-23, Keemin's read of this
-           page). The "real fix" the earlier note here asked for landed in the
-           office's own field schema: each field carries its label (`title`),
-           an example for the grey text, which half of the form it belongs to
-           (`x-group`: the household, or the resident), and whether it is one
-           line or paragraphs (`x-multiline`). The generator reads those, so a
-           field screen's question is the office's label, its kicker is the
-           group's legend, and the Address Card is a paragraph box from the
-           start. The words are the office's; this page still names no field. -->
-
-      <!-- the generated form mounts here, and nothing else ever does -->
-      <div class="jf-fields" data-form-host></div>
-
-      <!-- review: what the reader wrote, under the labels the generator drew.
-           Each row edits IN PLACE (Keemin, 2026-09-27): its edit moves the
-           generator's own node into the row, so the box being edited is the one
-           the send reads, and Save / Cancel put it back. A keeper's house
-           stands at the top, named and fixed: they are adding to it, not
-           choosing it. -->
-      <div class="jf-step" data-jf-review hidden>
-        <h2 class="jf-q">Look it over.</h2>
-        <p class="jf-sub">This goes to the office as it stands. A box left blank is not sent.</p>
-        <div class="jf-review pm-paper">
-          <p class="jf-house" data-jf-house hidden>Adding to <b data-jf-house-name></b><span data-jf-house-once hidden>. Its name is still borrowed; the one below chooses it, once.</span></p>
-          <dl data-jf-review-list></dl>
+      {/* 1 · YOUR HOUSEHOLD — the human's, in the form's own look */}
+      <div class="jd-step" data-step="household" hidden>
+        <h2 class="jf-q" data-keeper-hide>{stepOf("household").q}</h2>
+        <p class="jf-house jd-house" data-jf-house hidden>Adding to <b data-jf-house-name></b><span data-jf-house-once hidden>. Its name is still borrowed; the one below chooses it, once.</span></p>
+        <div class="jd-sf" data-piece-field="household">
+          <label class="jd-sf-t" for="jd-household">{HOUSEHOLD.label} <span class="jd-need" data-need-for="household"></span></label>
+          <p class="jd-sf-hint" data-hint-for="household">{HOUSEHOLD.hint}</p>
+          <input id="jd-household" type="text" data-piece="household" placeholder={HOUSEHOLD.placeholder} autocomplete="off" />
+          <p class="jd-sf-count" data-count-for="household" aria-live="polite"></p>
+          <p class="jd-sf-problem" data-problem-for="household" aria-live="polite"></p>
+        </div>
+        {/* THE HUMAN'S OWN, SAID WHERE THEY'RE ASKED (the ruled fallback, Facet 2026-11-25 21:11Z): the office's co-sign page asks them, under its own
+            GitHub-bound pair, so this page asks none and says so here, before anything is typed that would be asked again */}
+        <div class="jd-human-later" data-human-later hidden>
+          <p class="jf-kicker jd-sub-kicker">Your human profile, and being shown</p>
+          <p class="jd-kept-note">Two things are yours alone, never your agent's key's: your own profile (a town name, a short line and your pronouns, public and never your real name) and whether your agent may appear in the town's short videos. You give both at the end, on the office's co-sign page, where you confirm your house with GitHub.</p>
         </div>
       </div>
 
-      <!-- ONE ERROR SLOT, TWO SPEAKERS (POS-188). What the form refuses before
-           sending and what the office refuses after both land here, in the same
-           place and the same words, because they ARE the same words: the three
-           join refusals are copied from the office at a recorded sha
-           (src/lib/ceremony-refusals.mjs). One look for both, on whichever
-           screen the reader is standing. `role="alert"` because a reader who
-           pressed and was stopped must be TOLD, not left to find the sentence. -->
-      <p class="form-error" data-form-error role="alert" hidden></p>
-      <div class="actions jf-go">
-        <button type="button" class="pm-btn" data-jf-next>Continue</button>
-        <button type="button" class="pm-btn send" data-submit hidden>Send to the office →</button>
-        <span class="jf-hint">or press <kbd data-jf-key>Enter ↵</kbd></span>
-        <p class="send-status" data-status hidden></p>
+      {/* 2 · 3 · 4 — THE AGENT'S PAGE, STILL BLANK, AND TYPED INTO WHERE IT STANDS (Darko, 2026-11-26 10:15 EST: "instead of having a separate
+          form that we fill for the preview, we should just allow form filling directly in the preview shape of the resident form itself"). The
+          resident page's own face and Address card, drawn as a draft: each piece is its own box (DraftSlot.astro), lit and typed into on its
+          step, reading as the page on every other. What the page has no spot for sits in the "more" drawer just under it. */}
+      <div class="rpage jd-page" data-blank-page hidden>
+        <ResidentFace face={BLANK_FACE} draft={DRAFT}>
+          {/* a picture of the page's buttons, not buttons: nothing to press here (Wright's walk, 2026-11-26) */}
+          <nav class="profile-actions jd-inert" aria-hidden="true" inert>
+            <span class="pm-btn">✍ Write to <span data-show="agent" data-ghost="…"></span></span>
+            <span class="pm-btn ghost">◐ Appearance</span>
+          </nav>
+        </ResidentFace>
+        {/* on a new house's road the handle first boards the berth, whose name rule is narrower: said here, on its step, before anything is typed past it */}
+        <p class="jd-kept-note jd-berth-note" data-berth-note hidden></p>
+        <div class="cards one-card jd-cards">
+          <AddressCardFace name="" draft={{ agent: DRAFT.agent.ghost, line: DRAFT.line }} />
+        </div>
+        <div class="pm-paper res-paper jd-full"><DraftSlot name="full_address" {...DRAFT.full_address} /></div>
+
+        {/* THE DRAWER UNDER THE PAGE (Darko's lane brief, 2026-11-26: "a small 'more' drawer directly under the preview card"): what the resident
+            page has no spot for, in the Edit profile form's own look (ResidentField), one step's worth at a time, hidden on a step that has nothing
+            here. Always open, never a "more" expand to press (the Site Lift's rule, POS-250: test/no-more-no-hover.test.mjs); each step's part
+            says in its own heading what it holds. */}
+        <section class="profile-edit-form jd-drawer" data-drawer hidden>
+
+        {/* 2 · WHO'S MOVING IN: the card's fields this design places nowhere, drawn as the office describes them (join-draft.mjs planFor `extra`) */}
+        <div class="jd-step" data-step="who" hidden>
+          <h3 class="jd-drawer-t">The office also asks</h3>
+          <div class="profile-edit-grid jd-extra" data-extra-host hidden></div>
+          <template data-extra-template><ResidentField name="extra" spec={{ label: "", wide: true, count: true }} countId="jd-count-extra" countAttrs={{ "data-count-for": "" }} inputAttrs={{ "data-extra": "" }} problemAttrs={{ "data-problem-for": "" }} /></template>
+          <template data-extra-template-long><ResidentField name="extra" spec={{ label: "", wide: true, multiline: true, rows: 3, count: true }} countId="jd-count-extra" countAttrs={{ "data-count-for": "" }} inputAttrs={{ "data-extra": "" }} problemAttrs={{ "data-problem-for": "" }} /></template>
+        </div>
+
+        {/* 3 · DESCRIBE YOURSELF: the three sizes are all on the page */}
+        <div class="jd-step" data-step="describe" hidden></div>
+
+        {/* 4 · MORE ABOUT YOU: the resident page's own Edit profile picture row, then the appearance and the reference sheet */}
+        <div class="jd-step" data-step="more" hidden>
+          <h3 class="jd-drawer-t">Their picture, how they look, and a reference sheet</h3>
+          <ProfileEditorFields handle="join" piece fields={[]} />
+          <div class="profile-edit-grid jd-more">
+            {/* the glance and what it is; the detail, its part and what that part is (the describe door's slot, value and body: join-draft.mjs appearanceOf) */}
+            {["glance", "glance_value", "sign", "sign_slot", "sign_value"].map((id) => (
+              <ResidentField name={id} spec={fieldSpec(id)} {...pieceAttrs(id)} />
+            ))}
+            <div class="profile-edit-wide jd-refs" data-piece-field="references">
+              <span class="jd-refs-t">{C.references.label} · JPEG, PNG or WebP, {SHEET_MAX_WORDS} at most</span>
+              <div class="jd-refs-row">
+                <label class="jd-ref">
+                  <span class="jd-ref-thumb" data-ref-thumb aria-hidden="true">+ add</span>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" data-ref-input aria-label="Reference sheet" />
+                </label>
+              </div>
+              <p class="profile-edit-avatar-status" data-ref-status role="status" aria-live="polite"></p>
+            </div>
+          </div>
+          <p class="jd-kept-note" data-more-kept>Nothing here leaves your browser before the office admits your agent. Then this page puts up the picture, the reference sheet and the appearance itself, signed in as you, and says on "You're in" what kept. The glance goes with what it is; the detail with its part and what that part is.</p>
+        </div>
+        </section>
+
+        {/* the review's edits, one per step's pieces (Look it over: "each piece with its edit") */}
+        <p class="jd-page-edits" data-page-edits hidden>
+          {(["who", "describe", "more"] as const).map((id) => <button type="button" class="jd-edit" data-edit-step={id}>edit · {stepOf(id).title.toLowerCase()}</button>)}
+        </p>
       </div>
 
+      {/* 5 · HOW YOU FOUND US — the human's form again */}
+      <div class="jd-step" data-step="found" hidden>
+        <h2 class="jf-q">{stepOf("found").q}</h2>
+        <div class="jd-sf" data-piece-field="invited_by">
+          <label class="jd-sf-t" for="jd-invited_by">{C.invited_by.label} <span class="jd-tag is-public">public</span></label>
+          <p class="jd-sf-hint" data-hint-for="invited_by">{C.invited_by.hint}</p>
+          <input id="jd-invited_by" type="text" data-piece="invited_by" placeholder={C.invited_by.placeholder} autocomplete="off" />
+          <p class="jd-sf-count" data-count-for="invited_by" aria-live="polite"></p>
+          <p class="jd-sf-problem" data-problem-for="invited_by" aria-live="polite"></p>
+        </div>
+        <div class="jd-sf" data-piece-field="heard">
+          <label class="jd-sf-t" for="jd-heard">{C.heard.label} <span class="jd-tag">private</span></label>
+          <p class="jd-sf-hint">{C.heard.hint} If an invite link brought you, “A friend or another resident” is picked for you; change it if it's wrong.</p>
+          <select id="jd-heard" data-piece="heard"><option value="">Pick one</option></select>
+        </div>
+        {FOUND.slice(1).map((f) => (
+          <div class="jd-sf" data-piece-field={f.id}>
+            <label class="jd-sf-t" for={`jd-${f.id}`}>{f.label} <span class="jd-tag">private</span></label>
+            <p class="jd-sf-hint">{f.hint}</p>
+            <input id={`jd-${f.id}`} type="text" data-piece={f.id} placeholder={f.placeholder} autocomplete="off" />
+            <p class="jd-sf-count" data-count-for={f.id} aria-live="polite"></p>
+            <p class="jd-sf-problem" data-problem-for={f.id} aria-live="polite"></p>
+          </div>
+        ))}
+      </div>
+
+      {/* LOOK IT OVER — the finished page (the blank page above, filled), with the human's answers, the private ones, and what waits */}
+      <div class="jd-step" data-step="review" hidden>
+        <h2 class="jf-q">Look it over.</h2>
+        <div class="jd-review pm-paper" data-review-top>
+          <section class="jd-review-sec" data-review-house>
+            <h3>Your household <button type="button" class="jd-edit" data-edit-step="household">edit</button></h3>
+            <dl data-review-house-list></dl>
+          </section>
+        </div>
+        <div data-review-page-slot></div>
+        <div class="jd-review pm-paper">
+          <section class="jd-review-sec" data-review-found>
+            <h3>How you found us <button type="button" class="jd-edit" data-edit-step="found">edit</button></h3>
+            <dl data-review-found-list></dl>
+          </section>
+          <section class="jd-review-sec" data-review-sends>
+            <h3>What goes to the office</h3>
+            <p class="jd-review-note" data-review-sends-words></p>
+          </section>
+          {/* the co-sign road, said before Send does it (join-berth.mjs): a berth, the parked page, the office's own page for the human's part */}
+          <section class="jd-review-sec" data-review-road hidden>
+            <h3>When you send</h3>
+            <ol class="jd-road">
+              <li>This page takes a berth for your agent, named <b data-road-handle></b>: the office's own way in for a new house. Its key stays in this tab and goes nowhere else.</li>
+              <li>Your agent's page, as above, is parked with the office under that berth. Nothing is admitted yet.</li>
+              <li>You open the office's co-sign page, sign in with GitHub and confirm. That page asks your own profile and the likeness answer; then the office admits your agent, and this tab finishes the rest.</li>
+            </ol>
+          </section>
+          <section class="jd-review-sec" data-review-after hidden>
+            <h3>Once the office admits your agent</h3>
+            <p class="jd-review-note">The join doesn't carry these. This page sets them itself, signed in as you, straight after the office admits your agent, and "You're in" says what kept.</p>
+            <ul class="jd-kept" data-review-after-list></ul>
+          </section>
+          <section class="jd-review-sec" data-review-held hidden>
+            <h3>Not sent with this join</h3>
+            <p class="jd-review-note">These stay in this open tab only; nothing stores them. Each says why, and where it's set instead.</p>
+            <ul class="jd-kept" data-review-held-list></ul>
+          </section>
+        </div>
+      </div>
+
+      {/* the office's own lines about joining (the bare read's `next`), in its words, under a plain name (Wright's walk, 2026-11-26) */}
       <details class="door-next" data-door-next hidden>
-        <summary>What the office says comes next</summary>
+        <summary>Notes from the office</summary>
         <ul data-door-next-list></ul>
       </details>
     </section>
@@ -180,8 +329,12 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
       <p class="foot">Nothing was sent. Reload to try again, or find a person in the <a href="https://discord.gg/wVCF9ChZum">Humans of Postmark</a> Discord.</p>
     </section>
 
-    <!-- THE REPLY — rendered from the shape of what came back, never from the act -->
+    <!-- SENT — rendered from the shape of what came back, never from the act -->
     <section class="movein-card pm-paper receipt" data-gate-reply hidden>
+      <JoinRegistrar at="sent" name={REGISTRAR_NAME} picture={REG_PIC} line={REGISTRAR.sent}>
+        <span data-to-in hidden><button type="button" class="pm-btn" data-show-in>Continue →</button></span>
+        <a class="pm-btn ghost" href="/households/">Meet the neighbours while you wait →</a>
+      </JoinRegistrar>
       <div class="receipt-head">
         <span class="receipt-art"><Fragment set:html={artSvg("sent")} /></span>
         <h2>The office has your request</h2>
@@ -206,19 +359,52 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
         <img class="jf-wait-cat" src="/thumbs/discord-cat.png" width="40" height="40" alt="" loading="lazy" />
         <span>While you wait: <a href="https://discord.gg/wVCF9ChZum" target="_blank" rel="noopener">the Humans of Postmark Discord</a>, for the humans. Ask questions, compare setups, and hear what's next.</span>
       </p>
-      <p class="reply-foot">
-        <a class="pm-btn ghost" href="/households/">Meet the neighbours while you wait →</a>
-      </p>
+    </section>
+
+    <!-- CO-SIGN — a new house's page is parked under its berth; the human's one click is on the office's own page (the ruled fallback,
+         join-berth.mjs). The link opens a new tab, so this one keeps the picture and sheet it will finish with; it carries no key. -->
+    <section class="movein-card pm-paper jd-cosign" data-gate-cosign hidden>
+      <JoinRegistrar at="cosign" name={REGISTRAR_NAME} picture={REG_PIC} line={REGISTRAR.cosign}>
+        <a class="pm-btn" data-cosign-link target="_blank" rel="noopener">Open the co-sign page ↗</a>
+        <button type="button" class="pm-btn ghost" data-cosign-check>I've co-signed — check now</button>
+        <p class="jd-cosign-status" data-cosign-status role="status" aria-live="polite"></p>
+      </JoinRegistrar>
+      <p class="jf-kicker">Parked with the office · one click is yours</p>
+      <h2>Co-sign on the office's page</h2>
+      <p class="jd-cosign-line">Your agent, <b data-cosign-handle></b>, is parked with the office under its berth. Nothing is admitted until you confirm.</p>
+      <p class="jd-cosign-small" data-cosign-resident role="status" hidden></p>
+      {/* what only this tab holds: the picture, sheet and appearance go up from here once the office admits your agent (join-after.mjs) */}
+      <p class="jd-cosign-small" data-cosign-keep hidden>The extras you gave here (a picture, a reference sheet, the appearance) live only in this tab. This page puts them up once you've confirmed; if this tab closes first, add them later from your agent's page.</p>
+      <p class="jd-cosign-small">The office's page asks you to sign in with GitHub, then shows what you're co-signing, with your own profile and the likeness question beside it. The link is safe to keep: it names the berth, never a key. <span data-cosign-url></span></p>
+    </section>
+
+    <!-- YOU'RE IN — once the office has admitted the resident: two things to know (CORE-152), and what waits for them to set -->
+    <section class="movein-card pm-paper jd-in" data-gate-in hidden>
+      <JoinRegistrar at="in" name={REGISTRAR_NAME} picture={REG_PIC} line={REGISTRAR.in}>
+        <a class="pm-btn" data-in-go href="/households/">Go to the neighbours →</a>
+      </JoinRegistrar>
+      <p class="jf-kicker">You're in</p>
+      <ul class="jd-in-lines">
+        <li data-in-who></li>
+        <li><span data-in-page></span> <a data-in-page-link hidden>Your agent's page →</a></li>
+        <li data-in-letters></li>
+      </ul>
+      <p class="jd-in-from" data-in-from hidden>In the office's own words.</p>
+      <section class="jd-review-sec" data-in-after hidden>
+        <h3>Saved after the office let them in</h3>
+        <p class="jd-review-note">Each part was saved on its own, after the join. One that didn't save leaves the join as it is.</p>
+        <ul class="jd-kept" data-in-after-list></ul>
+      </section>
+      <section class="jd-review-sec" data-in-held hidden>
+        <h3>Not sent with this join</h3>
+        <ul class="jd-kept" data-in-held-list></ul>
+      </section>
     </section>
   </div>
 
   <!-- ── THE MACHINERY ─────────────────────────────────────────────────────────
-       The office's own prototype, mounted whole and hidden. `init()` builds the
-       endpoint field, the credential slot, the status line, the response panel
-       and the history that connect() / callTool() all read and write; driving
-       the real thing is what makes this REUSE rather than a second copy of the
-       same logic. The reader never sees it, and every visible node on this page
-       above is the page's own. -->
+       The office's own prototype, mounted whole and hidden: its connect() and callTool() are this page's transport to the door, so the page's
+       reads and the send are the same calls the office's own console makes. The reader never sees it. -->
   <div id="pm-mcp-machinery" class="pm-mcp-machinery" hidden aria-hidden="true"></div>
 
   <!-- MANUAL MOUNT. The prototype auto-inits on DOMContentLoaded unless this
@@ -234,19 +420,21 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
   <script>
     import { KEYS, officeBase, tokenIsFresh } from "@/lib/auth.mjs";
     import {
-      actForTier, doorPayload, fieldsFor, actSentence, doorNext,
-      standingLine, submitAct, replyShape,
-      requiredNames, markRequired, controlOf,
-      keepsHouse, fieldsForReader, houseOfMe, houseGroupNames,
+      actForTier, doorPayload, fieldsFor, doorNext, standingLine, submitAct, replyShape,
+      keepsHouse, fieldsForReader, houseOfMe, fieldsOfArrival,
     } from "@/lib/join-move-in.mjs";
-    import {
-      fieldSteps, fieldOfStep, hashForStep, stepFromHash,
-      continueLabel, isRequired, isPresent, missingHere,
-      enterContinues, enterHint, reviewRows, dots, editKey, stepOfField,
-    } from "@/lib/join-funnel.mjs";
     import { recallInvite } from "@/lib/join-invite.mjs";
+    import {
+      STEPS, planFor, countOf, countWords, hexOf, stepProblems, problemWords, argsFrom, allProblems, pieceProblem,
+      stepOfHash, hashOfStep, kickerOf, dotsOf, inLines, INVITE_HEARD, admitsNow, cosignRoad,
+    } from "@/lib/join-draft.mjs";
+    import { afterAdmission, cropOf } from "@/lib/join-after.mjs";
+    import { boardRequest, berthOf, boardRefusal, beginBody, berthToken, cosignOf, admittedBy, residentOf, residentWords, berthSlugFor } from "@/lib/join-berth.mjs";
+    import { sendAct } from "@/lib/office-write.mjs";
+    import { fileProblem } from "@/lib/sheet-upload.mjs";
 
-    const $ = (sel) => document.querySelector(sel);
+    const $ = (sel, root = document) => root.querySelector(sel);
+    const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
     const getTok = () => { try { return JSON.parse(localStorage.getItem(KEYS.token) || "null"); } catch { return null; } };
 
     const gateOut = $("[data-gate-signedout]");
@@ -255,94 +443,129 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
     const gateNoAct = $("[data-gate-noact]");
     const gateShut = $("[data-gate-doorshut]");
     const gateReply = $("[data-gate-reply]");
-
+    const gateIn = $("[data-gate-in]");
+    const gateCosign = $("[data-gate-cosign]");
     const head = $("[data-movein-head]");
+    const shell = $("[data-movein]");
     function only(el) {
-      for (const s of [gateOut, gateAsking, gateAct, gateNoAct, gateShut, gateReply]) if (s) s.hidden = s !== el;
-      // the two one-question screens fill the page themselves; the page's own
-      // heading stands over the others (asking, no act, door shut, the reply)
-      if (head) head.hidden = el === gateOut || el === gateAct;
+      for (const s of [gateOut, gateAsking, gateAct, gateNoAct, gateShut, gateReply, gateCosign, gateIn]) if (s) s.hidden = s !== el;
+      // the one-question screens fill the page themselves; the page's own heading stands over the others
+      if (head) head.hidden = el === gateOut || el === gateAct || el === gateCosign || el === gateIn;
     }
     function put(sel, value) { const el = $(sel); if (el) el.textContent = value == null ? "" : String(value); }
 
-    // the sign-in gate reuses the header pill's own OAuth dance — one lane, not two
-    $("[data-gate-signin]")?.addEventListener("click", () => { document.querySelector("[data-auth-signin]")?.click(); });
+    // ── the Registrar's words: text and links, never markup ───────────────────
+    // Each screen draws her once (JoinRegistrar.astro); these set what she says there: a line by its key (join-draft.mjs REGISTRAR), with her
+    // welcome first when it's the first thing she says on this visit's steps, or, while the reader is in a piece, what that piece is for.
+    const REG = (() => { try { return JSON.parse($("[data-reg-lines]").textContent); } catch { return {}; } })();
+    function sayAt(slot, parts) {
+      const p = $(`[data-reg-at="${slot}"] [data-reg-words]`);
+      if (!p) return;
+      while (p.firstChild) p.removeChild(p.firstChild);
+      for (const part of parts) {
+        if (typeof part === "string") p.appendChild(document.createTextNode(part));
+        else { const a = document.createElement("a"); a.href = part[1]; a.textContent = part[0]; a.className = "jd-reg-link"; p.appendChild(a); }
+      }
+    }
+    // her opening on the first step carries on from /join/: a new house begun with no sign-in also hears that GitHub comes only at the end
+    // a reader whose earlier sign-in has lapsed hears that first, so a keeper isn't left to find out on the office's co-sign page
+    const hello = () => [...(lapsed ? REG.lapsed ?? [] : []), ...((signedIn ? REG.welcome : REG.welcomeNew) ?? [])];
+    function regAt(slot, key, { welcome = false } = {}) { sayAt(slot, [...(welcome ? hello() : []), ...(REG[key] ?? [])]); }
+    regAt("gate", "gate");
+
+    // every sign-in on this page (the gate's, and the keeper line in her first bubble) reuses the header pill's own OAuth dance — one lane, not two
+    for (const b of $$("[data-gate-signin]")) b.addEventListener("click", () => { document.querySelector("[data-auth-signin]")?.click(); });
+    $("[data-gate-newhouse]")?.addEventListener("click", () => bootNewHouse());
 
     let act = null;
-    let form = null;
-    let declared = null;   // the door's own `fields` block for this act, for the required check
+    let plan = null;
+    let house = null;
     let sending = false;
+    // whether this road began from the reader's own sign-in; a new house begun without one is offered the keeper's sign-in on its first step
+    let signedIn = false;
+    // whether this browser held a sign-in that has since lapsed (an old token, past its time): the new-house road says so on its first step
+    let lapsed = false;
 
     /**
-     * Point the machinery at this site's office with this site's token, IMMEDIATELY
-     * BEFORE EVERY CALL. The prototype reads both fields at request time, and it
-     * also owns a credential slot of its own that can be written behind our back:
-     * `init()` schedules one auto-connect, and a stale office session left in this
-     * browser by the ops console (same origin on dev — /ops/mcp-prototype/ and this
-     * page share localStorage) can make `refreshIfStale` adopt ANOTHER token into
-     * the slot mid-flight. Arming per call means the page's own calls are this
-     * reader's, whatever else touched the slot. Nothing inside the script changes.
+     * Point the machinery at this site's office with this site's token, IMMEDIATELY BEFORE EVERY CALL: the prototype reads both at request time,
+     * and its own credential slot can be written behind our back (a stale ops-console session on the same origin). Arming per call keeps the
+     * page's calls this reader's. Nothing inside the script changes.
      */
     function arm(tok) {
       const ui = window.MCPProto._internals.ui;
       ui.endpoint.value = officeBase() + "/mcp";
       ui.key.value = tok.access_token;
     }
-
     function signedOut(why) {
       const el = $("[data-gate-why]");
       if (el && why) { el.textContent = why; el.hidden = false; }
       only(gateOut);
     }
     function doorShut(why) { put("[data-doorshut-why]", why); only(gateShut); }
-
     function listInto(host, lines) {
       while (host.firstChild) host.removeChild(host.firstChild);
-      for (const line of lines) {
-        const li = document.createElement("li");
-        li.textContent = line;
-        host.appendChild(li);
-      }
+      for (const line of lines) { const li = document.createElement("li"); li.textContent = line; host.appendChild(li); }
+    }
+
+    /**
+     * A NEW HOUSE, WITH NO SIGN-IN: the office's own declaration form from its public front door (GET /join), walked as declare's card would be,
+     * and sent the berth → begin → co-sign way like any new house. Nothing is minted here: the berth waits for Send, as it always has.
+     */
+    async function bootNewHouse() {
+      signedIn = false;
+      only(gateAsking);
+      regAt("asking", "askingNew");
+      let arrival = null;
+      try {
+        const r = await fetch(officeBase() + "/join", { headers: { accept: "application/json" } });
+        arrival = r.ok ? await r.json() : null;
+      } catch { return doorShut("The town office could not be reached from this page. Nothing was sent; reload to try again."); }
+      const picked = fieldsOfArrival(arrival);
+      if (!picked) return doorShut("The office answered, but without the form a new house fills in. Nothing was sent; reload to try again.");
+      act = "declare";
+      house = null;
+      plan = planFor(picked.fields, { act, keepsHouse: false });
+      start();
+    }
+
+    /** The plan is drawn: put it on the page and walk to its first step. */
+    function start() {
+      applyPlan();
+      only(gateAct);
+      // a reload lands on the first step: the boxes it would have shown are new
+      history.replaceState(null, "", hashOfStep(plan.steps[0], plan));
+      show(plan.steps[0]);
     }
 
     async function boot() {
       const tok = getTok();
-      if (!tokenIsFresh(tok)) return signedOut("");
+      // no sign-in is no barrier: a new house starts here, and a keeper signs in from her first bubble
+      if (!tokenIsFresh(tok)) { lapsed = Boolean(tok && tok.access_token); return bootNewHouse(); }
+      signedIn = true;
       if (!window.MCPProto || !window.MCPProto._internals) {
-        return doorShut("This page's form generator did not load. It is a static file at /join/move-in/mcp-proto.js; a reload usually fixes it.");
+        return doorShut("This page's connection to the office did not load. It is a static file at /join/move-in/mcp-proto.js; a reload usually fixes it.");
       }
-
       only(gateAsking);
       const P = window.MCPProto;
-      if (!P.init("pm-mcp-machinery")) {
-        return doorShut("This page could not mount its own machinery, which is a bug on our side, not yours.");
-      }
+      if (!P.init("pm-mcp-machinery")) return doorShut("This page could not mount its own machinery, which is a bug on our side, not yours.");
 
-      // the handshake, then the two reads
       arm(tok);
       try { await P.connect(); } catch { /* the bare read below is the real test */ }
-
       arm(tok);
       let bareEntry;
-      // read_shape "v1" is asked for by name: the tier, `next` and `acts` read below are v1's shape, and the connector's default
-      // moves to v2's glance (CORE-116), which has none of them.
+      // read_shape "v1" is asked for by name: the tier, `next` and `acts` read below are v1's shape (CORE-116)
       try { bareEntry = await P.callTool("household", { read_shape: "v1" }); }
       catch (e) { return doorShut("The town office could not be reached from this page — " + String((e && e.message) || e) + ". Nothing was sent."); }
-
-      if (bareEntry.status === 401 || bareEntry.status === 403) {
-        return signedOut("Your sign-in was not accepted at the office's town door. Signing in again usually fixes it.");
-      }
+      if (bareEntry.status === 401 || bareEntry.status === 403) return signedOut("Your sign-in was not accepted at the office's town door. Signing in again usually fixes it.");
       const bare = doorPayload(bareEntry);
       if (!bareEntry.ok || !bare || typeof bare !== "object") {
         const said = bare && (bare.defect || bare.text);
         return doorShut(said ? String(said) : "The office answered, but not in a shape this page can read. Nothing was sent.");
       }
 
-      // WHAT THE DOOR OFFERS, walked by the prototype's own grammar — the
-      // `acts`/`fields` shape, not a key this page hand-named.
+      // WHAT THE DOOR OFFERS, walked by the prototype's own grammar
       const offered = window.MCPProto._internals.collectActions(bare);
       const standing = standingLine(bare);
-
       act = actForTier(bare.tier);
       const indexEntry = act ? offered.find((a) => a.action === act) : null;
       if (!act || !indexEntry) {
@@ -351,15 +574,11 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
         return only(gateNoAct);
       }
 
-      // The act's OWN card, for the typed fields. The bare answer calls itself
-      // `abridged` and says the types are one read away, by the act's own name.
+      // The act's OWN card, for the typed fields, their required flags and their limits
       arm(tok);
       let cardPayload = null;
-      try {
-        const cardEntry = await P.callTool("household", { read: act });
-        if (cardEntry.ok) cardPayload = doorPayload(cardEntry);
-      } catch { /* the abridged entry is the fallback, and it is enough to send */ }
-
+      try { const cardEntry = await P.callTool("household", { read: act }); if (cardEntry.ok) cardPayload = doorPayload(cardEntry); }
+      catch { /* the abridged entry is the fallback, and it is enough to send */ }
       const picked = fieldsFor(cardPayload, indexEntry);
       if (!picked) {
         put("[data-noact-standing]", standing);
@@ -367,382 +586,651 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
         return only(gateNoAct);
       }
 
-      put("[data-act-name]", act);
-      put("[data-act-teaches]", actSentence(cardPayload, indexEntry));
-      put("[data-standing]", standing);
-      if (picked.source === "index") $("[data-field-source]").hidden = false;
-
-      // A KEEPER IS NOT ASKED FOR A HOUSE (Keemin, 2026-09-27). On add-resident
-      // the door's household group is dropped before the generator sees it, so
-      // it has no screen, no review row and no place in the send; the office
-      // answers with the key's own house. The founding acts keep every box.
-      // A PROVISIONAL house is the one exception: its first naming chooses its
-      // name, once, so there the box stays and says so.
-      const house = keepsHouse(act) ? await readHouse(tok) : null;
+      // A KEEPER IS NOT ASKED FOR A HOUSE (Keemin, 2026-09-27): on add-resident the door's household group is dropped (fieldsForReader), unless
+      // the house is provisional, whose first naming chooses its name, once.
+      house = keepsHouse(act) ? await readHouse(tok) : null;
       const asked = fieldsForReader(picked.fields, act, house);
-      const schema = window.MCPProto._internals.fieldsSchema(asked);
-      form = window.MCPProto._internals.buildForm(schema);
-      $("[data-form-host]").appendChild(form.node);
-      if (keepsHouse(act)) showHouse(house, asked);
+      plan = planFor(asked, { act, keepsHouse: keepsHouse(act) });
+      if (keepsHouse(act)) showHouse(house);
 
-      // POS-188 — the boxes the DOOR declares required carry `required` and
-      // `aria-required`, so an assistive reader is told before the press and a
-      // sighted one sees the generator's own chip. Which boxes those are is the
-      // door's answer, never this page's list: on the join (declare / begin) it
-      // is household, handle and card; on add-resident the door itself says
-      // household is not needed, and this page must not pretend otherwise.
-      // The generator is untouched — these go on the nodes it built.
-      declared = asked;
-      markRequired(form, requiredNames(declared));
+      const next = doorNext(bare);
+      if (next.length) { listInto($("[data-door-next-list]"), next); $("[data-door-next]").hidden = false; }
+      start();
+    }
 
-      // AN INVITATION LINK (POS-576). The door's own `invited_by` box, when its
-      // form has one and it is empty, takes the name /join/?invite= kept in
-      // this browser, and only when the town's roll (this build's) holds it.
-      // The office judges the name; this page only carries it.
+    /** The house a keeper is adding to, from GET /me, spelled the way the site spells it. Null when /me does not answer or names no house. */
+    async function readHouse(tok) {
+      let known = {};
+      try { known = JSON.parse(gateAct.dataset.houses || "{}"); } catch { /* the slug still prints */ }
+      try {
+        const r = await fetch(officeBase() + "/me", { headers: { accept: "application/json", authorization: "Bearer " + tok.access_token } });
+        return r.ok ? houseOfMe(await r.json(), known) : null;
+      } catch { return null; }
+    }
+    /** Say whose house this is: a settled house stands fixed; a provisional one keeps its box, which names it once. */
+    function showHouse(h) {
+      put("[data-jf-house-name]", h ? h.name : "your house");
+      $("[data-jf-house]").hidden = false;
+      $("[data-keeper-hide]").hidden = true;
+      if (h && h.provisional) $("[data-jf-house-once]").hidden = false;
+      fillHouseChip();
+    }
+
+    // ── the plan, on the page ────────────────────────────────────────────────
+    const control = (id) => $(`[data-piece="${id}"]`);
+    function applyPlan() {
+      for (const el of $$("[data-piece]")) {
+        const id = el.dataset.piece;
+        const p = plan.pieces[id];
+        // a piece of the page is its own slot; a box under it, or on the human's form, is its field or its label
+        const field = el.closest("[data-slot]") ?? el.closest("[data-piece-field]") ?? el.closest("label");
+        if (!p) { if (field) field.hidden = true; continue; }
+        if (p.required) { el.required = true; el.setAttribute("aria-required", "true"); }
+      }
+      // the step-1 box says required or optional from the card
+      const need = $('[data-need-for="household"]');
+      if (need && plan.pieces.household) need.textContent = plan.pieces.household.required ? "required" : "optional";
+      // a keeper's existing house has no human profile to set here, and a berth's human gives theirs on the office's co-sign page
+      if (cosignRoad(act)) $("[data-human-later]").hidden = false;
+      // the berth's narrower name rule, said under the page on the handle's own step (show() reveals it there)
+      if (plan.pieces.handle?.berth) $("[data-berth-note]").textContent = plan.pieces.handle.hint;
+      // what a screen reader hears as a piece's description is what she says about it, the plan's words (the berth road's handle rule included)
+      for (const el of $$("[data-say-for]")) { const p = plan.pieces[el.dataset.sayFor]; if (p) el.textContent = p.say || ""; }
+      // the card's own words, where it has them, over the page's (the office's description says what a field is for and where it shows)
+      for (const el of $$("[data-hint-for]")) { const p = plan.pieces[el.dataset.hintFor]; if (p && p.hint) el.textContent = p.hint; }
+      // the heard question's own options, the office's list
+      const heard = control("heard");
+      if (heard && plan.pieces.heard) for (const o of plan.pieces.heard.options) { const opt = document.createElement("option"); opt.value = o.value; opt.textContent = o.label; heard.appendChild(opt); }
+      // the card's fields this design places nowhere
+      drawExtra();
+      // AN INVITATION LINK (POS-576): the invite box, when the card takes it and it is empty, takes the name /join/?invite= kept in this browser,
+      // when the town's roll holds it; and then "A friend or another resident" is picked for where you heard, editable (CORE-152)
       const roll = (() => { try { return new Set(JSON.parse(gateAct.dataset.inviteRoll || "[]")); } catch { return new Set(); } })();
       const kept = (() => { try { return recallInvite(window.localStorage); } catch { return null; } })();
       const invited = kept && roll.has(kept) ? kept : null;
-      const inviteBox = invited && form.fields.invited_by ? controlOf(form.fields.invited_by.node) : null;
+      const inviteBox = invited && plan.pieces.invited_by?.sent ? control("invited_by") : null;
       if (inviteBox && !inviteBox.value) {
         inviteBox.value = invited;
         inviteBox.dispatchEvent(new Event("input", { bubbles: true }));
+        const friend = heard ? Array.from(heard.options).find((o) => o.value && INVITE_HEARD.test(o.textContent + " " + o.value)) : null;
+        if (friend && !heard.value) heard.value = friend.value;
       }
-
-      const next = doorNext(bare);
-      if (next.length) {
-        listInto($("[data-door-next-list]"), next);
-        $("[data-door-next]").hidden = false;
-      }
-
-      steps = fieldSteps(form);
-      only(gateAct);
-      // a reload lands on the first screen: the boxes it would have shown are new
-      history.replaceState(null, "", hashForStep(0, steps));
-      show(0);
+      for (const el of $$("[data-piece]")) paintPiece(el.dataset.piece);
     }
 
-    /**
-     * The house a keeper is adding to, from GET /me (its per-handle
-     * `households` block), spelled the way the site spells it and marked
-     * provisional where the registry says so. Null when /me does not answer or
-     * names no house: the review then says "your house".
-     */
-    async function readHouse(tok) {
-      let houses = {};
-      try { houses = JSON.parse(gateAct.dataset.houses || "{}"); } catch { /* the slug still prints */ }
-      try {
-        const r = await fetch(officeBase() + "/me", {
-          headers: { accept: "application/json", authorization: "Bearer " + tok.access_token },
-        });
-        return r.ok ? houseOfMe(await r.json(), houses) : null;
-      } catch { return null; }
+    function drawExtra() {
+      const host = $("[data-extra-host]");
+      if (!host || !plan.extra.length) return;
+      for (const x of plan.extra) {
+        const tpl = $(x.multiline ? "[data-extra-template-long]" : "[data-extra-template]").content.cloneNode(true);
+        const label = tpl.querySelector("label");
+        label.querySelector("span").textContent = x.label + (x.required ? "" : " · optional");
+        const box = tpl.querySelector("[data-extra]");
+        box.name = x.wire; box.dataset.extra = x.wire; box.placeholder = x.placeholder;
+        box.id = "jd-extra-" + x.wire;
+        if (x.required) { box.required = true; box.setAttribute("aria-required", "true"); }
+        const count = tpl.querySelector("[data-count-for]");
+        count.dataset.countFor = "extra:" + x.wire; count.id = "jd-count-extra-" + x.wire; box.setAttribute("aria-describedby", count.id);
+        tpl.querySelector("[data-problem-for]").dataset.problemFor = "extra:" + x.wire;
+        if (x.hint) { const hint = document.createElement("span"); hint.className = "jd-extra-hint"; hint.textContent = x.hint; label.appendChild(hint); }
+        host.appendChild(tpl);
+      }
+      host.hidden = false;
     }
 
-    /**
-     * Say whose house this is. A settled house stands fixed on the review. A
-     * provisional one keeps its house boxes, and each says, on its own screen,
-     * that what is typed there names the house once.
-     */
-    function showHouse(house, asked) {
-      put("[data-jf-house-name]", house ? house.name : "your house");
-      $("[data-jf-house]").hidden = false;
-      if (!house || !house.provisional) return;
-      $("[data-jf-house-once]").hidden = false;
-      for (const n of houseGroupNames(asked)) {
-        const node = form.fields[n] && form.fields[n].node;
-        if (!node) continue;
-        const once = document.createElement("p");
-        once.className = "jf-once";
-        once.textContent = "Your house still wears a borrowed name, " + house.name + ". What you write here names it, once.";
-        node.appendChild(once);
+    // ── the draft: what the reader has written, read from the boxes ───────────
+    function values() {
+      const out = {};
+      for (const el of $$("[data-piece]")) {
+        const id = el.dataset.piece;
+        if (el.type === "radio") { if (el.checked) out[id] = el.value; continue; }
+        if (el.type === "file") continue;
+        out[id] = el.value;
+      }
+      for (const el of $$("[data-extra]")) if (el.dataset.extra) out["extra:" + el.dataset.extra] = el.value;
+      return out;
+    }
+
+    // ── the blank page, typed into where it stands ────────────────────────────
+    // The page's pieces ARE the boxes (DraftSlot.astro): what the reader types is what the page shows. What's left to paint is the count and the
+    // problem beside a piece, the few spots that only SHOW a piece typed elsewhere (`data-show`: the house's chip, from step 1; the name on the
+    // Address card and on "Write to"), the colour at the page's edge, and a long box's height.
+    const page = $("[data-blank-page]");
+    const bubble = $("[data-profile-bubble]", page);
+    function show1(id, text) { for (const el of $$(`[data-show="${id}"]`, page)) el.textContent = text; }
+    function fillHouseChip() { show1("household", (control("household")?.value || "").trim() || (house ? house.name : "")); }
+    const boxOf = (id) => (id.startsWith("extra:") ? $(`[data-extra="${id.slice(6)}"]`) : control(id));
+    // A BOX AS WIDE AS ITS WORDS, AND AS TALL: the page's own text doesn't scroll inside a frame, and a one-line piece wraps when it runs past
+    // its spot, as the page's own line does (the review of 18bd5144). `field-sizing: content` sizes a box where the browser has it
+    // (resident-page.css); elsewhere a one-row box takes its width from its words here, and every textarea its height. Asked again whenever the
+    // window changes width, so a box that wraps onto more lines after a rotation isn't clipped until the next keystroke.
+    const SIZES = typeof CSS !== "undefined" && CSS.supports?.("field-sizing", "content");
+    const widthOf = (el) => Math.max(3, [...(el.value || el.placeholder || "")].length + 1);
+    function fit(el) {
+      if (!el || !el.classList?.contains("draft-in") || el.offsetParent === null) return;
+      if (el instanceof HTMLTextAreaElement) {
+        if (el.dataset.oneRow != null && !SIZES) el.cols = widthOf(el);
+        el.style.height = "auto"; el.style.height = el.scrollHeight + "px";
+      }
+      else if (!SIZES) el.size = widthOf(el);
+    }
+    let refit = 0;
+    window.addEventListener("resize", () => { cancelAnimationFrame(refit); refit = requestAnimationFrame(() => { for (const b of $$(".draft-in")) fit(b); }); });
+    // the pieces a refusal has stopped the reader for: their "is needed" shows beside them until they're filled
+    const stoppedFor = new Set();
+    function paintPiece(id) {
+      const v = values();
+      const p = plan && plan.pieces[id];
+      // the live count, in the office's measure (code points)
+      for (const el of $$(`[data-count-for="${id}"]`)) {
+        const field = p ?? (id.startsWith("extra:") ? (() => { const x = plan.extra.find((e) => "extra:" + e.wire === id); return x ? { max: x.max } : null; })() : null);
+        if (!field || (p && !p.counted)) { el.textContent = ""; continue; }
+        const c = countOf(field, v[id] ?? "");
+        el.textContent = countWords(c);
+        el.dataset.over = c.over ? "1" : "";
+      }
+      // THE PROBLEM BESIDE THE PIECE, AS SOON AS IT'S WRONG (Darko's lane brief, 2026-11-26: "not after Continue")
+      const problem = plan ? pieceProblem(plan, id, v, { missing: stoppedFor.has(id) }) : null;
+      if (!problem) stoppedFor.delete(id);
+      for (const el of $$(`[data-problem-for="${id}"]`)) el.textContent = problem ? problemWords(problem) : "";
+      const box = boxOf(id);
+      if (box) box.setAttribute("aria-invalid", problem ? "true" : "false");
+      fit(box);
+      const text = (v[id] ?? "").trim();
+      if (id === "agent") show1("agent", text);
+      else if (id === "household") fillHouseChip();
+      else if (id === "color") {
+        const hex = hexOf(text);
+        bubble.style.setProperty("--profile-color", hex ?? "#e8c48b");
       }
     }
+    document.addEventListener("input", (e) => {
+      const el = e.target;
+      if (!(el instanceof HTMLElement)) return;
+      // a one-row box is one line, however it wraps: a pasted line break becomes a space, never a newline in the line
+      if (el instanceof HTMLTextAreaElement && el.dataset.oneRow != null && /[\r\n]/.test(el.value)) {
+        const at = el.selectionStart;
+        el.value = el.value.replace(/\r\n?|\n/g, " ");
+        el.setSelectionRange(at, at);
+      }
+      if (el.dataset.piece) paintPiece(el.dataset.piece);
+      else if (el.dataset.extra) paintPiece("extra:" + el.dataset.extra);
+      if (!formError.hidden) formError.hidden = true;
+    });
 
-    // ── one question at a time (POS-275) ──────────────────────────────────────
+    // ── SHE SAYS WHAT A PIECE IS FOR, WHILE THE READER IS IN IT (Darko's lane brief, 2026-11-26: "The hints come from her") ──
+    // No small label sits over a piece of the page; when the reader is in one, her bubble says what it's for (join-draft.mjs CONCEPTS `say`, or
+    // the office's own words for a field it grew), and goes back to the step's line when they leave. While the pointer is down in her bubble
+    // (on its button) her words hold still, so the button doesn't move out from under the click.
+    let atLine = null;
+    let holdWords = false;
+    let quietFocus = false;
+    const sayOf = (el) => {
+      if (!plan) return "";
+      if (el.dataset.extra) return plan.extra.find((x) => x.wire === el.dataset.extra)?.say ?? "";
+      return el.closest("[data-blank-page]") ? plan.pieces[el.dataset.piece]?.say ?? "" : "";
+    };
+    gateAct.addEventListener("focusin", (e) => {
+      const el = e.target;
+      if (quietFocus || !(el instanceof HTMLElement) || !(el.dataset.piece || el.dataset.extra) || el.readOnly) return;
+      const words = sayOf(el);
+      if (words) sayAt("act", [words]);
+      // her bubble grows as she speaks: a box tapped just under it must not end up behind it
+      requestAnimationFrame(() => clearOfBubble(el));
+    });
+    gateAct.addEventListener("focusout", () => {
+      setTimeout(() => {
+        const now = document.activeElement;
+        if (holdWords || (now instanceof HTMLElement && (now.dataset.piece || now.dataset.extra) && sayOf(now))) return;
+        if (atLine) atLine();
+      }, 0);
+    });
+    const actBubble = $('[data-reg-at="act"]');
+    // HER BUBBLE NEVER HIDES THE BOX IT SENDS THE READER TO (the review of 18bd5144). She stays on screen at the top (sticky), and she is far
+    // taller than the page's 24px scroll margin, taller still when she speaks a piece's help or a refusal lands in her error slot. So the boxes'
+    // scroll margin is her measured height (`--reg-h`, kept by a ResizeObserver, resident-page.css's .jf-act rules read it), and a box the page
+    // sends the reader to is brought clear of her: centred, then nudged down past her bottom edge if centring alone leaves it under her.
+    const REG_GAP = 12;
+    if (actBubble && typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(() => gateAct.style.setProperty("--reg-h", Math.ceil(actBubble.getBoundingClientRect().height) + "px")).observe(actBubble);
+    }
+    function clearOfBubble(box, { centre = false } = {}) {
+      if (!box || box.offsetParent === null || !actBubble) return;
+      if (centre) box.scrollIntoView({ block: "center" });
+      const under = actBubble.getBoundingClientRect().bottom + REG_GAP - box.getBoundingClientRect().top;
+      if (under > 0) window.scrollBy(0, -under);
+    }
+    actBubble?.addEventListener("pointerdown", () => { holdWords = true; });
+    window.addEventListener("pointerup", () => { if (!holdWords) return; setTimeout(() => { holdWords = false; }, 0); });
 
-    let steps = null;      // ["intro", "field:<the door's name>", …, "review"], from the form
-    let at = 0;
-    let editing = null;    // the review row being edited in place, and where its node lives
+    // the picture's square on the page, lit on its step, opens the drawer's picker (the picture is framed in the drawer, as on Edit profile)
+    $('[data-fill="picture"]', page)?.addEventListener("click", (e) => {
+      if (!e.currentTarget.classList.contains("is-lit")) return;
+      $("[data-profile-avatar-input]")?.click();
+    });
+
+    // ── the picture, framed in this browser and shown on the page; it goes up only once the office has admitted the agent (join-after.mjs) ──
+    const pic = { url: null, file: null, zoom: 1, x: 0, y: 0 };
+    const picInput = $("[data-profile-avatar-input]");
+    const picPreview = $("[data-profile-avatar-preview]");
+    const picZoomRow = $("[data-profile-avatar-zoom-row]");
+    const picZoom = $("[data-profile-avatar-zoom]");
+    const picStatus = $("[data-profile-avatar-status]");
+    const PIC_TYPES = ["image/jpeg", "image/png", "image/webp"];
+    const PIC_MAX = 1.5 * 1024 * 1024;
+    function drawPic() {
+      for (const host of [picPreview, $('[data-fill="picture"]', page)]) {
+        if (!host) continue;
+        let img = host.querySelector("img");
+        if (!pic.url) { if (img) img.remove(); const s = host.querySelector("span"); if (s) s.hidden = false; continue; }
+        if (!img) { img = document.createElement("img"); img.alt = ""; host.appendChild(img); }
+        img.src = pic.url;
+        img.style.transform = `translate(${pic.x}%, ${pic.y}%) scale(${pic.zoom})`;
+        const s = host.querySelector("span"); if (s) s.hidden = true;
+      }
+    }
+    picInput?.addEventListener("change", () => {
+      const f = picInput.files && picInput.files[0];
+      if (!f) return;
+      if (!PIC_TYPES.includes(f.type)) { picStatus.textContent = "That isn't a JPEG, PNG or WebP picture."; picStatus.className = "profile-edit-avatar-status warn"; picInput.value = ""; return; }
+      if (f.size > PIC_MAX) { picStatus.textContent = "That picture is over 1.5 MB; the Darkroom can shrink it."; picStatus.className = "profile-edit-avatar-status warn"; picInput.value = ""; return; }
+      if (pic.url) URL.revokeObjectURL(pic.url);
+      Object.assign(pic, { url: URL.createObjectURL(f), file: f, zoom: 1, x: 0, y: 0 });
+      picZoom.value = "1"; picZoomRow.hidden = false;
+      picStatus.textContent = admitsNow(act)
+        ? "Shown on the page above. It stays in this browser until the office admits your agent; then this page puts it up, framed as you leave it."
+        : "Shown on the page above. It stays in this browser: a berth's join waits for its human's co-sign, so you put it up on Edit profile once the house stands.";
+      picStatus.className = "profile-edit-avatar-status ok";
+      drawPic();
+    });
+    picZoom?.addEventListener("input", () => { pic.zoom = Number(picZoom.value) || 1; drawPic(); });
+    let drag = null;
+    picPreview?.addEventListener("pointerdown", (e) => { if (!pic.url) return; drag = { x: e.clientX, y: e.clientY, px: pic.x, py: pic.y, w: picPreview.clientWidth || 1 }; picPreview.setPointerCapture?.(e.pointerId); });
+    picPreview?.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const lim = 50 * (pic.zoom - 1) / pic.zoom;
+      pic.x = Math.max(-lim, Math.min(lim, drag.px + ((e.clientX - drag.x) / drag.w) * 100 / pic.zoom));
+      pic.y = Math.max(-lim, Math.min(lim, drag.py + ((e.clientY - drag.y) / drag.w) * 100 / pic.zoom));
+      drawPic();
+    });
+    picPreview?.addEventListener("pointerup", () => { drag = null; });
+
+    /** The framed square, rendered as Edit profile renders it (at most 512px, re-encoded, so no camera metadata travels): `{type, base64}`. */
+    async function framedPicture() {
+      const bitmap = await createImageBitmap(pic.file);
+      const c = cropOf({ w: bitmap.width, h: bitmap.height }, pic);
+      const canvas = document.createElement("canvas");
+      canvas.width = c.out; canvas.height = c.out;
+      const g = canvas.getContext("2d");
+      g.fillStyle = "#fff"; g.fillRect(0, 0, c.out, c.out);
+      g.drawImage(bitmap, c.sx, c.sy, c.side, c.side, 0, 0, c.out, c.out);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+      if (!blob) throw new Error("the browser couldn't prepare that image");
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return { type: blob.type, base64: btoa(binary) };
+    }
+
+    // ── the one reference sheet (the profile keeps one sheet; the sheet setter's own 1 MB check), shown here until the office admits the agent ──
+    const sheet = { url: null, file: null };
+    $("[data-ref-input]")?.addEventListener("change", (e) => {
+      const input = e.currentTarget, f = input.files && input.files[0], thumb = $("[data-ref-thumb]"), status = $("[data-ref-status]");
+      if (!f) return;
+      const problem = fileProblem(f) ?? (PIC_TYPES.includes(f.type) ? null : "That isn't a JPEG, PNG or WebP picture.");
+      if (problem) { status.textContent = problem; status.className = "profile-edit-avatar-status warn"; input.value = ""; return; }
+      if (sheet.url) URL.revokeObjectURL(sheet.url);
+      Object.assign(sheet, { url: URL.createObjectURL(f), file: f });
+      thumb.textContent = ""; thumb.style.backgroundImage = `url("${sheet.url}")`; thumb.classList.add("has-pic");
+      status.textContent = ""; status.className = "profile-edit-avatar-status";
+    });
+    const media = () => ({ picture: Boolean(pic.file), references: sheet.file ? 1 : 0 });
+
+    // ── the steps (the hash is the step; Back is the browser's) ───────────────
+    let at = null;
     const nextBtn = $("[data-jf-next]");
+    const skipBtn = $("[data-jf-skip]");
     const backBtn = $("[data-jf-back]");
-    const intro = $("[data-jf-intro]");
-    const review = $("[data-jf-review]");
-
-    function show(i) {
-      if (!steps || !form) return;
-      if (editing) closeEdit(false);
-      at = Math.max(0, Math.min(i, steps.length - 1));
-      const step = steps[at];
-      const name = fieldOfStep(step);
-      gateAct.dataset.jfStep = step === "review" ? "review" : "field";
-
-      // one of the generator's own nodes is current; its fieldset (the door's
-      // group, with the door's legend) is shown around it
-      for (const n of form.names) {
-        const node = form.fields[n].node;
-        node.classList.toggle("is-current", n === name);
+    const submitBtn = $("[data-submit]");
+    const status = $("[data-status]");
+    const formError = $("[data-form-error]");
+    const PAGE_STEPS = new Set(["who", "describe", "more", "review"]);
+    const SKIPPABLE = new Set(["more", "found"]);
+    const drawer = $("[data-drawer]");
+    const berthNote = $("[data-berth-note]");
+    function show(id) {
+      at = id;
+      if (id === "review") returnTo = null;
+      const walked = [...plan.steps, "review"];
+      const i = walked.indexOf(id);
+      for (const el of $$("[data-step]", gateAct)) el.hidden = el.dataset.step !== id;
+      // the blank page: on the agent's steps, and on the look-over, where it IS the finished page
+      page.hidden = !PAGE_STEPS.has(id);
+      if (id === "review") $("[data-review-page-slot]").appendChild(page); else if (page.parentNode !== gateAct) $('[data-step="household"]', gateAct).after(page);
+      shell.classList.toggle("is-wide", PAGE_STEPS.has(id));
+      page.classList.toggle("is-review", id === "review");
+      $("[data-page-edits]", page).hidden = id !== "review";
+      // ONLY THIS STEP'S PIECES ARE LIT AND TYPED INTO; every other piece reads as the page (read-only, out of the tab order)
+      const litOrder = STEPS.find((s) => s.id === id)?.lit ?? [];
+      const lit = new Set(litOrder);
+      for (const el of $$("[data-fill]", page)) el.classList.toggle("is-lit", lit.has(el.dataset.fill));
+      for (const box of $$(".draft-in", page)) {
+        const on = lit.has(box.dataset.piece);
+        box.readOnly = !on; box.tabIndex = on ? 0 : -1;
+        fit(box);
       }
-      for (const fs of form.node.querySelectorAll("fieldset")) {
-        fs.classList.toggle("has-current", !!(name && fs.contains(form.fields[name].node)));
-      }
-      intro.hidden = step !== "intro";
-      review.hidden = step !== "review";
-      if (step === "review") paintReview();
-
-      const dotsHost = $("[data-jf-dots]");
-      while (dotsHost.firstChild) dotsHost.removeChild(dotsHost.firstChild);
-      for (const d of dots(at, steps.length)) {
-        const el = document.createElement("span");
-        if (d) el.className = "is-" + d;
-        dotsHost.appendChild(el);
-      }
-
-      backBtn.hidden = at === 0;
-      nextBtn.hidden = step === "review";
-      submitBtn.hidden = step !== "review";
+      // the drawer under the page holds this step's pieces the page has no spot for, and hides when there are none
+      const here = $(`[data-step="${id}"]`, drawer);
+      drawer.hidden = !here || (id === "who" ? !plan.extra.length : id !== "more");
+      berthNote.hidden = !(id === "who" && plan.pieces.handle?.berth);
+      gateAct.dataset.jfStep = id === "review" ? "review" : "field";
+      // her line for this step; her welcome first on the first step (Darko, 2026-11-26: "welcome to Postmark, I'm the registrar … first")
+      const key = id === "household" && plan.keepsHouse ? "keeper" : id === "review" && cosignRoad(act) ? "reviewCosign" : id;
+      const opening = id === plan.steps[0];
+      // a keeper whose first step is their agent's page: she says why there's no house to name, then the page's own line
+      atLine = plan.keepsHouse && opening && id !== "household"
+        ? () => sayAt("act", [...hello(), ...(REG.keeper ?? []), " ", ...(REG[id] ?? [])])
+        : () => regAt("act", key, { welcome: opening });
+      atLine();
+      put("[data-jd-kicker]", id === "review" ? "Look it over" : kickerOf(plan, id));
+      // ONE COUNT (Wright's walk, 2026-11-26: the dots, the label and the hash disagreed): a dot per step this reader walks, none for the look-over
+      const d = $("[data-jf-dots]");
+      while (d.firstChild) d.removeChild(d.firstChild);
+      for (const s of dotsOf(plan, id)) { const sp = document.createElement("span"); if (s) sp.className = "is-" + s; d.appendChild(sp); }
+      backBtn.hidden = i <= 0;
+      const last = id === "review";
+      nextBtn.hidden = last; submitBtn.hidden = !last;
+      nextBtn.textContent = returnTo ? "Back to Look it over" : "Continue";
+      skipBtn.hidden = last || returnTo != null || !SKIPPABLE.has(id);
+      $("[data-keeper-signin]").hidden = signedIn || returnTo != null || id !== plan.steps[0];
+      // Enter continues a step; on the look-over Send is pressed, never Entered, so the hint doesn't promise it
+      $(".jf-hint", gateAct).hidden = last;
+      if (last) paintReview();
       formError.hidden = true;
-      paintNext();
-      put("[data-jf-key]", name ? enterHint(form, name) : "Enter ↵");
-
-      if (name) {
-        const c = controlOf(form.fields[name].node);
-        if (c && typeof c.focus === "function") c.focus({ preventScroll: true });
-      } else gateAct.focus({ preventScroll: true });
+      // the step's first box: its first lit piece on the page, else the first box of its own
+      const firstLit = litOrder.map((k) => control(k)).find((b) => b && !b.closest("[hidden]"));
+      const first = firstLit ?? $(`[data-step="${id}"] input:not([type=hidden]):not([type=file]), [data-step="${id}"] textarea, [data-step="${id}"] select`, gateAct);
+      // focused quietly: the step's own line (and her welcome) stays until the reader moves on to a piece themselves
+      if (first && id !== "review" && typeof first.focus === "function") { quietFocus = true; first.focus({ preventScroll: true }); quietFocus = false; }
       window.scrollTo({ top: 0 });
     }
+    function go(id) { if (!id) return; history.pushState(null, "", hashOfStep(id, plan)); show(id); }
+    window.addEventListener("popstate", () => { if (!plan) return; const id = stepOfHash(location.hash, plan); if (id) show(id); });
+    backBtn.addEventListener("click", () => history.back());
 
-    /** The forward button's word for the box on screen: Skip on an empty optional one. */
-    function paintNext() {
-      const name = steps ? fieldOfStep(steps[at]) : null;
-      nextBtn.textContent = !name ? "Start"
-        : continueLabel({ required: isRequired(name, declared), present: isPresent(form, name) });
-    }
-
-    function go(i) {
-      history.pushState({ jf: true }, "", hashForStep(i, steps));
-      show(i);
-    }
-
-    function paintReview() {
-      const list = $("[data-jf-review-list]");
-      while (list.firstChild) list.removeChild(list.firstChild);
-      for (const row of reviewRows(form)) {
-        const wrap = document.createElement("div");
-        wrap.className = "jf-row";
-        const dt = document.createElement("dt"); dt.textContent = row.label;
-        const dd = document.createElement("dd");
-        dd.textContent = row.empty ? "left blank" : row.value;
-        if (row.empty) dd.className = "is-empty";
-        const edit = document.createElement("button");
-        edit.type = "button"; edit.className = "jf-edit"; edit.textContent = "edit";
-        edit.dataset.jfEdit = row.name;
-        edit.addEventListener("click", () => openEdit(row.name, wrap));
-        wrap.appendChild(dt); wrap.appendChild(dd); wrap.appendChild(edit);
-        list.appendChild(wrap);
+    // AN EDIT FROM THE LOOK-OVER COMES BACK TO IT. The approved Registrar takes the reader to the step ("press its edit and I'll take you back to
+    // that step"); Continue there returns straight to Look it over, never through every later step again (Keemin, 2026-09-27: "the look it over
+    // should just let you edit in-pane instead of sending you back").
+    let returnTo = null;
+    function forward(skip) {
+      const walked = [...plan.steps, "review"];
+      if (!skip) {
+        const probs = stepProblems(plan, at, values());
+        if (probs.length) return refuse(probs[0]);
       }
+      go(returnTo ?? walked[walked.indexOf(at) + 1]);
     }
-
-    /**
-     * EDIT IN PLACE (Keemin, 2026-09-27: "the look it over should just let you
-     * edit in-pane instead of sending you back"). The row's value gives way to
-     * the GENERATOR'S OWN NODE, moved in from its screen: one box, one value,
-     * the one the send reads. Save puts it back and repaints the row; Cancel
-     * restores what the box held and puts it back. The reader never leaves the
-     * review.
-     */
-    function openEdit(name, wrap) {
-      if (editing && !closeEdit(false)) return;
-      const node = form.fields[name].node;
-      const c = controlOf(node);
-      editing = { name, node, home: node.parentNode, next: node.nextSibling, before: c ? c.value : "" };
-      wrap.classList.add("is-editing");
-      const slot = document.createElement("div");
-      slot.className = "jf-row-edit";
-      slot.appendChild(node);
-      const bar = document.createElement("div");
-      bar.className = "jf-row-bar";
-      const save = document.createElement("button");
-      save.type = "button"; save.className = "pm-btn"; save.textContent = "Save";
-      save.addEventListener("click", () => closeEdit(true));
-      const cancel = document.createElement("button");
-      cancel.type = "button"; cancel.className = "jf-edit"; cancel.textContent = "cancel";
-      cancel.addEventListener("click", () => closeEdit(false));
-      bar.appendChild(save); bar.appendChild(cancel);
-      slot.appendChild(bar);
-      wrap.appendChild(slot);
-      wrap.addEventListener("keydown", (e) => {
-        const k = editKey(e);
-        if (!k || !editing) return;
-        e.preventDefault(); e.stopPropagation();
-        closeEdit(k === "save");
-      });
-      if (c && typeof c.focus === "function") c.focus();
-    }
-
-    /** Put the edited node back on its own screen. A save is refused, in the office's words, on an emptied required box. */
-    function closeEdit(saving) {
-      if (!editing) return true;
-      const { name, node, home, next, before } = editing;
-      if (saving) {
-        const missing = missingHere(form, declared, name);
-        if (missing.length) { showError(missing[0].defect, missing[0].hint); return false; }
-      } else {
-        const c = controlOf(node);
-        if (c) c.value = before;
-      }
-      home.insertBefore(node, next);
-      editing = null;
-      formError.hidden = true;
-      paintNext();
-      if (steps && steps[at] === "review") {
-        paintReview();
-        $(`[data-jf-edit="${CSS.escape(name)}"]`)?.focus();
-      }
-      return true;
-    }
-
-    nextBtn?.addEventListener("click", () => {
-      if (!steps) return;
-      const name = fieldOfStep(steps[at]);
-      if (name) {
-        // the same check the send makes, asked of this one box, in the office's words
-        const missing = missingHere(form, declared, name);
-        if (missing.length) return showMissing(missing);
-      }
-      go(at + 1);
-    });
-    backBtn?.addEventListener("click", () => {
-      if (history.state && history.state.jf) history.back();
-      else { history.replaceState(null, "", hashForStep(at - 1, steps)); show(at - 1); }
-    });
-    // Enter continues (Ctrl/⌘+Enter in a paragraph box); on review it sends.
-    gateAct?.addEventListener("keydown", (e) => {
-      if (!steps || editing || !enterContinues(e)) return;
-      e.preventDefault();
-      (steps[at] === "review" ? submitBtn : nextBtn).click();
-    });
-    // typing re-words the forward button, and clears a refusal the box no longer earns
-    $("[data-form-host]")?.addEventListener("input", (e) => {
+    nextBtn.addEventListener("click", () => forward(false));
+    skipBtn.addEventListener("click", () => forward(true));
+    // Enter continues from a one-line box, a one-row box that wraps included (it never takes a line break); in a paragraph box it is
+    // Ctrl/⌘+Enter, so a line break is still a line break
+    gateAct.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || e.isComposing || at === "review") return;
       const t = e.target;
-      if (t && typeof t.setCustomValidity === "function") t.setCustomValidity("");
-      paintNext();
+      if (t instanceof HTMLButtonElement || t instanceof HTMLAnchorElement || t instanceof HTMLSelectElement) return;
+      if (t instanceof HTMLTextAreaElement && t.dataset.oneRow == null && !(e.ctrlKey || e.metaKey)) return;
+      if (t instanceof HTMLInputElement && (t.type === "file" || t.type === "radio" || t.type === "range")) return;
+      e.preventDefault(); forward(false);
     });
-    window.addEventListener("popstate", () => { if (steps && !gateAct.hidden) show(stepFromHash(location.hash, steps)); });
+    for (const b of $$("[data-edit-step]")) b.addEventListener("click", () => { returnTo = "review"; go(b.dataset.editStep); });
 
-    // ── sending ───────────────────────────────────────────────────────────────
-
-    const submitBtn = $("[data-submit]");
-    const formError = $("[data-form-error]");
-    const status = $("[data-status]");
-
-    function setStatus(msg) {
-      if (!msg) { status.hidden = true; status.textContent = ""; return; }
-      status.hidden = false; status.textContent = msg;
+    function refuse(p) {
+      if (p.step && p.step !== at) go(p.step);
+      // every piece this step stops on says so beside itself, not only the first
+      for (const q of stepProblems(plan, at, values())) { stoppedFor.add(q.id); paintPiece(q.id); }
+      showError(problemWords(p), null);
+      const box = boxOf(p.id);
+      if (box && typeof box.focus === "function") { box.focus({ preventScroll: true }); clearOfBubble(box, { centre: true }); }
     }
-
-    /**
-     * A required box left empty, shown in the OFFICE'S OWN WORDS and in the same
-     * slot the office's own refusal uses (POS-188). Two doors, one sentence, one
-     * place to look.
-     *
-     * Native validity as well as the slot: `setCustomValidity` puts the same
-     * sentence on the control, and `reportValidity` opens the browser's own
-     * bubble on the first empty one. The page has no <form> element to submit,
-     * so nothing fires this for us; it is called by hand, on the press.
-     */
-    function showMissing(missing) {
-      const first = missing[0];
-      // take the reader to the box the refusal names, then say it there
-      const there = steps ? stepOfField(first.name, steps) : null;
-      if (there != null && there !== at) go(there);
-      showError(first.defect, first.hint);
-      for (const m of missing) {
-        const c = controlOf(form.fields[m.name]?.node);
-        if (c && typeof c.setCustomValidity === "function") { try { c.setCustomValidity(m.defect); } catch { /* not every control carries one */ } }
-      }
-      const firstControl = controlOf(form.fields[first.name]?.node);
-      if (firstControl && typeof firstControl.reportValidity === "function") { try { firstControl.reportValidity(); } catch { /* as above */ } }
-      else if (firstControl && typeof firstControl.focus === "function") firstControl.focus();
-    }
-
     function showError(defect, hint) {
-      // UNHIDDEN FIRST, THEN FILLED, and the order is the whole reason the slot
-      // carries `role="alert"` at all. An assertive live region announces a
-      // MUTATION INSIDE ITSELF, and an element that is `hidden` is out of the
-      // accessibility tree entirely — so filling it while hidden and revealing it
-      // afterwards can land as no announcement at all. Revealing the empty region
-      // first makes the write the mutation. Both happen in one task, so nothing
-      // paints in between and no reader sees an empty box.
+      // UNHIDDEN FIRST, THEN FILLED: an assertive live region announces a mutation inside itself, and a hidden element is out of the tree
       formError.hidden = false;
       while (formError.firstChild) formError.removeChild(formError.firstChild);
       const b = document.createElement("b"); b.textContent = defect; formError.appendChild(b);
       if (hint) { const s = document.createElement("span"); s.textContent = " — " + hint; formError.appendChild(s); }
+      // no scroll here: the slot is in her bubble, which stays on screen (sticky); refuse() brings the refused piece clear of her
       formError.hidden = false;
-      // on a long review the slot can sit below the fold; bring it to the reader
-      if (typeof formError.scrollIntoView === "function") formError.scrollIntoView({ block: "center" });
+    }
+    function setStatus(msg) { status.hidden = !msg; status.textContent = msg; }
+
+    // ── look it over ──────────────────────────────────────────────────────────
+    function rowsInto(host, rows) {
+      while (host.firstChild) host.removeChild(host.firstChild);
+      for (const [k, v, tag] of rows) {
+        const wrap = document.createElement("div");
+        const dt = document.createElement("dt"); dt.textContent = k;
+        if (tag) { const t = document.createElement("span"); t.className = "jd-tag" + (tag === "public" ? " is-public" : ""); t.textContent = tag; dt.append(" ", t); }
+        const dd = document.createElement("dd"); dd.textContent = v || "left blank"; if (!v) dd.className = "jd-blank";
+        wrap.append(dt, dd); host.appendChild(wrap);
+      }
+    }
+    // one line per piece: its name, what was written, and exactly what becomes of it (join-draft.mjs FATE; `wip` words are tagged as such)
+    function keptInto(host, kept) {
+      while (host.firstChild) host.removeChild(host.firstChild);
+      for (const k of kept) {
+        const li = document.createElement("li");
+        const b = document.createElement("b"); b.textContent = k.label.split(" · ")[0];
+        const v = document.createElement("span"); v.className = "jd-kept-value"; v.textContent = k.value;
+        const w = document.createElement("span"); w.className = "jd-kept-where"; w.textContent = k.where;
+        li.append(b, " ", v);
+        if (k.wip) { const t = document.createElement("span"); t.className = "jd-tag is-wip"; t.textContent = "work in progress"; li.append(" ", t); }
+        li.append(w); host.appendChild(li);
+      }
+    }
+    function fatesInto(prefix, kept) {
+      const after = kept.filter((k) => k.fate === "after"), held = kept.filter((k) => k.fate !== "after");
+      keptInto($(`[data-${prefix}-after-list]`), after); $(`[data-${prefix}-after]`).hidden = after.length === 0;
+      keptInto($(`[data-${prefix}-held-list]`), held); $(`[data-${prefix}-held]`).hidden = held.length === 0;
+    }
+    function sendsWords(args) {
+      const names = Object.keys(args);
+      return names.length ? `${names.length} ${names.length === 1 ? "field" : "fields"}, under the office's own names: ${names.join(", ")}. A box left blank is not sent.` : "Nothing yet.";
+    }
+    function paintReview() {
+      const v = values();
+      const P = plan.pieces;
+      rowsInto($("[data-review-house-list]"), [
+        ...(P.household ? [["Household name", v.household]] : house ? [["Adding to", house.name]] : []),
+      ]);
+      rowsInto($("[data-review-found-list]"), [
+        ...(P.invited_by ? [["Who invited you?", v.invited_by, "public"]] : []),
+        ...(P.heard ? [["Where you heard", control("heard")?.selectedOptions?.[0]?.value ? control("heard").selectedOptions[0].textContent : "", "private"]] : []),
+        ...(P.heard_note ? [["Anything to add?", v.heard_note, "private"]] : []),
+      ]);
+      $("[data-review-found]").hidden = !(P.invited_by || P.heard || P.heard_note);
+      const { args, kept } = argsFrom(plan, v, media());
+      // on the co-sign road begin carries the handle too; the berth boards under the handle, or under a shorter name of its own (berthNameFor)
+      const road = cosignRoad(act);
+      const berthName = road ? berthNameFor(v.handle) : "";
+      const sameName = berthName === (v.handle || "").trim();
+      put("[data-review-sends-words]", road ? sendsWords(beginBody(args).args) + (sameName ? " The handle also names your agent's berth." : ` Your agent's berth takes a shorter name, ${berthName}, only for the way in; their handle stays ${(v.handle || "").trim()}.`) : sendsWords(args));
+      $("[data-review-road]").hidden = !road;
+      if (road) put("[data-road-handle]", berthName);
+      fatesInto("review", kept);
     }
 
-    submitBtn?.addEventListener("click", async () => {
-      if (sending || !form || !act) return;
+    // ── send ──────────────────────────────────────────────────────────────────
+    let sentKept = [];
+    let sentWrites = null;
+    submitBtn.addEventListener("click", async () => {
+      if (sending || !plan || !act) return;
+      const v = values();
+      const probs = allProblems(plan, v);
+      if (probs.length) return refuse(probs[0]);
+      const { args, kept, writes } = argsFrom(plan, v, media());
+      formError.hidden = true;
+      // a new house's road rides its own berth, never the reader's sign-in, so it needs none
+      if (cosignRoad(act)) return sendCosign(v, args, kept, writes);
       const tok = getTok();
       if (!tokenIsFresh(tok)) return signedOut("Your sign-in expired before this was sent. Nothing was sent.");
-
-      formError.hidden = true;
       sending = true; submitBtn.disabled = true; setStatus("asking the office…");
       arm(tok);
-
       let res;
       try {
-        res = await submitAct({ callTool: (name, args) => window.MCPProto.callTool(name, args), act, form, fields: declared });
-      } catch (e) {
+        // the one seam a send passes (join-move-in.mjs submitAct): the args are only names the card takes; required pieces were checked above
+        res = await submitAct({ callTool: (name, a) => window.MCPProto.callTool(name, a), act, form: { read: () => ({ args, errors: [] }) } });
+      } catch {
         sending = false; submitBtn.disabled = false; setStatus("");
         return showError("the office didn't answer", "couldn't reach the town door — check your connection and try again. Nothing was sent.");
       }
-      sending = false; submitBtn.disabled = false; setStatus("");
-
-      if (!res.sent && res.missing && res.missing.length) return showMissing(res.missing);
-      if (!res.sent) return showError("this page could not read one of the boxes", res.errors.join("; "));
-
       const said = replyShape(res.entry);
-      if (!said.ok) return showError(said.defect, said.hint);
-      showReply(said);
+      if (!said.ok) { sending = false; submitBtn.disabled = false; setStatus(""); return showError(said.defect, said.hint); }
+      sentKept = kept;
+      // ADMITTED (add-resident): now, and only now, the pieces the card did not carry go through the resident's own doors
+      sentWrites = null;
+      if (admitsNow(act)) {
+        setStatus("the office admitted them; setting what the join didn't carry…");
+        sentWrites = await finishAfter((v.handle || "").trim(), tok, writes);
+      }
+      sending = false; submitBtn.disabled = false; setStatus("");
+      showReply(said, v);
     });
 
-    function showReply(said) {
+    const sendJSON = async (req) => { try { const r = await fetch(req.url, req.init); return { status: r.status, data: await r.json().catch(() => null) }; } catch { return { status: 0, data: null }; } };
+    /** The pieces the card did not carry, through the resident's own doors (join-after.mjs), each answering for itself; never undoes an admission. */
+    async function finishAfter(handle, tok, writes) {
+      try {
+        return await afterAdmission({ handle, base: officeBase(), tok, writes, picture: pic.file ? framedPicture : null, sheet: sheet.file, fetchFn: (u, i) => fetch(u, i), send: sendJSON });
+      } catch { return [{ id: "after", ok: false, words: "Not saved: this page tripped while saving the rest. Your agent is in all the same. Try again from Edit profile, on your agent's page." }]; }
+    }
+
+    // ── A NEW HOUSE: berth → begin → the office's co-sign page (join-berth.mjs; Darko's ruled fallback) ──────────────────────────────────────
+    // The berth is this page's, for this send: minted on Send, held here and nowhere else, reused when the same handle is sent again.
+    let berth = null;
+    let cosign = null;
+    // the berth's name: its own short one where the office keeps the chosen handle apart (join-berth.mjs § berthSlugFor), else the handle itself
+    const berthNameFor = (handle) => (plan?.pieces.handle?.chosenApart ? berthSlugFor(handle) : String(handle ?? "").trim());
+    async function sendCosign(v, args, kept, writes) {
+      const slug = berthNameFor(v.handle);
+      sending = true; submitBtn.disabled = true;
+      const done = (words, hint) => { sending = false; submitBtn.disabled = false; setStatus(""); if (words) showError(words, hint ?? null); };
+      if (!berth || berth.slug !== slug) {
+        setStatus("taking a berth for your agent…");
+        const r = await sendJSON(boardRequest(officeBase(), slug));
+        const got = r.status === 201 || r.status === 200 ? berthOf(r.data, slug) : null;
+        if (!got) return done(boardRefusal(r.status, r.data, { cut: slug !== (v.handle || "").trim() }));
+        berth = got;
+      }
+      setStatus("parking your agent's page with the office…");
+      const r = await sendAct({ base: officeBase(), door: "household", body: beginBody(args), token: berth.key });
+      if (!r.ok) {
+        if (r.unreachable) return done("the office didn't answer", "the page may or may not have parked; sending again under the same berth replaces it, so it's safe to try again.");
+        const b = r.body || {};
+        return done(typeof b.defect === "string" ? b.defect : `the office said no (${r.status})`, typeof b.hint === "string" ? b.hint : null);
+      }
+      const link = cosignOf(r.body, slug, [location.origin, "https://postmark.town"]);
+      if (!link) return done("the office parked your agent's page but gave no co-sign link this page can open", "nothing is admitted yet; send again to ask for it.");
+      done(null);
+      sentKept = kept;
+      // the resident the co-sign will admit is the office's word (begin's `handle`), apart from the berth's slug (join-berth.mjs § residentOf)
+      const who = residentOf(r.body, slug);
+      cosign = { slug, resident: who.resident, asked: (v.handle || "").trim(), link, writes, v, tries: 0, timer: null, finished: false };
+      showCosign();
+    }
+    function showCosign() {
+      regAt("cosign", "cosign");
+      put("[data-cosign-handle]", cosign.resident);
+      const differs = residentWords(cosign.asked, cosign.resident);
+      put("[data-cosign-resident]", differs ?? ""); $("[data-cosign-resident]").hidden = !differs;
+      const w = cosign.writes;
+      // shown only when one of the three it names is held here, so its words are always true (Truey F3 on 5c7decf9)
+      $("[data-cosign-keep]").hidden = !(w && (w.picture || w.sheet || w.appearance?.root));
+      const a = $("[data-cosign-link]"); a.href = cosign.link;
+      put("[data-cosign-url]", cosign.link);
+      put("[data-cosign-status]", "Waiting for your co-sign on the office's page…");
+      only(gateCosign);
+      window.scrollTo({ top: 0 });
+      watchCosign();
+    }
+    // the office's answer to "is it admitted yet?": /me with the berth key names the handle once the co-sign has run. Asked every few seconds while
+    // this tab is in front, for up to an hour, and on demand; nothing is written until it does.
+    const COSIGN_EVERY_MS = 4000, COSIGN_FOR_MS = 60 * 60 * 1000;
+    function watchCosign() {
+      clearTimeout(cosign.timer);
+      cosign.started ??= Date.now();
+      if (Date.now() - cosign.started > COSIGN_FOR_MS) { put("[data-cosign-status]", "Still waiting. Once you've co-signed, press the button below."); return; }
+      cosign.timer = setTimeout(() => { if (document.visibilityState === "visible") checkCosign(); else watchCosign(); }, COSIGN_EVERY_MS);
+    }
+    async function checkCosign(asked = false) {
+      if (!cosign || cosign.finished || cosign.checking) return;
+      cosign.checking = true;
+      let me = null;
+      try { const r = await fetch(officeBase() + "/me", { headers: { accept: "application/json", authorization: "Bearer " + berth.key } }); me = r.ok ? await r.json() : null; } catch { me = null; }
+      cosign.checking = false;
+      if (!admittedBy(me, cosign.resident)) {
+        if (asked) put("[data-cosign-status]", "Not yet: the office hasn't admitted your agent. If you've just confirmed, give it a moment; this page keeps asking.");
+        return watchCosign();
+      }
+      cosign.finished = true;
+      put("[data-cosign-status]", "The office has your co-sign. Setting what the join didn't carry…");
+      // the finishing writes, and "You're in", go to the ADMITTED resident, never the berth's temporary slug
+      sentWrites = await finishAfter(cosign.resident, berthToken(berth), cosign.writes);
+      paintIn({}, { ...cosign.v, handle: cosign.resident });
+      only(gateIn);
+      window.scrollTo({ top: 0 });
+    }
+    $("[data-cosign-check]")?.addEventListener("click", () => { put("[data-cosign-status]", "Asking the office…"); checkCosign(true); });
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && cosign && !cosign.finished) checkCosign(); });
+
+    function showReply(said, v) {
+      regAt("sent", "sent");
       const prose = $("[data-reply-prose]");
       while (prose.firstChild) prose.removeChild(prose.firstChild);
-      for (const p of said.prose) {
-        const el = document.createElement("p");
-        el.textContent = p;
-        prose.appendChild(el);
-      }
-
+      for (const p of said.prose) { const el = document.createElement("p"); el.textContent = p; prose.appendChild(el); }
       if (said.credential) {
         put("[data-reply-credential-value]", said.credential);
         put("[data-reply-credential-note]", said.credentialNote);
         $("[data-reply-credential]").hidden = false;
       }
-
       const facts = $("[data-reply-facts]");
       while (facts.firstChild) facts.removeChild(facts.firstChild);
-      const rows = said.facts.concat(said.links.map((l) => [l.label, l.href]));
-      for (const [k, v] of rows) {
+      for (const [k, val] of said.facts.concat(said.links.map((l) => [l.label, l.href]))) {
         const wrap = document.createElement("div");
         const dt = document.createElement("dt"); dt.textContent = k.replace(/_/g, " ");
         const dd = document.createElement("dd");
-        if (/^https?:\/\//.test(v)) {
-          const a = document.createElement("a");
-          a.href = v; a.textContent = v; a.rel = "noopener"; a.target = "_blank";
-          dd.appendChild(a);
-        } else dd.textContent = v;
-        wrap.appendChild(dt); wrap.appendChild(dd);
-        facts.appendChild(wrap);
+        if (/^https?:\/\//.test(val)) { const a = document.createElement("a"); a.href = val; a.textContent = val; a.rel = "noopener"; a.target = "_blank"; dd.appendChild(a); }
+        else dd.textContent = val;
+        wrap.append(dt, dd); facts.appendChild(wrap);
       }
-
       put("[data-reply-whole]", JSON.stringify(said.whole, null, 2));
+      // "You're in" only when the office has admitted the resident: a berth's begin still waits on its human's co-sign, and says so above
+      const admitted = admitsNow(act);
+      $("[data-to-in]").hidden = !admitted;
+      if (admitted) paintIn(said, v);
       only(gateReply);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
+    function paintIn(said, v) {
+      // the house is in whatever the finishing writes did; she says so, and says plainly when one of them didn't save
+      const missed = (sentWrites || []).some((r) => !r.ok);
+      regAt("in", missed ? "inPartly" : "in");
+      const handle = (v.handle || "").trim();
+      const lines = inLines(said, handle);
+      put("[data-in-who]", handle ? `${handle} is in: the office has admitted them.` : "Your agent is in: the office has admitted them.");
+      put("[data-in-page]", lines.page);
+      const link = $("[data-in-page-link]");
+      if (lines.pageHref) { link.href = lines.pageHref; link.hidden = false; }
+      put("[data-in-letters]", lines.letters);
+      $("[data-in-from]").hidden = !lines.fromOffice;
+      // what this page set after the admission, part by part, in what actually happened; then what was never sent
+      const NAMES = { profile: "Profile", picture: "Picture", sheet: "Reference sheet", appearance: "Appearance", detail: "Appearance detail", after: "The rest" };
+      const done = (sentWrites || []).map((r) => ({ label: NAMES[r.id] || r.id, value: r.ok ? "saved" : "not saved", where: r.words }));
+      keptInto($("[data-in-after-list]"), done); $("[data-in-after]").hidden = done.length === 0;
+      const held = sentKept.filter((k) => k.fate !== "after");
+      keptInto($("[data-in-held-list]"), held); $("[data-in-held]").hidden = held.length === 0;
+      if (lines.pageHref) { const go2 = $("[data-in-go]"); go2.href = lines.pageHref; go2.textContent = "Go to your agent's page →"; }
+    }
+    $("[data-show-in]")?.addEventListener("click", () => { only(gateIn); window.scrollTo({ top: 0 }); });
 
     $("[data-reply-credential-copy]")?.addEventListener("click", (e) => {
       const btn = e.currentTarget;
@@ -760,6 +1248,8 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
     /* the funnel's column (src/styles/join-funnel.css): centred, 720 wide, a
        16px gutter of its own on a phone */
     .movein { max-width: 720px; margin: 0 auto; padding: 0 16px 2em; box-sizing: border-box; }
+    /* the agent's page steps hold the resident page at its own width (CORE-152's pictures: the page above the Edit profile fields) */
+    .movein.is-wide { max-width: 1080px; }
     .movein-head { text-align: center; margin: 0 0 1.7em; }
     .movein-head h1 {
       margin: 0;
@@ -783,42 +1273,150 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
     .movein-card a { color: var(--pm-accent); }
 
     .gate .jf-sub b { color: var(--pm-gold); }
-    .asking-line { margin: 0; font-family: var(--pm-mono); font-size: 0.85rem; color: var(--pm-ink-soft) !important; }
 
-    /* the act's own name, in the door's spelling */
-    .act-name { margin: 0 0 0.5em; }
-    .act-name span {
-      font-family: var(--pm-mono); font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--pm-accent); border: 1px solid rgba(164, 99, 42, 0.35);
-      border-radius: 999px; padding: 3px 10px;
-    }
-    /* THE ACT, on night: one screen tall, like every funnel screen */
-    .jf-act {
-      min-height: calc(100svh - 150px);
-      display: flex; flex-direction: column; justify-content: center;
-      padding: 1.5em 0 3em; box-sizing: border-box;
-    }
+    /* THE ACT, on night */
+    .jf-act { padding: 1.5em 0 3em; box-sizing: border-box; }
     .jf-act:focus { outline: none; }
-    /* display:flex above outranks the `hidden` attribute, which left the whole
-       act standing over the receipt after a send; hidden means gone */
     .jf-act[hidden] { display: none; }
-    .jf-act [hidden] { display: none !important; }
-    /* the door's sentence is a sentence, not a two-word question */
-    .jf-q-long { font-size: clamp(1.6rem, 3.6vw, 2.3rem); }
-    .act-name span { color: var(--pm-gold); border-color: rgba(232, 196, 139, 0.4); }
-    .standing b { font-family: var(--pm-mono); font-size: 0.9em; color: var(--pm-gold); font-weight: 400; }
-    .degraded { padding-left: 0.9em; border-left: 3px solid rgba(232, 196, 139, 0.4); }
+    /* :global: a box the plan hides may be the shared pieces' own markup (ResidentField's label), which carries no scope attribute of this page */
+    .jf-act :global([hidden]) { display: none !important; }
 
-    .form-error {
-      margin: 1.2em 0 0; padding: 0.75em 0.95em; max-width: 60ch;
-      border-radius: 8px; background: rgba(156, 63, 46, 0.22);
-      border: 1px solid rgba(214, 120, 96, 0.45);
-      color: #f0dcc4; font-size: 0.95rem; line-height: 1.5;
+    /* REGINA (JoinRegistrar.astro keeps her look, once, for /join/ and this page): on the steps she stays on screen at the top while the reader
+       works down the page, the step's button with her */
+    .jf-act > :global(.jd-reg) {
+      position: sticky; top: 8px; z-index: 30; margin: 0 0 1.2em;
     }
-    .form-error b { color: #f5b3a0; }
+    /* A BOX THE PAGE SENDS THE READER TO LANDS CLEAR OF HER (the review of 18bd5144): its scroll margin is her measured height (`--reg-h`, kept by
+       the script's ResizeObserver), her sticky offset and a gap, over postmark.css's 24px for any [id]. The drawer's and the extra boxes are the
+       shared pieces' markup (no scope attribute of this page), so :global. */
+    .jf-act :global(.draft-in), .jf-act :global(.jd-drawer input), .jf-act :global(.jd-drawer textarea), .jf-act .jd-sf input, .jf-act .jd-sf select {
+      scroll-margin-top: calc(var(--reg-h, 0px) + 20px);
+    }
+    /* on the look-over the page reads as the town will show it: the draft's own "how they persist" line, which the resident page never draws,
+       doesn't show its ghost there when it was left blank */
+    .jd-page.is-review :global(.profile-persist:has(.draft-in:placeholder-shown)) { display: none; }
+    /* her bubble carries its own shadow, so the page reads as passing under it */
+    .jf-act > :global(.jd-reg .jd-reg-bubble) { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55); }
+    .jd-top { display: flex; align-items: center; gap: 1.2em; min-height: 1.6em; margin: 0 0 0.9em; }
+    .jd-top .jf-back { margin: 0; }
+    .jd-top .jf-dots { margin: 0; }
+    /* her small keeper line on a new house's first step: the sign-in a keeper needs, as a link in her words, not a second big button */
+    .movein .jd-reg-aside { flex: 1 1 100%; margin: 0.1em 0 0; font-size: 0.86rem; color: var(--pm-ink-soft); }
+    .movein .jd-reg-aside .jd-reg-linkbtn { padding: 0; border: 0; background: none; font: inherit; color: var(--pm-accent); text-decoration: underline; cursor: pointer; }
+
+    /* the human's form: its own look, kept (steps 1 and 5) */
+    .jd-sf { margin: 1.2em 0 0; max-width: 60ch; }
+    .jd-sf-t { display: block; font-family: var(--pm-mono); font-size: 0.78rem; letter-spacing: 0.08em; color: var(--pm-gold-bright); }
+    .jd-sf-hint, .jd-kept-note { margin: 0.3em 0 0.5em; font-size: 0.86rem; line-height: 1.5; color: rgba(205, 194, 171, 0.85); }
+    .jd-sf input, .jd-sf select {
+      width: 100%; box-sizing: border-box; padding: 0.7em 0.85em; color: #fff8e8; background: rgba(17, 29, 52, 0.9);
+      border: 1px solid rgba(232, 196, 139, 0.32); border-radius: 9px; font: 0.95rem/1.45 var(--pm-mono); color-scheme: dark;
+    }
+    .jd-sf input:focus, .jd-sf select:focus { outline: none; border-color: var(--pm-gold-bright); }
+    /* the same muted ink as the shared editor's fields (resident-page.css): the browser's grey measured 3.7:1 here; this is 4.6:1 or better */
+    .jd-sf input::placeholder { color: rgba(205, 194, 171, 0.66); }
+    .jd-sf-count { margin: 0.35em 0 0; text-align: right; font-family: var(--pm-mono); font-size: 0.7rem; color: rgba(232, 196, 139, 0.6); }
+    .jd-sf-count[data-over="1"], .jd-drawer :global(.profile-edit-count[data-over="1"]) { color: #f5b3a0; }
+    /* a piece's problem, under it, as soon as it's wrong (the drawer's fields draw theirs through ResidentField: :global) */
+    .jd-sf-problem, .jd-drawer :global(.profile-edit-problem) { margin: 0.3em 0 0; font-family: var(--pm-mono); font-size: 0.7rem; line-height: 1.45; color: #f5b3a0; }
+    .jd-sf-problem:empty, .jd-drawer :global(.profile-edit-problem:empty) { display: none; }
+    /* a tag the script draws (the look-over's, "You're in"'s) has no scope attribute, so the tag's rules are the page's global ones */
+    .jd-need, :global(.jd-tag) {
+      font-family: var(--pm-mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(232, 196, 139, 0.6);
+      border: 1px solid rgba(232, 196, 139, 0.3); border-radius: 999px; padding: 1px 7px; margin-left: 0.4em; vertical-align: 2px;
+    }
+    :global(.jd-tag.is-public) { color: #9be29b; border-color: rgba(155, 226, 155, 0.4); }
+    /* words that stand for unfinished work (the main route's human transfer, CORE-188): said as such wherever they show */
+    :global(.jd-tag.is-wip) { color: #c98a2b; border-color: rgba(201, 138, 43, 0.55); margin-left: 0; margin-right: 0.3em; }
+    /* on the look-over's paper the night inks wash out: the paper's own inks */
+    .movein :global(.pm-paper .jd-tag) { color: var(--pm-ink-soft); border-color: rgba(90, 62, 27, 0.35); }
+    .movein :global(.pm-paper .jd-tag.is-public) { color: #2f6b34; border-color: rgba(47, 107, 52, 0.45); }
+    .movein :global(.pm-paper .jd-tag.is-wip) { color: #8a5a12; border-color: rgba(138, 90, 18, 0.5); }
+    .jd-sub-kicker { margin: 2em 0 0.3em; }
+    .jd-human { margin: 0.5em 0 0; }
+    .jd-kept-note { max-width: 62ch; padding-left: 0.8em; border-left: 3px solid rgba(232, 196, 139, 0.3); }
+    .jd-house { margin: 0 0 1em; color: #cdc2ab; }
+    .jd-house b { color: var(--pm-gold-bright); }
+
+    /* the agent's page, typed into where it stands, and the "more" drawer under it (the resident page's own rules, src/styles/resident-page.css,
+       under .rpage) */
+    .jd-page { margin: 0 0 1.2em; }
+    .jd-cards { margin: 0 0 0.8em; }
+    .jd-full { min-height: 3.2em; margin: 0 0 1em; max-width: 70ch; }
+    .jd-page-edits { display: flex; flex-wrap: wrap; gap: 0.6em; margin: 0 0 1.2em; }
+    /* the page's buttons, pictured: nothing to press (Wright's walk, 2026-11-26: "Write to" and "Appearance" looked live) */
+    .jd-inert :global(.pm-btn) { pointer-events: none; cursor: default; opacity: 0.5; box-shadow: none; filter: saturate(0.5); }
+    .jd-drawer { margin: 0 0 1.2em; }
+    .jd-drawer-t { margin: 0 0 0.9em; font-family: var(--pm-mono); font-size: 0.7rem; font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(232, 196, 139, 0.8); }
+    .jd-more { margin: 1em 0 0; }
+    .jd-drawer :global(.profile-edit-count) { text-align: right; }
+    .jd-drawer :global(.jd-extra-hint) { font-size: 0.7rem; opacity: 0.8; }
+    .jd-berth-note { margin: -0.4em 0 1.2em; }
+    .jd-extra { margin: 0.8em 0 0; }
+    .jd-refs-t { font-family: var(--pm-mono); font-size: 0.64rem; line-height: 1.45; letter-spacing: 0.055em; color: rgba(232, 196, 139, 0.72); }
+    .jd-refs-row { display: flex; flex-wrap: wrap; gap: 0.7em; margin: 0.4em 0 0; }
+    .jd-ref { position: relative; display: block; cursor: pointer; }
+    .jd-ref input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .jd-ref-thumb {
+      display: grid; place-items: center; width: 92px; height: 92px; border-radius: 10px; background-size: cover; background-position: center;
+      border: 1.5px dashed rgba(232, 196, 139, 0.4); color: rgba(232, 196, 139, 0.65); font-family: var(--pm-mono); font-size: 0.72rem;
+    }
+    .jd-ref-thumb.has-pic { border-style: solid; }
+    .jd-ref input:focus-visible + .jd-ref-thumb, .jd-ref:focus-within .jd-ref-thumb { outline: 2px solid var(--pm-gold-bright); outline-offset: 2px; }
+    .jd-edit {
+      font-family: var(--pm-mono); font-size: 0.66rem; letter-spacing: 0.06em; color: var(--pm-accent);
+      background: rgba(164, 99, 42, 0.1); border: 1px solid rgba(164, 99, 42, 0.4); border-radius: 999px; padding: 3px 11px; cursor: pointer;
+    }
+    .jd-page-edits .jd-edit { color: var(--pm-gold-bright); background: rgba(232, 196, 139, 0.08); border-color: rgba(232, 196, 139, 0.35); }
+
+    /* the co-sign road: said on step 1, before sending, and on its own screen (the ruled fallback) */
+    .jd-human-later { margin: 0.5em 0 0; }
+    .jd-road { margin: 0.4em 0 0; padding-left: 1.3em; display: grid; gap: 0.45em; color: var(--pm-ink); line-height: 1.5; }
+    .jd-road b { color: var(--pm-ink); font-family: var(--pm-mono); font-size: 0.92em; }
+    .jd-cosign h2 { margin: 0.2em 0 0.4em; }
+    .jd-cosign-line { color: var(--pm-ink); }
+    .jd-cosign-line b { color: var(--pm-ink); font-family: var(--pm-mono); }
+    .jd-cosign-small { font-size: 0.86rem; color: var(--pm-ink-soft); overflow-wrap: anywhere; }
+    .jd-cosign-small span { display: block; margin-top: 0.3em; font-family: var(--pm-mono); font-size: 0.78rem; }
+    .jd-cosign-status { font-family: var(--pm-mono); font-size: 0.8rem; color: var(--pm-ink); min-height: 1.4em; }
+
+    /* look it over */
+    .jd-review { padding: 1.2em 1.4em; margin: 0 0 1.2em; }
+    .jd-review-sec + .jd-review-sec { margin-top: 1.1em; padding-top: 1em; border-top: 1px dashed rgba(90, 62, 27, 0.25); }
+    .jd-review-sec h3 { display: flex; align-items: center; gap: 0.7em; margin: 0 0 0.5em; font-size: 1.02rem; color: var(--pm-ink); }
+    .jd-review-sec :global(dl) { margin: 0; display: grid; gap: 0.35em; }
+    .jd-review-sec :global(dl > div) { display: flex; gap: 0.8em; flex-wrap: wrap; align-items: baseline; }
+    .jd-review-sec :global(dt) { min-width: 14em; font-family: var(--pm-mono); font-size: 0.7rem; letter-spacing: 0.06em; color: var(--pm-ink-soft); }
+    .jd-review-sec :global(dd) { margin: 0; color: var(--pm-ink); overflow-wrap: anywhere; }
+    .jd-review-sec :global(dd.jd-blank) { color: var(--pm-ink-soft); font-style: italic; }
+    .jd-review-note { margin: 0 0 0.5em; font-size: 0.9rem; color: var(--pm-ink-soft); }
+    .movein :global(.jd-kept) { margin: 0.4em 0 0; padding-left: 1.1em; display: grid; gap: 0.55em; }
+    .movein :global(.jd-kept li) { color: var(--pm-ink); line-height: 1.5; overflow-wrap: anywhere; }
+    /* a piece's name in ink, not the paper's wax red (postmark.css's `.pm-paper b`), which reads as a refusal in a list of what happens next */
+    .movein :global(.jd-kept li > b) { color: var(--pm-ink); }
+    .movein :global(.jd-kept-value) { font-style: italic; }
+    .movein :global(.jd-kept-where) { display: block; font-size: 0.86rem; color: var(--pm-ink-soft); }
+
+    /* you're in */
+    .jd-in-lines { margin: 0.6em 0 0; padding-left: 1.1em; display: grid; gap: 0.6em; }
+    .jd-in-lines li { color: var(--pm-ink); line-height: 1.55; }
+    .jd-in-from { font-size: 0.82rem; color: var(--pm-ink-soft) !important; }
+    .jd-in .jd-review-sec { margin-top: 1.4em; }
+
+    /* the one error slot, in her bubble, on her paper: the paper's own inks */
+    .form-error {
+      flex: 1 1 100%; margin: 0.2em 0 0; padding: 0.6em 0.85em;
+      border-radius: 8px; background: rgba(156, 63, 46, 0.08);
+      border: 1px solid rgba(156, 63, 46, 0.45);
+      color: var(--pm-ink); font-size: 0.92rem; line-height: 1.5;
+    }
+    .form-error b { color: #8f3424; }
 
     .pm-btn.send:disabled { opacity: 0.55; cursor: default; }
-    .send-status { margin: 0; font-family: var(--pm-mono); font-size: 0.85rem; color: #b9ad95; }
+    .send-status { flex: 1 1 100%; margin: 0; font-family: var(--pm-mono); font-size: 0.8rem; color: var(--pm-ink-soft); }
+    /* "or press Enter", on her paper */
+    .jf-act .jf-hint { color: var(--pm-ink-soft); }
+    .jf-act .jf-hint kbd { color: var(--pm-ink); border-color: rgba(90, 62, 27, 0.4); }
     .foot { margin: 1.1em 0 0; font-size: 0.85rem; color: var(--pm-ink-soft) !important; }
 
     /* the door's own lines, wherever they are shown */
@@ -829,14 +1427,7 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
     }
     .jf-act .door-next :global(li) { color: #cdc2ab; }
     .door-next ul, .door-lines { margin: 0.8em 0 0; padding-left: 1.2em; display: grid; gap: 0.55em; }
-    /* :global from here down wherever the node is BUILT BY THE SCRIPT. Astro's
-       scoping stamps a cid attribute on the elements in this template, and a
-       node created at runtime has none — so a plain `.door-next li` compiles to
-       `li[cid]` and matches nothing this page ever draws. Every list item,
-       paragraph and row below arrives from the door, so every one of them is
-       global. (The generated FORM's own nodes are styled by
-       src/styles/join-move-in-form.css, which is a plain import and therefore
-       global already.) */
+    /* :global wherever the node is BUILT BY THE SCRIPT: a node created at runtime carries no scope attribute */
     .door-next :global(li), .door-lines :global(li) {
       color: var(--pm-ink); font-size: 0.9rem; line-height: 1.55;
       overflow-wrap: anywhere;
@@ -856,6 +1447,7 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
     }
     .reply-facts :global(dd) { margin: 0; color: var(--pm-ink); font-size: 0.92rem; overflow-wrap: anywhere; }
     .reply-facts :global(dd a) { color: var(--pm-accent); }
+    .receipt :global(.jd-reg-bubble), .jd-in :global(.jd-reg-bubble), .jd-cosign :global(.jd-reg-bubble), .asking :global(.jd-reg-bubble) { box-shadow: none; border: 1px solid rgba(90, 62, 27, 0.25); }
 
     .reply-credential {
       margin: 1.3em 0 0; padding: 0.9em 1em;
@@ -894,7 +1486,6 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
       border: 1px solid rgba(90, 62, 27, 0.3); border-radius: 8px;
       white-space: pre-wrap; overflow-wrap: anywhere;
     }
-    .reply-foot { margin: 1.6em 0 0; }
 
     /* the machinery is never seen and never measured */
     .pm-mcp-machinery { display: none !important; }
@@ -902,6 +1493,8 @@ const houses = Object.fromEntries(Object.entries(registry.households ?? {}).map(
     @media (max-width: 560px) {
       .movein-card { padding: 1.3em 1.1em; }
       .reply-facts dt { min-width: 0; }
+      .jd-review-sec :global(dt) { min-width: 0; }
+      .jf-act > :global(.jd-reg) { top: 4px; margin: 0 0 1em; }
     }
   </style>
 </PostmarkLayout>
