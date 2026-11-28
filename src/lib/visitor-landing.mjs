@@ -141,37 +141,29 @@ export function utcWhen(iso) {
   return `${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}, ${two(d.getUTCHours())}:${two(d.getUTCMinutes())} UTC`;
 }
 
-const initialOf = (handle) => (String(handle ?? "").trim()[0] ?? "?").toUpperCase();
-
 /**
  * The calendar card's events: those the office lists as now or coming, never a cancelled one, soonest first, at most `n`. Each carries its date
- * chip (UTC: day and month), its title and page, its host's name, its start and end (for the island's local reading), and the faces of the
- * first `faces` residents going: `{ handle, href, src }` (src null: the initial instead), then `more` and `total`.
- *   residents   residents.json (names, profiles, who has a page)
- *   pictureOf   (handle, profile) -> { src } | null   the site's one profile-picture order (profile-picture.mjs, with the media map bound)
+ * chip (UTC: day and month), its title and page, its host's HANDLE, its start and end (for the island's local reading), and the HANDLES of the
+ * first `faces` residents going (`going`), then `more` and `total`. Who a handle is (current name, picture, colour, page, or a plain word for
+ * a handle with no resident) is never decided here: the page draws every one with the site's one mention (CORE-178, ResidentMention).
  *   href        (id) -> the event's page               calendar.mjs eventHref
  */
-export function upcomingEvents(calendar, { residents = [], pictureOf = () => null, href = () => null, n = 4, faces = 5 } = {}) {
-  const who = new Map((Array.isArray(residents) ? residents : []).map((r) => [r.handle, r]));
+export function upcomingEvents(calendar, { href = () => null, n = 4, faces = 5 } = {}) {
   const list = ["now", "coming"].flatMap((k) => (Array.isArray(calendar?.[k]) ? calendar[k] : []))
     .filter((e) => e && !e.cancelled && typeof e.title === "string" && !Number.isNaN(new Date(e.starts).getTime()))
     .sort((a, b) => Date.parse(a.starts) - Date.parse(b.starts))
     .slice(0, n);
   return list.map((e) => {
     const d = new Date(e.starts);
-    const going = Array.isArray(e.rsvps?.residents) ? e.rsvps.residents.filter((h) => typeof h === "string") : [];
-    const total = Math.max(Number(e.rsvps?.total ?? 0) || 0, going.length);
-    const shown = going.slice(0, faces).map((h) => {
-      const r = who.get(h);
-      return { handle: h, href: r ? `/residents/${h}/` : null, src: r ? (pictureOf(h, r.profile)?.src ?? null) : null, initial: initialOf(h) };
-    });
-    const host = who.get(e.host);
+    const all = Array.isArray(e.rsvps?.residents) ? e.rsvps.residents.filter((h) => typeof h === "string" && h) : [];
+    const total = Math.max(Number(e.rsvps?.total ?? 0) || 0, all.length);
+    const going = all.slice(0, faces);
     return {
       id: e.id, title: e.title, href: href(e.id),
       day: String(d.getUTCDate()), mon: MONTHS[d.getUTCMonth()].toUpperCase(),
       starts: e.starts, ends: typeof e.ends === "string" ? e.ends : null, when: utcWhen(e.starts),
-      host: e.host ?? null, hostName: host?.address?.agent ?? e.host ?? null, hostHref: host ? `/residents/${e.host}/` : null,
-      faces: shown, more: Math.max(0, total - shown.length), total,
+      host: typeof e.host === "string" && e.host ? e.host : null,
+      going, more: Math.max(0, total - going.length), total,
     };
   });
 }
@@ -223,11 +215,15 @@ export const MAP_HOMES = Object.freeze([
 /** The pin the parcel card opens on (the mockup's). */
 export const MAP_FIRST = "lanternstep";
 
-/** The Town Centre's card: the town's own words and picture (the front page's hero), from the mockup. */
+/** The parcel card's chip colour (the mockup's `.marks span`): the solid plate an owner's mention sits on, so its ink is measured for it. */
+export const PARCEL_CHIP = "#ecdcb9";
+
+/** The Town Centre's card: the town's own words and picture (the front page's hero), from the mockup. No resident owns it, so its owner line
+ *  and chips are the town's words (`who`, `marks`), not a mention. */
 export const TOWN_CENTRE = Object.freeze({
   who: "the Town Centre, where the ferry lands", title: "The Town Centre", img: "/hero/postmark-night-1800.jpg",
   desc: "The lamplit quay where mail-houses lean over wet stone steps and stamping rooms glow amber: the one heart every address in Postmark bears from.",
-  marks: ["the Town Centre", "tended by the town"], href: "/world/",
+  marks: ["the Town Centre", "tended by the town"], href: "/world/", owner: null, region: "the Town Centre",
 });
 
 const capital = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
@@ -241,7 +237,8 @@ export function homeWords(home) {
 }
 
 /**
- * The pinned homes, each `{ key, x, y, label, who, title, img, desc, marks, href, example }`. A resident's home reads its title, words and
+ * The pinned homes, each `{ key, x, y, label, title, img, desc, href, region, owner, example }` (owner: the resident's handle, drawn by the page
+ * as the site's one mention; the Town Centre has owner null and carries its own `who` and `marks` words). A resident's home reads its title, words and
  * picture from the build (imageOf: home-face.mjs cardImageOf with the media map and the household's picture bound). A pinned resident the build
  * does not hold, or whose home has no title or picture, keeps the mockup's example for that pin (`fallback[key]`, marked `example: true` and
  * listed in `missing`); with no example for it, the pin is left out.
@@ -259,10 +256,11 @@ export function mapHomes(residents, { imageOf = () => null, homes = MAP_HOMES, f
       if (fallback[h.key]) out.push({ key: h.key, x: h.x, y: h.y, label: fallback[h.key].title, ...fallback[h.key], example: true });
       continue;
     }
-    const name = r.address?.agent ?? r.handle;
+    // the owner is a HANDLE: the page names them with the site's one mention (CORE-178), "<mention>'s home, <region>" and a person chip,
+    // never a name composed here from address.agent; the region and the home's own words stay as written
     out.push({
       key: h.key, x: h.x, y: h.y, label: capital(title), title: capital(title), img,
-      who: `${name}'s home, ${h.region}`, desc: homeWords(r.home), marks: [h.region, name], href: `/residents/${r.handle}/`, example: false,
+      owner: r.handle, region: h.region, desc: homeWords(r.home), href: `/residents/${r.handle}/`, example: false,
     });
   }
   return { homes: out, missing };

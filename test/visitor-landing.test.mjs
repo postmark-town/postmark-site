@@ -105,11 +105,7 @@ test("the featured letter is the newest delivery between two residents that fits
   assert.equal(featuredLetter([], ledger), null);
 });
 
-const roll = [
-  { handle: "ash", address: { agent: "Ash" }, profile: { avatar_url: "https://media.postmark.town/media/ash/face.jpg" } },
-  { handle: "birch", address: { agent: "Birch Hollow" }, profile: {} },
-];
-const ev = (id, starts, over = {}) => ({ id, title: `Event ${id}`, host: "birch", starts, ends: null, phase: "announced", cancelled: false, rsvps: { total: 0, residents: [] }, ...over });
+const ev =(id, starts, over = {}) => ({ id, title: `Event ${id}`, host: "birch", starts, ends: null, phase: "announced", cancelled: false, rsvps: { total: 0, residents: [] }, ...over });
 
 test("the calendar card is the next four events now or coming, soonest first, never a cancelled one, with who is going", () => {
   const calendar = {
@@ -118,17 +114,17 @@ test("the calendar card is the next four events now or coming, soonest first, ne
     coming: [ev("host/c", "2031-11-23T10:00:00Z"), ev("host/a", "2031-11-21T10:00:00Z"), ev("host/x", "2031-11-20T10:00:00Z", { cancelled: true }), ev("host/b", "2031-11-22T10:00:00Z"), ev("host/d", "2031-11-24T10:00:00Z")],
     ended: [ev("host/gone", "2031-11-18T10:00:00Z", { phase: "ended" })],
   };
-  const out = upcomingEvents(calendar, { residents: roll, pictureOf: (h, p) => (p?.avatar_url ? { src: p.avatar_url } : null), href: (id) => `/events/${id}/` });
+  const out = upcomingEvents(calendar, { href: (id) => `/events/${id}/` });
   assert.deepEqual(out.map((e) => e.id), ["host/live", "host/a", "host/b", "host/c"]);
   const live = out[0];
   assert.equal(live.href, "/events/host/live/");
   assert.equal(live.day, "19");
   assert.equal(live.mon, "NOV");
   assert.equal(live.when, "Wed 19 Nov, 22:00 UTC", "the floor is the UTC time, never 'tonight'");
-  assert.equal(live.hostName, "Birch Hollow");
-  assert.equal(live.faces.length, 5);
-  assert.deepEqual(live.faces[0], { handle: "ash", href: "/residents/ash/", src: "https://media.postmark.town/media/ash/face.jpg", initial: "A" });
-  assert.deepEqual(live.faces[2], { handle: "cedar", href: null, src: null, initial: "C" }, "a handle with no page has no link and no face");
+  // the people are HANDLES: who they are (current name, picture, colour, page, or a plain word) is the site's one mention's to decide
+  assert.equal(live.host, "birch");
+  assert.deepEqual(live.going, ["ash", "birch", "cedar", "dune", "elm"]);
+  for (const k of ["hostName", "hostHref", "faces"]) assert.equal(k in live, false, `no name or face composed here (${k})`);
   assert.equal(live.more, 2, "seven going, five shown");
   assert.equal(live.total, 7);
   assert.deepEqual(upcomingEvents({ now: [], coming: [] }), []);
@@ -153,12 +149,18 @@ test("a pinned home reads its resident's own title, words and picture; one the b
   assert.deepEqual(homes.map((h) => h.key), MAP_HOMES.map((h) => h.key), "every pin, in the mockup's order");
   const rei = homes.find((h) => h.key === "lanternstep");
   assert.deepEqual({ ...rei }, { key: "lanternstep", x: 68.2, y: 25.5, label: "The Lanternstep House", title: "The Lanternstep House", img: "/media/rei-card.jpg",
-    who: "Rei's home, the Lanternseed Gardens", desc: "Mossy stone, cream paper. A short climb from the crossing.", marks: ["the Lanternseed Gardens", "Rei"], href: "/residents/rei/", example: false });
+    owner: "rei", region: "the Lanternseed Gardens", desc: "Mossy stone, cream paper. A short climb from the crossing.", href: "/residents/rei/", example: false },
+    "the owner is a handle for the site's one mention, never a name composed from address.agent; the region and the home's words stay");
   assert.deepEqual(missing, ["trueing", "threshold", "terminal", "lock"]);
   const wright = homes.find((h) => h.key === "trueing");
   assert.equal(wright.example, true);
   assert.equal(wright.title, EX.HOMES.trueing.title);
-  assert.equal(homes.find((h) => h.key === "towncentre").href, "/world/", "the Town Centre is the town's");
+  assert.equal(wright.owner, "wright", "an example home's owner is a handle too");
+  for (const h of homes.filter((x) => x.owner)) assert.equal("who" in h || "marks" in h, false, `${h.key} carries no composed owner words`);
+  const town = homes.find((h) => h.key === "towncentre");
+  assert.equal(town.href, "/world/", "the Town Centre is the town's");
+  assert.equal(town.owner, null);
+  assert.deepEqual(town.marks, ["the Town Centre", "tended by the town"], "the town's own words, no resident");
   assert.equal(mapHomes(residents, { imageOf: () => null }).homes.length, 1, "with no example and no picture a pin is left out, never drawn empty");
   assert.equal(homeWords({ style: "stone. ", body: "# T\n\nFirst." }), "Stone. First.");
 });
@@ -239,4 +241,62 @@ test("the landing's fonts are bundled, so a branch preview under /pr/<n>/ draws 
 test("the town's red mark survives for a visitor: the header keeps the sentinel's glyph and nothing else", () => {
   assert.doesNotMatch(PAGE, /\.pm-townhead\s*,|\.pm-townhead \{ display: none/, "the whole header is never hidden, or the degraded-town mark goes with it");
   assert.match(PAGE, /html:not\(\[data-lens\]\):has\(\.pm-landing\) \.pm-townhead \{\s*position: absolute;/, "a bare holder for the mark, placed over the hero's corner");
+});
+
+// ── EVERY PERSON THE PAGE NAMES IS THE SITE'S ONE MENTION (CORE-178, Darko 2026-11-24; Facet's FIX at a4efa808) ─────────────────────────
+// Each generated slot is pinned to the shared renderer, and its old raw form must fail. The renderer is CORE-178's own ResidentMention (its
+// files taken whole from #491 at 49cee70e, not copied or rewritten), so the slot pins here, and the mention's own behaviour (current name,
+// picture, colour, ink, the plain word for an unknown handle) is driven in the built page by test/visitor-landing-browser.test.mjs.
+const SLOT = (name) => {
+  const at = COMPONENT.indexOf(`data-landing-slot="${name}"`);
+  assert.ok(at >= 0, `the ${name} slot is marked`);
+  return COMPONENT.slice(at, COMPONENT.indexOf("\n", at));
+};
+
+test("THE SLOTS: the letter's and the ledger's people are the site's one mention, spans inside the card's and the line's own link (no nested link)", () => {
+  assert.match(SLOT("letter-people"), /FROM <ResidentMention handle=\{letter\.from\} link=\{false\} surface="paper" \/> · TO <ResidentMention handle=\{letter\.to\} link=\{false\} surface="paper" \/>/);
+  assert.match(SLOT("ledger-people"), /<ResidentMention handle=\{l\.from\} link=\{false\} \/> → <ResidentMention handle=\{l\.to\} link=\{false\} \/>/);
+  assert.doesNotMatch(COMPONENT, /FROM \{letter\.from\}|TO \{letter\.to\}|\{l\.from\} → \{l\.to\}/, "the raw handles are gone");
+});
+
+test("THE SLOTS: a home's owner line and person chip are the mention, and the island's pin redraw draws the same mention from the build's model", () => {
+  assert.match(SLOT("home-owner"), /<ResidentMention handle=\{first\.owner\} link=\{false\} \/>'s home, \{first\.region\}/);
+  assert.match(COMPONENT, /<span>✦ <ResidentMention handle=\{first\.owner\} surface=\{PARCEL_CHIP\} \/><\/span>/);
+  assert.match(COMPONENT, /owner: h\.owner \? mentionOf\(h\.owner\) : null/, "the homes' JSON carries the mention's model, decided by the build's roll");
+  assert.match(COMPONENT, /import \{ mentionNode \} from "@\/lib\/resident-mention\.mjs";/);
+  assert.match(COMPONENT, /who\.append\(mentionNode\(document, h\.owner, \{ link: false \}\), document\.createTextNode\("'s home, " \+ h\.region\)\)/);
+  assert.match(COMPONENT, /chip\(mentionNode\(document, h\.owner, \{ surface: PARCEL_CHIP \}\)\)/);
+  assert.doesNotMatch(COMPONENT, /card\.querySelector\("\[data-p-who\]"\)\.textContent = h\.who;|h\.marks\.forEach\(\(t\) => \{ const s/, "the old text redraw of the owner is gone");
+  assert.match(COMPONENT, /if \(h\.owner\) who\.append\([^\n]*\n\s*else who\.textContent = h\.who;/, "only the ownerless Town Centre keeps its own words");
+  for (const [k, h] of Object.entries(EX.HOMES)) {
+    assert.match(h.owner, /^[a-z0-9-]+$/, `${k}'s example owner is a handle`);
+    assert.equal("who" in h || "marks" in h, false, `${k}'s example carries no composed owner words`);
+  }
+});
+
+test("THE SLOTS: an event's host and the room's speakers are the mention; the RSVP pile stays portraits, each a mention or a plain initial", () => {
+  const host = COMPONENT.match(/hosted by <span data-landing-slot="event-host"><ResidentMention handle=\{e\.host\} \/><\/span>/g) ?? [];
+  assert.equal(host.length, 2, "the live and the example events both name their host as a mention");
+  assert.doesNotMatch(COMPONENT, /hosted by \{e\.hostName\}|e\.hostName/);
+  SLOT("room-speaker");
+  assert.match(COMPONENT, /<span class="who" data-landing-slot="room-speaker"><ResidentMention handle=\{l\.who\} \/><\/span>/);
+  assert.doesNotMatch(COMPONENT, />\{l\.who\}<\/a>/, "the raw speaker link is gone");
+  assert.match(COMPONENT, /const m = mentionOf\(h\); return m\.kind === "resident"\s*\? <span class="face is-rm" title=\{m\.title\} data-landing-slot="rsvp-face"><ResidentMentionModel model=\{m\} \/><\/span>\s*: <span class="face is-plain" title=\{h\} data-landing-slot="rsvp-face"><span>\{monogramOf\(h\)\}<\/span><\/span>/);
+  assert.doesNotMatch(COMPONENT, /f\.src \? <img|title=\{f\.handle\}/, "the pile's own picture lookup is gone");
+  for (const e of EX.EVENTS) {
+    assert.ok(Array.isArray(e.going) && e.going.every((h) => /^[a-z0-9-]+$/.test(h)), `${e.title}'s example people are handles`);
+    assert.doesNotMatch(e.when, /hosted by/, `${e.title}'s example carries no composed host words`);
+  }
+});
+
+test("THE RENDERER: the landing uses CORE-178's ResidentMention and its roll, and its own link colour keeps off a mention", () => {
+  assert.match(COMPONENT, /import ResidentMention from "@\/components\/ResidentMention\.astro";/);
+  assert.match(COMPONENT, /import \{ mentionOf \} from "@\/lib\/resident-mentions\.mjs";/);
+  for (const f of ["src/components/ResidentMention.astro", "src/components/ResidentMentionModel.astro", "src/lib/resident-mention.mjs", "src/lib/resident-mentions.mjs", "src/lib/resident-mention-roll.mjs", "src/styles/resident-mention.css"]) {
+    assert.ok(existsSync(join(ROOT, f)), `${f} (CORE-178's) is here`);
+  }
+  const css = readFileSync(join(ROOT, "src/styles/visitor-landing.css"), "utf8");
+  assert.match(css, /\.pm \.pm-landing a:where\(:not\(\.rm\)\)\{color:var\(--gold\)\}/, "the mockup's link colour can't repaint a resident's ink");
+  assert.doesNotMatch(css, /\.pm \.pm-landing a\{color/);
+  assert.doesNotMatch(css, /\.marks span\{/, "the chip rule is the chip's own, not the mention's inner spans");
 });

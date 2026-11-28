@@ -42,7 +42,6 @@ import { officeHandles } from "@/lib/mail.mjs";
 import { houseDirectory } from "@/lib/households-directory.mjs";
 import { eventHref, pictureOf as sparkPictureOf } from "@/lib/calendar.mjs";
 import { sparkHref } from "@/lib/sparks.mjs";
-import { profilePicture } from "@/lib/profile-picture.mjs";
 import { lettersInWeek, ledgerLines, featuredLetter, upcomingEvents, landingSparks, mapHomes } from "@/lib/visitor-landing.mjs";
 import { HOMES as EXAMPLE_HOMES } from "@/lib/visitor-landing-examples.mjs";
 
@@ -147,7 +146,7 @@ const landing = {
   week: lettersInWeek(ledger),
   letter: landingLetter ? { ...landingLetter, href: letterHref(landingLetter.id, letterBook) } : null,
   ledger: ledgerLines(ledger).map((l) => ({ ...l, href: letterHref(l.id, letterBook) })),
-  events: calendar?.as_of ? upcomingEvents(calendar, { residents, pictureOf: (h, p) => profilePicture(h, p, media), href: eventHref }) : null,
+  events: calendar?.as_of ? upcomingEvents(calendar, { href: eventHref }) : null,
   eventsAsOf: calendar?.as_of ?? null,
   sparks: landingSparks(sparksData, { pictureOf: sparkPictureOf }).map((s) => ({ ...s, href: sparkHref(s.id) ?? "/sparks/" })),
   homes: mapHomes(residents, { imageOf: (r) => cardImageOf(r, media, homePictureOf), fallback: EXAMPLE_HOMES }).homes,

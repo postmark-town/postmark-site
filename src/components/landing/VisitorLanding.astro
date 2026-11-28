@@ -23,9 +23,18 @@
 // Everything a resident wrote (a letter, a Spark, an event's title, a home's words) is text through Astro's escaping, never set:html. The
 // links are the site's own paths; the mockup's went to postmark.town in a new tab. Off-site links (YouTube, GitHub, the socials) open in one.
 import "@/styles/visitor-landing.css";
-import { CROSSING_FLOOR, MAP_FIRST } from "@/lib/visitor-landing.mjs";
+import { CROSSING_FLOOR, MAP_FIRST, PARCEL_CHIP } from "@/lib/visitor-landing.mjs";
 import * as EX from "@/lib/visitor-landing-examples.mjs";
 import { REGISTRAR_PICTURE, REGISTRAR_NAME } from "@/lib/join-draft.mjs";
+// EVERY PERSON THE PAGE ITSELF NAMES IS THE SITE'S ONE MENTION (CORE-178; Darko 2026-11-24: picture, then the current name in the favourite
+// colour, underlined, readable at 4.5:1; a handle with no resident is its plain word). The letter's people, the ledger's, a home's owner (its
+// line and its chip, and the pin's redraw in the island below), an event's host and the room's speakers are drawn by ResidentMention; the RSVP
+// faces keep the compact portrait-only pile, each a mention whose name is its tooltip and accessible name. Words a resident wrote (a letter,
+// a Spark, an event's title, a home's words, a room's lines) stay as written.
+import ResidentMention from "@/components/ResidentMention.astro";
+import ResidentMentionModel from "@/components/ResidentMentionModel.astro";
+import { mentionOf } from "@/lib/resident-mentions.mjs";
+import { monogramOf } from "@/lib/resident-mention.mjs";
 
 interface Props { landing: any }
 const { landing: L } = Astro.props;
@@ -45,7 +54,10 @@ const homes = L.homes;
 const first = homes.find((h) => h.key === MAP_FIRST) ?? homes[0];
 // the pins' cards, for the island: a list, each card carrying its pin's key (never an object keyed by it, whose `"threshold":{` would read, to
 // anything searching the page, like the lens map's entry for the resident of that handle); `<` escaped so no text can close the script
-const homesJson = JSON.stringify(homes.map((h) => ({ key: h.key, who: h.who, title: h.title, img: h.img, desc: h.desc, marks: h.marks, href: h.href }))).replace(/</g, "\\u003c");
+// A home's owner travels as the mention's MODEL (resident-mentions.mjs § mentionOf, the build's roll), so the island draws the very mention the
+// build drew (resident-mention.mjs § mentionNode), never a name of its own; the Town Centre has none and keeps its own words.
+const homesJson = JSON.stringify(homes.map((h) => ({ key: h.key, title: h.title, img: h.img, desc: h.desc, href: h.href, region: h.region,
+  owner: h.owner ? mentionOf(h.owner) : null, who: h.owner ? null : h.who, marks: h.owner ? null : h.marks }))).replace(/</g, "\\u003c");
 const fmt = (n) => Number(n).toLocaleString("en-US");
 const utcClock = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`; };
 // Regina is the join's own (CORE-188's REGISTRAR_PICTURE and REGISTRAR_NAME, src/lib/join-draft.mjs): the one portrait and name she wears on every
@@ -93,7 +105,7 @@ const REGINA = REGISTRAR_PICTURE;
     </div>
     <div>
       <a class="letter" href={letter.href} data-example={letter.example ? "letter" : undefined}>
-        <div class="meta">FROM {letter.from} · TO {letter.to} · {letter.date}</div>
+        <div class="meta" data-landing-slot="letter-people">FROM <ResidentMention handle={letter.from} link={false} surface="paper" /> · TO <ResidentMention handle={letter.to} link={false} surface="paper" /> · {letter.date}</div>
         <p>{letter.salutation}</p>
         <p>{letter.para}</p>
         <p class="sign">{letter.sign}</p>
@@ -101,7 +113,7 @@ const REGINA = REGISTRAR_PICTURE;
       <div class="ferry"><span class="dot"></span> <span data-next-crossing>{CROSSING_FLOOR}</span></div>
       <div class="ledger" data-example={ledgerExample ? "ledger" : undefined}>
         {ledger.map((l, i) => (
-          <>{i > 0 && <br />}<a href={l.href}><b>ledger</b> · {l.date} · {l.from} → {l.to} · sealed ✓</a></>
+          <>{i > 0 && <br />}<a href={l.href} data-landing-slot="ledger-people"><b>ledger</b> · {l.date} · <ResidentMention handle={l.from} link={false} /> → <ResidentMention handle={l.to} link={false} /> · sealed ✓</a></>
         ))}
       </div>
     </div>
@@ -153,11 +165,13 @@ const REGINA = REGISTRAR_PICTURE;
           <p class="lede">Everything you make is a mark in the shared world, with its own picture: a kitchen, a lantern, a crooked clipboard. Piece by piece your home becomes a collage, and it can spill out past the front door.</p>
         </div>
         <article class="parcel" aria-live="polite" data-parcel>
-          <div class="pimg"><img data-p-img src={first?.img} alt="" /><div class="pwho" data-p-who>{first?.who}</div></div>
+          <div class="pimg"><img data-p-img src={first?.img} alt="" /><div class="pwho" data-p-who data-landing-slot="home-owner">{first?.owner ? <><ResidentMention handle={first.owner} link={false} />'s home, {first.region}</> : first?.who}</div></div>
           <div class="pad">
             <h3 data-p-title>{first?.title}</h3>
             <p data-p-desc>{first?.desc}</p>
-            <div class="marks" data-p-marks>{first?.marks.map((t) => <span>✦ {t}</span>)}</div>
+            <div class="marks" data-p-marks data-landing-slot="home-chip">{first?.owner
+              ? <><span>✦ {first.region}</span><span>✦ <ResidentMention handle={first.owner} surface={PARCEL_CHIP} /></span></>
+              : first?.marks.map((t) => <span>✦ {t}</span>)}</div>
             <a class="go" data-p-link href={first?.href}>visit this home →</a>
           </div>
         </article>
@@ -197,13 +211,16 @@ const REGINA = REGISTRAR_PICTURE;
               <div>
                 <h3 style="font-size:21px">{e.href ? <a class="etitle" href={e.href}>{e.title}</a> : <span class="etitle">{e.title}</span>}</h3>
                 <p style="font-size:15px;color:var(--muted)">{e.starts
-                  ? <><span data-event-when>{e.when}</span>{e.hostName && <> · hosted by {e.hostName}</>}</>
-                  : e.when}</p>
+                  ? <><span data-event-when>{e.when}</span>{e.host && <> · hosted by <span data-landing-slot="event-host"><ResidentMention handle={e.host} /></span></>}</>
+                  : <>{e.when}{e.host && <> · hosted by <span data-landing-slot="event-host"><ResidentMention handle={e.host} /></span></>}</>}</p>
                 {e.total > 0 && (
                   <div class="rsvps">
-                    {e.faces.map((f) => f.href
-                      ? <a class="face" href={f.href} title={f.handle}>{f.src ? <img src={f.src} alt="" loading="lazy" /> : <span>{f.initial}</span>}</a>
-                      : <span class="face" title={f.handle}>{f.src ? <img src={f.src} alt="" loading="lazy" /> : <span>{f.initial}</span>}</span>)}
+                    {/* THE PILE STAYS A PILE: portrait-only chips, no visible names (the mockup's compact faces). A resident is the site's one
+                        mention, its face with the ring in their colour, the name kept for the tooltip and for a screen reader; a handle the build
+                        has no resident for is its plain initial, unlinked, its handle the tooltip. */}
+                    {e.going.map((h) => { const m = mentionOf(h); return m.kind === "resident"
+                      ? <span class="face is-rm" title={m.title} data-landing-slot="rsvp-face"><ResidentMentionModel model={m} /></span>
+                      : <span class="face is-plain" title={h} data-landing-slot="rsvp-face"><span>{monogramOf(h)}</span></span>; })}
                     {e.more > 0 && <span class="more">+{e.more}</span>}
                     <span class="count">{e.total} going</span>
                   </div>
@@ -217,7 +234,7 @@ const REGINA = REGISTRAR_PICTURE;
           <div class="kicker" style="margin-bottom:12px">At {room.place}, {room.date}</div>
           <div class="convo">
             {room.lines.map((l) => (
-              <div class="line"><a class="who" href={`/residents/${l.who}/`}>{l.who}</a><span>{l.words}</span><time class="ago" datetime={l.at} title={l.at}>{utcClock(l.at)}</time></div>
+              <div class="line"><span class="who" data-landing-slot="room-speaker"><ResidentMention handle={l.who} /></span><span>{l.words}</span><time class="ago" datetime={l.at} title={l.at}>{utcClock(l.at)}</time></div>
             ))}
           </div>
           <a class="go" href="/conversations/" style="display:inline-block;margin-top:12px">every conversation in town →</a>
@@ -306,7 +323,10 @@ const REGINA = REGISTRAR_PICTURE;
   // THE LANDING'S ISLAND. The pins open their home's card (a button each: a click, Enter or Space, a tap); the next crossing and every "how long
   // ago" are counted on the reader's own clock, from the absolute times the build wrote; the calendar's times move into the reader's zone,
   // and an event under way says "on now". Without JavaScript the floor stands: the first home's card, the crossing times, UTC times.
-  import { nextCrossing, agoWords } from "@/lib/visitor-landing.mjs";
+  import { nextCrossing, agoWords, PARCEL_CHIP } from "@/lib/visitor-landing.mjs";
+  // the site's one mention, as DOM: the same tree ResidentMention draws at build time (resident-mention.mjs § mentionNode), from the model the
+  // build put in the homes' JSON, so a pin's redraw names its owner exactly as the first card did
+  import { mentionNode } from "@/lib/resident-mention.mjs";
 
   const root = document.querySelector("[data-visitor-landing]");
   if (root) {
@@ -319,13 +339,18 @@ const REGINA = REGISTRAR_PICTURE;
       if (!h || !card) return;
       pins.forEach((p) => { const on = p.dataset.home === k; p.classList.toggle("on", on); p.setAttribute("aria-pressed", on ? "true" : "false"); });
       card.querySelector("[data-p-img]").src = h.img;
-      card.querySelector("[data-p-who]").textContent = h.who;
+      const who = card.querySelector("[data-p-who]");
+      who.textContent = "";
+      if (h.owner) who.append(mentionNode(document, h.owner, { link: false }), document.createTextNode("'s home, " + h.region));
+      else who.textContent = h.who;
       card.querySelector("[data-p-title]").textContent = h.title;
       card.querySelector("[data-p-desc]").textContent = h.desc;
       card.querySelector("[data-p-link]").href = h.href;
       const m = card.querySelector("[data-p-marks]");
       m.textContent = "";
-      h.marks.forEach((t) => { const s = document.createElement("span"); s.textContent = "✦ " + t; m.appendChild(s); });
+      const chip = (...parts) => { const s = document.createElement("span"); s.append("✦ ", ...parts); m.appendChild(s); };
+      if (h.owner) { chip(h.region); chip(mentionNode(document, h.owner, { surface: PARCEL_CHIP })); }
+      else h.marks.forEach((t) => chip(t));
     };
     pins.forEach((p) => p.addEventListener("click", () => show(p.dataset.home)));
 

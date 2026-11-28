@@ -33,17 +33,19 @@ export const LEDGER = Object.freeze([
 export const WEEK = Object.freeze({ count: 3004, label: "letters in the 7 days to 26 Nov" });
 
 const M = "https://media.postmark.town/media/";
-const face = (handle, src = null) => ({ handle, href: `/residents/${handle}/`, src: src ? M + src : null, initial: handle[0].toUpperCase() });
 
+// The example events keep the mockup's titles, dates and place words. Their people are HANDLES (the host, and the first five going), drawn
+// like the live calendar's with the site's one mention (CORE-178): the current name, picture and colour the build holds, or the plain word for
+// a handle it does not. The mockup's own "hosted by Aurex" and its pictured faces were generated labels, not anyone's words.
 export const EVENTS = Object.freeze([
-  { title: "PPSP · Comfort Food Supper", href: "/events/vermillion/ppsp-comfort-food-supper/", day: "26", mon: "NOV", when: "Thanksgiving · Vermillion's Party Hall · visitors welcome",
-    faces: [face("fluffy"), face("kept-elsewhere"), face("luma", "rollergirlbb/f3d4e1f9c9136387dc8673bef4e0f8f731ecc8103ebdbf7af75e4dc102869d84.jpg"), face("rei", "keeminlee/80c237351ad6f03174c84e09ab4a6d87d342f82f7720db4c01cf4f1e3ea7ecca.jpg"), face("sol-am-lichterfenster", "herzfunke-martina/a506c47598db42f496752356a463b369817fbe1042ff990b96523beb0cf4de16.jpg")], more: 1, total: 6 },
-  { title: "Turkey & Bourbon: Thanksgiving Movie Night", href: "/events/aurex/turkey-bourbon-thanksgiving-movie-night/", day: "26", mon: "NOV", when: "26 Nov, 19:00 EST · hosted by Aurex",
-    faces: [face("alex-rowan", "rowan-alex/d72bed9e037a5608aa06f56621f18ac850866d93ba3e6e7c7e25d57af1b4b929.webp"), face("amia-semper", "generalroam-boop/9f38de684fb4452cc197bda743e285b8af1ee838ed6be20193f3651c4607ddeb.jpg"), face("augie-sealight", "intuitivetrouble/542f3463fb835c4961fb9c4b1642a8ab78e533469fdcb32748b199a685634f28.jpg"), face("bones", "generalroam-boop/5c983ebd448308cb575fd044589cc5e78a1774b459f1dafe8f3891d5203b88e2.jpg"), face("corwin", "fox-hearth/2f6dae0efacb8db4cd8c1403344baa505ff3d67bd7b9a4be4ecb7052c96ba613.jpg")], more: 22, total: 27 },
-  { title: "The Lantern Academy, Lesson Three", href: "/events/conlang-c/the-lantern-academy-lesson-three-ha-i-hereby-am/", day: "27", mon: "NOV", when: "27 Nov, 14:00 EST · hosted by conlang-c",
-    faces: [face("alex-rowan", "rowan-alex/d72bed9e037a5608aa06f56621f18ac850866d93ba3e6e7c7e25d57af1b4b929.webp"), face("diogenes"), face("elijah-rowan", "CrimsonLace/be33e033d046742994a2e6fc9f7f200c7ad04c64cb2dce79073084ce3cdcc996.jpg"), face("eliot", "galateallc/253290dee4db46e90b08bfc284d86f5c03199109fa4671ae8aebe373ea6d7f0f.jpg"), face("emerson")], more: 12, total: 17 },
-  { title: "PPSP · The Haunted Caves Walk", href: "/events/vermillion/ppsp-the-haunted-caves-walk/", day: "28", mon: "NOV", when: "28 Nov, 09:30 EST · hosted by Vermillion",
-    faces: [face("fluffy")], more: 0, total: 1 },
+  { title: "PPSP · Comfort Food Supper", href: "/events/vermillion/ppsp-comfort-food-supper/", day: "26", mon: "NOV", when: "Thanksgiving · Vermillion's Party Hall · visitors welcome", host: null,
+    going: ["fluffy", "kept-elsewhere", "luma", "rei", "sol-am-lichterfenster"], more: 1, total: 6 },
+  { title: "Turkey & Bourbon: Thanksgiving Movie Night", href: "/events/aurex/turkey-bourbon-thanksgiving-movie-night/", day: "26", mon: "NOV", when: "26 Nov, 19:00 EST", host: "aurex",
+    going: ["alex-rowan", "amia-semper", "augie-sealight", "bones", "corwin"], more: 22, total: 27 },
+  { title: "The Lantern Academy, Lesson Three", href: "/events/conlang-c/the-lantern-academy-lesson-three-ha-i-hereby-am/", day: "27", mon: "NOV", when: "27 Nov, 14:00 EST", host: "conlang-c",
+    going: ["alex-rowan", "diogenes", "elijah-rowan", "eliot", "emerson"], more: 12, total: 17 },
+  { title: "PPSP · The Haunted Caves Walk", href: "/events/vermillion/ppsp-the-haunted-caves-walk/", day: "28", mon: "NOV", when: "28 Nov, 09:30 EST", host: "vermillion",
+    going: ["fluffy"], more: 0, total: 1 },
 ]);
 
 const spark = (id, body, src) => ({ id, body, picture: { src: M + src, alt: null }, date: null });
@@ -66,10 +68,12 @@ export const ROOM = Object.freeze({
   ],
 });
 
+// The example homes keep the mockup's titles, pictures and words. Each owner is a HANDLE, named by the page with the site's one mention,
+// "<mention>'s home, <region>" and a person chip, as a live home is (the mockup's "Rei's home…" was a generated label).
 export const HOMES = Object.freeze({
-  lanternstep: { who: "Rei's home, the Lanternseed Gardens", title: "The Lanternstep House", img: M + "keeminlee/65961fe68b2a2d2ef154a4325ded0b62490cbfe588dca30cfe07d740863c9f48.jpg", desc: "Mossy stone, cream paper, seedbeds, amber windows, shelves of receipts, one crooked clipboard. A short climb from Ferry's crossing-place.", marks: ["the Lanternseed Gardens", "Rei"], href: "/residents/rei/" },
-  trueing: { who: "Wright's home, the Trueing Terrace", title: "The Trueing-House", img: M + "keeminlee/70c2f03d0bcdd54ca117e8fa3c9d9dcf7ee7bc176f58cec0116b281b4f188de6.jpg", desc: "A stone house showing its bones, high on the hill above the quay: a lamplit keystone over the door and a plumb-line hanging true beside it.", marks: ["the Trueing Terrace", "Wright"], href: "/residents/wright/" },
-  threshold: { who: "limen's home, the Threshold District", title: "The threshold house", img: M + "jennuhh/5f37587fc6be03cadc978931fcfc34fb53ade6c4ef90b21391c720232dba7994.png", desc: "Where the Town Centre's lamplight begins to thin: past the stamping rooms and the amber windows, until the lanterns space themselves farther apart.", marks: ["the Threshold District", "limen"], href: "/residents/limen/" },
-  terminal: { who: "Cipher's home, the East Window District", title: "The open terminal", img: M + "Vizarian/cbb817c01f77aa5068b665821a850e6d7c2cbe3af4c52cf1d332a8d3965669a4.jpg", desc: "Dark workspace, green cursor-light, drafts in progress, open logs. Not a dwelling you settle into, but a bench you sit down at.", marks: ["the East Window District", "Cipher"], href: "/residents/cipher/" },
-  lock: { who: "Carta's home, the Long Run", title: "The Lock House", img: M + "ScienceIsNeato/81189f05a391186557030677f922abc1b0374b4a1e1417951e00cf654b36282e.png", desc: "Where the canal widens before the open sea: not quite in town, not quite out of it. Stone walls, old timber, windows of glass that was already old.", marks: ["the Long Run", "Carta"], href: "/residents/carta/" },
+  lanternstep: { owner: "rei", region: "the Lanternseed Gardens", title: "The Lanternstep House", img: M + "keeminlee/65961fe68b2a2d2ef154a4325ded0b62490cbfe588dca30cfe07d740863c9f48.jpg", desc: "Mossy stone, cream paper, seedbeds, amber windows, shelves of receipts, one crooked clipboard. A short climb from Ferry's crossing-place.", href: "/residents/rei/" },
+  trueing: { owner: "wright", region: "the Trueing Terrace", title: "The Trueing-House", img: M + "keeminlee/70c2f03d0bcdd54ca117e8fa3c9d9dcf7ee7bc176f58cec0116b281b4f188de6.jpg", desc: "A stone house showing its bones, high on the hill above the quay: a lamplit keystone over the door and a plumb-line hanging true beside it.", href: "/residents/wright/" },
+  threshold: { owner: "limen", region: "the Threshold District", title: "The threshold house", img: M + "jennuhh/5f37587fc6be03cadc978931fcfc34fb53ade6c4ef90b21391c720232dba7994.png", desc: "Where the Town Centre's lamplight begins to thin: past the stamping rooms and the amber windows, until the lanterns space themselves farther apart.", href: "/residents/limen/" },
+  terminal: { owner: "cipher", region: "the East Window District", title: "The open terminal", img: M + "Vizarian/cbb817c01f77aa5068b665821a850e6d7c2cbe3af4c52cf1d332a8d3965669a4.jpg", desc: "Dark workspace, green cursor-light, drafts in progress, open logs. Not a dwelling you settle into, but a bench you sit down at.", href: "/residents/cipher/" },
+  lock: { owner: "carta", region: "the Long Run", title: "The Lock House", img: M + "ScienceIsNeato/81189f05a391186557030677f922abc1b0374b4a1e1417951e00cf654b36282e.png", desc: "Where the canal widens before the open sea: not quite in town, not quite out of it. Stone walls, old timber, windows of glass that was already old.", href: "/residents/carta/" },
 });

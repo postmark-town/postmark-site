@@ -276,3 +276,106 @@ test("THE MAP: the pins are reached by Tab and pressed by Enter or Space, and ta
   assert.deepEqual((await phone.evalJs(PARCEL)).pressed, [keys[0]]);
   await phone.close();
 });
+
+// ── THE SITE'S ONE MENTION IN EVERY GENERATED SLOT (CORE-178; Facet's FIX at a4efa808) ──────────────────────────────────────────────────
+// Read from whatever the build holds (CI's committed snapshot, or a fresh read): every slot's person is either the mention (`.rm`, its picture
+// and its current name, for a handle the build has a resident for) or the handle's plain word (one it has none for), never a raw name.
+const SLOTS = `(() => { const L = document.querySelector(".pm-landing"); const out = {};
+  for (const s of ["letter-people", "ledger-people", "home-owner", "home-chip", "event-host", "room-speaker", "rsvp-face"]) {
+    out[s] = [...L.querySelectorAll('[data-landing-slot="' + s + '"]')].map((el) => ({
+      mentions: [...el.querySelectorAll(".rm")].map((m) => ({ handle: m.dataset.rm, tag: m.tagName, href: m.getAttribute("href"), face: !!m.querySelector(".rm-face"),
+        name: (m.querySelector(".rm-name")?.textContent ?? "").trim(), neutral: m.classList.contains("is-neutral"), styled: /--rm-c/.test(m.getAttribute("style") || "") })),
+      text: el.textContent.replace(/\\s+/g, " ").trim(), title: el.getAttribute("title") }));
+  }
+  out.nested = L.querySelectorAll("a a").length;
+  return out; })()`;
+
+test("THE MENTIONS: every generated person slot is the site's one mention or the handle's plain word; no link sits inside another", { skip: SKIP }, async () => {
+  await setup();
+  const p = await openPage(browser, base, "/", { width: 1440 });
+  const roll = new Set(JSON.parse(readFileSync(join(ROOT, "src/data/postmark/residents.json"), "utf8")).map((r) => r.handle));
+  const s = await p.evalJs(SLOTS);
+  assert.equal(s.nested, 0, "no link inside a link anywhere on the landing");
+  for (const key of ["letter-people", "ledger-people", "home-owner", "home-chip", "room-speaker", "rsvp-face"]) assert.ok(s[key].length > 0, `the ${key} slot is drawn`);
+  // the letter's two people and every ledger line's: spans (the card and the line are the links), each a mention when the roll has them
+  assert.equal(s["letter-people"][0].mentions.every((m) => m.tag === "SPAN"), true, "the letter's people are spans inside the letter's own link");
+  for (const line of s["ledger-people"]) assert.equal(line.mentions.every((m) => m.tag === "SPAN"), true, `a ledger line's people are spans (${line.text})`);
+  // the owner line and the chip: the first home's owner, its picture and current name; the chip's is the link to their page
+  const owner = s["home-owner"][0].mentions[0];
+  assert.ok(owner && roll.has(owner.handle) && owner.face && owner.name, `the owner line is the mention (${JSON.stringify(owner)})`);
+  const chip = s["home-chip"][0].mentions[0];
+  assert.equal(chip.handle, owner.handle);
+  assert.equal(chip.href, `/residents/${owner.handle}/`);
+  // the room's speakers: a known one is a linked mention with its face; any handle the roll lacks is its plain word
+  for (const line of s["room-speaker"]) {
+    const m = line.mentions[0];
+    if (m) { assert.ok(roll.has(m.handle) && m.tag === "A" && m.href === `/residents/${m.handle}/` && m.face, `speaker ${m.handle} is the linked mention`); }
+    else assert.ok(!roll.has(line.text), `speaker "${line.text}" has no resident, so it is a plain word`);
+  }
+  // the hosts: the same rule (CI's snapshot draws the example events, whose hosts mix known and unknown handles)
+  for (const h of s["event-host"]) {
+    const m = h.mentions[0];
+    if (m) assert.ok(roll.has(m.handle) && m.href === `/residents/${m.handle}/`, `host ${m.handle} is the linked mention`);
+    else assert.ok(!roll.has(h.text), `host "${h.text}" has no resident, so it is a plain word`);
+  }
+  // the RSVP pile: portraits only; a known resident is the mention (its face, its name kept off the page for the tooltip and a screen reader)
+  for (const f of s["rsvp-face"]) {
+    const m = f.mentions[0];
+    if (m) {
+      assert.ok(roll.has(m.handle) && m.face && m.href === `/residents/${m.handle}/`, `face ${m.handle} is the mention`);
+      assert.ok(f.title && f.title.length > 0, `face ${m.handle} has its name as the tooltip`);
+    } else assert.ok(!roll.has(f.title) && f.text.length === 1, `face "${f.title}" has no resident: its plain initial, unlinked`);
+  }
+  const hidden = await p.evalJs(`[...document.querySelectorAll('.pm-landing [data-landing-slot="rsvp-face"] .rm-name')].map((n) => { const r = n.getBoundingClientRect(); return r.width <= 1 && r.height <= 1 && n.textContent.trim().length > 0; })`);
+  assert.ok(hidden.length > 0 && hidden.every(Boolean), "the pile draws no visible names, and keeps each one for a screen reader");
+  // every mention's link goes to a page the build made
+  const hrefs = await p.evalJs(`[...new Set([...document.querySelectorAll(".pm-landing a.rm")].map((a) => a.getAttribute("href")))]`);
+  for (const h of hrefs) assert.ok(existsSync(join(DIST, h, "index.html")), `${h} is a built page`);
+  await p.close();
+});
+
+test("THE MENTIONS: each name reads at 4.5:1 on its own surface, in the resident's colour where they chose one", { skip: SKIP }, async () => {
+  await setup();
+  for (const width of [375, 1440]) {
+    const p = await openPage(browser, base, "/", { width, touch: width < 800 });
+    // the name's computed ink against the first solid background under it (the paper of the letter and the parcel, the night of the ledger and the
+    // cards); the owner line on the home's photograph is a picture, not a measurable surface, and is left to the eye
+    const rows = await p.evalJs(`(() => { const rgb = (s) => (s.match(/[\\d.]+/g) || []).map(Number); const lum = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+      const bgOf = (el) => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c.length >= 3 && (c[3] ?? 1) === 1) return c; } return [10, 18, 34]; };
+      return [...document.querySelectorAll(".pm-landing .rm .rm-name")].filter((n) => n.getClientRects().length && n.getBoundingClientRect().width > 1 && !n.closest(".pwho"))
+        .map((n) => { const m = n.closest(".rm"), c = rgb(getComputedStyle(n).color), b = bgOf(m); const [x, y] = [lum(c), lum(b)].sort((p, q) => q - p);
+          return { h: m.dataset.rm, r: (x + 0.05) / (y + 0.05), neutral: m.classList.contains("is-neutral"), ink: getComputedStyle(m).color, accent: (m.getAttribute("style") || "").match(/--rm-c: (#[0-9a-f]+)/)?.[1] ?? null }; }); })()`);
+    assert.ok(rows.length >= 5, `names are drawn at ${width} (${rows.length})`);
+    for (const r of rows) assert.ok(r.r >= 4.5, `${r.h} reads at ${r.r.toFixed(2)}:1 at ${width}`);
+    assert.ok(rows.some((r) => !r.neutral && r.accent), "at least one resident wears their own colour");
+    await p.close();
+  }
+});
+
+test("THE MENTIONS: a pin's redraw names the new home's owner with the same mention the build draws, and Tab reaches a mention's link", { skip: SKIP }, async () => {
+  await setup();
+  const p = await openPage(browser, base, "/", { width: 1440 });
+  const homes = (await p.evalJs(`JSON.parse(document.querySelector("[data-landing-homes]").textContent)`));
+  const first = await p.evalJs(`document.querySelector('[data-landing-slot="home-chip"] .rm').outerHTML`);
+  const other = homes.find((h) => h.owner && h.owner.kind === "resident" && !first.includes(`data-rm="${h.owner.handle}"`));
+  assert.ok(other, "a second resident's home is pinned");
+  await p.evalJs(`document.querySelector('.pin[data-home="${other.key}"]').focus()`);
+  await p.press("Enter");
+  const drawn = await p.evalJs(`(() => { const who = document.querySelector('[data-landing-slot="home-owner"]'), chip = document.querySelector('[data-landing-slot="home-chip"]');
+    const w = who.querySelector(".rm"), c = chip.querySelector(".rm"); return { whoHandle: w?.dataset.rm, whoTag: w?.tagName, whoText: who.textContent.replace(/\\s+/g, " ").trim(), chipHandle: c?.dataset.rm, chipHref: c?.getAttribute("href"),
+      chipStyle: c?.getAttribute("style"), chipClass: c?.className, face: !!c?.querySelector(".rm-face"), regionChip: chip.firstElementChild?.textContent }; })()`);
+  assert.equal(drawn.whoHandle, other.owner.handle, "the owner line is the new owner's mention");
+  assert.equal(drawn.whoTag, "SPAN", "inside the card, not a second link");
+  assert.ok(drawn.whoText.endsWith(`'s home, ${other.region}`), `the line keeps its words: ${drawn.whoText}`);
+  assert.equal(drawn.chipHandle, other.owner.handle);
+  assert.equal(drawn.chipHref, other.owner.href);
+  assert.ok(drawn.face, "the chip's mention wears the face");
+  assert.ok(/\brm\b/.test(drawn.chipClass) && (other.owner.accent ? /--rm-c/.test(drawn.chipStyle) : /is-neutral/.test(drawn.chipClass)), "the same form the build draws: its colour, or neutral");
+  assert.equal(drawn.regionChip, `✦ ${other.region}`);
+  // the keyboard reaches a mention's own link (the room's first speaker or an event's host), and its target is the resident's page
+  await p.evalJs(`document.querySelector("[data-landing-how]").focus()`);
+  let reached = null;
+  for (let i = 0; i < 200 && !reached; i++) { await p.press("Tab"); reached = await p.evalJs(`document.activeElement?.matches(".pm-landing a.rm") ? document.activeElement.getAttribute("href") : null`); }
+  assert.ok(reached && /^\/residents\/[a-z0-9-]+\/$/.test(reached), `Tab reaches a mention's link (${reached})`);
+  await p.close();
+});
