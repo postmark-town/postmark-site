@@ -65,9 +65,10 @@ const utcClock = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTi
 // screen of the join, so the landing's handoff and the join she hands off to cannot drift apart
 const REGINA = REGISTRAR_PICTURE;
 // THE COMPANY ROW (Darko, 2026-11-28: "just take the original like color … their most iconic visual of the logo with just like the word next
-// to it, and make the logo … predominate more of the space instead of having a card around it"). Each mark is its company's own published
-// file, unchanged (src/assets/landing/marks/sources.json: where each came from, its sha256, the terms read), drawn larger than its name with
-// no card. A company whose terms want its approval first, or that publishes no mark, is its name in plain text. Vite emits the files under
+// to it, and make the logo … predominate more of the space instead of having a card around it"). A company is drawn with its own published
+// mark, larger than its name, with no card, only where it publishes that mark for this use and the row keeps its rules; otherwise it is its
+// name in plain text, Wright's authorised fallback (src/assets/landing/marks/sources.json says why for each; at d4cd7e37's review all seven
+// are names: approval first, no published mark, no licence, or the Blossom's "not over a busy image"). Vite would emit a mark's file under
 // /_astro/, which the branch preview's assets prefix carries, as with the fonts. `inset` is the clear space a file draws around its mark, so
 // every mark shows at one size. The not-affiliated line is the footer's (Darko: "put it all the way at the bottom in like small font").
 // `?no-inline`: always a file, never a data: URI Vite rewrites (it would re-quote the SVG), so the browser gets each company's own bytes.

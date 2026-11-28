@@ -16,7 +16,7 @@
 //   · THE CHROME (Facet's return on c71116a2): a visitor gets the mockup's nav row and exactly one footer, the social one, with Privacy
 //     and Terms; the town's header and footer stand down for them and stay for a signed-in reader;
 //   · THE LETTER: its FROM · TO · date line never runs under the stamp, at 375 and 1440;
-//   · THE COMPANY ROW (Darko, 2026-11-28): each company's own mark, larger than its name, no card; the not-affiliated line is the footer's;
+//   · THE COMPANY ROW (Darko, 2026-11-28): no card; each company its name (no mark is published for this use); the not-affiliated line is the footer's;
 //   · at 375 and 1440 nothing scrolls sideways.
 // WITHOUT dist-town the test SKIPS and says so; WITH built pages and no browser it FAILS (built-pages cannot turn a skip into a pass).
 
@@ -226,7 +226,7 @@ const COMPANY_ROW = `(() => { const rgb = (s) => (s.match(/[\\d.]+/g) || []).map
   return { items, cap: document.querySelector(".pm-landing .logos-cap").textContent, heroAff: document.querySelector(".pm-landing .hero").textContent.includes("affiliated"),
     aff: f ? { text: f.textContent, shown: f.getClientRects().length > 0 && fs.visibility !== "hidden", size: parseFloat(fs.fontSize), footerSize: parseFloat(getComputedStyle(f.parentElement).fontSize), ratio: (a + 0.05) / (b + 0.05) } : null }; })()`;
 
-test("THE COMPANY ROW: each company's own mark, larger than its name, with no card; the not-affiliated line is the footer's, small, at 375 and 1440", { skip: SKIP }, async () => {
+test("THE COMPANY ROW: each company its name (its mark only where published for this use), with no card; the not-affiliated line is the footer's, small, at 375 and 1440", { skip: SKIP }, async () => {
   await setup();
   for (const [width, touch] of [[375, true], [1440, false]]) {
     const p = await openPage(browser, base, "/", { width, touch });
@@ -234,6 +234,9 @@ test("THE COMPANY ROW: each company's own mark, larger than its name, with no ca
     const r = await p.evalJs(COMPANY_ROW);
     assert.deepEqual(r.items.filter((i) => !i.you).map((i) => i.company), MARKS.row.map((c) => c.name), "the companies, in their order");
     assert.equal(r.items.at(-1).you && r.items.at(-1).name, "…and yours", "'…and yours' ends the row");
+    // today every company is its plain name (Truey's FIX and Facet's read at d4cd7e37): no mark image drawn, none emitted with the build
+    assert.deepEqual(r.items.filter((i) => i.img).map((i) => i.name), [], `no company's mark is drawn at ${width}`);
+    assert.deepEqual(readdirSync(join(DIST, "_astro")).filter((f) => /^(chatgpt|dearest|nomi|letta)[-.].*\.(svg|png)$/.test(f)), [], "no rejected mark is emitted");
     for (const i of r.items) {
       assert.ok(i.shown, `${i.name} is drawn at ${width}`);
       assert.ok(i.bg === 0 && i.border === 0 && i.pad === 0 && i.backdrop === "none" && i.shadow === "none", `${i.name} has no card at ${width}`);

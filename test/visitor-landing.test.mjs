@@ -10,7 +10,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
@@ -244,7 +244,7 @@ test("the landing's fonts are bundled, so a branch preview under /pr/<n>/ draws 
 const AFF = "Postmark isn't affiliated with or endorsed by these companies; their marks belong to them.";
 const MARKS = JSON.parse(readFileSync(join(ROOT, "src/assets/landing/marks/sources.json"), "utf8"));
 
-test("THE COMPANY ROW: the companies in their order, each mark its company's own file unchanged (its sha256 recorded), else its name in plain text", () => {
+test("THE COMPANY ROW: the companies in their order, each its own mark only where it is published for this use and kept to its rules; today each is its name", () => {
   assert.deepEqual(MARKS.row.map((c) => c.name), ["ChatGPT", "Claude", "Gemini", "Meta AI", "Dearest", "Nomi", "Letta"]);
   for (const c of MARKS.row) {
     if (!c.file) { assert.ok(c.text?.length > 20, `${c.name} says why it is text`); continue; }
@@ -253,6 +253,10 @@ test("THE COMPANY ROW: the companies in their order, each mark its company's own
     assert.match(c.source, /^https:\/\//, `${c.name}'s source is recorded`);
     assert.ok(c.terms, `${c.name}'s terms are recorded`);
   }
+  // Truey's FIX and Facet's read at d4cd7e37: no company publishes its mark for this row on this photograph, so all seven are names, and no
+  // file a rejected mark was is left for the row's glob to emit
+  assert.deepEqual(MARKS.row.filter((c) => c.file).map((c) => c.name), [], "every company is its plain name");
+  assert.deepEqual(readdirSync(join(ROOT, "src/assets/landing/marks")).filter((f) => /\.(svg|png)$/.test(f)), [], "no mark file is left to emit");
   const row = /<div class="logos" data-landing-companies>[\s\S]*?<\/div>/.exec(COMPONENT)?.[0] ?? "";
   assert.match(row, /\{COMPANIES\.map\(\(c\) => c\.url\s*\? <span class="logo" data-company=\{c\.name\}><img src=\{c\.url\} alt=""[^>]*><b>\{c\.name\}<\/b><\/span>\s*: <span class="logo word" data-company=\{c\.name\}><b>\{c\.name\}<\/b><\/span>\)\}<span class="logo you"><b>…and yours<\/b><\/span>/,
     "each company is its mark then its name, or its name alone; '…and yours' ends the row");
@@ -266,6 +270,7 @@ test("THE COMPANY ROW: no pill around a company, and the not-affiliated line is 
   for (const rule of css.matchAll(/\.pm \.pm-landing \.logo(?:\.you|\.word)?(?:[ ,][^{]*)?\{([^}]*)\}/g)) {
     assert.doesNotMatch(rule[1], /background|border|padding|backdrop-filter|box-shadow/, `no card on a company: ${rule[0]}`);
   }
+  for (const rule of css.matchAll(/\.pm \.pm-landing \.logo img\{([^}]*)\}/g)) assert.doesNotMatch(rule[1], /margin/, "a mark's own clear space is never taken back");
   assert.equal(COMPONENT.split(AFF).length - 1, 1, "the line is said once");
   const cap = /<p class="logos-cap">([\s\S]*?)<\/p>/.exec(COMPONENT)?.[1];
   assert.equal(cap, "If it's an AI, it can join Postmark.", "under the row, only the invitation");

@@ -1,54 +1,33 @@
 {
-  "about": "The hero's company row (UI-5; Darko 2026-11-28: each company's own mark in its own colour, larger than its name, no card). Every mark here is the company's own published file, unchanged, except where `derived` says how. A company whose terms want approval first, or that publishes no mark, is its name in plain text (`text`). Fetched 2026-11-28.",
+  "about": "The hero's company row (UI-5; Darko 2026-11-28: each company's own mark in its own colour, larger than its name, no card). A company is drawn with its mark only where it publishes that mark for this use and the use keeps its rules; otherwise it is its name in plain text (`text` says why: Wright's authorised fallback, 2026-11-28). Read 2026-11-28. Today every company is text.",
   "row": [
     {
       "name": "ChatGPT",
-      "file": "chatgpt-openai-blossom-white.svg",
-      "sha256": "01d158767c4eec0e47bd617e67759c33da0accd1438be1a8d29dfdb99ce87285",
-      "inset": 0.251,
-      "source": "https://cdn.openai.com/brand/openai-logos.zip → OpenAI-logos/SVGs/OAI_OpenAI-Blossom_White.svg",
-      "page": "https://openai.com/brand/",
-      "terms": "OpenAI's brand page: \"By using our logos, you agree to our Marks usage terms\"; use it \"exactly as provided\", don't \"add any colors to the Blossom\", don't imply endorsement, don't feature it \"more prominently than your own company's name or marks\"."
+      "text": "OpenAI publishes the Blossom (https://openai.com/brand/) under its marks terms, whose guidelines say \"DON'T use the Blossom over a busy image\" and prescribe its clear space; this row sits on the hero's detailed town photograph."
     },
     {
       "name": "Claude",
-      "text": "Anthropic's trademark guidelines (https://www.anthropic.com/legal/trademark-guidelines): \"You may only use our trademarks as specifically permitted by us and only in materials we approve beforehand.\" The Claude Spark (press kit, Clay #D97757) waits on marketing@anthropic.com."
+      "text": "Anthropic's trademark guidelines (https://www.anthropic.com/legal/trademark-guidelines): \"You may only use our trademarks as specifically permitted by us and only in materials we approve beforehand.\""
     },
     {
       "name": "Gemini",
-      "text": "Google's Partner Marketing Hub: a product icon needs an account and its approval form; for \"works with\" it says \"Use plain text\". No official download outside the hub's login."
+      "text": "Google's Partner Marketing Hub: a product icon needs an account and its approval form; for \"works with\" it says \"Use plain text\"."
     },
     {
       "name": "Meta AI",
-      "text": "Meta publishes no Meta AI brand guidelines or download (https://www.meta.com/brand/resources/), and \"You may only use our trademarks with our permission\"."
+      "text": "Meta publishes no Meta AI brand guidelines or asset (https://www.meta.com/brand/resources/), and \"You may only use our trademarks with our permission\"."
     },
     {
       "name": "Dearest",
-      "file": "dearest-128.png",
-      "sha256": "1946752fdb411ecea0dabaafd9c0c78efe4ed3b02efb1c78d6de205fd77434e4",
-      "inset": 0,
-      "source": "https://dearest.app/android-chrome-512x512.png (the site's own logo, its Organization schema's), sha256 7b940ed35b9ef641efbbf49450422fe2be447a4df626ae9c2e9396e9f5ee2d96",
-      "derived": "resized 512→128 px (sharp, lanczos3, PNG): the 436 KB original is the same picture at four times the size this row draws",
-      "page": "https://dearest.app/ (no press or brand page: /press, /brand, /media are 404)",
-      "terms": "https://dearest.app/terms (2026-02-13) has no trademark or logo clause."
+      "text": "Dearest publishes no brand or press assets (dearest.app /press, /brand, /media are 404); its site icon is not a published reusable mark, and its terms' silence is not permission."
     },
     {
       "name": "Nomi",
-      "file": "nomi-transparent-logo-3.png",
-      "sha256": "b63dcdcb31199a3ee4c29e0f4ba19b6c7d736a5877432b64a27dd1d6b649b10b",
-      "inset": 0.22,
-      "source": "https://nomi.ai/wp-content/uploads/2024/03/nomi-transparent-logo-3.png",
-      "page": "https://nomi.ai/ (no press or brand page found)",
-      "terms": "https://nomi.ai/terms-of-service/ (2026-01-16): \"Our logos displayed on the Site or the Service are our trademarks\"; no one may \"falsely imply that it is associated with\" them."
+      "text": "Nomi publishes no brand or press assets; its terms (https://nomi.ai/terms-of-service/) say \"Our logos displayed on the Site or the Service are our trademarks\" and grant no use of them."
     },
     {
       "name": "Letta",
-      "file": "letta-webclip.png",
-      "sha256": "9d49fe4ddeea5901adba77b68a625252948fcfe8d3874cc6853115f8da6e71f0",
-      "inset": 0,
-      "source": "https://www.letta.com/assets/images/webclip.png (its site icon: the mark in its dark theme's #C9CDD1 on #202020; the docs favicon is #202020 alone, unreadable on the hero)",
-      "page": "https://www.letta.com/ (no press or brand page: /brand, /press are 404)",
-      "terms": "https://www.letta.com/terms-of-service/: the Letta logo is Letta's property; using the Services grants no licence to its marks."
+      "text": "Letta publishes no brand or press assets, and its terms (https://www.letta.com/terms-of-service/) grant no right or licence to reproduce or use its marks."
     }
   ]
 }
